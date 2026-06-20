@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-raleway: "Raleway", system-ui, sans-serif;
+  --font-fraunces: "Fraunces", Georgia, serif;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-navy-ink text-ivory antialiased;
+    background-image:
+      radial-gradient(1100px 600px at 78% -8%, rgba(255,185,9,0.10), transparent 60%),
+      radial-gradient(900px 700px at 0% 100%, rgba(10,36,113,0.55), transparent 55%);
+    background-attachment: fixed;
+  }
+  ::selection { background: rgba(255,185,9,0.28); }
+  h1, h2, h3 { @apply font-display; letter-spacing: -0.01em; }
+}
+
+@layer components {
+  /* split-weight wordmark — the brand signature */
+  .wordmark { @apply font-sans tracking-[0.18em] leading-none select-none; }
+  .wordmark .q { @apply font-extralight text-ivory; }
+  .wordmark .f { @apply font-extrabold text-gold; }
+
+  .hairline { @apply border-t border-white/10; }
+  .eyebrow {
+    @apply font-sans text-[0.7rem] font-semibold uppercase tracking-[0.32em] text-gold/90;
+  }
+
+  .panel {
+    @apply rounded-xl2 border border-white/10 bg-white/[0.035] backdrop-blur-sm;
+  }
+  .panel-hover { @apply transition hover:border-gold/40 hover:bg-white/[0.06]; }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3
+           font-sans text-sm font-semibold tracking-wide transition
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-ink;
+  }
+  .btn-gold  { @apply btn bg-gold text-navy-ink hover:bg-gold-soft shadow-gold; }
+  .btn-ghost { @apply btn border border-white/[0.15] text-ivory hover:border-gold/50 hover:text-gold; }
+
+  .field {
+    @apply w-full rounded-lg border border-white/[0.12] bg-navy-deep/40 px-4 py-3
+           font-sans text-sm text-ivory placeholder:text-muted/50
+           focus:border-gold/60 focus:outline-none focus:ring-1 focus:ring-gold/40;
+  }
+  .label { @apply mb-1.5 block font-sans text-xs font-medium uppercase tracking-wider text-muted; }
+
+  .stat-num { @apply font-display text-3xl font-semibold text-gold; }
+  .pill { @apply inline-flex items-center rounded-full border border-white/[0.12] px-3 py-1 text-xs font-medium text-muted; }
+  .chip-on  { @apply border-gold/60 bg-gold/[0.15] text-gold; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

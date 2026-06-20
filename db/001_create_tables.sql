@@ -43,7 +43,8 @@ create table if not exists public.vendors (
   remaining_credits  integer default 0,
   is_active          boolean default true,
   last_assigned_at   timestamptz,
-  public_visibility  boolean default false
+  public_visibility  boolean default false,
+  message            text
 );
 
 -- ----------------------------------------------------------------------------
@@ -63,7 +64,7 @@ create table if not exists public.leads (
   message             text,
   verification_status text default 'Pending' check (verification_status in ('Pending','Verified','Rejected')),
   source              text default 'Website',
-  status              text default 'New' check (status in ('New','Assigned','Contacted','Site Visit Scheduled','Quotation Sent','Won','Lost','Duplicate')),
+  status              text default 'New' check (status in ('New','Verified','Assigned','Contacted','Site Visit Scheduled','Quotation Sent','Converted','Won','Lost','Duplicate','Bad Lead')),
   is_duplicate        boolean default false,
   duplicate_of        uuid references public.leads(id) on delete set null
 );

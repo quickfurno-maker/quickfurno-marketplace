@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabaseBrowser";
 import { submitVendorRegistration } from "@/app/actions";
+import { CITY, SERVICES } from "@/lib/config";
 
-const CITIES = ["Pune", "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
-const SERVICES = ["Interior Design", "Modular Kitchen", "Wardrobe", "Carpentry", "False Ceiling", "Painting", "Renovation"];
+const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
 
 export function VendorRegisterForm() {
   const router = useRouter();
@@ -16,8 +16,9 @@ export function VendorRegisterForm() {
 
   const [f, setF] = useState({
     business_name: "", owner_name: "", phone: "", email: "", password: "",
-    city: "Pune", areas_covered: "", covers_full_city: false,
+    city: CITY, areas_covered: "", covers_full_city: false,
     service_categories: [] as string[], experience: "", gst_number: "",
+    portfolio: "", message: "",
   });
   const set = (k: keyof typeof f, v: any) => setF((s) => ({ ...s, [k]: v }));
   const toggleService = (s: string) =>
@@ -53,6 +54,8 @@ export function VendorRegisterForm() {
       service_categories: f.service_categories,
       experience: f.experience || undefined,
       gst_number: f.gst_number || undefined,
+      portfolio_urls: f.portfolio.split(",").map((u) => u.trim()).filter(Boolean),
+      message: f.message || undefined,
       user_id: auth.user?.id,
     });
     setBusy(false);
@@ -89,10 +92,15 @@ export function VendorRegisterForm() {
           <L label="Areas covered (comma separated)"><input className="field" value={f.areas_covered} onChange={(e) => set("areas_covered", e.target.value)} placeholder="Kharadi, Wagholi, Viman Nagar" /></L>
           <L label="Experience"><input className="field" value={f.experience} onChange={(e) => set("experience", e.target.value)} placeholder="e.g. 8 years" /></L>
           <L label="GST number (optional)"><input className="field" value={f.gst_number} onChange={(e) => set("gst_number", e.target.value)} /></L>
+          <L label="Portfolio / website / Instagram"><input className="field" value={f.portfolio} onChange={(e) => set("portfolio", e.target.value)} placeholder="https://… (comma-separate multiple)" /></L>
           <label className="flex items-center gap-3 self-end font-sans text-sm text-muted">
             <input type="checkbox" checked={f.covers_full_city} onChange={(e) => set("covers_full_city", e.target.checked)} className="h-4 w-4 accent-gold" />
             We cover the whole city
           </label>
+        </div>
+
+        <div className="mt-5">
+          <L label="Message (optional)"><textarea className="field min-h-[80px]" value={f.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell us about your studio and the work you do best…" /></L>
         </div>
 
         <div className="mt-6">

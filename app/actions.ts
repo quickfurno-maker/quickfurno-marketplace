@@ -124,6 +124,7 @@ async function asAdmin<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
 
 export const adminStats           = async () => asAdmin(() => admin.getAdminDashboardStats());
 export const adminAllLeads        = async () => asAdmin(() => admin.getAllLeads());
+export const adminUpdateLeadStatus = async (leadId: string, status: string) => asAdmin(() => admin.updateLeadStatus(leadId, status));
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());
 export const adminApproveVendor   = async (id: string) => asAdmin(() => admin.approveVendor(id));
 export const adminRejectVendor    = async (id: string) => asAdmin(() => admin.rejectVendor(id));

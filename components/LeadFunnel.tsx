@@ -3,21 +3,22 @@
 import { useState } from "react";
 import { submitLead, fetchEligibleVendors, assignLead } from "@/app/actions";
 import type { PublicVendorCard } from "@/lib/types";
+import { CITY, ENQUIRY_SERVICES, BUDGETS } from "@/lib/config";
 
-const CITIES = ["Pune", "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
-const SERVICES = ["Interior Design", "Modular Kitchen", "Wardrobe", "Carpentry", "False Ceiling", "Painting", "Renovation"];
-const BUDGETS = ["Under ₹1L", "₹1L–3L", "₹3L–6L", "₹6L–12L", "₹12L+"];
+const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
+const SERVICES = ENQUIRY_SERVICES;
 
 type Step = "form" | "pick" | "done";
 
-export function LeadFunnel() {
+export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    name: "", phone: "", city: "Pune", area: "", service_required: "Modular Kitchen",
-    budget: "", property_type: "", timeline: "", message: "",
+    name: "", phone: "", city: CITY,
+    service_required: defaultService && (SERVICES as readonly string[]).includes(defaultService) ? defaultService : "Modular Kitchen",
+    area: "", budget: "", property_type: "", timeline: "", message: "",
   });
 
   const [leadId, setLeadId] = useState<string | null>(null);

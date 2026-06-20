@@ -57,6 +57,7 @@ export interface VendorRegistrationInput {
   portfolio_urls?: string[];
   profile_image_url?: string;
   gst_number?: string;
+  message?: string;
   user_id?: string;
 }
 

@@ -1,5 +1,5 @@
 import {
-  adminStats, adminAllVendors, adminBadLeadReports, fetchPackages,
+  adminStats, adminAllVendors, adminBadLeadReports, fetchPackages, adminAllLeads,
 } from "@/app/actions";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import type { AdminDashboardStats } from "@/lib/types";
@@ -14,8 +14,8 @@ const EMPTY: AdminDashboardStats = {
 };
 
 export default async function AdminPage() {
-  const [s, v, r, p] = await Promise.all([
-    adminStats(), adminAllVendors(), adminBadLeadReports(), fetchPackages(),
+  const [s, v, r, p, l] = await Promise.all([
+    adminStats(), adminAllVendors(), adminBadLeadReports(), fetchPackages(), adminAllLeads(),
   ]);
 
   return (
@@ -24,6 +24,7 @@ export default async function AdminPage() {
       vendors={(v.ok ? v.data : []) as any[]}
       reports={(r.ok ? r.data : []) as any[]}
       packages={(p.ok ? p.data : []) as any[]}
+      leads={(l.ok ? l.data : []) as any[]}
     />
   );
 }

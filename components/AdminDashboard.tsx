@@ -5,20 +5,23 @@ import { useRouter } from "next/navigation";
 import {
   adminApproveVendor, adminRejectVendor, adminSuspendVendor,
   adminCreditVendorNow, adminApproveBadLead, adminRejectBadLead,
+  adminUpdateLeadStatus,
 } from "@/app/actions";
+import { LEAD_STATUSES } from "@/lib/config";
 import type { AdminDashboardStats } from "@/lib/types";
 
 type Vendor = { id: string; business_name: string; city: string; status: string; remaining_credits: number; total_credits: number; public_visibility: boolean; phone: string };
 type Pack = { id: string; name: string; total_price: number };
 type Report = { id: string; reason: string; description: string | null; vendor: { business_name: string } | null; assignment: { lead: { name: string; service_required: string; city: string } | null } | null };
+type Lead = { id: string; name: string; phone: string; city: string; area: string | null; service_required: string; budget: string | null; timeline: string | null; message: string | null; created_at: string; status: string };
 
-type Tab = "vendors" | "reports";
+type Tab = "leads" | "vendors" | "reports";
 
 export function AdminDashboard({
-  stats, vendors, packages, reports,
-}: { stats: AdminDashboardStats; vendors: Vendor[]; packages: Pack[]; reports: Report[] }) {
+  stats, vendors, packages, reports, leads,
+}: { stats: AdminDashboardStats; vendors: Vendor[]; packages: Pack[]; reports: Report[]; leads: Lead[] }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("vendors");
+  const [tab, setTab] = useState<Tab>("leads");
   const [busy, setBusy] = useState<string | null>(null);
   const [creditFor, setCreditFor] = useState<string | null>(null);
 
@@ -47,12 +50,49 @@ export function AdminDashboard({
       </div>
 
       {/* tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => setTab("leads")} className={`pill ${tab === "leads" ? "chip-on" : ""}`}>Leads · {leads.length}</button>
         <button onClick={() => setTab("vendors")} className={`pill ${tab === "vendors" ? "chip-on" : ""}`}>Vendors</button>
         <button onClick={() => setTab("reports")} className={`pill ${tab === "reports" ? "chip-on" : ""}`}>
           Bad-lead reports{stats.bad_lead_reports_pending > 0 ? ` · ${stats.bad_lead_reports_pending}` : ""}
         </button>
       </div>
+
+      {tab === "leads" && (
+        <div className="space-y-3">
+          {leads.length === 0 && <div className="panel p-8 text-center font-sans text-sm text-muted">No enquiries yet.</div>}
+          {leads.map((l) => (
+            <div key={l.id} className="panel p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-display text-lg text-ivory">{l.name} · {l.service_required}</h3>
+                  <p className="mt-0.5 font-sans text-sm text-muted">
+                    <a href={`tel:${l.phone}`} className="text-gold hover:underline">{l.phone}</a>
+                    {" · "}{l.city}{l.area ? `, ${l.area}` : ""}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2 font-sans text-xs text-muted">
+                    {l.budget && <span className="pill">{l.budget}</span>}
+                    {l.timeline && <span className="pill">{l.timeline}</span>}
+                    <span className="pill">{new Date(l.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                  </div>
+                  {l.message && <p className="mt-3 max-w-2xl font-sans text-sm text-muted/90">“{l.message}”</p>}
+                </div>
+                <label className="block">
+                  <span className="label">Status</span>
+                  <select
+                    className="field !py-2 text-sm"
+                    value={LEAD_STATUSES.includes(l.status as any) ? l.status : "New"}
+                    disabled={busy === l.id}
+                    onChange={(e) => run(l.id, () => adminUpdateLeadStatus(l.id, e.target.value))}
+                  >
+                    {LEAD_STATUSES.map((s) => <option key={s} value={s} className="bg-navy-deep">{s}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tab === "vendors" && (
         <div className="space-y-3">

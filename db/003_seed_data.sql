@@ -13,13 +13,14 @@ on conflict do nothing;
 
 -- ---- Service categories ---------------------------------------------------
 insert into public.service_categories (name, slug) values
-  ('Interior Design', 'interior-design'),
-  ('Carpentry',       'carpentry'),
-  ('Modular Kitchen', 'modular-kitchen'),
-  ('Wardrobe',        'wardrobe'),
-  ('False Ceiling',   'false-ceiling'),
-  ('Painting',        'painting'),
-  ('Renovation',      'renovation')
+  ('Full Home Interior', 'full-home-interior'),
+  ('Modular Kitchen',    'modular-kitchen'),
+  ('Wardrobe',           'wardrobe'),
+  ('Carpentry',          'carpentry'),
+  ('False Ceiling',      'false-ceiling'),
+  ('Painting',           'painting'),
+  ('Home Renovation',    'home-renovation'),
+  ('Custom Furniture',   'custom-furniture')
 on conflict (slug) do nothing;
 
 -- ---- Cities (QuickFurno launch markets) -----------------------------------

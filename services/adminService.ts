@@ -62,6 +62,17 @@ export async function getAllLeads(): Promise<Result<unknown[]>> {
   }
 }
 
+/** Admin sets a lead's workflow status (New/Verified/Assigned/Contacted/Converted/Bad Lead…). */
+export async function updateLeadStatus(leadId: string, status: string): Promise<Result<null>> {
+  try {
+    const { error } = await adminClient().from("leads").update({ status }).eq("id", leadId);
+    if (error) throw error;
+    return ok(null);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function getAllVendors(): Promise<Result<unknown[]>> {
   try {
     const { data, error } = await adminClient()

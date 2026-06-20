@@ -29,6 +29,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
         portfolio_urls: input.portfolio_urls ?? [],
         profile_image_url: input.profile_image_url ?? null,
         gst_number: input.gst_number ?? null,
+        message: input.message ?? null,
         user_id: input.user_id ?? null,
         status: "Pending",
         public_visibility: false,

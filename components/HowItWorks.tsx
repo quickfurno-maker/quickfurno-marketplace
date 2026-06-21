@@ -23,9 +23,9 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <div className="steps-grid">
+    <div className="steps-grid" data-reveal-group>
       {steps.map((step) => (
-        <article className="step-card reveal-card" key={step.number}>
+        <article className="step-card" key={step.number}>
           <span>{step.number}</span>
           <h3>{step.title}</h3>
           <p>{step.description}</p>

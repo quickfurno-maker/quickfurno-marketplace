@@ -5,18 +5,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy:   { DEFAULT: "#0A2471", deep: "#071A54", ink: "#050F33" },
-        gold:   { DEFAULT: "#FFB909", soft: "#F6C453", deep: "#C98F00" },
-        ivory:  "#F4EFE6",
-        muted:  "#B9C0DC",
+        // "navy" tokens retained as keys for compatibility, now a premium deep-emerald scale.
+        navy:   { DEFAULT: "#0E5A47", deep: "#093A2E", ink: "#06251D" },
+        gold:   { DEFAULT: "#C9A227", soft: "#E6C65A", deep: "#8F6F12" },
+        ivory:  "#F4F1EA",
+        muted:  "#C2BCAD",
       },
       fontFamily: {
-        display: ["var(--font-fraunces)", "Georgia", "serif"],
-        sans:    ["var(--font-raleway)", "system-ui", "sans-serif"],
+        display: ["var(--font-jakarta)", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans:    ["var(--font-jakarta)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
         lift: "0 24px 60px -20px rgba(0,0,0,0.55)",
-        gold: "0 0 0 1px rgba(255,185,9,0.35), 0 18px 40px -18px rgba(255,185,9,0.4)",
+        gold: "0 0 0 1px rgba(201,162,39,0.35), 0 18px 40px -18px rgba(201,162,39,0.4)",
       },
       borderRadius: { xl2: "1.25rem" },
     },

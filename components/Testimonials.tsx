@@ -2,9 +2,9 @@ import { clientTestimonials } from "@/lib/quickfurno-data";
 
 export function Testimonials() {
   return (
-    <div className="testimonial-grid">
+    <div className="testimonial-grid" data-reveal-group>
       {clientTestimonials.map((testimonial) => (
-        <article className="testimonial-card reveal-card" key={testimonial.name}>
+        <article className="testimonial-card" key={testimonial.name}>
           <div className="stars" aria-label="5 star review">★★★★★</div>
           <p>“{testimonial.quote}”</p>
           <div className="testimonial-author">

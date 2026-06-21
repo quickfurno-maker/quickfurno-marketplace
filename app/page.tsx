@@ -5,6 +5,7 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { FAQ } from "@/components/FAQ";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { HeroVisual } from "@/components/HeroVisual";
 import { HowItWorks } from "@/components/HowItWorks";
 import { PortfolioGallery } from "@/components/PortfolioGallery";
 import { PricingEstimator } from "@/components/PricingEstimator";
@@ -27,8 +28,6 @@ export const metadata: Metadata = {
   },
 };
 
-const trustBadges = ["Verified vendors", "Fast response", "Transparent rates", "Pune & Mumbai"];
-
 export default function HomePage() {
   return (
     <>
@@ -37,56 +36,51 @@ export default function HomePage() {
         <section className="hero-section section-pad-top">
           <div className="container hero-grid">
             <div className="hero-copy">
-              <span className="eyebrow">Client-first marketplace</span>
-              <h1>Tell us your requirement and get connected with verified home-service vendors near you.</h1>
-              <p>
-                Compare verified interior designers, carpenters, modular factories, painters and
-                civil-work experts with ratings, project images and transparent rates.
+              <span className="eyebrow hero-rise" style={{ "--rise-delay": "0ms" } as React.CSSProperties}>
+                Pune &amp; Mumbai home-service marketplace
+              </span>
+              <h1 className="hero-headline hero-rise" style={{ "--rise-delay": "90ms" } as React.CSSProperties}>
+                Find <span className="hl">verified</span> interior &amp; home-service vendors{" "}
+                <span className="hl">near you</span>
+              </h1>
+              <p className="hero-sub hero-rise" style={{ "--rise-delay": "210ms" } as React.CSSProperties}>
+                Compare trusted carpenters, interior designers, modular factories, painters, sofa
+                makers and civil-work vendors in Pune &amp; Mumbai — with{" "}
+                <strong>transparent rates</strong> and <strong>free enquiry</strong>.
               </p>
 
-              <div className="hero-cta-row">
-                <EnquiryModalTrigger className="btn btn-primary">
+              <div
+                className="hero-cta-row hero-rise"
+                style={{ "--rise-delay": "320ms" } as React.CSSProperties}
+              >
+                <EnquiryModalTrigger className="btn btn-primary btn-shine">
                   Get Free Quotes
                 </EnquiryModalTrigger>
                 <Link href="#verified-vendors" className="btn btn-secondary">
-                  Browse Vendors
+                  Explore Vendors
                 </Link>
-                <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">
-                  WhatsApp Us
-                </a>
               </div>
 
-              <div className="trust-badge-row" aria-label="QuickFurno trust indicators">
-                {trustBadges.map((badge) => (
-                  <span key={badge}>{badge}</span>
-                ))}
-              </div>
-
-              <div className="hero-preview-strip" aria-label="QuickFurno project previews">
-                {["Living room", "Kitchen", "Wardrobe"].map((label, index) => (
-                  <div className={`mini-preview mini-preview-${index + 1}`} key={label}>
-                    <span>{label}</span>
-                  </div>
-                ))}
-              </div>
+              <ul
+                className="hero-trust-strip hero-rise"
+                style={{ "--rise-delay": "430ms" } as React.CSSProperties}
+                aria-label="QuickFurno trust indicators"
+              >
+                <li>Verified vendors</li>
+                <li>Transparent rates</li>
+                <li>Free client enquiry</li>
+                <li>Pune &amp; Mumbai</li>
+              </ul>
             </div>
 
-            <div className="hero-form-wrap">
-              <div className="hero-conversion-card">
-                <span className="eyebrow">Free client enquiry</span>
-                <h2>Ready to compare interior quotes?</h2>
-                <p>Tell us your requirement once and get matched with trusted studios.</p>
-                <EnquiryModalTrigger className="btn btn-primary">
-                  Get Free Quotes
-                </EnquiryModalTrigger>
-                <p className="hero-conversion-note">Verified studios in Pune & Mumbai. No spam.</p>
-              </div>
+            <div className="hero-form-wrap hero-rise" style={{ "--rise-delay": "260ms" } as React.CSSProperties}>
+              <HeroVisual />
             </div>
           </div>
         </section>
 
         <section id="services" className="section-block">
-          <div className="container section-heading">
+          <div className="container section-heading" data-reveal>
             <span className="eyebrow">Popular home-service categories</span>
             <h2>Find the right expert by category, rate and project quality.</h2>
             <p>
@@ -100,7 +94,7 @@ export default function HomePage() {
         </section>
 
         <section id="how-it-works" className="section-block section-warm">
-          <div className="container section-heading">
+          <div className="container section-heading" data-reveal>
             <span className="eyebrow">How QuickFurno Works</span>
             <h2>From requirement to shortlist in four clear steps.</h2>
           </div>
@@ -110,7 +104,7 @@ export default function HomePage() {
         </section>
 
         <section id="verified-vendors" className="section-block">
-          <div className="container section-heading section-heading--split">
+          <div className="container section-heading section-heading--split" data-reveal>
             <div>
               <span className="eyebrow">Verified vendor cards</span>
               <h2>Compare active paid vendors before you enquire.</h2>
@@ -128,13 +122,13 @@ export default function HomePage() {
         </section>
 
         <section id="pricing-estimate" className="section-block section-warm">
-          <div className="container">
+          <div className="container" data-reveal>
             <PricingEstimator />
           </div>
         </section>
 
         <section id="projects" className="section-block">
-          <div className="container section-heading">
+          <div className="container section-heading" data-reveal>
             <span className="eyebrow">Portfolio Gallery</span>
             <h2>Preview the kind of work clients can compare.</h2>
             <p>
@@ -147,13 +141,13 @@ export default function HomePage() {
         </section>
 
         <section className="section-block section-warm">
-          <div className="container section-heading">
+          <div className="container section-heading" data-reveal>
             <span className="eyebrow">Why clients choose QuickFurno</span>
             <h2>A more controlled way to find home-service experts.</h2>
           </div>
-          <div className="container choose-grid">
+          <div className="container choose-grid" data-reveal-group>
             {whyChooseQuickFurno.map((item) => (
-              <article className="choose-card reveal-card" key={item}>
+              <article className="choose-card" key={item}>
                 <span aria-hidden="true">✓</span>
                 <h3>{item}</h3>
                 <p>Designed to help homeowners compare confidently before starting a project.</p>
@@ -163,7 +157,7 @@ export default function HomePage() {
         </section>
 
         <section id="reviews" className="section-block">
-          <div className="container section-heading">
+          <div className="container section-heading" data-reveal>
             <span className="eyebrow">Client testimonials</span>
             <h2>Homeowners want clarity, not endless follow-ups.</h2>
           </div>
@@ -173,7 +167,7 @@ export default function HomePage() {
         </section>
 
         <section id="faq" className="section-block section-warm">
-          <div className="container faq-layout">
+          <div className="container faq-layout" data-reveal>
             <div className="section-heading section-heading--left">
               <span className="eyebrow">FAQ</span>
               <h2>Questions clients ask before submitting a requirement.</h2>
@@ -184,7 +178,7 @@ export default function HomePage() {
         </section>
 
         <section className="final-cta">
-          <div className="container final-cta-card">
+          <div className="container final-cta-card" data-reveal>
             <span className="eyebrow">Ready to start?</span>
             <h2>Ready to start your home project?</h2>
             <p>Tell QuickFurno your requirement and get matched with verified vendors in Pune or Mumbai.</p>

@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/Logo";
 
 export function Wordmark({ className = "text-xl" }: { className?: string }) {
   return (
     <span className={`wordmark ${className}`} aria-label="QuickFurno">
-      <span className="q">QUICK</span>
-      <span className="f">FURNO</span>
+      <LogoMark className="wordmark-mark" />
+      <span className="wordmark-text">
+        <span className="q">Quick</span>
+        <span className="f">Furno</span>
+      </span>
     </span>
   );
 }

@@ -1,19 +1,14 @@
-import type { Metadata } from "next";
-import { Fraunces, Raleway } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
+import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
 
-const raleway = Raleway({
+// One premium type family across the whole site, with weight variation for hierarchy.
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  variable: "--font-raleway",
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-fraunces",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
   display: "swap",
 });
 
@@ -31,10 +26,22 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f1ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#06251d" },
+  ],
+  colorScheme: "light",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${raleway.variable} ${fraunces.variable}`}>
+    <html lang="en" className={jakarta.variable}>
       <body>
+        <ScrollReveal />
         <EnquiryModalProvider>{children}</EnquiryModalProvider>
       </body>
     </html>

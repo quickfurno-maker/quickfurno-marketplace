@@ -42,9 +42,9 @@ export function VendorCards({ compact = false }: { compact?: boolean }) {
       ) : null}
 
       {/* Future integration: fetch active paid vendors from Supabase vendors table where active_paid_plan = true. */}
-      <div className={`vendor-grid ${compact ? "vendor-grid--compact" : ""}`}>
+      <div className={`vendor-grid ${compact ? "vendor-grid--compact" : ""}`} data-reveal-group>
         {filteredVendors.map((vendor) => (
-          <article className="vendor-card reveal-card" key={vendor.slug}>
+          <article className="vendor-card" key={vendor.slug}>
             <div className={`project-visual ${vendor.imageTone}`} role="img" aria-label={`${vendor.businessName} project preview`}>
               <span>{vendor.category}</span>
             </div>

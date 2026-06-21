@@ -3,9 +3,9 @@ import { categories } from "@/lib/quickfurno-data";
 
 export function CategoryCards() {
   return (
-    <div className="category-grid">
+    <div className="category-grid" data-reveal-group>
       {categories.map((category) => (
-        <article className="category-card reveal-card" key={category.name}>
+        <article className="category-card" key={category.name}>
           <div className="category-icon" aria-hidden="true">
             {category.icon}
           </div>

@@ -1,14 +1,20 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/Logo";
 import { categories } from "@/lib/quickfurno-data";
 
 export function Footer() {
   return (
     <footer className="site-footer">
-      <div className="container footer-grid">
+      <div className="container footer-grid" data-reveal>
         <div className="footer-brand">
           <Link href="/" className="brand-lockup" aria-label="QuickFurno home">
-            <span className="brand-mark">QF</span>
-            <span className="brand-text">QuickFurno</span>
+            <span className="brand-mark">
+              <LogoMark />
+            </span>
+            <span className="brand-text">
+              <span className="bw-quick">Quick</span>
+              <span className="bw-furno">Furno</span>
+            </span>
           </Link>
           <p>
             Client-first marketplace for verified interior, carpentry, modular, painting,

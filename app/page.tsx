@@ -7,8 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HeroVisual } from "@/components/HeroVisual";
 import { HowItWorks } from "@/components/HowItWorks";
-import { PortfolioGallery } from "@/components/PortfolioGallery";
-import { PricingEstimator } from "@/components/PricingEstimator";
+import { StatsBand } from "@/components/StatsBand";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { Testimonials } from "@/components/Testimonials";
 import { VendorCards } from "@/components/VendorCards";
@@ -36,8 +35,8 @@ export default function HomePage() {
         <section className="hero-section section-pad-top">
           <div className="container hero-grid">
             <div className="hero-copy">
-              <span className="eyebrow hero-rise" style={{ "--rise-delay": "0ms" } as React.CSSProperties}>
-                Pune &amp; Mumbai home-service marketplace
+              <span className="hero-urgency hero-rise" style={{ "--rise-delay": "0ms" } as React.CSSProperties}>
+                <i aria-hidden="true">⚡</i> Get 4 free quotes in 24 hours · No spam
               </span>
               <h1 className="hero-headline hero-rise" style={{ "--rise-delay": "90ms" } as React.CSSProperties}>
                 Find <span className="hl">verified</span> interior &amp; home-service vendors{" "}
@@ -71,11 +70,33 @@ export default function HomePage() {
                 <li>Free client enquiry</li>
                 <li>Pune &amp; Mumbai</li>
               </ul>
+
+              <div
+                className="hero-social-proof hero-rise"
+                style={{ "--rise-delay": "540ms" } as React.CSSProperties}
+              >
+                <span className="avatar-stack" aria-hidden="true">
+                  {["AP", "SK", "RM", "VJ"].map((i, idx) => (
+                    <span key={i} className={`avatar-stack-item avatar-stack-item--${idx + 1}`}>
+                      {i}
+                    </span>
+                  ))}
+                </span>
+                <span className="hero-social-text">
+                  <strong>Trusted by 1,200+ homeowners</strong>
+                  <span>
+                    <b>4.8</b> <i aria-hidden="true">★★★★★</i> average rating
+                  </span>
+                </span>
+              </div>
             </div>
 
             <div className="hero-form-wrap hero-rise" style={{ "--rise-delay": "260ms" } as React.CSSProperties}>
               <HeroVisual />
             </div>
+          </div>
+          <div className="container hero-stats-wrap" data-reveal>
+            <StatsBand />
           </div>
         </section>
 
@@ -106,37 +127,19 @@ export default function HomePage() {
         <section id="verified-vendors" className="section-block">
           <div className="container section-heading section-heading--split" data-reveal>
             <div>
-              <span className="eyebrow">Verified vendor cards</span>
-              <h2>Compare active paid vendors before you enquire.</h2>
+              <span className="eyebrow">Featured verified vendors</span>
+              <h2>Top-rated studios on QuickFurno right now.</h2>
               <p>
-                Only vendors with an active paid plan appear on the client marketplace preview.
+                A preview of our highest-rated active vendors. Pick a category to see every
+                verified vendor near you.
               </p>
             </div>
-            <EnquiryModalTrigger className="btn btn-primary">
-              Compare Interior Quotes
-            </EnquiryModalTrigger>
+            <Link href="#services" className="btn btn-primary">
+              Browse by category
+            </Link>
           </div>
           <div className="container">
-            <VendorCards />
-          </div>
-        </section>
-
-        <section id="pricing-estimate" className="section-block section-warm">
-          <div className="container" data-reveal>
-            <PricingEstimator />
-          </div>
-        </section>
-
-        <section id="projects" className="section-block">
-          <div className="container section-heading" data-reveal>
-            <span className="eyebrow">Portfolio Gallery</span>
-            <h2>Preview the kind of work clients can compare.</h2>
-            <p>
-              These premium project cards are placeholders for future vendor project images.
-            </p>
-          </div>
-          <div className="container">
-            <PortfolioGallery />
+            <VendorCards limit={5} />
           </div>
         </section>
 

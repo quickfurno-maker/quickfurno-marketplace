@@ -9,7 +9,6 @@ const navItems = [
   { label: "Services", href: "/#services" },
   { label: "How It Works", href: "/#how-it-works" },
   { label: "Verified Vendors", href: "/#verified-vendors" },
-  { label: "Pricing Estimate", href: "/#pricing-estimate" },
   { label: "Reviews", href: "/#reviews" },
   { label: "For Vendors", href: "/vendors" },
 ];

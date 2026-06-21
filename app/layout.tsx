@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
+import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
 
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={jakarta.variable}>
       <body>
+        <ScrollProgress />
         <ScrollReveal />
         <EnquiryModalProvider>{children}</EnquiryModalProvider>
       </body>

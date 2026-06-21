@@ -5,6 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 // and route guards can read the session.
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: { headers: req.headers } });
+  const path = req.nextUrl.pathname;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +20,12 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (path.startsWith("/admin") && path !== "/admin/login" && !user) {
+    return NextResponse.redirect(new URL("/admin/login", req.url));
+  }
+
   return res;
 }
 

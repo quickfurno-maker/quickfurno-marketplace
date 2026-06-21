@@ -2,22 +2,38 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { Avatar } from "@/components/Avatar";
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { activePaidVendors, vendorFilterCategories } from "@/lib/quickfurno-data";
+import type { QuickFurnoCategory } from "@/lib/quickfurno-data";
 
 type VendorFilter = (typeof vendorFilterCategories)[number];
 
-export function VendorCards({ compact = false }: { compact?: boolean }) {
-  const [activeFilter, setActiveFilter] = useState<VendorFilter>("All");
+export function VendorCards({
+  compact = false,
+  category,
+  limit,
+}: {
+  compact?: boolean;
+  category?: QuickFurnoCategory;
+  limit?: number;
+}) {
+  const [activeFilter, setActiveFilter] = useState<VendorFilter>(category ?? "All");
+
+  // Filters only make sense on the full marketplace view (not category pages or limited previews).
+  const showFilters = !compact && !category && !limit;
 
   const filteredVendors = useMemo(() => {
-    return activePaidVendors
-      .filter((vendor) => activeFilter === "All" || vendor.category === activeFilter)
+    const selected = category ?? activeFilter;
+    const sorted = activePaidVendors
+      .filter((vendor) => selected === "All" || vendor.category === selected)
       .sort((a, b) => {
         if (Boolean(b.featured) !== Boolean(a.featured)) return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
         if (b.rating !== a.rating) return b.rating - a.rating;
         return b.reviews - a.reviews;
       });
-  }, [activeFilter]);
+    return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
+  }, [activeFilter, category, limit]);
 
   function trackCtaClick(label: string) {
     // Future integration: save click events to website_events table for analytics and daily AI agent report.
@@ -26,18 +42,29 @@ export function VendorCards({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="vendor-marketplace">
-      {!compact ? (
+      {showFilters ? (
         <div className="filter-row" aria-label="Vendor category filters">
-          {vendorFilterCategories.map((category) => (
+          {vendorFilterCategories.map((filter) => (
             <button
-              key={category}
+              key={filter}
               type="button"
-              className={`filter-chip ${activeFilter === category ? "filter-chip--active" : ""}`}
-              onClick={() => setActiveFilter(category)}
+              className={`filter-chip ${activeFilter === filter ? "filter-chip--active" : ""}`}
+              onClick={() => setActiveFilter(filter)}
             >
-              {category}
+              {filter}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {filteredVendors.length === 0 ? (
+        <div className="vendor-empty">
+          <h3>New verified vendors arriving soon</h3>
+          <p>
+            We&apos;re onboarding verified vendors for this category. Submit a free enquiry and our
+            team will match you with the right experts near you.
+          </p>
+          <EnquiryModalTrigger className="btn btn-primary">Get Free Quotes</EnquiryModalTrigger>
         </div>
       ) : null}
 
@@ -50,7 +77,8 @@ export function VendorCards({ compact = false }: { compact?: boolean }) {
             </div>
             <div className="vendor-card-body">
               <div className="vendor-card-top">
-                <div>
+                <Avatar name={vendor.businessName} src={vendor.imageUrl} className="vendor-avatar" />
+                <div className="vendor-card-id">
                   <h3>{vendor.businessName}</h3>
                   <p>{vendor.city} • {vendor.subCategory}</p>
                 </div>

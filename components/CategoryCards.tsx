@@ -1,23 +1,40 @@
+import Image from "next/image";
 import Link from "next/link";
-import { categories } from "@/lib/quickfurno-data";
+import { categories, categorySlug } from "@/lib/quickfurno-data";
+import { categoryImage } from "@/lib/images";
 
 export function CategoryCards() {
   return (
     <div className="category-grid" data-reveal-group>
       {categories.map((category) => (
-        <article className="category-card" key={category.name}>
-          <div className="category-icon" aria-hidden="true">
-            {category.icon}
+        <Link
+          href={`/category/${categorySlug(category.name)}`}
+          className="category-card"
+          key={category.name}
+        >
+          <div className="cat-card-media">
+            <Image
+              src={categoryImage(category.name)}
+              alt={`${category.name} projects on QuickFurno`}
+              fill
+              sizes="(max-width: 560px) 100vw, (max-width: 980px) 50vw, 300px"
+              className="cat-card-img"
+            />
+            <span className="cat-card-shade" aria-hidden="true" />
+            <span className="cat-card-icon" aria-hidden="true">
+              {category.icon}
+            </span>
+            <span className="cat-card-tag">Verified</span>
           </div>
-          <div>
+          <div className="cat-card-body">
             <h3>{category.name}</h3>
             <p>{category.description}</p>
-            <strong>{category.startingPrice}</strong>
+            <div className="cat-card-foot">
+              <strong>{category.startingPrice}</strong>
+              <span className="cat-card-cta">View Vendors →</span>
+            </div>
           </div>
-          <Link href={`/#verified-vendors`} className="card-link">
-            View Vendors
-          </Link>
-        </article>
+        </Link>
       ))}
     </div>
   );

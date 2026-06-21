@@ -35,7 +35,7 @@ export default function AppleIcon() {
               width: 104,
               height: 104,
               borderRadius: "50%",
-              border: "13px solid #f4f1ea",
+              border: "13px solid #e6c65a",
             }}
           />
           {/* gold spark tail */}

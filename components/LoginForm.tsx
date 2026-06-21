@@ -18,8 +18,10 @@ export function LoginForm() {
     if (e) { setError(e.message); setBusy(false); return; }
 
     const { data: profile } = await sb.from("profiles").select("role").eq("id", data.user.id).single();
+    const isAdmin = profile?.role === "admin";
+
     router.refresh();
-    router.push(profile?.role === "admin" ? "/admin" : "/vendor");
+    router.push(isAdmin ? "/admin/dashboard" : "/vendor");
   }
 
   return (

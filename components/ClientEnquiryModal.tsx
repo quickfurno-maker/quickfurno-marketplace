@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import { submitLead } from "@/app/actions";
-import { ENQUIRY_SERVICES, trackEvent } from "@/lib/config";
+import { ENQUIRY_SERVICE_GROUPS, trackEvent } from "@/lib/config";
 import { cities } from "@/lib/quickfurno-data";
 
 type EnquiryFormState = {
@@ -284,11 +284,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       onChange={(event) => updateField("serviceCategory", event.target.value)}
                     >
                       <option value="">Select service</option>
-                      {ENQUIRY_SERVICES.map((service) => (
-                        <option key={service} value={service}>
-                          {service}
-                        </option>
+                      {ENQUIRY_SERVICE_GROUPS.map((group) => (
+                        <optgroup key={group.category} label={group.category}>
+                          {group.options.map((service) => (
+                            <option key={`${group.category}-${service}`} value={service}>
+                              {service}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
+                      <option value="Other">Other</option>
                     </select>
                   </label>
 

@@ -25,6 +25,8 @@ export type Vendor = {
   featured?: boolean;
   description: string;
   imageTone: string;
+  /** Vendor-uploaded logo/profile image; when absent the card shows an initials avatar. */
+  imageUrl?: string;
 };
 
 export const brandName = "QuickFurno";
@@ -47,19 +49,19 @@ export const categories: Array<{
     name: "Carpenters",
     icon: "CP",
     description: "Custom furniture, wardrobes, repairs and on-site woodwork.",
-    startingPrice: "Starting ₹950/sq.ft",
+    startingPrice: "Starting ₹250/sq.ft",
   },
   {
     name: "Modular Factory",
     icon: "MF",
     description: "Factory-made kitchen, wardrobes and modular furniture.",
-    startingPrice: "Starting ₹1,200/sq.ft",
+    startingPrice: "Starting ₹1,250/sq.ft",
   },
   {
     name: "Premium Interiors",
     icon: "PI",
     description: "Luxury design, premium materials and managed execution.",
-    startingPrice: "Starting ₹1,800/sq.ft",
+    startingPrice: "Starting ₹1,450/sq.ft",
   },
   {
     name: "Sofa",
@@ -82,6 +84,19 @@ export const categories: Array<{
 ];
 
 export const vendorFilterCategories = ["All", ...categories.map((category) => category.name)] as const;
+
+/** URL-safe slug for a category name, e.g. "Interior Designers" -> "interior-designers". */
+export function categorySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function getCategoryBySlug(slug: string) {
+  return categories.find((category) => categorySlug(category.name) === slug);
+}
 
 export const vendors: Vendor[] = [
   {

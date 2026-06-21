@@ -40,7 +40,7 @@ export default function OpengraphImage() {
               boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
             }}
           >
-            <div style={{ width: 70, height: 70, borderRadius: "50%", border: "9px solid #f4f1ea" }} />
+            <div style={{ width: 70, height: 70, borderRadius: "50%", border: "9px solid #e6c65a" }} />
             <div
               style={{
                 position: "absolute",

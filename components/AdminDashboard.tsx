@@ -1,196 +1,289 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
-  adminApproveVendor, adminRejectVendor, adminSuspendVendor,
-  adminCreditVendorNow, adminApproveBadLead, adminRejectBadLead,
-  adminUpdateLeadStatus,
-} from "@/app/actions";
-import { LEAD_STATUSES } from "@/lib/config";
-import type { AdminDashboardStats } from "@/lib/types";
+  ActionMenu,
+  ChartCard,
+  DataTable,
+  Drawer,
+  EmptyState,
+  InfoGrid,
+  PageHeader,
+  PrimaryButton,
+  SecondaryButton,
+  StatCard,
+  StatusBadge,
+  Toast,
+} from "@/components/admin/AdminPrimitives";
+import { emptySnapshot, type Lead, type Snapshot, type Vendor } from "@/components/admin/adminTypes";
+import {
+  assignmentStatus,
+  formatDate,
+  formatINR,
+  formatNumber,
+  groupBy,
+  groupLeadsByDate,
+  packageName,
+  revenueByPackage,
+  shortId,
+  vendorName,
+} from "@/components/admin/adminUtils";
 
-type Vendor = { id: string; business_name: string; city: string; status: string; remaining_credits: number; total_credits: number; public_visibility: boolean; phone: string };
-type Pack = { id: string; name: string; total_price: number };
-type Report = { id: string; reason: string; description: string | null; vendor: { business_name: string } | null; assignment: { lead: { name: string; service_required: string; city: string } | null } | null };
-type Lead = { id: string; name: string; phone: string; city: string; area: string | null; service_required: string; budget: string | null; timeline: string | null; message: string | null; created_at: string; status: string };
+export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null; error?: string | null }) {
+  const data = snapshot ?? emptySnapshot();
+  const stats = data.stats ?? {};
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-type Tab = "leads" | "vendors" | "reports";
+  const recentLeads = data.leads.slice(0, 8);
+  const recentVendors = data.vendors.slice(0, 8);
+  const failedAssignments = data.assignments.filter((item) => String(item.vendor_status ?? "").toLowerCase().includes("failed")).slice(0, 6);
+  const packageAlerts = data.vendorPackages
+    .filter((item) => String(item.status ?? "").toLowerCase().includes("expired") || Number(item.remaining_leads ?? item.leads_remaining ?? item.remaining_credits ?? 0) <= 3)
+    .slice(0, 6);
 
-export function AdminDashboard({
-  stats, vendors, packages, reports, leads,
-}: { stats: AdminDashboardStats; vendors: Vendor[]; packages: Pack[]; reports: Report[]; leads: Lead[] }) {
-  const router = useRouter();
-  const [tab, setTab] = useState<Tab>("leads");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [creditFor, setCreditFor] = useState<string | null>(null);
+  const cards = [
+    ["Total Leads", formatNumber(stats.total_leads), `${formatNumber(stats.leads_today)} today`, "leads", "emerald"],
+    ["Leads Today", formatNumber(stats.leads_today), `${formatNumber(stats.leads_this_week)} this week`, "leads", "indigo"],
+    ["Active Vendors", formatNumber(stats.active_vendors), `${formatNumber(stats.pending_vendors)} pending`, "vendors", "emerald"],
+    ["Paid Vendors", formatNumber(stats.paid_vendors), `${formatNumber(stats.expired_vendors)} expired`, "subscriptions", "indigo"],
+    ["Revenue This Month", formatINR(stats.revenue_this_month), `${formatINR(stats.total_revenue)} lifetime`, "payments", "emerald"],
+    ["Pending Payments", formatNumber(stats.pending_payments), "Collections queue", "payments", "amber"],
+    ["Expired Packages", formatNumber(stats.expired_vendors), "Needs renewal follow-up", "packages", "rose"],
+    ["Active Cities", formatNumber(stats.active_cities), `Top: ${stats.top_city || "Not enough data"}`, "cities", "slate"],
+    ["Low Balance Vendors", formatNumber(stats.low_balance_vendors), "Renewal opportunity", "subscriptions", "amber"],
+    ["Pending Follow-ups", formatNumber(stats.pending_followups), "Sales queue", "notifications", "amber"],
+    ["Conversion Rate", `${formatNumber(stats.conversion_rate)}%`, "Converted / total", "reports", "emerald"],
+    ["Assignment Success", `${formatNumber(stats.lead_distribution_success_rate)}%`, `${formatNumber(stats.leads_distributed)} assignments`, "distribution", "indigo"],
+  ] as const;
 
-  async function run(id: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
-    setBusy(id);
-    const res = await fn();
-    setBusy(null);
-    if (!res.ok && res.error) alert(res.error);
-    router.refresh();
-  }
+  const charts = useMemo(
+    () => [
+      { title: "Leads by Date", rows: groupLeadsByDate(data.leads) },
+      { title: "Leads by Category", rows: groupBy(data.leads, (lead) => lead.service_required || lead.category) },
+      { title: "Revenue by Package", rows: revenueByPackage(data.payments, data.packages) },
+      { title: "Lead Status Funnel", rows: groupBy(data.leads, (lead) => lead.status || "New") },
+    ],
+    [data]
+  );
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-semibold text-ivory">Operations</h1>
+    <div className="space-y-5">
+      <PageHeader
+        title="Marketplace Command Center"
+        description="Manage leads, vendors, packages, cities, payments, and automation from one place."
+        actions={
+          <>
+            <LinkButton href="/admin/leads">Add Lead</LinkButton>
+            <LinkButton href="/admin/vendors">Add Vendor</LinkButton>
+            <LinkButton href="/admin/packages">Add Package</LinkButton>
+            <LinkButton href="/admin/cities">Add City</LinkButton>
+          </>
+        }
+      />
 
-      {/* stat grid */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Stat label="Total leads" value={stats.total_leads} />
-        <Stat label="Assigned" value={stats.assigned_leads} />
-        <Stat label="Duplicates" value={stats.duplicate_leads} />
-        <Stat label="Leads distributed" value={stats.leads_distributed} />
-        <Stat label="Vendors" value={stats.total_vendors} />
-        <Stat label="Pending vendors" value={stats.pending_vendors} highlight={stats.pending_vendors > 0} />
-        <Stat label="Credits in market" value={stats.remaining_vendor_credits} />
-        <Stat label="Revenue (₹)" value={stats.total_revenue} />
+      {error ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+          Admin data loaded with fallback UI because Supabase returned: {error}
+        </div>
+      ) : null}
+
+      {data.warnings?.length ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
+          <p className="font-semibold text-slate-950">Supabase fallback notices</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {data.warnings.slice(0, 4).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map(([label, value, helper, icon, tone]) => (
+          <StatCard key={label} label={label} value={value} helper={helper} icon={icon} tone={tone} />
+        ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-4">
+        {charts.map((chart) => (
+          <ChartCard key={chart.title} title={chart.title} rows={chart.rows} />
+        ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Recent Leads" action={<Link href="/admin/leads" className="text-sm font-semibold text-emerald-700">View all</Link>}>
+          <DataTable
+            rows={recentLeads}
+            emptyTitle="No leads yet"
+            emptyMessage="Client enquiries will appear here as soon as the public form receives submissions."
+            columns={[
+              { header: "Client", cell: (lead) => <PersonCell title={lead.name || "Unnamed lead"} subtitle={lead.phone || "No phone"} /> },
+              { header: "City", cell: (lead) => lead.city || "Not set" },
+              { header: "Category", cell: (lead) => lead.service_required || lead.category || "Not set" },
+              { header: "Status", cell: (lead) => <StatusBadge value={lead.status || "New"} /> },
+              { header: "Actions", cell: (lead) => <SecondaryButton onClick={() => setSelectedLead(lead)}>View</SecondaryButton> },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="Recent Vendors" action={<Link href="/admin/vendors" className="text-sm font-semibold text-emerald-700">View all</Link>}>
+          <DataTable
+            rows={recentVendors}
+            emptyTitle="No vendors yet"
+            emptyMessage="Vendor registrations and approved studios will appear here."
+            columns={[
+              { header: "Vendor", cell: (vendor) => <PersonCell title={vendor.business_name || "Unnamed vendor"} subtitle={vendor.phone || "No phone"} /> },
+              { header: "City", cell: (vendor) => vendor.city || "Not set" },
+              { header: "Credits", cell: (vendor) => formatNumber(vendor.remaining_credits) },
+              { header: "Status", cell: (vendor) => <StatusBadge value={vendor.status || "Pending"} /> },
+              { header: "Actions", cell: (vendor) => <SecondaryButton onClick={() => setSelectedVendor(vendor)}>View</SecondaryButton> },
+            ]}
+          />
+        </Panel>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Package Expiry Alerts">
+          <DataTable
+            rows={packageAlerts}
+            emptyTitle="No expiry alerts"
+            emptyMessage="Low-balance and expired vendor packages will appear here."
+            columns={[
+              { header: "Vendor", cell: (row: any) => vendorName(data.vendors, row.vendor_id) },
+              { header: "Package", cell: (row: any) => packageName(data.packages, row.package_id) },
+              { header: "Remaining", cell: (row: any) => formatNumber(row.remaining_leads ?? row.leads_remaining ?? row.remaining_credits ?? 0) },
+              { header: "Status", cell: (row: any) => <StatusBadge value={row.status || row.payment_status || "Needs review"} /> },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="Failed Lead Assignments">
+          <DataTable
+            rows={failedAssignments}
+            emptyTitle="No failed assignments"
+            emptyMessage="Failed distribution attempts will be shown here for operations review."
+            columns={[
+              { header: "Lead", cell: (row) => shortId(row.lead_id) },
+              { header: "Vendor", cell: (row) => vendorName(data.vendors, row.vendor_id) },
+              { header: "Status", cell: (row) => <StatusBadge value={assignmentStatus(row)} /> },
+              { header: "Time", cell: (row) => formatDate(row.assigned_at || row.created_at) },
+            ]}
+          />
+        </Panel>
+      </section>
+
+      {selectedLead ? <LeadDrawer lead={selectedLead} vendors={data.vendors} onClose={() => setSelectedLead(null)} /> : null}
+      {selectedVendor ? <VendorDrawer vendor={selectedVendor} onClose={() => setSelectedVendor(null)} /> : null}
+      {toast ? <Toast message={toast} tone="info" /> : null}
+
+      <div className="hidden">
+        <PrimaryButton onClick={() => setToast("Action placeholder ready for implementation.")}>Hidden action</PrimaryButton>
       </div>
-
-      {/* tabs */}
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => setTab("leads")} className={`pill ${tab === "leads" ? "chip-on" : ""}`}>Leads · {leads.length}</button>
-        <button onClick={() => setTab("vendors")} className={`pill ${tab === "vendors" ? "chip-on" : ""}`}>Vendors</button>
-        <button onClick={() => setTab("reports")} className={`pill ${tab === "reports" ? "chip-on" : ""}`}>
-          Bad-lead reports{stats.bad_lead_reports_pending > 0 ? ` · ${stats.bad_lead_reports_pending}` : ""}
-        </button>
-      </div>
-
-      {tab === "leads" && (
-        <div className="space-y-3">
-          {leads.length === 0 && <div className="panel p-8 text-center font-sans text-sm text-muted">No enquiries yet.</div>}
-          {leads.map((l) => (
-            <div key={l.id} className="panel p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-display text-lg text-ivory">{l.name} · {l.service_required}</h3>
-                  <p className="mt-0.5 font-sans text-sm text-muted">
-                    <a href={`tel:${l.phone}`} className="text-gold hover:underline">{l.phone}</a>
-                    {" · "}{l.city}{l.area ? `, ${l.area}` : ""}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2 font-sans text-xs text-muted">
-                    {l.budget && <span className="pill">{l.budget}</span>}
-                    {l.timeline && <span className="pill">{l.timeline}</span>}
-                    <span className="pill">{new Date(l.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-                  </div>
-                  {l.message && <p className="mt-3 max-w-2xl font-sans text-sm text-muted/90">“{l.message}”</p>}
-                </div>
-                <label className="block">
-                  <span className="label">Status</span>
-                  <select
-                    className="field !py-2 text-sm"
-                    value={LEAD_STATUSES.includes(l.status as any) ? l.status : "New"}
-                    disabled={busy === l.id}
-                    onChange={(e) => run(l.id, () => adminUpdateLeadStatus(l.id, e.target.value))}
-                  >
-                    {LEAD_STATUSES.map((s) => <option key={s} value={s} className="bg-navy-deep">{s}</option>)}
-                  </select>
-                </label>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === "vendors" && (
-        <div className="space-y-3">
-          {vendors.map((v) => (
-            <div key={v.id} className="panel p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-display text-lg text-ivory">{v.business_name}</h3>
-                  <p className="mt-0.5 font-sans text-sm text-muted">{v.city} · {v.phone}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <span className={`pill ${v.status === "Approved" ? "chip-on" : ""}`}>{v.status}</span>
-                    <span className="pill">{v.remaining_credits} credits</span>
-                    <span className="pill">{v.public_visibility ? "Listed" : "Hidden"}</span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {v.status !== "Approved" && <button disabled={busy === v.id} onClick={() => run(v.id, () => adminApproveVendor(v.id))} className="btn-gold !px-4 !py-2 text-xs">Approve</button>}
-                  {v.status !== "Suspended" && <button disabled={busy === v.id} onClick={() => run(v.id, () => adminSuspendVendor(v.id))} className="btn-ghost !px-4 !py-2 text-xs">Suspend</button>}
-                  {v.status !== "Rejected" && <button disabled={busy === v.id} onClick={() => run(v.id, () => adminRejectVendor(v.id))} className="btn-ghost !px-4 !py-2 text-xs">Reject</button>}
-                  <button onClick={() => setCreditFor(creditFor === v.id ? null : v.id)} className="btn-ghost !px-4 !py-2 text-xs">Credit pack</button>
-                </div>
-              </div>
-
-              {creditFor === v.id && (
-                <CreditPanel vendor={v} packages={packages} busy={busy === v.id}
-                  onCredit={(pkgId, amount, method, txn) => run(v.id, async () => {
-                    const r = await adminCreditVendorNow(v.id, pkgId, amount, method, txn);
-                    if (r.ok) setCreditFor(null);
-                    return r;
-                  })} />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === "reports" && (
-        <div className="space-y-3">
-          {reports.length === 0 && <div className="panel p-8 text-center font-sans text-sm text-muted">No pending reports.</div>}
-          {reports.map((r) => (
-            <div key={r.id} className="panel flex flex-wrap items-center justify-between gap-3 p-5">
-              <div>
-                <h3 className="font-display text-lg text-ivory">{r.vendor?.business_name ?? "Studio"}</h3>
-                <p className="mt-0.5 font-sans text-sm text-muted">
-                  {r.reason} · {r.assignment?.lead?.name ?? "lead"} ({r.assignment?.lead?.service_required}, {r.assignment?.lead?.city})
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button disabled={busy === r.id} onClick={() => run(r.id, () => adminApproveBadLead(r.id))} className="btn-gold !px-4 !py-2 text-xs">Refund credit</button>
-                <button disabled={busy === r.id} onClick={() => run(r.id, () => adminRejectBadLead(r.id))} className="btn-ghost !px-4 !py-2 text-xs">Reject</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-function CreditPanel({
-  vendor, packages, busy, onCredit,
-}: { vendor: Vendor; packages: Pack[]; busy: boolean; onCredit: (pkgId: string, amount: number, method: string, txn?: string) => void }) {
-  const [pkgId, setPkgId] = useState(packages[0]?.id ?? "");
-  const [method, setMethod] = useState("UPI");
-  const [txn, setTxn] = useState("");
-  const pack = packages.find((p) => p.id === pkgId);
-
+function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <div className="mt-4 hairline pt-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block"><span className="label">Pack</span>
-          <select className="field" value={pkgId} onChange={(e) => setPkgId(e.target.value)}>
-            {packages.map((p) => <option key={p.id} value={p.id} className="bg-navy-deep">{p.name} — ₹{p.total_price.toLocaleString("en-IN")}</option>)}
-          </select>
-        </label>
-        <label className="block"><span className="label">Method</span>
-          <select className="field" value={method} onChange={(e) => setMethod(e.target.value)}>
-            {["UPI", "Bank transfer", "Cash", "Card"].map((m) => <option key={m} className="bg-navy-deep">{m}</option>)}
-          </select>
-        </label>
-        <label className="block"><span className="label">Txn ref (optional)</span>
-          <input className="field" value={txn} onChange={(e) => setTxn(e.target.value)} />
-        </label>
+    <Link href={href} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-emerald-700">
+      {children}
+    </Link>
+  );
+}
+
+function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="min-w-0 space-y-3">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h2 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
+        {action}
       </div>
-      <button disabled={busy || !pkgId} onClick={() => onCredit(pkgId, pack?.total_price ?? 0, method, txn || undefined)} className="btn-gold mt-4 !py-2 text-xs">
-        {busy ? "Crediting…" : `Confirm payment & credit ${vendor.business_name}`}
-      </button>
+      {children}
+    </section>
+  );
+}
+
+function PersonCell({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="min-w-44">
+      <p className="font-semibold text-slate-950">{title}</p>
+      <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
     </div>
   );
 }
 
-function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function LeadDrawer({ lead, vendors, onClose }: { lead: Lead; vendors: Vendor[]; onClose: () => void }) {
   return (
-    <div className={`panel p-5 ${highlight ? "!border-gold/50 shadow-gold" : ""}`}>
-      <p className={`font-display text-2xl font-semibold ${highlight ? "text-gold" : "text-ivory"}`}>
-        {value.toLocaleString("en-IN")}
-      </p>
-      <p className="mt-1 font-sans text-xs uppercase tracking-wider text-muted">{label}</p>
-    </div>
+    <Drawer title={lead.name || "Lead details"} subtitle={`Lead ID ${shortId(lead.id)}`} onClose={onClose}>
+      <div className="space-y-5">
+        <InfoGrid
+          rows={[
+            ["Phone", lead.phone || "Not provided"],
+            ["Email", lead.email || "Not provided"],
+            ["City", lead.city || "Not provided"],
+            ["Locality", lead.locality || lead.area || "Not provided"],
+            ["Category", lead.service_required || lead.category || "Not provided"],
+            ["Budget", lead.budget || "Not provided"],
+            ["Timeline", lead.timeline || "Not provided"],
+            ["Source", lead.source || "Website"],
+          ]}
+        />
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Requirement</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{lead.message || "No detailed requirement message was provided."}</p>
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Assigned Vendors</h3>
+          <div className="mt-3 space-y-2">
+            {lead.lead_assignments?.length ? (
+              lead.lead_assignments.map((assignment) => (
+                <div key={assignment.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                  <span className="font-medium text-slate-700">{vendorName(vendors, assignment.vendor_id)}</span>
+                  <StatusBadge value={assignmentStatus(assignment)} />
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">No vendor assignment recorded yet.</p>
+            )}
+          </div>
+        </section>
+      </div>
+    </Drawer>
+  );
+}
+
+function VendorDrawer({ vendor, onClose }: { vendor: Vendor; onClose: () => void }) {
+  return (
+    <Drawer title={vendor.business_name || "Vendor details"} subtitle={`Vendor ID ${shortId(vendor.id)}`} onClose={onClose}>
+      <div className="space-y-5">
+        <InfoGrid
+          rows={[
+            ["Owner", vendor.owner_name || "Not provided"],
+            ["Phone", vendor.phone || "Not provided"],
+            ["Email", vendor.email || "Not provided"],
+            ["City", vendor.city || "Not provided"],
+            ["Categories", vendor.service_categories?.join(", ") || "Not provided"],
+            ["Areas", vendor.areas_covered?.join(", ") || "Not provided"],
+            ["Remaining Leads", formatNumber(vendor.remaining_credits)],
+            ["Rating", vendor.rating ? `${vendor.rating}/5` : "Not rated"],
+          ]}
+        />
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-950">Vendor Status</h3>
+              <p className="mt-1 text-sm text-slate-500">Operational status and public visibility.</p>
+            </div>
+            <StatusBadge value={vendor.status || "Pending"} />
+          </div>
+          <div className="mt-4">
+            <ActionMenu actions={[{ label: "Assign package", onClick: () => {} }, { label: "Pause vendor", onClick: () => {} }, { label: "Add internal note", onClick: () => {} }]} />
+          </div>
+        </section>
+      </div>
+    </Drawer>
   );
 }

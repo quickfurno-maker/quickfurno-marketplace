@@ -38,6 +38,19 @@ export const SERVICES = [
 // homeowner dropdown adds a catch-all (vendors never pick "Other")
 export const ENQUIRY_SERVICES = [...SERVICES, "Other"] as const;
 
+// Organised service picker for the homeowner enquiry popup — grouped by the
+// marketplace categories shown across the site. Option values stay aligned with
+// SERVICES above (plus two natural additions) so lead↔vendor matching keeps working.
+export const ENQUIRY_SERVICE_GROUPS: { category: string; options: string[] }[] = [
+  { category: "Interior Designers", options: ["Full Home Interior", "False Ceiling"] },
+  { category: "Premium Interiors", options: ["Premium Interior Design"] },
+  { category: "Modular Factory", options: ["Modular Kitchen", "Wardrobe"] },
+  { category: "Carpenters", options: ["Carpentry", "Custom Furniture"] },
+  { category: "Sofa", options: ["Custom Sofa & Upholstery"] },
+  { category: "Painter", options: ["Painting"] },
+  { category: "Civil Work", options: ["Home Renovation"] },
+];
+
 // ---- Budget & timeline options (stored as text on the lead) ----------------
 export const BUDGETS = [
   "Below ₹1 lakh",

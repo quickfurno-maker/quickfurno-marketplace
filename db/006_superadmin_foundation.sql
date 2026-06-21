@@ -1,0 +1,3 @@
+-- See supabase/migrations/20260621000006_superadmin_foundation.sql.
+-- Kept as a short pointer so the canonical Supabase migration remains the
+-- single source of truth for the Superadmin foundation schema.

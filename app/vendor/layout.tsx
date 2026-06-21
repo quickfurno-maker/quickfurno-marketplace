@@ -7,7 +7,7 @@ import { SignOut } from "@/components/SignOut";
 export default async function VendorLayout({ children }: { children: React.ReactNode }) {
   const role = await getMyRole();
   if (!role) redirect("/login");
-  if (role === "admin") redirect("/admin");
+  if (role === "admin") redirect("/admin/dashboard");
 
   return (
     <div className="min-h-screen">

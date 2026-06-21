@@ -1,25 +1,17 @@
-import Link from "next/link";
-
-/**
- * Premium home-interiors marketplace visual for the hero — a glassmorphism panel
- * of verified vendor/category tiles with trust badges, plus floating trust chips.
- * Built with CSS gradient "project" thumbnails so it stays fast and on-brand
- * (drop real photos into the .hmc-thumb tiles later via next/image if desired).
- */
-const categoryTiles = [
-  { label: "Interior Designers", tone: "warm-suite", badge: "Verified" },
-  { label: "Modular Factory", tone: "kitchen-line", badge: "Quick Matching" },
-  { label: "Carpenters", tone: "wood-craft", badge: "Transparent Rates" },
-  { label: "Painters", tone: "paint-finish", badge: "Free Quote" },
-];
+import Image from "next/image";
+import { heroImage } from "@/lib/images";
 
 const floatingBadges = [
-  { label: "Verified", icon: "✓", className: "hero-chip--1" },
+  { label: "100% Verified", icon: "✓", className: "hero-chip--1" },
   { label: "Transparent Rates", icon: "₹", className: "hero-chip--2" },
   { label: "Quick Matching", icon: "⚡", className: "hero-chip--3" },
   { label: "Free Quote", icon: "★", className: "hero-chip--4" },
 ];
 
+/**
+ * Hero visual — a premium HD interior photo (optimised + priority-loaded for LCP)
+ * with glassmorphism trust overlays and floating badges to drive conversion.
+ */
 export function HeroVisual() {
   return (
     <div className="hero-visual">
@@ -27,34 +19,35 @@ export function HeroVisual() {
       <div className="hero-blob hero-blob--a" aria-hidden="true" />
       <div className="hero-blob hero-blob--b" aria-hidden="true" />
 
-      <div className="hero-market-card hero-float-slow">
-        <div className="hmc-head">
-          <span className="hmc-live">
-            <i aria-hidden="true" /> Live marketplace
-          </span>
-          <strong>Verified home-service vendors</strong>
+      <div className="hero-photo-frame hero-float-slow">
+        <Image
+          src={heroImage}
+          alt="Premium home interior delivered by QuickFurno verified vendors in Pune and Mumbai"
+          fill
+          priority
+          sizes="(max-width: 980px) 100vw, 460px"
+          className="hero-photo"
+        />
+        <span className="hero-photo-shade" aria-hidden="true" />
+
+        <div className="hero-photo-badge hero-photo-badge--verified">
+          <i aria-hidden="true">✓</i> Verified vendors only
         </div>
 
-        <div className="hmc-grid">
-          {categoryTiles.map((tile) => (
-            <Link href="#verified-vendors" className="hmc-tile" key={tile.label}>
-              <span className={`hmc-thumb ${tile.tone}`} aria-hidden="true" />
-              <span className="hmc-tile-body">
-                <span className="hmc-tile-label">{tile.label}</span>
-                <span className="hmc-badge">{tile.badge}</span>
-              </span>
-            </Link>
-          ))}
+        <div className="hero-photo-card">
+          <div className="hpc-rating">
+            <strong>4.8</strong>
+            <span className="hpc-stars" aria-hidden="true">★★★★★</span>
+          </div>
+          <div className="hpc-text">
+            <strong>Loved by homeowners</strong>
+            <span>Across Pune &amp; Mumbai</span>
+          </div>
         </div>
 
-        <Link href="#verified-vendors" className="hmc-foot">
-          <span className="hmc-foot-tone civil-reno" aria-hidden="true" />
-          <span className="hmc-foot-text">
-            <strong>Civil Work &amp; Renovation</strong>
-            <span>Vetted contractors · transparent quotes</span>
-          </span>
-          <span className="hmc-foot-cta" aria-hidden="true">→</span>
-        </Link>
+        <div className="hero-photo-pill" aria-hidden="true">
+          <i>⚡</i> 4 free quotes in 24 hrs
+        </div>
       </div>
 
       {floatingBadges.map((badge) => (

@@ -15,20 +15,44 @@ import type {
   CreateLeadInput, VendorRegistrationInput, VendorLeadStatus,
 } from "../lib/types";
 
+type AdminRoleName =
+  | "Superadmin"
+  | "Sales Admin"
+  | "Support Admin"
+  | "Finance Admin"
+  | "Content Admin"
+  | "Operations Admin";
+
+type CurrentUser = {
+  id: string;
+  role: "admin" | "vendor" | undefined;
+  adminRole: AdminRoleName | null;
+};
+
 // --------------------------------------------------------------------------
 // Auth guards
 // --------------------------------------------------------------------------
-async function currentUser() {
+async function currentUser(): Promise<CurrentUser | null> {
   const sb = await serverClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
   const { data: profile } = await sb.from("profiles").select("role").eq("id", user.id).single();
-  return { id: user.id, role: profile?.role as "admin" | "vendor" | undefined };
+  return {
+    id: user.id,
+    role: profile?.role as "admin" | "vendor" | undefined,
+    adminRole: (user.app_metadata?.admin_role as AdminRoleName | undefined) ?? null,
+  };
 }
 
 async function requireAdmin() {
   const u = await currentUser();
   if (!u || u.role !== "admin") throw appError("UNAUTHORIZED");
+  return u;
+}
+
+async function requireSuperadmin() {
+  const u = await requireAdmin();
+  if (u.adminRole !== "Superadmin") throw appError("UNAUTHORIZED");
   return u;
 }
 
@@ -49,6 +73,21 @@ async function requireVendorOwner(vendorId: string) {
 export async function getMyRole(): Promise<"admin" | "vendor" | null> {
   const u = await currentUser();
   return u?.role ?? null;
+}
+
+export async function getAdminSession(): Promise<{
+  isLoggedIn: boolean;
+  isAdmin: boolean;
+  isSuperadmin: boolean;
+  adminRole: AdminRoleName | null;
+}> {
+  const u = await currentUser();
+  return {
+    isLoggedIn: Boolean(u),
+    isAdmin: u?.role === "admin",
+    isSuperadmin: u?.role === "admin" && u.adminRole === "Superadmin",
+    adminRole: u?.adminRole ?? null,
+  };
 }
 
 /** The vendor business row owned by the signed-in user (or null). */
@@ -172,17 +211,30 @@ export async function vendorReportBadLead(
 // ADMIN
 // --------------------------------------------------------------------------
 async function asAdmin<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
-  try { await requireAdmin(); } catch (e) { return fail(e); }
+  try { await requireSuperadmin(); } catch (e) { return fail(e); }
   return fn();
 }
 
 export const adminStats           = async () => asAdmin(() => admin.getAdminDashboardStats());
+export const adminSnapshot        = async () => asAdmin(() => admin.getSuperadminSnapshot());
 export const adminAllLeads        = async () => asAdmin(() => admin.getAllLeads());
 export const adminUpdateLeadStatus = async (leadId: string, status: string) => asAdmin(() => admin.updateLeadStatus(leadId, status));
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());
 export const adminApproveVendor   = async (id: string) => asAdmin(() => admin.approveVendor(id));
 export const adminRejectVendor    = async (id: string) => asAdmin(() => admin.rejectVendor(id));
 export const adminSuspendVendor   = async (id: string) => asAdmin(() => admin.suspendVendor(id));
+export const adminCreatePackage   = async (input: { name: string; lead_count: number; total_price: number; validity_days: number; is_active?: boolean }) =>
+  asAdmin(() => admin.createPackage(input));
+export const adminSetPackageActive = async (id: string, isActive: boolean) =>
+  asAdmin(() => admin.setPackageActive(id, isActive));
+export const adminCreateCategory = async (input: { name: string; is_active?: boolean }) =>
+  asAdmin(() => admin.createCategory(input));
+export const adminSetCategoryActive = async (id: string, isActive: boolean) =>
+  asAdmin(() => admin.setCategoryActive(id, isActive));
+export const adminCreateCity = async (input: { name: string; is_active?: boolean }) =>
+  asAdmin(() => admin.createCity(input));
+export const adminSetCityActive = async (id: string, isActive: boolean) =>
+  asAdmin(() => admin.setCityActive(id, isActive));
 export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin(() => admin.approveBadLeadReport(id, note));
 export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());

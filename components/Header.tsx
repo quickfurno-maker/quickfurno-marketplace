@@ -1,5 +1,6 @@
 "use client";
 
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -45,13 +46,12 @@ export function Header() {
         </nav>
 
         <div className="header-actions">
-          <Link
-            href="/#lead-form"
+          <EnquiryModalTrigger
             className="btn btn-primary header-quote"
             onClick={() => trackCtaClick("Get 4 Verified Quotes - Header")}
           >
-            Get 4 Verified Quotes
-          </Link>
+            Get Free Quotes
+          </EnquiryModalTrigger>
           <Link href="/vendors" className="btn btn-text">
             Vendor Login / Register
           </Link>
@@ -76,16 +76,15 @@ export function Header() {
               {item.label}
             </Link>
           ))}
-          <Link
-            href="/#lead-form"
+          <EnquiryModalTrigger
             className="btn btn-primary"
             onClick={() => {
               setMenuOpen(false);
               trackCtaClick("Get 4 Verified Quotes - Mobile Menu");
             }}
           >
-            Get 4 Verified Quotes
-          </Link>
+            Get Free Quotes
+          </EnquiryModalTrigger>
         </nav>
       </div>
     </header>

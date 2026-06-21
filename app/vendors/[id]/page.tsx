@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { PortfolioGallery } from "@/components/PortfolioGallery";
@@ -61,7 +61,7 @@ export default function VendorProfilePage() {
                 <div className="hero-cta-row">
                   <a className="btn btn-secondary" href="tel:+919999999999">Call</a>
                   <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">WhatsApp</a>
-                  <Link className="btn btn-primary" href="/#lead-form">Request Quote</Link>
+                  <EnquiryModalTrigger className="btn btn-primary">Request Quote</EnquiryModalTrigger>
                 </div>
               </div>
             </div>
@@ -132,7 +132,7 @@ export default function VendorProfilePage() {
             <aside className="profile-contact-card" aria-label="Contact Raj Premium Interiors">
               <h2>Request a verified quote</h2>
               <p>QuickFurno can help you compare this vendor with 3 more verified options.</p>
-              <Link className="btn btn-primary" href="/#lead-form">Request Quote</Link>
+              <EnquiryModalTrigger className="btn btn-primary">Request Quote</EnquiryModalTrigger>
               <a className="btn btn-secondary" href="tel:+919999999999">Call Vendor</a>
               <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">WhatsApp</a>
             </aside>
@@ -143,7 +143,7 @@ export default function VendorProfilePage() {
       <div className="vendor-profile-mobile-cta" aria-label="Vendor profile contact actions">
         <a href="tel:+919999999999">Call</a>
         <a href="https://wa.me/91XXXXXXXXXX">WhatsApp</a>
-        <Link href="/#lead-form">Request Quote</Link>
+        <EnquiryModalTrigger>Request Quote</EnquiryModalTrigger>
       </div>
     </>
   );

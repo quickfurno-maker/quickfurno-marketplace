@@ -11,25 +11,38 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is missing.`);
+  return value;
+}
+
+function supabaseUrl() {
+  return requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
+}
+
+function anonKey() {
+  return requiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+}
+
+function serviceRoleKey() {
+  return requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+}
 
 /** Service-role client. SERVER ONLY — throws if used without the key. */
 export function adminClient(): SupabaseClient {
-  if (!SERVICE) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing (server only).");
-  return createClient(URL, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(supabaseUrl(), serviceRoleKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 /** Anon client for public, unauthenticated reads. */
 export function publicClient(): SupabaseClient {
-  return createClient(URL, ANON, { auth: { persistSession: false } });
+  return createClient(supabaseUrl(), anonKey(), { auth: { persistSession: false } });
 }
 
 /** Request-scoped client that respects the signed-in user's session (App Router). */
 export async function serverClient(): Promise<SupabaseClient> {
   const store = await cookies();
-  return createServerClient(URL, ANON, {
+  return createServerClient(supabaseUrl(), anonKey(), {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (items: { name: string; value: string; options?: Record<string, unknown> }[]) => {

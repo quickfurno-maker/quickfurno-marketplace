@@ -34,15 +34,35 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       setError("Please add your name, phone, city and the service you need.");
       return;
     }
+    if (form.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
     setBusy(true);
-    const res = await submitLead(form);
-    if (!res.ok) { setError(res.error); setBusy(false); return; }
-    setLeadId(res.data.id);
-    const elig = await fetchEligibleVendors(res.data.id);
-    setBusy(false);
-    if (!elig.ok) { setError(elig.error); return; }
-    setVendors(elig.data);
-    setStep("pick");
+    try {
+      console.info("[lead funnel] submitting", {
+        source: "Enquiry funnel",
+        city: form.city,
+        service_category: form.service_required,
+        has_budget_range: Boolean(form.budget),
+        has_requirement: Boolean(form.message),
+      });
+      const res = await submitLead({ ...form, source: "Enquiry funnel" });
+      if (!res.ok) { setError(res.error); return; }
+      console.info("[lead funnel] submission confirmed", {
+        lead_id: res.data.id,
+        is_duplicate: res.data.is_duplicate,
+      });
+      setLeadId(res.data.id);
+      const elig = await fetchEligibleVendors(res.data.id);
+      if (!elig.ok) { setError(elig.error); return; }
+      setVendors(elig.data);
+      setStep("pick");
+    } catch (err) {
+      console.error("[lead funnel] submission error", {
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError("We could not submit your enquiry. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function togglePick(id: string) {

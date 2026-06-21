@@ -5,8 +5,8 @@
 // ============================================================================
 "use server";
 
-import { serverClient } from "../lib/supabase";
-import { appError, fail, type Result } from "../lib/errors";
+import { adminClient, serverClient } from "../lib/supabase";
+import { appError, fail, ok, type Result } from "../lib/errors";
 import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
@@ -85,6 +85,60 @@ export async function fetchPackages() {
 
 export async function submitVendorRegistration(input: VendorRegistrationInput) {
   return vendors.registerVendor(input);
+}
+
+export async function submitVendorAccountRegistration(input: VendorRegistrationInput & { password: string }) {
+  let createdUserId: string | null = null;
+
+  try {
+    const email = input.email?.trim().toLowerCase();
+    const password = input.password;
+
+    if (!input.business_name?.trim() || !input.phone?.trim() || !email || !password || password.length < 6) {
+      return fail(appError("VALIDATION"));
+    }
+
+    const db = adminClient();
+    const { data: auth, error: authErr } = await db.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        role: "vendor",
+        full_name: input.owner_name || input.business_name,
+        phone: input.phone,
+      },
+    });
+
+    if (authErr || !auth.user) {
+      return {
+        ok: false,
+        code: authErr?.code ?? "AUTH_SIGNUP_FAILED",
+        error: authErr?.message ?? "Could not create vendor account.",
+      };
+    }
+
+    createdUserId = auth.user.id;
+
+    const vendor = await vendors.registerVendor({
+      ...input,
+      email,
+      user_id: auth.user.id,
+    });
+
+    if (!vendor.ok) {
+      await db.auth.admin.deleteUser(auth.user.id);
+      createdUserId = null;
+      return vendor;
+    }
+
+    return ok({ ...vendor.data, user_id: auth.user.id });
+  } catch (e) {
+    if (createdUserId) {
+      await adminClient().auth.admin.deleteUser(createdUserId);
+    }
+    return fail(e);
+  }
 }
 
 // --------------------------------------------------------------------------

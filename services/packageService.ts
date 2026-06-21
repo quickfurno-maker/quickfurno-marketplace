@@ -4,6 +4,7 @@
 // ============================================================================
 import { adminClient, publicClient } from "../lib/supabase";
 import { appError, type Result, ok, fail } from "../lib/errors";
+import { logSupabaseInsertError } from "../lib/supabaseLogging";
 
 export async function listPackages(): Promise<Result<unknown[]>> {
   try {
@@ -30,7 +31,14 @@ export async function createManualPayment(
       })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) {
+      logSupabaseInsertError("payments", error, {
+        vendor_id: vendorId,
+        package_id: packageId,
+        has_transaction_id: Boolean(transactionId),
+      });
+      throw error;
+    }
     return ok({ id: data.id });
   } catch (e) {
     return fail(e);

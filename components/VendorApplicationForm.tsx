@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { categories, cities } from "@/lib/quickfurno-data";
+import { submitVendorRegistration } from "@/app/actions";
+import { SERVICES } from "@/lib/config";
+import { cities } from "@/lib/quickfurno-data";
 
 type VendorFormState = {
   businessName: string;
@@ -54,8 +56,30 @@ export function VendorApplicationForm() {
     }
 
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    const messageParts = [
+      form.whatsappNumber.trim() ? `WhatsApp number: ${form.whatsappNumber.trim()}` : "",
+      form.subCategory.trim() ? `Sub-category: ${form.subCategory.trim()}` : "",
+      form.ratePerSqft.trim() ? `Rate per sq.ft: ${form.ratePerSqft.trim()}` : "",
+      form.address.trim() ? `Address: ${form.address.trim()}` : "",
+      form.message.trim() ? `Message: ${form.message.trim()}` : "",
+    ].filter(Boolean);
+
+    const result = await submitVendorRegistration({
+      business_name: form.businessName.trim(),
+      owner_name: form.ownerName.trim(),
+      phone: form.phone.trim(),
+      city: form.city,
+      service_categories: [form.serviceCategory],
+      experience: form.experience.trim() || undefined,
+      portfolio_urls: form.projectImage.trim() ? [form.projectImage.trim()] : [],
+      message: messageParts.join("\n") || undefined,
+    });
     setSubmitting(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
     setSuccess("Vendor application received. QuickFurno will review your profile and contact you shortly.");
     setForm(initialVendorForm);
   }
@@ -99,7 +123,7 @@ export function VendorApplicationForm() {
           <span>Service Category</span>
           <select value={form.serviceCategory} onChange={(event) => updateField("serviceCategory", event.target.value)}>
             <option value="">Select category</option>
-            {categories.map((category) => <option key={category.name} value={category.name}>{category.name}</option>)}
+            {SERVICES.map((service) => <option key={service} value={service}>{service}</option>)}
           </select>
         </label>
         <label>

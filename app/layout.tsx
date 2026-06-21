@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Raleway } from "next/font/google";
+import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import "./globals.css";
 
 const raleway = Raleway({
@@ -33,7 +34,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${raleway.variable} ${fraunces.variable}`}>
-      <body>{children}</body>
+      <body>
+        <EnquiryModalProvider>{children}</EnquiryModalProvider>
+      </body>
     </html>
   );
 }

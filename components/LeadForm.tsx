@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { categories, cities } from "@/lib/quickfurno-data";
+import { submitLead } from "@/app/actions";
+import { ENQUIRY_SERVICES } from "@/lib/config";
+import { cities } from "@/lib/quickfurno-data";
 
 type LeadFormState = {
   name: string;
@@ -55,14 +57,47 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       return;
     }
 
+    const payload = {
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      city: form.city,
+      service_category: form.serviceCategory,
+      budget_range: form.budgetRange,
+      requirement: form.requirement.trim() || undefined,
+      source: compact ? "Homepage compact lead form" : "Homepage lead form",
+    };
+
+    console.info("[lead form] submitting", {
+      source: payload.source,
+      city: payload.city,
+      service_category: payload.service_category,
+      has_budget_range: Boolean(payload.budget_range),
+      has_requirement: Boolean(payload.requirement),
+    });
+
     setSubmitting(true);
+    try {
+      const result = await submitLead(payload);
+      if (!result.ok) {
+        console.error("[lead form] submission failed", { code: result.code, error: result.error });
+        setError(result.error);
+        return;
+      }
 
-    // Future integration: submit this lead to /api/leads, save in Supabase leads table, trigger n8n workflow, assign to 4 active paid vendors, and send WhatsApp alerts.
-    await new Promise((resolve) => setTimeout(resolve, 700));
-
-    setSubmitting(false);
-    setSuccess("Thank you. QuickFurno will match you with 4 verified vendors shortly.");
-    setForm(initialState);
+      console.info("[lead form] submission confirmed", {
+        lead_id: result.data.id,
+        is_duplicate: result.data.is_duplicate,
+      });
+      setSuccess("Thank you. QuickFurno will match you with 4 verified vendors shortly.");
+      setForm(initialState);
+    } catch (err) {
+      console.error("[lead form] submission error", {
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError("We could not submit your enquiry. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -125,9 +160,9 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
             onChange={(event) => updateField("serviceCategory", event.target.value)}
           >
             <option value="">Select service</option>
-            {categories.map((category) => (
-              <option key={category.name} value={category.name}>
-                {category.name}
+            {ENQUIRY_SERVICES.map((service) => (
+              <option key={service} value={service}>
+                {service}
               </option>
             ))}
           </select>

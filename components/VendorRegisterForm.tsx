@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabaseBrowser";
-import { submitVendorRegistration } from "@/app/actions";
+import { submitVendorAccountRegistration } from "@/app/actions";
 import { CITY, SERVICES } from "@/lib/config";
 
 const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
@@ -33,17 +33,8 @@ export function VendorRegisterForm() {
     if (f.service_categories.length === 0) { setError("Pick at least one service you offer."); return; }
     setBusy(true);
 
-    // 1) create the auth account (role=vendor via metadata → trigger makes the profile)
-    const sb = browserClient();
-    const { data: auth, error: authErr } = await sb.auth.signUp({
-      email: f.email,
-      password: f.password,
-      options: { data: { role: "vendor", full_name: f.owner_name || f.business_name, phone: f.phone } },
-    });
-    if (authErr) { setError(authErr.message); setBusy(false); return; }
-
-    // 2) create the (pending) vendor business profile, linked to the account
-    const res = await submitVendorRegistration({
+    // Create the auth account and pending vendor row on the server.
+    const res = await submitVendorAccountRegistration({
       business_name: f.business_name,
       owner_name: f.owner_name || undefined,
       phone: f.phone,
@@ -56,13 +47,19 @@ export function VendorRegisterForm() {
       gst_number: f.gst_number || undefined,
       portfolio_urls: f.portfolio.split(",").map((u) => u.trim()).filter(Boolean),
       message: f.message || undefined,
-      user_id: auth.user?.id,
+      password: f.password,
+    });
+    if (!res.ok) { setError(res.error); setBusy(false); return; }
+
+    const { data: session, error: signInErr } = await browserClient().auth.signInWithPassword({
+      email: f.email,
+      password: f.password,
     });
     setBusy(false);
-    if (!res.ok) { setError(res.error); return; }
+    if (signInErr) { setDone(true); return; }
 
-    if (auth.session) { router.push("/vendor"); return; }  // logged in immediately
-    setDone(true);                                          // email confirmation required
+    if (session.session) { router.push("/vendor"); return; }
+    setDone(true);
   }
 
   if (done) {

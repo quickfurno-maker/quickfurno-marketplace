@@ -26,11 +26,30 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
     }
     if (f.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
     setBusy(true);
-    const res = await submitLead({ ...f, source: "Homepage" });
-    setBusy(false);
-    if (!res.ok) { setError(res.error); return; }
-    trackEvent("lead_submit", { source: "homepage", service: f.service_required });
-    setDone(true);
+    try {
+      console.info("[home enquiry form] submitting", {
+        source: "Homepage",
+        city: f.city,
+        service_category: f.service_required,
+        has_budget_range: Boolean(f.budget),
+        has_requirement: Boolean(f.message),
+      });
+      const res = await submitLead({ ...f, source: "Homepage" });
+      if (!res.ok) { setError(res.error); return; }
+      console.info("[home enquiry form] submission confirmed", {
+        lead_id: res.data.id,
+        is_duplicate: res.data.is_duplicate,
+      });
+      trackEvent("lead_submit", { source: "homepage", service: f.service_required });
+      setDone(true);
+    } catch (err) {
+      console.error("[home enquiry form] submission error", {
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError("We could not submit your enquiry. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (done) {

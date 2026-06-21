@@ -4,6 +4,7 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { appError, type Result, ok, fail } from "../lib/errors";
+import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
@@ -36,7 +37,15 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) {
+      logSupabaseInsertError("vendors", error, {
+        has_user_id: Boolean(input.user_id),
+        has_email: Boolean(input.email),
+        service_count: input.service_categories?.length ?? 0,
+        area_count: input.areas_covered?.length ?? 0,
+      });
+      throw error;
+    }
     return ok({ id: data.id });
   } catch (e) {
     return fail(e);
@@ -113,9 +122,17 @@ export async function updateVendorLeadStatus(
       .from("lead_assignments").update({ vendor_status: status }).eq("id", assignmentId);
     if (upErr) throw upErr;
 
-    await db.from("lead_status_updates").insert({
+    const { error: statusErr } = await db.from("lead_status_updates").insert({
       lead_assignment_id: assignmentId, vendor_id: a.vendor_id, status, notes: notes ?? null,
     });
+    if (statusErr) {
+      logSupabaseInsertError("lead_status_updates", statusErr, {
+        assignment_id: assignmentId,
+        vendor_id: a.vendor_id,
+        status,
+      });
+      throw statusErr;
+    }
     return ok(null);
   } catch (e) {
     return fail(e);
@@ -147,7 +164,14 @@ export async function reportBadLead(
       })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) {
+      logSupabaseInsertError("bad_lead_reports", error, {
+        assignment_id: assignmentId,
+        vendor_id: a.vendor_id,
+        has_description: Boolean(description),
+      });
+      throw error;
+    }
 
     await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", assignmentId);
     return ok({ id: data.id });

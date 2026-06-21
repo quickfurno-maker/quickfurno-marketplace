@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CategoryCards } from "@/components/CategoryCards";
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { FAQ } from "@/components/FAQ";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HowItWorks } from "@/components/HowItWorks";
-import { LeadForm } from "@/components/LeadForm";
 import { PortfolioGallery } from "@/components/PortfolioGallery";
 import { PricingEstimator } from "@/components/PricingEstimator";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
@@ -45,9 +45,9 @@ export default function HomePage() {
               </p>
 
               <div className="hero-cta-row">
-                <Link href="#lead-form" className="btn btn-primary">
-                  Get 4 Verified Quotes
-                </Link>
+                <EnquiryModalTrigger className="btn btn-primary">
+                  Get Free Quotes
+                </EnquiryModalTrigger>
                 <Link href="#verified-vendors" className="btn btn-secondary">
                   Browse Vendors
                 </Link>
@@ -72,7 +72,15 @@ export default function HomePage() {
             </div>
 
             <div className="hero-form-wrap">
-              <LeadForm />
+              <div className="hero-conversion-card">
+                <span className="eyebrow">Free client enquiry</span>
+                <h2>Ready to compare interior quotes?</h2>
+                <p>Tell us your requirement once and get matched with trusted studios.</p>
+                <EnquiryModalTrigger className="btn btn-primary">
+                  Get Free Quotes
+                </EnquiryModalTrigger>
+                <p className="hero-conversion-note">Verified studios in Pune & Mumbai. No spam.</p>
+              </div>
             </div>
           </div>
         </section>
@@ -110,9 +118,9 @@ export default function HomePage() {
                 Only vendors with an active paid plan appear on the client marketplace preview.
               </p>
             </div>
-            <Link href="#lead-form" className="btn btn-primary">
-              Get 4 Verified Quotes
-            </Link>
+            <EnquiryModalTrigger className="btn btn-primary">
+              Compare Interior Quotes
+            </EnquiryModalTrigger>
           </div>
           <div className="container">
             <VendorCards />
@@ -181,9 +189,9 @@ export default function HomePage() {
             <h2>Ready to start your home project?</h2>
             <p>Tell QuickFurno your requirement and get matched with verified vendors in Pune or Mumbai.</p>
             <div className="hero-cta-row">
-              <Link href="#lead-form" className="btn btn-primary">
-                Get 4 Verified Quotes
-              </Link>
+              <EnquiryModalTrigger className="btn btn-primary">
+                Start Enquiry
+              </EnquiryModalTrigger>
               <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">
                 WhatsApp Us
               </a>

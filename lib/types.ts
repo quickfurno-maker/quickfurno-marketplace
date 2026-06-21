@@ -15,11 +15,16 @@ export interface CreateLeadInput {
   phone: string;
   city: string;
   area?: string;
-  service_required: string;
+  service_required?: string;
+  service_category?: string;
+  serviceCategory?: string;
   budget?: string;
+  budget_range?: string;
+  budgetRange?: string;
   property_type?: string;
   timeline?: string;
   message?: string;
+  requirement?: string;
   source?: string;
 }
 

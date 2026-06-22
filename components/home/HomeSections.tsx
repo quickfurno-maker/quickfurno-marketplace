@@ -1,11 +1,6 @@
-import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
-import {
-  categorySlug,
-  clientTestimonials,
-  type QuickFurnoCategory,
-} from "@/lib/quickfurno-data";
+import { clientTestimonials } from "@/lib/quickfurno-data";
 
 export function HomeIllustration() {
   return (
@@ -163,60 +158,7 @@ export function ClientCTASection() {
   );
 }
 
-const popularServices: Array<{
-  title: string;
-  description: string;
-  icon: Parameters<typeof QFIcon>[0]["name"];
-  category: QuickFurnoCategory;
-}> = [
-  { title: "Premium Interior", description: "High-end finishes and managed execution.", icon: "home", category: "Premium Interiors" },
-  { title: "Interior Designer", description: "Complete design and turnkey support.", icon: "home", category: "Interior Designers" },
-  { title: "Modular Factory", description: "Factory-finish kitchens and wardrobes.", icon: "kitchen", category: "Modular Factory" },
-  { title: "Custom Sofa", description: "Sofa, recliner and upholstery work.", icon: "sofa", category: "Sofa" },
-  { title: "Painting", description: "Interior, texture and waterproofing.", icon: "paint", category: "Painter" },
-  { title: "Civil Work", description: "Renovation, tiling and mason work.", icon: "civil", category: "Civil Work" },
-];
-
-export function PopularServicesSection() {
-  return (
-    <section className="qf-home-section" id="popular-services">
-      <div className="qf-section-head qf-section-head--split">
-        <div>
-          <h2>Popular Services</h2>
-          <p>Explore the most requested home-service categories.</p>
-        </div>
-      </div>
-      <div className="qf-popular-grid" data-reveal-group>
-        {popularServices.map((service) => (
-          <Link key={service.title} className="qf-popular-card" href={`/category/${categorySlug(service.category)}`}>
-            <span className="qf-popular-icon">
-              <QFIcon name={service.icon} />
-            </span>
-            <strong>{service.title}</strong>
-            <p>{service.description}</p>
-            <span className="qf-card-link">Explore Vendors</span>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function VendorCTASection() {
-  return (
-    <section className="qf-vendor-cta">
-      <div>
-        <h2>Are you a carpenter, interior designer or home-service vendor?</h2>
-        <p>List your business on QuickFurno and receive relevant client enquiries.</p>
-      </div>
-      <Link href="/vendors" className="qf-teal-btn">
-        List Your Business
-      </Link>
-    </section>
-  );
-}
-
-// --- Phase 2A skeleton sections ---------------------------------------------
+// --- Homepage sections ------------------------------------------------------
 
 const trustStripItems = [
   { icon: "verified-vendors", title: "Verified Vendors", label: "Background-checked pros" },
@@ -255,10 +197,10 @@ export function CoverageSection() {
       <div className="qf-coverage" data-reveal>
         <div>
           <span className="qf-u-eyebrow">Now serving</span>
-          <h2>Trusted home-service vendors across Pune &amp; Mumbai</h2>
+          <h2>We&apos;re live in Pune &amp; Mumbai</h2>
           <p>
-            QuickFurno matches you with verified local experts wherever you are in
-            Pune and Mumbai — with more cities on the way.
+            QuickFurno connects you with verified local experts across Pune and
+            Mumbai — with more cities on the way.
           </p>
           <div className="qf-coverage-cities">
             <span>Pune</span>

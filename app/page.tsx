@@ -10,9 +10,7 @@ import {
   CoverageSection,
   HomeHowItWorksSection,
   HomeTestimonials,
-  PopularServicesSection,
   TrustStrip,
-  VendorCTASection,
   WhyChooseSection,
   trustBadges,
 } from "@/components/home/HomeSections";
@@ -102,11 +100,9 @@ export default function HomePage() {
           <TrustStrip />
           <HomeHowItWorksSection />
           <WhyChooseSection />
-          <PopularServicesSection />
           <CoverageSection />
           <HomeTestimonials />
           <ClientCTASection />
-          <VendorCTASection />
         </div>
       </main>
       <Footer />

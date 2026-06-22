@@ -414,6 +414,7 @@ h3 {
   align-items: center;
   gap: 0.5rem;
   width: fit-content;
+  max-width: 100%;
   border: 1px solid rgba(198, 120, 33, 0.3);
   border-radius: 999px;
   padding: 0.4rem 0.85rem;
@@ -423,6 +424,7 @@ h3 {
   font-weight: 850;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  line-height: 1.25;
   box-shadow: 0 8px 20px rgba(198, 120, 33, 0.1);
   animation: qfFadeUp 640ms ease both;
 }
@@ -2200,4 +2202,55 @@ h3 {
   .qf-card-hover:hover {
     transform: none !important;
   }
+}
+
+/* ============================================================
+   Phase 9B — mobile horizontal-overflow safety (homepage).
+   Width/wrap guards only; desktop layout unchanged.
+   ============================================================ */
+@media (max-width: 768px) {
+  .qf-home-app-shell,
+  .qf-hero-section,
+  .qf-home-section,
+  .qf-hero-copy,
+  .qf-hero-visual {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Long headings/copy must wrap, never push the page wider */
+  .qf-hero-copy h1,
+  .qf-hero-copy p,
+  .qf-section-head h2,
+  .qf-section-head p {
+    overflow-wrap: break-word;
+  }
+
+  .qf-hero-eyebrow {
+    white-space: normal;
+  }
+
+  /* CTAs never extend past the screen */
+  .qf-hero-actions .qf-gold-btn,
+  .qf-hero-actions .qf-outline-btn,
+  .qf-hero-actions .qf-teal-btn,
+  .qf-client-cta .qf-gold-btn {
+    max-width: 100%;
+  }
+}
+
+/* Bottom mobile nav: pinned full width, fully contained */
+.qf-bottom-nav {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.qf-bottom-nav-item {
+  min-width: 0;
+}
+.qf-bottom-nav-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

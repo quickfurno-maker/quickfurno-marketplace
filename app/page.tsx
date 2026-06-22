@@ -37,8 +37,8 @@ export default function HomePage() {
           <div className="container hero-grid">
             <div className="hero-copy">
               <h1 className="hero-headline hero-rise">
-                Find verified interior &amp; home-service{" "}
-                <span className="hl">vendors near you.</span>
+                Find Verified Home-Service{" "}
+                <span className="hl">Vendors Near You</span>
               </h1>
               <p className="hero-sub hero-rise">
                 Compare trusted interior designers, carpenters, modular factories, painters,
@@ -48,7 +48,7 @@ export default function HomePage() {
 
               <div className="hero-cta-row hero-rise">
                 <EnquiryModalTrigger className="btn btn-primary btn-shine">
-                  Get Free Quotes
+                  Get 4 Free Quotes
                 </EnquiryModalTrigger>
                 <Link href="#verified-vendors" className="btn btn-secondary">
                   Explore Vendors
@@ -60,6 +60,7 @@ export default function HomePage() {
                 <li>Transparent rates</li>
                 <li>Free enquiry</li>
                 <li>Pune &amp; Mumbai</li>
+                <li>No spam</li>
               </ul>
 
               <div className="hero-social-proof hero-rise">
@@ -156,10 +157,10 @@ export default function HomePage() {
           </div>
           <div className="container choose-grid" data-reveal-group>
             {whyChooseQuickFurno.map((item) => (
-              <article className="choose-card" key={item}>
-                <span aria-hidden="true">OK</span>
-                <h3>{item}</h3>
-                <p>Designed to help homeowners compare confidently before starting a project.</p>
+              <article className="choose-card" key={item.title}>
+                <span aria-hidden="true">✓</span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
               </article>
             ))}
           </div>

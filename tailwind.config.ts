@@ -5,20 +5,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Indigo & Coral brand. Keys ("navy"/"gold") retained for compatibility
-        // with existing utility usage; values are the new palette.
-        navy:   { DEFAULT: "#4F46E5", deep: "#312A6B", ink: "#1E1B3A" },
-        gold:   { DEFAULT: "#FF6B5A", soft: "#FF8A7A", deep: "#E0493A" },
-        ivory:  "#F7F7FB",
-        muted:  "#5B5670",
+        // Beige editorial brand. Keys ("navy"/"gold") retained for compatibility
+        // with existing utility usage; values are the warm palette.
+        navy:   { DEFAULT: "#171412", deep: "#221C15", ink: "#181512" },
+        gold:   { DEFAULT: "#B8874A", soft: "#C9A066", deep: "#9A6E37" },
+        ivory:  "#F7F1E8",
+        muted:  "#70675D",
       },
       fontFamily: {
-        display: ["var(--font-jakarta)", "ui-sans-serif", "system-ui", "sans-serif"],
-        sans:    ["var(--font-jakarta)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-playfair)", "Cormorant Garamond", "Georgia", "serif"],
+        serif:   ["var(--font-playfair)", "Cormorant Garamond", "Georgia", "serif"],
+        sans:    ["var(--font-manrope)", "var(--font-jakarta)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
         lift: "0 24px 60px -20px rgba(0,0,0,0.55)",
-        gold: "0 0 0 1px rgba(255,107,90,0.35), 0 18px 40px -18px rgba(255,107,90,0.4)",
+        gold: "0 0 0 1px rgba(184,135,74,0.35), 0 18px 40px -18px rgba(184,135,74,0.4)",
       },
       borderRadius: { xl2: "1.25rem" },
     },

@@ -42,44 +42,44 @@ export const categories: Array<{
   {
     name: "Interior Designers",
     icon: "ID",
-    description: "Full home interiors, kitchen, wardrobe and premium design execution.",
-    startingPrice: "Starting ₹1,250/sq.ft",
+    description: "Complete home interiors, space planning and execution support.",
+    startingPrice: "Starting ₹1,499/sq.ft",
   },
   {
     name: "Carpenters",
     icon: "CP",
-    description: "Custom furniture, wardrobes, repairs and on-site woodwork.",
-    startingPrice: "Starting ₹250/sq.ft",
+    description: "Custom furniture, wardrobes, storage and on-site woodwork.",
+    startingPrice: "Starting ₹450/sq.ft",
   },
   {
     name: "Modular Factory",
     icon: "MF",
-    description: "Factory-made kitchen, wardrobes and modular furniture.",
+    description: "Machine-finish kitchens, wardrobes and factory-made furniture.",
     startingPrice: "Starting ₹1,250/sq.ft",
   },
   {
     name: "Premium Interiors",
     icon: "PI",
-    description: "Luxury design, premium materials and managed execution.",
-    startingPrice: "Starting ₹1,450/sq.ft",
+    description: "High-end materials, premium finish and managed execution.",
+    startingPrice: "Starting ₹2,499/sq.ft",
   },
   {
     name: "Sofa",
     icon: "SF",
-    description: "Custom sofas, recliners, repairs and upholstery.",
-    startingPrice: "Custom pricing",
+    description: "Custom sofa makers, recliners and upholstery vendors.",
+    startingPrice: "Starting ₹18,000",
   },
   {
     name: "Painter",
     icon: "PT",
-    description: "Home painting, texture walls and premium finish work.",
-    startingPrice: "Starting ₹22/sq.ft",
+    description: "Interior painting, texture walls and waterproofing support.",
+    startingPrice: "Starting ₹12/sq.ft",
   },
   {
     name: "Civil Work",
     icon: "CW",
-    description: "Renovation, breaking, masonry, tiling and repair work.",
-    startingPrice: "Project based",
+    description: "Renovation, false ceiling, POP, tiling and repair work.",
+    startingPrice: "Starting site inspection",
   },
 ];
 
@@ -256,13 +256,31 @@ export const portfolioProjects = [
   imageTone: ["warm-suite", "kitchen-line", "wood-craft", "sofa-studio", "paint-finish", "civil-reno"][index % 6],
 }));
 
-export const whyChooseQuickFurno = [
-  "Verified vendors only",
-  "Compare transparent rates",
-  "View real project images",
-  "Get fast response",
-  "No obligation",
-  "Support after enquiry",
+export const whyChooseQuickFurno: { title: string; body: string }[] = [
+  {
+    title: "Verified vendors only",
+    body: "Every listed vendor is checked for service category, location, response quality and profile completeness.",
+  },
+  {
+    title: "Maximum 4 quotes",
+    body: "We do not send your number to 20 vendors. You get a limited set of relevant verified vendors.",
+  },
+  {
+    title: "Transparent rates",
+    body: "View starting rates before speaking to vendors, so you can compare with confidence.",
+  },
+  {
+    title: "No spam promise",
+    body: "Your enquiry is shared only with selected vendors matching your city and requirement.",
+  },
+  {
+    title: "Local network",
+    body: "Start with Pune and Mumbai vendors who understand local pricing and execution.",
+  },
+  {
+    title: "Better comparison",
+    body: "Compare rates, ratings, response time, service areas and experience in one place.",
+  },
 ];
 
 export const clientTestimonials = [

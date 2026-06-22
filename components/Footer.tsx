@@ -66,7 +66,7 @@ export function Footer() {
         </div>
       </div>
       <div className="container footer-bottom">
-        <span>© 2026 QuickFurno. Pune & Mumbai.</span>
+        <span>© 2026 QuickFurno · Pune &amp; Mumbai</span>
         <span>Verified vendors. Transparent rates. Fast response.</span>
       </div>
     </footer>

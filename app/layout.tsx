@@ -1,15 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Manrope, Playfair_Display } from "next/font/google";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
 
-// One premium type family across the whole site, with weight variation for hierarchy.
-const jakarta = Plus_Jakarta_Sans({
+// Editorial type system: Playfair Display for premium headlines/section titles
+// and brand accent; Manrope for clean body, UI and forms.
+const manrope = Manrope({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-jakarta",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-manrope",
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
   display: "swap",
 });
 
@@ -32,15 +41,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F7FB" },
-    { media: "(prefers-color-scheme: dark)", color: "#1E1B3A" },
+    { media: "(prefers-color-scheme: light)", color: "#F7F1E8" },
+    { media: "(prefers-color-scheme: dark)", color: "#1F1A14" },
   ],
   colorScheme: "light",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={jakarta.variable}>
+    <html lang="en" className={`${manrope.variable} ${playfair.variable}`}>
       <body>
         <ScrollProgress />
         <ScrollReveal />

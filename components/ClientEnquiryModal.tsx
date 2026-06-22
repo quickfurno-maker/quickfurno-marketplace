@@ -20,26 +20,36 @@ type EnquiryFormState = {
   name: string;
   phone: string;
   city: string;
+  area: string;
   serviceCategory: string;
   budgetRange: string;
+  timeline: string;
   requirement: string;
 };
 
 const budgetOptions = [
-  "Below Rs. 1 lakh",
-  "Rs. 1-3 lakh",
-  "Rs. 3-5 lakh",
-  "Rs. 5-10 lakh",
-  "Above Rs. 10 lakh",
-  "Not sure yet",
+  "Below ₹1 lakh",
+  "₹1–3 lakh",
+  "₹3–7 lakh",
+  "₹7–15 lakh",
+  "₹15 lakh+",
+];
+
+const timelineOptions = [
+  "Immediately",
+  "Within 15 days",
+  "Within 30 days",
+  "Planning stage",
 ];
 
 const initialState: EnquiryFormState = {
   name: "",
   phone: "",
   city: "",
+  area: "",
   serviceCategory: "",
   budgetRange: "",
+  timeline: "",
   requirement: "",
 };
 
@@ -168,8 +178,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       name: form.name.trim(),
       phone: form.phone.trim(),
       city: form.city,
+      area: form.area.trim() || undefined,
       service_category: form.serviceCategory,
       budget_range: form.budgetRange,
+      timeline: form.timeline || undefined,
       requirement: form.requirement.trim() || undefined,
       source: "Homepage enquiry popup",
     };
@@ -291,6 +303,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       </label>
 
                       <label>
+                        <span>Area / Locality</span>
+                        <input
+                          value={form.area}
+                          onChange={(event) => updateField("area", event.target.value)}
+                          placeholder="e.g. Kharadi, Baner"
+                          autoComplete="address-level2"
+                        />
+                      </label>
+
+                      <label>
                         <span>Service required</span>
                         <select
                           value={form.serviceCategory}
@@ -310,13 +332,25 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                         </select>
                       </label>
 
-                      <label className="form-grid-full">
+                      <label>
                         <span>Budget range</span>
                         <select value={form.budgetRange} onChange={(event) => updateField("budgetRange", event.target.value)}>
                           <option value="">Select budget</option>
                           {budgetOptions.map((budget) => (
                             <option key={budget} value={budget}>
                               {budget}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>Timeline</span>
+                        <select value={form.timeline} onChange={(event) => updateField("timeline", event.target.value)}>
+                          <option value="">Select timeline</option>
+                          {timelineOptions.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
                             </option>
                           ))}
                         </select>
@@ -337,7 +371,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       {submitting ? "Submitting..." : "Submit Enquiry"}
                     </button>
                     <p className="enquiry-modal-trust">
-                      Your details are shared only with matched verified vendors.
+                      Free enquiry. Your number is shared only with limited verified vendors.
                     </p>
                   </form>
                 ) : (

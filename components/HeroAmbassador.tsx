@@ -15,12 +15,12 @@ export function SareeAmbassador({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient id="amb-saree" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#4F46E5" />
+          <stop offset="0" stopColor="#B8874A" />
           <stop offset="1" stopColor="#083b2e" />
         </linearGradient>
         <linearGradient id="amb-gold" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#FF8A7A" />
-          <stop offset="1" stopColor="#FF6B5A" />
+          <stop offset="0" stopColor="#C9A066" />
+          <stop offset="1" stopColor="#B8874A" />
         </linearGradient>
         <radialGradient id="amb-bg" cx="50%" cy="32%" r="75%">
           <stop offset="0" stopColor="#fbf3e3" />

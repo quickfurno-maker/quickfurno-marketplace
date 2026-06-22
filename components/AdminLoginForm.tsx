@@ -64,13 +64,13 @@ export function AdminLoginForm({ initialError }: AdminLoginFormProps) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#EEF0FB] px-5 py-10 text-[#16131F]">
+    <main className="flex min-h-screen items-center justify-center bg-[#F3EADF] px-5 py-10 text-[#181512]">
       <section className="w-full max-w-md rounded-[28px] border border-white/80 bg-white p-7 shadow-[0_30px_90px_rgba(15,23,42,0.14)]">
         <div className="mb-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#4F46E5]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#B8874A]">
             QuickFurno Admin
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#1E1B3A]">
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#1F1A14]">
             Superadmin login
           </h1>
           <p className="mt-2 text-sm leading-6 text-[#667085]">
@@ -94,7 +94,7 @@ export function AdminLoginForm({ initialError }: AdminLoginFormProps) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              className="mt-2 w-full rounded-2xl border border-[#d0d5dd] bg-white px-4 py-3 text-sm text-[#16131F] outline-none transition focus:border-[#4F46E5] focus:ring-4 focus:ring-[#4F46E5]/15"
+              className="mt-2 w-full rounded-2xl border border-[#d0d5dd] bg-white px-4 py-3 text-sm text-[#181512] outline-none transition focus:border-[#B8874A] focus:ring-4 focus:ring-[#B8874A]/15"
             />
           </label>
 
@@ -106,14 +106,14 @@ export function AdminLoginForm({ initialError }: AdminLoginFormProps) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
-              className="mt-2 w-full rounded-2xl border border-[#d0d5dd] bg-white px-4 py-3 text-sm text-[#16131F] outline-none transition focus:border-[#4F46E5] focus:ring-4 focus:ring-[#4F46E5]/15"
+              className="mt-2 w-full rounded-2xl border border-[#d0d5dd] bg-white px-4 py-3 text-sm text-[#181512] outline-none transition focus:border-[#B8874A] focus:ring-4 focus:ring-[#B8874A]/15"
             />
           </label>
 
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-2xl bg-[#1E1B3A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl bg-[#1F1A14] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Signing in..." : "Sign in"}
           </button>

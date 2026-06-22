@@ -103,12 +103,17 @@ export function VendorCards({
               </div>
 
               <div className="badge-row">
-                {vendor.verified ? <span className="status-badge status-badge--verified">Verified</span> : null}
-                <span className="status-badge status-badge--paid">Active plan</span>
+                {vendor.verified ? <span className="status-badge status-badge--verified">QuickFurno verified</span> : null}
+                <span className="status-badge status-badge--paid">Limited leads accepted</span>
                 {vendor.featured ? <span className="status-badge status-badge--featured">Featured</span> : null}
               </div>
 
               <p className="vendor-description">{vendor.description}</p>
+
+              <ul className="vendor-trust-note" aria-label="Vendor checks">
+                <li>Business checked</li>
+                <li>Project photos verified</li>
+              </ul>
 
               <dl className="vendor-meta-grid">
                 <div>

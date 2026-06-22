@@ -1,8 +1,8 @@
 import Image from "next/image";
 
 const gradients = [
-  "linear-gradient(135deg, #4F46E5, #1E1B3A)",
-  "linear-gradient(135deg, #FF6B5A, #E0493A)",
+  "linear-gradient(135deg, #B8874A, #1F1A14)",
+  "linear-gradient(135deg, #B8874A, #9A6E37)",
   "linear-gradient(135deg, #126b76, #073b43)",
   "linear-gradient(135deg, #8b5a2b, #2f4b4b)",
   "linear-gradient(135deg, #6a716d, #142d36)",

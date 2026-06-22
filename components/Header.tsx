@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { label: "Services", href: "/#services" },
-  { label: "How It Works", href: "/#how-it-works" },
-  { label: "Verified Vendors", href: "/#verified-vendors" },
-  { label: "Reviews", href: "/#reviews" },
-  { label: "For Vendors", href: "/vendors" },
+  { label: "Home", href: "/" },
+  { label: "Categories", href: "/#services" },
+  { label: "Vendors", href: "/#verified-vendors" },
+  { label: "How it Works", href: "/#how-it-works" },
+  { label: "Vendor Plans", href: "/vendors" },
 ];
 
 export function Header() {

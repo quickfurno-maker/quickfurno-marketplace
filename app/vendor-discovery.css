@@ -1058,3 +1058,62 @@
     transform: none !important;
   }
 }
+
+/* ============================================================
+   Phase 7 — listing/detail animation polish (transform/opacity).
+   Also globally gated by the reduced-motion reset in globals.css.
+   ============================================================ */
+@keyframes qfSlotEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Filter chips: subtle hover lift (active state already handled) */
+.qf-filter-chip {
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.qf-filter-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(198, 120, 33, 0.5);
+  box-shadow: 0 8px 18px rgba(198, 120, 33, 0.14);
+}
+
+/* Quote / profile action buttons: gentle hover + press */
+.qf-action-btn {
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+}
+.qf-action-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+.qf-action-btn:active {
+  transform: scale(0.98);
+}
+
+/* Right sticky lead card + bottom sticky mobile CTA: soft entrance */
+.listing-assist-card,
+.vendor-detail-side-card {
+  animation: qfSlotEnter 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.vendor-detail-mobile-cta {
+  animation: qfSlotEnter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-filter-chip:hover,
+  .qf-action-btn:hover {
+    transform: none !important;
+  }
+  .listing-assist-card,
+  .vendor-detail-side-card,
+  .vendor-detail-mobile-cta {
+    animation: none !important;
+  }
+}

@@ -142,10 +142,19 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 80;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(17, 17, 17, 0.92);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(17, 17, 17, 0.82);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(12px);
+  transition: background 280ms ease, box-shadow 280ms ease, border-color 280ms ease;
+}
+
+/* Elevated / more solid once the page is scrolled (toggled in Header.tsx) */
+.qf-site-header--scrolled {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: rgba(13, 13, 13, 0.95);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
 }
 
 .qf-header-shell {
@@ -592,6 +601,10 @@ h3 {
 .qf-teal-btn:hover {
   transform: translateY(-2px);
   filter: brightness(1.04);
+}
+
+.qf-gold-btn:hover {
+  box-shadow: 0 20px 40px rgba(198, 120, 33, 0.42);
 }
 
 .qf-outline-btn {
@@ -2103,4 +2116,88 @@ h3 {
 /* Tight section spacing modifier */
 .qf-home-section--tight {
   margin-block: 0.25rem;
+}
+
+/* ============================================================
+   Phase 7 — Premium lightweight animation utilities.
+   Transform/opacity only. All disabled under reduced motion.
+   ============================================================ */
+@keyframes qfFadeUpUtil {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes qfModalEnterUtil {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Load-time fade-up (and reveal alias) */
+.qf-fade-up,
+.qf-reveal {
+  animation: qfFadeUpUtil 0.66s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Hover lift — for any interactive surface */
+.qf-hover-lift {
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
+  will-change: transform;
+}
+.qf-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--qf-shadow-lift);
+}
+
+/* Soft copper glow on hover — for CTAs/emphasis */
+.qf-soft-glow {
+  transition: box-shadow 0.28s ease, filter 0.28s ease;
+}
+.qf-soft-glow:hover {
+  box-shadow: 0 14px 34px rgba(198, 120, 33, 0.34);
+  filter: brightness(1.03);
+}
+
+/* Combined premium card hover */
+.qf-card-hover {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s ease, border-color 0.28s ease;
+  will-change: transform;
+}
+.qf-card-hover:hover {
+  transform: translateY(-5px);
+  border-color: rgba(198, 120, 33, 0.4);
+  box-shadow: var(--qf-shadow-card);
+}
+
+/* Modal enter (opt-in) */
+.qf-modal-enter {
+  animation: qfModalEnterUtil 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-fade-up,
+  .qf-reveal,
+  .qf-modal-enter {
+    animation: none !important;
+  }
+  .qf-hover-lift,
+  .qf-soft-glow,
+  .qf-card-hover {
+    transition: none !important;
+  }
+  .qf-hover-lift:hover,
+  .qf-card-hover:hover {
+    transform: none !important;
+  }
 }

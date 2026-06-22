@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
@@ -19,9 +19,29 @@ const NAV_LINKS = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Lightweight, rAF-throttled scroll listener that elevates the header once
+  // the page is scrolled. Transform/opacity/shadow only — no layout work.
+  useEffect(() => {
+    let raf = 0;
+    const update = () => {
+      setScrolled(window.scrollY > 8);
+      raf = 0;
+    };
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
 
   return (
-    <header className="qf-site-header">
+    <header className={`qf-site-header${scrolled ? " qf-site-header--scrolled" : ""}`}>
       <div className="qf-header-shell">
         <Link href="/" className="qf-brand" aria-label="QuickFurno home" onClick={() => setOpen(false)}>
           <span className="qf-brand-mark">

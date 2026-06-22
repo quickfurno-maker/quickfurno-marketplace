@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:supabase:lead": "node scripts/test-supabase-lead-insert.mjs"
+    "test:supabase:lead": "node scripts/test-supabase-lead-insert.mjs",
+    "grant:superadmin": "node scripts/grant-superadmin.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -23,7 +23,7 @@ export function MobileBottomNav() {
         <QFIcon name="home" />
         <span>Home</span>
       </Link>
-      <Link href="/#services" className="qf-bottom-nav-item">
+      <Link href="/#categories" className="qf-bottom-nav-item">
         <QFIcon name="grid" />
         <span>Categories</span>
       </Link>

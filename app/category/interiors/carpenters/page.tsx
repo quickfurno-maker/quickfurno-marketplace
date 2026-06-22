@@ -20,23 +20,30 @@ export const metadata: Metadata = {
   },
 };
 
-type VendorBadge = "Verified" | "Premium" | "Top Rated" | "Direct Factory";
+type VendorBadge =
+  | "Verified"
+  | "Premium"
+  | "Top Rated"
+  | "Direct Factory"
+  | "Subscription Active"
+  | "Priority";
 
 type ListingVendor = {
   name: string;
   slug: string;
   logo: string;
   thumbnail: string;
+  professionalLabel: string;
+  experience: string;
   badges: VendorBadge[];
+  isSubscribed: boolean;
+  priorityRank: number;
   rating: number;
   reviews: number;
   location: string;
-  serviceLine: string;
-  experience: string;
   tags: string[];
   price: string;
-  note: string;
-  contactAction: "whatsapp" | "callback";
+  usp: string;
 };
 
 const quickFilters = [
@@ -62,89 +69,162 @@ const quickFilters = [
   },
 ];
 
-const vendors: ListingVendor[] = [
+const filterSections = [
+  {
+    title: "Ratings",
+    options: ["4.5 & above", "4.0 & above", "3.5 & above", "All Ratings"],
+    checked: ["4.5 & above"],
+  },
+  {
+    title: "Service Type",
+    options: ["Modular Factory", "On-site Carpentry", "Customization Experts", "Design + Build"],
+    checked: ["Modular Factory"],
+  },
+  {
+    title: "City",
+    options: ["Pune", "PCMC", "Baner", "Kharadi", "Hinjewadi"],
+    checked: ["Pune"],
+  },
+  {
+    title: "Response Time",
+    options: ["Within 30 mins", "Within 1 hour", "Within 2 hours", "Anytime"],
+    checked: ["Within 30 mins"],
+  },
+];
+
+const unsortedVendors: ListingVendor[] = [
   {
     name: "ModuCraft Interiors",
     slug: "moducraft-interiors",
     logo: "/assets/quickfurno/images/vendors/moducraft-logo.svg",
     thumbnail: "/assets/quickfurno/images/vendors/modular-kitchen.svg",
-    badges: ["Verified", "Premium"],
+    professionalLabel: "Modular Factory",
+    experience: "8+ Years",
+    badges: ["Verified", "Premium", "Subscription Active", "Priority"],
+    isSubscribed: true,
+    priorityRank: 1,
     rating: 4.8,
     reviews: 310,
     location: "Pune",
-    serviceLine: "Modular Factory",
-    experience: "8+ Years",
     tags: ["Modular Factory", "Machine Finish", "Premium Interiors"],
     price: "\u20b91,250 / sq ft",
-    note: "Factory-made modular furniture with machine-finish precision.",
-    contactAction: "whatsapp",
+    usp: "Factory-made modular furniture with machine-finish precision.",
   },
   {
     name: "WoodNest Interiors",
     slug: "woodnest-interiors",
     logo: "/assets/quickfurno/images/vendors/woodnest-logo.svg",
     thumbnail: "/assets/quickfurno/images/vendors/wardrobe-interior.svg",
-    badges: ["Verified", "Top Rated"],
+    professionalLabel: "On-site Carpentry",
+    experience: "6+ Years",
+    badges: ["Verified", "Top Rated", "Subscription Active"],
+    isSubscribed: true,
+    priorityRank: 2,
     rating: 4.7,
     reviews: 235,
     location: "Pune",
-    serviceLine: "On-site Carpentry",
-    experience: "6+ Years",
     tags: ["On-site Carpentry", "Custom Design", "Timely Delivery"],
     price: "\u20b9950 / sq ft",
-    note: "Custom carpentry with flawless finishing and timely delivery.",
-    contactAction: "whatsapp",
+    usp: "Custom carpentry with flawless finishing and timely delivery.",
   },
   {
     name: "Urban Wood Studio",
     slug: "urban-wood-studio",
     logo: "/assets/quickfurno/images/vendors/urbanwood-logo.svg",
     thumbnail: "/assets/quickfurno/images/vendors/premium-living-room.svg",
-    badges: ["Verified", "Direct Factory"],
+    professionalLabel: "Modular Factory",
+    experience: "10+ Years",
+    badges: ["Verified", "Direct Factory", "Subscription Active"],
+    isSubscribed: true,
+    priorityRank: 3,
     rating: 4.6,
     reviews: 198,
     location: "Pune",
-    serviceLine: "Modular Factory",
-    experience: "10+ Years",
     tags: ["Direct Factory", "Modular Furniture", "Best Price"],
     price: "\u20b91,150 / sq ft",
-    note: "Direct factory pricing for modular furniture and custom units.",
-    contactAction: "whatsapp",
+    usp: "Direct factory pricing for modular furniture and custom units.",
+  },
+  {
+    name: "FineLine Carpentry",
+    slug: "fineline-carpentry",
+    logo: "/assets/quickfurno/images/vendors/fineline-logo.svg",
+    thumbnail: "/assets/quickfurno/images/vendors/wood-shelving.svg",
+    professionalLabel: "On-site Carpentry",
+    experience: "5+ Years",
+    badges: ["Verified"],
+    isSubscribed: false,
+    priorityRank: 20,
+    rating: 4.4,
+    reviews: 164,
+    location: "Pune",
+    tags: ["Custom Design", "Civil Carpentry", "Furniture Repair"],
+    price: "\u20b9800 / sq ft",
+    usp: "Fast response with expert on-site carpentry solutions.",
   },
   {
     name: "Prism Interiors",
     slug: "prism-interiors",
     logo: "/assets/quickfurno/images/vendors/prism-logo.svg",
     thumbnail: "/assets/quickfurno/images/vendors/office-interior.svg",
-    badges: ["Verified", "Premium"],
+    professionalLabel: "Modular Factory",
+    experience: "12+ Years",
+    badges: ["Verified", "Premium", "Subscription Active"],
+    isSubscribed: true,
+    priorityRank: 4,
     rating: 4.6,
     reviews: 420,
     location: "Pune",
-    serviceLine: "Modular Factory",
-    experience: "12+ Years",
     tags: ["Luxury Interiors", "Modular Factory", "10 Yr Warranty"],
     price: "\u20b91,600 / sq ft",
-    note: "Luxury modular interiors with extended warranty support.",
-    contactAction: "callback",
+    usp: "Luxury modular interiors with extended warranty support.",
+  },
+  {
+    name: "CraftEdge Solutions",
+    slug: "craftedge-solutions",
+    logo: "/assets/quickfurno/images/vendors/craftedge-logo.svg",
+    thumbnail: "/assets/quickfurno/images/vendors/wardrobe-interior.svg",
+    professionalLabel: "On-site Carpentry",
+    experience: "7+ Years",
+    badges: ["Verified"],
+    isSubscribed: false,
+    priorityRank: 21,
+    rating: 4.4,
+    reviews: 122,
+    location: "Pune",
+    tags: ["On-site Carpentry", "Interiors Fit-Out", "Budget Friendly"],
+    price: "\u20b9650 / sq ft",
+    usp: "Budget-friendly solutions with quality workmanship.",
   },
 ];
+
+const vendors = [...unsortedVendors].sort((a, b) => {
+  if (Number(b.isSubscribed) !== Number(a.isSubscribed)) {
+    return Number(b.isSubscribed) - Number(a.isSubscribed);
+  }
+  if (a.priorityRank !== b.priorityRank) return a.priorityRank - b.priorityRank;
+  return b.rating - a.rating;
+});
 
 function badgeClass(badge: VendorBadge) {
   if (badge === "Verified") return styles.badgeVerified;
   if (badge === "Premium") return styles.badgePremium;
   if (badge === "Top Rated") return styles.badgeTopRated;
-  return styles.badgeFactory;
+  if (badge === "Direct Factory") return styles.badgeFactory;
+  if (badge === "Subscription Active") return styles.badgeSubscription;
+  return styles.badgePriority;
 }
 
 function VendorListingCard({ vendor, priority }: { vendor: ListingVendor; priority?: boolean }) {
+  const enquiryRequirement = `I want a quote from ${vendor.name} for carpentry work in Pune.`;
+
   return (
-    <article className={styles.vendorCard}>
+    <article className={`${styles.vendorCard} ${vendor.isSubscribed ? styles.vendorCardPriority : ""}`}>
       <div className={styles.logoWrap}>
         <Image src={vendor.logo} width={92} height={92} alt={`${vendor.name} logo`} priority={priority} />
       </div>
 
       <div className={styles.vendorBody}>
-        <div className={styles.badgeRow} aria-label={`${vendor.name} badges`}>
+        <div className={styles.badgeRow} aria-label={`${vendor.name} trust and priority badges`}>
           {vendor.badges.map((badge) => (
             <span className={`${styles.badge} ${badgeClass(badge)}`} key={badge}>
               {badge}
@@ -155,16 +235,20 @@ function VendorListingCard({ vendor, priority }: { vendor: ListingVendor; priori
         <div>
           <h2>{vendor.name}</h2>
           <p className={styles.vendorMeta}>
-            {vendor.serviceLine}
+            <span>{vendor.professionalLabel}</span>
             <span aria-hidden="true">.</span>
-            {vendor.experience}
+            <span>{vendor.experience}</span>
           </p>
         </div>
 
         <div className={styles.proofRow}>
-          <span className={styles.ratingStar} aria-hidden="true">
-            *
-          </span>
+          <Image
+            src="/assets/quickfurno/icons/actions/star-rating.svg"
+            width={16}
+            height={16}
+            alt=""
+            aria-hidden="true"
+          />
           <strong>{vendor.rating.toFixed(1)}</strong>
           <span>({vendor.reviews} reviews)</span>
           <span aria-hidden="true">.</span>
@@ -177,7 +261,7 @@ function VendorListingCard({ vendor, priority }: { vendor: ListingVendor; priori
           ))}
         </div>
 
-        <p className={styles.vendorNote}>{vendor.note}</p>
+        <p className={styles.vendorUsp}>{vendor.usp}</p>
       </div>
 
       <div className={styles.vendorAside}>
@@ -191,7 +275,7 @@ function VendorListingCard({ vendor, priority }: { vendor: ListingVendor; priori
             src={vendor.thumbnail}
             alt={`${vendor.name} project thumbnail`}
             fill
-            sizes="(max-width: 760px) 33vw, 160px"
+            sizes="(max-width: 760px) 36vw, 160px"
             priority={priority}
           />
         </div>
@@ -205,36 +289,67 @@ function VendorListingCard({ vendor, priority }: { vendor: ListingVendor; priori
             modalTitle={`Get quote from ${vendor.name}`}
             serviceCategory="Carpentry"
             city="Pune"
-            requirement={`I want a quote from ${vendor.name} for carpentry work.`}
-            source={`Phase 3A listing quote: ${vendor.slug}`}
+            requirement={enquiryRequirement}
+            source={`Phase 3B listing quote: ${vendor.slug}`}
           >
             Get Quote
           </EnquiryModalTrigger>
         </div>
 
-        {vendor.contactAction === "whatsapp" ? (
+        {vendor.isSubscribed ? (
           <a
             className={styles.whatsappAction}
             href={whatsappLink(`Hi QuickFurno, I want to contact ${vendor.name} for carpentry work in Pune.`)}
             target="_blank"
             rel="noopener noreferrer"
           >
+            <Image
+              src="/assets/quickfurno/icons/actions/whatsapp.svg"
+              width={15}
+              height={15}
+              alt=""
+              aria-hidden="true"
+            />
             Chat on WhatsApp
           </a>
         ) : (
           <EnquiryModalTrigger
-            className={styles.whatsappAction}
+            className={`${styles.whatsappAction} ${styles.callbackAction}`}
             modalTitle={`Ask ${vendor.name} to contact me`}
             serviceCategory="Carpentry"
             city="Pune"
-            requirement={`Please ask ${vendor.name} to contact me for carpentry work.`}
-            source={`Phase 3A listing callback: ${vendor.slug}`}
+            requirement={`Please ask ${vendor.name} to contact me for carpentry work in Pune.`}
+            source={`Phase 3B listing callback: ${vendor.slug}`}
           >
             Ask Vendor to Contact
           </EnquiryModalTrigger>
         )}
       </div>
     </article>
+  );
+}
+
+function FilterCheckboxGroup({
+  title,
+  options,
+  checked,
+}: {
+  title: string;
+  options: string[];
+  checked: string[];
+}) {
+  return (
+    <div className={styles.filterGroup}>
+      <h3>{title}</h3>
+      <div className={styles.checkboxGrid}>
+        {options.map((option) => (
+          <label key={option}>
+            <input type="checkbox" defaultChecked={checked.includes(option)} />
+            <span>{option}</span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -257,44 +372,48 @@ export default function CarpentersListingPage() {
               <h1 id="listing-title">Verified Carpenters in Pune</h1>
               <p>Compare verified carpenters for modular furniture, wardrobes, kitchens, TV units &amp; more.</p>
             </div>
-            <div className={styles.heroTrust}>
+            <div className={styles.heroTrust} aria-label="Listing summary">
               <span>128 vendors found</span>
-              <span>Background checked</span>
+              <span>Paid vendors shown first</span>
             </div>
           </section>
 
           <section className={styles.searchPanel} aria-label="Search and listing filters">
-            <div className={styles.selectBox}>
+            <label className={styles.selectBox}>
               <span>City</span>
               <select defaultValue="Pune, Maharashtra" aria-label="City">
                 <option>Pune, Maharashtra</option>
               </select>
-            </div>
-            <div className={styles.selectBox}>
+            </label>
+            <label className={styles.selectBox}>
               <span>Category</span>
               <select defaultValue="Interiors" aria-label="Category">
                 <option>Interiors</option>
               </select>
-            </div>
-            <div className={styles.selectBox}>
+            </label>
+            <label className={styles.selectBox}>
               <span>Subcategory</span>
               <select defaultValue="Carpenters" aria-label="Subcategory">
                 <option>Carpenters</option>
               </select>
-            </div>
+            </label>
             <button className={styles.searchButton} type="button">
+              <Image src="/assets/quickfurno/icons/actions/search.svg" width={18} height={18} alt="" aria-hidden="true" />
               Search
             </button>
           </section>
 
           <section className={styles.mobileTools} aria-label="Mobile listing controls">
-            <button type="button">Filters</button>
+            <button type="button">
+              <Image src="/assets/quickfurno/icons/actions/filter.svg" width={17} height={17} alt="" aria-hidden="true" />
+              Filters
+            </button>
             <label>
               <span>Sort by:</span>
               <select defaultValue="Relevance" aria-label="Sort vendors">
                 <option>Relevance</option>
-                <option>Rating</option>
-                <option>Price</option>
+                <option>Top Rated</option>
+                <option>Budget Friendly</option>
               </select>
             </label>
           </section>
@@ -302,8 +421,8 @@ export default function CarpentersListingPage() {
           <section className={styles.quickFilters} aria-label="Quick filters">
             <span>Quick filters:</span>
             <div>
-              {quickFilters.map((filter) => (
-                <button type="button" key={filter.label}>
+              {quickFilters.map((filter, index) => (
+                <button className={index === 0 ? styles.activeFilterChip : ""} type="button" key={filter.label}>
                   <Image src={filter.icon} width={18} height={18} alt="" aria-hidden="true" />
                   {filter.label}
                 </button>
@@ -312,7 +431,7 @@ export default function CarpentersListingPage() {
           </section>
 
           <section className={styles.layout} aria-label="Carpenter vendor listings">
-            <aside className={styles.filterSidebar} aria-label="Filter sidebar placeholder">
+            <aside className={styles.filterSidebar} aria-label="Listing filters">
               <div className={styles.sidebarHeader}>
                 <h2>Filters</h2>
                 <button type="button">Reset All</button>
@@ -323,61 +442,45 @@ export default function CarpentersListingPage() {
                 <select defaultValue="Interiors > Carpenters" aria-label="Filter category">
                   <option>Interiors &gt; Carpenters</option>
                 </select>
-                <span>Modular Furniture</span>
-                <span>Wardrobes</span>
-                <span>TV Units</span>
-                <span>Kitchen Cabinets</span>
+                <div className={styles.pillList}>
+                  <button type="button">Modular Furniture</button>
+                  <button type="button">Wardrobes</button>
+                  <button type="button">TV Units</button>
+                  <button type="button">Kitchen Cabinets</button>
+                  <button type="button">Office Furniture</button>
+                </div>
               </div>
 
               <div className={styles.filterGroup}>
-                <h3>Budget (per sq ft)</h3>
+                <h3>Budget range</h3>
                 <div className={styles.rangeLine} aria-hidden="true">
                   <i />
+                  <b />
                 </div>
                 <div className={styles.rangeLabels}>
                   <span>Rs 500</span>
                   <span>Rs 5,000+</span>
                 </div>
+                <div className={styles.budgetInputs}>
+                  <span>Rs 500</span>
+                  <span>Rs 5,000+</span>
+                </div>
               </div>
 
-              <div className={styles.filterGroup}>
-                <h3>Ratings</h3>
-                <label>
-                  <input type="checkbox" defaultChecked /> 4.5 &amp; above
-                </label>
-                <label>
-                  <input type="checkbox" /> 4.0 &amp; above
-                </label>
-              </div>
-
-              <div className={styles.filterGroup}>
-                <h3>Service Type</h3>
-                <label>
-                  <input type="checkbox" defaultChecked /> Modular Factory
-                </label>
-                <label>
-                  <input type="checkbox" /> On-site Carpentry
-                </label>
-                <label>
-                  <input type="checkbox" /> Design + Build
-                </label>
-              </div>
-
-              <div className={styles.filterGroup}>
-                <h3>City</h3>
-                <label>
-                  <input type="checkbox" defaultChecked /> Pune
-                </label>
-                <label>
-                  <input type="checkbox" /> PCMC
-                </label>
-                <label>
-                  <input type="checkbox" /> Baner
-                </label>
-              </div>
+              {filterSections.map((section) => (
+                <FilterCheckboxGroup
+                  title={section.title}
+                  options={section.options}
+                  checked={section.checked}
+                  key={section.title}
+                />
+              ))}
 
               <button className={styles.applyButton} type="button">
                 Apply Filters
+              </button>
+              <button className={styles.clearButton} type="button">
+                Clear Filters
               </button>
             </aside>
 
@@ -385,22 +488,57 @@ export default function CarpentersListingPage() {
               <div className={styles.resultsHeader}>
                 <div>
                   <h2>Verified Carpenters in Pune</h2>
-                  <p>Compare verified carpenters for modular furniture, wardrobes, kitchens, TV units &amp; more.</p>
+                  <p>
+                    Compare verified carpenters for modular furniture, wardrobes, kitchens, TV units &amp; more.
+                  </p>
                 </div>
-                <label>
-                  <span>Sort by:</span>
-                  <select defaultValue="Relevance" aria-label="Sort listing">
-                    <option>Relevance</option>
-                    <option>Highest Rated</option>
-                    <option>Budget First</option>
-                  </select>
-                </label>
+                <div className={styles.resultsTools}>
+                  <span>{vendors.length} shown</span>
+                  <label>
+                    <span>Sort by:</span>
+                    <select defaultValue="Relevance" aria-label="Sort listing">
+                      <option>Relevance</option>
+                      <option>Highest Rated</option>
+                      <option>Budget First</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className={styles.priorityNote}>
+                <Image
+                  src="/assets/quickfurno/icons/actions/crown-premium.svg"
+                  width={18}
+                  height={18}
+                  alt=""
+                  aria-hidden="true"
+                />
+                Paid or subscribed vendors appear first. Non-paid verified vendors remain visible unless disabled.
               </div>
 
               <div className={styles.vendorStack}>
                 {vendors.map((vendor, index) => (
                   <VendorListingCard vendor={vendor} priority={index < 2} key={vendor.slug} />
                 ))}
+              </div>
+
+              <div className={styles.pagination} aria-label="Pagination placeholder">
+                <button type="button" aria-label="Previous page">
+                  &lt;
+                </button>
+                <button className={styles.activePage} type="button">
+                  1
+                </button>
+                <button type="button">2</button>
+                <button type="button">3</button>
+                <span>...</span>
+                <button type="button">13</button>
+                <button type="button" aria-label="Next page">
+                  &gt;
+                </button>
+                <button className={styles.loadMoreButton} type="button">
+                  Load More
+                </button>
               </div>
 
               <div className={styles.safetyNote}>
@@ -415,15 +553,16 @@ export default function CarpentersListingPage() {
                   <strong>All vendors are background-checked &amp; verified</strong>
                   <span>Your project is in safe hands.</span>
                 </div>
+                <Link href="/#why-quickfurno">Learn how we verify vendors</Link>
               </div>
             </div>
 
-            <aside className={styles.matchCard} aria-label="Lead matching card placeholder">
+            <aside className={styles.matchCard} aria-label="Lead matching card">
               <div className={styles.matchIllustration}>
                 <Image
                   src="/assets/quickfurno/icons/process/matched-vendors.svg"
-                  width={128}
-                  height={128}
+                  width={132}
+                  height={132}
                   alt=""
                   aria-hidden="true"
                 />
@@ -431,10 +570,34 @@ export default function CarpentersListingPage() {
               <h2>Let us match you with top carpenters</h2>
               <p>Share your requirements and get matched with the best verified vendors.</p>
 
-              <ul>
-                <li>100% free for clients</li>
-                <li>Quick matches in under 2 mins</li>
-                <li>Only relevant vendors</li>
+              <ul className={styles.benefitList}>
+                <li>
+                  <Image src="/assets/quickfurno/icons/trust/best-price.svg" width={22} height={22} alt="" aria-hidden="true" />
+                  <span>
+                    <strong>100% Free</strong>
+                    No hidden charges
+                  </span>
+                </li>
+                <li>
+                  <Image src="/assets/quickfurno/icons/trust/fast-response.svg" width={22} height={22} alt="" aria-hidden="true" />
+                  <span>
+                    <strong>Quick &amp; Easy</strong>
+                    Takes less than 2 mins
+                  </span>
+                </li>
+                <li>
+                  <Image
+                    src="/assets/quickfurno/icons/trust/location-matching.svg"
+                    width={22}
+                    height={22}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <span>
+                    <strong>Personalized Matches</strong>
+                    Only relevant vendors
+                  </span>
+                </li>
               </ul>
 
               <div className={styles.matchFields}>
@@ -451,12 +614,12 @@ export default function CarpentersListingPage() {
                   </select>
                 </label>
                 <label>
-                  <span>Enter your location</span>
+                  <span>Enter Location</span>
                   <input defaultValue="Pune, Maharashtra" />
                 </label>
                 <label>
-                  <span>Describe your requirement</span>
-                  <textarea placeholder="e.g. Modular kitchen, wardrobe, TV unit..." rows={4} />
+                  <span>Describe Requirement</span>
+                  <textarea placeholder="e.g. Modular kitchen for 2BHK apartment, modern design..." rows={4} />
                 </label>
               </div>
 
@@ -465,10 +628,15 @@ export default function CarpentersListingPage() {
                 modalTitle="Get matched with verified carpenters"
                 serviceCategory="Carpentry"
                 city="Pune"
-                source="Phase 3A right match card"
+                source="Phase 3B right match card"
               >
                 Get Matched Now
               </EnquiryModalTrigger>
+
+              <div className={styles.matchRating}>
+                <span>Trusted by 2,500+ homeowners in Pune</span>
+                <strong>4.8 / 5</strong>
+              </div>
             </aside>
           </section>
         </div>
@@ -483,7 +651,7 @@ export default function CarpentersListingPage() {
             modalTitle="Get matched with verified carpenters"
             serviceCategory="Carpentry"
             city="Pune"
-            source="Phase 3A mobile sticky match CTA"
+            source="Phase 3B mobile sticky match CTA"
           >
             Get Matched Now
           </EnquiryModalTrigger>

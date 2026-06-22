@@ -97,7 +97,10 @@ if (!user) {
   }
 }
 
-// 2) Ensure profiles row: role = 'admin', admin_role = 'Superadmin'
+// 2) Ensure profiles row: role = 'admin'. The login guard reads profiles.role
+//    plus the auth app_metadata.admin_role set above — it does NOT read a
+//    profiles.admin_role column, so we don't write one (that column only exists
+//    if the optional superadmin migration has been applied).
 {
   const { error } = await supabase
     .from("profiles")
@@ -105,7 +108,6 @@ if (!user) {
       {
         id: user.id,
         role: "admin",
-        admin_role: "Superadmin",
         full_name: user.user_metadata?.full_name || "QuickFurno Admin",
         is_active: true,
       },

@@ -67,9 +67,19 @@ body::before {
 }
 
 img,
-svg {
+svg,
+video {
   display: block;
   max-width: 100%;
+}
+
+/* Preserve intrinsic aspect for media without an explicit width attribute
+   (e.g. plain <img>/decorative SVG). next/image always sets a width attribute,
+   so its fixed-size thumbnails/logos are excluded and remain unaffected. */
+img:not([width]),
+svg:not([width]),
+video {
+  height: auto;
 }
 
 a {

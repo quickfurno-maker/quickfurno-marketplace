@@ -7,8 +7,11 @@ import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { HomeCategoryGrid } from "@/components/home/HomeCategoryGrid";
 import {
   ClientCTASection,
+  CoverageSection,
   HomeHowItWorksSection,
+  HomeTestimonials,
   PopularServicesSection,
+  TrustStrip,
   VendorCTASection,
   WhyChooseSection,
   trustBadges,
@@ -46,19 +49,26 @@ export default function HomePage() {
                 <i aria-hidden="true" /> Premium home interiors, made simple
               </span>
               <h1>
-                Crafting <em>luxury</em> spaces with verified experts near you
+                Tell us your requirement and get connected with verified
+                home-service vendors near you.
               </h1>
               <p>
-                Tell us your requirement and get connected with trusted carpenters,
-                interior designers, painters, sofa makers and renovation experts.
+                Trusted carpenters, interior designers, painters, sofa makers and
+                renovation experts — matched to your city, budget and timeline.
               </p>
 
               <div className="qf-hero-actions">
-                <EnquiryModalTrigger className="qf-gold-btn">Get Free Quotes</EnquiryModalTrigger>
-                <Link href="#services" className="qf-teal-btn">
+                <EnquiryModalTrigger className="qf-gold-btn" source="Homepage hero">
+                  Get Free Vendor Matches
+                </EnquiryModalTrigger>
+                <Link href="#categories" className="qf-teal-btn">
                   Explore Categories
                 </Link>
               </div>
+
+              <p className="qf-hero-rating">
+                <b>4.8★</b> average rating · 1,200+ verified vendors · No brokerage
+              </p>
 
               <div className="qf-trust-badges" aria-label="QuickFurno trust badges">
                 {trustBadges.map((badge) => (
@@ -72,7 +82,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          <section className="qf-home-section" id="services">
+          <section className="qf-home-section" id="categories">
             <div className="qf-section-head">
               <h2>Explore Home Services</h2>
               <p>Choose a service and compare verified vendors near you.</p>
@@ -80,10 +90,13 @@ export default function HomePage() {
             <HomeCategoryGrid />
           </section>
 
-          <WhyChooseSection />
+          <TrustStrip />
           <HomeHowItWorksSection />
-          <ClientCTASection />
+          <WhyChooseSection />
           <PopularServicesSection />
+          <CoverageSection />
+          <HomeTestimonials />
+          <ClientCTASection />
           <VendorCTASection />
         </div>
       </main>

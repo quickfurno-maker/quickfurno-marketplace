@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SiteHeader, SiteFooter } from "@/components/Brand";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { listPackages } from "@/services/packageService";
 
 export const metadata = { title: "Lead packs — QuickFurno" };
@@ -17,7 +18,7 @@ export default async function PricingPage() {
 
   return (
     <>
-      <SiteHeader />
+      <Header />
       <section className="mx-auto max-w-6xl px-5 pt-12 pb-8">
         <p className="eyebrow">For partner studios</p>
         <h1 className="mt-4 text-3xl font-semibold text-ivory md:text-4xl">Prepaid lead packs</h1>
@@ -54,7 +55,7 @@ export default async function PricingPage() {
           credits are added to your account and you go live in listings.
         </p>
       </section>
-      <SiteFooter />
+      <Footer />
     </>
   );
 }

@@ -142,9 +142,9 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 80;
-  border-bottom: 1px solid rgba(75, 90, 62, 0.12);
-  background: rgba(250, 247, 239, 0.82);
-  box-shadow: 0 10px 30px rgba(75, 90, 62, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 17, 17, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(16px);
 }
 
@@ -163,7 +163,7 @@ h3 {
   align-items: center;
   gap: 0.6rem;
   min-width: 0;
-  color: var(--qf-green-dark);
+  color: var(--qf-cream-base);
   font-weight: 950;
 }
 
@@ -171,7 +171,7 @@ h3 {
   width: 40px;
   height: 40px;
   flex: 0 0 auto;
-  filter: drop-shadow(0 6px 14px rgba(75, 90, 62, 0.2));
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
   transition: transform 220ms ease;
 }
 
@@ -185,7 +185,7 @@ h3 {
 }
 
 .qf-brand-text {
-  color: var(--qf-green-dark);
+  color: var(--qf-cream-base);
   font-family: var(--font-display);
   font-size: 1.16rem;
   font-weight: 700;
@@ -330,7 +330,7 @@ h3 {
 .qf-hero-media-img {
   position: absolute;
   inset: -6%;
-  background-image: url("https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&q=80");
+  background-image: url("/assets/quickfurno/images/hero/hero-interior-diorama.svg");
   background-size: cover;
   background-position: center;
   transform: scale(1.08);
@@ -1769,4 +1769,270 @@ h3 {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ============================================================
+   Phase 2A — Unified header nav, mobile menu, and homepage
+   skeleton sections (trust strip, coverage, testimonials).
+   ============================================================ */
+
+/* --- Desktop primary nav (charcoal header) --- */
+.qf-nav {
+  display: none;
+  align-items: center;
+  gap: 1.5rem;
+}
+.qf-nav-link {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+.qf-nav-link:hover {
+  color: var(--qf-copper-light);
+}
+
+/* --- Header CTA (copper) --- */
+.qf-header-cta {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 1.2rem;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--qf-copper-light), var(--qf-copper));
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 10px 22px rgba(198, 120, 33, 0.3);
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+.qf-header-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 14px 28px rgba(198, 120, 33, 0.4);
+}
+.qf-header-cta--block {
+  width: 100%;
+  padding-block: 0.7rem;
+}
+
+/* --- Mobile hamburger toggle --- */
+.qf-nav-toggle {
+  width: 42px;
+  height: 38px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+.qf-nav-toggle span {
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--qf-cream-base);
+}
+
+/* --- Mobile dropdown panel --- */
+.qf-mobile-nav {
+  display: grid;
+  gap: 0.35rem;
+  width: min(1180px, calc(100% - 24px));
+  margin: 0.5rem auto 0.75rem;
+  padding: 0.6rem;
+  border-radius: 18px;
+  background: rgba(28, 25, 23, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.qf-mobile-nav-link {
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.qf-mobile-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--qf-copper-light);
+}
+.qf-mobile-nav .qf-header-cta {
+  margin-top: 0.35rem;
+}
+
+/* Desktop: show nav + CTA, hide toggle. */
+@media (min-width: 960px) {
+  .qf-nav {
+    display: flex;
+  }
+  .qf-nav-toggle {
+    display: none;
+  }
+  .qf-mobile-nav {
+    display: none;
+  }
+}
+/* Small screens: keep the inline CTA compact; rely on the toggle. */
+@media (max-width: 520px) {
+  .qf-header-actions .qf-header-cta {
+    display: none;
+  }
+}
+
+/* --- Trust strip --- */
+.qf-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  padding: 1.25rem;
+  border: 1px solid var(--qf-border);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-card);
+  box-shadow: var(--qf-shadow-soft);
+}
+.qf-trust-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.qf-trust-strip-item img {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+.qf-trust-strip-item b {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--qf-ink);
+}
+.qf-trust-strip-item small {
+  color: var(--qf-muted);
+  font-size: 0.78rem;
+}
+@media (min-width: 760px) {
+  .qf-trust-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* --- Pune & Mumbai coverage --- */
+.qf-coverage {
+  display: grid;
+  gap: 1.5rem;
+  align-items: center;
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+  border: 1px solid var(--qf-border);
+  border-radius: var(--qf-radius-lg);
+  background: linear-gradient(135deg, var(--qf-cream-soft), var(--qf-cream));
+  box-shadow: var(--qf-shadow-soft);
+}
+.qf-coverage h2 {
+  margin-bottom: 0.4rem;
+}
+.qf-coverage p {
+  color: var(--qf-muted);
+  max-width: 42ch;
+}
+.qf-coverage-cities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.qf-coverage-cities span {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--qf-border);
+  background: var(--qf-card);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--qf-copper-deep);
+}
+.qf-coverage-media {
+  display: flex;
+  justify-content: center;
+}
+.qf-coverage-media img {
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+}
+@media (min-width: 860px) {
+  .qf-coverage {
+    grid-template-columns: 1.1fr 0.9fr;
+  }
+}
+
+/* --- Testimonials (homepage skeleton wrapper) --- */
+.qf-home-testimonials {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+.qf-home-testimonial-card {
+  padding: 1.5rem;
+  border: 1px solid var(--qf-border);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-card);
+  box-shadow: var(--qf-shadow-soft);
+}
+.qf-home-testimonial-card .qf-stars {
+  color: var(--qf-copper);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.qf-home-testimonial-card p {
+  margin: 0.6rem 0 1rem;
+  color: var(--qf-ink);
+}
+.qf-home-testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.qf-home-testimonial-author span {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--qf-copper), var(--qf-brown));
+  color: #fff;
+  font-weight: 800;
+}
+.qf-home-testimonial-author strong {
+  display: block;
+  font-size: 0.92rem;
+}
+.qf-home-testimonial-author small {
+  color: var(--qf-muted);
+}
+@media (min-width: 760px) {
+  .qf-home-testimonials {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Hero trust/rating microcopy */
+.qf-hero-rating {
+  margin-top: 1rem;
+  font-size: 0.86rem;
+  color: var(--qf-muted);
+}
+.qf-hero-rating b {
+  color: var(--qf-copper-deep);
+}
+
+/* Tight section spacing modifier */
+.qf-home-section--tight {
+  margin-block: 0.25rem;
 }

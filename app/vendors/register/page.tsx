@@ -1,4 +1,5 @@
-import { SiteHeader, SiteFooter } from "@/components/Brand";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { VendorRegisterForm } from "@/components/VendorRegisterForm";
 
 export const metadata = { title: "Become a partner — QuickFurno" };
@@ -6,7 +7,7 @@ export const metadata = { title: "Become a partner — QuickFurno" };
 export default function VendorRegisterPage() {
   return (
     <>
-      <SiteHeader />
+      <Header />
       <section className="mx-auto max-w-6xl px-5 pt-12 pb-8">
         <p className="eyebrow">Partner studios</p>
         <h1 className="mt-4 text-3xl font-semibold text-ivory md:text-4xl">Get matched to ready homeowners</h1>
@@ -18,7 +19,7 @@ export default function VendorRegisterPage() {
       <section className="mx-auto max-w-6xl px-5 pb-16">
         <VendorRegisterForm />
       </section>
-      <SiteFooter />
+      <Footer />
     </>
   );
 }

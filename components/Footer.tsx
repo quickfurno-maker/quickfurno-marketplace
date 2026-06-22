@@ -5,7 +5,7 @@ import { categories } from "@/lib/quickfurno-data";
 
 export function Footer() {
   return (
-    <footer className="site-footer">
+    <footer className="site-footer" id="contact">
       <div className="container footer-grid" data-reveal>
         <div className="footer-brand">
           <Link href="/" className="brand-lockup" aria-label="QuickFurno home">

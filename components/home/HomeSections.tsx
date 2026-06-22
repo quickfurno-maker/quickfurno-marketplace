@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
-import { categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import {
+  categorySlug,
+  clientTestimonials,
+  type QuickFurnoCategory,
+} from "@/lib/quickfurno-data";
 
 export function HomeIllustration() {
   return (
@@ -204,6 +208,96 @@ export function VendorCTASection() {
       <Link href="/vendors" className="qf-teal-btn">
         List Your Business
       </Link>
+    </section>
+  );
+}
+
+// --- Phase 2A skeleton sections ---------------------------------------------
+
+const trustStripItems = [
+  { icon: "verified-vendors", title: "Verified vendors", label: "Background-checked pros" },
+  { icon: "fast-response", title: "Fast response", label: "Matches in minutes" },
+  { icon: "best-price", title: "Transparent rates", label: "Compare before you commit" },
+  { icon: "location-matching", title: "Local experts", label: "Matched to your area" },
+] as const;
+
+export function TrustStrip() {
+  return (
+    <section className="qf-home-section qf-home-section--tight" id="trust">
+      <div className="qf-trust-strip" data-reveal-group>
+        {trustStripItems.map((item) => (
+          <div className="qf-trust-strip-item" key={item.title}>
+            <img
+              src={`/assets/quickfurno/icons/trust/${item.icon}.svg`}
+              alt=""
+              width={30}
+              height={30}
+              loading="lazy"
+            />
+            <span>
+              <b>{item.title}</b>
+              <small>{item.label}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function CoverageSection() {
+  return (
+    <section className="qf-home-section" id="coverage">
+      <div className="qf-coverage" data-reveal>
+        <div>
+          <span className="qf-u-eyebrow">Now serving</span>
+          <h2>Trusted home-service vendors across Pune &amp; Mumbai</h2>
+          <p>
+            QuickFurno matches you with verified local experts wherever you are in
+            Pune and Mumbai — with more cities on the way.
+          </p>
+          <div className="qf-coverage-cities">
+            <span>Pune</span>
+            <span>Mumbai</span>
+            <span>More cities soon</span>
+          </div>
+        </div>
+        <div className="qf-coverage-media">
+          <img
+            src="/assets/quickfurno/images/city/pune-mumbai-line-art.svg"
+            alt="Pune and Mumbai coverage illustration"
+            loading="lazy"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function HomeTestimonials() {
+  return (
+    <section className="qf-home-section" id="testimonials">
+      <div className="qf-section-head">
+        <h2>What clients say about QuickFurno</h2>
+        <p>Real homeowners who found the right vendor through us.</p>
+      </div>
+      <div className="qf-home-testimonials" data-reveal-group>
+        {clientTestimonials.map((testimonial) => (
+          <article className="qf-home-testimonial-card" key={testimonial.name}>
+            <div className="qf-stars" aria-label="5 out of 5 rating">
+              ★★★★★
+            </div>
+            <p>&quot;{testimonial.quote}&quot;</p>
+            <div className="qf-home-testimonial-author">
+              <span aria-hidden="true">{testimonial.name.slice(0, 1)}</span>
+              <div>
+                <strong>{testimonial.name}</strong>
+                <small>{testimonial.detail}</small>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

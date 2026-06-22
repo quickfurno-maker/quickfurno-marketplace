@@ -19,6 +19,8 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
   async function onSubmit() {
+    if (busy) return;
+
     setError(null);
     if (!f.name.trim() || !f.phone.trim() || !f.city || !f.service_required) {
       setError("Please add your name, phone, city and the service you need.");

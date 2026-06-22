@@ -29,6 +29,8 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   async function onSubmitForm() {
+    if (busy) return;
+
     setError(null);
     if (!form.name.trim() || !form.phone.trim() || !form.city || !form.service_required) {
       setError("Please add your name, phone, city and the service you need.");
@@ -70,13 +72,23 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   }
 
   async function onConfirm() {
-    if (!leadId) return;
-    setBusy(true); setError(null);
-    const res = await assignLead(leadId, picked);
-    setBusy(false);
-    if (!res.ok) { setError(res.error); return; }
-    setAssignedCount(res.data.assigned_count);
-    setStep("done");
+    if (busy || !leadId) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await assignLead(leadId, picked);
+      if (!res.ok) { setError(res.error); return; }
+      setAssignedCount(res.data.assigned_count);
+      setStep("done");
+    } catch (err) {
+      console.error("[lead funnel] assignment error", {
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError("We could not finish matching your enquiry. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

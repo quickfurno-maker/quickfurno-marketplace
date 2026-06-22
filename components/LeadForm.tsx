@@ -44,6 +44,8 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
+
     setError("");
     setSuccess("");
 

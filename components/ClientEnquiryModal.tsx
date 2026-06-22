@@ -185,6 +185,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
+
     setError("");
     setSuccess("");
 

@@ -47,11 +47,18 @@ export function VendorApplicationForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
+
     setError("");
     setSuccess("");
 
     if (!form.businessName.trim() || !form.ownerName.trim() || !form.phone.trim() || !form.city || !form.serviceCategory) {
       setError("Please fill business name, owner name, phone, city and service category.");
+      return;
+    }
+
+    if (form.phone.replace(/\D/g, "").length < 10) {
+      setError("Please enter a valid 10 digit phone number.");
       return;
     }
 
@@ -64,24 +71,32 @@ export function VendorApplicationForm() {
       form.message.trim() ? `Message: ${form.message.trim()}` : "",
     ].filter(Boolean);
 
-    const result = await submitVendorRegistration({
-      business_name: form.businessName.trim(),
-      owner_name: form.ownerName.trim(),
-      phone: form.phone.trim(),
-      city: form.city,
-      service_categories: [form.serviceCategory],
-      experience: form.experience.trim() || undefined,
-      portfolio_urls: form.projectImage.trim() ? [form.projectImage.trim()] : [],
-      message: messageParts.join("\n") || undefined,
-    });
-    setSubmitting(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+    try {
+      const result = await submitVendorRegistration({
+        business_name: form.businessName.trim(),
+        owner_name: form.ownerName.trim(),
+        phone: form.phone.trim(),
+        city: form.city,
+        service_categories: [form.serviceCategory],
+        experience: form.experience.trim() || undefined,
+        portfolio_urls: form.projectImage.trim() ? [form.projectImage.trim()] : [],
+        message: messageParts.join("\n") || undefined,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
 
-    setSuccess("Vendor application received. QuickFurno will review your profile and contact you shortly.");
-    setForm(initialVendorForm);
+      setSuccess("Vendor application received. QuickFurno will review your profile and contact you shortly.");
+      setForm(initialVendorForm);
+    } catch (err) {
+      console.error("[vendor application form] submission error", {
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError("We could not submit your vendor application. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (

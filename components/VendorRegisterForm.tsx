@@ -25,41 +25,55 @@ export function VendorRegisterForm() {
     setF((p) => ({ ...p, service_categories: p.service_categories.includes(s) ? p.service_categories.filter((x) => x !== s) : [...p.service_categories, s] }));
 
   async function onSubmit() {
+    if (busy) return;
+
     setError(null);
     if (!f.business_name.trim() || !f.phone.trim() || !f.email.trim() || f.password.length < 6) {
       setError("Add your business name, phone, email, and a password of at least 6 characters.");
       return;
     }
+    if (f.phone.replace(/\D/g, "").length < 10) {
+      setError("Please enter a valid 10 digit phone number.");
+      return;
+    }
     if (f.service_categories.length === 0) { setError("Pick at least one service you offer."); return; }
     setBusy(true);
 
-    // Create the auth account and pending vendor row on the server.
-    const res = await submitVendorAccountRegistration({
-      business_name: f.business_name,
-      owner_name: f.owner_name || undefined,
-      phone: f.phone,
-      email: f.email,
-      city: f.city,
-      areas_covered: f.areas_covered.split(",").map((a) => a.trim()).filter(Boolean),
-      covers_full_city: f.covers_full_city,
-      service_categories: f.service_categories,
-      experience: f.experience || undefined,
-      gst_number: f.gst_number || undefined,
-      portfolio_urls: f.portfolio.split(",").map((u) => u.trim()).filter(Boolean),
-      message: f.message || undefined,
-      password: f.password,
-    });
-    if (!res.ok) { setError(res.error); setBusy(false); return; }
+    try {
+      // Create the auth account and pending vendor row on the server.
+      const res = await submitVendorAccountRegistration({
+        business_name: f.business_name,
+        owner_name: f.owner_name || undefined,
+        phone: f.phone,
+        email: f.email,
+        city: f.city,
+        areas_covered: f.areas_covered.split(",").map((a) => a.trim()).filter(Boolean),
+        covers_full_city: f.covers_full_city,
+        service_categories: f.service_categories,
+        experience: f.experience || undefined,
+        gst_number: f.gst_number || undefined,
+        portfolio_urls: f.portfolio.split(",").map((u) => u.trim()).filter(Boolean),
+        message: f.message || undefined,
+        password: f.password,
+      });
+      if (!res.ok) { setError(res.error); return; }
 
-    const { data: session, error: signInErr } = await browserClient().auth.signInWithPassword({
-      email: f.email,
-      password: f.password,
-    });
-    setBusy(false);
-    if (signInErr) { setDone(true); return; }
+      const { data: session, error: signInErr } = await browserClient().auth.signInWithPassword({
+        email: f.email,
+        password: f.password,
+      });
 
-    if (session.session) { router.push("/vendor"); return; }
-    setDone(true);
+      if (signInErr) { setDone(true); return; }
+      if (session.session) { router.push("/vendor"); return; }
+      setDone(true);
+    } catch (err) {
+      console.error("[vendor register form] submission error", {
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError("We could not submit your vendor registration. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (done) {

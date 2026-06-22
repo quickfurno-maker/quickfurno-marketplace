@@ -95,19 +95,19 @@ export const trustBadges = [
 ];
 
 export const whyChooseItems = [
-  ["shield", "Verified local vendors", "Connect with trusted home-service experts near you."],
-  ["compare", "Compare rates and services", "Check services, pricing and expertise before choosing."],
-  ["bolt", "Fast response", "Get connected with suitable vendors quickly."],
-  ["noFee", "No brokerage", "QuickFurno helps you connect without unnecessary middlemen."],
-  ["request", "One request, multiple options", "Submit your requirement once and explore matching experts."],
-  ["home", "Home-service focused", "Built specially for interiors, furniture, renovation and repairs."],
+  ["shield", "Verified local vendors", "Every vendor is checked before they can receive your enquiry."],
+  ["request", "Direct access to professionals", "Talk to the right vendors directly — no middlemen, no runaround."],
+  ["noFee", "Best price match", "Compare transparent rates and pick the best value with confidence."],
+  ["kitchen", "Machine-finish interiors", "Factory-grade modular kitchens, wardrobes and woodwork."],
+  ["bolt", "Hassle-free experience", "One simple request, matched options and fast responses."],
 ] as const;
 
 export function WhyChooseSection() {
   return (
     <section className="qf-home-section" id="why-quickfurno">
       <div className="qf-section-head">
-        <h2>Why clients choose QuickFurno</h2>
+        <h2>Why homeowners love QuickFurno</h2>
+        <p>A premium, verified way to find the right home-service vendor.</p>
       </div>
       <div className="qf-usp-grid" data-reveal-group>
         {whyChooseItems.map(([icon, title, body]) => (
@@ -126,15 +126,17 @@ export function WhyChooseSection() {
 
 export function HomeHowItWorksSection() {
   const steps = [
-    ["1", "Tell requirement", "Share what you need, city and timeline."],
-    ["2", "We match vendors", "QuickFurno shortlists suitable verified options."],
-    ["3", "Compare, talk, choose", "Speak directly and move ahead with confidence."],
+    ["1", "Tell us your requirement", "Share what you need, your city and timeline."],
+    ["2", "Get matched with verified vendors", "QuickFurno shortlists suitable verified vendors for you."],
+    ["3", "Compare and choose", "Compare rates and profiles, then talk directly."],
+    ["4", "Start your project", "Pick your vendor and get started with confidence."],
   ];
 
   return (
     <section className="qf-home-section" id="how-it-works">
       <div className="qf-section-head">
-        <h2>How QuickFurno Works</h2>
+        <h2>Simple steps. Perfect results.</h2>
+        <p>From requirement to project start in four easy steps.</p>
       </div>
       <div className="qf-steps-flow" data-reveal-group>
         {steps.map(([number, title, body]) => (
@@ -152,9 +154,11 @@ export function HomeHowItWorksSection() {
 export function ClientCTASection() {
   return (
     <section className="qf-client-cta">
-      <h2>Need help finding the right vendor?</h2>
+      <h2>Ready to start your project?</h2>
       <p>Share your requirement and QuickFurno will connect you with suitable verified vendors near you.</p>
-      <EnquiryModalTrigger className="qf-gold-btn">Get Free Assistance</EnquiryModalTrigger>
+      <EnquiryModalTrigger className="qf-gold-btn" source="Homepage final CTA">
+        Get Free Vendor Matches
+      </EnquiryModalTrigger>
     </section>
   );
 }
@@ -215,10 +219,10 @@ export function VendorCTASection() {
 // --- Phase 2A skeleton sections ---------------------------------------------
 
 const trustStripItems = [
-  { icon: "verified-vendors", title: "Verified vendors", label: "Background-checked pros" },
-  { icon: "fast-response", title: "Fast response", label: "Matches in minutes" },
-  { icon: "best-price", title: "Transparent rates", label: "Compare before you commit" },
-  { icon: "location-matching", title: "Local experts", label: "Matched to your area" },
+  { icon: "verified-vendors", title: "Verified Vendors", label: "Background-checked pros" },
+  { icon: "fast-response", title: "Fast Response", label: "Matches in minutes" },
+  { icon: "transparent-process", title: "Transparent Process", label: "Clear rates, no surprises" },
+  { icon: "location-matching", title: "Location-Based Matching", label: "Matched to your area" },
 ] as const;
 
 export function TrustStrip() {

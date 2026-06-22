@@ -38,36 +38,32 @@ export default function HomePage() {
       <Header />
       <main className="qf-home-page">
         <div className="qf-home-app-shell">
-          <section className="qf-hero-section qf-hero-section--centered qf-hero-section--banner">
-            <div className="qf-hero-media" aria-hidden="true">
-              <div className="qf-hero-media-img" />
-              <div className="qf-hero-media-scrim" />
-              <span className="qf-hero-media-shine" />
-            </div>
+          <section className="qf-hero-section qf-hero-section--split">
             <div className="qf-hero-copy">
               <span className="qf-hero-eyebrow">
-                <i aria-hidden="true" /> Premium home interiors, made simple
+                <i aria-hidden="true" /> India&apos;s trusted home-service marketplace
               </span>
               <h1>
-                Tell us your requirement and get connected with verified
-                home-service vendors near you.
+                Tell us your requirement and get connected with{" "}
+                <em>verified home-service</em> vendors near you.
               </h1>
               <p>
-                Trusted carpenters, interior designers, painters, sofa makers and
-                renovation experts — matched to your city, budget and timeline.
+                Submit your requirement once and get matched with verified
+                home-service vendors near you — interiors, carpentry, sofa,
+                painting and civil work, fitted to your city, budget and timeline.
               </p>
 
               <div className="qf-hero-actions">
                 <EnquiryModalTrigger className="qf-gold-btn" source="Homepage hero">
                   Get Free Vendor Matches
                 </EnquiryModalTrigger>
-                <Link href="#categories" className="qf-teal-btn">
+                <Link href="#categories" className="qf-outline-btn">
                   Explore Categories
                 </Link>
               </div>
 
               <p className="qf-hero-rating">
-                <b>4.8★</b> average rating · 1,200+ verified vendors · No brokerage
+                <b>4.8★</b> average rating · 2,300+ verified vendors · No brokerage
               </p>
 
               <div className="qf-trust-badges" aria-label="QuickFurno trust badges">
@@ -79,6 +75,19 @@ export default function HomePage() {
                   </span>
                 ))}
               </div>
+            </div>
+
+            <div className="qf-hero-visual">
+              <img
+                src="/assets/quickfurno/images/hero/hero-interior-diorama.svg"
+                alt="Premium home interior styled by QuickFurno vendors"
+              />
+              <span className="qf-hero-chip qf-hero-chip--rating">
+                <b>4.8★</b> Verified pros
+              </span>
+              <span className="qf-hero-chip qf-hero-chip--quote">
+                <b>Free</b> quotes in minutes
+              </span>
             </div>
           </section>
 

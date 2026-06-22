@@ -17,16 +17,27 @@ type HomeCategory = {
 
 const homeCategories: HomeCategory[] = [
   {
-    label: "Interior",
+    label: "Interiors",
     tagline: "Design, woodwork & turnkey homes",
     icon: "home",
     category: "Interior Designers",
     subcategories: [
+      { label: "Carpenters", category: "Carpenters" },
+      { label: "Modular Factory", category: "Modular Factory" },
+      { label: "Premium Interiors", category: "Premium Interiors" },
+      { label: "Interior Designers", category: "Interior Designers" },
+    ],
+  },
+  {
+    label: "Carpentry",
+    tagline: "Carpenters, wardrobes & custom furniture",
+    icon: "hammer",
+    category: "Carpenters",
+    subcategories: [
       { label: "Carpenter", category: "Carpenters" },
       { label: "Modular Factory", category: "Modular Factory" },
-      { label: "Interior Designer", category: "Interior Designers" },
-      { label: "Premium Interior", category: "Premium Interiors" },
-      { label: "Ultra Luxury", category: "Premium Interiors" },
+      { label: "Custom Furniture", category: "Carpenters" },
+      { label: "Wardrobes", category: "Carpenters" },
     ],
   },
   {

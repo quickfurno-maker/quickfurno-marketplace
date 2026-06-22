@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Raj Premium Interiors on QuickFurno",
     description: "Verified interior design vendor profile with pricing, gallery and reviews.",
-    url: "https://quickfurno.com/vendors/raj-premium-interiors",
+    url: "https://quickfurno.in/vendors/raj-premium-interiors",
     siteName: "QuickFurno",
     type: "profile",
   },

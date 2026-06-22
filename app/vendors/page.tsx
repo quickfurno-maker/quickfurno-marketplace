@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Grow with QuickFurno verified leads",
     description: "Join QuickFurno and receive genuine home-service enquiries in Pune and Mumbai.",
-    url: "https://quickfurno.com/vendors",
+    url: "https://quickfurno.in/vendors",
     siteName: "QuickFurno",
     type: "website",
   },

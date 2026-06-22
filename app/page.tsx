@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     title: "QuickFurno | Verified home-service vendors",
     description:
       "Tell QuickFurno your requirement and get connected with verified home-service vendors near you.",
-    url: "https://quickfurno.com",
+    url: "https://quickfurno.in",
     siteName: "QuickFurno",
     type: "website",
   },

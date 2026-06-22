@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: "QuickFurno | Verified Home-Service Marketplace",
   description:
     "QuickFurno helps clients in Pune and Mumbai compare verified interior designers, carpenters, modular factories, painters, sofa and civil-work vendors.",
-  metadataBase: new URL("https://quickfurno.com"),
+  metadataBase: new URL("https://quickfurno.in"),
   openGraph: {
     title: "QuickFurno | Verified Home-Service Marketplace",
     description:

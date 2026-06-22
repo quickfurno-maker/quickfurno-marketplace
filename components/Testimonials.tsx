@@ -5,8 +5,8 @@ export function Testimonials() {
     <div className="testimonial-grid" data-reveal-group>
       {clientTestimonials.map((testimonial) => (
         <article className="testimonial-card" key={testimonial.name}>
-          <div className="stars" aria-label="5 star review">★★★★★</div>
-          <p>“{testimonial.quote}”</p>
+          <div className="stars" aria-label="5 out of 5 rating">5.0 rated</div>
+          <p>&quot;{testimonial.quote}&quot;</p>
           <div className="testimonial-author">
             <span>{testimonial.name.slice(0, 1)}</span>
             <div>

@@ -1,61 +1,66 @@
 import Image from "next/image";
 import { heroImage } from "@/lib/images";
 
-const floatingBadges = [
-  { label: "100% Verified", icon: "✓", className: "hero-chip--1" },
-  { label: "Transparent Rates", icon: "₹", className: "hero-chip--2" },
-  { label: "Quick Matching", icon: "⚡", className: "hero-chip--3" },
-  { label: "Free Quote", icon: "★", className: "hero-chip--4" },
+const matchRows = [
+  { label: "Interior studio", meta: "Premium interiors", score: "4.8" },
+  { label: "Modular factory", meta: "Kitchen and wardrobe", score: "4.7" },
+  { label: "Carpentry expert", meta: "Custom storage", score: "4.6" },
 ];
 
-/**
- * Hero visual — a premium HD interior photo (optimised + priority-loaded for LCP)
- * with glassmorphism trust overlays and floating badges to drive conversion.
- */
 export function HeroVisual() {
   return (
-    <div className="hero-visual">
-      <div className="hero-glow" aria-hidden="true" />
-      <div className="hero-blob hero-blob--a" aria-hidden="true" />
-      <div className="hero-blob hero-blob--b" aria-hidden="true" />
-
+    <div className="hero-visual hero-visual--premium">
       <div className="hero-photo-frame hero-float-slow">
         <Image
           src={heroImage}
           alt="Premium home interior delivered by QuickFurno verified vendors in Pune and Mumbai"
           fill
           priority
-          sizes="(max-width: 980px) 100vw, 460px"
+          sizes="(max-width: 980px) 100vw, 520px"
           className="hero-photo"
         />
         <span className="hero-photo-shade" aria-hidden="true" />
 
         <div className="hero-photo-badge hero-photo-badge--verified">
-          <i aria-hidden="true">✓</i> Verified vendors only
+          <span aria-hidden="true">OK</span>
+          Verified vendors only
         </div>
 
         <div className="hero-photo-card">
           <div className="hpc-rating">
-            <strong>4.8</strong>
-            <span className="hpc-stars" aria-hidden="true">★★★★★</span>
+            <strong>4</strong>
+            <span>matches</span>
           </div>
           <div className="hpc-text">
-            <strong>Loved by homeowners</strong>
-            <span>Across Pune &amp; Mumbai</span>
+            <strong>Shortlist in 24 hours</strong>
+            <span>No spam. No resold leads.</span>
           </div>
-        </div>
-
-        <div className="hero-photo-pill" aria-hidden="true">
-          <i>⚡</i> 4 free quotes in 24 hrs
         </div>
       </div>
 
-      {floatingBadges.map((badge) => (
-        <span key={badge.label} className={`hero-chip ${badge.className}`} aria-hidden="true">
-          <i>{badge.icon}</i>
-          {badge.label}
-        </span>
-      ))}
+      <aside className="hero-match-card" aria-label="QuickFurno matching preview">
+        <div className="hero-match-head">
+          <span>Requirement preview</span>
+          <strong>2BHK kitchen, wardrobe and painting</strong>
+        </div>
+        <div className="hero-match-meter" aria-hidden="true">
+          <span />
+        </div>
+        <div className="hero-match-list">
+          {matchRows.map((row) => (
+            <div className="hero-match-row" key={row.label}>
+              <div>
+                <strong>{row.label}</strong>
+                <span>{row.meta}</span>
+              </div>
+              <em>{row.score}</em>
+            </div>
+          ))}
+        </div>
+        <div className="hero-match-footer">
+          <span>Matched by city, category, rate and response quality</span>
+        </div>
+      </aside>
     </div>
   );
 }

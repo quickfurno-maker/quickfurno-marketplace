@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
+import { categoryImage } from "@/lib/images";
 import { activePaidVendors, vendorFilterCategories } from "@/lib/quickfurno-data";
 import type { QuickFurnoCategory } from "@/lib/quickfurno-data";
 
@@ -20,7 +22,6 @@ export function VendorCards({
 }) {
   const [activeFilter, setActiveFilter] = useState<VendorFilter>(category ?? "All");
 
-  // Filters only make sense on the full marketplace view (not category pages or limited previews).
   const showFilters = !compact && !category && !limit;
 
   const filteredVendors = useMemo(() => {
@@ -28,7 +29,9 @@ export function VendorCards({
     const sorted = activePaidVendors
       .filter((vendor) => selected === "All" || vendor.category === selected)
       .sort((a, b) => {
-        if (Boolean(b.featured) !== Boolean(a.featured)) return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+        if (Boolean(b.featured) !== Boolean(a.featured)) {
+          return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+        }
         if (b.rating !== a.rating) return b.rating - a.rating;
         return b.reviews - a.reviews;
       });
@@ -70,24 +73,37 @@ export function VendorCards({
 
       {/* Future integration: fetch active paid vendors from Supabase vendors table where active_paid_plan = true. */}
       <div className={`vendor-grid ${compact ? "vendor-grid--compact" : ""}`} data-reveal-group>
-        {filteredVendors.map((vendor) => (
+        {filteredVendors.map((vendor, index) => (
           <article className="vendor-card" key={vendor.slug}>
-            <div className={`project-visual ${vendor.imageTone}`} role="img" aria-label={`${vendor.businessName} project preview`}>
-              <span>{vendor.category}</span>
+            <div className="vendor-card-media">
+              <Image
+                src={categoryImage(vendor.category)}
+                alt={`${vendor.businessName} ${vendor.category} project preview`}
+                fill
+                sizes="(max-width: 560px) 100vw, (max-width: 980px) 50vw, 360px"
+                className="vendor-card-img"
+                priority={index === 0}
+              />
+              <span className="vendor-card-shade" aria-hidden="true" />
+              <div className="vendor-media-copy">
+                <span>{vendor.category}</span>
+                <strong>{vendor.city}</strong>
+              </div>
             </div>
+
             <div className="vendor-card-body">
               <div className="vendor-card-top">
                 <Avatar name={vendor.businessName} src={vendor.imageUrl} className="vendor-avatar" />
                 <div className="vendor-card-id">
                   <h3>{vendor.businessName}</h3>
-                  <p>{vendor.city} • {vendor.subCategory}</p>
+                  <p>{vendor.subCategory}</p>
                 </div>
-                <span className="rating-badge">{vendor.rating} ★</span>
+                <span className="rating-badge">{vendor.rating}/5</span>
               </div>
 
               <div className="badge-row">
                 {vendor.verified ? <span className="status-badge status-badge--verified">Verified</span> : null}
-                <span className="status-badge status-badge--paid">Active paid vendor</span>
+                <span className="status-badge status-badge--paid">Active plan</span>
                 {vendor.featured ? <span className="status-badge status-badge--featured">Featured</span> : null}
               </div>
 
@@ -113,7 +129,11 @@ export function VendorCards({
               </dl>
 
               <div className="vendor-actions">
-                <a className="btn btn-secondary btn-small" href="tel:+919999999999" onClick={() => trackCtaClick(`Call ${vendor.businessName}`)}>
+                <a
+                  className="btn btn-secondary btn-small"
+                  href="tel:+919999999999"
+                  onClick={() => trackCtaClick(`Call ${vendor.businessName}`)}
+                >
                   Call
                 </a>
                 <a

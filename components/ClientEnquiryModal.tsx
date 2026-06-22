@@ -26,11 +26,11 @@ type EnquiryFormState = {
 };
 
 const budgetOptions = [
-  "Below ₹1 lakh",
-  "₹1–3 lakh",
-  "₹3–5 lakh",
-  "₹5–10 lakh",
-  "Above ₹10 lakh",
+  "Below Rs. 1 lakh",
+  "Rs. 1-3 lakh",
+  "Rs. 3-5 lakh",
+  "Rs. 5-10 lakh",
+  "Above Rs. 10 lakh",
   "Not sure yet",
 ];
 
@@ -220,118 +220,133 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
               aria-label="Close enquiry form"
               onClick={closeModal}
             >
-              ×
+              x
             </button>
 
-            <div className="form-card-header enquiry-modal-header">
-              <span className="eyebrow">Free client enquiry</span>
-              <h2 id="enquiry-modal-title">Get free interior quotes</h2>
-              <p>Share your requirement. We&apos;ll match you with up to 4 verified studios in Pune & Mumbai.</p>
-            </div>
+            <div className="enquiry-modal-shell">
+              <aside className="enquiry-modal-proof" aria-label="QuickFurno matching benefits">
+                <span>QuickFurno match desk</span>
+                <h2>Tell us your requirement.</h2>
+                <p>Get connected with verified home-service vendors near you.</p>
+                <ul>
+                  <li>Up to 4 relevant vendor matches</li>
+                  <li>City, category and budget fit checked</li>
+                  <li>No spam and no resold leads</li>
+                </ul>
+              </aside>
 
-            {error ? (
-              <p className="form-alert form-alert--error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {success ? (
-              <p className="form-alert form-alert--success" role="status">
-                {success}
-              </p>
-            ) : null}
-
-            {!success ? (
-              <form className="enquiry-modal-form" onSubmit={handleSubmit}>
-                <div className="form-grid">
-                  <label>
-                    <span>Full name</span>
-                    <input
-                      ref={nameInputRef}
-                      value={form.name}
-                      onChange={(event) => updateField("name", event.target.value)}
-                      placeholder="Your full name"
-                      autoComplete="name"
-                    />
-                  </label>
-
-                  <label>
-                    <span>Phone number</span>
-                    <input
-                      value={form.phone}
-                      onChange={(event) => updateField("phone", event.target.value)}
-                      placeholder="+91"
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                  </label>
-
-                  <label>
-                    <span>City</span>
-                    <select value={form.city} onChange={(event) => updateField("city", event.target.value)}>
-                      <option value="">Select city</option>
-                      {cities.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span>Service required</span>
-                    <select
-                      value={form.serviceCategory}
-                      onChange={(event) => updateField("serviceCategory", event.target.value)}
-                    >
-                      <option value="">Select service</option>
-                      {ENQUIRY_SERVICE_GROUPS.map((group) => (
-                        <optgroup key={group.category} label={group.category}>
-                          {group.options.map((service) => (
-                            <option key={`${group.category}-${service}`} value={service}>
-                              {service}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                      <option value="Other">Other</option>
-                    </select>
-                  </label>
-
-                  <label className="form-grid-full">
-                    <span>Budget range</span>
-                    <select value={form.budgetRange} onChange={(event) => updateField("budgetRange", event.target.value)}>
-                      <option value="">Select budget</option>
-                      {budgetOptions.map((budget) => (
-                        <option key={budget} value={budget}>
-                          {budget}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="form-grid-full">
-                    <span>Requirement</span>
-                    <textarea
-                      value={form.requirement}
-                      onChange={(event) => updateField("requirement", event.target.value)}
-                      placeholder="Tell us about your home project, location and timeline."
-                      rows={3}
-                    />
-                  </label>
+              <div className="enquiry-modal-form-panel">
+                <div className="form-card-header enquiry-modal-header">
+                  <span className="eyebrow">Free client enquiry</span>
+                  <h2 id="enquiry-modal-title">Get a verified vendor shortlist</h2>
+                  <p>Share the basics. We&apos;ll route your requirement to matched vendors in Pune or Mumbai.</p>
                 </div>
 
-                <button className="btn btn-primary form-submit" type="submit" disabled={submitting}>
-                  {submitting ? "Submitting..." : "Submit Enquiry"}
-                </button>
-                <p className="enquiry-modal-trust">
-                  Your details are shared only with matched verified studios. No spam. No resold leads.
-                </p>
-              </form>
-            ) : (
-              <button className="btn btn-primary form-submit" type="button" onClick={closeModal}>
-                Close
-              </button>
-            )}
+                {error ? (
+                  <p className="form-alert form-alert--error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                {success ? (
+                  <p className="form-alert form-alert--success" role="status">
+                    {success}
+                  </p>
+                ) : null}
+
+                {!success ? (
+                  <form className="enquiry-modal-form" onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                      <label>
+                        <span>Full name</span>
+                        <input
+                          ref={nameInputRef}
+                          value={form.name}
+                          onChange={(event) => updateField("name", event.target.value)}
+                          placeholder="Your full name"
+                          autoComplete="name"
+                        />
+                      </label>
+
+                      <label>
+                        <span>Phone number</span>
+                        <input
+                          value={form.phone}
+                          onChange={(event) => updateField("phone", event.target.value)}
+                          placeholder="+91"
+                          inputMode="tel"
+                          autoComplete="tel"
+                        />
+                      </label>
+
+                      <label>
+                        <span>City</span>
+                        <select value={form.city} onChange={(event) => updateField("city", event.target.value)}>
+                          <option value="">Select city</option>
+                          {cities.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>Service required</span>
+                        <select
+                          value={form.serviceCategory}
+                          onChange={(event) => updateField("serviceCategory", event.target.value)}
+                        >
+                          <option value="">Select service</option>
+                          {ENQUIRY_SERVICE_GROUPS.map((group) => (
+                            <optgroup key={group.category} label={group.category}>
+                              {group.options.map((service) => (
+                                <option key={`${group.category}-${service}`} value={service}>
+                                  {service}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                          <option value="Other">Other</option>
+                        </select>
+                      </label>
+
+                      <label className="form-grid-full">
+                        <span>Budget range</span>
+                        <select value={form.budgetRange} onChange={(event) => updateField("budgetRange", event.target.value)}>
+                          <option value="">Select budget</option>
+                          {budgetOptions.map((budget) => (
+                            <option key={budget} value={budget}>
+                              {budget}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="form-grid-full">
+                        <span>Requirement</span>
+                        <textarea
+                          value={form.requirement}
+                          onChange={(event) => updateField("requirement", event.target.value)}
+                          placeholder="Tell us about your home project, location and timeline."
+                          rows={3}
+                        />
+                      </label>
+                    </div>
+
+                    <button className="btn btn-primary form-submit" type="submit" disabled={submitting}>
+                      {submitting ? "Submitting..." : "Submit Enquiry"}
+                    </button>
+                    <p className="enquiry-modal-trust">
+                      Your details are shared only with matched verified vendors.
+                    </p>
+                  </form>
+                ) : (
+                  <button className="btn btn-primary form-submit" type="button" onClick={closeModal}>
+                    Close
+                  </button>
+                )}
+              </div>
+            </div>
           </section>
         </div>
       ) : null}

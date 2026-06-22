@@ -6,7 +6,7 @@ import { categoryImage } from "@/lib/images";
 export function CategoryCards() {
   return (
     <div className="category-grid" data-reveal-group>
-      {categories.map((category) => (
+      {categories.map((category, index) => (
         <Link
           href={`/category/${categorySlug(category.name)}`}
           className="category-card"
@@ -19,19 +19,22 @@ export function CategoryCards() {
               fill
               sizes="(max-width: 560px) 100vw, (max-width: 980px) 50vw, 300px"
               className="cat-card-img"
+              priority={index === 0}
             />
             <span className="cat-card-shade" aria-hidden="true" />
             <span className="cat-card-icon" aria-hidden="true">
               {category.icon}
             </span>
-            <span className="cat-card-tag">Verified</span>
+            <span className="cat-card-tag">0{index + 1}</span>
           </div>
           <div className="cat-card-body">
-            <h3>{category.name}</h3>
-            <p>{category.description}</p>
+            <div>
+              <h3>{category.name}</h3>
+              <p>{category.description}</p>
+            </div>
             <div className="cat-card-foot">
               <strong>{category.startingPrice}</strong>
-              <span className="cat-card-cta">View Vendors →</span>
+              <span className="cat-card-cta">View vendors</span>
             </div>
           </div>
         </Link>

@@ -14,9 +14,9 @@ import { VendorCards } from "@/components/VendorCards";
 import { clientFaqs, whyChooseQuickFurno } from "@/lib/quickfurno-data";
 
 export const metadata: Metadata = {
-  title: "QuickFurno | Get 4 Verified Home-Service Quotes in Pune & Mumbai",
+  title: "QuickFurno | Get Verified Home-Service Vendors Near You",
   description:
-    "Compare verified interior designers, carpenters, modular factories, painters, sofa and civil-work experts with ratings, project images and transparent rates.",
+    "Tell QuickFurno your requirement and get connected with verified interior, carpentry, modular, painting, sofa and civil-work vendors in Pune and Mumbai.",
   openGraph: {
     title: "QuickFurno | Verified home-service vendors",
     description:
@@ -32,26 +32,20 @@ export default function HomePage() {
     <>
       <Header />
       <main>
-        <section className="hero-section section-pad-top">
+        <section className="hero-section premium-home-hero section-pad-top">
           <div className="container hero-grid">
             <div className="hero-copy">
-              <span className="hero-urgency hero-rise" style={{ "--rise-delay": "0ms" } as React.CSSProperties}>
-                <i aria-hidden="true">⚡</i> Get 4 free quotes in 24 hours · No spam
-              </span>
-              <h1 className="hero-headline hero-rise" style={{ "--rise-delay": "90ms" } as React.CSSProperties}>
-                Find <span className="hl">verified</span> interior &amp; home-service vendors{" "}
-                <span className="hl">near you</span>
+              <h1 className="hero-headline hero-rise">
+                Tell us your requirement and get connected with{" "}
+                <span className="hl">verified home-service vendors near you.</span>
               </h1>
-              <p className="hero-sub hero-rise" style={{ "--rise-delay": "210ms" } as React.CSSProperties}>
-                Compare trusted carpenters, interior designers, modular factories, painters, sofa
-                makers and civil-work vendors in Pune &amp; Mumbai — with{" "}
-                <strong>transparent rates</strong> and <strong>free enquiry</strong>.
+              <p className="hero-sub hero-rise">
+                QuickFurno matches homeowners in Pune and Mumbai with vetted interior designers,
+                carpenters, modular factories, painters, sofa makers and civil-work experts, so
+                you can compare rates, reviews and project fit before the first call.
               </p>
 
-              <div
-                className="hero-cta-row hero-rise"
-                style={{ "--rise-delay": "320ms" } as React.CSSProperties}
-              >
+              <div className="hero-cta-row hero-rise">
                 <EnquiryModalTrigger className="btn btn-primary btn-shine">
                   Get Free Quotes
                 </EnquiryModalTrigger>
@@ -60,38 +54,31 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              <ul
-                className="hero-trust-strip hero-rise"
-                style={{ "--rise-delay": "430ms" } as React.CSSProperties}
-                aria-label="QuickFurno trust indicators"
-              >
-                <li>Verified vendors</li>
-                <li>Transparent rates</li>
+              <ul className="hero-trust-strip hero-rise" aria-label="QuickFurno trust indicators">
+                <li>No spam handoff</li>
+                <li>Up to 4 matched vendors</li>
                 <li>Free client enquiry</li>
-                <li>Pune &amp; Mumbai</li>
+                <li>Pune and Mumbai</li>
               </ul>
 
-              <div
-                className="hero-social-proof hero-rise"
-                style={{ "--rise-delay": "540ms" } as React.CSSProperties}
-              >
+              <div className="hero-social-proof hero-rise">
                 <span className="avatar-stack" aria-hidden="true">
-                  {["AP", "SK", "RM", "VJ"].map((i, idx) => (
-                    <span key={i} className={`avatar-stack-item avatar-stack-item--${idx + 1}`}>
-                      {i}
+                  {["AP", "SK", "RM", "VJ"].map((initials, idx) => (
+                    <span key={initials} className={`avatar-stack-item avatar-stack-item--${idx + 1}`}>
+                      {initials}
                     </span>
                   ))}
                 </span>
                 <span className="hero-social-text">
                   <strong>Trusted by 1,200+ homeowners</strong>
                   <span>
-                    <b>4.8</b> <i aria-hidden="true">★★★★★</i> average rating
+                    <b>4.8/5</b> average vendor experience rating
                   </span>
                 </span>
               </div>
             </div>
 
-            <div className="hero-form-wrap hero-rise" style={{ "--rise-delay": "260ms" } as React.CSSProperties}>
+            <div className="hero-form-wrap hero-rise">
               <HeroVisual />
             </div>
           </div>
@@ -103,11 +90,25 @@ export default function HomePage() {
         <section id="services" className="section-block">
           <div className="container section-heading" data-reveal>
             <span className="eyebrow">Popular home-service categories</span>
-            <h2>Find the right expert by category, rate and project quality.</h2>
+            <h2>Choose the service. Compare the right experts.</h2>
             <p>
-              QuickFurno keeps the client journey simple: choose a service, compare verified vendors,
-              and request quotes without getting spammed.
+              Each category is built for fast shortlisting: clear starting rates, project context
+              and verified vendor profiles without a directory-style maze.
             </p>
+          </div>
+          <div className="container market-intro-strip" data-reveal-group>
+            <article>
+              <strong>Requirement first</strong>
+              <span>Tell us what you need before vendors start calling.</span>
+            </article>
+            <article>
+              <strong>Verified profiles</strong>
+              <span>Review ratings, response time, experience and project focus.</span>
+            </article>
+            <article>
+              <strong>Controlled matching</strong>
+              <span>Get a focused shortlist instead of unlimited spam.</span>
+            </article>
           </div>
           <div className="container">
             <CategoryCards />
@@ -117,21 +118,25 @@ export default function HomePage() {
         <section id="how-it-works" className="section-block section-warm">
           <div className="container section-heading" data-reveal>
             <span className="eyebrow">How QuickFurno Works</span>
-            <h2>From requirement to shortlist in four clear steps.</h2>
+            <h2>A simple quote flow that protects your attention.</h2>
+            <p>
+              The marketplace stays clear and controlled from the moment you submit a
+              requirement to the moment you compare vendors.
+            </p>
           </div>
           <div className="container">
             <HowItWorks />
           </div>
         </section>
 
-        <section id="verified-vendors" className="section-block">
+        <section id="verified-vendors" className="section-block featured-vendors-section">
           <div className="container section-heading section-heading--split" data-reveal>
             <div>
               <span className="eyebrow">Featured verified vendors</span>
-              <h2>Top-rated studios on QuickFurno right now.</h2>
+              <h2>Premium vendor profiles, not anonymous listings.</h2>
               <p>
-                A preview of our highest-rated active vendors. Pick a category to see every
-                verified vendor near you.
+                Preview active paid vendors with ratings, starting rates, response time and
+                category fit before you open a profile.
               </p>
             </div>
             <Link href="#services" className="btn btn-primary">
@@ -146,12 +151,12 @@ export default function HomePage() {
         <section className="section-block section-warm">
           <div className="container section-heading" data-reveal>
             <span className="eyebrow">Why clients choose QuickFurno</span>
-            <h2>A more controlled way to find home-service experts.</h2>
+            <h2>Built for homeowners who want clarity before calls.</h2>
           </div>
           <div className="container choose-grid" data-reveal-group>
             {whyChooseQuickFurno.map((item) => (
               <article className="choose-card" key={item}>
-                <span aria-hidden="true">✓</span>
+                <span aria-hidden="true">OK</span>
                 <h3>{item}</h3>
                 <p>Designed to help homeowners compare confidently before starting a project.</p>
               </article>
@@ -163,6 +168,10 @@ export default function HomePage() {
           <div className="container section-heading" data-reveal>
             <span className="eyebrow">Client testimonials</span>
             <h2>Homeowners want clarity, not endless follow-ups.</h2>
+            <p>
+              The strongest signal is simple: clients want a shorter path from requirement to
+              confident vendor conversation.
+            </p>
           </div>
           <div className="container">
             <Testimonials />
@@ -183,8 +192,8 @@ export default function HomePage() {
         <section className="final-cta">
           <div className="container final-cta-card" data-reveal>
             <span className="eyebrow">Ready to start?</span>
-            <h2>Ready to start your home project?</h2>
-            <p>Tell QuickFurno your requirement and get matched with verified vendors in Pune or Mumbai.</p>
+            <h2>Start with one requirement. Get a verified shortlist.</h2>
+            <p>Tell QuickFurno what you need and get connected with relevant vendors in Pune or Mumbai.</p>
             <div className="hero-cta-row">
               <EnquiryModalTrigger className="btn btn-primary">
                 Start Enquiry

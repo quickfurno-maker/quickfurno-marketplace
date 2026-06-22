@@ -6,18 +6,18 @@ const steps = [
   },
   {
     number: "02",
-    title: "Get matched with 4 verified vendors",
-    description: "We shortlist relevant active vendors based on category and city.",
+    title: "We verify the fit",
+    description: "Your enquiry is matched by service category, city, response quality and vendor profile.",
   },
   {
     number: "03",
-    title: "Compare rates, ratings and project work",
-    description: "Review profiles, starting rates, response time and project galleries.",
+    title: "Compare clear profiles",
+    description: "Review rates, ratings, reviews, experience and project focus before you speak.",
   },
   {
     number: "04",
-    title: "Choose the best expert",
-    description: "Speak directly, compare quotes and start your home project confidently.",
+    title: "Choose with confidence",
+    description: "Speak directly with shortlisted vendors and move forward only when you are ready.",
   },
 ];
 

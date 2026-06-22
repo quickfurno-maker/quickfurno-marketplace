@@ -1,27 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CategoryCards } from "@/components/CategoryCards";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
-import { FAQ } from "@/components/FAQ";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { HeroVisual } from "@/components/HeroVisual";
-import { HowItWorks } from "@/components/HowItWorks";
-import { StatsBand } from "@/components/StatsBand";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
-import { Testimonials } from "@/components/Testimonials";
-import { VendorCards } from "@/components/VendorCards";
-import { whatsappLink } from "@/lib/config";
-import { clientFaqs, whyChooseQuickFurno } from "@/lib/quickfurno-data";
+import { HomeCategoryGrid } from "@/components/home/HomeCategoryGrid";
+import { HomeSearchBar } from "@/components/home/HomeSearchBar";
+import {
+  ClientCTASection,
+  HomeHowItWorksSection,
+  HomeIllustration,
+  PopularServicesSection,
+  VendorCTASection,
+  WhyChooseSection,
+  trustBadges,
+} from "@/components/home/HomeSections";
+import { QFIcon } from "@/components/QuickFurnoIcons";
 
 export const metadata: Metadata = {
-  title: "QuickFurno | Get Verified Home-Service Vendors Near You",
+  title: "QuickFurno | Find Verified Home-Service Vendors Near You",
   description:
-    "Tell QuickFurno your requirement and get connected with verified interior, carpentry, modular, painting, sofa and civil-work vendors in Pune and Mumbai.",
+    "Find verified carpenters, interior designers, painters, sofa makers and renovation experts near you with QuickFurno.",
   openGraph: {
-    title: "QuickFurno | Verified home-service vendors",
+    title: "QuickFurno | Verified home-service vendors near you",
     description:
-      "Tell QuickFurno your requirement and get connected with verified home-service vendors near you.",
+      "Tell QuickFurno your requirement and get connected with trusted local experts.",
     url: "https://quickfurno.in",
     siteName: "QuickFurno",
     type: "website",
@@ -32,204 +35,52 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      <main>
-        <section className="hero-section premium-home-hero section-pad-top">
-          <div className="container hero-grid">
-            <div className="hero-copy">
-              <h1 className="hero-headline hero-rise">
-                Find Verified Home-Service{" "}
-                <span className="hl">Vendors Near You</span>
-              </h1>
-              <p className="hero-sub hero-rise">
-                Compare trusted interior designers, carpenters, modular factories, painters,
-                sofa makers and civil-work vendors in Pune &amp; Mumbai — with transparent rates
-                and a free, no-spam enquiry.
+      <main className="qf-home-page">
+        <div className="qf-home-app-shell">
+          <section className="qf-hero-section">
+            <div className="qf-hero-copy">
+              <h1>Find verified home-service vendors near you</h1>
+              <p>
+                Tell us your requirement and get connected with trusted carpenters,
+                interior designers, painters, sofa makers and renovation experts.
               </p>
 
-              <div className="hero-cta-row hero-rise">
-                <EnquiryModalTrigger className="btn btn-primary btn-shine">
-                  Get 4 Free Quotes
-                </EnquiryModalTrigger>
-                <Link href="#verified-vendors" className="btn btn-secondary">
-                  Explore Vendors
+              <div className="qf-trust-badges" aria-label="QuickFurno trust badges">
+                {trustBadges.map((badge) => (
+                  <span key={`${badge.title}-${badge.label}`}>
+                    <QFIcon name={badge.icon} />
+                    <b>{badge.title}</b>
+                    <small>{badge.label}</small>
+                  </span>
+                ))}
+              </div>
+
+              <div className="qf-hero-actions">
+                <EnquiryModalTrigger className="qf-gold-btn">Get Free Quotes</EnquiryModalTrigger>
+                <Link href="#services" className="qf-teal-btn">
+                  Explore Categories
                 </Link>
               </div>
-
-              <ul className="hero-trust-strip hero-rise" aria-label="QuickFurno trust indicators">
-                <li>Verified vendors</li>
-                <li>Transparent rates</li>
-                <li>Free enquiry</li>
-                <li>Pune &amp; Mumbai</li>
-                <li>No spam</li>
-              </ul>
-
-              <div className="hero-social-proof hero-rise">
-                <span className="avatar-stack" aria-hidden="true">
-                  {["AP", "SK", "RM", "VJ"].map((initials, idx) => (
-                    <span key={initials} className={`avatar-stack-item avatar-stack-item--${idx + 1}`}>
-                      {initials}
-                    </span>
-                  ))}
-                </span>
-                <span className="hero-social-text">
-                  <strong>Trusted by 1,200+ homeowners</strong>
-                  <span>
-                    <b>4.8/5</b> average vendor experience rating
-                  </span>
-                </span>
-              </div>
             </div>
+            <HomeIllustration />
+          </section>
 
-            <div className="hero-form-wrap hero-rise">
-              <HeroVisual />
+          <HomeSearchBar />
+
+          <section className="qf-home-section" id="services">
+            <div className="qf-section-head">
+              <h2>Explore Home Services</h2>
+              <p>Choose a service and compare verified vendors near you.</p>
             </div>
-          </div>
-          <div className="container hero-stats-wrap" data-reveal>
-            <StatsBand />
-          </div>
-        </section>
+            <HomeCategoryGrid />
+          </section>
 
-        <section id="services" className="section-block">
-          <div className="container section-heading" data-reveal>
-            <span className="eyebrow">Popular home-service categories</span>
-            <h2>Choose the service. Compare the right experts.</h2>
-            <p>
-              Each category is built for fast shortlisting: clear starting rates, project context
-              and verified vendor profiles without a directory-style maze.
-            </p>
-          </div>
-          <div className="container market-intro-strip" data-reveal-group>
-            <article>
-              <strong>Requirement first</strong>
-              <span>Tell us what you need before vendors start calling.</span>
-            </article>
-            <article>
-              <strong>Verified profiles</strong>
-              <span>Review ratings, response time, experience and project focus.</span>
-            </article>
-            <article>
-              <strong>Controlled matching</strong>
-              <span>Get a focused shortlist instead of unlimited spam.</span>
-            </article>
-          </div>
-          <div className="container">
-            <CategoryCards />
-          </div>
-        </section>
-
-        <section id="how-it-works" className="section-block section-warm">
-          <div className="container section-heading" data-reveal>
-            <span className="eyebrow">How QuickFurno Works</span>
-            <h2>A simple quote flow that protects your attention.</h2>
-            <p>
-              The marketplace stays clear and controlled from the moment you submit a
-              requirement to the moment you compare vendors.
-            </p>
-          </div>
-          <div className="container">
-            <HowItWorks />
-          </div>
-        </section>
-
-        <section id="verified-vendors" className="section-block featured-vendors-section">
-          <div className="container section-heading section-heading--split" data-reveal>
-            <div>
-              <span className="eyebrow">Featured verified vendors</span>
-              <h2>Premium vendor profiles, not anonymous listings.</h2>
-              <p>
-                Preview active paid vendors with ratings, starting rates, response time and
-                category fit before you open a profile.
-              </p>
-            </div>
-            <Link href="#services" className="btn btn-primary">
-              Browse by category
-            </Link>
-          </div>
-          <div className="container">
-            <VendorCards limit={5} />
-          </div>
-        </section>
-
-        <section className="section-block section-warm">
-          <div className="container section-heading" data-reveal>
-            <span className="eyebrow">Why clients choose QuickFurno</span>
-            <h2>Built for homeowners who want clarity before calls.</h2>
-          </div>
-          <div className="container choose-grid" data-reveal-group>
-            {whyChooseQuickFurno.map((item) => (
-              <article className="choose-card" key={item.title}>
-                <span aria-hidden="true">✓</span>
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </article>
-            ))}
-          </div>
-          <div className="container" data-reveal>
-            <div className="nospam-band">
-              <div className="nospam-band-icon" aria-hidden="true">🔒</div>
-              <div className="nospam-band-copy">
-                <strong>Why only up to 4 quotes?</strong>
-                <p>
-                  We do not blast your number to 20 vendors. You get a small, relevant set of
-                  verified vendors so you can compare without getting spammed with calls.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="reviews" className="section-block">
-          <div className="container section-heading" data-reveal>
-            <span className="eyebrow">Client testimonials</span>
-            <h2>Homeowners want clarity, not endless follow-ups.</h2>
-            <p>
-              The strongest signal is simple: clients want a shorter path from requirement to
-              confident vendor conversation.
-            </p>
-          </div>
-          <div className="container">
-            <Testimonials />
-          </div>
-        </section>
-
-        <section id="faq" className="section-block section-warm">
-          <div className="container faq-layout" data-reveal>
-            <div className="section-heading section-heading--left">
-              <span className="eyebrow">FAQ</span>
-              <h2>Questions clients ask before submitting a requirement.</h2>
-              <p>Quick answers for quote flow, verification and city availability.</p>
-            </div>
-            <FAQ items={clientFaqs} />
-          </div>
-        </section>
-
-        <section className="final-cta">
-          <div className="container final-cta-card" data-reveal>
-            <span className="eyebrow">Ready to start?</span>
-            <h2>Ready to compare verified vendors for your project?</h2>
-            <p>
-              Tell QuickFurno what you need and get up to 4 relevant, verified vendor matches in
-              Pune or Mumbai — with transparent rates so you can compare before the first call.
-            </p>
-            <div className="hero-cta-row">
-              <EnquiryModalTrigger className="btn btn-primary btn-shine">
-                Get Free Quotes
-              </EnquiryModalTrigger>
-              <Link href="#verified-vendors" className="btn btn-secondary">
-                Browse Vendors
-              </Link>
-              <a
-                className="btn btn-outline"
-                href={whatsappLink()}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                WhatsApp Us
-              </a>
-            </div>
-            <p className="final-cta-microcopy">Free enquiry. No spam. Verified vendors only.</p>
-          </div>
-        </section>
+          <WhyChooseSection />
+          <HomeHowItWorksSection />
+          <ClientCTASection />
+          <PopularServicesSection />
+          <VendorCTASection />
+        </div>
       </main>
       <Footer />
       <StickyMobileCTA />

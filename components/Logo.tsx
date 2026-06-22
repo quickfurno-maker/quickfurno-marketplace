@@ -1,9 +1,3 @@
-/**
- * QuickFurno logo mark — premium editorial identity.
- * A refined monoline "Q" in warm bronze on a deep espresso tile, with a subtle
- * cream sheen and a small bronze serif terminal. Self-contained SVG so it
- * renders identically on any background at zero cost.
- */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg
@@ -15,42 +9,23 @@ export function LogoMark({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient id="qfTile" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#26201A" />
-          <stop offset="1" stopColor="#171412" />
+        <linearGradient id="qfTealTile" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#F6FBF8" />
+          <stop offset="1" stopColor="#E5F1EE" />
         </linearGradient>
-        <linearGradient id="qfBronze" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0" stopColor="#E2C089" />
-          <stop offset="0.5" stopColor="#C9A066" />
-          <stop offset="1" stopColor="#B8874A" />
+        <linearGradient id="qfGoldRoof" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#E7B45A" />
+          <stop offset="1" stopColor="#D9902F" />
         </linearGradient>
-        <radialGradient id="qfVig" cx="30%" cy="22%" r="90%">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.12" />
-          <stop offset="55%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.3" />
-        </radialGradient>
       </defs>
-
-      <rect width="48" height="48" rx="14" fill="url(#qfTile)" />
-      <rect width="48" height="48" rx="14" fill="url(#qfVig)" />
-
-      {/* fine bronze seal ring */}
-      <circle cx="24" cy="24" r="17.2" fill="none" stroke="url(#qfBronze)" strokeWidth="0.9" opacity="0.45" />
-
-      {/* monoline Q */}
-      <circle cx="23.2" cy="22.8" r="9" fill="none" stroke="url(#qfBronze)" strokeWidth="3" />
-      {/* cream sheen */}
-      <path
-        d="M16.4 18 A9 9 0 0 1 24.6 13.9"
-        fill="none"
-        stroke="#F7EFDF"
-        strokeWidth="1.1"
-        strokeLinecap="round"
-        opacity="0.5"
-      />
-      {/* tail terminal */}
-      <path d="M27.8 27.6 L32.6 32.4" stroke="url(#qfBronze)" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="33.2" cy="33" r="1.7" fill="#E2C089" />
+      <rect width="48" height="48" rx="14" fill="url(#qfTealTile)" />
+      <rect x="4" y="4" width="40" height="40" rx="12" fill="none" stroke="#B9D4D7" strokeWidth="1.2" />
+      <path d="M10 25.5 24 14l14 11.5" fill="none" stroke="#075B67" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 23.5V37h18V23.5" fill="#FFFDF8" stroke="#075B67" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M19 37v-8h6v8" fill="#F8F4EA" stroke="#075B67" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M28 18.2h5.2V26" fill="none" stroke="url(#qfGoldRoof)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="35.2" cy="13.4" r="2.2" fill="#D9902F" opacity="0.95" />
+      <path d="M31 31h5" stroke="#D9902F" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }

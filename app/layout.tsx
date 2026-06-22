@@ -5,6 +5,7 @@ import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
 import "./vendor-discovery.css";
+import "./qf-redesign.css";
 
 // Editorial type system: Playfair Display for premium headlines/section titles
 // and brand accent; Manrope for clean body, UI and forms.
@@ -42,8 +43,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F1E8" },
-    { media: "(prefers-color-scheme: dark)", color: "#1F1A14" },
+    { media: "(prefers-color-scheme: light)", color: "#F8F4EA" },
+    { media: "(prefers-color-scheme: dark)", color: "#03424B" },
   ],
   colorScheme: "light",
 };

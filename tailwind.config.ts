@@ -5,11 +5,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // "navy" tokens retained as keys for compatibility, now a premium deep-emerald scale.
-        navy:   { DEFAULT: "#0E5A47", deep: "#093A2E", ink: "#06251D" },
-        gold:   { DEFAULT: "#C9A227", soft: "#E6C65A", deep: "#8F6F12" },
-        ivory:  "#F4F1EA",
-        muted:  "#C2BCAD",
+        // Indigo & Coral brand. Keys ("navy"/"gold") retained for compatibility
+        // with existing utility usage; values are the new palette.
+        navy:   { DEFAULT: "#4F46E5", deep: "#312A6B", ink: "#1E1B3A" },
+        gold:   { DEFAULT: "#FF6B5A", soft: "#FF8A7A", deep: "#E0493A" },
+        ivory:  "#F7F7FB",
+        muted:  "#5B5670",
       },
       fontFamily: {
         display: ["var(--font-jakarta)", "ui-sans-serif", "system-ui", "sans-serif"],
@@ -17,7 +18,7 @@ const config: Config = {
       },
       boxShadow: {
         lift: "0 24px 60px -20px rgba(0,0,0,0.55)",
-        gold: "0 0 0 1px rgba(201,162,39,0.35), 0 18px 40px -18px rgba(201,162,39,0.4)",
+        gold: "0 0 0 1px rgba(255,107,90,0.35), 0 18px 40px -18px rgba(255,107,90,0.4)",
       },
       borderRadius: { xl2: "1.25rem" },
     },

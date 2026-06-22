@@ -1,18 +1,16 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { VendorCards } from "@/components/VendorCards";
-import { categoryImage } from "@/lib/images";
 import {
-  activePaidVendors,
   categories,
   categorySlug,
+  enquiryServiceForCategory,
   getCategoryBySlug,
+  visibleVendors,
 } from "@/lib/quickfurno-data";
 
 type CategoryPageProps = { params: { slug: string } };
@@ -26,7 +24,7 @@ export function generateMetadata({ params }: CategoryPageProps): Metadata {
   if (!category) return { title: "Category not found | QuickFurno" };
 
   const title = `${category.name} in Pune & Mumbai | QuickFurno`;
-  const description = `Compare verified ${category.name.toLowerCase()} on QuickFurno — ratings, transparent rates and free client enquiry across Pune & Mumbai.`;
+  const description = `Compare verified ${category.name.toLowerCase()} on QuickFurno - ratings, transparent rates and free client enquiry across Pune & Mumbai.`;
 
   return {
     title,
@@ -39,68 +37,84 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   const category = getCategoryBySlug(params.slug);
   if (!category) notFound();
 
-  const vendorCount = activePaidVendors.filter((vendor) => vendor.category === category.name).length;
+  const categoryVendors = visibleVendors.filter((vendor) => vendor.category === category.name);
+  const vendorCount = categoryVendors.length;
+  const premiumCount = categoryVendors.filter((vendor) => vendor.activePaidPlan).length;
+  const enquiryService = enquiryServiceForCategory(category.name);
 
   return (
     <>
       <Header />
-      <main>
-        <section className="category-hero">
-          <div className="category-hero-media" aria-hidden="true">
-            <Image
-              src={categoryImage(category.name)}
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="category-hero-img"
-            />
-            <span className="category-hero-shade" />
-          </div>
-
-          <div className="container category-hero-inner">
-            <Link href="/#services" className="category-back category-back--light">
-              ← All categories
-            </Link>
-            <span className="eyebrow eyebrow--light">Verified vendors</span>
-            <h1 className="category-hero-title">
-              {category.name} <span className="hl-light">near you</span>
-            </h1>
-            <p className="category-hero-sub">{category.description}</p>
-
-            <div className="category-hero-chips">
-              <span>
-                {vendorCount > 0
-                  ? `${vendorCount} verified vendor${vendorCount > 1 ? "s" : ""}`
-                  : "Onboarding vendors"}
-              </span>
-              <span>Transparent rates</span>
-              <span>Free client enquiry</span>
-              <span>{category.startingPrice}</span>
-            </div>
-
-            <div className="hero-cta-row category-hero-cta">
-              <EnquiryModalTrigger className="btn btn-primary btn-shine">
-                Get Free Quotes
-              </EnquiryModalTrigger>
-              <Link href="/#services" className="btn btn-glass">
-                Explore Other Categories
+      <main className="category-market-page">
+        <section className="category-market-intro section-pad-top">
+          <div className="container category-market-intro-grid">
+            <div>
+              <Link href="/#services" className="category-back">
+                Back to all categories
               </Link>
+              <p className="category-market-copy">{category.description}</p>
+            </div>
+            <div className="category-market-stats" aria-label={`${category.name} listing summary`}>
+              <span>
+                <strong>{vendorCount || "New"}</strong>
+                verified profiles
+              </span>
+              <span>
+                <strong>{premiumCount}</strong>
+                premium vendors
+              </span>
+              <span>
+                <strong>{category.startingPrice.replace("Starting ", "")}</strong>
+                starting rate
+              </span>
             </div>
           </div>
         </section>
 
-        <section className="section-block">
-          <div className="container section-heading" data-reveal>
-            <span className="eyebrow">Compare vendors</span>
-            <h2>
-              {vendorCount > 0
-                ? `Top verified ${category.name.toLowerCase()} for your project`
-                : `Verified ${category.name.toLowerCase()} arriving soon`}
-            </h2>
-          </div>
-          <div className="container">
-            <VendorCards category={category.name} />
+        <section className="category-listing-section">
+          <div className="container category-listing-layout">
+            <aside className="listing-refine-panel" aria-label="Listing refinement summary">
+              <h2>Refine search</h2>
+              <p>Use the sticky filters to compare by rating, response speed, plan and availability.</p>
+              <div className="listing-refine-group">
+                <span>Popular areas</span>
+                <button type="button">Kharadi</button>
+                <button type="button">Baner</button>
+                <button type="button">Andheri</button>
+                <button type="button">Thane</button>
+              </div>
+              <div className="listing-refine-group">
+                <span>Trust filters</span>
+                <button type="button">Verified</button>
+                <button type="button">Top rated</button>
+                <button type="button">Quick response</button>
+              </div>
+            </aside>
+
+            <div className="listing-results-panel">
+              <VendorCards category={category.name} mode="listing" />
+            </div>
+
+            <aside className="listing-assist-card" aria-label="QuickFurno assistance">
+              <h2>Get matched faster</h2>
+              <p>
+                Tell QuickFurno your requirement and we will connect you with suitable{" "}
+                {category.name.toLowerCase()} near you.
+              </p>
+              <EnquiryModalTrigger
+                className="btn btn-primary"
+                modalTitle={`Get quotes from verified ${category.name}`}
+                serviceCategory={enquiryService}
+                source={`Category assistance: ${category.name}`}
+              >
+                Get Free Assistance
+              </EnquiryModalTrigger>
+              <ul>
+                <li>Up to 4 relevant vendor matches</li>
+                <li>Paid vendors prioritised for lead routing</li>
+                <li>Free vendors remain visible for comparison</li>
+              </ul>
+            </aside>
           </div>
         </section>
 
@@ -112,7 +126,12 @@ export default function CategoryPage({ params }: CategoryPageProps) {
               Tell QuickFurno your requirement and get matched with verified vendors in Pune or Mumbai.
             </p>
             <div className="hero-cta-row">
-              <EnquiryModalTrigger className="btn btn-primary">
+              <EnquiryModalTrigger
+                className="btn btn-primary"
+                modalTitle={`Get quotes from verified ${category.name}`}
+                serviceCategory={enquiryService}
+                source={`Category final CTA: ${category.name}`}
+              >
                 Start Enquiry
               </EnquiryModalTrigger>
               <Link href="/#verified-vendors" className="btn btn-outline">
@@ -123,7 +142,6 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         </section>
       </main>
       <Footer />
-      <StickyMobileCTA />
     </>
   );
 }

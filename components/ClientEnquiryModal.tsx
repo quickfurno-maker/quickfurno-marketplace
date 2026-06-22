@@ -27,6 +27,15 @@ type EnquiryFormState = {
   requirement: string;
 };
 
+type EnquiryModalOptions = {
+  title?: string;
+  serviceCategory?: string;
+  city?: string;
+  area?: string;
+  requirement?: string;
+  source?: string;
+};
+
 const budgetOptions = [
   "Below ₹1 lakh",
   "₹1–3 lakh",
@@ -56,7 +65,7 @@ const initialState: EnquiryFormState = {
 const OPEN_EVENT = "quickfurno:open-enquiry-modal";
 
 type EnquiryModalContextValue = {
-  openModal: () => void;
+  openModal: (options?: EnquiryModalOptions) => void;
 };
 
 const EnquiryModalContext = createContext<EnquiryModalContextValue | null>(null);
@@ -64,10 +73,24 @@ const EnquiryModalContext = createContext<EnquiryModalContextValue | null>(null)
 export function EnquiryModalTrigger({
   children,
   type = "button",
+  modalTitle,
+  serviceCategory,
+  city,
+  area,
+  requirement,
+  source,
   onClick,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & EnquiryModalOptions & { modalTitle?: string }) {
   const context = useContext(EnquiryModalContext);
+  const modalOptions = {
+    title: modalTitle,
+    serviceCategory,
+    city,
+    area,
+    requirement,
+    source,
+  };
 
   return (
     <button
@@ -79,11 +102,11 @@ export function EnquiryModalTrigger({
         if (event.defaultPrevented) return;
 
         if (context) {
-          context.openModal();
+          context.openModal(modalOptions);
           return;
         }
 
-        window.dispatchEvent(new Event(OPEN_EVENT));
+        window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: modalOptions }));
       }}
     >
       {children}
@@ -94,15 +117,24 @@ export function EnquiryModalTrigger({
 export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<EnquiryFormState>(initialState);
+  const [modalOptions, setModalOptions] = useState<EnquiryModalOptions>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const openModal = useCallback(() => {
+  const openModal = useCallback((options: EnquiryModalOptions = {}) => {
     setError("");
     setSuccess("");
     setSubmitting(false);
+    setModalOptions(options);
+    setForm({
+      ...initialState,
+      city: options.city ?? "",
+      area: options.area ?? "",
+      serviceCategory: options.serviceCategory ?? "",
+      requirement: options.requirement ?? "",
+    });
     setOpen(true);
   }, []);
 
@@ -113,6 +145,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setError("");
     setSuccess("");
     setSubmitting(false);
+    setModalOptions({});
     setForm(initialState);
   }
 
@@ -121,22 +154,13 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const onClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-
-      const trigger = target.closest<HTMLElement>("[data-enquiry-modal-trigger]");
-      if (!trigger) return;
-
-      event.preventDefault();
-      openModal();
+    const onOpenEvent = (event: Event) => {
+      openModal(event instanceof CustomEvent ? event.detail : {});
     };
 
-    window.addEventListener(OPEN_EVENT, openModal);
-    document.addEventListener("click", onClick);
+    window.addEventListener(OPEN_EVENT, onOpenEvent);
     return () => {
-      window.removeEventListener(OPEN_EVENT, openModal);
-      document.removeEventListener("click", onClick);
+      window.removeEventListener(OPEN_EVENT, onOpenEvent);
     };
   }, [openModal]);
 
@@ -164,8 +188,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setError("");
     setSuccess("");
 
-    if (!form.name.trim() || !form.phone.trim() || !form.city || !form.serviceCategory || !form.budgetRange) {
-      setError("Please fill name, phone, city, service category and budget range.");
+    if (!form.name.trim() || !form.phone.trim() || !form.city || !form.serviceCategory) {
+      setError("Please fill name, phone, city and service category.");
       return;
     }
 
@@ -180,10 +204,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       city: form.city,
       area: form.area.trim() || undefined,
       service_category: form.serviceCategory,
-      budget_range: form.budgetRange,
+      budget_range: form.budgetRange || undefined,
       timeline: form.timeline || undefined,
       requirement: form.requirement.trim() || undefined,
-      source: "Homepage enquiry popup",
+      source: modalOptions.source ?? "Homepage enquiry popup",
     };
 
     setSubmitting(true);
@@ -195,8 +219,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      trackEvent("lead_submit", { source: "homepage_popup", service: payload.service_category });
-      setSuccess("Thank you! Your enquiry has been received. Our team will connect you with matched studios shortly.");
+      trackEvent("lead_submit", { source: payload.source, service: payload.service_category });
+      setSuccess("Thanks! QuickFurno will connect you with suitable vendors shortly.");
       setForm(initialState);
     } catch (err) {
       console.error("[enquiry modal] submission error", {
@@ -207,6 +231,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       setSubmitting(false);
     }
   }
+
+  const modalTitle = modalOptions.title ?? "Get a verified vendor shortlist";
 
   return (
     <EnquiryModalContext.Provider value={contextValue}>
@@ -250,7 +276,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
               <div className="enquiry-modal-form-panel">
                 <div className="form-card-header enquiry-modal-header">
                   <span className="eyebrow">Free client enquiry</span>
-                  <h2 id="enquiry-modal-title">Get a verified vendor shortlist</h2>
+                  <h2 id="enquiry-modal-title">{modalTitle}</h2>
                   <p>Share the basics. We&apos;ll route your requirement to matched vendors in Pune or Mumbai.</p>
                 </div>
 
@@ -333,7 +359,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       </label>
 
                       <label>
-                        <span>Budget range</span>
+                        <span>Budget range (optional)</span>
                         <select value={form.budgetRange} onChange={(event) => updateField("budgetRange", event.target.value)}>
                           <option value="">Select budget</option>
                           {budgetOptions.map((budget) => (

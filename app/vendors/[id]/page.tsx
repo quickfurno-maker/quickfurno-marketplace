@@ -1,150 +1,241 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { PortfolioGallery } from "@/components/PortfolioGallery";
 import { VendorCards } from "@/components/VendorCards";
+import { VendorDetailHeader } from "@/components/VendorDetailHeader";
 import { CONTACT_TEL, whatsappLink } from "@/lib/config";
+import {
+  enquiryServiceForCategory,
+  getVendorBySlug,
+  getVendorListingMeta,
+  getVendorServiceChips,
+  visibleVendors,
+} from "@/lib/quickfurno-data";
 
-export const metadata: Metadata = {
-  title: "Raj Premium Interiors | QuickFurno Verified Vendor",
-  description:
-    "View Raj Premium Interiors profile, pricing, portfolio, reviews and contact actions on QuickFurno.",
-  openGraph: {
-    title: "Raj Premium Interiors on QuickFurno",
-    description: "Verified interior design vendor profile with pricing, gallery and reviews.",
-    url: "https://quickfurno.in/vendors/raj-premium-interiors",
-    siteName: "QuickFurno",
-    type: "profile",
-  },
-};
+type VendorPageProps = { params: { id: string } };
 
-const profileStats = [
-  ["125", "Projects Completed"],
-  ["12 Years", "Experience"],
-  ["4.8", "Average Rating"],
-  ["< 1 hr", "Response"],
+export function generateStaticParams() {
+  return visibleVendors.map((vendor) => ({ id: vendor.slug }));
+}
+
+export function generateMetadata({ params }: VendorPageProps): Metadata {
+  const vendor = getVendorBySlug(params.id);
+  if (!vendor) return { title: "Vendor not found | QuickFurno" };
+
+  const title = `${vendor.businessName} | QuickFurno Verified Vendor`;
+  const description = `View ${vendor.businessName} profile, pricing, services, reviews and contact actions on QuickFurno.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://quickfurno.in/vendors/${vendor.slug}`,
+      siteName: "QuickFurno",
+      type: "profile",
+    },
+  };
+}
+
+const reviewNames = ["Aarav Joshi", "Meera Deshpande", "Sanjay Kulkarni"];
+const faqItems = [
+  ["How quickly can I get a quote?", "Most vendors respond the same day after QuickFurno receives your requirement."],
+  ["Can I compare this vendor with others?", "Yes. QuickFurno can match you with up to 4 suitable vendors for comparison."],
+  ["Is the enquiry free?", "Yes. Client enquiries are free and routed only to relevant vendor matches."],
 ];
 
-const services = [
-  ["Interior Design", "Starting ₹1,450/sq.ft"],
-  ["Modular Kitchen", "Starting ₹1,250/sq.ft"],
-  ["Wardrobe", "Starting ₹1,100/sq.ft"],
-  ["False Ceiling", "Starting ₹140/sq.ft"],
-  ["Civil Renovation", "Project based"],
-];
+export default function VendorProfilePage({ params }: VendorPageProps) {
+  const vendor = getVendorBySlug(params.id);
+  if (!vendor) notFound();
 
-const reviews = [
-  ["Aarav Joshi", "Elegant execution and transparent pricing. The team explained material choices clearly."],
-  ["Meera Deshpande", "Our kitchen and wardrobe work was coordinated well, with quick updates and good finishing."],
-  ["Sanjay Kulkarni", "Professional process from measurement to installation. Helpful for a first-time renovation."],
-  ["Nikita Shah", "Good design suggestions and practical storage ideas for a compact apartment."],
-];
+  const meta = getVendorListingMeta(vendor);
+  const services = getVendorServiceChips(vendor);
+  const enquiryService = enquiryServiceForCategory(vendor.category);
+  const serviceAreas = [meta.locality, vendor.city === "Pune" ? "Baner" : "Andheri", vendor.city === "Pune" ? "Wakad" : "Thane"];
 
-export default function VendorProfilePage() {
   return (
     <>
       <Header />
-      <main>
-        <section className="profile-cover section-pad-top">
-          <div className="container profile-cover-card">
-            <div className="profile-cover-image warm-suite" role="img" aria-label="Raj Premium Interiors project cover preview" />
-            <div className="profile-summary">
-              <div className="profile-avatar" aria-hidden="true">RP</div>
-              <div>
-                <div className="badge-row">
-                  <span className="status-badge status-badge--verified">Verified</span>
-                  <span className="status-badge status-badge--featured">Featured</span>
-                </div>
-                <h1>Raj Premium Interiors</h1>
-                <p>Interior Designers • Premium Interiors • Pune, Kharadi, Viman Nagar and nearby areas</p>
-                <div className="profile-rating">4.8 ★ • 118 reviews</div>
-                <div className="hero-cta-row">
-                  <a className="btn btn-secondary" href={CONTACT_TEL}>Call</a>
-                  <a className="btn btn-outline" href={whatsappLink()}>WhatsApp</a>
-                  <EnquiryModalTrigger className="btn btn-primary">Request Quote</EnquiryModalTrigger>
-                </div>
-              </div>
-            </div>
+      <main className="vendor-detail-page">
+        <section className="vendor-detail-hero section-pad-top">
+          <div className="container">
+            <VendorDetailHeader vendor={vendor} />
           </div>
         </section>
 
-        <section className="section-block">
-          <div className="container profile-layout">
-            <div className="profile-main">
-              <div className="profile-stat-grid">
-                {profileStats.map(([value, label]) => (
-                  <article className="profile-stat-card reveal-card" key={label}>
-                    <strong>{value}</strong>
-                    <span>{label}</span>
-                  </article>
+        <section className="vendor-detail-content">
+          <div className="container vendor-detail-layout">
+            <div className="vendor-detail-main">
+              <nav className="vendor-detail-tabs" aria-label="Vendor profile sections">
+                {["Overview", "Services", "Prices", "Portfolio", "Reviews", "Hours", "Areas", "About", "FAQs"].map((item) => (
+                  <a key={item} href={`#${item.toLowerCase()}`}>
+                    {item}
+                  </a>
                 ))}
-              </div>
+              </nav>
 
-              <section className="profile-panel reveal-card">
-                <span className="eyebrow">About vendor</span>
-                <h2>Premium interiors with managed execution.</h2>
-                <p>
-                  Raj Premium Interiors helps homeowners create elegant, functional and durable interiors
-                  with transparent pricing, premium materials and managed execution.
-                </p>
+              <section id="overview" className="vendor-detail-panel">
+                <h2>Overview</h2>
+                <p>{vendor.description}</p>
+                <div className="vendor-overview-grid">
+                  <span>
+                    <strong>{vendor.rating.toFixed(1)}/5</strong>
+                    rating
+                  </span>
+                  <span>
+                    <strong>{vendor.reviews}</strong>
+                    reviews
+                  </span>
+                  <span>
+                    <strong>{vendor.experience}</strong>
+                    experience
+                  </span>
+                  <span>
+                    <strong>{vendor.responseTime}</strong>
+                    response
+                  </span>
+                </div>
               </section>
 
-              <section className="profile-panel reveal-card">
-                <span className="eyebrow">Services & Pricing</span>
-                <h2>Starting rates for common project scopes.</h2>
-                <div className="service-price-grid">
-                  {services.map(([service, price]) => (
-                    <article key={service}>
-                      <h3>{service}</h3>
-                      <p>{price}</p>
+              <section id="services" className="vendor-detail-panel">
+                <h2>Services Offered</h2>
+                <div className="vendor-service-grid-v2">
+                  {services.map((service) => (
+                    <article key={`${service.label}-${service.price}`}>
+                      <h3>{service.label}</h3>
+                      <p>{service.price}</p>
                     </article>
                   ))}
                 </div>
               </section>
 
-              <section className="profile-panel reveal-card">
-                <span className="eyebrow">Portfolio masonry gallery</span>
-                <h2>Recent project work.</h2>
-                <PortfolioGallery limit={8} />
+              <section id="prices" className="vendor-detail-panel">
+                <h2>Starting Prices</h2>
+                <div className="vendor-price-list">
+                  {services.slice(0, 4).map((service) => (
+                    <div key={service.label}>
+                      <span>{service.label}</span>
+                      <strong>{service.price || "Price on request"}</strong>
+                    </div>
+                  ))}
+                </div>
+                <p className="vendor-detail-note">Final quote depends on scope, measurements, material grade and site conditions.</p>
               </section>
 
-              <section className="profile-panel reveal-card">
-                <span className="eyebrow">Client reviews</span>
-                <h2>What homeowners say.</h2>
-                <div className="review-grid">
-                  {reviews.map(([name, quote]) => (
-                    <article className="review-card" key={name}>
-                      <div className="stars" aria-label="5 star review">★★★★★</div>
-                      <p>“{quote}”</p>
+              <section id="portfolio" className="vendor-detail-panel">
+                <h2>Portfolio Images</h2>
+                <PortfolioGallery limit={6} />
+              </section>
+
+              <section id="reviews" className="vendor-detail-panel">
+                <h2>Reviews</h2>
+                <div className="vendor-review-list">
+                  {reviewNames.map((name, index) => (
+                    <article key={name}>
+                      <div className="stars" aria-label="5 star review">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                      <p>
+                        {index === 0
+                          ? "Professional process, clear rates and quick coordination after the first enquiry."
+                          : index === 1
+                            ? "The team explained the work scope well and shared practical options for our budget."
+                            : "Helpful profile details made it easier to shortlist before speaking on call."}
+                      </p>
                       <strong>{name}</strong>
                     </article>
                   ))}
                 </div>
               </section>
 
-              <section className="profile-panel reveal-card">
-                <span className="eyebrow">Similar vendors near you</span>
-                <h2>Compare other active paid vendors.</h2>
-                <VendorCards compact />
+              <section id="hours" className="vendor-detail-panel">
+                <h2>Business Hours</h2>
+                <p>Mon - Sun, 10:00 am - 9:00 pm</p>
+                <span className="vendor-detail-note">{meta.openStatus}</span>
+              </section>
+
+              <section id="areas" className="vendor-detail-panel">
+                <h2>Service Areas</h2>
+                <div className="vendor-area-tags">
+                  {serviceAreas.map((area) => (
+                    <span key={area}>{area}</span>
+                  ))}
+                </div>
+              </section>
+
+              <section id="about" className="vendor-detail-panel">
+                <h2>About Vendor</h2>
+                <p>
+                  {vendor.businessName} is listed on QuickFurno for {vendor.category.toLowerCase()} projects in{" "}
+                  {vendor.city}. The profile highlights starting rates, response quality and service fit so homeowners
+                  can compare before sharing detailed requirements.
+                </p>
+              </section>
+
+              <section id="faqs" className="vendor-detail-panel">
+                <h2>FAQs</h2>
+                <div className="vendor-faq-list">
+                  {faqItems.map(([question, answer]) => (
+                    <article key={question}>
+                      <h3>{question}</h3>
+                      <p>{answer}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="vendor-detail-panel">
+                <h2>Similar Vendors</h2>
+                <VendorCards compact category={vendor.category} excludeSlug={vendor.slug} limit={3} />
               </section>
             </div>
 
-            <aside className="profile-contact-card" aria-label="Contact Raj Premium Interiors">
+            <aside className="vendor-detail-side-card" aria-label={`Contact ${vendor.businessName}`}>
+              <span className="qf-mini-badge qf-mini-badge--verified">QuickFurno assist</span>
               <h2>Request a verified quote</h2>
-              <p>QuickFurno can help you compare this vendor with 3 more verified options.</p>
-              <EnquiryModalTrigger className="btn btn-primary">Request Quote</EnquiryModalTrigger>
-              <a className="btn btn-secondary" href={CONTACT_TEL}>Call Vendor</a>
-              <a className="btn btn-outline" href={whatsappLink()}>WhatsApp</a>
+              <p>Compare this vendor with suitable options near {vendor.city} before you finalise.</p>
+              <EnquiryModalTrigger
+                className="btn btn-primary"
+                modalTitle={`Get quote from ${vendor.businessName}`}
+                serviceCategory={enquiryService}
+                city={vendor.city}
+                area={meta.locality.split(",")[0]}
+                requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
+                source={`Vendor side card: ${vendor.slug}`}
+              >
+                Send Enquiry
+              </EnquiryModalTrigger>
+              <a className="btn btn-secondary" href={CONTACT_TEL}>
+                Call Now
+              </a>
+              <a
+                className="btn btn-outline"
+                href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                WhatsApp
+              </a>
             </aside>
           </div>
         </section>
       </main>
       <Footer />
-      <div className="vendor-profile-mobile-cta" aria-label="Vendor profile contact actions">
-        <a href={CONTACT_TEL}>Call</a>
-        <a href={whatsappLink()}>WhatsApp</a>
-        <EnquiryModalTrigger>Request Quote</EnquiryModalTrigger>
+      <div className="vendor-detail-mobile-cta" aria-label="Vendor profile contact actions">
+        <a href={CONTACT_TEL}>Call Now</a>
+        <a href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}>WhatsApp</a>
+        <EnquiryModalTrigger
+          modalTitle={`Get quote from ${vendor.businessName}`}
+          serviceCategory={enquiryService}
+          city={vendor.city}
+          area={meta.locality.split(",")[0]}
+          requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
+          source={`Vendor mobile CTA: ${vendor.slug}`}
+        >
+          Send Enquiry
+        </EnquiryModalTrigger>
       </div>
     </>
   );

@@ -23,10 +23,18 @@ export type Vendor = {
   activePaidPlan: boolean;
   verified: boolean;
   featured?: boolean;
+  status?: "active" | "inactive" | "disabled";
+  planPriority?: number;
+  responseScore?: number;
   description: string;
   imageTone: string;
   /** Vendor-uploaded logo/profile image; when absent the card shows an initials avatar. */
   imageUrl?: string;
+};
+
+export type VendorServiceChip = {
+  label: string;
+  price: string;
 };
 
 export const brandName = "QuickFurno";
@@ -198,24 +206,223 @@ export const vendors: Vendor[] = [
     imageTone: "civil-reno",
   },
   {
-    slug: "hidden-test-vendor",
-    businessName: "Hidden Test Vendor",
+    slug: "pune-civil-repair-co",
+    businessName: "Pune Civil Repair Co.",
     city: "Pune",
     category: "Civil Work",
-    subCategory: "Test Vendor",
-    rating: 3.8,
-    reviews: 4,
+    subCategory: "Renovation Repair",
+    rating: 4.2,
+    reviews: 18,
     rate: "Project based",
-    experience: "1 year",
+    experience: "5 years",
     responseTime: "2 hr",
     activePaidPlan: false,
-    verified: false,
-    description: "This vendor is intentionally hidden because the paid plan is inactive.",
+    verified: true,
+    description: "Civil repair, waterproofing, tiles and compact renovation work.",
     imageTone: "civil-reno",
+  },
+  {
+    slug: "baner-home-interiors",
+    businessName: "Baner Home Interiors",
+    city: "Pune",
+    category: "Interior Designers",
+    subCategory: "Budget Interiors",
+    rating: 4.3,
+    reviews: 24,
+    rate: "Price on request",
+    experience: "4 years",
+    responseTime: "3 hr",
+    activePaidPlan: false,
+    verified: true,
+    description: "Practical home interiors, storage planning and phased execution support.",
+    imageTone: "warm-suite",
+  },
+  {
+    slug: "thane-woodcraft-studio",
+    businessName: "Thane Woodcraft Studio",
+    city: "Mumbai",
+    category: "Carpenters",
+    subCategory: "Wardrobe & Storage",
+    rating: 4.1,
+    reviews: 15,
+    rate: "Price on request",
+    experience: "6 years",
+    responseTime: "4 hr",
+    activePaidPlan: false,
+    verified: true,
+    description: "Custom wardrobes, TV units and repair carpentry for apartments.",
+    imageTone: "wood-craft",
   },
 ];
 
-export const activePaidVendors = vendors.filter((vendor) => vendor.activePaidPlan);
+const vendorListingMeta: Record<
+  string,
+  { locality: string; distance: string; openStatus: string; trustSignals: string[] }
+> = {
+  "raj-premium-interiors": {
+    locality: "Kharadi, Pune",
+    distance: "2.4 km",
+    openStatus: "Open till 9:00 pm",
+    trustSignals: ["Verified", "Top rated", "High response", "Background checked"],
+  },
+  "kharadi-modular-factory": {
+    locality: "Kharadi, Pune",
+    distance: "3.1 km",
+    openStatus: "Responds in 20 min",
+    trustSignals: ["Verified", "Factory finish", "High response"],
+  },
+  "mumbai-carpenter-pro": {
+    locality: "Andheri, Mumbai",
+    distance: "4.8 km",
+    openStatus: "Responds in 30 min",
+    trustSignals: ["Verified", "Top rated", "High response"],
+  },
+  "elite-sofa-works": {
+    locality: "Wakad, Pune",
+    distance: "5.2 km",
+    openStatus: "Available today",
+    trustSignals: ["Verified", "Custom work", "High response"],
+  },
+  "perfect-paint-studio": {
+    locality: "Borivali, Mumbai",
+    distance: "6.0 km",
+    openStatus: "Open till 8:30 pm",
+    trustSignals: ["Verified", "Top rated", "Site visit"],
+  },
+  "buildright-civil-works": {
+    locality: "Baner, Pune",
+    distance: "4.1 km",
+    openStatus: "Responds in 1 hr",
+    trustSignals: ["Verified", "Background checked", "Site visit"],
+  },
+  "pune-civil-repair-co": {
+    locality: "Hadapsar, Pune",
+    distance: "7.3 km",
+    openStatus: "Available today",
+    trustSignals: ["Verified", "Budget friendly", "Site visit"],
+  },
+  "baner-home-interiors": {
+    locality: "Baner, Pune",
+    distance: "4.4 km",
+    openStatus: "Responds in 3 hr",
+    trustSignals: ["Verified", "Budget friendly", "Local team"],
+  },
+  "thane-woodcraft-studio": {
+    locality: "Thane, Mumbai",
+    distance: "8.2 km",
+    openStatus: "Available tomorrow",
+    trustSignals: ["Verified", "Budget friendly", "Local team"],
+  },
+};
+
+const serviceChipMap: Record<QuickFurnoCategory, VendorServiceChip[]> = {
+  "Interior Designers": [
+    { label: "Modular Kitchen", price: "Rs.1,500/sq.ft" },
+    { label: "Wardrobe", price: "Rs.1,200/sq.ft" },
+    { label: "Interior Design", price: "Consultation" },
+    { label: "False Ceiling", price: "Rs.140/sq.ft" },
+  ],
+  Carpenters: [
+    { label: "Wardrobe", price: "Rs.950/sq.ft" },
+    { label: "TV Unit", price: "Price on request" },
+    { label: "Custom Furniture", price: "Site based" },
+    { label: "Repair Work", price: "Visit based" },
+  ],
+  "Modular Factory": [
+    { label: "Modular Kitchen", price: "Rs.1,250/sq.ft" },
+    { label: "Wardrobe", price: "Rs.1,100/sq.ft" },
+    { label: "Factory Finish", price: "Premium" },
+  ],
+  "Premium Interiors": [
+    { label: "Full Home", price: "Rs.2,499/sq.ft" },
+    { label: "Luxury Kitchen", price: "Premium" },
+    { label: "Designer Wardrobe", price: "Premium" },
+  ],
+  Sofa: [
+    { label: "Custom Sofa", price: "Rs.18,000 onwards" },
+    { label: "Recliner", price: "Price on request" },
+    { label: "Upholstery", price: "Visit based" },
+  ],
+  Painter: [
+    { label: "Interior Painting", price: "Rs.22/sq.ft" },
+    { label: "Texture Wall", price: "Price on request" },
+    { label: "Waterproofing", price: "Site based" },
+  ],
+  "Civil Work": [
+    { label: "Home Renovation", price: "Project based" },
+    { label: "Tiling", price: "Site based" },
+    { label: "Waterproofing", price: "Visit based" },
+    { label: "False Ceiling", price: "Price on request" },
+  ],
+};
+
+export function isVendorVisible(vendor: Vendor) {
+  return vendor.status !== "inactive" && vendor.status !== "disabled";
+}
+
+export function vendorResponseScore(vendor: Vendor) {
+  if (typeof vendor.responseScore === "number") return vendor.responseScore;
+  const hours = /(\d+)\s*hr/i.exec(vendor.responseTime)?.[1];
+  const minutes = /(\d+)\s*min/i.exec(vendor.responseTime)?.[1];
+  if (minutes) return Math.max(60, 100 - Number(minutes));
+  if (hours) return Math.max(20, 70 - Number(hours) * 10);
+  return 55;
+}
+
+export function rankVendors(vendorList: Vendor[]) {
+  return [...vendorList].filter(isVendorVisible).sort((a, b) => {
+    if (Number(b.activePaidPlan) !== Number(a.activePaidPlan)) {
+      return Number(b.activePaidPlan) - Number(a.activePaidPlan);
+    }
+    const planDelta = (b.planPriority ?? (b.featured ? 30 : 20)) - (a.planPriority ?? (a.featured ? 30 : 20));
+    if (planDelta !== 0) return planDelta;
+    if (b.rating !== a.rating) return b.rating - a.rating;
+    const responseDelta = vendorResponseScore(b) - vendorResponseScore(a);
+    if (responseDelta !== 0) return responseDelta;
+    return b.reviews - a.reviews;
+  });
+}
+
+export const visibleVendors = rankVendors(vendors);
+export const activePaidVendors = visibleVendors.filter((vendor) => vendor.activePaidPlan);
+
+export function getVendorBySlug(slug: string) {
+  return visibleVendors.find((vendor) => vendor.slug === slug);
+}
+
+export function getVendorsByCategory(category?: QuickFurnoCategory) {
+  return rankVendors(category ? vendors.filter((vendor) => vendor.category === category) : vendors);
+}
+
+export function getVendorListingMeta(vendor: Vendor) {
+  return vendorListingMeta[vendor.slug] ?? {
+    locality: vendor.city,
+    distance: "Nearby",
+    openStatus: `Responds in ${vendor.responseTime}`,
+    trustSignals: vendor.verified ? ["Verified", "Local team"] : ["Local team"],
+  };
+}
+
+export function getVendorServiceChips(vendor: Vendor) {
+  const chips = serviceChipMap[vendor.category] ?? [];
+  if (!chips.some((chip) => chip.price === vendor.rate)) {
+    return [{ label: vendor.subCategory, price: vendor.rate }, ...chips];
+  }
+  return chips;
+}
+
+export function enquiryServiceForCategory(category: QuickFurnoCategory) {
+  const map: Record<QuickFurnoCategory, string> = {
+    "Interior Designers": "Full Home Interior",
+    Carpenters: "Carpentry",
+    "Modular Factory": "Modular Kitchen",
+    "Premium Interiors": "Premium Interior Design",
+    Sofa: "Custom Sofa & Upholstery",
+    Painter: "Painting",
+    "Civil Work": "Home Renovation",
+  };
+  return map[category];
+}
 
 export const pricingMatrix: Record<Exclude<QuickFurnoCategory, "Sofa">, Record<QualityLevel, number>> = {
   "Interior Designers": { Budget: 950, Standard: 1250, Premium: 1800 },

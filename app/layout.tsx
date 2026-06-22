@@ -4,6 +4,7 @@ import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
+import "./vendor-discovery.css";
 
 // Editorial type system: Playfair Display for premium headlines/section titles
 // and brand accent; Manrope for clean body, UI and forms.

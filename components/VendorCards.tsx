@@ -1,52 +1,179 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Avatar } from "@/components/Avatar";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
-import { CONTACT_TEL, whatsappLink } from "@/lib/config";
-import { categoryImage } from "@/lib/images";
-import { activePaidVendors, vendorFilterCategories } from "@/lib/quickfurno-data";
-import type { QuickFurnoCategory } from "@/lib/quickfurno-data";
+import { FilterChips, type FilterChipItem } from "@/components/FilterChips";
+import { VendorCompactCard } from "@/components/VendorCompactCard";
+import {
+  cities,
+  enquiryServiceForCategory,
+  getVendorListingMeta,
+  getVendorsByCategory,
+  rankVendors,
+  vendorFilterCategories,
+  vendorResponseScore,
+  visibleVendors,
+  type QuickFurnoCategory,
+  type Vendor,
+} from "@/lib/quickfurno-data";
 
 type VendorFilter = (typeof vendorFilterCategories)[number];
+type SortMode = "ranked" | "rating" | "reviews" | "response";
+
+const listingFilterChips: FilterChipItem[] = [
+  { key: "top-rated", label: "Top Rated" },
+  { key: "verified", label: "Verified" },
+  { key: "quick-response", label: "Quick Response" },
+  { key: "near-me", label: "Near Me" },
+  { key: "budget", label: "Budget Friendly" },
+  { key: "premium", label: "Premium Vendors" },
+  { key: "available", label: "Available Today" },
+];
+
+const sortLabels: Record<SortMode, string> = {
+  ranked: "Sort by",
+  rating: "Rating",
+  reviews: "Reviews",
+  response: "Response",
+};
+
+function matchesQuery(vendor: Vendor, query: string) {
+  if (!query.trim()) return true;
+  const text = [
+    vendor.businessName,
+    vendor.category,
+    vendor.subCategory,
+    vendor.city,
+    vendor.description,
+    getVendorListingMeta(vendor).locality,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return text.includes(query.trim().toLowerCase());
+}
+
+function applyFilters(vendor: Vendor, filters: string[], selectedCity: string) {
+  const meta = getVendorListingMeta(vendor);
+  if (selectedCity !== "All" && vendor.city !== selectedCity) return false;
+  if (filters.includes("top-rated") && vendor.rating < 4.6) return false;
+  if (filters.includes("verified") && !vendor.verified) return false;
+  if (filters.includes("quick-response") && vendorResponseScore(vendor) < 70) return false;
+  if (filters.includes("near-me") && selectedCity !== "All" && vendor.city !== selectedCity) return false;
+  if (filters.includes("budget") && vendor.activePaidPlan && !meta.trustSignals.includes("Budget friendly")) return false;
+  if (filters.includes("premium") && !vendor.activePaidPlan) return false;
+  if (filters.includes("available") && !/available|open|responds/i.test(meta.openStatus)) return false;
+  return true;
+}
+
+function sortVendors(vendors: Vendor[], sortMode: SortMode) {
+  if (sortMode === "ranked") return rankVendors(vendors);
+  return [...vendors].sort((a, b) => {
+    if (sortMode === "rating") return b.rating - a.rating;
+    if (sortMode === "reviews") return b.reviews - a.reviews;
+    return vendorResponseScore(b) - vendorResponseScore(a);
+  });
+}
 
 export function VendorCards({
   compact = false,
   category,
+  excludeSlug,
   limit,
+  mode = category && !compact ? "listing" : "preview",
 }: {
   compact?: boolean;
   category?: QuickFurnoCategory;
+  excludeSlug?: string;
   limit?: number;
+  mode?: "listing" | "preview";
 }) {
   const [activeFilter, setActiveFilter] = useState<VendorFilter>(category ?? "All");
+  const [query, setQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState("All");
+  const [activeChips, setActiveChips] = useState<string[]>([]);
+  const [sortMode, setSortMode] = useState<SortMode>("ranked");
 
-  const showFilters = !compact && !category && !limit;
+  const selectedCategory = category ?? (activeFilter === "All" ? undefined : activeFilter);
+  const listingMode = mode === "listing";
+  const showCategoryFilters = !listingMode && !compact && !category && !limit;
 
   const filteredVendors = useMemo(() => {
-    const selected = category ?? activeFilter;
-    const sorted = activePaidVendors
-      .filter((vendor) => selected === "All" || vendor.category === selected)
-      .sort((a, b) => {
-        if (Boolean(b.featured) !== Boolean(a.featured)) {
-          return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
-        }
-        if (b.rating !== a.rating) return b.rating - a.rating;
-        return b.reviews - a.reviews;
-      });
+    const base = selectedCategory ? getVendorsByCategory(selectedCategory) : visibleVendors;
+    const filtered = base.filter((vendor) => vendor.slug !== excludeSlug)
+      .filter((vendor) => matchesQuery(vendor, query))
+      .filter((vendor) => applyFilters(vendor, activeChips, selectedCity));
+    const sorted = sortVendors(filtered, sortMode);
     return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
-  }, [activeFilter, category, limit]);
+  }, [activeChips, excludeSlug, limit, query, selectedCategory, selectedCity, sortMode]);
 
-  function trackCtaClick(label: string) {
-    // Future integration: save click events to website_events table for analytics and daily AI agent report.
-    console.info(`QuickFurno vendor CTA clicked: ${label}`);
+  function toggleChip(key: string) {
+    setActiveChips((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
   }
 
+  function cycleSort() {
+    setSortMode((current) => {
+      if (current === "ranked") return "rating";
+      if (current === "rating") return "reviews";
+      if (current === "reviews") return "response";
+      return "ranked";
+    });
+  }
+
+  const categoryTitle = selectedCategory ?? "home-service vendors";
+  const enquiryService = selectedCategory ? enquiryServiceForCategory(selectedCategory) : undefined;
+
   return (
-    <div className="vendor-marketplace">
-      {showFilters ? (
+    <div className={`vendor-marketplace-v2 ${listingMode ? "vendor-marketplace-v2--listing" : ""}`}>
+      {listingMode ? (
+        <div className="vendor-discovery-top">
+          <div className="vendor-search-row">
+            <label className="vendor-search-box">
+              <span className="vendor-search-icon" aria-hidden="true">Search</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search carpenters, interior designers, painters..."
+                aria-label="Search vendors"
+              />
+            </label>
+            <label className="vendor-location-select">
+              <span>Location</span>
+              <select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
+                <option value="All">Pune & Mumbai</option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="vendor-listing-title-row">
+            <div>
+              <h1>{selectedCategory ? `${selectedCategory} near you` : "Vendors near you"}</h1>
+              <p>Compare verified vendors, rates, ratings and availability</p>
+            </div>
+            <span className="vendor-result-count">
+              {filteredVendors.length} vendor{filteredVendors.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="vendor-filter-scroll">
+            <button
+              type="button"
+              className={`qf-filter-chip ${sortMode !== "ranked" ? "qf-filter-chip--active" : ""}`}
+              onClick={cycleSort}
+              aria-label="Cycle vendor sort"
+            >
+              {sortLabels[sortMode]}
+            </button>
+            <FilterChips chips={listingFilterChips} activeKeys={activeChips} onToggle={toggleChip} />
+          </div>
+        </div>
+      ) : null}
+
+      {showCategoryFilters ? (
         <div className="filter-row" aria-label="Vendor category filters">
           {vendorFilterCategories.map((filter) => (
             <button
@@ -62,101 +189,44 @@ export function VendorCards({
       ) : null}
 
       {filteredVendors.length === 0 ? (
-        <div className="vendor-empty">
+        <div className="vendor-empty-v2">
           <h3>New verified vendors arriving soon</h3>
           <p>
-            We&apos;re onboarding verified vendors for this category. Submit a free enquiry and our
-            team will match you with the right experts near you.
+            We are onboarding verified vendors for this category. Submit a free enquiry and
+            QuickFurno will match you with suitable experts near you.
           </p>
-          <EnquiryModalTrigger className="btn btn-primary">Get Free Quotes</EnquiryModalTrigger>
+          <EnquiryModalTrigger
+            className="btn btn-primary"
+            modalTitle={`Get quotes from verified ${categoryTitle}`}
+            serviceCategory={enquiryService}
+            source="Empty category listing"
+          >
+            Get Free Quotes
+          </EnquiryModalTrigger>
         </div>
       ) : null}
 
-      {/* Future integration: fetch active paid vendors from Supabase vendors table where active_paid_plan = true. */}
-      <div className={`vendor-grid ${compact ? "vendor-grid--compact" : ""}`} data-reveal-group>
+      <div className={`vendor-results-stack ${compact ? "vendor-results-stack--compact" : ""}`} data-reveal-group>
         {filteredVendors.map((vendor, index) => (
-          <article className="vendor-card" key={vendor.slug}>
-            <div className="vendor-card-media">
-              <Image
-                src={categoryImage(vendor.category)}
-                alt={`${vendor.businessName} ${vendor.category} project preview`}
-                fill
-                sizes="(max-width: 560px) 100vw, (max-width: 980px) 50vw, 360px"
-                className="vendor-card-img"
-                priority={index === 0}
-              />
-              <span className="vendor-card-shade" aria-hidden="true" />
-              <div className="vendor-media-copy">
-                <span>{vendor.category}</span>
-                <strong>{vendor.city}</strong>
-              </div>
-            </div>
-
-            <div className="vendor-card-body">
-              <div className="vendor-card-top">
-                <Avatar name={vendor.businessName} src={vendor.imageUrl} className="vendor-avatar" />
-                <div className="vendor-card-id">
-                  <h3>{vendor.businessName}</h3>
-                  <p>{vendor.subCategory}</p>
-                </div>
-                <span className="rating-badge">{vendor.rating}/5</span>
-              </div>
-
-              <div className="badge-row">
-                {vendor.verified ? <span className="status-badge status-badge--verified">QuickFurno verified</span> : null}
-                <span className="status-badge status-badge--paid">Limited leads accepted</span>
-                {vendor.featured ? <span className="status-badge status-badge--featured">Featured</span> : null}
-              </div>
-
-              <p className="vendor-description">{vendor.description}</p>
-
-              <ul className="vendor-trust-note" aria-label="Vendor checks">
-                <li>Business checked</li>
-                <li>Project photos verified</li>
-              </ul>
-
-              <dl className="vendor-meta-grid">
+          <div key={vendor.slug} className="vendor-result-slot">
+            {listingMode && index === 2 ? (
+              <div className="vendor-native-banner">
                 <div>
-                  <dt>Reviews</dt>
-                  <dd>{vendor.reviews}</dd>
+                  <strong>Need help choosing the right vendor?</strong>
+                  <span>QuickFurno can match you with verified vendors near you.</span>
                 </div>
-                <div>
-                  <dt>Rate</dt>
-                  <dd>{vendor.rate}</dd>
-                </div>
-                <div>
-                  <dt>Experience</dt>
-                  <dd>{vendor.experience}</dd>
-                </div>
-                <div>
-                  <dt>Response</dt>
-                  <dd>{vendor.responseTime}</dd>
-                </div>
-              </dl>
-
-              <div className="vendor-actions">
-                <a
-                  className="btn btn-secondary btn-small"
-                  href={CONTACT_TEL}
-                  onClick={() => trackCtaClick(`Call ${vendor.businessName}`)}
+                <EnquiryModalTrigger
+                  className="qf-banner-link"
+                  modalTitle={`Get quotes from verified ${categoryTitle}`}
+                  serviceCategory={enquiryService}
+                  source="Listing assistance banner"
                 >
-                  Call
-                </a>
-                <a
-                  className="btn btn-outline btn-small"
-                  href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackCtaClick(`WhatsApp ${vendor.businessName}`)}
-                >
-                  WhatsApp
-                </a>
-                <Link className="btn btn-primary btn-small" href={`/vendors/${vendor.slug}`}>
-                  View Profile
-                </Link>
+                  Get Free Assistance
+                </EnquiryModalTrigger>
               </div>
-            </div>
-          </article>
+            ) : null}
+            <VendorCompactCard vendor={vendor} priority={index < 2} showCategory={!category} />
+          </div>
         ))}
       </div>
     </div>

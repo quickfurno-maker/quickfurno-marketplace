@@ -20,8 +20,8 @@ export default function OpengraphImage() {
           flexDirection: "column",
           justifyContent: "center",
           padding: "0 92px",
-          background: "linear-gradient(135deg, #0b4536 0%, #06251d 70%)",
-          color: "#f4f1ea",
+          background: "linear-gradient(135deg, #4F46E5 0%, #1E1B3A 70%)",
+          color: "#F7F7FB",
           fontFamily: "sans-serif",
         }}
       >
@@ -40,7 +40,7 @@ export default function OpengraphImage() {
               boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
             }}
           >
-            <div style={{ width: 70, height: 70, borderRadius: "50%", border: "9px solid #e6c65a" }} />
+            <div style={{ width: 70, height: 70, borderRadius: "50%", border: "9px solid #FF8A7A" }} />
             <div
               style={{
                 position: "absolute",
@@ -49,14 +49,14 @@ export default function OpengraphImage() {
                 width: 34,
                 height: 9,
                 borderRadius: 5,
-                background: "#e6c65a",
+                background: "#FF8A7A",
                 transform: "rotate(45deg)",
               }}
             />
           </div>
           <div style={{ display: "flex", fontSize: 70, fontWeight: 800, letterSpacing: -2 }}>
             <span style={{ color: "#ffffff" }}>Quick</span>
-            <span style={{ color: "#e6c65a" }}>Furno</span>
+            <span style={{ color: "#FF8A7A" }}>Furno</span>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export default function OpengraphImage() {
                 borderRadius: 999,
                 fontSize: 28,
                 fontWeight: 700,
-                color: "#f4f1ea",
+                color: "#F7F7FB",
                 background: "rgba(255,255,255,0.08)",
                 border: "1px solid rgba(230,198,90,0.45)",
               }}

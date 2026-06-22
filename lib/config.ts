@@ -4,8 +4,10 @@
 // needs touching for these.
 // ============================================================================
 
-// ---- CHANGE ME: WhatsApp business number (digits only, country code, no +) --
-export const WHATSAPP_NUMBER = "91XXXXXXXXXX"; // e.g. "917720000553"
+// NOTE: WhatsApp links now derive from CONTACT.phone below (see whatsappLink()).
+// This constant is kept for backwards-compat; editing it has no effect — change
+// CONTACT.phone instead.
+export const WHATSAPP_NUMBER = "91XXXXXXXXXX"; // deprecated, unused
 export const WHATSAPP_DEFAULT_MSG =
   "Hi QuickFurno, I'd like to know more about getting quotes for my home project.";
 
@@ -18,6 +20,14 @@ export const CONTACT = {
   email: "quickfurno@gmail.com",
   address: "Kharadi Annex, Pune, Maharashtra 411014",
 };
+
+// Derived, ready-to-use contact links so Call / WhatsApp buttons never ship a
+// placeholder number. Edit CONTACT.phone above and these update everywhere.
+export const CONTACT_PHONE_DIGITS = CONTACT.phone.replace(/\D/g, ""); // e.g. "917720000553"
+export const CONTACT_TEL = `tel:+${CONTACT_PHONE_DIGITS}`;
+export function whatsappLink(message: string = WHATSAPP_DEFAULT_MSG) {
+  return `https://wa.me/${CONTACT_PHONE_DIGITS}?text=${encodeURIComponent(message)}`;
+}
 
 // ---- Canonical services -----------------------------------------------------
 // These power BOTH the homeowner enquiry dropdown and the vendor "services

@@ -1,6 +1,6 @@
 "use client";
 
-import { WHATSAPP_NUMBER, WHATSAPP_DEFAULT_MSG, trackEvent } from "@/lib/config";
+import { WHATSAPP_DEFAULT_MSG, trackEvent, whatsappLink } from "@/lib/config";
 
 export function WhatsAppButton({
   label = "Chat on WhatsApp",
@@ -8,7 +8,7 @@ export function WhatsAppButton({
   message = WHATSAPP_DEFAULT_MSG,
   source = "generic",
 }: { label?: string; className?: string; message?: string; source?: string }) {
-  const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  const href = whatsappLink(message);
   return (
     <a
       href={href}

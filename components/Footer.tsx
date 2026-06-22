@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
+import { whatsappLink } from "@/lib/config";
 import { categories } from "@/lib/quickfurno-data";
 
 export function Footer() {
@@ -20,7 +21,12 @@ export function Footer() {
             Client-first marketplace for verified interior, carpentry, modular, painting,
             sofa and civil-work vendors in Pune and Mumbai.
           </p>
-          <a className="btn btn-secondary footer-whatsapp" href="https://wa.me/91XXXXXXXXXX">
+          <a
+            className="btn btn-secondary footer-whatsapp"
+            href={whatsappLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             WhatsApp QuickFurno
           </a>
         </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
+import { CONTACT_TEL, whatsappLink } from "@/lib/config";
 import { categoryImage } from "@/lib/images";
 import { activePaidVendors, vendorFilterCategories } from "@/lib/quickfurno-data";
 import type { QuickFurnoCategory } from "@/lib/quickfurno-data";
@@ -131,14 +132,16 @@ export function VendorCards({
               <div className="vendor-actions">
                 <a
                   className="btn btn-secondary btn-small"
-                  href="tel:+919999999999"
+                  href={CONTACT_TEL}
                   onClick={() => trackCtaClick(`Call ${vendor.businessName}`)}
                 >
                   Call
                 </a>
                 <a
                   className="btn btn-outline btn-small"
-                  href={`https://wa.me/91XXXXXXXXXX?text=${encodeURIComponent(`I want a quote from ${vendor.businessName}`)}`}
+                  href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={() => trackCtaClick(`WhatsApp ${vendor.businessName}`)}
                 >
                   WhatsApp

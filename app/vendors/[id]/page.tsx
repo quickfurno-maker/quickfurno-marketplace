@@ -4,6 +4,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { PortfolioGallery } from "@/components/PortfolioGallery";
 import { VendorCards } from "@/components/VendorCards";
+import { CONTACT_TEL, whatsappLink } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Raj Premium Interiors | QuickFurno Verified Vendor",
@@ -59,8 +60,8 @@ export default function VendorProfilePage() {
                 <p>Interior Designers • Premium Interiors • Pune, Kharadi, Viman Nagar and nearby areas</p>
                 <div className="profile-rating">4.8 ★ • 118 reviews</div>
                 <div className="hero-cta-row">
-                  <a className="btn btn-secondary" href="tel:+919999999999">Call</a>
-                  <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">WhatsApp</a>
+                  <a className="btn btn-secondary" href={CONTACT_TEL}>Call</a>
+                  <a className="btn btn-outline" href={whatsappLink()}>WhatsApp</a>
                   <EnquiryModalTrigger className="btn btn-primary">Request Quote</EnquiryModalTrigger>
                 </div>
               </div>
@@ -133,16 +134,16 @@ export default function VendorProfilePage() {
               <h2>Request a verified quote</h2>
               <p>QuickFurno can help you compare this vendor with 3 more verified options.</p>
               <EnquiryModalTrigger className="btn btn-primary">Request Quote</EnquiryModalTrigger>
-              <a className="btn btn-secondary" href="tel:+919999999999">Call Vendor</a>
-              <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">WhatsApp</a>
+              <a className="btn btn-secondary" href={CONTACT_TEL}>Call Vendor</a>
+              <a className="btn btn-outline" href={whatsappLink()}>WhatsApp</a>
             </aside>
           </div>
         </section>
       </main>
       <Footer />
       <div className="vendor-profile-mobile-cta" aria-label="Vendor profile contact actions">
-        <a href="tel:+919999999999">Call</a>
-        <a href="https://wa.me/91XXXXXXXXXX">WhatsApp</a>
+        <a href={CONTACT_TEL}>Call</a>
+        <a href={whatsappLink()}>WhatsApp</a>
         <EnquiryModalTrigger>Request Quote</EnquiryModalTrigger>
       </div>
     </>

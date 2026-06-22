@@ -1,8 +1,8 @@
 /**
- * QuickFurno premium logo mark — a luxury "seal/medallion": a fine champagne-gold
- * seal ring framing an elegant monoline gold "Q" monogram on a deep emerald tile,
- * with a subtle metallic sheen, top crest dot and refined tail terminal.
- * Self-contained SVG so it renders identically on any background at zero cost.
+ * QuickFurno logo mark — modern startup identity.
+ * A bold monoline "Q" with an indigo→coral gradient stroke on a deep indigo
+ * tile, finished with a coral "spark" at the tail. Self-contained SVG so it
+ * renders identically on any background at zero cost.
  */
 export function LogoMark({ className }: { className?: string }) {
   return (
@@ -16,43 +16,43 @@ export function LogoMark({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient id="qfTile" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#15735a" />
-          <stop offset="1" stopColor="#06352a" />
+          <stop offset="0" stopColor="#4F46E5" />
+          <stop offset="1" stopColor="#1E1B3A" />
         </linearGradient>
-        <linearGradient id="qfGold" x1="0" y1="0" x2="0.85" y2="1">
-          <stop offset="0" stopColor="#f6e3a0" />
-          <stop offset="0.45" stopColor="#e6c65a" />
-          <stop offset="1" stopColor="#b5871d" />
+        <linearGradient id="qfStroke" x1="0.1" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#A5B4FF" />
+          <stop offset="0.5" stopColor="#FF8A7A" />
+          <stop offset="1" stopColor="#FF6B5A" />
         </linearGradient>
-        <radialGradient id="qfVig" cx="32%" cy="24%" r="85%">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.16" />
-          <stop offset="58%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.3" />
+        <radialGradient id="qfVig" cx="30%" cy="22%" r="90%">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.18" />
+          <stop offset="55%" stopColor="#ffffff" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.28" />
         </radialGradient>
       </defs>
 
       <rect width="48" height="48" rx="14" fill="url(#qfTile)" />
       <rect width="48" height="48" rx="14" fill="url(#qfVig)" />
 
-      {/* fine seal ring (medallion) */}
-      <circle cx="24" cy="24" r="17.4" fill="none" stroke="url(#qfGold)" strokeWidth="1" opacity="0.55" />
-      {/* crest dot at 12 o'clock */}
-      <circle cx="24" cy="6.6" r="1.15" fill="url(#qfGold)" />
-
-      {/* elegant monoline Q */}
-      <circle cx="23.2" cy="22.8" r="8.4" fill="none" stroke="url(#qfGold)" strokeWidth="2.9" />
-      {/* sheen highlight on the ring */}
+      {/* bold monoline Q */}
+      <circle cx="22.6" cy="22.6" r="9.6" fill="none" stroke="url(#qfStroke)" strokeWidth="3.4" />
+      {/* sheen highlight */}
       <path
-        d="M17.5 18.6 A8.4 8.4 0 0 1 25 15"
+        d="M15.6 17.4 A9.6 9.6 0 0 1 24.6 13.4"
         fill="none"
-        stroke="#fbeec2"
-        strokeWidth="1.15"
+        stroke="#ffffff"
+        strokeWidth="1.2"
         strokeLinecap="round"
-        opacity="0.7"
+        opacity="0.45"
       />
-      {/* refined tail + terminal */}
-      <path d="M27.8 27.4 L33 32.6" stroke="url(#qfGold)" strokeWidth="2.9" strokeLinecap="round" />
-      <circle cx="33.5" cy="33.1" r="1.85" fill="#f6e3a0" />
+      {/* tail */}
+      <path d="M27.8 27.8 L32.2 32.2" stroke="url(#qfStroke)" strokeWidth="3.4" strokeLinecap="round" />
+
+      {/* coral spark */}
+      <path
+        d="M34.8 30.2 C35.1 32.0 35.6 32.5 37.4 32.8 C35.6 33.1 35.1 33.6 34.8 35.4 C34.5 33.6 34.0 33.1 32.2 32.8 C34.0 32.5 34.5 32.0 34.8 30.2 Z"
+        fill="#FF6B5A"
+      />
     </svg>
   );
 }

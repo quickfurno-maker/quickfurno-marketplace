@@ -11,6 +11,7 @@ import { StatsBand } from "@/components/StatsBand";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { Testimonials } from "@/components/Testimonials";
 import { VendorCards } from "@/components/VendorCards";
+import { whatsappLink } from "@/lib/config";
 import { clientFaqs, whyChooseQuickFurno } from "@/lib/quickfurno-data";
 
 export const metadata: Metadata = {
@@ -36,13 +37,13 @@ export default function HomePage() {
           <div className="container hero-grid">
             <div className="hero-copy">
               <h1 className="hero-headline hero-rise">
-                Tell us your requirement and get connected with{" "}
-                <span className="hl">verified home-service vendors near you.</span>
+                Find verified interior &amp; home-service{" "}
+                <span className="hl">vendors near you.</span>
               </h1>
               <p className="hero-sub hero-rise">
-                QuickFurno matches homeowners in Pune and Mumbai with vetted interior designers,
-                carpenters, modular factories, painters, sofa makers and civil-work experts, so
-                you can compare rates, reviews and project fit before the first call.
+                Compare trusted interior designers, carpenters, modular factories, painters,
+                sofa makers and civil-work vendors in Pune &amp; Mumbai — with transparent rates
+                and a free, no-spam enquiry.
               </p>
 
               <div className="hero-cta-row hero-rise">
@@ -55,10 +56,10 @@ export default function HomePage() {
               </div>
 
               <ul className="hero-trust-strip hero-rise" aria-label="QuickFurno trust indicators">
-                <li>No spam handoff</li>
-                <li>Up to 4 matched vendors</li>
-                <li>Free client enquiry</li>
-                <li>Pune and Mumbai</li>
+                <li>Verified vendors</li>
+                <li>Transparent rates</li>
+                <li>Free enquiry</li>
+                <li>Pune &amp; Mumbai</li>
               </ul>
 
               <div className="hero-social-proof hero-rise">
@@ -162,6 +163,18 @@ export default function HomePage() {
               </article>
             ))}
           </div>
+          <div className="container" data-reveal>
+            <div className="nospam-band">
+              <div className="nospam-band-icon" aria-hidden="true">🔒</div>
+              <div className="nospam-band-copy">
+                <strong>Why only up to 4 quotes?</strong>
+                <p>
+                  We do not blast your number to 20 vendors. You get a small, relevant set of
+                  verified vendors so you can compare without getting spammed with calls.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section id="reviews" className="section-block">
@@ -192,16 +205,28 @@ export default function HomePage() {
         <section className="final-cta">
           <div className="container final-cta-card" data-reveal>
             <span className="eyebrow">Ready to start?</span>
-            <h2>Start with one requirement. Get a verified shortlist.</h2>
-            <p>Tell QuickFurno what you need and get connected with relevant vendors in Pune or Mumbai.</p>
+            <h2>Ready to compare verified vendors for your project?</h2>
+            <p>
+              Tell QuickFurno what you need and get up to 4 relevant, verified vendor matches in
+              Pune or Mumbai — with transparent rates so you can compare before the first call.
+            </p>
             <div className="hero-cta-row">
-              <EnquiryModalTrigger className="btn btn-primary">
-                Start Enquiry
+              <EnquiryModalTrigger className="btn btn-primary btn-shine">
+                Get Free Quotes
               </EnquiryModalTrigger>
-              <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">
+              <Link href="#verified-vendors" className="btn btn-secondary">
+                Browse Vendors
+              </Link>
+              <a
+                className="btn btn-outline"
+                href={whatsappLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 WhatsApp Us
               </a>
             </div>
+            <p className="final-cta-microcopy">Free enquiry. No spam. Verified vendors only.</p>
           </div>
         </section>
       </main>

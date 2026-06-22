@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { VendorApplicationForm } from "@/components/VendorApplicationForm";
 import { VendorDashboardPreview } from "@/components/VendorDashboardPreview";
+import { whatsappLink } from "@/lib/config";
 import { vendorFaqs } from "@/lib/quickfurno-data";
 
 export const metadata: Metadata = {
@@ -91,7 +92,7 @@ export default function VendorsPage() {
                 <Link href="#lead-packages" className="btn btn-secondary">
                   View Lead Packages
                 </Link>
-                <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">
+                <a className="btn btn-outline" href={whatsappLink()}>
                   WhatsApp Team
                 </a>
               </div>
@@ -197,7 +198,7 @@ export default function VendorsPage() {
               <Link href="#vendor-form" className="btn btn-primary">
                 Register Now
               </Link>
-              <a className="btn btn-outline" href="https://wa.me/91XXXXXXXXXX">
+              <a className="btn btn-outline" href={whatsappLink()}>
                 WhatsApp Team
               </a>
             </div>

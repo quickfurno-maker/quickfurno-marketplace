@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { FAQ } from "@/components/FAQ";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { StickyMobileCTA } from "@/components/StickyMobileCTA";
-import { VendorApplicationForm } from "@/components/VendorApplicationForm";
-import { VendorDashboardPreview } from "@/components/VendorDashboardPreview";
-import { whatsappLink } from "@/lib/config";
-import { vendorFaqs } from "@/lib/quickfurno-data";
+import styles from "./vendors.module.css";
+
+const registerHref = "/vendors/register";
 
 export const metadata: Metadata = {
   title: "For Vendors | QuickFurno",
   description:
-    "Register with QuickFurno to receive verified client leads for interiors, carpentry, modular factory work, painting, sofa and civil work.",
+    "Join QuickFurno to receive verified home-service leads, manage enquiries, build trust and grow faster in Pune and Mumbai.",
   openGraph: {
-    title: "Grow with QuickFurno verified leads",
-    description: "Join QuickFurno and receive genuine home-service enquiries in Pune and Mumbai.",
+    title: "Grow your business with verified client leads from QuickFurno",
+    description:
+      "QuickFurno helps vendors receive genuine home-service enquiries in Pune and Mumbai.",
     url: "https://quickfurno.in/vendors",
     siteName: "QuickFurno",
     type: "website",
@@ -23,190 +22,433 @@ export const metadata: Metadata = {
 };
 
 const benefits = [
-  "Get verified client leads",
-  "Pay per lead package",
-  "Showcase your projects",
-  "Get visibility in your city",
-  "Receive WhatsApp lead alerts",
-  "Manage leads in vendor app",
-  "Build ratings and trust",
-];
-
-const packages = [
   {
-    name: "Starter Plan",
-    badge: "MVP package",
-    leads: "5 leads",
-    price: "₹250 per lead",
-    total: "Total ₹1,250",
-    features: ["WhatsApp lead alerts", "Vendor listing visibility", "Basic profile page"],
-    highlighted: true,
+    title: "Verified Leads",
+    body: "Get high-intent enquiries from real homeowners.",
+    icon: "/assets/quickfurno/icons/trust/verified-vendors.svg",
   },
   {
-    name: "Growth Plan",
-    badge: "For steady teams",
-    leads: "20 leads",
-    price: "Better ranking",
-    total: "Priority visibility",
-    features: ["Project gallery", "Profile improvements", "Higher marketplace placement"],
-    highlighted: false,
+    title: "Faster Growth",
+    body: "Win more projects and scale your business.",
+    icon: "/assets/quickfurno/icons/process/start-project.svg",
   },
   {
-    name: "Premium Plan",
-    badge: "Scale package",
-    leads: "50 leads",
-    price: "Top placement",
-    total: "Featured profile",
-    features: ["Analytics support", "Featured marketplace badge", "Premium profile visibility"],
-    highlighted: false,
+    title: "Transparent Lead Allocation",
+    body: "Fair distribution with no hidden preferences.",
+    icon: "/assets/quickfurno/icons/process/matched-vendors.svg",
+  },
+  {
+    title: "Dedicated Support",
+    body: "We are here to help you succeed at every step.",
+    icon: "/assets/quickfurno/icons/trust/fast-response.svg",
   },
 ];
 
 const vendorSteps = [
-  "Register your business",
-  "Admin verifies profile",
-  "Buy lead package",
-  "Receive client leads",
-  "Contact client quickly",
-  "Update status in vendor app",
+  ["Create profile", "Complete your profile and get verified by our team."],
+  ["Choose plan", "Select the plan that fits your business goals."],
+  ["Get matched to leads", "Receive verified enquiries from your service areas."],
+  ["Win more projects", "Connect with clients, share quotes and grow your business."],
 ];
+
+const sampleLeads = [
+  {
+    title: "Premium Interior Design",
+    location: "Baner, Pune",
+    budget: "Rs 8-12 Lakh",
+    status: "New",
+    requested: "2m ago",
+    image: "/assets/quickfurno/images/vendors/premium-living-room.svg",
+  },
+  {
+    title: "Modular Kitchen",
+    location: "Wakad, Pune",
+    budget: "Rs 3-5 Lakh",
+    status: "New",
+    requested: "15m ago",
+    image: "/assets/quickfurno/images/vendors/modular-kitchen.svg",
+  },
+  {
+    title: "Civil Work",
+    location: "Kothrud, Pune",
+    budget: "Rs 5-8 Lakh",
+    status: "Contacted",
+    requested: "1h ago",
+    image: "/assets/quickfurno/images/vendors/civil-work-site.svg",
+  },
+];
+
+const plans = [
+  {
+    name: "Starter",
+    price: "Rs 1,499",
+    period: "/month",
+    description: "Perfect for getting started",
+    cta: "Choose Starter",
+    features: [
+      "15 lead credits/month",
+      "Profile visibility in search",
+      "WhatsApp leads",
+      "Basic support",
+    ],
+  },
+  {
+    name: "Growth",
+    price: "Rs 2,999",
+    period: "/month",
+    description: "Best for growing businesses",
+    cta: "Choose Growth",
+    badge: "Recommended",
+    featured: true,
+    features: [
+      "40 lead credits/month",
+      "Priority listing in search",
+      "WhatsApp leads",
+      "Performance insights",
+      "Priority support",
+    ],
+  },
+  {
+    name: "Premium",
+    price: "Rs 4,999",
+    period: "/month",
+    description: "For established professionals",
+    cta: "Choose Premium",
+    features: [
+      "80 lead credits/month",
+      "Top listing in search",
+      "WhatsApp leads",
+      "Performance insights",
+      "Dedicated account manager",
+    ],
+  },
+];
+
+const uspCards = [
+  ["Better lead quality", "High-intent clients ready to hire."],
+  ["City-based matching", "Get leads from your service areas."],
+  ["Priority listing for active subscribers", "Active plans get priority access."],
+  ["Simple dashboard", "Manage leads and clients in one place."],
+  ["Build trust with verified badges", "Verified badge boosts your credibility."],
+  ["No hidden charges", "Transparent pricing you can trust."],
+];
+
+const testimonials = [
+  {
+    name: "Rohit Deshmukh",
+    company: "UrbanCraft Interiors, Pune",
+    quote: "QuickFurno brings us quality leads every day. Our project bookings have increased by 3x.",
+  },
+  {
+    name: "Sanket Patil",
+    company: "Patil Modular Solutions, Pune",
+    quote: "The platform is easy to use and the leads are genuine. Highly recommended.",
+  },
+  {
+    name: "Arjun Mehta",
+    company: "Mehta Construction, Mumbai",
+    quote: "Transparent process and great support. We have grown our business significantly.",
+  },
+];
+
+const recentDashboardLeads = [
+  ["Premium Interior Design", "Baner, Pune", "Budget: Rs 8-12 Lakh", "New"],
+  ["Modular Kitchen", "Wakad, Pune", "Budget: Rs 3-5 Lakh", "New"],
+  ["Custom Wardrobe", "Andheri, Mumbai", "Budget: Rs 2-3 Lakh", "Contacted"],
+];
+
+function VendorDashboardMockup() {
+  return (
+    <div className={styles.dashboardWrap} aria-label="QuickFurno vendor dashboard preview">
+      <div className={styles.dashboardLaptop}>
+        <div className={styles.dashboardTop}>
+          <div>
+            <strong>QuickFurno Vendor</strong>
+            <span>Welcome, UrbanCraft Interiors</span>
+          </div>
+          <span className={styles.avatar}>UI</span>
+        </div>
+
+        <div className={styles.dashboardGrid}>
+          <aside className={styles.dashboardNav}>
+            {["Dashboard", "Leads", "My Projects", "Messages", "Profile", "Reviews", "Payments"].map((item) => (
+              <span className={item === "Dashboard" ? styles.navActive : ""} key={item}>
+                {item}
+              </span>
+            ))}
+          </aside>
+
+          <div className={styles.dashboardMain}>
+            <div className={styles.statGrid}>
+              <article>
+                <span>Active Leads</span>
+                <strong>12</strong>
+                <small>3 new today</small>
+              </article>
+              <article>
+                <span>New Requests Today</span>
+                <strong>5</strong>
+                <small>+20% vs yesterday</small>
+              </article>
+              <article>
+                <span>Subscription Status</span>
+                <strong>Premium Plan</strong>
+                <small>Renews on 15 Jan 2027</small>
+              </article>
+              <article>
+                <span>Response Rate</span>
+                <strong>92%</strong>
+                <small>+8% this week</small>
+              </article>
+            </div>
+
+            <div className={styles.dashboardLower}>
+              <section className={styles.recentLeads}>
+                <div className={styles.panelHeader}>
+                  <strong>Recent Leads</strong>
+                  <Link href={registerHref}>View demo</Link>
+                </div>
+                {recentDashboardLeads.map(([title, place, budget, status]) => (
+                  <div className={styles.recentLeadRow} key={title}>
+                    <span className={styles.leadAvatar}>{title.slice(0, 1)}</span>
+                    <div>
+                      <strong>{title}</strong>
+                      <small>{place}</small>
+                    </div>
+                    <span>{budget}</span>
+                    <em>{status}</em>
+                  </div>
+                ))}
+              </section>
+
+              <section className={styles.chartCard}>
+                <div className={styles.panelHeader}>
+                  <strong>Lead overview</strong>
+                  <span>This week</span>
+                </div>
+                <div className={styles.chartLine} aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className={styles.messageCard}>
+                  <span>Unread Messages</span>
+                  <strong>7</strong>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.phonePreview}>
+        <div className={styles.phoneTop}>
+          <strong>Leads</strong>
+          <span>Search</span>
+        </div>
+        {sampleLeads.map((lead) => (
+          <div className={styles.phoneLead} key={lead.title}>
+            <strong>{lead.title}</strong>
+            <span>{lead.location}</span>
+            <small>{lead.budget}</small>
+          </div>
+        ))}
+        <Link href={registerHref}>View All Leads</Link>
+      </div>
+    </div>
+  );
+}
 
 export default function VendorsPage() {
   return (
     <>
       <Header />
-      <main>
-        <section className="vendor-hero section-pad-top">
-          <div className="container vendor-hero-grid">
-            <div>
-              <span className="eyebrow">For verified professionals</span>
-              <h1>Grow your home-service business with verified client leads.</h1>
+      <main className={styles.page}>
+        <section className={styles.hero}>
+          <div className={styles.shell}>
+            <div className={styles.heroCopy} data-reveal>
+              <h1>Grow your business with verified client leads from QuickFurno.</h1>
               <p>
-                Join QuickFurno and receive genuine client enquiries for interiors, carpentry,
-                modular factory work, painting, sofa and civil work.
+                Vendors can receive genuine home-service leads, manage enquiries, build trust,
+                and grow faster across Pune &amp; Mumbai.
               </p>
-              <div className="hero-cta-row">
-                <Link href="#vendor-form" className="btn btn-primary">
-                  Register as Vendor
+              <div className={styles.heroActions}>
+                <Link className={styles.primaryCta} href={registerHref}>
+                  Become a Vendor
                 </Link>
-                <Link href="#lead-packages" className="btn btn-secondary">
-                  View Lead Packages
+                <Link className={styles.secondaryCta} href="#lead-demo">
+                  View Lead Demo
                 </Link>
-                <a className="btn btn-outline" href={whatsappLink()}>
-                  WhatsApp Team
-                </a>
+              </div>
+              <div className={styles.trustLine}>
+                <span>Trusted by 500+ service professionals in Pune &amp; Mumbai</span>
+                <strong>4.8/5 from 500+ professionals</strong>
               </div>
             </div>
-            <VendorDashboardPreview />
+            <VendorDashboardMockup />
           </div>
         </section>
 
-        <section className="section-block">
-          <div className="container section-heading">
-            <span className="eyebrow">Vendor benefits</span>
-            <h2>Built for professionals who want filtered enquiries, not random calls.</h2>
-          </div>
-          <div className="container benefit-grid">
+        <section className={styles.benefitStrip} aria-label="Vendor benefits">
+          <div className={styles.stripShell}>
             {benefits.map((benefit) => (
-              <article className="benefit-card reveal-card" key={benefit}>
-                <span aria-hidden="true">✓</span>
-                <h3>{benefit}</h3>
+              <article className={styles.benefitCard} key={benefit.title}>
+                <Image src={benefit.icon} width={40} height={40} alt="" aria-hidden="true" />
+                <div>
+                  <h2>{benefit.title}</h2>
+                  <p>{benefit.body}</p>
+                </div>
               </article>
             ))}
           </div>
         </section>
 
-        <section id="lead-packages" className="section-block section-warm">
-          <div className="container section-heading">
-            <span className="eyebrow">Lead packages</span>
-            <h2>Start small, measure quality, then scale visibility.</h2>
+        <section className={styles.section}>
+          <div className={styles.sectionHeading}>
+            <h2>How it works for vendors</h2>
           </div>
-          <div className="container packages-grid">
-            {packages.map((item) => (
-              <article className={`package-card ${item.highlighted ? "package-card--highlighted" : ""}`} key={item.name}>
-                <span>{item.badge}</span>
-                <h3>{item.name}</h3>
-                <strong>{item.leads}</strong>
-                <p>{item.price}</p>
-                <p>{item.total}</p>
-                <ul>
-                  {item.features.map((feature) => (
-                    <li key={feature}>{feature}</li>
-                  ))}
-                </ul>
-                <Link href="#vendor-form" className="btn btn-primary">
-                  Register as Vendor
-                </Link>
+          <div className={styles.stepGrid}>
+            {vendorSteps.map(([title, body], index) => (
+              <article className={styles.stepCard} key={title}>
+                <span>{index + 1}</span>
+                <h3>{title}</h3>
+                <p>{body}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <section id="vendor-form" className="section-block">
-          <div className="container">
-            <VendorApplicationForm />
+        <section className={styles.leadSection} id="lead-demo">
+          <div className={styles.sectionHeading}>
+            <h2>Leads waiting for you</h2>
+          </div>
+          <div className={styles.leadLayout}>
+            <div className={styles.leadGrid}>
+              {sampleLeads.map((lead) => (
+                <article className={styles.leadCard} key={lead.title}>
+                  <Image src={lead.image} width={160} height={120} alt={`${lead.title} preview`} />
+                  <div className={styles.leadInfo}>
+                    <h3>{lead.title}</h3>
+                    <span>{lead.location}</span>
+                    <dl>
+                      <div>
+                        <dt>Budget</dt>
+                        <dd>{lead.budget}</dd>
+                      </div>
+                      <div>
+                        <dt>Client Status</dt>
+                        <dd>{lead.status}</dd>
+                      </div>
+                      <div>
+                        <dt>Requested</dt>
+                        <dd>{lead.requested}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div className={styles.leadActions}>
+                    <Link href={registerHref}>Accept Lead</Link>
+                    <Link href={registerHref}>View Details</Link>
+                    <Link href={registerHref}>WhatsApp</Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <aside className={styles.leadBenefits}>
+              {[
+                ["Real-time lead notifications", "Never miss a new opportunity."],
+                ["Direct client communication", "Chat or call directly through the platform."],
+                ["Secure & transparent process", "No hidden charges, no compromises."],
+                ["Performance insights", "Track response rate and conversions."],
+              ].map(([title, body]) => (
+                <div key={title}>
+                  <strong>{title}</strong>
+                  <span>{body}</span>
+                </div>
+              ))}
+            </aside>
           </div>
         </section>
 
-        <section className="section-block section-warm">
-          <div className="container section-heading">
-            <span className="eyebrow">Vendor system</span>
-            <h2>How the QuickFurno vendor flow works.</h2>
+        <section className={styles.splitSection}>
+          <div>
+            <div className={styles.sectionHeading}>
+              <h2>Choose the plan that grows with your business</h2>
+            </div>
+            <div className={styles.pricingGrid}>
+              {plans.map((plan) => (
+                <article className={`${styles.planCard} ${plan.featured ? styles.planFeatured : ""}`} key={plan.name}>
+                  {plan.badge ? <span className={styles.planBadge}>{plan.badge}</span> : null}
+                  <h3>{plan.name}</h3>
+                  <p>{plan.description}</p>
+                  <strong>
+                    {plan.price}
+                    <small>{plan.period}</small>
+                  </strong>
+                  <ul>
+                    {plan.features.map((feature) => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
+                  <Link href={registerHref}>{plan.cta}</Link>
+                </article>
+              ))}
+            </div>
           </div>
-          <div className="container vendor-step-grid">
-            {vendorSteps.map((step, index) => (
-              <article className="step-card reveal-card" key={step}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <h3>{step}</h3>
+
+          <div>
+            <div className={styles.sectionHeading}>
+              <h2>Why vendors love QuickFurno</h2>
+            </div>
+            <div className={styles.uspGrid}>
+              {uspCards.map(([title, body]) => (
+                <article className={styles.uspCard} key={title}>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.testimonials}>
+          <div className={styles.sectionHeading}>
+            <h2>What our vendors say</h2>
+          </div>
+          <div className={styles.testimonialGrid}>
+            {testimonials.map((item) => (
+              <article className={styles.testimonialCard} key={item.name}>
+                <div>
+                  <span>{item.name.slice(0, 1)}</span>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <small>{item.company}</small>
+                  </div>
+                </div>
+                <p>&quot;{item.quote}&quot;</p>
+                <em>*****</em>
               </article>
             ))}
           </div>
         </section>
 
-        <section className="section-block">
-          <div className="container app-preview-grid">
-            <VendorDashboardPreview />
-            <div className="app-preview-card reveal-card">
-              <span className="eyebrow">Android vendor app preview</span>
-              <h2>Android vendor dashboard app coming.</h2>
-              <ul>
-                <li>View assigned leads</li>
-                <li>Call or WhatsApp clients</li>
-                <li>Update lead status</li>
-                <li>Track remaining leads</li>
-                <li>Renew package</li>
-              </ul>
-            </div>
+        <section className={styles.finalCta}>
+          <div>
+            <h2>Ready to receive more client enquiries?</h2>
+            <p>Join 500+ service professionals who are growing faster with QuickFurno.</p>
           </div>
-        </section>
-
-        <section className="section-block section-warm">
-          <div className="container faq-layout">
-            <div className="section-heading section-heading--left">
-              <span className="eyebrow">Vendor FAQ</span>
-              <h2>Questions vendors ask before joining QuickFurno.</h2>
-            </div>
-            <FAQ items={vendorFaqs} />
-          </div>
-        </section>
-
-        <section className="final-cta">
-          <div className="container final-cta-card">
-            <span className="eyebrow">Start receiving enquiries</span>
-            <h2>Start receiving verified client enquiries.</h2>
-            <div className="hero-cta-row">
-              <Link href="#vendor-form" className="btn btn-primary">
-                Register Now
-              </Link>
-              <a className="btn btn-outline" href={whatsappLink()}>
-                WhatsApp Team
-              </a>
-            </div>
-          </div>
+          <Link href={registerHref}>Join QuickFurno Today</Link>
+          <ul>
+            <li>No hidden charges</li>
+            <li>Cancel anytime</li>
+            <li>24/7 support</li>
+          </ul>
         </section>
       </main>
       <Footer />
-      <StickyMobileCTA />
     </>
   );
 }

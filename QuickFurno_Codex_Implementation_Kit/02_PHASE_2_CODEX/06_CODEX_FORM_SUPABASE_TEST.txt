@@ -1,0 +1,17 @@
+Test all QuickFurno forms and Supabase submission flows.
+
+Do not redesign anything.
+
+Check:
+1. Client enquiry form
+2. CTA popup form
+3. Vendor registration form
+4. Category enquiry form if present
+5. Required field validation
+6. Mobile form behavior
+7. Supabase insert logic
+8. Error handling
+9. Success message
+10. Console errors
+
+Fix only bugs related to forms or Supabase. Do not change UI design unless required for bug fix.

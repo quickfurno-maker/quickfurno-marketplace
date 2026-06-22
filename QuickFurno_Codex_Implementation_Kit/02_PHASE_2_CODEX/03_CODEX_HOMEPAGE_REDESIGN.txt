@@ -1,0 +1,30 @@
+Redesign only the QuickFurno client homepage based on the reference images:
+- /public/assets/quickfurno/images/reference_mockups/01_client_homepage_desktop.png
+- /public/assets/quickfurno/images/reference_mockups/02_client_homepage_mobile.png
+
+Important:
+- Do not change Supabase integration
+- Do not change environment variables
+- Do not change backend logic
+- Do not remove existing working form submission
+- Do not redesign vendor listing page yet
+- Do not redesign vendor landing page yet
+
+Homepage requirements:
+1. Premium hero with headline: “Tell us your requirement and get connected with verified home-service vendors near you.”
+2. CTA buttons: Get Free Vendor Matches, Explore Categories
+3. No vendor cards on homepage
+4. Category/subcategory selector with Interiors, Carpentry, Sofa, Painting, Civil Work
+5. Interiors subcategories: Carpenters, Modular Factory, Premium Interiors, Interior Designers
+6. Trust strip: Verified Vendors, Fast Response, Transparent Process, Location-Based Matching
+7. How QuickFurno Works section
+8. USP section
+9. Pune & Mumbai coverage section
+10. Testimonials
+11. Final CTA section
+12. Lead enquiry form opens as popup/modal on CTA click
+13. Fully responsive mobile design
+14. Use assets from /assets/quickfurno/
+15. Lightweight premium animations
+
+After changes, run build and report exactly what changed.

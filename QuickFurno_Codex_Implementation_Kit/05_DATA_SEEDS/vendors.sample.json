@@ -1,0 +1,88 @@
+{
+  "priorityLogic": "show enabled vendors; sort subscribed/paid vendors first; then by rating/response; do not hide non-paid vendors unless disabled",
+  "vendors": [
+    {
+      "name": "ModuCraft Interiors",
+      "category": "Interiors",
+      "subcategory": "Carpenters",
+      "isSubscribed": true,
+      "badges": [
+        "Verified",
+        "Premium"
+      ],
+      "rating": 4.8,
+      "reviews": 310,
+      "location": "Pune",
+      "price": "\u20b91,250 / sq ft",
+      "tags": [
+        "Modular Factory",
+        "Machine Finish",
+        "Premium Interiors"
+      ],
+      "logo": "/assets/quickfurno/images/vendors/moducraft-logo.svg",
+      "thumbnail": "/assets/quickfurno/images/vendors/modular-kitchen.svg"
+    },
+    {
+      "name": "WoodNest Interiors",
+      "category": "Interiors",
+      "subcategory": "Carpenters",
+      "isSubscribed": true,
+      "badges": [
+        "Verified",
+        "Top Rated"
+      ],
+      "rating": 4.7,
+      "reviews": 235,
+      "location": "Pune",
+      "price": "\u20b9950 / sq ft",
+      "tags": [
+        "On-site Carpentry",
+        "Custom Design",
+        "Timely Delivery"
+      ],
+      "logo": "/assets/quickfurno/images/vendors/woodnest-logo.svg",
+      "thumbnail": "/assets/quickfurno/images/vendors/wardrobe-interior.svg"
+    },
+    {
+      "name": "Urban Wood Studio",
+      "category": "Interiors",
+      "subcategory": "Carpenters",
+      "isSubscribed": true,
+      "badges": [
+        "Verified",
+        "Direct Factory"
+      ],
+      "rating": 4.6,
+      "reviews": 198,
+      "location": "Pune",
+      "price": "\u20b91,150 / sq ft",
+      "tags": [
+        "Direct Factory",
+        "Modular Furniture",
+        "Best Price"
+      ],
+      "logo": "/assets/quickfurno/images/vendors/urbanwood-logo.svg",
+      "thumbnail": "/assets/quickfurno/images/vendors/premium-living-room.svg"
+    },
+    {
+      "name": "CraftEdge Solutions",
+      "category": "Carpentry",
+      "subcategory": "On-site Carpentry",
+      "isSubscribed": false,
+      "badges": [
+        "Verified"
+      ],
+      "rating": 4.4,
+      "reviews": 122,
+      "location": "Pune",
+      "price": "\u20b9650 / sq ft",
+      "tags": [
+        "Budget Friendly",
+        "Furniture Repair",
+        "On-site"
+      ],
+      "logo": "/assets/quickfurno/images/vendors/craftedge-logo.svg",
+      "thumbnail": "/assets/quickfurno/images/vendors/wood-shelving.svg"
+    }
+  ]
+}

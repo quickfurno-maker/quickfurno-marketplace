@@ -1,0 +1,18 @@
+Perform final production readiness check for QuickFurno.
+
+Check:
+1. npm run build
+2. TypeScript/JS errors
+3. Console errors
+4. Broken routes
+5. Broken images
+6. Missing alt text
+7. Mobile responsiveness
+8. Forms working
+9. Supabase connection
+10. SEO title/meta
+11. Performance issues
+12. Unused code if obvious
+13. Deployment readiness
+
+Do not make large redesign changes. Fix only production-blocking issues. Give final launch checklist.

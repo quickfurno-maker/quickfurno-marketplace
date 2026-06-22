@@ -1,0 +1,16 @@
+Inspect the existing QuickFurno project structure.
+
+Do not change any files yet.
+
+Find:
+1. Homepage file/component
+2. Category/vendor listing page file/component
+3. Vendor page file/component
+4. Lead form component
+5. Supabase integration files
+6. Global CSS / Tailwind / styling files
+7. Routing structure
+8. Any files connected to form submission
+9. Public assets folder
+
+Then give me a safe frontend redesign plan that keeps existing functionality, Supabase integration, environment variables, routes, and deployment setup unchanged.

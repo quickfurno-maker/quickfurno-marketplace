@@ -1,0 +1,15 @@
+# Local backup and commits
+
+git status
+git add .
+git commit -m "Backup before premium UI redesign"
+
+# After each phase
+
+git status
+git add .
+git commit -m "Phase completed"
+
+# Final push
+
+git push origin main

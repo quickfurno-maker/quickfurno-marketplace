@@ -1,0 +1,19 @@
+Polish the mobile responsiveness of the QuickFurno website.
+
+Do not change backend or functionality.
+
+Check and improve:
+1. Homepage mobile spacing
+2. Hero mobile layout
+3. Category cards mobile scrolling
+4. CTA popup mobile usability
+5. Vendor listing mobile cards
+6. Vendor landing page mobile layout
+7. Sticky CTA buttons
+8. Header hamburger menu
+9. Font sizes
+10. Button tap sizes
+11. No horizontal scroll
+12. Fast loading
+
+Use the mobile reference images as the final guide.

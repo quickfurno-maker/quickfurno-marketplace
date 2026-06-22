@@ -1,0 +1,5 @@
+Local VS Code project folder:
+C:\Users\KESHAV SHARMA\Desktop\quickfurno market\quickfurno-live-github\quickfurno
+
+Server project folder:
+/var/www/quickfurno-marketplace

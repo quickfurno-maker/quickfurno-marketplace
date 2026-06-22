@@ -1,0 +1,222 @@
+[
+  {
+    "path": "quickfurno/logos/quickfurno-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/logos/quickfurno-mark.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/categories/interiors.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/categories/carpentry.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/categories/sofa.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/categories/painting.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/categories/civil-work.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/trust/verified-vendors.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/trust/fast-response.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/trust/transparent-process.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/trust/location-matching.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/trust/best-price.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/trust/direct-factory.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/process/tell-requirement.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/process/matched-vendors.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/process/compare-choose.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/process/start-project.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/search.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/filter.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/whatsapp.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/lead.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/crown-premium.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/star-rating.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/icons/actions/rupee.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/reference_mockups/01_client_homepage_desktop.png",
+    "type": "png",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/reference_mockups/02_client_homepage_mobile.png",
+    "type": "png",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/reference_mockups/03_vendor_listing_desktop.png",
+    "type": "png",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/reference_mockups/04_vendor_listing_mobile.png",
+    "type": "png",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/reference_mockups/05_vendor_landing_page_desktop.png",
+    "type": "png",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/hero/hero-interior-diorama.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/moducraft-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/woodnest-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/urbanwood-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/prism-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/fineline-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/craftedge-logo.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/modular-kitchen.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/wardrobe-interior.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/premium-living-room.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/civil-work-site.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/wood-shelving.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/vendors/office-interior.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/dashboard/vendor-dashboard-preview.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  },
+  {
+    "path": "quickfurno/images/city/pune-mumbai-line-art.svg",
+    "type": "svg",
+    "usage": "public asset for QuickFurno UI"
+  }
+]

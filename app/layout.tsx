@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Playfair_Display } from "next/font/google";
+import { Poppins, Playfair_Display } from "next/font/google";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -7,9 +7,11 @@ import "./globals.css";
 import "./vendor-discovery.css";
 import "./qf-redesign.css";
 
-// Editorial type system: Playfair Display for premium headlines/section titles
-// and brand accent; Manrope for clean body, UI and forms.
-const manrope = Manrope({
+// Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
+// Playfair Display italic only for the gold accent words.
+// NOTE: Poppins is exposed under the legacy `--font-manrope` variable name so
+// every existing `var(--font-manrope)` reference resolves to it with no churn.
+const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-manrope",
@@ -51,7 +53,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${poppins.variable} ${playfair.variable}`}>
       <body>
         <ScrollProgress />
         <ScrollReveal />

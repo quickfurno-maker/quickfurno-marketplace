@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interiors">
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="#FFF8EF"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" stroke="#E8D7C4"/>
+  <g stroke="#C67821" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 42h24"/>
+  <path d="M25 42V28c0-5 4-9 9-9s9 4 9 9v14"/>
+  <path d="M18 50h28"/>
+  <path d="M25 50v-8"/>
+  <path d="M39 50v-8"/>
+  </g>
+</svg>

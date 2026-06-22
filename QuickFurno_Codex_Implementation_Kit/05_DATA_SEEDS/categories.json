@@ -1,0 +1,56 @@
+{
+  "categories": [
+    {
+      "name": "Interiors",
+      "slug": "interiors",
+      "icon": "/assets/quickfurno/icons/categories/interiors.svg",
+      "subcategories": [
+        "Carpenters",
+        "Modular Factory",
+        "Premium Interiors",
+        "Interior Designers"
+      ]
+    },
+    {
+      "name": "Carpentry",
+      "slug": "carpentry",
+      "icon": "/assets/quickfurno/icons/categories/carpentry.svg",
+      "subcategories": [
+        "On-site Carpentry",
+        "Wardrobes",
+        "TV Units",
+        "Kitchen Cabinets"
+      ]
+    },
+    {
+      "name": "Sofa",
+      "slug": "sofa",
+      "icon": "/assets/quickfurno/icons/categories/sofa.svg",
+      "subcategories": [
+        "Custom Sofa",
+        "Sofa Repair",
+        "Premium Sofa"
+      ]
+    },
+    {
+      "name": "Painting",
+      "slug": "painting",
+      "icon": "/assets/quickfurno/icons/categories/painting.svg",
+      "subcategories": [
+        "Home Painting",
+        "Texture Painting",
+        "Commercial Painting"
+      ]
+    },
+    {
+      "name": "Civil Work",
+      "slug": "civil-work",
+      "icon": "/assets/quickfurno/icons/categories/civil-work.svg",
+      "subcategories": [
+        "Renovation",
+        "Repair",
+        "Construction"
+      ]
+    }
+  ]
+}

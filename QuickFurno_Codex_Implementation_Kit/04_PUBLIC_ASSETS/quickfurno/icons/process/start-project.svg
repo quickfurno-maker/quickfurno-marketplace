@@ -1,0 +1,9 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Start Project">
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="#FFF8EF"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" stroke="#E8D7C4"/>
+  <g stroke="#C67821" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14 34l18-17 18 17"/>
+  <path d="M19 32v20h26V32"/>
+  <path d="M27 52V39h10v13"/>
+  </g>
+</svg>

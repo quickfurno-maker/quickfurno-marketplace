@@ -1,0 +1,6 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="QuickFurno mark">
+  <path d="M40 6L68 22V58L40 74L12 58V22L40 6Z" fill="#C67821"/>
+  <path d="M40 18L57 28V52L40 62L23 52V28L40 18Z" fill="#111111"/>
+  <path d="M34 35h14v10H34z" stroke="#FFF8EF" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M42 45l14 14" stroke="#FFF8EF" stroke-width="6" stroke-linecap="round"/>
+</svg>

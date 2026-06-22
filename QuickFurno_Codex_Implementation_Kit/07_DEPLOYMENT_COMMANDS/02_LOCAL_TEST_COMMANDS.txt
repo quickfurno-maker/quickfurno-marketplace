@@ -1,0 +1,11 @@
+# Install dependencies if needed
+npm install
+
+# Run local dev server
+npm run dev
+
+# Build test
+npm run build
+
+# Optional lint if available
+npm run lint

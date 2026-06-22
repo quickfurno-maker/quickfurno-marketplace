@@ -5,22 +5,80 @@ import { categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 
 export function HomeIllustration() {
   return (
-    <div className="qf-hero-illustration" aria-hidden="true">
+    <div className="qf-hero-banner" aria-hidden="true">
+      <span className="qf-hero-glow" />
       <span className="qf-float-shape qf-float-shape--one" />
       <span className="qf-float-shape qf-float-shape--two" />
       <span className="qf-float-shape qf-float-shape--three" />
-      <svg viewBox="0 0 250 180" role="img" aria-label="">
-        <path d="M45 143h160" stroke="#B9D4D7" strokeWidth="4" strokeLinecap="round" />
-        <path d="M62 82 124 30l64 52" fill="#E7B45A" stroke="#075B67" strokeWidth="5" strokeLinejoin="round" />
-        <path d="M75 78v67h99V78" fill="#FFFDF8" stroke="#075B67" strokeWidth="5" strokeLinejoin="round" />
-        <path d="M105 145v-38h34v38" fill="#F8F4EA" stroke="#075B67" strokeWidth="4" />
-        <path d="M86 92h24v22H86zM145 92h18v22h-18z" fill="#D9ECE8" stroke="#075B67" strokeWidth="3" />
-        <path d="M171 48v26" stroke="#075B67" strokeWidth="5" strokeLinecap="round" />
-        <path d="M165 48h17" stroke="#075B67" strokeWidth="5" strokeLinecap="round" />
-        <circle cx="53" cy="56" r="5" fill="#D9902F" />
-        <circle cx="201" cy="70" r="4" fill="#075B67" />
-        <path d="M208 38c12 2 16 8 12 19-11-1-17-7-12-19Z" fill="#4D8C79" opacity="0.65" />
+
+      <svg className="qf-hero-scene" viewBox="0 0 360 300" role="img" aria-label="">
+        <defs>
+          <linearGradient id="qfRoom" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#FFF3E9" />
+            <stop offset="1" stopColor="#FFE2CE" />
+          </linearGradient>
+          <linearGradient id="qfSofa" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#F58A5B" />
+            <stop offset="1" stopColor="#E85A2A" />
+          </linearGradient>
+          <linearGradient id="qfWindow" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#BFE3F7" />
+            <stop offset="1" stopColor="#7FC0E8" />
+          </linearGradient>
+          <linearGradient id="qfRug" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#F2C14E" />
+            <stop offset="1" stopColor="#E0992B" />
+          </linearGradient>
+        </defs>
+
+        {/* Room */}
+        <rect x="14" y="14" width="332" height="272" rx="26" fill="url(#qfRoom)" />
+        <rect x="14" y="14" width="332" height="272" rx="26" fill="none" stroke="#FFFFFF" strokeOpacity="0.6" strokeWidth="2" />
+
+        {/* Arched window with sunrise */}
+        <path d="M48 70a44 44 0 0 1 88 0v66H48Z" fill="url(#qfWindow)" />
+        <circle cx="92" cy="84" r="17" fill="#FFE7A6" opacity="0.95" />
+        <path d="M48 104h88M92 38v98" stroke="#FFFFFF" strokeOpacity="0.7" strokeWidth="3" />
+        <path d="M48 70a44 44 0 0 1 88 0v66H48Z" fill="none" stroke="#1B6BA8" strokeOpacity="0.25" strokeWidth="3" />
+
+        {/* Wall art */}
+        <rect x="210" y="58" width="46" height="58" rx="6" fill="#FFFFFF" stroke="#E0992B" strokeWidth="3" />
+        <path d="M218 100l9-12 8 9 7-8 6 11Z" fill="#2E8FCC" opacity="0.7" />
+        <rect x="270" y="64" width="40" height="46" rx="6" fill="#FFFFFF" stroke="#2E8FCC" strokeWidth="3" />
+        <circle cx="290" cy="84" r="9" fill="#F58A5B" opacity="0.8" />
+
+        {/* Floor rug */}
+        <ellipse cx="200" cy="252" rx="150" ry="22" fill="url(#qfRug)" opacity="0.55" />
+
+        {/* Sofa */}
+        <rect x="150" y="176" width="170" height="54" rx="20" fill="url(#qfSofa)" />
+        <rect x="158" y="158" width="154" height="40" rx="16" fill="#FF9A62" />
+        <rect x="168" y="168" width="64" height="32" rx="11" fill="#FFFFFF" opacity="0.35" />
+        <rect x="240" y="168" width="64" height="32" rx="11" fill="#FFFFFF" opacity="0.22" />
+        <rect x="150" y="220" width="20" height="34" rx="8" fill="#C9491F" />
+        <rect x="300" y="220" width="20" height="34" rx="8" fill="#C9491F" />
+
+        {/* Cushions */}
+        <rect x="176" y="170" width="30" height="30" rx="9" fill="#F2C14E" transform="rotate(8 191 185)" />
+        <rect x="268" y="170" width="30" height="30" rx="9" fill="#2E8FCC" transform="rotate(-8 283 185)" />
+
+        {/* Floor lamp */}
+        <path d="M126 250V150" stroke="#1B6BA8" strokeWidth="4" strokeLinecap="round" />
+        <path d="M112 150h28l-8-22h-12Z" fill="#F2C14E" stroke="#E0992B" strokeWidth="2" />
+        <ellipse cx="126" cy="252" rx="16" ry="5" fill="#1B6BA8" opacity="0.3" />
+
+        {/* Potted plant */}
+        <path d="M300 250v-22" stroke="#2F8F5B" strokeWidth="4" strokeLinecap="round" />
+        <path d="M300 232c-12-4-18-16-14-28 12 2 18 14 14 28ZM300 234c12-6 16-20 10-32-11 4-15 18-10 32Z" fill="#3DA76C" />
+        <path d="M292 250h22l-4 18h-14Z" fill="#E85A2A" />
       </svg>
+
+      <span className="qf-hero-chip qf-hero-chip--rating">
+        <b>4.8★</b> Verified pros
+      </span>
+      <span className="qf-hero-chip qf-hero-chip--quote">
+        <b>Free</b> quotes in minutes
+      </span>
     </div>
   );
 }
@@ -103,14 +161,12 @@ const popularServices: Array<{
   icon: Parameters<typeof QFIcon>[0]["name"];
   category: QuickFurnoCategory;
 }> = [
-  { title: "Modular Kitchen", description: "Kitchen design, cabinets and installation.", icon: "kitchen", category: "Modular Factory" },
-  { title: "Full Home Interior", description: "Complete design and execution support.", icon: "home", category: "Interior Designers" },
-  { title: "Custom Wardrobe", description: "Storage made for your room and budget.", icon: "wardrobe", category: "Modular Factory" },
-  { title: "Sofa Making", description: "Custom sofa, recliner and upholstery work.", icon: "sofa", category: "Sofa" },
-  { title: "Painting", description: "Interior, exterior and texture painting.", icon: "paint", category: "Painter" },
-  { title: "False Ceiling", description: "Ceiling design, lighting and repair.", icon: "ceiling", category: "Interior Designers" },
-  { title: "Civil Renovation", description: "Tiles, mason work and renovation support.", icon: "civil", category: "Civil Work" },
-  { title: "Flooring", description: "Tile, wooden and vinyl flooring services.", icon: "floor", category: "Civil Work" },
+  { title: "Premium Interior", description: "High-end finishes and managed execution.", icon: "home", category: "Premium Interiors" },
+  { title: "Interior Designer", description: "Complete design and turnkey support.", icon: "home", category: "Interior Designers" },
+  { title: "Modular Factory", description: "Factory-finish kitchens and wardrobes.", icon: "kitchen", category: "Modular Factory" },
+  { title: "Custom Sofa", description: "Sofa, recliner and upholstery work.", icon: "sofa", category: "Sofa" },
+  { title: "Painting", description: "Interior, texture and waterproofing.", icon: "paint", category: "Painter" },
+  { title: "Civil Work", description: "Renovation, tiling and mason work.", icon: "civil", category: "Civil Work" },
 ];
 
 export function PopularServicesSection() {

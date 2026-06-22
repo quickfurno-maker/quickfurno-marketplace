@@ -1,0 +1,9 @@
+<svg width="700" height="260" viewBox="0 0 700 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pune and Mumbai city line art">
+  <rect width="700" height="260" rx="28" fill="#FFF8EF"/>
+  <g stroke="#C67821" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.65">
+    <path d="M55 220h590"/>
+    <path d="M100 220V120h80v100"/><path d="M120 120V80h40v40"/><path d="M205 220V95h70v125"/><path d="M225 95l15-35 15 35"/>
+    <path d="M310 220V75h95v145"/><path d="M330 75V45h55v30"/><path d="M435 220V115h70v105"/><path d="M470 115V70"/><path d="M540 220V90h75v130"/><path d="M560 90l17-35 18 35"/>
+    <path d="M115 155h45M115 185h45M220 135h40M220 170h40M330 120h55M330 160h55M450 150h40M555 130h45M555 170h45"/>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+You are a senior UI/UX designer and frontend architect.
+
+I am redesigning QuickFurno, a premium home-service and interior vendor marketplace in India.
+
+Use the attached reference mockups and assets as the final design direction.
+
+Create a final implementation-ready design system for the existing QuickFurno website.
+
+Brand feel:
+- Premium home-service marketplace
+- Urban Company trust
+- Livspace premium interior feel
+- SaaS dashboard clarity
+- Warm beige, ivory, charcoal, copper-gold theme
+- Clean, conversion-focused, not like JustDial
+- Homepage should be client-first
+- Vendor cards should not appear on homepage
+- Vendor listing should use compact premium cards
+- Vendor page should focus on lead generation for service professionals
+
+Output only:
+1. Final color palette with exact hex codes
+2. Font recommendation
+3. Button styles
+4. Card styles
+5. Section spacing
+6. Animation rules
+7. Mobile responsiveness rules
+8. Component list for homepage, vendor listing page, vendor landing page
+9. What should NOT be changed in backend/functionality
+10. Asset path map using /assets/quickfurno/...
+
+Do not write code yet.

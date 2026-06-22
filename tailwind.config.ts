@@ -5,12 +5,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Beige editorial brand. Keys ("navy"/"gold") retained for compatibility
-        // with existing utility usage; values are the warm palette.
-        navy:   { DEFAULT: "#171412", deep: "#221C15", ink: "#181512" },
-        gold:   { DEFAULT: "#B8874A", soft: "#C9A066", deep: "#9A6E37" },
-        ivory:  "#F7F1E8",
-        muted:  "#70675D",
+        // Copper & Charcoal editorial brand. Legacy keys ("navy"/"gold") retained
+        // for compatibility with existing utility usage; values now map to the kit
+        // palette (charcoal shell, copper accent). New work can use the `qf.*` keys.
+        navy:   { DEFAULT: "#111111", deep: "#1C1917", ink: "#171412" },
+        gold:   { DEFAULT: "#C67821", soft: "#E1942C", deep: "#9A5E16" },
+        ivory:  "#F8EFE3",
+        muted:  "#7A6B5C",
+        // Kit canonical design tokens.
+        qf: {
+          charcoal: "#111111",
+          charcoalSoft: "#1C1917",
+          brown: "#4A2F1D",
+          copper: "#C67821",
+          copperLight: "#E1942C",
+          copperDeep: "#9A5E16",
+          cream: "#FFF8EF",
+          ivory: "#F8EFE3",
+          beige: "#ECE6D6",
+          taupe: "#C9B8A4",
+          text: "#171412",
+          muted: "#7A6B5C",
+          border: "#E8D7C4",
+          success: "#19A55A",
+        },
       },
       fontFamily: {
         display: ["var(--font-playfair)", "Cormorant Garamond", "Georgia", "serif"],
@@ -19,7 +37,7 @@ const config: Config = {
       },
       boxShadow: {
         lift: "0 24px 60px -20px rgba(0,0,0,0.55)",
-        gold: "0 0 0 1px rgba(184,135,74,0.35), 0 18px 40px -18px rgba(184,135,74,0.4)",
+        gold: "0 0 0 1px rgba(198,120,33,0.35), 0 18px 40px -18px rgba(198,120,33,0.4)",
       },
       borderRadius: { xl2: "1.25rem" },
     },

@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tell Requirement">
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="#FFF8EF"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" stroke="#E8D7C4"/>
+  <g stroke="#C67821" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 15h22v38H21z"/>
+  <path d="M27 24h10"/>
+  <path d="M27 32h10"/>
+  <path d="M27 40h6"/>
+  <path d="M41 43l8 8"/>
+  </g>
+</svg>

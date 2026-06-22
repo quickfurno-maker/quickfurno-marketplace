@@ -1,0 +1,14 @@
+Implement only the global QuickFurno design system.
+
+Use files in:
+03_DESIGN_SYSTEM/
+04_PUBLIC_ASSETS/quickfurno/
+
+Tasks:
+1. Add/copy design tokens into the correct global CSS/Tailwind location.
+2. Add or preserve premium fonts safely.
+3. Add reusable button/card/badge/input styles if the project structure supports it.
+4. Do not change page layouts yet.
+5. Do not change Supabase or backend logic.
+
+Run build/lint if available and report changed files.

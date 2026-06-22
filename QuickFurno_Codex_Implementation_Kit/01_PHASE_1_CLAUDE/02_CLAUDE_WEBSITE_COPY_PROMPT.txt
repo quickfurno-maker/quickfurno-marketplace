@@ -1,0 +1,21 @@
+Create final conversion-focused website copy for QuickFurno based on the attached designs.
+
+Pages:
+1. Client homepage
+2. Category/vendor listing page
+3. Vendor landing page
+
+Tone:
+- Premium but simple
+- Indian startup marketplace feel
+- Trust-building
+- Clear CTA
+- Not too much text
+
+Business model:
+- Clients submit requirements and get connected with verified vendors near them.
+- Vendors are visible by category.
+- Paid/subscribed vendors get priority and receive direct leads.
+- Non-paid vendors can remain visible unless disabled, with CTA such as Ask Vendor to Contact.
+
+Output copy section-wise with headings, subheadings, CTA labels, feature card copy, testimonial placeholders, and form labels.

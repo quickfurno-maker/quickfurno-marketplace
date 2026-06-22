@@ -1,0 +1,7 @@
+ssh root@213.210.21.216
+cd /var/www/quickfurno-marketplace
+git pull origin main
+npm install
+npm run build
+pm2 restart all
+pm2 status

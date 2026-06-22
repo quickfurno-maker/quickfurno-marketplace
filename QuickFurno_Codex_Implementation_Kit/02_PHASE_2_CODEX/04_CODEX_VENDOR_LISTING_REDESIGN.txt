@@ -1,0 +1,20 @@
+Redesign only the category/vendor listing page based on:
+- /public/assets/quickfurno/images/reference_mockups/03_vendor_listing_desktop.png
+- /public/assets/quickfurno/images/reference_mockups/04_vendor_listing_mobile.png
+
+Do not change homepage now.
+Do not change Supabase integration.
+Do not change backend logic.
+
+Requirements:
+1. Breadcrumb: Home > Interiors > Carpenters
+2. Search/filter bar: City, Category, Subcategory, Search button
+3. Quick filter chips: Verified, Top Rated, Budget Friendly, Premium, Direct Factory
+4. Desktop: left filter sidebar, main compact vendor list, right sticky lead matching card
+5. Mobile: top filters, filter button, sort dropdown, compact stacked cards, bottom sticky Get Matched Now CTA
+6. Vendor cards include logo, name, badges, rating, reviews, location, tags, price, thumbnail, View Profile, Get Quote, WhatsApp/Ask Vendor to Contact
+7. Vendor priority logic display: subscribed vendors first; non-paid vendors visible unless disabled
+8. Use sample data from 05_DATA_SEEDS/vendors.sample.json if useful
+9. Keep compact and premium
+
+Run build and report changed files.

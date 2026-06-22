@@ -9,23 +9,38 @@ export function LogoMark({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient id="qfTealTile" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#F6FBF8" />
-          <stop offset="1" stopColor="#E5F1EE" />
-        </linearGradient>
-        <linearGradient id="qfGoldRoof" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#E7B45A" />
-          <stop offset="1" stopColor="#D9902F" />
+        <linearGradient id="qfTile" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#8FA382" />
+          <stop offset="1" stopColor="#566848" />
         </linearGradient>
       </defs>
-      <rect width="48" height="48" rx="14" fill="url(#qfTealTile)" />
-      <rect x="4" y="4" width="40" height="40" rx="12" fill="none" stroke="#B9D4D7" strokeWidth="1.2" />
-      <path d="M10 25.5 24 14l14 11.5" fill="none" stroke="#075B67" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M15 23.5V37h18V23.5" fill="#FFFDF8" stroke="#075B67" strokeWidth="2.2" strokeLinejoin="round" />
-      <path d="M19 37v-8h6v8" fill="#F8F4EA" stroke="#075B67" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M28 18.2h5.2V26" fill="none" stroke="url(#qfGoldRoof)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="35.2" cy="13.4" r="2.2" fill="#D9902F" opacity="0.95" />
-      <path d="M31 31h5" stroke="#D9902F" strokeWidth="2" strokeLinecap="round" />
+
+      {/* Sage tile */}
+      <rect width="48" height="48" rx="15" fill="url(#qfTile)" />
+      <rect x="3.5" y="3.5" width="41" height="41" rx="12" fill="none" stroke="#FFFFFF" strokeOpacity="0.3" strokeWidth="1.1" />
+
+      {/* Arched doorway = the "Q" bowl */}
+      <path
+        d="M15.5 38.5 V23 a8.5 8.5 0 0 1 17 0 V38.5"
+        fill="#F6F3EA"
+        stroke="#33402A"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+
+      {/* Floor / threshold line */}
+      <path d="M13.5 38.5 H34.5" stroke="#33402A" strokeWidth="2.2" strokeLinecap="round" />
+
+      {/* Window mullion detail */}
+      <path d="M24 38.5 V18.5" stroke="#33402A" strokeOpacity="0.26" strokeWidth="1.5" />
+      <path d="M16.5 27 H31.5" stroke="#33402A" strokeOpacity="0.18" strokeWidth="1.3" />
+
+      {/* Terracotta keystone at the arch apex */}
+      <path d="M24 11.6 l3.2 4.6 h-6.4 z" fill="#E07A4E" />
+
+      {/* Terracotta Q-tail crossing the base */}
+      <path d="M27 35 L34.5 42.5" stroke="#E07A4E" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
 }

@@ -1,0 +1,8 @@
+Use this ZIP as the QuickFurno implementation kit.
+
+First, copy:
+04_PUBLIC_ASSETS/quickfurno
+into the project folder:
+public/assets/quickfurno
+
+Do not change functionality yet. Confirm the assets are available and list the final asset paths.

@@ -1,0 +1,20 @@
+Suggest lightweight premium animations for QuickFurno.
+
+Rules:
+- Must not slow the website
+- Must be mobile friendly
+- Must feel premium, not childish
+- Prefer CSS transitions, transform, opacity, subtle scroll reveal, hover lift
+- Avoid heavy 3D libraries for MVP
+
+Give section-wise animation plan for:
+1. Header
+2. Hero
+3. Category cards
+4. CTA buttons
+5. Trust strip
+6. How it works section
+7. Vendor cards
+8. Form popup
+9. Scroll reveal
+10. Mobile interactions

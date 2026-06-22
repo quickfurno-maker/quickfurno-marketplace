@@ -1,0 +1,23 @@
+Create/redesign the dedicated QuickFurno vendor landing page based on:
+/public/assets/quickfurno/images/reference_mockups/05_vendor_landing_page_desktop.png
+
+Do not change client homepage.
+Do not change vendor listing page.
+Do not break existing routes, Supabase, or forms.
+
+Requirements:
+1. Header with For Vendors active
+2. Hero: “Grow your business with verified client leads from QuickFurno.”
+3. CTA: Become a Vendor, View Lead Demo
+4. Dashboard preview with Active Leads, New Requests Today, Subscription Status, Response Rate, Recent Leads
+5. Benefits strip
+6. How it works for vendors
+7. Leads waiting for you section
+8. Pricing: Starter, Growth, Premium
+9. Vendor USPs
+10. Vendor testimonials
+11. Final CTA: “Ready to receive more client enquiries?”
+12. Fully responsive mobile version
+13. Become a Vendor CTA opens/links to existing vendor registration flow/form if available
+
+Run build and report changed files.

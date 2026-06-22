@@ -5,50 +5,73 @@ import Link from "next/link";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 
+type HomeSubcategory = { label: string; category: QuickFurnoCategory };
+
 type HomeCategory = {
   label: string;
+  tagline: string;
   icon: Parameters<typeof QFIcon>[0]["name"];
-  category?: QuickFurnoCategory;
-  subcategories: string[];
+  category: QuickFurnoCategory;
+  subcategories: HomeSubcategory[];
 };
 
 const homeCategories: HomeCategory[] = [
   {
     label: "Interior",
+    tagline: "Design, woodwork & turnkey homes",
     icon: "home",
     category: "Interior Designers",
-    subcategories: ["Interior Designer", "Full Home Interior", "Premium Interiors", "Modular Factory", "Kitchen & Wardrobe", "Home Renovation"],
+    subcategories: [
+      { label: "Carpenter", category: "Carpenters" },
+      { label: "Modular Factory", category: "Modular Factory" },
+      { label: "Interior Designer", category: "Interior Designers" },
+      { label: "Premium Interior", category: "Premium Interiors" },
+      { label: "Ultra Luxury", category: "Premium Interiors" },
+    ],
   },
   {
-    label: "Carpenter",
-    icon: "hammer",
-    category: "Carpenters",
-    subcategories: ["Custom Furniture", "Wardrobe", "TV Unit", "Bed", "Kitchen Work", "Repair Work"],
+    label: "Sofa",
+    tagline: "Custom sofas, recliners & upholstery",
+    icon: "sofa",
+    category: "Sofa",
+    subcategories: [
+      { label: "Sofa Maker", category: "Sofa" },
+      { label: "Custom Sofa", category: "Sofa" },
+      { label: "Recliner", category: "Sofa" },
+      { label: "Upholstery", category: "Sofa" },
+    ],
   },
   {
-    label: "Modular Kitchen",
-    icon: "kitchen",
-    category: "Modular Factory",
-    subcategories: ["L Shape Kitchen", "U Shape Kitchen", "Parallel Kitchen", "Island Kitchen", "Kitchen Renovation"],
+    label: "Painting",
+    tagline: "Interior, texture & waterproofing",
+    icon: "paint",
+    category: "Painter",
+    subcategories: [
+      { label: "Interior Painting", category: "Painter" },
+      { label: "Exterior Painting", category: "Painter" },
+      { label: "Texture Painting", category: "Painter" },
+      { label: "Waterproofing", category: "Painter" },
+    ],
   },
-  { label: "Wardrobe", icon: "wardrobe", category: "Modular Factory", subcategories: ["Sliding Wardrobe", "Hinged Wardrobe", "Loft Storage", "Walk-in Wardrobe"] },
-  { label: "Painting", icon: "paint", category: "Painter", subcategories: ["Interior Painting", "Exterior Painting", "Texture Painting", "Waterproofing"] },
-  { label: "Sofa", icon: "sofa", category: "Sofa", subcategories: ["Sofa Maker", "Sofa Repair", "Recliner", "Custom Sofa", "Upholstery"] },
-  { label: "Painter", icon: "paint", category: "Painter", subcategories: ["Interior Painting", "Exterior Painting", "Texture Painting", "Waterproofing"] },
-  { label: "False Ceiling", icon: "ceiling", category: "Interior Designers", subcategories: ["Gypsum Ceiling", "POP Ceiling", "Lighting Layout", "Ceiling Repair"] },
-  { label: "Civil Work", icon: "civil", category: "Civil Work", subcategories: ["Renovation", "Tile Work", "Bathroom Renovation", "Mason Work"] },
-  { label: "Electrician", icon: "plug", category: "Civil Work", subcategories: ["Wiring", "Switchboards", "Lighting", "Repair Work"] },
-  { label: "Renovation", icon: "reno", category: "Civil Work", subcategories: ["Home Renovation", "Bathroom Renovation", "Tile Work", "Civil Repair"] },
-  { label: "Plumber", icon: "pipe", category: "Civil Work", subcategories: ["Bathroom Plumbing", "Leak Repair", "Kitchen Plumbing", "Fittings"] },
-  { label: "Flooring", icon: "floor", category: "Civil Work", subcategories: ["Tile Flooring", "Wooden Flooring", "Vinyl Flooring", "Repair"] },
-  { label: "More Services", icon: "more", category: "Civil Work", subcategories: ["Civil Work", "Painting", "Custom Furniture", "Home Renovation"] },
+  {
+    label: "Civil Work",
+    tagline: "Renovation, tiling & masonry",
+    icon: "civil",
+    category: "Civil Work",
+    subcategories: [
+      { label: "Home Renovation", category: "Civil Work" },
+      { label: "Tile Work", category: "Civil Work" },
+      { label: "Bathroom Renovation", category: "Civil Work" },
+      { label: "Mason Work", category: "Civil Work" },
+    ],
+  },
 ];
 
 export function HomeCategoryGrid() {
   const [active, setActive] = useState<HomeCategory | null>(null);
 
-  function routeFor(item: HomeCategory) {
-    return `/category/${categorySlug(item.category ?? "Civil Work")}`;
+  function routeFor(category: QuickFurnoCategory) {
+    return `/category/${categorySlug(category)}`;
   }
 
   function openCategory(item: HomeCategory) {
@@ -63,7 +86,11 @@ export function HomeCategoryGrid() {
             <span className="qf-home-category-icon">
               <QFIcon name={item.icon} />
             </span>
-            <span>{item.label}</span>
+            <span className="qf-home-category-label">{item.label}</span>
+            <small className="qf-home-category-tag">{item.tagline}</small>
+            <span className="qf-home-category-arrow" aria-hidden="true">
+              <QFIcon name="arrow" />
+            </span>
           </button>
         ))}
       </div>
@@ -89,13 +116,13 @@ export function HomeCategoryGrid() {
             </div>
             <div className="qf-subcategory-list">
               {active.subcategories.map((subcategory) => (
-                <Link key={subcategory} href={routeFor(active)} onClick={() => setActive(null)}>
-                  <span>{subcategory}</span>
+                <Link key={subcategory.label} href={routeFor(subcategory.category)} onClick={() => setActive(null)}>
+                  <span>{subcategory.label}</span>
                   <QFIcon name="arrow" />
                 </Link>
               ))}
             </div>
-            <Link className="qf-sheet-primary" href={routeFor(active)} onClick={() => setActive(null)}>
+            <Link className="qf-sheet-primary" href={routeFor(active.category)} onClick={() => setActive(null)}>
               View all {active.label} vendors
             </Link>
           </section>

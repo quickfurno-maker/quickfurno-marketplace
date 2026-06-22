@@ -1,0 +1,9 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rupee">
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="#FFF8EF"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" stroke="#E8D7C4"/>
+  <g stroke="#C67821" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M22 18h20"/>
+  <path d="M22 26h20"/>
+  <path d="M24 18c11 0 16 5 16 11s-5 11-16 11l16 16"/>
+  </g>
+</svg>

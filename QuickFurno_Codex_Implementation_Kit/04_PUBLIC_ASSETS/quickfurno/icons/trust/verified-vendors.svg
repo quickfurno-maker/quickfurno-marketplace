@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verified Vendors">
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="#FFF8EF"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" stroke="#E8D7C4"/>
+  <g stroke="#C67821" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M32 13l17 7v12c0 11-7 18-17 22C22 50 15 43 15 32V20l17-7z"/>
+  <path d="M24 32l6 6 11-13"/>
+  </g>
+</svg>

@@ -1,0 +1,37 @@
+:root {
+  --qf-charcoal: #111111;
+  --qf-charcoal-soft: #1C1917;
+  --qf-brown: #4A2F1D;
+  --qf-copper: #C67821;
+  --qf-copper-light: #E1942C;
+  --qf-cream: #FFF8EF;
+  --qf-ivory: #F8EFE3;
+  --qf-warm-card: #FFFFFF;
+  --qf-taupe: #C9B8A4;
+  --qf-text: #171412;
+  --qf-muted: #7A6B5C;
+  --qf-border: #E8D7C4;
+  --qf-success: #19A55A;
+  --qf-radius-sm: 12px;
+  --qf-radius-md: 18px;
+  --qf-radius-lg: 28px;
+  --qf-radius-xl: 36px;
+  --qf-shadow-card: 0 18px 45px rgba(74, 47, 29, 0.10);
+  --qf-shadow-soft: 0 10px 28px rgba(74, 47, 29, 0.08);
+  --qf-max-width: 1180px;
+}
+
+.qf-btn-primary {
+  background: linear-gradient(135deg, var(--qf-copper), var(--qf-copper-light));
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 14px;
+  box-shadow: 0 12px 25px rgba(198,120,33,.25);
+}
+
+.qf-card {
+  background: rgba(255,255,255,.84);
+  border: 1px solid var(--qf-border);
+  border-radius: var(--qf-radius-lg);
+  box-shadow: var(--qf-shadow-soft);
+}

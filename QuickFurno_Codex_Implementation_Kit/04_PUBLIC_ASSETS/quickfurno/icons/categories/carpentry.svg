@@ -1,0 +1,12 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Carpentry">
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="#FFF8EF"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" stroke="#E8D7C4"/>
+  <g stroke="#C67821" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M16 24h32v24H16z"/>
+  <path d="M16 32h32"/>
+  <path d="M28 24v24"/>
+  <path d="M36 24v24"/>
+  <path d="M22 38h2"/>
+  <path d="M42 38h2"/>
+  </g>
+</svg>

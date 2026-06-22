@@ -1,0 +1,19 @@
+Implement lightweight premium animations across QuickFurno.
+
+Do not change functionality.
+Do not add heavy libraries unless already installed.
+Prefer CSS transitions, transform, opacity, subtle scroll reveal, hover lift, modal animation.
+
+Apply to:
+1. Header
+2. Hero visual and trust badges
+3. Category cards
+4. CTA buttons
+5. Trust strip
+6. How it works cards
+7. Vendor cards
+8. Lead popup/modal
+9. Sticky CTA
+10. Mobile interactions
+
+Run build after implementation.

@@ -24,6 +24,10 @@ type IconName =
   | "reno"
   | "pipe"
   | "floor"
+  | "clock"
+  | "lock"
+  | "tag"
+  | "star"
   | "arrow";
 
 const paths: Record<IconName, string[]> = {
@@ -52,6 +56,10 @@ const paths: Record<IconName, string[]> = {
   reno: ["M4 17 17 4l3 3L7 20H4Z", "M14 7l3 3"],
   pipe: ["M5 8h8a4 4 0 0 1 0 8h-1", "M5 8V5", "M5 8v3", "M12 16v3", "M12 16h-3"],
   floor: ["M4 5h16v14H4Z", "M4 12h16", "M10 5v14", "M16 5v14"],
+  clock: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7.5v5l3.2 2"],
+  lock: ["M6 11h12v9H6Z", "M9 11V8a3 3 0 0 1 6 0v3", "M12 15v2"],
+  tag: ["M4 4h7l9 9-7 7-9-9Z", "M8.4 8.4h.01"],
+  star: ["M12 4l2.3 4.9 5.2.7-3.8 3.6 1 5.3-4.7-2.6-4.7 2.6 1-5.3L4.5 9.6l5.2-.7L12 4Z"],
   arrow: ["M5 12h14", "m13 6 6 6-6 6"],
 };
 

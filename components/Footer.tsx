@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { LogoMark } from "@/components/Logo";
 import { whatsappLink } from "@/lib/config";
 import { categories } from "@/lib/quickfurno-data";
 
@@ -9,9 +8,6 @@ export function Footer() {
       <div className="container footer-grid" data-reveal>
         <div className="footer-brand">
           <Link href="/" className="brand-lockup" aria-label="QuickFurno home">
-            <span className="brand-mark">
-              <LogoMark />
-            </span>
             <span className="brand-text">
               <span className="bw-quick">Quick</span>
               <span className="bw-furno">Furno</span>

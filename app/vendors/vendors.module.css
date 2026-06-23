@@ -985,3 +985,305 @@
     transform: none !important;
   }
 }
+
+/* ============================================================
+   Vendor Hero Phase 1 — premium SaaS hero makeover.
+   White base + deep navy + orange/gold accent. Scoped to the
+   hero zone (hero copy, CTAs, dashboard mock, phone card and the
+   benefit badge strip). Loads last so it wins the cascade.
+   ============================================================ */
+.hero {
+  position: relative;
+  padding: clamp(2.4rem, 6vw, 4.6rem) 0 clamp(1.5rem, 4vw, 2.6rem);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.shell {
+  align-items: center;
+}
+
+.heroCopy {
+  gap: 0.95rem;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  color: #d99a16;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.eyebrow::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: #f5a400;
+}
+
+.heroCopy h1 {
+  max-width: 640px;
+  color: #07111f;
+  font-size: clamp(2.05rem, 5.2vw, 3rem);
+  font-weight: 850;
+  line-height: 1.06;
+}
+.heroHighlight {
+  display: block;
+  color: #f5a400;
+}
+
+.heroCopy p {
+  max-width: 560px;
+  color: #5b6472;
+  font-size: clamp(0.98rem, 1.5vw, 1.1rem);
+  line-height: 1.62;
+}
+
+/* CTAs — scoped to the hero only via .heroActions parent */
+.heroActions .primaryCta {
+  color: #ffffff;
+  background: #07111f;
+  box-shadow: 0 14px 30px rgba(7, 17, 31, 0.2);
+}
+.heroActions .primaryCta:hover {
+  background: #0b1f3a;
+  box-shadow: 0 18px 38px rgba(7, 17, 31, 0.28);
+}
+.heroActions .secondaryCta {
+  color: #07111f;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+.heroActions .secondaryCta:hover {
+  border-color: #f5a400;
+  color: #07111f;
+  box-shadow: 0 12px 26px rgba(7, 17, 31, 0.1);
+}
+
+.trustLine {
+  color: #5b6472;
+}
+.trustLine strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  color: #07111f;
+}
+.trustLine strong::before {
+  content: "★";
+  color: #f5a400;
+}
+
+/* --- Dashboard mock card (clean SaaS card, no laptop bezel) --- */
+.dashboardLaptop {
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 34px 80px -38px rgba(7, 17, 31, 0.35);
+  animation: vhSlideIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.dashboardLaptop::after {
+  display: none;
+}
+.dashboardTop {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #07111f;
+}
+.dashboardTop strong {
+  color: #ffffff !important;
+}
+.dashboardTop span {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+.avatar {
+  background: linear-gradient(135deg, #f5a400, #d99a16);
+}
+
+.dashboardNav {
+  border-right: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+.dashboardNav span {
+  color: #5b6472;
+}
+.navActive {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #f5a400, #d99a16) !important;
+}
+
+.dashboardWrap .statGrid article,
+.dashboardWrap .recentLeads,
+.dashboardWrap .chartCard,
+.dashboardWrap .messageCard {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 12px 30px -24px rgba(7, 17, 31, 0.3);
+}
+.statGrid strong,
+.messageCard strong {
+  color: #07111f;
+}
+.statGrid span,
+.statGrid small {
+  color: #5b6472;
+}
+.panelHeader a {
+  color: #d99a16;
+}
+.recentLeadRow {
+  border-top-color: #eef0f3;
+}
+.leadAvatar {
+  color: #b97400;
+  background: rgba(245, 164, 0, 0.14);
+}
+.recentLeadRow em {
+  color: #b06f00;
+  background: rgba(245, 164, 0, 0.16);
+}
+.chartLine span {
+  background: linear-gradient(180deg, #f5a400, #d99a16);
+}
+
+/* --- Phone lead card (overlapping, gentle float) --- */
+.phonePreview {
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 28px 60px -28px rgba(7, 17, 31, 0.42);
+  animation: vhFloat 6s ease-in-out infinite;
+}
+.phoneTop strong {
+  color: #07111f !important;
+}
+.phoneTop span {
+  color: #5b6472 !important;
+}
+.phoneStats {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.phoneStat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+}
+.phoneStat em {
+  color: #5b6472;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.phoneStat b {
+  color: #07111f;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+.phoneStat:nth-child(1) b {
+  color: #d99a16;
+}
+.phoneStat:nth-child(3) b {
+  color: #2f7d59;
+}
+.phonePreview > a {
+  background: #07111f;
+}
+
+/* --- Benefit badges (hero benefit strip → separate hover-lift cards) --- */
+.benefitStrip {
+  padding: 0.4rem 0 1.7rem;
+}
+.stripShell {
+  overflow: visible;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  gap: 0.9rem;
+}
+.benefitCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px -28px rgba(7, 17, 31, 0.5);
+  padding: 1.05rem;
+  gap: 0.85rem;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+.benefitCard:hover {
+  transform: translateY(-4px);
+  border-color: #f5a400;
+  box-shadow: 0 24px 48px -26px rgba(7, 17, 31, 0.45);
+}
+.benefitCard h2 {
+  color: #07111f;
+}
+.benefitCard p {
+  color: #5b6472;
+}
+/* Override legacy divider rules so each badge keeps a full border at
+   every breakpoint (matches the new separate-card look). */
+.benefitCard + .benefitCard,
+.benefitCard:first-child,
+.benefitCard:nth-child(odd),
+.benefitCard:nth-child(n + 3) {
+  border: 1px solid #e5e7eb;
+}
+
+@keyframes vhSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes vhFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Hero responsive: keep headline compact and stacking clean.
+   Declared after the legacy media queries so it lands last. */
+@media (max-width: 860px) {
+  .heroCopy h1 {
+    font-size: clamp(2rem, 7vw, 2.6rem);
+  }
+  .phonePreview {
+    margin-top: -0.6rem;
+  }
+}
+@media (max-width: 414px) {
+  .heroCopy h1 {
+    font-size: clamp(1.85rem, 9vw, 2.15rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboardLaptop,
+  .phonePreview {
+    animation: none !important;
+  }
+  .benefitCard {
+    transition: none !important;
+  }
+  .benefitCard:hover {
+    transform: none !important;
+  }
+}

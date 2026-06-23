@@ -22,9 +22,4 @@
     <path d="M185 460c28-62 82-62 122 0" fill="#2B211B"/>
     <rect x="140" y="475" width="220" height="28" rx="14" fill="#6F4A2C"/>
   </g>
-  <g font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">
-    <rect x="70" y="90" width="250" height="70" rx="18" fill="white" stroke="#E8D7C4"/><text x="130" y="120" fill="#111">Verified Experts</text><text x="130" y="145" fill="#7A6B5C" font-size="15">Background checked</text>
-    <rect x="600" y="90" width="245" height="70" rx="18" fill="white" stroke="#E8D7C4"/><text x="660" y="120" fill="#111">Premium Interiors</text><text x="660" y="145" fill="#7A6B5C" font-size="15">Machine-finish quality</text>
-    <rect x="585" y="450" width="245" height="70" rx="18" fill="white" stroke="#E8D7C4"/><text x="645" y="480" fill="#111">Best Price Match</text><text x="645" y="505" fill="#7A6B5C" font-size="15">Direct-from-factory</text>
-  </g>
 </svg>

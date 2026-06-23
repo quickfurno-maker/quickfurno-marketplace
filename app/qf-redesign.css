@@ -2259,3 +2259,1330 @@ h3 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ============================================================
+   Phase 1A — Header + Hero + Search makeover.
+   Clean white base, deep navy ink, golden-orange accent.
+   Scoped to the header and the homepage hero only; loads last
+   so it overrides the legacy copper/charcoal styling above.
+   ============================================================ */
+:root {
+  --qf-navy: #07111f;
+  --qf-navy-hover: #0b1f3a;
+  --qf-gold: #f5a400;
+  --qf-gold-deep: #d99a16;
+  --qf-ink-2: #5b6472;
+  --qf-line-2: #e5e7eb;
+  --qf-soft-bg: #f8fafc;
+  --qf-soft-line: rgba(7, 17, 31, 0.1);
+}
+
+/* --- White clean header --------------------------------------- */
+.qf-site-header {
+  border-bottom: 1px solid var(--qf-line-2);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 18px rgba(7, 17, 31, 0.05);
+  backdrop-filter: blur(12px);
+}
+.qf-site-header--scrolled {
+  border-bottom-color: var(--qf-line-2);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 26px rgba(7, 17, 31, 0.1);
+}
+
+.qf-header-shell {
+  width: min(1240px, calc(100% - 32px));
+  min-height: 72px;
+  gap: 1rem;
+}
+
+.qf-brand {
+  color: var(--qf-navy);
+  gap: 0.55rem;
+}
+.qf-brand-mark {
+  filter: drop-shadow(0 6px 14px rgba(7, 17, 31, 0.18));
+}
+.qf-brand-lockup {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+}
+.qf-brand-text {
+  color: var(--qf-navy);
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  line-height: 1.05;
+}
+.qf-brand-tagline {
+  color: var(--qf-gold-deep);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* --- Desktop nav --- */
+.qf-nav {
+  gap: 1.6rem;
+}
+.qf-nav-link {
+  color: var(--qf-ink-2);
+  font-weight: 700;
+}
+.qf-nav-link:hover {
+  color: var(--qf-navy);
+}
+
+/* --- Location pill --- */
+.qf-header-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--qf-line-2);
+  border-radius: 999px;
+  color: var(--qf-navy);
+  background: #fff;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.qf-header-loc svg {
+  width: 16px;
+  height: 16px;
+  color: var(--qf-gold-deep);
+}
+.qf-header-loc b {
+  font-weight: 700;
+}
+
+/* --- "Book a Service" CTA → solid navy --- */
+.qf-header-cta {
+  border-radius: 12px;
+  color: #fff;
+  background: var(--qf-navy);
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.18);
+}
+.qf-header-cta:hover {
+  background: var(--qf-navy-hover);
+  box-shadow: 0 14px 28px rgba(7, 17, 31, 0.26);
+}
+
+/* --- Hamburger toggle on white --- */
+.qf-nav-toggle {
+  border: 1px solid var(--qf-line-2);
+  background: #fff;
+}
+.qf-nav-toggle span {
+  background: var(--qf-navy);
+}
+
+/* --- Mobile dropdown panel on white --- */
+.qf-mobile-nav {
+  width: min(1240px, calc(100% - 32px));
+  background: #fff;
+  border: 1px solid var(--qf-line-2);
+  box-shadow: 0 18px 40px rgba(7, 17, 31, 0.12);
+}
+.qf-mobile-nav-link {
+  color: var(--qf-navy);
+}
+.qf-mobile-nav-link:hover {
+  background: var(--qf-soft-bg);
+  color: var(--qf-gold-deep);
+}
+
+/* Show the location pill from tablet up; hide on small mobile. */
+@media (max-width: 640px) {
+  .qf-header-loc {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Phase 1A — Clean hero
+   ============================================================ */
+.qf-hero-clean {
+  border: 1px solid var(--qf-line-2);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(245, 164, 0, 0.08), transparent 24rem),
+    linear-gradient(180deg, #ffffff 0%, var(--qf-soft-bg) 100%);
+  box-shadow: 0 24px 60px rgba(7, 17, 31, 0.07);
+}
+.qf-hero-clean::before,
+.qf-hero-clean::after {
+  display: none;
+}
+
+.qf-hero-clean .qf-hero-eyebrow {
+  border: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--qf-ink-2);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.qf-hero-clean h1 {
+  color: var(--qf-navy);
+  font-weight: 800;
+  line-height: 1.02;
+}
+.qf-hero-clean h1 em {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--qf-gold);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.qf-hero-clean .qf-hero-copy p {
+  color: var(--qf-ink-2);
+}
+
+/* --- Hero search bar --- */
+.qf-hero-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 580px;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.5rem;
+  border: 1px solid var(--qf-line-2);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(7, 17, 31, 0.08);
+  animation: qfFadeUp 820ms ease both;
+  animation-delay: 200ms;
+}
+.qf-hero-search-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+  padding: 0 0.55rem 0 0.35rem;
+  color: var(--qf-navy);
+  font-size: 0.86rem;
+  white-space: nowrap;
+  border-right: 1px solid var(--qf-line-2);
+}
+.qf-hero-search-loc svg {
+  width: 17px;
+  height: 17px;
+  color: var(--qf-gold-deep);
+}
+.qf-hero-search-loc b {
+  font-weight: 800;
+}
+.qf-hero-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--qf-navy);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.qf-hero-search-input::placeholder {
+  color: #9aa2af;
+  font-weight: 500;
+}
+.qf-hero-search-btn {
+  flex: 0 0 auto;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  background: var(--qf-navy);
+  font-size: 0.86rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.2);
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.qf-hero-search-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.qf-hero-search-btn:hover {
+  transform: translateY(-1px);
+  background: var(--qf-navy-hover);
+  box-shadow: 0 14px 28px rgba(7, 17, 31, 0.28);
+}
+
+/* --- Hero trust badges (single inline row, wraps cleanly) --- */
+.qf-hero-clean .qf-hero-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  margin-top: 0.7rem;
+}
+.qf-hero-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: var(--qf-navy);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.qf-hero-trust-item svg {
+  width: 17px;
+  height: 17px;
+  color: var(--qf-navy);
+}
+
+/* --- Hero visual + overlapping mini service cards --- */
+.qf-hero-clean .qf-hero-visual {
+  border: 1px solid var(--qf-line-2);
+  background: #fff;
+  box-shadow: 0 26px 64px rgba(7, 17, 31, 0.12);
+}
+.qf-hero-mini-cards {
+  position: absolute;
+  top: 50%;
+  right: 0.7rem;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 0.5rem;
+  z-index: 3;
+}
+.qf-hero-mini-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem 0.5rem 0.5rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--qf-navy);
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: 0 12px 28px rgba(7, 17, 31, 0.16);
+  backdrop-filter: blur(6px);
+  animation: qfFloatY 6s ease-in-out infinite;
+}
+.qf-hero-mini-card:nth-child(2) {
+  animation-delay: 0.6s;
+}
+.qf-hero-mini-card:nth-child(3) {
+  animation-delay: 1.2s;
+}
+.qf-hero-mini-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 8px 16px rgba(245, 164, 0, 0.32);
+}
+.qf-hero-mini-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Hide the floating mini cards on small screens (keeps mobile clean). */
+@media (max-width: 720px) {
+  .qf-hero-mini-cards {
+    display: none;
+  }
+}
+
+/* --- Hero search responsive: stack cleanly on mobile --- */
+@media (max-width: 560px) {
+  .qf-hero-search {
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    padding: 0.6rem;
+  }
+  .qf-hero-search-loc {
+    border-right: 0;
+    padding-left: 0.25rem;
+  }
+  .qf-hero-search-input {
+    flex: 1 1 100%;
+    order: 3;
+    min-height: 40px;
+    padding: 0 0.25rem;
+    border-top: 1px solid var(--qf-line-2);
+    padding-top: 0.5rem;
+  }
+  .qf-hero-search-btn {
+    flex: 1 1 auto;
+    order: 2;
+  }
+}
+
+/* --- Mobile compactness for the new white header (re-applied after
+   the desktop overrides above so the cascade lands correctly). --- */
+@media (max-width: 620px) {
+  .qf-header-shell {
+    min-height: 60px;
+    gap: 0.5rem;
+  }
+  .qf-brand-text {
+    font-size: 1.04rem;
+  }
+  .qf-brand-tagline {
+    font-size: 0.58rem;
+  }
+}
+@media (max-width: 380px) {
+  .qf-brand-text {
+    font-size: 0.94rem;
+  }
+  .qf-brand-tagline {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-hero-search,
+  .qf-hero-mini-card {
+    animation: none !important;
+  }
+  .qf-hero-search-btn,
+  .qf-header-cta {
+    transition: none !important;
+  }
+}
+
+/* ============================================================
+   Page 1 — Homepage redesign (white / navy / gold theme).
+   Scoped under .qf-home-page (+ .site-footer) so it overrides
+   the legacy copper/cream homepage styling without touching
+   vendor / category / admin pages. Loads last → wins cascade.
+   ============================================================ */
+
+/* Page canvas → clean natural white */
+.qf-home-page {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfaf7 42%, #f8fafc 100%);
+  padding-bottom: 6.2rem;
+}
+
+/* Sections sit directly on the white canvas (drop the cream panel) */
+.qf-home-app-shell {
+  gap: 1.45rem;
+}
+@media (min-width: 760px) {
+  .qf-home-app-shell {
+    width: min(1180px, calc(100% - 32px));
+    border: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Section shells → white cards, light border */
+.qf-home-page .qf-home-section {
+  border: 1px solid var(--qf-line-2);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px -32px rgba(7, 17, 31, 0.28);
+}
+.qf-home-page .qf-section-head h2 {
+  color: var(--qf-navy);
+  font-weight: 850;
+}
+.qf-home-page .qf-section-head p {
+  color: var(--qf-ink-2);
+}
+
+/* Section head with trailing "view all" link */
+.qf-section-head--row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.qf-section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+  color: var(--qf-gold-deep);
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+.qf-section-link svg {
+  width: 15px;
+  height: 15px;
+}
+.qf-section-link:hover {
+  color: var(--qf-navy);
+}
+
+/* --- Popular Home Services (category cards) --- */
+.qf-home-page .qf-home-category-card {
+  border: 1px solid var(--qf-line-2);
+  color: var(--qf-navy);
+  background: #ffffff;
+  box-shadow: 0 14px 34px -26px rgba(7, 17, 31, 0.32);
+}
+.qf-home-page .qf-home-category-card:hover {
+  border-color: rgba(245, 164, 0, 0.5);
+  box-shadow: 0 22px 46px -26px rgba(7, 17, 31, 0.4);
+}
+.qf-home-page .qf-home-category-card::before {
+  background: linear-gradient(180deg, var(--qf-gold), var(--qf-gold-deep));
+}
+.qf-home-page .qf-home-category-icon {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 10px 22px rgba(245, 164, 0, 0.3);
+}
+.qf-home-page .qf-home-category-label {
+  color: var(--qf-navy);
+}
+.qf-home-page .qf-home-category-tag {
+  color: var(--qf-ink-2);
+}
+.qf-home-page .qf-home-category-arrow {
+  color: var(--qf-gold-deep);
+  background: rgba(245, 164, 0, 0.12);
+}
+.qf-home-page .qf-home-category-card:hover .qf-home-category-arrow {
+  color: #ffffff;
+  background: var(--qf-gold);
+}
+
+/* --- Featured Service Flows --- */
+.qf-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+.qf-featured-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  min-width: 0;
+  border: 1px solid var(--qf-line-2);
+  border-radius: 16px;
+  padding: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 14px 32px -26px rgba(7, 17, 31, 0.3);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+.qf-featured-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(245, 164, 0, 0.5);
+  box-shadow: 0 22px 44px -24px rgba(7, 17, 31, 0.38);
+}
+.qf-featured-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--qf-navy);
+  background: rgba(245, 164, 0, 0.14);
+}
+.qf-featured-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.qf-featured-meta {
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+}
+.qf-featured-meta strong {
+  color: var(--qf-navy);
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.qf-featured-meta small {
+  color: var(--qf-ink-2);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+.qf-featured-price {
+  margin-top: 0.12rem;
+  color: var(--qf-gold-deep);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+@media (min-width: 760px) {
+  .qf-featured-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* --- Stats strip (navy) --- */
+.qf-stats-section {
+  min-width: 0;
+  max-width: 100%;
+}
+.qf-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.3rem;
+  border-radius: 22px;
+  padding: 1.25rem 0.8rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245, 164, 0, 0.16), transparent 16rem),
+    linear-gradient(135deg, #07111f, #0b1f3a);
+  box-shadow: 0 24px 54px -30px rgba(7, 17, 31, 0.6);
+}
+.qf-stat-item {
+  display: grid;
+  justify-items: center;
+  gap: 0.16rem;
+  padding: 0.3rem 0.45rem;
+  text-align: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+.qf-stat-item:last-child {
+  border-right: 0;
+}
+.qf-stat-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  margin-bottom: 0.18rem;
+  color: var(--qf-gold);
+  background: rgba(245, 164, 0, 0.16);
+}
+.qf-stat-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.qf-stat-item strong {
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+.qf-stat-item small {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.67rem;
+  font-weight: 700;
+  line-height: 1.22;
+}
+@media (max-width: 640px) {
+  .qf-stats-strip {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .qf-stats-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .qf-stat-item {
+    flex: 0 0 33.33%;
+    scroll-snap-align: start;
+  }
+}
+
+/* --- How QuickFurno Works --- */
+.qf-home-page .qf-steps-flow::before {
+  background: linear-gradient(90deg, var(--qf-navy), var(--qf-gold));
+}
+.qf-home-page .qf-step-node span {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 0 0 5px #ffffff, 0 8px 18px rgba(245, 164, 0, 0.3);
+}
+.qf-home-page .qf-step-node h3 {
+  color: var(--qf-navy);
+}
+.qf-home-page .qf-step-node p {
+  color: var(--qf-ink-2);
+}
+
+/* --- Why Homeowners Choose QuickFurno --- */
+.qf-home-page .qf-usp-card {
+  border: 1px solid var(--qf-line-2);
+  background: #ffffff;
+  box-shadow: 0 14px 32px -26px rgba(7, 17, 31, 0.3);
+}
+.qf-home-page .qf-usp-card:hover {
+  border-color: rgba(245, 164, 0, 0.5);
+  box-shadow: 0 22px 44px -24px rgba(7, 17, 31, 0.38);
+}
+.qf-home-page .qf-usp-card > span {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 8px 18px rgba(245, 164, 0, 0.26);
+}
+.qf-home-page .qf-usp-card h3 {
+  color: var(--qf-navy);
+}
+.qf-home-page .qf-usp-card p {
+  color: var(--qf-ink-2);
+}
+
+/* --- Testimonials --- */
+.qf-home-page .qf-home-testimonial-card {
+  border: 1px solid var(--qf-line-2);
+  background: #ffffff;
+  box-shadow: 0 14px 32px -26px rgba(7, 17, 31, 0.3);
+}
+.qf-home-page .qf-home-testimonial-card .qf-stars {
+  color: var(--qf-gold);
+}
+.qf-home-page .qf-home-testimonial-card p {
+  color: var(--qf-navy);
+}
+.qf-home-page .qf-home-testimonial-author span {
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+}
+.qf-home-page .qf-home-testimonial-author strong {
+  color: var(--qf-navy);
+}
+.qf-home-page .qf-home-testimonial-author small {
+  color: var(--qf-ink-2);
+}
+
+/* --- Cities served (coverage) --- */
+.qf-home-page .qf-coverage {
+  border: 1px solid var(--qf-line-2);
+  background: linear-gradient(135deg, #ffffff, var(--qf-soft-bg));
+  box-shadow: 0 18px 44px -32px rgba(7, 17, 31, 0.28);
+}
+.qf-home-page .qf-coverage h2 {
+  color: var(--qf-navy);
+}
+.qf-home-page .qf-coverage p {
+  color: var(--qf-ink-2);
+}
+.qf-home-page .qf-u-eyebrow {
+  color: var(--qf-gold-deep);
+}
+.qf-home-page .qf-coverage-cities span {
+  border: 1px solid var(--qf-line-2);
+  color: var(--qf-navy);
+  background: #ffffff;
+}
+
+/* --- Final CTA banner (navy) --- */
+.qf-client-cta--banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.2rem;
+  border: 0;
+  border-radius: 24px;
+  padding: clamp(1.5rem, 4vw, 2.3rem);
+  text-align: left;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245, 164, 0, 0.22), transparent 18rem),
+    linear-gradient(135deg, #07111f, #0b1f3a);
+  box-shadow: 0 26px 60px -34px rgba(7, 17, 31, 0.7);
+}
+.qf-client-cta--banner h2 {
+  color: #ffffff;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+}
+.qf-client-cta--banner p {
+  margin-inline: 0;
+  max-width: 46ch;
+  color: rgba(255, 255, 255, 0.78);
+}
+.qf-cta-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.qf-cta-points li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.qf-cta-points li::before {
+  content: "✓";
+  color: var(--qf-gold);
+  font-weight: 900;
+}
+.qf-client-cta--banner .qf-gold-btn {
+  margin-inline: 0;
+  white-space: nowrap;
+}
+
+/* Homepage primary (gold) button → new gold */
+.qf-home-page .qf-gold-btn {
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 16px 30px rgba(245, 164, 0, 0.34);
+}
+.qf-home-page .qf-gold-btn:hover {
+  box-shadow: 0 20px 40px rgba(245, 164, 0, 0.44);
+}
+
+/* --- Footer → deep navy --- */
+.site-footer {
+  background: #07111f;
+}
+.site-footer .bw-furno {
+  color: var(--qf-gold);
+}
+
+/* --- Homepage responsive polish --- */
+@media (max-width: 620px) {
+  .qf-client-cta--banner {
+    grid-template-columns: 1fr;
+  }
+  .qf-client-cta--banner .qf-gold-btn {
+    width: 100%;
+  }
+  .qf-section-head--row {
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-featured-card,
+  .qf-section-link {
+    transition: none !important;
+  }
+  .qf-featured-card:hover {
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   Phase 1A Fix — homepage hero layout (mobile + desktop).
+   Rebuilds the hero on a grid so children order correctly:
+   mobile  → copy, image, search, trust
+   desktop → copy/search/trust (left) + image (right)
+   Loads last → overrides the earlier hero rules above.
+   ============================================================ */
+.qf-hero-clean {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "visual"
+    "copy"
+    "cta"
+    "trust";
+  gap: 1rem;
+  align-items: start;
+}
+.qf-hero-clean > .qf-hero-copy {
+  grid-area: copy;
+}
+.qf-hero-clean > .qf-hero-visual {
+  grid-area: visual;
+}
+.qf-hero-clean > .qf-hero-actions {
+  grid-area: cta;
+  margin-top: 0.1rem;
+}
+.qf-hero-clean > .qf-hero-trust {
+  grid-area: trust;
+}
+
+/* Hero CTA buttons (replaces the old search card) */
+.qf-hero-clean > .qf-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.qf-hero-cta-primary,
+.qf-hero-cta-secondary {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 1.4rem;
+  border-radius: 13px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease,
+    border-color 160ms ease;
+}
+.qf-hero-cta-primary {
+  color: #ffffff;
+  background: var(--qf-navy);
+  border: 1px solid var(--qf-navy);
+  box-shadow: 0 14px 30px rgba(7, 17, 31, 0.2);
+}
+.qf-hero-cta-primary svg {
+  width: 16px;
+  height: 16px;
+  color: var(--qf-gold);
+}
+.qf-hero-cta-primary:hover {
+  transform: translateY(-2px);
+  background: var(--qf-navy-hover);
+  box-shadow: 0 18px 38px rgba(7, 17, 31, 0.28);
+}
+.qf-hero-cta-secondary {
+  color: var(--qf-navy);
+  background: #ffffff;
+  border: 1px solid var(--qf-line-2);
+}
+.qf-hero-cta-secondary:hover {
+  transform: translateY(-2px);
+  border-color: var(--qf-gold);
+  box-shadow: 0 12px 26px rgba(7, 17, 31, 0.1);
+}
+
+/* Hero image card → always visible, rounded, soft shadow, gentle float */
+.qf-hero-clean > .qf-hero-visual {
+  display: block;
+  animation: qfFadeUp 760ms ease both, qfHeroFloat 6s ease-in-out 1.1s infinite;
+}
+.qf-hero-clean > .qf-hero-visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@keyframes qfHeroFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Search button: deep navy with an orange arrow */
+.qf-hero-search-btn svg {
+  color: var(--qf-gold);
+}
+
+/* Trust badges → tidy 2×2 grid with aligned icon + text */
+.qf-hero-clean > .qf-hero-trust {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.9rem;
+  margin-top: 0.1rem;
+}
+.qf-hero-clean .qf-hero-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: normal;
+  color: var(--qf-navy);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.qf-hero-clean .qf-hero-trust-item svg {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  color: var(--qf-navy);
+}
+
+/* Desktop: copy + search + trust stacked left, image spanning right */
+@media (min-width: 860px) {
+  .qf-hero-clean {
+    grid-template-columns: 1.05fr 0.95fr;
+    grid-template-areas:
+      "copy   visual"
+      "cta    visual"
+      "trust  visual";
+    column-gap: 2.4rem;
+    row-gap: 1rem;
+    align-content: center;
+  }
+  .qf-hero-clean > .qf-hero-visual {
+    align-self: center;
+  }
+}
+
+/* Mobile: CTA buttons stack full width */
+@media (max-width: 600px) {
+  .qf-hero-clean > .qf-hero-actions {
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .qf-hero-cta-primary,
+  .qf-hero-cta-secondary {
+    width: 100%;
+  }
+}
+
+/* Mobile: image card sizing + clearance for the fixed bottom nav */
+@media (max-width: 620px) {
+  .qf-hero-clean > .qf-hero-visual img {
+    aspect-ratio: 16 / 10;
+  }
+  .qf-home-page {
+    padding-bottom: 7.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-hero-clean > .qf-hero-visual {
+    animation: none !important;
+  }
+  .qf-hero-cta-primary,
+  .qf-hero-cta-secondary {
+    transition: none !important;
+  }
+  .qf-hero-cta-primary:hover,
+  .qf-hero-cta-secondary:hover {
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   Hero motion polish — premium CSS-only animation.
+   Transform / opacity only (GPU-friendly). No JS, no video.
+   Everything below is disabled under prefers-reduced-motion.
+   ============================================================ */
+
+/* Trust badges join the staggered fade-up entrance */
+.qf-hero-clean > .qf-hero-trust {
+  animation: qfFadeUp 820ms ease both;
+  animation-delay: 320ms;
+}
+
+/* Hero image → slow continuous zoom (Ken-Burns) inside the
+   rounded card; the card itself keeps its soft float. */
+.qf-hero-clean > .qf-hero-visual img {
+  transform-origin: 60% 40%;
+  animation: qfHeroZoom 18s ease-in-out 0.8s infinite alternate;
+  will-change: transform;
+}
+@keyframes qfHeroZoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+/* Floating badges drift on a gentle, staggered loop */
+.qf-hero-mini-card {
+  will-change: transform;
+}
+
+/* CTA hover → lift + arrow slide + soft gold glow */
+.qf-hero-cta-primary .qf-icon,
+.qf-hero-cta-primary svg {
+  transition: transform 200ms ease;
+}
+.qf-hero-cta-primary:hover svg {
+  transform: translateX(4px);
+}
+.qf-hero-cta-primary:hover {
+  box-shadow: 0 18px 38px rgba(7, 17, 31, 0.28),
+    0 0 24px rgba(245, 164, 0, 0.28);
+}
+.qf-hero-cta-secondary:hover {
+  box-shadow: 0 14px 28px rgba(7, 17, 31, 0.12),
+    0 0 0 3px rgba(245, 164, 0, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-hero-clean > .qf-hero-trust,
+  .qf-hero-clean > .qf-hero-visual img,
+  .qf-hero-mini-card {
+    animation: none !important;
+  }
+  .qf-hero-cta-primary svg {
+    transition: none !important;
+  }
+  .qf-hero-cta-primary:hover svg {
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   Hero final fix — compact premium mobile image, bottom-nav
+   clearance, neat 2×2 trust badges, balanced 45 / 55 desktop.
+   Loads last → overrides earlier hero rules.
+   ============================================================ */
+
+/* Desktop: clean 45 / 55 two-column — left text never cut,
+   right visual never overflows the screen. */
+@media (min-width: 860px) {
+  .qf-hero-clean {
+    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+    column-gap: 2.6rem;
+  }
+  .qf-hero-clean > .qf-hero-visual img {
+    aspect-ratio: 4 / 3;
+    max-height: 460px;
+  }
+}
+
+/* Mobile: compact, premium hero image card (220–260px tall) */
+@media (max-width: 620px) {
+  .qf-hero-clean > .qf-hero-visual {
+    border-radius: 26px;
+  }
+  .qf-hero-clean > .qf-hero-visual img {
+    aspect-ratio: auto;
+    height: clamp(220px, 60vw, 260px);
+    object-fit: cover;
+  }
+
+  /* Trust badges: tidy 2×2, text stays clean */
+  .qf-hero-clean .qf-hero-trust-item {
+    font-size: 0.78rem;
+    line-height: 1.18;
+    align-items: center;
+  }
+
+  /* Fixed bottom nav must never cover hero CTA or next section */
+  .qf-home-page {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Smallest phones (360–414px): keep badge labels on tidy lines */
+@media (max-width: 414px) {
+  .qf-hero-clean .qf-hero-trust-item {
+    font-size: 0.74rem;
+  }
+}
+
+/* ============================================================
+   Header navy polish — premium deep-navy navbar, text-only
+   brand (logo icon removed). Loads last → overrides the white
+   header from earlier phases. Mobile + desktop share one style.
+   ============================================================ */
+.qf-site-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 27, 58, 0.92);
+  box-shadow: 0 8px 24px rgba(3, 12, 28, 0.28);
+}
+.qf-site-header--scrolled {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  background: rgba(7, 27, 58, 0.97);
+  box-shadow: 0 12px 30px rgba(3, 12, 28, 0.4);
+}
+
+/* Remove the small square logo icon — text-only brand, no leftover gap */
+.qf-brand-mark {
+  display: none;
+}
+.qf-brand {
+  gap: 0;
+  color: #ffffff;
+}
+
+/* QuickFurno wordmark: white "Quick" + golden "Furno" */
+.qf-brand-text {
+  color: #ffffff;
+}
+.qf-bw-quick {
+  color: #ffffff;
+}
+.qf-bw-furno {
+  color: var(--qf-gold);
+}
+.qf-brand-tagline {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Desktop nav links → near-white, gold on hover */
+.qf-nav-link {
+  color: rgba(255, 255, 255, 0.82);
+}
+.qf-nav-link:hover {
+  color: var(--qf-gold);
+}
+
+/* Location pill → readable on navy */
+.qf-header-loc {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.qf-header-loc svg {
+  color: var(--qf-gold);
+}
+.qf-header-loc b {
+  color: #ffffff;
+}
+
+/* "Book a Service" CTA → golden, high-contrast on navy */
+.qf-header-cta {
+  color: #07111f;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 10px 22px rgba(245, 164, 0, 0.3);
+}
+.qf-header-cta:hover {
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  filter: brightness(1.05);
+  box-shadow: 0 14px 28px rgba(245, 164, 0, 0.4);
+}
+
+/* Hamburger → white bars on a subtle outline */
+.qf-nav-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+.qf-nav-toggle span {
+  background: #ffffff;
+}
+
+/* Mobile dropdown panel → navy */
+.qf-mobile-nav {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 27, 58, 0.98);
+  box-shadow: 0 18px 40px rgba(3, 12, 28, 0.5);
+}
+.qf-mobile-nav-link {
+  color: rgba(255, 255, 255, 0.85);
+}
+.qf-mobile-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--qf-gold);
+}
+
+/* ============================================================
+   Header brand consistency — match the premium desktop wordmark
+   on mobile (larger text, visible tagline). Overrides the earlier
+   mobile-compactness shrink rules. Loads last → wins cascade.
+   ============================================================ */
+@media (max-width: 620px) {
+  .qf-brand-text {
+    font-size: 1.45rem; /* ~23px — balanced, premium, not oversized */
+    line-height: 1.06;
+    letter-spacing: -0.01em;
+  }
+  .qf-brand-tagline {
+    display: block;
+    font-size: 0.78rem; /* ~12.5px */
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .qf-brand-lockup {
+    gap: 0.08rem;
+  }
+  .qf-header-shell {
+    min-height: 62px;
+  }
+}
+
+@media (max-width: 380px) {
+  .qf-brand-text {
+    font-size: 1.38rem; /* ~22px on the smallest phones */
+  }
+  .qf-brand-tagline {
+    display: block;
+    font-size: 0.75rem; /* ~12px */
+  }
+}
+
+/* ============================================================
+   Homepage section background fix — pure bright white canvas.
+   Removes the warm off-white page gradient and any cream/peach
+   card tints; white cards keep separation via border + shadow.
+   Scoped to .qf-home-page (header/footer/other pages untouched).
+   ============================================================ */
+.qf-home-page {
+  background: #ffffff;
+}
+
+/* Section shells + key cards → pure white (drop warm/cream tints) */
+.qf-home-page .qf-home-section,
+.qf-home-page .qf-coverage,
+.qf-home-page .qf-usp-card,
+.qf-home-page .qf-home-category-card,
+.qf-home-page .qf-featured-card,
+.qf-home-page .qf-home-testimonial-card {
+  background: #ffffff;
+  border: 1px solid var(--qf-line-2);
+}
+
+/* ============================================================
+   Mobile hero floating badges restore — compact animated pills
+   over the hero image. Desktop keeps its single clean group
+   (no duplicates). Badges are clipped by the card's overflow,
+   so they can never cause horizontal overflow.
+   ============================================================ */
+
+/* Staggered fade-up entrance + gentle float (all breakpoints) */
+.qf-hero-mini-card {
+  animation: qfFadeUp 560ms ease both, qfFloatY 6s ease-in-out infinite;
+}
+.qf-hero-mini-card:nth-child(1) {
+  animation-delay: 0.15s, 0.5s;
+}
+.qf-hero-mini-card:nth-child(2) {
+  animation-delay: 0.3s, 1s;
+}
+.qf-hero-mini-card:nth-child(3) {
+  animation-delay: 0.45s, 1.5s;
+}
+
+/* Show compact badges on mobile (previously hidden) */
+@media (max-width: 720px) {
+  .qf-hero-mini-cards {
+    display: grid;
+    top: 50%;
+    right: 0.5rem;
+    gap: 0.38rem;
+  }
+  .qf-hero-mini-card {
+    gap: 0.38rem;
+    padding: 0.32rem 0.55rem 0.32rem 0.32rem;
+    border-radius: 11px;
+    font-size: 0.72rem; /* ~11.5px */
+    white-space: nowrap;
+    box-shadow: 0 8px 18px rgba(7, 17, 31, 0.18);
+  }
+  .qf-hero-mini-icon {
+    width: 23px;
+    height: 23px;
+    border-radius: 8px;
+  }
+  .qf-hero-mini-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Very small phones (≤400px incl. 379/375/360): keep them tucked in */
+@media (max-width: 400px) {
+  .qf-hero-mini-cards {
+    right: 0.4rem;
+    gap: 0.34rem;
+  }
+  .qf-hero-mini-card {
+    font-size: 0.68rem; /* ~11px */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-hero-mini-card {
+    animation: none !important;
+  }
+}

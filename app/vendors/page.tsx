@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 const benefits = [
   {
     title: "Verified Leads",
-    body: "Get high-intent enquiries from real homeowners.",
+    body: "High-intent enquiries from real homeowners.",
     icon: "/assets/quickfurno/icons/trust/verified-vendors.svg",
   },
   {
@@ -34,12 +34,12 @@ const benefits = [
   },
   {
     title: "Transparent Lead Allocation",
-    body: "Fair distribution with no hidden preferences.",
+    body: "Fair distribution with no hidden preference.",
     icon: "/assets/quickfurno/icons/process/matched-vendors.svg",
   },
   {
     title: "Dedicated Support",
-    body: "We are here to help you succeed at every step.",
+    body: "We help you succeed at every step.",
     icon: "/assets/quickfurno/icons/trust/fast-response.svg",
   },
 ];
@@ -152,9 +152,9 @@ const testimonials = [
 ];
 
 const recentDashboardLeads = [
-  ["Premium Interior Design", "Baner, Pune", "Budget: Rs 8-12 Lakh", "New"],
-  ["Modular Kitchen", "Wakad, Pune", "Budget: Rs 3-5 Lakh", "New"],
-  ["Custom Wardrobe", "Andheri, Mumbai", "Budget: Rs 2-3 Lakh", "Contacted"],
+  ["Premium Interior Design", "Baner, Pune", "₹8-12 Lakh", "New"],
+  ["Modular Kitchen", "Wakad, Pune", "₹3-5 Lakh", "New"],
+  ["Civil Work", "Kothrud, Pune", "₹5-8 Lakh", "Contacted"],
 ];
 
 function VendorDashboardMockup() {
@@ -247,15 +247,22 @@ function VendorDashboardMockup() {
       <div className={styles.phonePreview}>
         <div className={styles.phoneTop}>
           <strong>Leads</strong>
-          <span>Search</span>
+          <span>Today</span>
         </div>
-        {sampleLeads.map((lead) => (
-          <div className={styles.phoneLead} key={lead.title}>
-            <strong>{lead.title}</strong>
-            <span>{lead.location}</span>
-            <small>{lead.budget}</small>
-          </div>
-        ))}
+        <div className={styles.phoneStats}>
+          <span className={styles.phoneStat}>
+            <em>New</em>
+            <b>5</b>
+          </span>
+          <span className={styles.phoneStat}>
+            <em>Contacted</em>
+            <b>3</b>
+          </span>
+          <span className={styles.phoneStat}>
+            <em>Won</em>
+            <b>8</b>
+          </span>
+        </div>
         <Link href={registerHref}>View All Leads</Link>
       </div>
     </div>
@@ -270,10 +277,14 @@ export default function VendorsPage() {
         <section className={styles.hero}>
           <div className={styles.shell}>
             <div className={styles.heroCopy} data-reveal>
-              <h1>Grow your business with verified client leads from QuickFurno.</h1>
+              <span className={styles.eyebrow}>For Service Professionals</span>
+              <h1>
+                Grow your business with verified client leads.
+                <span className={styles.heroHighlight}>From QuickFurno.</span>
+              </h1>
               <p>
-                Vendors can receive genuine home-service leads, manage enquiries, build trust,
-                and grow faster across Pune &amp; Mumbai.
+                Receive genuine home-service enquiries, manage leads with ease, and grow
+                faster across Pune &amp; Mumbai.
               </p>
               <div className={styles.heroActions}>
                 <Link className={styles.primaryCta} href={registerHref}>

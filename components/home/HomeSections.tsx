@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { clientTestimonials } from "@/lib/quickfurno-data";
@@ -90,19 +91,19 @@ export const trustBadges = [
 ];
 
 export const whyChooseItems = [
-  ["shield", "Verified local vendors", "Every vendor is checked before they can receive your enquiry."],
-  ["request", "Direct access to professionals", "Talk to the right vendors directly — no middlemen, no runaround."],
-  ["noFee", "Best price match", "Compare transparent rates and pick the best value with confidence."],
-  ["kitchen", "Machine-finish interiors", "Factory-grade modular kitchens, wardrobes and woodwork."],
-  ["bolt", "Hassle-free experience", "One simple request, matched options and fast responses."],
+  ["shield", "Verified & Skilled", "Background-checked professionals you can trust."],
+  ["tag", "Upfront & Transparent", "Clear pricing. No hidden charges."],
+  ["clock", "On-Time Guarantee", "We value your time. On-time or on us."],
+  ["compare", "Quality Assured", "Top-quality materials and work, every time."],
+  ["bolt", "Hassle-Free Experience", "From booking to completion — we've got you covered."],
 ] as const;
 
 export function WhyChooseSection() {
   return (
     <section className="qf-home-section" id="why-quickfurno">
       <div className="qf-section-head">
-        <h2>Why homeowners love QuickFurno</h2>
-        <p>A premium, verified way to find the right home-service vendor.</p>
+        <h2>Why Homeowners Choose QuickFurno</h2>
+        <p>A premium, verified way to book the right home-service professional.</p>
       </div>
       <div className="qf-usp-grid" data-reveal-group>
         {whyChooseItems.map(([icon, title, body]) => (
@@ -121,17 +122,17 @@ export function WhyChooseSection() {
 
 export function HomeHowItWorksSection() {
   const steps = [
-    ["1", "Tell us your requirement", "Share what you need, your city and timeline."],
-    ["2", "Get matched with verified vendors", "QuickFurno shortlists suitable verified vendors for you."],
-    ["3", "Compare and choose", "Compare rates and profiles, then talk directly."],
-    ["4", "Start your project", "Pick your vendor and get started with confidence."],
+    ["1", "Tell Us What You Need", "Share your requirement in a few simple steps."],
+    ["2", "Get Matched", "We connect you with the best verified professionals."],
+    ["3", "Schedule & Confirm", "Choose a time that works for you. Easy and fast."],
+    ["4", "Sit Back & Relax", "Work gets done with quality, on time, every time."],
   ];
 
   return (
     <section className="qf-home-section" id="how-it-works">
       <div className="qf-section-head">
-        <h2>Simple steps. Perfect results.</h2>
-        <p>From requirement to project start in four easy steps.</p>
+        <h2>How QuickFurno Works</h2>
+        <p>From requirement to finished work in four easy steps.</p>
       </div>
       <div className="qf-steps-flow" data-reveal-group>
         {steps.map(([number, title, body]) => (
@@ -148,12 +149,87 @@ export function HomeHowItWorksSection() {
 
 export function ClientCTASection() {
   return (
-    <section className="qf-client-cta">
-      <h2>Ready to start your project?</h2>
-      <p>Share your requirement and QuickFurno will connect you with suitable verified vendors near you.</p>
+    <section className="qf-client-cta qf-client-cta--banner">
+      <div className="qf-client-cta-body">
+        <h2>Ready to transform your home?</h2>
+        <p>
+          Book trusted professionals and enjoy a seamless home-service
+          experience.
+        </p>
+        <ul className="qf-cta-points" aria-label="QuickFurno promises">
+          <li>Instant Booking</li>
+          <li>Best Price Guarantee</li>
+          <li>Dedicated Support</li>
+        </ul>
+      </div>
       <EnquiryModalTrigger className="qf-gold-btn" source="Homepage final CTA">
-        Get Free Vendor Matches
+        Book a Service Now
       </EnquiryModalTrigger>
+    </section>
+  );
+}
+
+// Featured ready-to-book service packages with upfront pricing.
+const featuredFlows = [
+  { icon: "kitchen", title: "Modular Kitchen", desc: "Design. Build. Installed.", price: "From ₹49,999" },
+  { icon: "paint", title: "Full Home Painting", desc: "Beautiful walls. On time.", price: "From ₹14,999" },
+  { icon: "sofa", title: "Sofa Deep Cleaning", desc: "Refresh. Remove. Revive.", price: "From ₹1,499" },
+  { icon: "wardrobe", title: "Wardrobe Setup", desc: "Custom storage solutions.", price: "From ₹9,999" },
+] as const;
+
+export function FeaturedFlows() {
+  return (
+    <section className="qf-home-section" id="featured">
+      <div className="qf-section-head qf-section-head--row">
+        <div>
+          <h2>Featured Service Flows</h2>
+          <p>Popular ready-to-book packages with upfront pricing.</p>
+        </div>
+        <Link href="#categories" className="qf-section-link">
+          View all services <QFIcon name="arrow" />
+        </Link>
+      </div>
+      <div className="qf-featured-grid" data-reveal-group>
+        {featuredFlows.map((flow) => (
+          <article className="qf-featured-card" key={flow.title}>
+            <span className="qf-featured-icon">
+              <QFIcon name={flow.icon} />
+            </span>
+            <div className="qf-featured-meta">
+              <strong>{flow.title}</strong>
+              <small>{flow.desc}</small>
+              <b className="qf-featured-price">{flow.price}</b>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Headline marketplace stats (navy strip).
+const homeStats = [
+  { icon: "user", value: "10,000+", label: "Verified Professionals" },
+  { icon: "chat", value: "1L+", label: "Happy Customers" },
+  { icon: "star", value: "4.7", label: "Average Rating" },
+  { icon: "clock", value: "98%", label: "On-Time Service" },
+  { icon: "lock", value: "Secure", label: "Payments & Data" },
+] as const;
+
+export function StatsStrip() {
+  return (
+    <section className="qf-stats-section" id="stats" aria-label="QuickFurno stats">
+      <div className="qf-stats-strip" data-reveal-group>
+        {homeStats.map((stat) => (
+          <div className="qf-stat-item" key={stat.label}>
+            <span className="qf-stat-icon">
+              <QFIcon name={stat.icon} />
+            </span>
+            <strong>{stat.value}</strong>
+            <small>{stat.label}</small>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

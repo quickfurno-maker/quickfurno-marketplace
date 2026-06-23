@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { QFIcon } from "@/components/QuickFurnoIcons";
 import styles from "./vendors.module.css";
 
 const registerHref = "/vendors/register";
@@ -151,119 +152,73 @@ const testimonials = [
   },
 ];
 
-const recentDashboardLeads = [
-  ["Premium Interior Design", "Baner, Pune", "₹8-12 Lakh", "New"],
-  ["Modular Kitchen", "Wakad, Pune", "₹3-5 Lakh", "New"],
-  ["Civil Work", "Kothrud, Pune", "₹5-8 Lakh", "Contacted"],
+const miniLeads = [
+  { title: "Premium Interior Design", place: "Baner, Pune", budget: "₹8–12L", status: "New" },
+  { title: "Modular Kitchen", place: "Wakad, Pune", budget: "₹3–5L", status: "New" },
+  { title: "Civil Work", place: "Kothrud, Pune", budget: "₹5–8L", status: "Contacted" },
 ];
 
-function VendorDashboardMockup() {
+// Floating benefit badges around the hero visual.
+const heroFloatBadges = [
+  { icon: "shield" as const, title: "Verified Leads", sub: "Pre-qualified enquiries" },
+  { icon: "bolt" as const, title: "Fast Lead Alerts", sub: "Real-time notifications" },
+  { icon: "map" as const, title: "Pune & Mumbai", sub: "High-demand leads" },
+  { icon: "compare" as const, title: "Higher Conversions", sub: "Convert more leads" },
+  { icon: "star" as const, title: "Premium Visibility", sub: "Stand out & grow" },
+];
+
+// Compact stats strip shown below the hero visual.
+const heroStats = [
+  { value: "10,000+", label: "Verified Pros" },
+  { value: "4.7", label: "Average Rating" },
+  { value: "100%", label: "Secure & Trusted" },
+];
+
+function VendorLeadCard() {
   return (
-    <div className={styles.dashboardWrap} aria-label="QuickFurno vendor dashboard preview">
-      <div className={styles.dashboardLaptop}>
-        <div className={styles.dashboardTop}>
-          <div>
-            <strong>QuickFurno Vendor</strong>
-            <span>Welcome, UrbanCraft Interiors</span>
-          </div>
-          <span className={styles.avatar}>UI</span>
+    <div className={styles.leadCardMock} aria-label="QuickFurno vendor lead dashboard preview">
+      <div className={styles.leadCardTop}>
+        <span className={styles.leadCardAvatar}>UI</span>
+        <div className={styles.leadCardWho}>
+          <strong>QuickFurno Vendor</strong>
+          <small>UrbanCraft Interiors · Premium plan</small>
         </div>
+        <span className={styles.leadCardLive}>Live</span>
+      </div>
 
-        <div className={styles.dashboardGrid}>
-          <aside className={styles.dashboardNav}>
-            {["Dashboard", "Leads", "My Projects", "Messages", "Profile", "Reviews", "Payments"].map((item) => (
-              <span className={item === "Dashboard" ? styles.navActive : ""} key={item}>
-                {item}
-              </span>
-            ))}
-          </aside>
-
-          <div className={styles.dashboardMain}>
-            <div className={styles.statGrid}>
-              <article>
-                <span>Active Leads</span>
-                <strong>12</strong>
-                <small>3 new today</small>
-              </article>
-              <article>
-                <span>New Requests Today</span>
-                <strong>5</strong>
-                <small>+20% vs yesterday</small>
-              </article>
-              <article>
-                <span>Subscription Status</span>
-                <strong>Premium Plan</strong>
-                <small>Renews on 15 Jan 2027</small>
-              </article>
-              <article>
-                <span>Response Rate</span>
-                <strong>92%</strong>
-                <small>+8% this week</small>
-              </article>
-            </div>
-
-            <div className={styles.dashboardLower}>
-              <section className={styles.recentLeads}>
-                <div className={styles.panelHeader}>
-                  <strong>Recent Leads</strong>
-                  <Link href={registerHref}>View demo</Link>
-                </div>
-                {recentDashboardLeads.map(([title, place, budget, status]) => (
-                  <div className={styles.recentLeadRow} key={title}>
-                    <span className={styles.leadAvatar}>{title.slice(0, 1)}</span>
-                    <div>
-                      <strong>{title}</strong>
-                      <small>{place}</small>
-                    </div>
-                    <span>{budget}</span>
-                    <em>{status}</em>
-                  </div>
-                ))}
-              </section>
-
-              <section className={styles.chartCard}>
-                <div className={styles.panelHeader}>
-                  <strong>Lead overview</strong>
-                  <span>This week</span>
-                </div>
-                <div className={styles.chartLine} aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <div className={styles.messageCard}>
-                  <span>Unread Messages</span>
-                  <strong>7</strong>
-                </div>
-              </section>
-            </div>
-          </div>
+      <div className={styles.leadCardKpis}>
+        <div>
+          <strong>12</strong>
+          <small>Active Leads</small>
+        </div>
+        <div>
+          <strong>5</strong>
+          <small>New Today</small>
+        </div>
+        <div>
+          <strong>92%</strong>
+          <small>Response</small>
         </div>
       </div>
 
-      <div className={styles.phonePreview}>
-        <div className={styles.phoneTop}>
-          <strong>Leads</strong>
-          <span>Today</span>
-        </div>
-        <div className={styles.phoneStats}>
-          <span className={styles.phoneStat}>
-            <em>New</em>
-            <b>5</b>
-          </span>
-          <span className={styles.phoneStat}>
-            <em>Contacted</em>
-            <b>3</b>
-          </span>
-          <span className={styles.phoneStat}>
-            <em>Won</em>
-            <b>8</b>
-          </span>
-        </div>
-        <Link href={registerHref}>View All Leads</Link>
+      <div className={styles.leadCardListHead}>
+        <strong>Recent Leads</strong>
+        <span>This week</span>
+      </div>
+      <div className={styles.leadCardList}>
+        {miniLeads.map((lead) => (
+          <div className={styles.leadCardRow} key={lead.title}>
+            <span className={styles.leadCardRowAvatar}>{lead.title.slice(0, 1)}</span>
+            <div className={styles.leadCardRowMeta}>
+              <strong>{lead.title}</strong>
+              <small>{lead.place}</small>
+            </div>
+            <b className={styles.leadCardRowBudget}>{lead.budget}</b>
+            <em className={styles.leadCardRowStatus} data-status={lead.status}>
+              {lead.status}
+            </em>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -299,7 +254,33 @@ export default function VendorsPage() {
                 <strong>4.8/5 from 500+ professionals</strong>
               </div>
             </div>
-            <VendorDashboardMockup />
+
+            <div className={styles.heroVisual}>
+              <div className={styles.heroVisualStage}>
+                <VendorLeadCard />
+                <div className={styles.floatBadges} aria-hidden="true">
+                  {heroFloatBadges.map((badge) => (
+                    <span className={styles.floatBadge} key={badge.title}>
+                      <span className={styles.floatBadgeIcon}>
+                        <QFIcon name={badge.icon} />
+                      </span>
+                      <span className={styles.floatBadgeText}>
+                        <strong>{badge.title}</strong>
+                        <small>{badge.sub}</small>
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.heroStats}>
+                {heroStats.map((stat) => (
+                  <div className={styles.heroStat} key={stat.label}>
+                    <strong>{stat.value}</strong>
+                    <small>{stat.label}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

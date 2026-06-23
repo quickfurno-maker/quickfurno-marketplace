@@ -1,10 +1,7 @@
 .page {
   overflow-x: clip;
   color: var(--qf-ink, #171412);
-  background:
-    radial-gradient(circle at 9% -4%, rgba(198, 120, 33, 0.12), transparent 30rem),
-    radial-gradient(circle at 88% 2%, rgba(74, 47, 29, 0.08), transparent 34rem),
-    linear-gradient(180deg, var(--qf-cream-soft, #fff8ef), var(--qf-cream, #f8efe3) 54%, #fffaf3);
+  background: #ffffff;
 }
 
 .shell,
@@ -24,7 +21,7 @@
 
 .shell {
   display: grid;
-  grid-template-columns: minmax(0, 0.82fr) minmax(520px, 1.18fr);
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
   gap: clamp(1.5rem, 4vw, 3.2rem);
   align-items: center;
 }
@@ -1285,5 +1282,332 @@
   }
   .benefitCard:hover {
     transform: none !important;
+  }
+}
+
+/* ============================================================
+   Vendor Hero Phase 1 (refresh) — floating benefit badges +
+   stats strip, homepage-consistent white / navy / gold style.
+   ============================================================ */
+.heroVisual {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.heroVisualStage {
+  position: relative;
+  min-width: 0;
+}
+
+/* --- Compact premium lead-dashboard card (entrance + soft float) --- */
+.leadCardMock {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 34px 80px -38px rgba(7, 17, 31, 0.35);
+  animation: vhSlideIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) both,
+    vhFloat 7s ease-in-out 1s infinite;
+}
+.leadCardTop {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.leadCardAvatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #f5a400, #d99a16);
+}
+.leadCardWho {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+.leadCardWho strong {
+  color: #07111f;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+.leadCardWho small {
+  color: #5b6472;
+  font-size: 0.74rem;
+}
+.leadCardLive {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.26rem 0.55rem;
+  border-radius: 999px;
+  color: #2f7d59;
+  background: rgba(47, 125, 89, 0.12);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.leadCardLive::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2f7d59;
+}
+.leadCardKpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.leadCardKpis > div {
+  padding: 0.6rem 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: center;
+}
+.leadCardKpis strong {
+  display: block;
+  color: #07111f;
+  font-size: 1.25rem;
+  font-weight: 950;
+  line-height: 1;
+}
+.leadCardKpis small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #5b6472;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.leadCardListHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.leadCardListHead strong {
+  color: #07111f;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+.leadCardListHead span {
+  color: #5b6472;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.leadCardList {
+  display: grid;
+  gap: 0.4rem;
+}
+.leadCardRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+.leadCardRowAvatar {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #b97400;
+  background: rgba(245, 164, 0, 0.14);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+.leadCardRowMeta {
+  min-width: 0;
+  display: grid;
+  gap: 0.05rem;
+}
+.leadCardRowMeta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #07111f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.leadCardRowMeta small {
+  color: #5b6472;
+  font-size: 0.68rem;
+}
+.leadCardRowBudget {
+  color: #07111f;
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.leadCardRowStatus {
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  color: #b06f00;
+  background: rgba(245, 164, 0, 0.16);
+  font-style: normal;
+  font-size: 0.64rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.leadCardRowStatus[data-status="Contacted"] {
+  color: #2f7d59;
+  background: rgba(47, 125, 89, 0.12);
+}
+
+/* --- Floating benefit badges (desktop: around the card) --- */
+.floatBadges {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.floatBadge {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px -22px rgba(7, 17, 31, 0.4);
+  white-space: nowrap;
+  animation: vhFadeUp 0.55s ease both, vhFloat 6s ease-in-out infinite;
+}
+.floatBadgeIcon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #f5a400, #d99a16);
+  box-shadow: 0 8px 16px rgba(245, 164, 0, 0.3);
+}
+.floatBadgeIcon svg {
+  width: 17px;
+  height: 17px;
+}
+.floatBadgeText strong {
+  display: block;
+  color: #07111f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.12;
+}
+.floatBadgeText small {
+  display: block;
+  color: #5b6472;
+  font-size: 0.68rem;
+}
+
+.floatBadge:nth-child(1) {
+  top: 3%;
+  left: -3%;
+  animation-delay: 0.1s, 0.4s;
+}
+.floatBadge:nth-child(2) {
+  top: 22%;
+  right: -4%;
+  animation-delay: 0.25s, 0.9s;
+}
+.floatBadge:nth-child(3) {
+  bottom: 28%;
+  left: -4%;
+  animation-delay: 0.4s, 1.3s;
+}
+.floatBadge:nth-child(4) {
+  bottom: 5%;
+  right: -1%;
+  animation-delay: 0.55s, 0.7s;
+}
+.floatBadge:nth-child(5) {
+  top: -3%;
+  right: 22%;
+  animation-delay: 0.7s, 1.6s;
+}
+
+/* --- Stats strip below the visual --- */
+.heroStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px -28px rgba(7, 17, 31, 0.4);
+}
+.heroStat {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+.heroStat + .heroStat {
+  border-left: 1px solid #e5e7eb;
+}
+.heroStat strong {
+  color: #07111f;
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  font-weight: 950;
+}
+.heroStat small {
+  color: #5b6472;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+@keyframes vhFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Mobile: badges become a clean grid below the card --- */
+@media (max-width: 860px) {
+  .floatBadges {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    pointer-events: auto;
+  }
+  .floatBadge {
+    position: static;
+    white-space: normal;
+    box-shadow: 0 12px 28px -24px rgba(7, 17, 31, 0.4);
+    animation: vhFadeUp 0.5s ease both;
+  }
+  .floatBadge:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatBadge,
+  .leadCardMock {
+    animation: none !important;
   }
 }

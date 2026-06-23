@@ -3586,3 +3586,158 @@ h3 {
     animation: none !important;
   }
 }
+
+/* ============================================================
+   Global background → pure bright white (site-wide).
+   Color-only: repoints warm surface tokens to white, clears the
+   page wash/grid, and whites the page wrappers + main panels.
+   Layouts, brand navy/gold, borders and shadows are unchanged.
+   ============================================================ */
+:root {
+  /* Warm surface tokens → white (keeps borders/shadows for separation) */
+  --qf-cream: #ffffff;
+  --qf-cream-soft: #ffffff;
+  --qf-cream-base: #ffffff;
+  --qf-ivory: #ffffff;
+  --qf-beige: #ffffff;
+  --qf-beige-soft: #ffffff;
+  --qf-bg: #ffffff;
+  --qf-bg-soft: #ffffff;
+  --qf-green-tint: #f8fafc;
+  --color-ivory: #ffffff;
+  --color-ivory-strong: #ffffff;
+  --color-beige: #ffffff;
+  --color-beige-soft: #ffffff;
+  --color-teal-soft: #f8fafc;
+}
+
+/* Page canvas → pure white, no warm wash or dotted grid */
+body {
+  background: #ffffff;
+}
+body::before {
+  background: none !important;
+}
+
+/* Page-level wrappers → pure white */
+.category-market-page,
+.vendor-detail-page,
+.vendor-discovery-page {
+  background: #ffffff;
+}
+
+/* Large warm panels / cards → white (premium border + shadow stay) */
+.listing-refine-panel,
+.listing-assist-card,
+.vendor-detail-side-card,
+.vendor-detail-panel,
+.vendor-detail-header,
+.vendor-compact-card,
+.vendor-discovery-top,
+.vendor-detail-mobile-cta {
+  background: #ffffff;
+}
+
+/* ============================================================
+   Category / listing page — navy theme + mobile CTA overflow fix.
+   ============================================================ */
+
+/* Intro text → navy ink / grey */
+.category-market-page .category-back {
+  color: var(--qf-navy);
+}
+.category-market-page .category-back:hover {
+  color: var(--qf-gold-deep);
+}
+.category-market-page .category-market-copy {
+  color: var(--qf-ink-2);
+}
+
+/* Vendor listing cards → white, light border, subtle shadow */
+.category-market-page .vendor-card,
+.category-market-page .vendor-compact-card {
+  background: #ffffff;
+  border: 1px solid var(--qf-line-2);
+  box-shadow: 0 16px 36px -28px rgba(7, 17, 31, 0.3);
+}
+.category-market-page .vendor-compact-card--premium {
+  border-color: rgba(245, 164, 0, 0.5);
+}
+
+/* Assist-card primary button → premium navy */
+.listing-assist-card .btn-primary {
+  background: var(--qf-navy);
+  border-color: var(--qf-navy);
+}
+.listing-assist-card .btn-primary:hover {
+  background: var(--qf-navy-hover);
+}
+
+/* --- Final CTA card → premium deep navy (was dark/brown) --- */
+.final-cta-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-inline: auto;
+  transform: none;
+  border: 0;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245, 164, 0, 0.18), transparent 18rem),
+    linear-gradient(135deg, #071b3a, #0b1f3a);
+}
+.final-cta-card .eyebrow,
+.final-cta-card h2,
+.final-cta-card p {
+  color: #ffffff;
+}
+.final-cta-card .eyebrow {
+  color: rgba(255, 255, 255, 0.85);
+}
+.final-cta-card .eyebrow::before {
+  background: var(--qf-gold);
+  box-shadow: 0 0 0 5px rgba(245, 164, 0, 0.18);
+}
+
+/* CTA buttons inside the navy card */
+.final-cta-card .btn-primary {
+  color: #07111f;
+  background: linear-gradient(135deg, var(--qf-gold), var(--qf-gold-deep));
+  box-shadow: 0 16px 30px rgba(245, 164, 0, 0.32);
+}
+.final-cta-card .btn-outline {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+.final-cta-card .btn-outline:hover {
+  border-color: var(--qf-gold);
+  color: #ffffff;
+}
+
+/* Children must stay inside the card — no clipping / overflow */
+.final-cta-card > * {
+  max-width: 100%;
+  min-width: 0;
+}
+.final-cta-card h2 {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Mobile: premium padding, contained heading, full-width buttons */
+@media (max-width: 600px) {
+  .final-cta-card {
+    padding: 22px 18px;
+  }
+  .final-cta-card h2 {
+    font-size: clamp(1.9rem, 8vw, 2.2rem); /* ~30–36px */
+    line-height: 1.1;
+  }
+  .final-cta-card p {
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+  .final-cta-card .hero-cta-row .btn {
+    width: 100%;
+  }
+}

@@ -45,12 +45,8 @@ const homeCategories: HomeCategory[] = [
     tagline: "Custom sofas, recliners & upholstery",
     icon: "sofa",
     category: "Sofa",
-    subcategories: [
-      { label: "Sofa Maker", category: "Sofa" },
-      { label: "Custom Sofa", category: "Sofa" },
-      { label: "Recliner", category: "Sofa" },
-      { label: "Upholstery", category: "Sofa" },
-    ],
+    // No subcategories — clicking Sofa opens the vendor listing directly.
+    subcategories: [],
   },
   {
     label: "Painting",
@@ -92,18 +88,37 @@ export function HomeCategoryGrid() {
   return (
     <>
       <div className="qf-home-category-grid" data-reveal-group>
-        {homeCategories.map((item) => (
-          <button key={item.label} type="button" className="qf-home-category-card" onClick={() => openCategory(item)}>
-            <span className="qf-home-category-icon">
-              <QFIcon name={item.icon} />
-            </span>
-            <span className="qf-home-category-label">{item.label}</span>
-            <small className="qf-home-category-tag">{item.tagline}</small>
-            <span className="qf-home-category-arrow" aria-hidden="true">
-              <QFIcon name="arrow" />
-            </span>
-          </button>
-        ))}
+        {homeCategories.map((item) => {
+          const cardInner = (
+            <>
+              <span className="qf-home-category-icon">
+                <QFIcon name={item.icon} />
+              </span>
+              <span className="qf-home-category-label">{item.label}</span>
+              <small className="qf-home-category-tag">{item.tagline}</small>
+              <span className="qf-home-category-arrow" aria-hidden="true">
+                <QFIcon name="arrow" />
+              </span>
+            </>
+          );
+
+          // Categories with subcategories open the picker modal; categories
+          // without (e.g. Sofa) link straight to the vendor listing.
+          return item.subcategories.length > 0 ? (
+            <button
+              key={item.label}
+              type="button"
+              className="qf-home-category-card"
+              onClick={() => openCategory(item)}
+            >
+              {cardInner}
+            </button>
+          ) : (
+            <Link key={item.label} href={routeFor(item.category)} className="qf-home-category-card">
+              {cardInner}
+            </Link>
+          );
+        })}
       </div>
 
       {active ? (

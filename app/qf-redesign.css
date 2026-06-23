@@ -552,6 +552,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
+  min-width: 0;
 }
 
 .qf-gold-btn,
@@ -567,6 +568,8 @@ h3 {
   font-size: 0.86rem;
   font-weight: 900;
   line-height: 1;
+  white-space: normal;
+  word-break: break-word;
   transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
 }
 
@@ -1615,6 +1618,8 @@ h3 {
     display: flex;
     gap: 0.6rem;
     overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0.4rem;

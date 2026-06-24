@@ -9,34 +9,66 @@ import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
 
+/** PostgREST/Postgres "column does not exist" — i.e. the location migration
+ *  (007_vendor_location.sql) has not been applied yet. */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
+}
+
 /** Public vendor registration. Always lands as Pending + not visible. */
 export async function registerVendor(input: VendorRegistrationInput): Promise<Result<{ id: string }>> {
   try {
     if (!input.business_name?.trim() || !input.phone?.trim() || !input.city?.trim()) {
       throw appError("VALIDATION");
     }
-    const { data, error } = await adminClient()
-      .from("vendors")
-      .insert({
-        business_name: input.business_name,
-        owner_name: input.owner_name ?? null,
-        phone: input.phone,
-        email: input.email ?? null,
-        city: input.city,
-        areas_covered: input.areas_covered ?? [],
-        covers_full_city: input.covers_full_city ?? false,
-        service_categories: input.service_categories ?? [],
-        experience: input.experience ?? null,
-        portfolio_urls: input.portfolio_urls ?? [],
-        profile_image_url: input.profile_image_url ?? null,
-        gst_number: input.gst_number ?? null,
-        message: input.message ?? null,
-        user_id: input.user_id ?? null,
-        status: "Pending",
-        public_visibility: false,
-      })
-      .select("id")
-      .single();
+
+    const basePayload = {
+      business_name: input.business_name,
+      owner_name: input.owner_name ?? null,
+      phone: input.phone,
+      email: input.email ?? null,
+      city: input.city,
+      areas_covered: input.areas_covered ?? [],
+      covers_full_city: input.covers_full_city ?? false,
+      service_categories: input.service_categories ?? [],
+      experience: input.experience ?? null,
+      portfolio_urls: input.portfolio_urls ?? [],
+      profile_image_url: input.profile_image_url ?? null,
+      gst_number: input.gst_number ?? null,
+      message: input.message ?? null,
+      user_id: input.user_id ?? null,
+      status: "Pending",
+      public_visibility: false,
+    };
+
+    // Optional vendor base location (GPS) — only persisted once the
+    // 007_vendor_location.sql migration has added these columns.
+    const locationPayload = {
+      base_latitude: input.base_latitude ?? null,
+      base_longitude: input.base_longitude ?? null,
+      location_accuracy_meters: input.location_accuracy_meters ?? null,
+      location_source: input.location_source ?? null,
+      location_captured_at: input.location_captured_at ?? null,
+      service_radius_km: input.service_radius_km ?? null,
+      base_area: input.base_area ?? null,
+      base_pincode: input.base_pincode ?? null,
+    };
+
+    const insertVendor = (payload: Record<string, unknown>) =>
+      adminClient().from("vendors").insert(payload).select("id").single();
+
+    let { data, error } = await insertVendor({ ...basePayload, ...locationPayload });
+
+    // Graceful fallback: if the location columns aren't migrated yet, register
+    // without them so vendor onboarding is never blocked.
+    if (error && isMissingColumnError(error)) {
+      console.warn("[vendors] location columns missing — run 007_vendor_location.sql; registering without GPS.");
+      ({ data, error } = await insertVendor(basePayload));
+    }
+
     if (error) {
       logSupabaseInsertError("vendors", error, {
         has_user_id: Boolean(input.user_id),
@@ -46,7 +78,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       });
       throw error;
     }
-    return ok({ id: data.id });
+    return ok({ id: data!.id });
   } catch (e) {
     return fail(e);
   }

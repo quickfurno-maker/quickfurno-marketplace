@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { FilterChips, type FilterChipItem } from "@/components/FilterChips";
 import { VendorCompactCard } from "@/components/VendorCompactCard";
+import { VendorCompareProvider } from "@/components/VendorCompare";
 import {
   cities,
   enquiryServiceForCategory,
@@ -122,7 +123,7 @@ export function VendorCards({
   const categoryTitle = selectedCategory ?? "home-service vendors";
   const enquiryService = selectedCategory ? enquiryServiceForCategory(selectedCategory) : undefined;
 
-  return (
+  const content = (
     <div className={`vendor-marketplace-v2 ${listingMode ? "vendor-marketplace-v2--listing" : ""}`}>
       {listingMode ? (
         <div className="vendor-discovery-top">
@@ -231,4 +232,7 @@ export function VendorCards({
       </div>
     </div>
   );
+
+  // Compare is scoped to the full listing experience only (not preview/related strips).
+  return listingMode ? <VendorCompareProvider>{content}</VendorCompareProvider> : content;
 }

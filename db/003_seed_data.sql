@@ -36,7 +36,7 @@ on conflict (slug) do nothing;
 
 -- ---- App settings ---------------------------------------------------------
 insert into public.app_settings (key, value) values
-  ('max_vendors_per_lead',        '4'::jsonb),
+  ('max_vendors_per_lead',        '3'::jsonb),
   ('hide_zero_credit_vendors',    'true'::jsonb),
   ('duplicate_lead_window_days',  '30'::jsonb),
   ('bad_lead_report_window_hours','24'::jsonb)

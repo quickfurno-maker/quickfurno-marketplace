@@ -69,7 +69,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
   return (
     <div className="panel p-6 md:p-7">
       <h3 className="font-display text-xl text-ivory">Get free quotes</h3>
-      <p className="mt-1 font-sans text-sm text-muted">One requirement → up to 4 verified pros. No charge, no spam.</p>
+      <p className="mt-1 font-sans text-sm text-muted">One requirement → up to 3 verified pros. No charge, no spam.</p>
 
       {error && <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 font-sans text-sm text-red-200">{error}</p>}
 

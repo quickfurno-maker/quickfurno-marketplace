@@ -8,6 +8,16 @@ import { CITY, SERVICES } from "@/lib/config";
 
 const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
 
+type LocStatus = "idle" | "requesting" | "success" | "denied" | "unavailable";
+
+const LOC_STATUS_TEXT: Record<LocStatus, string> = {
+  idle: "Location not added yet",
+  requesting: "Requesting location…",
+  success: "Location added successfully",
+  denied: "Location permission denied. You can continue with city and areas covered.",
+  unavailable: "Location unavailable. Please check browser permission.",
+};
+
 export function VendorRegisterForm() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -23,6 +33,42 @@ export function VendorRegisterForm() {
   const set = (k: keyof typeof f, v: any) => setF((s) => ({ ...s, [k]: v }));
   const toggleService = (s: string) =>
     setF((p) => ({ ...p, service_categories: p.service_categories.includes(s) ? p.service_categories.filter((x) => x !== s) : [...p.service_categories, s] }));
+
+  // Vendor base location (optional GPS) — never blocks registration.
+  const [loc, setLoc] = useState<{
+    status: LocStatus;
+    latitude: number | null;
+    longitude: number | null;
+    accuracy: number | null;
+    capturedAt: string | null;
+  }>({ status: "idle", latitude: null, longitude: null, accuracy: null, capturedAt: null });
+  const [serviceRadius, setServiceRadius] = useState("10"); // km, or "city" = entire city
+
+  function captureLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLoc((s) => ({ ...s, status: "unavailable" }));
+      return;
+    }
+    setLoc((s) => ({ ...s, status: "requesting" }));
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLoc({
+          status: "success",
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          capturedAt: new Date().toISOString(),
+        });
+      },
+      (err) => {
+        setLoc((s) => ({
+          ...s,
+          status: err.code === err.PERMISSION_DENIED ? "denied" : "unavailable",
+        }));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }
 
   async function onSubmit() {
     if (busy) return;
@@ -55,6 +101,15 @@ export function VendorRegisterForm() {
         portfolio_urls: f.portfolio.split(",").map((u) => u.trim()).filter(Boolean),
         message: f.message || undefined,
         password: f.password,
+        // Optional vendor base location (GPS enhancement, not a replacement for
+        // city / areas covered). Only sent when the vendor captured a location.
+        base_latitude: loc.latitude ?? undefined,
+        base_longitude: loc.longitude ?? undefined,
+        location_accuracy_meters: loc.accuracy ?? undefined,
+        location_source: loc.status === "success" ? "browser_gps" : undefined,
+        location_captured_at: loc.capturedAt ?? undefined,
+        // "Entire city" stores a high radius (50) since the column is numeric.
+        service_radius_km: serviceRadius === "city" ? 50 : Number(serviceRadius),
       });
       if (!res.ok) { setError(res.error); return; }
 
@@ -108,6 +163,50 @@ export function VendorRegisterForm() {
             <input type="checkbox" checked={f.covers_full_city} onChange={(e) => set("covers_full_city", e.target.checked)} className="h-4 w-4 accent-gold" />
             We cover the whole city
           </label>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-5">
+          <h3 className="font-display text-lg text-ivory">Business Location</h3>
+          <p className="mt-1 font-sans text-sm text-muted">
+            Use your current location so QuickFurno can match you with nearby client leads.
+          </p>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <button
+                type="button"
+                onClick={captureLocation}
+                disabled={loc.status === "requesting"}
+                className="w-full rounded-lg border border-gold/40 bg-gold/[0.08] px-4 py-3 font-sans text-sm font-semibold text-gold transition hover:bg-gold/[0.14] disabled:opacity-60 sm:w-auto"
+              >
+                {loc.status === "requesting" ? "Requesting location…" : "Use Current Location"}
+              </button>
+              <p className="mt-2 font-sans text-xs text-muted">{LOC_STATUS_TEXT[loc.status]}</p>
+              {loc.status === "success" && (
+                <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 font-sans text-xs text-emerald-200">
+                  <strong className="block">Approx location captured</strong>
+                  <span>Accuracy: {loc.accuracy != null ? Math.round(loc.accuracy) : "—"} meters</span>
+                  <span className="mt-1 block text-emerald-200/70">
+                    Your exact coordinates are used only for vendor matching.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <L label="Service radius">
+              <select className="field" value={serviceRadius} onChange={(e) => setServiceRadius(e.target.value)}>
+                <option className="bg-navy-deep" value="5">5 km</option>
+                <option className="bg-navy-deep" value="10">10 km</option>
+                <option className="bg-navy-deep" value="15">15 km</option>
+                <option className="bg-navy-deep" value="20">20 km</option>
+                <option className="bg-navy-deep" value="city">Entire city</option>
+              </select>
+            </L>
+          </div>
+
+          <p className="mt-3 font-sans text-xs text-muted/70">
+            Your location helps us send nearby leads. It is not shown publicly as exact GPS.
+          </p>
         </div>
 
         <div className="mt-5">

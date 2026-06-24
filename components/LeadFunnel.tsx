@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { submitLead, fetchEligibleVendors, assignLead } from "@/app/actions";
 import type { PublicVendorCard } from "@/lib/types";
-import { CITY, ENQUIRY_SERVICES, BUDGETS } from "@/lib/config";
+import { CITY, ENQUIRY_SERVICES, BUDGETS, MAX_VENDORS_PER_LEAD } from "@/lib/config";
 
 const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
 const SERVICES = ENQUIRY_SERVICES;
@@ -68,7 +68,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   }
 
   function togglePick(id: string) {
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 4 ? p : [...p, id]));
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_VENDORS_PER_LEAD ? p : [...p, id]));
   }
 
   async function onConfirm() {
@@ -150,14 +150,14 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         <div className="mt-6">
           <p className="font-sans text-sm text-muted">
             {vendors.length > 0
-              ? <>Pick up to <span className="text-gold">4</span> studios. We’ll complete the shortlist if you choose fewer.</>
+              ? <>Pick up to <span className="text-gold">{MAX_VENDORS_PER_LEAD}</span> studios. We’ll complete the shortlist if you choose fewer.</>
               : "No studios are open in your area right now — submit anyway and our team will match you manually."}
           </p>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {vendors.map((v) => {
               const on = picked.includes(v.id);
-              const full = !on && picked.length >= 4;
+              const full = !on && picked.length >= MAX_VENDORS_PER_LEAD;
               return (
                 <button
                   key={v.id}
@@ -186,9 +186,9 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
 
           <div className="mt-6 flex items-center gap-3">
             <button onClick={onConfirm} disabled={busy} className="btn-gold">
-              {busy ? "Sending…" : picked.length ? `Confirm ${picked.length} & auto-fill to 4` : "Match me automatically"}
+              {busy ? "Sending…" : picked.length ? `Confirm ${picked.length} & auto-fill to ${MAX_VENDORS_PER_LEAD}` : "Match me automatically"}
             </button>
-            <span className="font-sans text-xs text-muted">{picked.length}/4 selected</span>
+            <span className="font-sans text-xs text-muted">{picked.length}/{MAX_VENDORS_PER_LEAD} selected</span>
           </div>
         </div>
       )}

@@ -13,7 +13,7 @@ export default function VendorRegisterPage() {
         <h1 className="mt-4 text-3xl font-semibold text-ivory md:text-4xl">Get matched to ready homeowners</h1>
         <p className="mt-3 max-w-xl font-sans text-muted">
           Apply once. After approval, buy a prepaid lead pack and start receiving exclusive,
-          area-matched enquiries — capped at four studios per lead.
+          area-matched enquiries — capped at three studios per lead.
         </p>
       </section>
       <section className="mx-auto max-w-6xl px-5 pb-16">

@@ -44,7 +44,7 @@ export function generateMetadata({ params }: VendorPageProps): Metadata {
 const reviewNames = ["Aarav Joshi", "Meera Deshpande", "Sanjay Kulkarni"];
 const faqItems = [
   ["How quickly can I get a quote?", "Most vendors respond the same day after QuickFurno receives your requirement."],
-  ["Can I compare this vendor with others?", "Yes. QuickFurno can match you with up to 4 suitable vendors for comparison."],
+  ["Can I compare this vendor with others?", "Yes. QuickFurno can match you with up to 3 suitable vendors for comparison."],
   ["Is the enquiry free?", "Yes. Client enquiries are free and routed only to relevant vendor matches."],
 ];
 

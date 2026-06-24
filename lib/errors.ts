@@ -16,7 +16,7 @@ const MESSAGES: Record<string, string> = {
   NO_ELIGIBLE_VENDORS: "No eligible vendors found.",
   VENDOR_NO_CREDITS: "Vendor has no credits.",
   LEAD_ALREADY_ASSIGNED: "Lead already assigned.",
-  MAX_VENDORS_EXCEEDED: "Maximum 4 vendors allowed.",
+  MAX_VENDORS_EXCEEDED: "Maximum 3 vendors allowed.",
   DUPLICATE_LEAD: "Duplicate lead detected.",
   UNAUTHORIZED: "Unauthorized access.",
   LEAD_NOT_FOUND: "Lead not found.",

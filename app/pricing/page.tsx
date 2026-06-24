@@ -23,7 +23,7 @@ export default async function PricingPage() {
         <p className="eyebrow">For partner studios</p>
         <h1 className="mt-4 text-3xl font-semibold text-ivory md:text-4xl">Prepaid lead packs</h1>
         <p className="mt-3 max-w-xl font-sans text-muted">
-          One credit per assigned lead. Each lead goes to four studios at most — never resold to a crowd.
+          One credit per assigned lead. Each lead goes to three studios at most — never resold to a crowd.
           Run out and you’re paused from listings until you top up.
         </p>
       </section>

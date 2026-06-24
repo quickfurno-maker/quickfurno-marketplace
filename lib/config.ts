@@ -99,6 +99,13 @@ export const PACKAGES_PREVIEW: { name: string; price: number; leads: number; tag
   { name: "Pro", price: 4999, leads: 75 },
 ];
 
+// ---- Lead distribution model ------------------------------------------------
+// One client lead is shared with at most this many vendors. The authoritative
+// value at the DB level lives in app_settings.max_vendors_per_lead (configurable
+// by admin); these constants keep the app + comparison UI in sync with it.
+export const MAX_VENDORS_PER_LEAD = 3;
+export const MAX_COMPARE_VENDORS = 3;
+
 // ---- Admin lead workflow statuses ------------------------------------------
 export const LEAD_STATUSES = [
   "New",

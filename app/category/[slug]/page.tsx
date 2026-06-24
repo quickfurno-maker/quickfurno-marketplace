@@ -110,7 +110,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
                 Get Free Assistance
               </EnquiryModalTrigger>
               <ul>
-                <li>Up to 4 relevant vendor matches</li>
+                <li>Up to 3 relevant vendor matches</li>
                 <li>Paid vendors prioritised for lead routing</li>
                 <li>Free vendors remain visible for comparison</li>
               </ul>

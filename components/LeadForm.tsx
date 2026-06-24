@@ -90,7 +90,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
         lead_id: result.data.id,
         is_duplicate: result.data.is_duplicate,
       });
-      setSuccess("Thank you. QuickFurno will match you with 4 verified vendors shortly.");
+      setSuccess("Thank you. QuickFurno will match you with 3 verified vendors shortly.");
       setForm(initialState);
     } catch (err) {
       console.error("[lead form] submission error", {
@@ -106,7 +106,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
     <form id="lead-form" className={`lead-form-card ${compact ? "lead-form-card--compact" : ""}`} onSubmit={handleSubmit}>
       <div className="form-card-header">
         <span className="eyebrow">Free client enquiry</span>
-        <h2>Get matched with 4 verified vendors</h2>
+        <h2>Get matched with 3 verified vendors</h2>
         <p>Verified vendors • Fast response • No obligation</p>
       </div>
 
@@ -194,7 +194,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       </div>
 
       <button className="btn btn-primary form-submit" type="submit" disabled={submitting}>
-        {submitting ? "Matching vendors..." : "Get 4 Verified Quotes"}
+        {submitting ? "Matching vendors..." : "Get 3 Verified Quotes"}
       </button>
     </form>
   );

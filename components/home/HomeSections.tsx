@@ -1,5 +1,7 @@
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
+import { StatsCounter } from "@/components/home/StatsCounter";
+import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
 import { clientTestimonials } from "@/lib/quickfurno-data";
 
 export function HomeIllustration() {
@@ -170,10 +172,10 @@ export function ClientCTASection() {
 
 // Featured ready-to-book service packages with upfront pricing.
 const featuredFlows = [
-  { icon: "kitchen", title: "Modular Kitchen", desc: "Design. Build. Installed.", price: "From ₹49,999" },
+  { icon: "kitchen", title: "Modular Kitchen", desc: "Design. Build. Install.", price: "From ₹49,999" },
   { icon: "paint", title: "Full Home Painting", desc: "Beautiful walls. On time.", price: "From ₹14,999" },
-  { icon: "sofa", title: "Sofa Deep Cleaning", desc: "Refresh. Remove. Revive.", price: "From ₹1,499" },
-  { icon: "wardrobe", title: "Wardrobe Setup", desc: "Custom storage solutions.", price: "From ₹9,999" },
+  { icon: "sofa", title: "Sofa Maker", desc: "Custom. Comfort. Built.", price: "From ₹1,499" },
+  { icon: "wardrobe", title: "Verified Carpenters", desc: "Skilled. Verified. Nearby.", price: "From ₹9,999" },
 ] as const;
 
 export function FeaturedFlows() {
@@ -201,31 +203,10 @@ export function FeaturedFlows() {
   );
 }
 
-// Headline marketplace stats (navy strip).
-const homeStats = [
-  { icon: "user", value: "10,000+", label: "Verified Professionals" },
-  { icon: "chat", value: "1L+", label: "Happy Customers" },
-  { icon: "star", value: "4.7", label: "Average Rating" },
-  { icon: "clock", value: "98%", label: "On-Time Service" },
-  { icon: "lock", value: "Secure", label: "Payments & Data" },
-] as const;
-
+// Headline marketplace stats (navy strip) — animated counters live in the
+// client component so the rest of this module stays a server component.
 export function StatsStrip() {
-  return (
-    <section className="qf-stats-section" id="stats" aria-label="QuickFurno stats">
-      <div className="qf-stats-strip" data-reveal-group>
-        {homeStats.map((stat) => (
-          <div className="qf-stat-item" key={stat.label}>
-            <span className="qf-stat-icon">
-              <QFIcon name={stat.icon} />
-            </span>
-            <strong>{stat.value}</strong>
-            <small>{stat.label}</small>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+  return <StatsCounter />;
 }
 
 // --- Homepage sections ------------------------------------------------------
@@ -297,23 +278,7 @@ export function HomeTestimonials() {
         <h2>What clients say about QuickFurno</h2>
         <p>Real homeowners who found the right vendor through us.</p>
       </div>
-      <div className="qf-home-testimonials" data-reveal-group>
-        {clientTestimonials.map((testimonial) => (
-          <article className="qf-home-testimonial-card" key={testimonial.name}>
-            <div className="qf-stars" aria-label="5 out of 5 rating">
-              ★★★★★
-            </div>
-            <p>&quot;{testimonial.quote}&quot;</p>
-            <div className="qf-home-testimonial-author">
-              <span aria-hidden="true">{testimonial.name.slice(0, 1)}</span>
-              <div>
-                <strong>{testimonial.name}</strong>
-                <small>{testimonial.detail}</small>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+      <TestimonialsCarousel testimonials={clientTestimonials} />
     </section>
   );
 }

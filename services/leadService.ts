@@ -6,6 +6,7 @@
 import { adminClient, publicClient } from "../lib/supabase";
 import { appError, fromPgError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
+import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 
 function firstText(...values: Array<string | undefined>): string {
@@ -117,8 +118,9 @@ export async function getEligibleVendors(leadId: string): Promise<Result<PublicV
 }
 
 /**
- * Hybrid assignment: client picks 0–4 vendors, the system fills the rest to a
- * hard cap of 4, deducting one credit per assigned vendor — atomically.
+ * Hybrid assignment: client picks 0–3 vendors, the system fills the rest to a
+ * hard cap of MAX_VENDORS_PER_LEAD, deducting one credit per assigned vendor —
+ * atomically. The DB RPC enforces the same cap via app_settings.
  */
 export async function assignLeadToVendors(
   leadId: string,
@@ -126,7 +128,7 @@ export async function assignLeadToVendors(
   opts: { allowDuplicate?: boolean; assignmentType?: "client_selected" | "admin_assigned" } = {}
 ): Promise<Result<AssignResult>> {
   try {
-    if (selectedVendorIds.length > 4) throw appError("MAX_VENDORS_EXCEEDED");
+    if (selectedVendorIds.length > MAX_VENDORS_PER_LEAD) throw appError("MAX_VENDORS_EXCEEDED");
 
     const { data, error } = await adminClient().rpc("assign_lead_to_vendors", {
       p_lead_id: leadId,

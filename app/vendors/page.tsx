@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { QFIcon } from "@/components/QuickFurnoIcons";
+import { VendorHeroStats } from "@/components/vendors/VendorHeroStats";
 import styles from "./vendors.module.css";
 
 const registerHref = "/vendors/register";
@@ -167,13 +168,6 @@ const heroFloatBadges = [
   { icon: "star" as const, title: "Premium Visibility", sub: "Stand out & grow" },
 ];
 
-// Compact stats strip shown below the hero visual.
-const heroStats = [
-  { value: "10,000+", label: "Verified Pros" },
-  { value: "4.7", label: "Average Rating" },
-  { value: "100%", label: "Secure & Trusted" },
-];
-
 function VendorLeadCard() {
   return (
     <div className={styles.leadCardMock} aria-label="QuickFurno vendor lead dashboard preview">
@@ -272,14 +266,7 @@ export default function VendorsPage() {
                   ))}
                 </div>
               </div>
-              <div className={styles.heroStats}>
-                {heroStats.map((stat) => (
-                  <div className={styles.heroStat} key={stat.label}>
-                    <strong>{stat.value}</strong>
-                    <small>{stat.label}</small>
-                  </div>
-                ))}
-              </div>
+              <VendorHeroStats />
             </div>
           </div>
         </section>

@@ -4696,7 +4696,7 @@ body * {
   transform: translateY(0);
 }
 
-/* ---- "Why only 4 quotes?" trust band ----------------------------------- */
+/* ---- "Why only 3 quotes?" trust band ----------------------------------- */
 .nospam-band {
   display: flex;
   align-items: center;

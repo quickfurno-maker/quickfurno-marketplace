@@ -411,6 +411,70 @@ export function getVendorServiceChips(vendor: Vendor) {
   return chips;
 }
 
+// ---------------------------------------------------------------------------
+// Scannable vendor card support — portfolio imagery + safe trust fallbacks.
+// All images are existing LOCAL assets under /public (no external URLs).
+// No database changes: derived display values only.
+// ---------------------------------------------------------------------------
+const VENDOR_IMG = "/assets/quickfurno/images/vendors";
+
+const portfolioByCategory: Record<QuickFurnoCategory, string[]> = {
+  "Interior Designers": [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`, `${VENDOR_IMG}/modular-kitchen.svg`],
+  "Premium Interiors": [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`, `${VENDOR_IMG}/wardrobe-interior.svg`],
+  "Modular Factory": [`${VENDOR_IMG}/modular-kitchen.svg`, `${VENDOR_IMG}/wardrobe-interior.svg`, `${VENDOR_IMG}/wood-shelving.svg`],
+  Carpenters: [`${VENDOR_IMG}/wood-shelving.svg`, `${VENDOR_IMG}/wardrobe-interior.svg`, `${VENDOR_IMG}/modular-kitchen.svg`],
+  Sofa: [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`, `${VENDOR_IMG}/wardrobe-interior.svg`],
+  Painter: [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`, `${VENDOR_IMG}/civil-work-site.svg`],
+  "Civil Work": [`${VENDOR_IMG}/civil-work-site.svg`, `${VENDOR_IMG}/modular-kitchen.svg`, `${VENDOR_IMG}/wood-shelving.svg`],
+};
+
+/** Up to 3 local portfolio thumbnails for a vendor's category (safe fallback: []). */
+export function getVendorPortfolio(vendor: Vendor): string[] {
+  return portfolioByCategory[vendor.category] ?? [];
+}
+
+export type VendorTrust = {
+  rating: number;
+  ratingLabel: string;
+  responseLabel: string;
+  responseScore: number;
+  experienceLabel: string;
+  warrantyLabel: string;
+  warrantyYears: number;
+  startingPrice: string;
+  /** Numeric starting price for comparison, or null when "Price on request". */
+  priceValue: number | null;
+};
+
+/** Display-ready trust snippets with safe fallbacks (PART 4 of the redesign brief). */
+export function getVendorTrust(vendor: Vendor): VendorTrust {
+  const rating = vendor.rating > 0 ? vendor.rating : 4.7;
+  const responseTime = vendor.responseTime?.trim();
+  const responseLabel = responseTime ? `Responds in ${responseTime}` : "Responds in 15 min";
+  const expNum = /(\d+)/.exec(vendor.experience ?? "")?.[1];
+  const experienceLabel = expNum ? `${expNum}+ years` : "5+ years";
+  const warrantyYears = vendor.activePaidPlan ? 10 : 0;
+  const warrantyLabel = vendor.activePaidPlan ? "Up to 10 years warranty" : "Warranty available";
+
+  const rate = vendor.rate?.trim() ?? "";
+  const hasPrice = /\d/.test(rate) && !/request/i.test(rate);
+  const startingPrice = hasPrice ? `Starting at ${rate.startsWith("₹") ? rate : `₹${rate}`}` : "Price on request";
+  const parsed = hasPrice ? Number(rate.replace(/[^\d.]/g, "")) : NaN;
+  const priceValue = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+
+  return {
+    rating,
+    ratingLabel: rating.toFixed(1),
+    responseLabel,
+    responseScore: vendorResponseScore(vendor),
+    experienceLabel,
+    warrantyLabel,
+    warrantyYears,
+    startingPrice,
+    priceValue,
+  };
+}
+
 export function enquiryServiceForCategory(category: QuickFurnoCategory) {
   const map: Record<QuickFurnoCategory, string> = {
     "Interior Designers": "Full Home Interior",
@@ -469,7 +533,7 @@ export const whyChooseQuickFurno: { title: string; body: string }[] = [
     body: "Every listed vendor is checked for service category, location, response quality and profile completeness.",
   },
   {
-    title: "Maximum 4 quotes",
+    title: "Maximum 3 quotes",
     body: "We do not send your number to 20 vendors. You get a limited set of relevant verified vendors.",
   },
   {
@@ -520,7 +584,7 @@ export const clientFaqs = [
   },
   {
     question: "How many vendors will contact me?",
-    answer: "QuickFurno is designed to match you with up to 4 relevant verified vendors, so you can compare without getting spammed.",
+    answer: "QuickFurno is designed to match you with up to 3 relevant verified vendors, so you can compare without getting spammed.",
   },
   {
     question: "Are vendors verified?",
@@ -547,7 +611,7 @@ export const vendorFaqs = [
   },
   {
     question: "How many vendors receive one lead?",
-    answer: "Client enquiries are shared with a limited set of relevant paid vendors, with the client experience capped around 4 vendor matches.",
+    answer: "Client enquiries are shared with a limited set of relevant paid vendors, with the client experience capped at 3 vendor matches.",
   },
   {
     question: "How do I receive leads?",

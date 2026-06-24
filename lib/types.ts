@@ -64,6 +64,16 @@ export interface VendorRegistrationInput {
   gst_number?: string;
   message?: string;
   user_id?: string;
+  // Vendor base location (optional, browser GPS) — used later for nearest-client
+  // lead matching. All optional so registration still works without GPS.
+  base_latitude?: number;
+  base_longitude?: number;
+  location_accuracy_meters?: number;
+  location_source?: string;
+  location_captured_at?: string;
+  service_radius_km?: number;
+  base_area?: string;
+  base_pincode?: string;
 }
 
 export interface VendorDashboardStats {

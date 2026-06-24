@@ -1557,6 +1557,7 @@
   display: grid;
   justify-items: center;
   gap: 0.1rem;
+  min-width: 0;
   text-align: center;
 }
 .heroStat + .heroStat {
@@ -1566,11 +1567,26 @@
   color: #07111f;
   font-size: clamp(1rem, 2.2vw, 1.2rem);
   font-weight: 950;
+  white-space: nowrap;
 }
 .heroStat small {
   color: #5b6472;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+/* Keep the 3 columns tidy and clip-free on the narrowest phones. */
+@media (max-width: 400px) {
+  .heroStats {
+    gap: 0.3rem;
+    padding: 0.85rem 0.6rem;
+  }
+  .heroStat strong {
+    font-size: 0.96rem;
+  }
+  .heroStat small {
+    font-size: 0.66rem;
+  }
 }
 
 @keyframes vhFadeUp {
@@ -1584,24 +1600,101 @@
   }
 }
 
-/* --- Mobile: badges become a clean grid below the card --- */
+/* --- Mobile: 3 badges float AROUND the dashboard card, 2 stack below ---
+   `.floatBadges` is made static so its absolutely-positioned children anchor
+   to `.heroVisualStage` (the visual wrapper) — keeping badges inside the hero
+   visual and within screen width. The remaining static children flow below
+   the card, inside the same wrapper. */
 @media (max-width: 860px) {
   .floatBadges {
     position: static;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
-    margin-top: 0.85rem;
+    margin-top: 0.95rem;
     pointer-events: auto;
   }
   .floatBadge {
-    position: static;
-    white-space: normal;
-    box-shadow: 0 12px 28px -24px rgba(7, 17, 31, 0.4);
+    gap: 0.45rem;
+    padding: 8px 10px;
+    border-radius: 16px;
+    box-shadow: 0 12px 28px -22px rgba(7, 17, 31, 0.45);
     animation: vhFadeUp 0.5s ease both;
   }
+  .floatBadgeIcon {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+  }
+  .floatBadgeIcon svg {
+    width: 15px;
+    height: 15px;
+  }
+  .floatBadgeText strong {
+    font-size: 12px;
+  }
+  .floatBadgeText small {
+    font-size: 11px;
+  }
+
+  /* Badges 1–3 float around the card (overlay the visual wrapper). */
+  .floatBadge:nth-child(1),
+  .floatBadge:nth-child(2),
+  .floatBadge:nth-child(3) {
+    position: absolute;
+    z-index: 5;
+    margin: 0;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: vhFadeUp 0.55s ease both, vhFloat 6s ease-in-out infinite;
+  }
+  /* Title-only on the floating pills keeps them compact and uncrowded. */
+  .floatBadge:nth-child(1) .floatBadgeText small,
+  .floatBadge:nth-child(2) .floatBadgeText small,
+  .floatBadge:nth-child(3) .floatBadgeText small {
+    display: none;
+  }
+  .floatBadge:nth-child(1) {
+    top: -12px;
+    left: 4px;
+    right: auto;
+    bottom: auto;
+    animation-delay: 0.1s, 0.5s;
+  }
+  .floatBadge:nth-child(2) {
+    top: -12px;
+    right: 4px;
+    left: auto;
+    bottom: auto;
+    animation-delay: 0.22s, 0.9s;
+  }
+  .floatBadge:nth-child(3) {
+    top: 32%;
+    right: 6px;
+    left: auto;
+    bottom: auto;
+    animation-delay: 0.34s, 1.3s;
+  }
+
+  /* Badges 4–5 stack neatly below the card, inside the same visual wrapper. */
+  .floatBadge:nth-child(4),
   .floatBadge:nth-child(5) {
-    grid-column: 1 / -1;
+    position: static;
+    white-space: normal;
+    animation-delay: 0.46s;
+  }
+}
+
+@media (max-width: 400px) {
+  .floatBadge:nth-child(1),
+  .floatBadge:nth-child(2),
+  .floatBadge:nth-child(3) {
+    padding: 7px 9px;
+  }
+  .floatBadge:nth-child(1) .floatBadgeText strong,
+  .floatBadge:nth-child(2) .floatBadgeText strong,
+  .floatBadge:nth-child(3) .floatBadgeText strong {
+    font-size: 11px;
   }
 }
 

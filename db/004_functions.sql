@@ -179,7 +179,7 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- ----------------------------------------------------------------------------
--- CORE: atomic hybrid lead assignment (max 4, 1 credit each, no double-assign)
+-- CORE: atomic hybrid lead assignment (max 3, 1 credit each, no double-assign)
 --   p_selected_vendor_ids : client-chosen vendors (validated against eligibility)
 --   p_allow_duplicate     : admin override to assign a flagged duplicate
 --   p_selected_type       : label for the selected vendors
@@ -204,7 +204,7 @@ declare
   v_ok       boolean;
   v_type     text;
 begin
-  v_max := public.get_setting_int('max_vendors_per_lead', 4);
+  v_max := public.get_setting_int('max_vendors_per_lead', 3);
 
   -- lock the lead row (serialises concurrent assignment attempts)
   select * into v_lead from public.leads where id = p_lead_id for update;

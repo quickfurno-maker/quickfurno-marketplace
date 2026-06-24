@@ -1,7 +1,7 @@
 # QuickFurno — Verified Interior & Carpentry Lead Portal
 
 A prepaid lead-credit marketplace. Homeowners submit a project; the system matches
-them to **at most four** verified local studios. Studios buy prepaid lead packs and
+them to **at most three** verified local studios. Studios buy prepaid lead packs and
 spend **one credit per assigned lead**. Run out of credits and you're auto-paused
 from public listings.
 
@@ -81,8 +81,8 @@ select cron.schedule('quickfurno-expire','0 2 * * *',
 ## The flows
 
 **Homeowner** — `/enquiry`: submit -> de-duped & saved -> see eligible studios
-(safe fields only) -> pick up to 4 -> `assign_lead_to_vendors` RPC fills to a hard
-cap of 4, deducts one credit each atomically, queues WhatsApp to client + studios.
+(safe fields only) -> pick up to 3 -> `assign_lead_to_vendors` RPC fills to a hard
+cap of 3, deducts one credit each atomically, queues WhatsApp to client + studios.
 
 **Studio** — `/vendors/register` -> pending -> admin approves -> admin credits a pack
 -> goes live. `/vendor`: see assigned leads with contact, move pipeline status, report
@@ -103,6 +103,6 @@ payment and credit a pack in one click, resolve bad-lead reports.
 
 ## Verified
 
-SQL applied to live PostgreSQL 16; full credit flow tested (hybrid fill to 4,
+SQL applied to live PostgreSQL 16; full credit flow tested (hybrid fill to 3,
 per-vendor deduction, auto-delist at zero, no double-assign, all error guards,
 bad-lead refund). TypeScript passes `tsc --strict`. `next build` compiles all routes.

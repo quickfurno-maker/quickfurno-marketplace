@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { clientTestimonials } from "@/lib/quickfurno-data";
@@ -180,14 +179,9 @@ const featuredFlows = [
 export function FeaturedFlows() {
   return (
     <section className="qf-home-section" id="featured">
-      <div className="qf-section-head qf-section-head--row">
-        <div>
-          <h2>Featured Service Flows</h2>
-          <p>Popular ready-to-book packages with upfront pricing.</p>
-        </div>
-        <Link href="#categories" className="qf-section-link">
-          View all services <QFIcon name="arrow" />
-        </Link>
+      <div className="qf-section-head">
+        <h2>Featured Service Flows</h2>
+        <p>Popular ready-to-book packages with upfront pricing.</p>
       </div>
       <div className="qf-featured-grid" data-reveal-group>
         {featuredFlows.map((flow) => (

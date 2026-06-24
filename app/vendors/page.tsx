@@ -80,51 +80,11 @@ const sampleLeads = [
   },
 ];
 
-const plans = [
-  {
-    name: "Starter",
-    price: "Rs 1,499",
-    period: "/month",
-    description: "Perfect for getting started",
-    cta: "Choose Starter",
-    features: [
-      "15 lead credits/month",
-      "Profile visibility in search",
-      "WhatsApp leads",
-      "Basic support",
-    ],
-  },
-  {
-    name: "Growth",
-    price: "Rs 2,999",
-    period: "/month",
-    description: "Best for growing businesses",
-    cta: "Choose Growth",
-    badge: "Recommended",
-    featured: true,
-    features: [
-      "40 lead credits/month",
-      "Priority listing in search",
-      "WhatsApp leads",
-      "Performance insights",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Premium",
-    price: "Rs 4,999",
-    period: "/month",
-    description: "For established professionals",
-    cta: "Choose Premium",
-    features: [
-      "80 lead credits/month",
-      "Top listing in search",
-      "WhatsApp leads",
-      "Performance insights",
-      "Dedicated account manager",
-    ],
-  },
-];
+// NOTE: Public lead-pack pricing (Starter/Growth/Premium, credits, monthly
+// pricing) is intentionally NOT shown on the public vendor page — package
+// details are shared privately after business verification. Plan/credit logic
+// still lives in admin + the future vendor dashboard.
+// TODO: Later add OTP authentication for client enquiry and vendor registration/login.
 
 const uspCards = [
   ["Better lead quality", "High-intent clients ready to hire."],
@@ -355,26 +315,27 @@ export default function VendorsPage() {
         <section className={styles.splitSection}>
           <div>
             <div className={styles.sectionHeading}>
-              <h2>Choose the plan that grows with your business</h2>
+              <h2>Become a QuickFurno Verified Vendor</h2>
             </div>
-            <div className={styles.pricingGrid}>
-              {plans.map((plan) => (
-                <article className={`${styles.planCard} ${plan.featured ? styles.planFeatured : ""}`} key={plan.name}>
-                  {plan.badge ? <span className={styles.planBadge}>{plan.badge}</span> : null}
-                  <h3>{plan.name}</h3>
-                  <p>{plan.description}</p>
-                  <strong>
-                    {plan.price}
-                    <small>{plan.period}</small>
-                  </strong>
-                  <ul>
-                    {plan.features.map((feature) => (
-                      <li key={feature}>{feature}</li>
-                    ))}
-                  </ul>
-                  <Link href={registerHref}>{plan.cta}</Link>
-                </article>
-              ))}
+            <div className={styles.vendorJoinCard}>
+              <p className={styles.vendorJoinLead}>
+                Submit your business details and our team will share the right growth package after verification.
+              </p>
+              <ul className={styles.vendorJoinPoints}>
+                <li>Verified vendor onboarding</li>
+                <li>Area-wise lead matching</li>
+                <li>Premium visibility for trusted professionals</li>
+                <li>Package details shared after business verification</li>
+                <li>Future vendor dashboard access</li>
+              </ul>
+              <div className={styles.vendorJoinActions}>
+                <Link className={styles.primaryCta} href={registerHref}>Fill Vendor Form</Link>
+                <Link className={styles.secondaryCta} href={registerHref}>Get Package Details</Link>
+              </div>
+              <p className={styles.vendorJoinNote}>Our team will contact you with package details.</p>
+              <p className={styles.vendorJoinNote}>
+                Package details and subscription options will be available inside the vendor dashboard after verification.
+              </p>
             </div>
           </div>
 

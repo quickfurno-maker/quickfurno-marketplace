@@ -4277,6 +4277,27 @@ body::before {
   accent-color: #f5a400;
 }
 
+/* Multi-line lead-sharing consent — top-align the checkbox with the text. */
+.qf-rf-consent {
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #36404d;
+}
+
+.qf-rf-consent input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.qf-rf-consent a {
+  color: #b8711c;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .qf-rf-loc-btn {
   display: inline-flex;
   align-items: center;
@@ -4583,6 +4604,220 @@ body::before {
 }
 
 /* ==========================================================================
+   Vendor registration wizard (qf-vrf) — premium inline onboarding card.
+   Reuses qf-rf-* inner elements (tiles, chips, fields, summary, buttons) on a
+   light card so headings read with strong contrast on mobile dark backgrounds.
+   ========================================================================== */
+.qf-vrf {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  border: 1px solid #e8ebf0;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 30px 70px -34px rgba(7, 17, 31, 0.55);
+  overflow: hidden;
+}
+
+.qf-vrf-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.1rem 1.3rem 0.95rem;
+  background: #ffffff;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.qf-vrf-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qf-vrf-stepcount {
+  color: #b8711c;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.qf-vrf-stepname {
+  color: #07111f;
+  font-size: 0.9rem;
+  font-weight: 850;
+  text-align: right;
+}
+
+.qf-vrf-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.qf-vrf-dot {
+  flex: 1 1 0;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid #e0e4ea;
+  background: #f6f8fb;
+  color: #94a0b0;
+  font-size: 0.7rem;
+  font-weight: 900;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+
+.qf-vrf-dot.is-active {
+  border-color: #f5a400;
+  background: #fffaf0;
+  color: #b8711c;
+  transform: scale(1.06);
+}
+
+.qf-vrf-dot.is-done {
+  border-color: #071b3a;
+  background: #071b3a;
+  color: #ffffff;
+}
+
+.qf-vrf-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 1.2rem 1.3rem;
+}
+
+.qf-vrf-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.95rem 1.3rem;
+  padding-bottom: max(0.95rem, env(safe-area-inset-bottom));
+  border-top: 1px solid #eef1f5;
+  background: #ffffff;
+}
+
+/* Business-strength grouped chip rows */
+.qf-vrf-group {
+  margin-top: 1rem;
+}
+
+.qf-vrf-group:first-of-type {
+  margin-top: 0.4rem;
+}
+
+.qf-vrf-group-label {
+  display: block;
+  margin-bottom: 0.1rem;
+  color: #071b3a;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+/* Premium location permission card */
+.qf-vrf-loc-card {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1.1rem;
+  border: 1.5px solid #f3d9a3;
+  border-radius: 20px;
+  background: linear-gradient(160deg, #fffaf0, #fdf3e0);
+  text-align: center;
+  justify-items: center;
+}
+
+.qf-vrf-loc-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #f5a400, #d99a16);
+  box-shadow: 0 12px 26px -10px rgba(245, 164, 0, 0.7);
+}
+
+.qf-vrf-loc-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.qf-vrf-loc-text strong {
+  display: block;
+  color: #07111f;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.qf-vrf-loc-text small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #6b7585;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+@media (max-width: 620px) {
+  .qf-vrf {
+    border-radius: 20px;
+  }
+
+  .qf-vrf-head {
+    padding: 1rem 1.05rem 0.85rem;
+  }
+
+  .qf-vrf-body {
+    padding: 1.05rem;
+  }
+
+  .qf-vrf-tiles,
+  .qf-rf-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .qf-vrf-footer {
+    padding: 0.85rem 1.05rem;
+    padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  }
+
+  .qf-vrf-footer .qf-rf-btn {
+    flex: 1 1 auto;
+  }
+
+  .qf-vrf-footer .qf-rf-footer-spacer {
+    display: none;
+  }
+
+  .qf-vrf-stepname {
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .qf-vrf-dot {
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.64rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-vrf-dot {
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
    Scannable Vendor Cards + Compare (Urban Company / Justdial-style)
    Theme: navy #071B3A / text #07111F, accent #F5A400, grey #5B6472,
    border #E5E7EB, white cards with soft shadow.
@@ -4836,6 +5071,16 @@ body::before {
 /* ---- Price ---- */
 .qf-vcard-price {
   grid-area: price;
+}
+
+.qf-vcard-price-label {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #5b6472;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .qf-vcard-price-tag {
@@ -5382,3 +5627,1147 @@ body::before {
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   Vendor registration — premium intro header (strong contrast on light bg)
+   ========================================================================== */
+.qf-vendor-intro {
+  width: min(640px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: clamp(1.6rem, 5vw, 2.6rem) 0 1.1rem;
+  text-align: center;
+}
+
+.qf-vendor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #d4e0ff;
+  border-radius: 999px;
+  background: #eaf0ff;
+  color: #1d4ed8;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.qf-vendor-intro-title {
+  margin: 0.9rem 0 0;
+  /* Strong dark heading — fixes the pale-on-pale mobile contrast issue. */
+  color: #0f172a;
+  font-family: var(--font-sans);
+  font-size: clamp(1.6rem, 5.2vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+}
+
+.qf-vendor-intro-sub {
+  margin: 0.8rem auto 0;
+  max-width: 38rem;
+  color: #45526a;
+  font-size: clamp(0.95rem, 2.4vw, 1.02rem);
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.qf-vendor-bullets {
+  list-style: none;
+  margin: 1.15rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 0.6rem;
+}
+
+.qf-vendor-bullets li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #e3e8ef;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 6px 16px -12px rgba(15, 23, 42, 0.4);
+}
+
+.qf-vendor-bullet-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.qf-vendor-form-wrap {
+  width: min(640px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 0 0 clamp(3rem, 8vw, 5rem);
+}
+
+/* ==========================================================================
+   Vendor wizard — premium BLUE theme, scoped to .qf-vrf only so the shared
+   client enquiry modal (qf-rf-*) keeps its original styling. Orange stays a
+   small accent (the step-count label) per brand direction.
+   ========================================================================== */
+.qf-vrf {
+  --qf-blue: #2563eb;
+  --qf-blue-dark: #1d4ed8;
+  --qf-blue-soft: #4f86f7;
+  --qf-blue-tint: #eef4ff;
+  --qf-blue-ring: rgba(37, 99, 235, 0.18);
+}
+
+.qf-vrf .qf-rf-btn--primary {
+  background: var(--qf-blue);
+  box-shadow: 0 14px 28px -14px rgba(37, 99, 235, 0.6);
+}
+
+.qf-vrf .qf-rf-btn--primary:hover:not(:disabled) {
+  background: var(--qf-blue-dark);
+}
+
+.qf-vrf .qf-rf-progress-fill {
+  background: linear-gradient(90deg, var(--qf-blue), var(--qf-blue-soft));
+}
+
+.qf-vrf .qf-rf-tile-icon {
+  background: linear-gradient(135deg, var(--qf-blue), var(--qf-blue-soft));
+  box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.6);
+}
+
+.qf-vrf .qf-rf-tile.is-selected,
+.qf-vrf .qf-rf-chip.is-selected {
+  border-color: var(--qf-blue);
+  background: var(--qf-blue-tint);
+  box-shadow: 0 0 0 3px var(--qf-blue-ring);
+}
+
+.qf-vrf .qf-rf-tile-check {
+  background: var(--qf-blue);
+}
+
+.qf-vrf .qf-rf-field input:focus,
+.qf-vrf .qf-rf-field select:focus,
+.qf-vrf .qf-rf-field textarea:focus {
+  border-color: var(--qf-blue);
+  box-shadow: 0 0 0 3px var(--qf-blue-ring);
+}
+
+.qf-vrf .qf-rf-check input {
+  accent-color: var(--qf-blue);
+}
+
+.qf-vrf .qf-rf-success-mark {
+  background: linear-gradient(135deg, var(--qf-blue), var(--qf-blue-soft));
+  box-shadow: 0 14px 30px -12px rgba(37, 99, 235, 0.6);
+}
+
+.qf-vrf .qf-vrf-dot.is-active {
+  border-color: var(--qf-blue);
+  background: var(--qf-blue-tint);
+  color: var(--qf-blue-dark);
+}
+
+.qf-vrf .qf-vrf-dot.is-done {
+  border-color: var(--qf-blue);
+  background: var(--qf-blue);
+  color: #ffffff;
+}
+
+.qf-vrf .qf-vrf-loc-card {
+  border-color: #cdddff;
+  background: linear-gradient(160deg, #f4f8ff, #e9f0ff);
+}
+
+.qf-vrf .qf-vrf-loc-icon {
+  background: linear-gradient(135deg, var(--qf-blue), var(--qf-blue-soft));
+  box-shadow: 0 12px 26px -10px rgba(37, 99, 235, 0.7);
+}
+
+/* Sticky Back/Continue footer on mobile so the primary CTA stays reachable. */
+@media (max-width: 620px) {
+  .qf-vrf-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    box-shadow: 0 -10px 24px -18px rgba(15, 23, 42, 0.5);
+  }
+}
+
+/* ==========================================================================
+   Vendor dashboard (qf-vd) — modern white/blue SaaS portal.
+   Self-contained theme so it never inherits the old dark/gold dashboard look.
+   ========================================================================== */
+.qf-vd-shell {
+  --qf-blue: #2563eb;
+  --qf-blue-dark: #1d4ed8;
+  --qf-blue-tint: #eef4ff;
+  --qf-ink: #0f172a;
+  --qf-muted: #5b6675;
+  --qf-line: #e7ebf0;
+  --qf-bg: #f4f6fb;
+  min-height: 100vh;
+  background: var(--qf-bg);
+  color: var(--qf-ink);
+  font-family: var(--font-sans);
+}
+
+/* Sidebar (desktop) */
+.qf-vd-sidebar {
+  display: none;
+}
+
+.qf-vd-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-family: var(--font-sans);
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.qf-vd-brand-q { color: var(--qf-ink); }
+.qf-vd-brand-f { color: #f5a400; }
+.qf-vd-brand--sm { font-size: 1.15rem; }
+
+.qf-vd-brand-tag {
+  margin-top: 0.3rem;
+  color: var(--qf-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.qf-vd-nav {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 1.4rem;
+}
+
+.qf-vd-nav a {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 750;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.qf-vd-nav a:hover {
+  background: var(--qf-blue-tint);
+  color: var(--qf-blue-dark);
+}
+
+.qf-vd-sidebar-foot {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--qf-line);
+}
+
+/* Top bar */
+.qf-vd-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  padding-top: max(0.8rem, env(safe-area-inset-top));
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--qf-line);
+  backdrop-filter: blur(10px);
+}
+
+.qf-vd-topbar-title {
+  display: none;
+  font-size: 1.05rem;
+  font-weight: 850;
+  color: var(--qf-ink);
+}
+
+.qf-vd-content {
+  padding: 1rem;
+  padding-bottom: 5.5rem;
+}
+
+/* Bottom nav (mobile) */
+.qf-vd-bottomnav {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border: 1px solid var(--qf-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 18px 40px -18px rgba(15, 23, 42, 0.4);
+}
+
+.qf-vd-bottomnav a {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border-radius: 12px;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.qf-vd-bottomnav a:hover {
+  background: var(--qf-blue-tint);
+  color: var(--qf-blue-dark);
+}
+
+/* Content layout */
+.qf-vd-page {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.qf-vd-card {
+  border: 1px solid var(--qf-line);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px -28px rgba(15, 23, 42, 0.5);
+  padding: 1.1rem;
+}
+
+.qf-vd-card-title {
+  margin: 0 0 0.7rem;
+  font-size: 1rem;
+  font-weight: 850;
+  color: var(--qf-ink);
+  letter-spacing: -0.01em;
+}
+
+.qf-vd-welcome {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, #f3f7ff, #ffffff 60%);
+  border-color: #d9e4ff;
+}
+
+.qf-vd-welcome h1 {
+  font-family: var(--font-sans);
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--qf-ink);
+}
+
+.qf-vd-welcome p {
+  margin-top: 0.4rem;
+  color: var(--qf-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.qf-vd-chip {
+  flex: 0 0 auto;
+  padding: 0.34rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.qf-vd-chip--ok { color: #0f7a4a; background: #e7f6ee; }
+.qf-vd-chip--pending { color: #9a6400; background: rgba(245, 164, 0, 0.16); }
+
+/* Status cards */
+.qf-vd-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.qf-vd-stat {
+  border: 1px solid var(--qf-line);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px -30px rgba(15, 23, 42, 0.5);
+  padding: 0.85rem;
+}
+
+.qf-vd-stat-label {
+  display: block;
+  color: var(--qf-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.qf-vd-stat-value {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--qf-ink);
+  line-height: 1.1;
+}
+
+.qf-vd-stat--ok .qf-vd-stat-value { color: #0f7a4a; }
+.qf-vd-stat--pending .qf-vd-stat-value { color: #b07400; }
+.qf-vd-stat--blue .qf-vd-stat-value { color: var(--qf-blue); }
+
+.qf-vd-columns {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.qf-vd-col {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+/* Notes */
+.qf-vd-note {
+  margin: 0;
+  color: var(--qf-muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.qf-vd-note--ok {
+  color: #0f7a4a;
+  font-weight: 700;
+}
+
+.qf-vd-note--pending {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(245, 164, 0, 0.3);
+  border-radius: 12px;
+  background: rgba(245, 164, 0, 0.08);
+  color: #8a5a00;
+  font-weight: 650;
+}
+
+/* Empty states */
+.qf-vd-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1.6rem 1rem;
+  text-align: center;
+}
+
+.qf-vd-empty-icon { font-size: 1.6rem; }
+
+.qf-vd-empty p {
+  margin: 0;
+  max-width: 26rem;
+  color: var(--qf-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.qf-vd-empty-profile {
+  max-width: 30rem;
+  margin: 3rem auto;
+  padding: 2rem 1.4rem;
+  border: 1px solid var(--qf-line, #e7ebf0);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 20px 50px -30px rgba(15, 23, 42, 0.5);
+  text-align: center;
+}
+
+.qf-vd-empty-profile h1 {
+  font-family: var(--font-sans);
+  font-size: 1.4rem;
+  font-weight: 850;
+  color: #0f172a;
+}
+
+.qf-vd-empty-profile p {
+  margin: 0.7rem 0 1.2rem;
+  color: #5b6675;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+/* Leads */
+.qf-vd-leads { display: grid; gap: 0.7rem; }
+
+.qf-vd-lead {
+  border: 1px solid var(--qf-line);
+  border-radius: 16px;
+  background: #fbfcfe;
+  padding: 0.9rem;
+}
+
+.qf-vd-lead-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.qf-vd-lead-head strong {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 850;
+  color: var(--qf-ink);
+}
+
+.qf-vd-lead-head span {
+  color: var(--qf-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.qf-vd-lead-status {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: var(--qf-blue-tint);
+  color: var(--qf-blue-dark);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.qf-vd-lead-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.7rem 0 0;
+}
+
+.qf-vd-lead-meta div {
+  border: 1px solid var(--qf-line);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.4rem 0.6rem;
+}
+
+.qf-vd-lead-meta dt {
+  color: var(--qf-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.qf-vd-lead-meta dd {
+  margin: 0.1rem 0 0;
+  color: var(--qf-ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.qf-vd-lead-msg {
+  margin: 0.7rem 0 0;
+  color: #44506a;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.qf-vd-lead-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.qf-vd-lead-foot {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--qf-line);
+}
+
+.qf-vd-mini-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--qf-muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qf-vd-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.qf-vd-pill {
+  border: 1px solid var(--qf-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #44506a;
+  padding: 0.42rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.qf-vd-pill:hover:not(:disabled) { border-color: #b9c6dd; }
+.qf-vd-pill:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.qf-vd-pill.is-on {
+  border-color: var(--qf-blue);
+  background: var(--qf-blue);
+  color: #ffffff;
+}
+
+.qf-vd-report { margin-top: 0.7rem; }
+
+.qf-vd-report-done {
+  color: var(--qf-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.qf-vd-link {
+  border: 0;
+  background: transparent;
+  color: var(--qf-blue);
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Profile summary */
+.qf-vd-profile {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--qf-line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.qf-vd-profile > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--qf-line);
+}
+
+.qf-vd-profile > div:last-child { border-bottom: 0; }
+
+.qf-vd-profile dt {
+  color: var(--qf-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.qf-vd-profile dd {
+  margin: 0;
+  color: var(--qf-ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* Visibility toggle */
+.qf-vd-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.qf-vd-toggle-state {
+  display: block;
+  color: var(--qf-ink);
+  font-size: 0.92rem;
+  font-weight: 850;
+}
+
+.qf-vd-switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: #d4dae4;
+  transition: background 180ms ease;
+}
+
+.qf-vd-switch.is-on { background: var(--qf-blue); }
+.qf-vd-switch.is-disabled { opacity: 0.55; }
+
+.qf-vd-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.3);
+  transition: transform 180ms ease;
+}
+
+.qf-vd-switch.is-on .qf-vd-switch-knob { transform: translateX(20px); }
+
+.qf-vd-support .qf-vd-btn { margin-top: 0.6rem; }
+
+/* Buttons */
+.qf-vd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.6rem 1.1rem;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
+}
+
+.qf-vd-btn--primary {
+  color: #ffffff;
+  background: var(--qf-blue, #2563eb);
+  box-shadow: 0 14px 26px -16px rgba(37, 99, 235, 0.7);
+}
+
+.qf-vd-btn--primary:hover { background: var(--qf-blue-dark, #1d4ed8); transform: translateY(-1px); }
+
+.qf-vd-btn--ghost {
+  color: #1d4ed8;
+  background: #ffffff;
+  border-color: #cdddff;
+}
+
+.qf-vd-btn--ghost:hover { background: #f3f7ff; }
+
+.qf-vd-btn--full { width: 100%; }
+
+/* Desktop layout */
+@media (min-width: 900px) {
+  .qf-vd-shell {
+    display: grid;
+    grid-template-columns: 248px 1fr;
+  }
+
+  .qf-vd-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 1.3rem 1.1rem;
+    background: #ffffff;
+    border-right: 1px solid var(--qf-line);
+  }
+
+  .qf-vd-topbar-title { display: block; }
+  .qf-vd-brand--sm { display: none; }
+  .qf-vd-topbar-actions { display: none; }
+
+  .qf-vd-content {
+    padding: 1.5rem;
+    padding-bottom: 2rem;
+  }
+
+  .qf-vd-bottomnav { display: none; }
+
+  .qf-vd-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+  }
+
+  .qf-vd-columns {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .qf-vd-lead-actions {
+    grid-template-columns: auto auto;
+    justify-content: start;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 899px) {
+  .qf-vd-content { padding: 1.5rem; }
+}
+
+/* ==========================================================================
+   Footer (qf-foot) — compact, premium, white/blue. Mobile = collapsible
+   accordions; desktop = multi-column with everything expanded.
+   ========================================================================== */
+.qf-foot {
+  --qf-blue: #2563eb;
+  --qf-blue-dark: #1d4ed8;
+  --qf-ink: #0f172a;
+  --qf-muted: #5b6675;
+  --qf-line: #e7ebf0;
+  margin-top: 2.5rem;
+  background: #f8fafc;
+  border-top: 1px solid var(--qf-line);
+  color: var(--qf-ink);
+  font-family: var(--font-sans);
+}
+
+.qf-foot-inner {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 1.4rem 0 0.6rem;
+  display: grid;
+  gap: 1.2rem;
+}
+
+/* Brand block */
+.qf-foot-brand {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.qf-foot-logo {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.qf-foot-logo-q { color: var(--qf-ink); }
+.qf-foot-logo-f { color: #f5a400; }
+
+.qf-foot-tagline {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--qf-muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* Accordion sections */
+.qf-foot-sections {
+  display: grid;
+}
+
+.qf-foot-acc {
+  border-top: 1px solid var(--qf-line);
+}
+
+.qf-foot-acc-head { margin: 0; }
+
+.qf-foot-acc-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0.1rem;
+  border: 0;
+  background: transparent;
+  color: var(--qf-ink);
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qf-foot-acc-chev {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.qf-foot-acc-chev::before,
+.qf-foot-acc-chev::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--qf-blue);
+  transform: translate(-50%, -50%);
+  transition: transform 240ms ease, opacity 240ms ease;
+}
+
+.qf-foot-acc-chev::after { transform: translate(-50%, -50%) rotate(90deg); }
+.qf-foot-acc.is-open .qf-foot-acc-chev::after { opacity: 0; transform: translate(-50%, -50%) rotate(0deg); }
+
+.qf-foot-acc-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qf-foot-acc.is-open .qf-foot-acc-panel {
+  grid-template-rows: 1fr;
+}
+
+.qf-foot-acc-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.qf-foot-links {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.85rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.qf-foot-links a,
+.qf-foot-links span {
+  color: var(--qf-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: color 150ms ease;
+}
+
+.qf-foot-links a:hover { color: var(--qf-blue-dark); }
+
+/* Bottom bar */
+.qf-foot-bottom {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 0.9rem 0 calc(1rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--qf-line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: #8a93a3;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .qf-foot-acc-panel,
+  .qf-foot-acc-chev::before,
+  .qf-foot-acc-chev::after {
+    transition: none !important;
+  }
+}
+
+/* Desktop: multi-column, everything expanded, no toggling */
+@media (min-width: 900px) {
+  .qf-foot-inner {
+    grid-template-columns: 1.5fr 2.5fr;
+    gap: 2.5rem;
+    padding: 2.4rem 0 1rem;
+  }
+
+  .qf-foot-sections {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .qf-foot-acc { border-top: 0; }
+
+  .qf-foot-acc-btn {
+    padding: 0 0 0.7rem;
+    cursor: default;
+    pointer-events: none;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #44506a;
+  }
+
+  .qf-foot-acc-chev { display: none; }
+
+  /* Always expanded on desktop regardless of toggle state. */
+  .qf-foot-acc-panel { grid-template-rows: 1fr; }
+
+  .qf-foot-links { padding-bottom: 0; }
+
+  .qf-foot-bottom {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+
+/* Vendor wizard — Starting ₹/sqft rate: single premium number input. */
+.qf-vrf-rate-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0 0.95rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.qf-vrf-rate-input:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.qf-vrf-rate-input.has-error {
+  border-color: #d8463b;
+  box-shadow: 0 0 0 3px rgba(216, 70, 59, 0.15);
+}
+
+.qf-vrf-rate-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0.85rem 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #07111f;
+}
+
+.qf-vrf-rate-prefix {
+  color: #5b6675;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.qf-vrf-rate-suffix {
+  color: #5b6675;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.qf-vrf-rate-min {
+  margin: 0.45rem 0 0;
+  color: #5b6675;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.qf-vrf-rate-error {
+  margin: 0.4rem 0 0;
+  color: #b4231a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* Vendor wizard — validation warning box + inline field errors. */
+.qf-rf-warnbox {
+  margin-bottom: 0.95rem;
+  border: 1px solid rgba(180, 35, 24, 0.22);
+  border-radius: 14px;
+  background: rgba(180, 35, 24, 0.06);
+  padding: 0.8rem 0.95rem;
+}
+.qf-rf-warnbox strong {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #9b2c20;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+.qf-rf-warnbox ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: grid;
+  gap: 0.2rem;
+}
+.qf-rf-warnbox li {
+  color: #9b2c20;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.qf-rf-field-err {
+  color: #b4231a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.qf-rf-field-err--block {
+  margin: 0.45rem 0 0;
+}
+.qf-rf-field.has-error input,
+.qf-rf-field.has-error select,
+.qf-rf-field.has-error textarea {
+  border-color: #d8463b;
+  box-shadow: 0 0 0 3px rgba(216, 70, 59, 0.14);
+}
+.qf-rf-tiles.has-error,
+.qf-rf-chips.has-error {
+  outline: 1.5px solid rgba(216, 70, 59, 0.45);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
+/* Step 3 — office address subsection heading + two-up field row. */
+.qf-vrf-subhead {
+  margin: 1.25rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 850;
+  color: #071b3a;
+  letter-spacing: -0.01em;
+}
+.qf-vrf-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+@media (max-width: 380px) {
+  .qf-vrf-field-row { grid-template-columns: 1fr; }
+}
+
+/* Vendor dashboard — Business Location card. */
+.qf-vd-address {
+  display: flex;
+  gap: 0.55rem;
+  font-style: normal;
+  color: var(--qf-ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.qf-vd-address-icon { flex: 0 0 auto; }
+.qf-vd-address-text { display: grid; gap: 0.1rem; }
+.qf-vd-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  color: var(--qf-blue);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.qf-vd-link:hover { text-decoration: underline; }

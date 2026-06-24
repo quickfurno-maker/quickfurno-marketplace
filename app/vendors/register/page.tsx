@@ -4,19 +4,37 @@ import { VendorRegisterForm } from "@/components/VendorRegisterForm";
 
 export const metadata = { title: "Become a partner — QuickFurno" };
 
+const trustBullets = [
+  "Verified vendor profile",
+  "Area-based enquiry matching",
+  "Dashboard access after approval",
+  "WhatsApp-first communication",
+];
+
 export default function VendorRegisterPage() {
   return (
     <>
       <Header />
-      <section className="mx-auto max-w-6xl px-5 pt-12 pb-8">
-        <p className="eyebrow">Partner studios</p>
-        <h1 className="mt-4 text-3xl font-semibold text-ivory md:text-4xl">Get matched to ready homeowners</h1>
-        <p className="mt-3 max-w-xl font-sans text-muted">
-          Apply once. After approval, buy a prepaid lead pack and start receiving exclusive,
-          area-matched enquiries — capped at three studios per lead.
+      <section className="qf-vendor-intro">
+        <span className="qf-vendor-badge">Partner with QuickFurno</span>
+        <h1 className="qf-vendor-intro-title">
+          Get verified and start receiving serious home-service enquiries
+        </h1>
+        <p className="qf-vendor-intro-sub">
+          Join QuickFurno as a verified vendor. Share your business details once, choose your
+          service areas, and our team will review your profile before giving access to suitable
+          client enquiries.
         </p>
+        <ul className="qf-vendor-bullets">
+          {trustBullets.map((bullet) => (
+            <li key={bullet}>
+              <span className="qf-vendor-bullet-check" aria-hidden="true">✓</span>
+              {bullet}
+            </li>
+          ))}
+        </ul>
       </section>
-      <section className="mx-auto max-w-6xl px-5 pb-16">
+      <section className="qf-vendor-form-wrap">
         <VendorRegisterForm />
       </section>
       <Footer />

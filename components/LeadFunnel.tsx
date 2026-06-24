@@ -25,8 +25,23 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const [vendors, setVendors] = useState<PublicVendorCard[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
   const [assignedCount, setAssignedCount] = useState(0);
+  const [consent, setConsent] = useState(false);
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  function readTracking() {
+    if (typeof window === "undefined") return {};
+    const params = new URLSearchParams(window.location.search);
+    const pick = (key: string) => params.get(key)?.trim() || undefined;
+    return {
+      source_url: window.location.href,
+      utm_source: pick("utm_source"),
+      utm_medium: pick("utm_medium"),
+      utm_campaign: pick("utm_campaign"),
+      utm_term: pick("utm_term"),
+      utm_content: pick("utm_content"),
+    };
+  }
 
   async function onSubmitForm() {
     if (busy) return;
@@ -37,6 +52,10 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       return;
     }
     if (form.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
+    if (!consent) {
+      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
+      return;
+    }
     setBusy(true);
     try {
       console.info("[lead funnel] submitting", {
@@ -46,7 +65,12 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         has_budget_range: Boolean(form.budget),
         has_requirement: Boolean(form.message),
       });
-      const res = await submitLead({ ...form, source: "Enquiry funnel" });
+      const res = await submitLead({
+        ...form,
+        source: "Enquiry funnel",
+        share_consent: consent,
+        ...readTracking(),
+      });
       if (!res.ok) { setError(res.error); return; }
       console.info("[lead funnel] submission confirmed", {
         lead_id: res.data.id,
@@ -139,6 +163,21 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
           <Field label="Anything else (optional)">
             <textarea className="field min-h-[90px]" value={form.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell the studios about your space…" />
           </Field>
+          <label className="mt-5 flex items-start gap-3 font-sans text-xs leading-5 text-muted">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-gold"
+            />
+            <span>
+              I agree to share my details with up to 3 verified vendors so they can contact me about
+              my requirement. See our{" "}
+              <a href="/privacy" className="text-gold underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
+              and{" "}
+              <a href="/terms" className="text-gold underline" target="_blank" rel="noopener noreferrer">Terms</a>.
+            </span>
+          </label>
           <button onClick={onSubmitForm} disabled={busy} className="btn-gold mt-6 w-full sm:w-auto">
             {busy ? "Finding studios…" : "Find matching studios"}
           </button>

@@ -3,20 +3,11 @@
 // Vendor registration, dashboard data, lead status updates, bad-lead reports.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
-import { appError, type Result, ok, fail } from "../lib/errors";
+import { appError, AppError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
-
-/** PostgREST/Postgres "column does not exist" — i.e. the location migration
- *  (007_vendor_location.sql) has not been applied yet. */
-function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  const code = error.code ?? "";
-  const message = (error.message ?? "").toLowerCase();
-  return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
-}
 
 /** Public vendor registration. Always lands as Pending + not visible. */
 export async function registerVendor(input: VendorRegistrationInput): Promise<Result<{ id: string }>> {
@@ -25,51 +16,65 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       throw appError("VALIDATION");
     }
 
-    const basePayload = {
+    // Exact column set written to public.vendors (matches the onboarding wizard).
+    // Status/consent defaults are forced here regardless of input.
+    const payload = {
       business_name: input.business_name,
       owner_name: input.owner_name ?? null,
       phone: input.phone,
+      whatsapp_number: input.whatsapp_number ?? null,
       email: input.email ?? null,
       city: input.city,
+      // Detailed office / business address (migration 011).
+      office_address_line1: input.office_address_line1 ?? null,
+      office_address_line2: input.office_address_line2 ?? null,
+      office_landmark: input.office_landmark ?? null,
+      office_city: input.office_city ?? null,
+      office_state: input.office_state ?? null,
+      office_pincode: input.office_pincode ?? null,
+      office_latitude: input.office_latitude ?? null,
+      office_longitude: input.office_longitude ?? null,
       areas_covered: input.areas_covered ?? [],
       covers_full_city: input.covers_full_city ?? false,
       service_categories: input.service_categories ?? [],
       experience: input.experience ?? null,
       portfolio_urls: input.portfolio_urls ?? [],
-      profile_image_url: input.profile_image_url ?? null,
       gst_number: input.gst_number ?? null,
       message: input.message ?? null,
-      user_id: input.user_id ?? null,
+      location_permission_status: input.location_permission_status ?? "not_requested",
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      service_radius_km: input.service_radius_km ?? 10,
+      business_type: input.business_type ?? null,
+      team_size: input.team_size ?? null,
+      monthly_capacity: input.monthly_capacity ?? null,
+      starting_price: input.starting_price ?? null,
       status: "Pending",
+      verification_status: "Pending",
+      paid_status: "Unpaid",
+      is_active: true,
       public_visibility: false,
+      source_url: input.source_url ?? null,
+      utm_source: input.utm_source ?? null,
+      utm_medium: input.utm_medium ?? null,
+      utm_campaign: input.utm_campaign ?? null,
+      // Kept for the account-linked registration path (FK to profiles); null for
+      // the public application wizard.
+      user_id: input.user_id ?? null,
     };
 
-    // Optional vendor base location (GPS) — only persisted once the
-    // 007_vendor_location.sql migration has added these columns.
-    const locationPayload = {
-      base_latitude: input.base_latitude ?? null,
-      base_longitude: input.base_longitude ?? null,
-      location_accuracy_meters: input.location_accuracy_meters ?? null,
-      location_source: input.location_source ?? null,
-      location_captured_at: input.location_captured_at ?? null,
-      service_radius_km: input.service_radius_km ?? null,
-      base_area: input.base_area ?? null,
-      base_pincode: input.base_pincode ?? null,
-    };
+    console.log("Vendor payload:", payload);
 
-    const insertVendor = (payload: Record<string, unknown>) =>
-      adminClient().from("vendors").insert(payload).select("id").single();
-
-    let { data, error } = await insertVendor({ ...basePayload, ...locationPayload });
-
-    // Graceful fallback: if the location columns aren't migrated yet, register
-    // without them so vendor onboarding is never blocked.
-    if (error && isMissingColumnError(error)) {
-      console.warn("[vendors] location columns missing — run 007_vendor_location.sql; registering without GPS.");
-      ({ data, error } = await insertVendor(basePayload));
-    }
+    // Single insert with the full payload — the vendors table already has every
+    // column, so no fallback (a fallback would silently drop the new fields).
+    const { data, error } = await adminClient()
+      .from("vendors")
+      .insert(payload)
+      .select("id")
+      .single();
 
     if (error) {
+      console.error("Vendor insert error:", error);
       logSupabaseInsertError("vendors", error, {
         has_user_id: Boolean(input.user_id),
         has_email: Boolean(input.email),
@@ -80,7 +85,19 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
     }
     return ok({ id: data!.id });
   } catch (e) {
-    return fail(e);
+    // Known validation errors keep their friendly message. For unexpected
+    // (e.g. Postgres) failures, surface the real message in development and a
+    // simple, safe message in production.
+    if (e instanceof AppError) return fail(e);
+    const message = (e as { message?: string })?.message ?? "Unknown error";
+    return {
+      ok: false,
+      code: "UNKNOWN",
+      error:
+        process.env.NODE_ENV === "development"
+          ? `Something went wrong: ${message}`
+          : "Something went wrong. Please check your details and try again.",
+    };
   }
 }
 

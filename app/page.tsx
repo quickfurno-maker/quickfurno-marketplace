@@ -18,17 +18,17 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 
 // Phase 1A hero trust badges (visual; matches final design direction).
 const heroBadges = [
-  { icon: "shield" as const, label: "Verified Professionals" },
-  { icon: "tag" as const, label: "Upfront Pricing" },
-  { icon: "clock" as const, label: "On-Time Guarantee" },
-  { icon: "lock" as const, label: "Secure Payments" },
+  { icon: "shield" as const, label: "Verified Vendors" },
+  { icon: "tag" as const, label: "Free for Homeowners" },
+  { icon: "clock" as const, label: "Fast Response" },
+  { icon: "lock" as const, label: "Privacy First" },
 ];
 
 // Floating trust badges overlapping the hero image (desktop only).
 const heroMiniCards = [
   { icon: "shield" as const, label: "Verified Experts" },
   { icon: "home" as const, label: "Premium Interiors" },
-  { icon: "tag" as const, label: "Best Price Match" },
+  { icon: "tag" as const, label: "Up to 3 Matches" },
 ];
 
 export const metadata: Metadata = {
@@ -53,15 +53,16 @@ export default function HomePage() {
         <div className="qf-home-app-shell">
           <section className="qf-hero-section qf-hero-clean">
             <div className="qf-hero-copy">
-              <span className="qf-hero-eyebrow">Trusted Home Services</span>
+              <span className="qf-hero-eyebrow">Verified Home Services</span>
               <h1>
-                Beautiful homes.
+                Tell us your requirement
                 <br />
-                <em>Expertly done.</em>
+                <em>&amp; get matched.</em>
               </h1>
               <p>
-                Book verified professionals for every corner of your home. Fast,
-                reliable &amp; hassle-free.
+                Get connected with verified home-service vendors near you. One
+                enquiry is shared with up to 3 verified vendors — free for
+                homeowners.
               </p>
             </div>
 
@@ -87,7 +88,7 @@ export default function HomePage() {
                 className="qf-hero-cta-primary"
                 source="Homepage hero"
               >
-                Book Now <QFIcon name="arrow" />
+                Get Free Vendor Matches <QFIcon name="arrow" />
               </EnquiryModalTrigger>
               <Link href="#categories" className="qf-hero-cta-secondary">
                 Explore Services
@@ -108,7 +109,7 @@ export default function HomePage() {
             <div className="qf-section-head qf-section-head--row">
               <div>
                 <h2>Popular Home Services</h2>
-                <p>Choose a service and book verified professionals near you.</p>
+                <p>Pick a service and get matched with verified vendors near you.</p>
               </div>
               <Link href="#featured" className="qf-section-link">
                 View all <QFIcon name="arrow" />

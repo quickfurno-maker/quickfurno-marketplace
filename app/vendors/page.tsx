@@ -99,7 +99,7 @@ const testimonials = [
   {
     name: "Rohit Deshmukh",
     company: "UrbanCraft Interiors, Pune",
-    quote: "QuickFurno brings us quality leads every day. Our project bookings have increased by 3x.",
+    quote: "QuickFurno brings us genuine, high-intent leads from real homeowners in our service areas.",
   },
   {
     name: "Sanket Patil",
@@ -204,8 +204,8 @@ export default function VendorsPage() {
                 </Link>
               </div>
               <div className={styles.trustLine}>
-                <span>Trusted by 500+ service professionals in Pune &amp; Mumbai</span>
-                <strong>4.8/5 from 500+ professionals</strong>
+                <span>Join verified service professionals across Pune &amp; Mumbai</span>
+                <strong>Verified vendor network</strong>
               </div>
             </div>
 
@@ -378,7 +378,7 @@ export default function VendorsPage() {
         <section className={styles.finalCta}>
           <div>
             <h2>Ready to receive more client enquiries?</h2>
-            <p>Join 500+ service professionals who are growing faster with QuickFurno.</p>
+            <p>Join the verified service professionals growing faster with QuickFurno.</p>
           </div>
           <Link href={registerHref}>Join QuickFurno Today</Link>
           <ul>

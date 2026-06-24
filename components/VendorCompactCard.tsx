@@ -117,6 +117,7 @@ export function VendorCompactCard({
 
       {/* Price chip */}
       <div className="qf-vcard-price">
+        <span className="qf-vcard-price-label">Starting rate</span>
         <span className="qf-vcard-price-tag">{trust.startingPrice}</span>
       </div>
 

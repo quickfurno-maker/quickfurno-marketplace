@@ -3,7 +3,7 @@ import { getMyVendor, vendorDashboard, vendorLeads } from "@/app/actions";
 import { VendorDashboard } from "@/components/VendorDashboard";
 import type { VendorDashboardStats } from "@/lib/types";
 
-export const metadata = { title: "Studio dashboard — QuickFurno" };
+export const metadata = { title: "Vendor dashboard — QuickFurno" };
 export const dynamic = "force-dynamic";
 
 export default async function VendorPage() {
@@ -12,12 +12,15 @@ export default async function VendorPage() {
 
   if (!vendor) {
     return (
-      <div className="panel p-8 text-center">
-        <h1 className="text-2xl text-ivory">No studio profile yet</h1>
-        <p className="mx-auto mt-3 max-w-md font-sans text-sm text-muted">
-          Your account isn’t linked to a studio. Complete your partner application to get started.
+      <div className="qf-vd-empty-profile">
+        <h1>No vendor profile yet</h1>
+        <p>
+          Your account isn’t linked to a vendor profile yet. Complete your application to get
+          started — our team will verify your details and enable dashboard access.
         </p>
-        <Link href="/vendors/register" className="btn-gold mt-6">Complete application</Link>
+        <Link href="/vendors/register" className="qf-vd-btn qf-vd-btn--primary">
+          Complete application
+        </Link>
       </div>
     );
   }
@@ -28,5 +31,5 @@ export default async function VendorPage() {
   }) as VendorDashboardStats;
   const leads = (leadsRes.ok ? leadsRes.data : []) as any[];
 
-  return <VendorDashboard vendorId={vendor.id} status={vendor.status} stats={stats} leads={leads} />;
+  return <VendorDashboard vendor={vendor} stats={stats} leads={leads} />;
 }

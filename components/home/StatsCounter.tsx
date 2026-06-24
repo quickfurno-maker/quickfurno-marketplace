@@ -13,13 +13,14 @@ type Stat = {
   short: string;
 };
 
-// Headline marketplace stats (navy strip).
+// Headline trust strip (navy strip). MVP-safe qualitative text — no fabricated
+// counters. Swap to real numbers here once we have verified figures.
 const homeStats: Stat[] = [
-  { icon: "user", value: "10,000+", label: "Verified Professionals", short: "Verified Pros" },
-  { icon: "chat", value: "1L+", label: "Happy Customers", short: "Happy Customers" },
-  { icon: "star", value: "4.7", label: "Average Rating", short: "Avg. Rating" },
-  { icon: "clock", value: "98%", label: "On-Time Service", short: "On-Time Service" },
-  { icon: "lock", value: "Secure", label: "Payments & Data", short: "Secure Payments" },
+  { icon: "user", value: "Verified", label: "Vendors near you", short: "Verified Vendors" },
+  { icon: "request", value: "Up to 3", label: "Vendor matches per enquiry", short: "Up to 3 Matches" },
+  { icon: "tag", value: "Free", label: "Client enquiries", short: "Free Enquiry" },
+  { icon: "map", value: "Pune & Mumbai", label: "Now serving", short: "Pune & Mumbai" },
+  { icon: "lock", value: "Secure", label: "Data & privacy", short: "Secure & Private" },
 ];
 
 const DURATION = 1200;

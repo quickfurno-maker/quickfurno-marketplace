@@ -5,10 +5,12 @@ import styles from "@/app/vendors/vendors.module.css";
 
 // Compact stats strip shown below the vendor hero visual — counters animate up
 // once when the strip first scrolls into view.
+// MVP-safe qualitative trust text — no fabricated counters. Replace with real
+// figures once available.
 const heroStats = [
-  { value: "10,000+", label: "Verified Pros" },
-  { value: "4.7", label: "Average Rating" },
-  { value: "100%", label: "Secure & Trusted" },
+  { value: "Genuine", label: "Verified leads" },
+  { value: "Area-based", label: "Lead matching" },
+  { value: "Secure", label: "& Transparent" },
 ];
 
 const DURATION = 1200;

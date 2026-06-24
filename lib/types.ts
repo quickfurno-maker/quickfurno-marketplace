@@ -26,6 +26,15 @@ export interface CreateLeadInput {
   message?: string;
   requirement?: string;
   source?: string;
+  // Tracking readiness + consent (stored once 008_lead_capture_consent.sql runs).
+  source_url?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  location_consent?: boolean;
+  share_consent?: boolean;
 }
 
 export interface PublicVendorCard {
@@ -74,6 +83,66 @@ export interface VendorRegistrationInput {
   service_radius_km?: number;
   base_area?: string;
   base_pincode?: string;
+  // Guided onboarding wizard fields (stored once 009_vendor_onboarding.sql /
+  // 010_vendor_exact_columns.sql run; registerVendor falls back gracefully if
+  // the columns are missing).
+  latitude?: number | null;
+  longitude?: number | null;
+  whatsapp_number?: string;
+  selected_category?: string;
+  selected_subcategories?: string[];
+  custom_service_area?: string;
+  // Detailed office / business address (migration 011_vendor_office_address).
+  office_address_line1?: string;
+  office_address_line2?: string;
+  office_landmark?: string;
+  office_city?: string;
+  office_state?: string;
+  office_pincode?: string;
+  office_latitude?: number | null;
+  office_longitude?: number | null;
+  location_permission_status?: string;
+  business_type?: string;
+  years_experience?: string;
+  team_size?: string;
+  monthly_capacity?: string;
+  starting_price?: string;
+  paid_status?: string;
+  source_url?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+}
+
+/** Read-only profile summary shown on the vendor dashboard (display fields). */
+export interface VendorProfileSummary {
+  id: string;
+  business_name: string;
+  owner_name: string | null;
+  phone: string | null;
+  whatsapp_number: string | null;
+  email: string | null;
+  city: string | null;
+  areas_covered: string[] | null;
+  service_categories: string[] | null;
+  selected_category: string | null;
+  business_type: string | null;
+  // Office / business address (migration 011_vendor_office_address).
+  office_address_line1: string | null;
+  office_address_line2: string | null;
+  office_landmark: string | null;
+  office_city: string | null;
+  office_state: string | null;
+  office_pincode: string | null;
+  office_latitude: number | null;
+  office_longitude: number | null;
+  status: string;
+  verification_status: string | null;
+  paid_status: string | null;
+  remaining_credits: number;
+  total_credits: number;
+  public_visibility: boolean;
+  is_active: boolean;
 }
 
 export interface VendorDashboardStats {

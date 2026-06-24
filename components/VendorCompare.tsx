@@ -207,7 +207,7 @@ function CompareModal({
               </div>
             ))}
 
-            <div className="qf-compare-cell qf-compare-cell--rowhead">Starting price</div>
+            <div className="qf-compare-cell qf-compare-cell--rowhead">Starting rate</div>
             {rows.map(({ vendor, trust }) => (
               <div
                 className={`qf-compare-cell${trust.priceValue != null && trust.priceValue === bestPrice ? " is-best" : ""}`}

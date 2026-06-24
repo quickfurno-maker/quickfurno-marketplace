@@ -146,6 +146,7 @@ type RFState = {
   message: string;
   lat: number | null;
   lng: number | null;
+  shareConsent: boolean;
 };
 
 const initialState: RFState = {
@@ -165,7 +166,23 @@ const initialState: RFState = {
   message: "",
   lat: null,
   lng: null,
+  shareConsent: false,
 };
+
+/** Read UTM params + the current page URL for lead-source tracking. */
+function readTrackingContext() {
+  if (typeof window === "undefined") return {};
+  const params = new URLSearchParams(window.location.search);
+  const pick = (key: string) => params.get(key)?.trim() || undefined;
+  return {
+    source_url: window.location.href,
+    utm_source: pick("utm_source"),
+    utm_medium: pick("utm_medium"),
+    utm_campaign: pick("utm_campaign"),
+    utm_term: pick("utm_term"),
+    utm_content: pick("utm_content"),
+  };
+}
 
 type EnquiryModalOptions = {
   title?: string;
@@ -347,7 +364,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       case 4:
         return Boolean(form.timeline);
       case 5:
-        return form.name.trim().length > 1 && form.phone.replace(/\D/g, "").length >= 10;
+        return (
+          form.name.trim().length > 1 &&
+          form.phone.replace(/\D/g, "").length >= 10 &&
+          form.shareConsent
+        );
       default:
         return true;
     }
@@ -440,6 +461,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (!form.shareConsent) {
+      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
+      return;
+    }
+
     const requirementParts = [
       form.needLabel ? `Need: ${form.needLabel}` : "",
       form.projectType ? `Project type: ${form.projectType}` : "",
@@ -459,6 +485,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       timeline: form.timeline || undefined,
       requirement: requirementParts.join(" | ") || undefined,
       source: modalOptions.source ?? "Requirement flow",
+      location_consent: form.lat != null && form.lng != null,
+      share_consent: form.shareConsent,
+      ...readTrackingContext(),
     };
 
     setSubmitting(true);
@@ -712,6 +741,20 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   placeholder="Anything else vendors should know?"
                   rows={3}
                 />
+              </label>
+              <label className="qf-rf-check qf-rf-consent">
+                <input
+                  type="checkbox"
+                  checked={form.shareConsent}
+                  onChange={(e) => set("shareConsent", e.target.checked)}
+                />
+                <span>
+                  I agree to share my details with up to 3 verified vendors so they
+                  can contact me about my requirement. See our{" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
+                  and{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.
+                </span>
               </label>
             </div>
           </div>

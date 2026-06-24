@@ -4,84 +4,20 @@ import { useState } from "react";
 import Link from "next/link";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import { mainCategories, type MainCategory } from "@/lib/categories";
 
-type HomeSubcategory = { label: string; category: QuickFurnoCategory };
-
-type HomeCategory = {
-  label: string;
-  tagline: string;
-  icon: Parameters<typeof QFIcon>[0]["name"];
-  category: QuickFurnoCategory;
-  subcategories: HomeSubcategory[];
-};
-
-const homeCategories: HomeCategory[] = [
-  {
-    label: "Interiors",
-    tagline: "Design, woodwork & turnkey homes",
-    icon: "home",
-    category: "Interior Designers",
-    subcategories: [
-      { label: "Carpenters", category: "Carpenters" },
-      { label: "Modular Factory", category: "Modular Factory" },
-      { label: "Premium Interiors", category: "Premium Interiors" },
-      { label: "Interior Designers", category: "Interior Designers" },
-    ],
-  },
-  {
-    label: "Carpentry",
-    tagline: "Carpenters, wardrobes & custom furniture",
-    icon: "hammer",
-    category: "Carpenters",
-    subcategories: [
-      { label: "Carpenter", category: "Carpenters" },
-      { label: "Modular Factory", category: "Modular Factory" },
-      { label: "Custom Furniture", category: "Carpenters" },
-      { label: "Wardrobes", category: "Carpenters" },
-    ],
-  },
-  {
-    label: "Sofa",
-    tagline: "Custom sofas, recliners & upholstery",
-    icon: "sofa",
-    category: "Sofa",
-    // No subcategories — clicking Sofa opens the vendor listing directly.
-    subcategories: [],
-  },
-  {
-    label: "Painting",
-    tagline: "Interior, texture & waterproofing",
-    icon: "paint",
-    category: "Painter",
-    subcategories: [
-      { label: "Interior Painting", category: "Painter" },
-      { label: "Exterior Painting", category: "Painter" },
-      { label: "Texture Painting", category: "Painter" },
-      { label: "Waterproofing", category: "Painter" },
-    ],
-  },
-  {
-    label: "Civil Work",
-    tagline: "Renovation, tiling & masonry",
-    icon: "civil",
-    category: "Civil Work",
-    subcategories: [
-      { label: "Home Renovation", category: "Civil Work" },
-      { label: "Tile Work", category: "Civil Work" },
-      { label: "Bathroom Renovation", category: "Civil Work" },
-      { label: "Mason Work", category: "Civil Work" },
-    ],
-  },
-];
+// Single source of truth — shared with the vendor registration Step 2 so the
+// public category structure never drifts. See lib/categories.ts.
+const homeCategories = mainCategories;
 
 export function HomeCategoryGrid() {
-  const [active, setActive] = useState<HomeCategory | null>(null);
+  const [active, setActive] = useState<MainCategory | null>(null);
 
   function routeFor(category: QuickFurnoCategory) {
     return `/category/${categorySlug(category)}`;
   }
 
-  function openCategory(item: HomeCategory) {
+  function openCategory(item: MainCategory) {
     setActive(item);
   }
 
@@ -114,7 +50,7 @@ export function HomeCategoryGrid() {
               {cardInner}
             </button>
           ) : (
-            <Link key={item.label} href={routeFor(item.category)} className="qf-home-category-card">
+            <Link key={item.label} href={item.category ? routeFor(item.category) : "#featured"} className="qf-home-category-card">
               {cardInner}
             </Link>
           );
@@ -161,9 +97,11 @@ export function HomeCategoryGrid() {
                 </Link>
               ))}
             </div>
-            <Link className="qf-sheet-primary" href={routeFor(active.category)} onClick={() => setActive(null)}>
-              View all {active.label} vendors
-            </Link>
+            {active.category ? (
+              <Link className="qf-sheet-primary" href={routeFor(active.category)} onClick={() => setActive(null)}>
+                View all {active.label} vendors
+              </Link>
+            ) : null}
           </section>
         </div>
       ) : null}

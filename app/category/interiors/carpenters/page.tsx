@@ -373,7 +373,7 @@ export default function CarpentersListingPage() {
               <p>Compare verified carpenters for modular furniture, wardrobes, kitchens, TV units &amp; more.</p>
             </div>
             <div className={styles.heroTrust} aria-label="Listing summary">
-              <span>128 vendors found</span>
+              <span>Verified vendors</span>
               <span>Paid vendors shown first</span>
             </div>
           </section>
@@ -634,8 +634,8 @@ export default function CarpentersListingPage() {
               </EnquiryModalTrigger>
 
               <div className={styles.matchRating}>
-                <span>Trusted by 2,500+ homeowners in Pune</span>
-                <strong>4.8 / 5</strong>
+                <span>Trusted by homeowners across Pune</span>
+                <strong>Verified vendors</strong>
               </div>
             </aside>
           </section>

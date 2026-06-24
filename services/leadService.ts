@@ -13,6 +13,15 @@ function firstText(...values: Array<string | undefined>): string {
   return values.map((value) => value?.trim()).find(Boolean) ?? "";
 }
 
+/** PostgREST/Postgres "column does not exist" — i.e. the lead tracking/consent
+ *  migration (008_lead_capture_consent.sql) has not been applied yet. */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
+}
+
 /** Create a client lead. De-dupes by phone+service+city within the configured window. */
 export async function createLead(input: CreateLeadInput): Promise<Result<{ id: string; is_duplicate: boolean }>> {
   try {
@@ -46,26 +55,48 @@ export async function createLead(input: CreateLeadInput): Promise<Result<{ id: s
 
     const isDuplicate = Boolean(dupId);
 
-    const { data, error } = await db
-      .from("leads")
-      .insert({
-        name,
-        phone,
-        city,
-        area: input.area ?? null,
-        service_required: serviceRequired,
-        budget: budget || null,
-        property_type: input.property_type ?? null,
-        timeline: input.timeline ?? null,
-        message: message || null,
-        source,
-        verification_status: "Verified", // MVP placeholder (OTP comes later)
-        is_duplicate: isDuplicate,
-        duplicate_of: isDuplicate ? dupId : null,
-        status: isDuplicate ? "Duplicate" : "New",
-      })
-      .select("id, is_duplicate")
-      .single();
+    const basePayload = {
+      name,
+      phone,
+      city,
+      area: input.area ?? null,
+      service_required: serviceRequired,
+      budget: budget || null,
+      property_type: input.property_type ?? null,
+      timeline: input.timeline ?? null,
+      message: message || null,
+      source,
+      verification_status: "Verified", // MVP placeholder (OTP comes later)
+      is_duplicate: isDuplicate,
+      duplicate_of: isDuplicate ? dupId : null,
+      status: isDuplicate ? "Duplicate" : "New",
+    };
+
+    // Tracking + consent fields — only persisted once 008_lead_capture_consent.sql
+    // has added these columns. Falls back to basePayload if not migrated yet.
+    const trackingPayload = {
+      source_url: input.source_url ?? null,
+      utm_source: input.utm_source ?? null,
+      utm_medium: input.utm_medium ?? null,
+      utm_campaign: input.utm_campaign ?? null,
+      utm_term: input.utm_term ?? null,
+      utm_content: input.utm_content ?? null,
+      location_consent: input.location_consent ?? false,
+      share_consent: input.share_consent ?? false,
+    };
+
+    const insertLead = (payload: Record<string, unknown>) =>
+      db.from("leads").insert(payload).select("id, is_duplicate").single();
+
+    let { data, error } = await insertLead({ ...basePayload, ...trackingPayload });
+
+    // Graceful fallback: if the tracking/consent columns aren't migrated yet,
+    // insert without them so lead capture is never blocked.
+    if (error && isMissingColumnError(error)) {
+      console.warn("[leads] tracking/consent columns missing — run 008_lead_capture_consent.sql; saving lead without them.");
+      ({ data, error } = await insertLead(basePayload));
+    }
+
     if (error) {
       logSupabaseInsertError("leads", error, {
         source,

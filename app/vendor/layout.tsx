@@ -1,8 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getMyRole } from "@/app/actions";
-import { Wordmark } from "@/components/Brand";
 import { SignOut } from "@/components/SignOut";
+
+const NAV = [
+  { label: "Dashboard", href: "#welcome" },
+  { label: "Status", href: "#status" },
+  { label: "Leads", href: "#leads" },
+  { label: "Profile", href: "#profile" },
+  { label: "Support", href: "#support" },
+];
 
 export default async function VendorLayout({ children }: { children: React.ReactNode }) {
   const role = await getMyRole();
@@ -10,17 +17,44 @@ export default async function VendorLayout({ children }: { children: React.React
   if (role === "admin") redirect("/admin/dashboard");
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-white/10 bg-navy-ink/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link href="/vendor"><Wordmark className="text-lg" /></Link>
-          <div className="flex items-center gap-5">
-            <span className="pill">Studio</span>
+    <div className="qf-vd-shell">
+      <aside className="qf-vd-sidebar">
+        <Link href="/vendor" className="qf-vd-brand">
+          <span className="qf-vd-brand-q">Quick</span>
+          <span className="qf-vd-brand-f">Furno</span>
+        </Link>
+        <span className="qf-vd-brand-tag">Vendor Portal</span>
+        <nav className="qf-vd-nav" aria-label="Vendor sections">
+          {NAV.map((item) => (
+            <a key={item.label} href={item.href}>{item.label}</a>
+          ))}
+        </nav>
+        <div className="qf-vd-sidebar-foot">
+          <SignOut />
+        </div>
+      </aside>
+
+      <div className="qf-vd-main">
+        <header className="qf-vd-topbar">
+          <Link href="/vendor" className="qf-vd-brand qf-vd-brand--sm">
+            <span className="qf-vd-brand-q">Quick</span>
+            <span className="qf-vd-brand-f">Furno</span>
+          </Link>
+          <span className="qf-vd-topbar-title">Vendor Dashboard</span>
+          <div className="qf-vd-topbar-actions">
             <SignOut />
           </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>
+        </header>
+
+        <main className="qf-vd-content">{children}</main>
+
+        <nav className="qf-vd-bottomnav" aria-label="Vendor navigation">
+          <a href="#welcome">Home</a>
+          <a href="#leads">Leads</a>
+          <a href="#profile">Profile</a>
+          <a href="#support">Support</a>
+        </nav>
+      </div>
     </div>
   );
 }

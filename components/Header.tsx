@@ -11,7 +11,6 @@ const NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "Services", href: "/#categories" },
   { label: "How It Works", href: "/#how-it-works" },
-  { label: "Pricing", href: "/pricing" },
   { label: "For Professionals", href: "/vendors" },
   { label: "Resources", href: "/#why-quickfurno" },
 ];
@@ -62,7 +61,7 @@ export function Header() {
 
         <div className="qf-header-actions">
           <EnquiryModalTrigger className="qf-header-cta" source="Header CTA">
-            Book a Service
+            Get Free Vendor Matches
           </EnquiryModalTrigger>
           <button
             type="button"
@@ -95,7 +94,7 @@ export function Header() {
             source="Header CTA"
             onClick={() => setOpen(false)}
           >
-            Book a Service
+            Get Free Vendor Matches
           </EnquiryModalTrigger>
         </nav>
       ) : null}

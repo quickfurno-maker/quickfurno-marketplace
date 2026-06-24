@@ -104,7 +104,7 @@ export function WhyChooseSection() {
     <section className="qf-home-section" id="why-quickfurno">
       <div className="qf-section-head">
         <h2>Why Homeowners Choose QuickFurno</h2>
-        <p>A premium, verified way to book the right home-service professional.</p>
+        <p>A premium, verified way to connect with the right home-service vendor.</p>
       </div>
       <div className="qf-usp-grid" data-reveal-group>
         {whyChooseItems.map(([icon, title, body]) => (
@@ -154,36 +154,37 @@ export function ClientCTASection() {
       <div className="qf-client-cta-body">
         <h2>Ready to transform your home?</h2>
         <p>
-          Book trusted professionals and enjoy a seamless home-service
-          experience.
+          Tell us your requirement and get connected with verified home-service
+          vendors near you.
         </p>
         <ul className="qf-cta-points" aria-label="QuickFurno promises">
-          <li>Instant Booking</li>
-          <li>Best Price Guarantee</li>
-          <li>Dedicated Support</li>
+          <li>Up to 3 verified matches</li>
+          <li>Free for homeowners</li>
+          <li>Dedicated support</li>
         </ul>
       </div>
       <EnquiryModalTrigger className="qf-gold-btn" source="Homepage final CTA">
-        Book a Service Now
+        Get Free Vendor Matches
       </EnquiryModalTrigger>
     </section>
   );
 }
 
-// Featured ready-to-book service packages with upfront pricing.
+// Most-requested home services (no public pricing — clients are matched to
+// verified vendors who share quotes after the enquiry).
 const featuredFlows = [
-  { icon: "kitchen", title: "Modular Kitchen", desc: "Design. Build. Install.", price: "From ₹49,999" },
-  { icon: "paint", title: "Full Home Painting", desc: "Beautiful walls. On time.", price: "From ₹14,999" },
-  { icon: "sofa", title: "Sofa Maker", desc: "Custom. Comfort. Built.", price: "From ₹1,499" },
-  { icon: "wardrobe", title: "Verified Carpenters", desc: "Skilled. Verified. Nearby.", price: "From ₹9,999" },
+  { icon: "kitchen", title: "Modular Kitchen", desc: "Design. Build. Install." },
+  { icon: "paint", title: "Full Home Painting", desc: "Beautiful walls. On time." },
+  { icon: "sofa", title: "Sofa Maker", desc: "Custom. Comfort. Built." },
+  { icon: "wardrobe", title: "Verified Carpenters", desc: "Skilled. Verified. Nearby." },
 ] as const;
 
 export function FeaturedFlows() {
   return (
     <section className="qf-home-section" id="featured">
       <div className="qf-section-head">
-        <h2>Featured Service Flows</h2>
-        <p>Popular ready-to-book packages with upfront pricing.</p>
+        <h2>Popular Services</h2>
+        <p>Most-requested home services across Pune &amp; Mumbai.</p>
       </div>
       <div className="qf-featured-grid" data-reveal-group>
         {featuredFlows.map((flow) => (
@@ -194,7 +195,6 @@ export function FeaturedFlows() {
             <div className="qf-featured-meta">
               <strong>{flow.title}</strong>
               <small>{flow.desc}</small>
-              <b className="qf-featured-price">{flow.price}</b>
             </div>
           </article>
         ))}

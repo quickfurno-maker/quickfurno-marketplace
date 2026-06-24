@@ -10,7 +10,6 @@ import {
   categorySlug,
   enquiryServiceForCategory,
   getCategoryBySlug,
-  visibleVendors,
 } from "@/lib/quickfurno-data";
 
 type CategoryPageProps = { params: { slug: string } };
@@ -37,9 +36,6 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   const category = getCategoryBySlug(params.slug);
   if (!category) notFound();
 
-  const categoryVendors = visibleVendors.filter((vendor) => vendor.category === category.name);
-  const vendorCount = categoryVendors.length;
-  const premiumCount = categoryVendors.filter((vendor) => vendor.activePaidPlan).length;
   const enquiryService = enquiryServiceForCategory(category.name);
 
   return (
@@ -49,23 +45,23 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         <section className="category-market-intro section-pad-top">
           <div className="container category-market-intro-grid">
             <div>
-              <Link href="/#services" className="category-back">
+              <Link href="/#categories" className="category-back">
                 Back to all categories
               </Link>
               <p className="category-market-copy">{category.description}</p>
             </div>
             <div className="category-market-stats" aria-label={`${category.name} listing summary`}>
               <span>
-                <strong>{vendorCount || "New"}</strong>
-                verified profiles
+                <strong>Verified</strong>
+                vendor profiles
               </span>
               <span>
-                <strong>{premiumCount}</strong>
-                premium vendors
+                <strong>Up to 3</strong>
+                vendor matches
               </span>
               <span>
-                <strong>{category.startingPrice.replace("Starting ", "")}</strong>
-                starting rate
+                <strong>Free</strong>
+                client enquiry
               </span>
             </div>
           </div>
@@ -134,8 +130,8 @@ export default function CategoryPage({ params }: CategoryPageProps) {
               >
                 Start Enquiry
               </EnquiryModalTrigger>
-              <Link href="/#verified-vendors" className="btn btn-outline">
-                See Featured Vendors
+              <Link href="/#categories" className="btn btn-outline">
+                Browse All Services
               </Link>
             </div>
           </div>

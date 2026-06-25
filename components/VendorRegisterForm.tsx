@@ -964,7 +964,7 @@ export function VendorRegisterForm() {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 4 of 6</span>
-            <h3>Improve your lead matching</h3>
+            <h3>Improve your client matching</h3>
             <p className="qf-rf-qhint">
               Sharing location helps QuickFurno match you with nearby client enquiries.
             </p>
@@ -994,7 +994,7 @@ export function VendorRegisterForm() {
             {loc.status === "granted" ? (
               <p className="qf-rf-loc-note qf-rf-loc-note--ok">
                 Location captured — accuracy ~{loc.accuracy != null ? Math.round(loc.accuracy) : "—"} m.
-                We&apos;ll match you with nearby leads.
+                We&apos;ll match you with nearby clients.
               </p>
             ) : (
               <p className="qf-rf-loc-note">
@@ -1101,7 +1101,7 @@ export function VendorRegisterForm() {
               {f.businessType ? <SummaryRow label="Setup" value={f.businessType} /> : null}
             </dl>
             <p className="qf-rf-qhint" style={{ marginTop: "0.9rem" }}>
-              After verification, our team will share suitable lead-access options for your city,
+              After verification, our team will share suitable matching options for your city,
               category and service area.
             </p>
           </div>

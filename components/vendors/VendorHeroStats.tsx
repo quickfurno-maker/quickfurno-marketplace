@@ -8,8 +8,8 @@ import styles from "@/app/vendors/vendors.module.css";
 // MVP-safe qualitative trust text — no fabricated counters. Replace with real
 // figures once available.
 const heroStats = [
-  { value: "Genuine", label: "Verified leads" },
-  { value: "Area-based", label: "Lead matching" },
+  { value: "Genuine", label: "Verified client requests" },
+  { value: "Area-Based", label: "Client Matching" },
   { value: "Secure", label: "& Transparent" },
 ];
 

@@ -12,9 +12,9 @@ const registerHref = "/vendors/register";
 export const metadata: Metadata = {
   title: "For Vendors | QuickFurno",
   description:
-    "Join QuickFurno to receive verified home-service leads, manage enquiries, build trust and grow faster in Pune and Mumbai.",
+    "Join QuickFurno to receive verified client matches, manage enquiries, build trust and grow faster in Pune and Mumbai.",
   openGraph: {
-    title: "Grow your business with verified client leads from QuickFurno",
+    title: "Grow your business with verified client matches from QuickFurno",
     description:
       "QuickFurno helps vendors receive genuine home-service enquiries in Pune and Mumbai.",
     url: "https://quickfurno.in/vendors",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 const benefits = [
   {
-    title: "Verified Leads",
+    title: "Verified Client Matches",
     body: "High-intent enquiries from real homeowners.",
     icon: "/assets/quickfurno/icons/trust/verified-vendors.svg",
   },
@@ -35,29 +35,29 @@ const benefits = [
     icon: "/assets/quickfurno/icons/process/start-project.svg",
   },
   {
-    title: "Transparent Lead Allocation",
+    title: "Transparent Client Allocation",
     body: "Fair distribution with no hidden preference.",
     icon: "/assets/quickfurno/icons/process/matched-vendors.svg",
   },
   {
-    title: "Dedicated Support",
-    body: "We help you succeed at every step.",
+    title: "24×7 Support Channel",
+    body: "Get help whenever you need it.",
     icon: "/assets/quickfurno/icons/trust/fast-response.svg",
   },
 ];
 
 const vendorSteps = [
-  ["Create profile", "Complete your profile and get verified by our team."],
-  ["Choose plan", "Select the plan that fits your business goals."],
-  ["Get matched to leads", "Receive verified enquiries from your service areas."],
-  ["Win more projects", "Connect with clients, share quotes and grow your business."],
+  ["Create profile", "Complete your business profile and get verified by our team."],
+  ["Choose plan", "Select the growth option that fits your business goals."],
+  ["Get matched with clients", "Receive verified enquiries from your selected service areas."],
+  ["Win more projects", "Connect with clients, share quotes, and grow your business."],
 ];
 
 const sampleLeads = [
   {
     title: "Premium Interior Design",
     location: "Baner, Pune",
-    budget: "Rs 8-12 Lakh",
+    budget: "₹8–12L",
     status: "New",
     requested: "2m ago",
     image: "/assets/quickfurno/images/vendors/premium-living-room.svg",
@@ -65,7 +65,7 @@ const sampleLeads = [
   {
     title: "Modular Kitchen",
     location: "Wakad, Pune",
-    budget: "Rs 3-5 Lakh",
+    budget: "₹3–5L",
     status: "New",
     requested: "15m ago",
     image: "/assets/quickfurno/images/vendors/modular-kitchen.svg",
@@ -73,7 +73,7 @@ const sampleLeads = [
   {
     title: "Civil Work",
     location: "Kothrud, Pune",
-    budget: "Rs 5-8 Lakh",
+    budget: "₹5–8L",
     status: "Contacted",
     requested: "1h ago",
     image: "/assets/quickfurno/images/vendors/civil-work-site.svg",
@@ -87,10 +87,10 @@ const sampleLeads = [
 // TODO: Later add OTP authentication for client enquiry and vendor registration/login.
 
 const uspCards = [
-  ["Better lead quality", "High-intent clients ready to hire."],
-  ["City-based matching", "Get leads from your service areas."],
-  ["Priority listing for active subscribers", "Active plans get priority access."],
-  ["Simple dashboard", "Manage leads and clients in one place."],
+  ["Better client quality", "High-intent clients ready to hire."],
+  ["City-based matching", "Get client enquiries from your service areas."],
+  ["Priority matching for verified professionals", "Verified profiles get priority matching."],
+  ["Simple dashboard", "Manage enquiries and clients in one place."],
   ["Build trust with verified badges", "Verified badge boosts your credibility."],
   ["No hidden charges", "Transparent pricing you can trust."],
 ];
@@ -99,12 +99,12 @@ const testimonials = [
   {
     name: "Rohit Deshmukh",
     company: "UrbanCraft Interiors, Pune",
-    quote: "QuickFurno brings us genuine, high-intent leads from real homeowners in our service areas.",
+    quote: "QuickFurno brings us genuine, high-intent client matches from real homeowners in our service areas.",
   },
   {
     name: "Sanket Patil",
     company: "Patil Modular Solutions, Pune",
-    quote: "The platform is easy to use and the leads are genuine. Highly recommended.",
+    quote: "The platform is easy to use and the client enquiries are genuine. Highly recommended.",
   },
   {
     name: "Arjun Mehta",
@@ -121,16 +121,16 @@ const miniLeads = [
 
 // Floating benefit badges around the hero visual.
 const heroFloatBadges = [
-  { icon: "shield" as const, title: "Verified Leads", sub: "Pre-qualified enquiries" },
-  { icon: "bolt" as const, title: "Fast Lead Alerts", sub: "Real-time notifications" },
-  { icon: "map" as const, title: "Pune & Mumbai", sub: "High-demand leads" },
-  { icon: "compare" as const, title: "Higher Conversions", sub: "Convert more leads" },
+  { icon: "shield" as const, title: "Verified Client Matches", sub: "Pre-qualified enquiries" },
+  { icon: "bolt" as const, title: "Fast Client Alerts", sub: "Real-time notifications" },
+  { icon: "map" as const, title: "Pune & Mumbai", sub: "High-demand enquiries" },
+  { icon: "compare" as const, title: "Higher Conversions", sub: "Convert more matches" },
   { icon: "star" as const, title: "Premium Visibility", sub: "Stand out & grow" },
 ];
 
 function VendorLeadCard() {
   return (
-    <div className={styles.leadCardMock} aria-label="QuickFurno vendor lead dashboard preview">
+    <div className={styles.leadCardMock} aria-label="QuickFurno vendor client match dashboard preview">
       <div className={styles.leadCardTop}>
         <span className={styles.leadCardAvatar}>UI</span>
         <div className={styles.leadCardWho}>
@@ -143,7 +143,7 @@ function VendorLeadCard() {
       <div className={styles.leadCardKpis}>
         <div>
           <strong>12</strong>
-          <small>Active Leads</small>
+          <small>Active Client Matches</small>
         </div>
         <div>
           <strong>5</strong>
@@ -156,7 +156,7 @@ function VendorLeadCard() {
       </div>
 
       <div className={styles.leadCardListHead}>
-        <strong>Recent Leads</strong>
+        <strong>Recent Client Requests</strong>
         <span>This week</span>
       </div>
       <div className={styles.leadCardList}>
@@ -188,11 +188,11 @@ export default function VendorsPage() {
             <div className={styles.heroCopy} data-reveal>
               <span className={styles.eyebrow}>For Service Professionals</span>
               <h1>
-                Grow your business with verified client leads.
-                <span className={styles.heroHighlight}>From QuickFurno.</span>
+                Grow your business with verified client matches
+                <span className={styles.heroHighlight}> from QuickFurno.</span>
               </h1>
               <p>
-                Receive genuine home-service enquiries, manage leads with ease, and grow
+                Receive genuine home-service enquiries, manage client requests with ease, and grow
                 faster across Pune &amp; Mumbai.
               </p>
               <div className={styles.heroActions}>
@@ -200,12 +200,12 @@ export default function VendorsPage() {
                   Become a Vendor
                 </Link>
                 <Link className={styles.secondaryCta} href="#lead-demo">
-                  View Lead Demo
+                  View Demo
                 </Link>
               </div>
               <div className={styles.trustLine}>
                 <span>Join verified service professionals across Pune &amp; Mumbai</span>
-                <strong>Verified vendor network</strong>
+                <strong>Verified professional network</strong>
               </div>
             </div>
 
@@ -262,7 +262,7 @@ export default function VendorsPage() {
 
         <section className={styles.leadSection} id="lead-demo">
           <div className={styles.sectionHeading}>
-            <h2>Leads waiting for you</h2>
+            <h2>Client requests waiting for you</h2>
           </div>
           <div className={styles.leadLayout}>
             <div className={styles.leadGrid}>
@@ -288,7 +288,7 @@ export default function VendorsPage() {
                     </dl>
                   </div>
                   <div className={styles.leadActions}>
-                    <Link href={registerHref}>Accept Lead</Link>
+                    <Link href={registerHref}>Accept Match</Link>
                     <Link href={registerHref}>View Details</Link>
                     <Link href={registerHref}>WhatsApp</Link>
                   </div>
@@ -298,7 +298,7 @@ export default function VendorsPage() {
 
             <aside className={styles.leadBenefits}>
               {[
-                ["Real-time lead notifications", "Never miss a new opportunity."],
+                ["Real-time client notifications", "Never miss a new opportunity."],
                 ["Direct client communication", "Chat or call directly through the platform."],
                 ["Secure & transparent process", "No hidden charges, no compromises."],
                 ["Performance insights", "Track response rate and conversions."],
@@ -323,7 +323,7 @@ export default function VendorsPage() {
               </p>
               <ul className={styles.vendorJoinPoints}>
                 <li>Verified vendor onboarding</li>
-                <li>Area-wise lead matching</li>
+                <li>Area-wise client matching</li>
                 <li>Premium visibility for trusted professionals</li>
                 <li>Package details shared after business verification</li>
                 <li>Future vendor dashboard access</li>
@@ -334,7 +334,7 @@ export default function VendorsPage() {
               </div>
               <p className={styles.vendorJoinNote}>Our team will contact you with package details.</p>
               <p className={styles.vendorJoinNote}>
-                Package details and subscription options will be available inside the vendor dashboard after verification.
+                Package details and matching options will be available inside the vendor dashboard after verification.
               </p>
             </div>
           </div>
@@ -384,7 +384,7 @@ export default function VendorsPage() {
           <ul>
             <li>No hidden charges</li>
             <li>Cancel anytime</li>
-            <li>24/7 support</li>
+            <li>24×7 support</li>
           </ul>
         </section>
       </main>

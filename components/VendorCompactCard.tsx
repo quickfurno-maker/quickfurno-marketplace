@@ -36,110 +36,91 @@ export function VendorCompactCard({
   const compare = useVendorCompare();
   const selectedForCompare = compare?.isSelected(vendor.slug) ?? false;
 
+  const thumbnailSrc = portfolio[0] || "/assets/quickfurno/images/hero/hero-interior-diorama.svg";
+
   return (
     <article className={`qf-vcard${vendor.activePaidPlan ? " qf-vcard--premium" : ""}`}>
-      {/* Portfolio preview strip (local assets) */}
-      <div className="qf-vcard-portfolio">
-        {portfolio.length > 0 ? (
-          <Link className="qf-vcard-shots" href={profileHref} aria-label={`View ${vendor.businessName} portfolio`}>
-            {portfolio.map((src, index) => (
-              <span className="qf-vcard-shot" key={src + index}>
-                <Image
-                  src={src}
-                  alt={`${vendor.businessName} ${vendor.category} project ${index + 1}`}
-                  fill
-                  sizes="(max-width: 759px) 33vw, 200px"
-                  className="qf-vcard-shot-img"
-                  priority={priority && index === 0}
-                />
-              </span>
-            ))}
-            <span className="qf-vcard-shot-count" aria-hidden="true">
-              {portfolio.length} photos
-            </span>
+      <div className="qf-vcard-main">
+        {/* Left: Image Thumbnail */}
+        <div className="qf-vcard-thumb-container">
+          <Link href={profileHref} className="qf-vcard-thumb-link" aria-label={`View ${vendor.businessName} profile`}>
+            <Image
+              src={thumbnailSrc}
+              alt={`${vendor.businessName} thumbnail`}
+              fill
+              sizes="(max-width: 759px) 90px, 110px"
+              className="qf-vcard-thumb-img"
+              priority={priority}
+            />
           </Link>
-        ) : (
-          <div className="qf-vcard-portfolio-empty" aria-label="Portfolio coming soon">
-            <QFIcon name="grid" />
-            <span>Portfolio coming soon</span>
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Identity */}
-      <div className="qf-vcard-head">
-        <div className="qf-vcard-id">
-          <h3>
-            <Link href={profileHref}>{vendor.businessName}</Link>
-          </h3>
-          <p className="qf-vcard-meta">
+        {/* Right: Vendor Details */}
+        <div className="qf-vcard-info-container">
+          <div className="qf-vcard-title-row">
+            <h3 className="qf-vcard-title">
+              <Link href={profileHref}>{vendor.businessName}</Link>
+            </h3>
+            {vendor.verified && (
+              <span className="qf-vcard-verified-badge" title="Business details reviewed & verified">
+                Verified ✓
+              </span>
+            )}
+          </div>
+
+          <p className="qf-vcard-category-text">
             {showCategory ? `${vendor.category} · ` : ""}
             {vendor.subCategory}
           </p>
-          <p className="qf-vcard-area">
-            <QFIcon name="pin" />
-            {meta.locality}
-          </p>
+
+          <div className="qf-vcard-rating-row">
+            <span className="qf-vcard-rating-stars">
+              {trust.ratingLabel} ★
+            </span>
+            <span className="qf-vcard-reviews-count">
+              ({vendor.reviews > 0 ? `${vendor.reviews} reviews` : "New"})
+            </span>
+            <span className="qf-vcard-bullet">·</span>
+            <span className="qf-vcard-locality-text">
+              {meta.locality} {meta.distance ? `(${meta.distance})` : ""}
+            </span>
+          </div>
+
+          <div className="qf-vcard-status-row">
+            <span className="qf-vcard-status-badge">
+              {meta.openStatus}
+            </span>
+          </div>
+
+          <div className="qf-vcard-trust-lines">
+            <span className="qf-vcard-trust-tag">Fast response</span>
+            <span className="qf-vcard-bullet">·</span>
+            <span className="qf-vcard-trust-tag">Business details reviewed</span>
+            {vendor.verified && (
+              <>
+                <span className="qf-vcard-bullet">·</span>
+                <span className="qf-vcard-trust-tag">Profile verified</span>
+              </>
+            )}
+          </div>
+
+          <div className="qf-vcard-price-row">
+            <span className="qf-vcard-price-label">Starting rate: </span>
+            <strong className="qf-vcard-price-value">
+              {trust.startingPrice.replace("Starting at", "").trim()}
+            </strong>
+          </div>
         </div>
-        <div className="qf-vcard-badges">
-          {vendor.verified ? <span className="qf-vcard-badge qf-vcard-badge--verified">Verified ✓</span> : null}
-          {vendor.activePaidPlan ? <span className="qf-vcard-badge qf-vcard-badge--premium">Premium</span> : null}
-        </div>
       </div>
 
-      {/* Trust snippets */}
-      <div className="qf-vcard-trust" aria-label="Trust indicators">
-        <span className="qf-vcard-snip qf-vcard-snip--rating">
-          {trust.ratingLabel} <span aria-hidden="true">★</span>
-          <small>{vendor.reviews > 0 ? `${vendor.reviews} reviews` : "New"}</small>
-        </span>
-        <span className="qf-vcard-snip">
-          <QFIcon name="clock" />
-          {trust.responseLabel}
-        </span>
-        <span className="qf-vcard-snip">
-          <QFIcon name="briefcase" />
-          {trust.experienceLabel}
-        </span>
-        <span className="qf-vcard-snip">
-          <QFIcon name="shield" />
-          {trust.warrantyLabel}
-        </span>
-      </div>
-
-      {/* Service chips */}
-      <div className="qf-vcard-chips" aria-label="Key services">
-        {visibleChips.map((chip) => (
-          <span key={`${chip.label}-${chip.price}`}>{chip.label}</span>
-        ))}
-        {hiddenChipCount > 0 ? <span className="qf-vcard-chip-more">+{hiddenChipCount} more</span> : null}
-      </div>
-
-      {/* Price chip */}
-      <div className="qf-vcard-price">
-        <span className="qf-vcard-price-label">Starting rate</span>
-        <span className="qf-vcard-price-tag">{trust.startingPrice}</span>
-      </div>
-
-      {/* Actions */}
-      <div className="qf-vcard-cta">
-        <div className="qf-vcard-cta-grid">
-          <a className="qf-vcard-btn qf-vcard-btn--call" href={CONTACT_TEL}>
+      {/* Bottom/Right: Action Buttons */}
+      <div className="qf-vcard-actions-row">
+        <div className="qf-vcard-main-buttons">
+          <a className="qf-vcard-action-btn qf-vcard-action-btn--call" href={CONTACT_TEL}>
             Call Now
           </a>
-          <a
-            className="qf-vcard-btn qf-vcard-btn--wa"
-            href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp
-          </a>
-          <Link className="qf-vcard-btn qf-vcard-btn--profile" href={profileHref}>
-            View Profile
-          </Link>
           <EnquiryModalTrigger
-            className="qf-vcard-btn qf-vcard-btn--enquiry"
+            className="qf-vcard-action-btn qf-vcard-action-btn--enquiry"
             modalTitle={`Get quote from ${vendor.businessName}`}
             serviceCategory={enquiryService}
             city={vendor.city}
@@ -151,19 +132,32 @@ export function VendorCompactCard({
           </EnquiryModalTrigger>
         </div>
 
-        {compare ? (
-          <button
-            type="button"
-            className={`qf-vcard-compare${selectedForCompare ? " is-active" : ""}`}
-            aria-pressed={selectedForCompare}
-            onClick={() => compare.toggle(vendor)}
+        <div className="qf-vcard-sub-actions">
+          <a
+            className="qf-vcard-action-btn qf-vcard-action-btn--wa"
+            href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            <span className="qf-vcard-compare-box" aria-hidden="true">
-              {selectedForCompare ? "✓" : ""}
-            </span>
-            {selectedForCompare ? "Added to compare" : "Compare"}
-          </button>
-        ) : null}
+            WhatsApp
+          </a>
+          <Link className="qf-vcard-link-profile" href={profileHref}>
+            View Profile
+          </Link>
+          {compare ? (
+            <button
+              type="button"
+              className={`qf-vcard-action-compare${selectedForCompare ? " is-active" : ""}`}
+              aria-pressed={selectedForCompare}
+              onClick={() => compare.toggle(vendor)}
+            >
+              <span className="qf-vcard-compare-checkbox">
+                {selectedForCompare ? "✓" : ""}
+              </span>
+              <span>Compare</span>
+            </button>
+          ) : null}
+        </div>
       </div>
     </article>
   );

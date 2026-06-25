@@ -4824,411 +4824,350 @@ body::before {
    border #E5E7EB, white cards with soft shadow.
    ========================================================================== */
 .qf-vcard {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    "portfolio"
-    "head"
-    "trust"
-    "chips"
-    "price"
-    "cta";
-  gap: 0.75rem;
-  padding: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem;
   border: 1px solid #e5e7eb;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 12px 30px -22px rgba(7, 17, 31, 0.45);
+  box-shadow: 0 10px 24px -18px rgba(7, 17, 31, 0.35);
   transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
 .qf-vcard:hover {
   border-color: #d7dde6;
-  box-shadow: 0 20px 44px -26px rgba(7, 17, 31, 0.5);
+  box-shadow: 0 16px 36px -20px rgba(7, 17, 31, 0.4);
 }
 
 .qf-vcard--premium {
   border-color: rgba(245, 164, 0, 0.5);
+  background: #fffdf9;
 }
 
-/* ---- Portfolio strip ---- */
-.qf-vcard-portfolio {
-  grid-area: portfolio;
-  min-width: 0;
-}
-
-.qf-vcard-shots {
-  position: relative;
+.qf-vcard-main {
   display: flex;
-  gap: 0.45rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  border-radius: 14px;
+  gap: 0.75rem;
+  align-items: flex-start;
 }
 
-.qf-vcard-shots::-webkit-scrollbar {
-  display: none;
-}
-
-.qf-vcard-shot {
+/* Left: Thumbnail container */
+.qf-vcard-thumb-container {
   position: relative;
-  flex: 0 0 33%;
-  aspect-ratio: 4 / 3;
-  min-width: 0;
+  flex: 0 0 90px;
+  width: 90px;
+  height: 90px;
+  border-radius: 12px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #f3f5f8;
-  scroll-snap-align: start;
+  background: #f7fafc;
 }
 
-.qf-vcard-shot-img {
+.qf-vcard-thumb-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qf-vcard-thumb-img {
   object-fit: cover;
-  transition: transform 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.qf-vcard-shots:hover .qf-vcard-shot-img {
-  transform: scale(1.06);
-}
-
-.qf-vcard-shot-count {
-  position: absolute;
-  right: 0.4rem;
-  bottom: 0.4rem;
-  padding: 0.16rem 0.5rem;
-  border-radius: 999px;
-  color: #ffffff;
-  background: rgba(7, 17, 31, 0.72);
-  font-size: 0.68rem;
-  font-weight: 800;
-  pointer-events: none;
-}
-
-.qf-vcard-portfolio-empty {
-  display: grid;
-  place-items: center;
-  gap: 0.35rem;
-  aspect-ratio: 16 / 7;
-  border: 1px dashed #cbd3de;
-  border-radius: 14px;
-  color: #5b6472;
-  background: #f8fafc;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.qf-vcard-portfolio-empty svg {
-  width: 24px;
-  height: 24px;
-  color: #9aa4b2;
-}
-
-/* ---- Identity ---- */
-.qf-vcard-head {
-  grid-area: head;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.6rem;
+/* Right: Details */
+.qf-vcard-info-container {
+  flex: 1 1 0;
   min-width: 0;
-}
-
-.qf-vcard-id {
-  min-width: 0;
-}
-
-.qf-vcard-id h3 {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 900;
-  line-height: 1.15;
-}
-
-.qf-vcard-id h3 a {
-  color: #07111f;
-}
-
-.qf-vcard-id h3 a:hover {
-  color: #071b3a;
-}
-
-.qf-vcard-meta {
-  margin: 0.16rem 0 0;
-  color: #5b6472;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.qf-vcard-area {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  margin: 0.22rem 0 0;
-  color: #5b6472;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.qf-vcard-area svg {
-  width: 14px;
-  height: 14px;
-  color: #f5a400;
-}
-
-.qf-vcard-badges {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 0.3rem;
-  flex: 0 0 auto;
+  gap: 0.2rem;
 }
 
-.qf-vcard-badge {
-  padding: 0.22rem 0.5rem;
+.qf-vcard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.qf-vcard-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.qf-vcard-title a {
+  color: #07111f;
+  text-decoration: none;
+}
+
+.qf-vcard-title a:hover {
+  color: #2563eb;
+}
+
+.qf-vcard-verified-badge {
+  font-size: 0.65rem;
+  padding: 0.12rem 0.4rem;
   border-radius: 999px;
-  font-size: 0.68rem;
+  background: #e7f6ee;
+  color: #0f7a4a;
   font-weight: 850;
   white-space: nowrap;
 }
 
-.qf-vcard-badge--verified {
-  color: #0f7a4a;
-  background: #e7f6ee;
-}
-
-.qf-vcard-badge--premium {
-  color: #9a6400;
-  background: rgba(245, 164, 0, 0.16);
-}
-
-/* ---- Trust snippets ---- */
-.qf-vcard-trust {
-  grid-area: trust;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.qf-vcard-snip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.32rem;
-  padding: 0.34rem 0.6rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fbfcfe;
-  color: #07111f;
+.qf-vcard-category-text {
+  margin: 0;
   font-size: 0.78rem;
-  font-weight: 800;
+  color: #5b6472;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
-.qf-vcard-snip svg {
-  width: 15px;
-  height: 15px;
+.qf-vcard-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
   color: #5b6472;
-}
-
-.qf-vcard-snip small {
-  color: #5b6472;
-  font-size: 0.72rem;
   font-weight: 700;
 }
 
-.qf-vcard-snip--rating {
+.qf-vcard-rating-stars {
   color: #07111f;
-  border-color: rgba(245, 164, 0, 0.45);
   background: #fffaf0;
+  border: 1px solid rgba(245, 164, 0, 0.4);
+  border-radius: 4px;
+  padding: 0.05rem 0.25rem;
+  font-weight: 850;
+  display: inline-flex;
+  align-items: center;
 }
 
-.qf-vcard-snip--rating span[aria-hidden] {
-  color: #f5a400;
+.qf-vcard-bullet {
+  color: #cbd3de;
+  margin: 0 0.1rem;
 }
 
-/* ---- Service chips ---- */
-.qf-vcard-chips {
-  grid-area: chips;
+.qf-vcard-status-row {
   display: flex;
+  margin-top: 0.05rem;
+}
+
+.qf-vcard-status-badge {
+  font-size: 0.72rem;
+  color: #0f7a4a;
+  font-weight: 800;
+}
+
+/* Trust Lines list */
+.qf-vcard-trust-lines {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   flex-wrap: wrap;
-  gap: 0.36rem;
-}
-
-.qf-vcard-chips span {
-  padding: 0.28rem 0.56rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #ffffff;
+  font-size: 0.72rem;
   color: #5b6472;
-  font-size: 0.74rem;
-  font-weight: 750;
+  font-weight: 700;
+  margin-top: 0.05rem;
 }
 
-.qf-vcard-chip-more {
-  color: #071b3a !important;
-  font-weight: 850 !important;
+.qf-vcard-trust-tag {
+  color: #4a5568;
 }
 
-/* ---- Price ---- */
-.qf-vcard-price {
-  grid-area: price;
+/* Price row */
+.qf-vcard-price-row {
+  margin-top: 0.1rem;
+  font-size: 0.8rem;
+  color: #07111f;
 }
 
 .qf-vcard-price-label {
-  display: block;
-  margin-bottom: 0.2rem;
   color: #5b6472;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
-.qf-vcard-price-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.4rem 0.7rem;
-  border-radius: 10px;
-  color: #07111f;
-  background: rgba(245, 164, 0, 0.14);
-  font-size: 0.92rem;
+.qf-vcard-price-value {
   font-weight: 900;
+  color: #07111f;
 }
 
-/* ---- Actions ---- */
-.qf-vcard-cta {
-  grid-area: cta;
-  display: grid;
+/* Bottom/Right: Action Buttons Strip */
+.qf-vcard-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+.qf-vcard-main-buttons {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.qf-vcard-sub-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.1rem;
 }
 
-.qf-vcard-cta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-}
-
-.qf-vcard-btn {
+.qf-vcard-action-btn {
+  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 0.85rem;
+  min-height: 42px;
+  border-radius: 10px;
+  font-size: 0.82rem;
   font-weight: 850;
   text-align: center;
-  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
+  border: 1px solid #e5e7eb;
+  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
+  cursor: pointer;
 }
 
-.qf-vcard-btn:hover {
+.qf-vcard-action-btn:hover {
   transform: translateY(-1px);
 }
 
-.qf-vcard-btn--call {
+.qf-vcard-action-btn--call {
   color: #ffffff;
   background: #071b3a;
   border-color: #071b3a;
 }
 
-.qf-vcard-btn--wa {
+.qf-vcard-action-btn--enquiry {
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.qf-vcard-action-btn--enquiry:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.qf-vcard-action-btn--wa {
   color: #0f6b45;
   background: #e9f9ee;
   border-color: #b7ead0;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 0.65rem;
+  border-radius: 8px;
+  font-size: 0.74rem;
 }
 
-.qf-vcard-btn--profile {
+.qf-vcard-link-profile {
+  font-size: 0.76rem;
+  font-weight: 850;
   color: #071b3a;
-  background: #ffffff;
+  text-decoration: none;
 }
 
-.qf-vcard-btn--enquiry {
-  color: #07111f;
-  background: linear-gradient(135deg, #f5a400, #d99a16);
-  border-color: rgba(245, 164, 0, 0.6);
+.qf-vcard-link-profile:hover {
+  text-decoration: underline;
 }
 
-.qf-vcard-compare {
+.qf-vcard-action-compare {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  min-height: 42px;
-  padding: 0.45rem 0.8rem;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #071b3a;
-  font-size: 0.84rem;
-  font-weight: 850;
+  gap: 0.3rem;
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease;
+  color: #5b6472;
+  font-size: 0.74rem;
+  font-weight: 850;
+  padding: 0;
 }
 
-.qf-vcard-compare:hover {
-  border-color: #f5c873;
-}
-
-.qf-vcard-compare-box {
-  width: 18px;
-  height: 18px;
+.qf-vcard-compare-checkbox {
+  width: 15px;
+  height: 15px;
   display: grid;
   place-items: center;
   border: 1.5px solid #cbd3de;
-  border-radius: 5px;
-  font-size: 0.7rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
   font-weight: 900;
   color: #ffffff;
 }
 
-.qf-vcard-compare.is-active {
-  border-color: #f5a400;
-  background: #fffaf0;
+.qf-vcard-action-compare.is-active {
+  color: #f5a400;
 }
 
-.qf-vcard-compare.is-active .qf-vcard-compare-box {
+.qf-vcard-action-compare.is-active .qf-vcard-compare-checkbox {
   border-color: #f5a400;
   background: #f5a400;
   color: #07111f;
 }
 
-/* ---- Desktop horizontal layout ---- */
+/* ---- Desktop horizontal layout override ---- */
 @media (min-width: 760px) {
   .qf-vcard {
-    grid-template-columns: 210px minmax(0, 1fr) 232px;
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-      "portfolio head  price"
-      "portfolio trust cta"
-      "portfolio chips cta";
-    gap: 0.5rem 1.1rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
     padding: 1.1rem;
   }
 
-  .qf-vcard-shots {
+  .qf-vcard-main {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+  }
+
+  .qf-vcard-thumb-container {
+    flex: 0 0 110px;
+    width: 110px;
+    height: 110px;
+    border-radius: 14px;
+  }
+
+  .qf-vcard-actions-row {
+    flex: 0 0 220px;
+    display: flex;
     flex-direction: column;
-    overflow: visible;
-    height: 100%;
+    gap: 0.5rem;
+    border-left: 1px solid #e5e7eb;
+    padding-left: 1.25rem;
+    margin-top: 0;
   }
 
-  .qf-vcard-shot {
-    flex: 1 1 auto;
-    aspect-ratio: auto;
-    min-height: 0;
+  .qf-vcard-main-buttons {
+    flex-direction: column;
+    gap: 0.4rem;
+    width: 100%;
   }
 
-  .qf-vcard-price {
-    justify-self: end;
-    align-self: start;
+  .qf-vcard-action-btn {
+    width: 100%;
   }
 
-  .qf-vcard-cta {
-    align-content: start;
+  .qf-vcard-sub-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    margin-top: 0.15rem;
   }
 
-  .qf-vcard-cta-grid {
-    grid-template-columns: 1fr;
+  .qf-vcard-action-btn--wa {
+    width: 100%;
+    min-height: 38px;
+    border-radius: 10px;
+    font-size: 0.8rem;
   }
 }
 

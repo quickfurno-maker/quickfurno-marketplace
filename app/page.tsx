@@ -56,12 +56,10 @@ export default function HomePage() {
             <div className="qf-hero-copy">
               <span className="qf-hero-eyebrow">Verified Home Services</span>
               <h1>
-                Tell us your home-service requirement.
-                <br />
-                <em>Get matched with 3 verified local vendors.</em>
+                Get matched with <em>3 verified local vendors</em> for your home project.
               </h1>
               <p>
-                Compare trusted interior designers, carpenters, sofa makers, painters, modular and civil-work experts near you — free for homeowners.
+                Tell us what you need and compare trusted interior designers, carpenters, sofa makers, painters, modular and civil-work experts near you — free for homeowners.
               </p>
             </div>
 

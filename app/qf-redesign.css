@@ -2513,7 +2513,8 @@ h3 {
 .qf-hero-clean h1 {
   color: var(--qf-navy);
   font-weight: 800;
-  line-height: 1.02;
+  line-height: 1.08;
+  font-size: clamp(1.8rem, 3.8vw, 2.65rem);
 }
 .qf-hero-clean h1 em {
   font-family: inherit;
@@ -2526,6 +2527,9 @@ h3 {
 
 .qf-hero-clean .qf-hero-copy p {
   color: var(--qf-ink-2);
+  line-height: 1.45;
+  font-size: clamp(0.9rem, 1.8vw, 1rem);
+  margin-top: -0.1rem;
 }
 
 /* --- Hero search bar --- */
@@ -3334,16 +3338,16 @@ h3 {
 
 /* Trust badges → tidy 2×2 grid with aligned icon + text */
 .qf-hero-clean > .qf-hero-trust {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.1rem;
   margin-top: 0.1rem;
 }
 .qf-hero-clean .qf-hero-trust-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  white-space: normal;
+  white-space: nowrap;
   color: var(--qf-navy);
   font-size: 0.8rem;
   font-weight: 700;
@@ -3483,30 +3487,47 @@ h3 {
    right visual never overflows the screen. */
 @media (min-width: 860px) {
   .qf-hero-clean {
-    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
-    column-gap: 2.6rem;
+    grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+    column-gap: 2.8rem;
+    align-items: center;
+    padding: 2.4rem;
+  }
+  .qf-hero-clean > .qf-hero-visual {
+    height: auto;
+    aspect-ratio: 4 / 3;
+    max-height: 400px;
+    align-self: center;
   }
   .qf-hero-clean > .qf-hero-visual img {
-    aspect-ratio: 4 / 3;
-    max-height: 460px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    aspect-ratio: auto;
+    max-height: none;
   }
 }
 
-/* Mobile: compact, premium hero image card (220–260px tall) */
+/* Mobile: compact, premium hero image card (160–200px tall) */
 @media (max-width: 620px) {
+  .qf-hero-clean {
+    gap: 0.75rem;
+  }
   .qf-hero-clean > .qf-hero-visual {
     border-radius: 26px;
   }
   .qf-hero-clean > .qf-hero-visual img {
     aspect-ratio: auto;
-    height: clamp(220px, 60vw, 260px);
+    height: clamp(160px, 45vw, 200px);
     object-fit: cover;
   }
 
-  /* Trust badges: tidy 2×2, text stays clean */
+  /* Trust badges: tidy wrapping flex row */
+  .qf-hero-clean > .qf-hero-trust {
+    gap: 0.4rem 0.8rem;
+  }
   .qf-hero-clean .qf-hero-trust-item {
-    font-size: 0.78rem;
-    line-height: 1.18;
+    font-size: 0.74rem;
+    line-height: 1.15;
     align-items: center;
   }
 

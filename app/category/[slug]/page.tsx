@@ -107,8 +107,8 @@ export default function CategoryPage({ params }: CategoryPageProps) {
               </EnquiryModalTrigger>
               <ul>
                 <li>Up to 3 relevant vendor matches</li>
-                <li>Paid vendors prioritised for lead routing</li>
-                <li>Free vendors remain visible for comparison</li>
+                <li>100% verified local experts</li>
+                <li>Free service, no hidden charges</li>
               </ul>
             </aside>
           </div>

@@ -374,7 +374,7 @@ export default function CarpentersListingPage() {
             </div>
             <div className={styles.heroTrust} aria-label="Listing summary">
               <span>Verified vendors</span>
-              <span>Paid vendors shown first</span>
+              <span>Quick response expected</span>
             </div>
           </section>
 
@@ -505,16 +505,6 @@ export default function CarpentersListingPage() {
                 </div>
               </div>
 
-              <div className={styles.priorityNote}>
-                <Image
-                  src="/assets/quickfurno/icons/actions/crown-premium.svg"
-                  width={18}
-                  height={18}
-                  alt=""
-                  aria-hidden="true"
-                />
-                Paid or subscribed vendors appear first. Non-paid verified vendors remain visible unless disabled.
-              </div>
 
               <div className={styles.vendorStack}>
                 {vendors.map((vendor, index) => (

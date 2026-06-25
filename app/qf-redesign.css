@@ -6767,7 +6767,64 @@ body::before {
   margin-top: 0.6rem;
   color: var(--qf-blue);
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 850;
   text-decoration: none;
 }
 .qf-vd-link:hover { text-decoration: underline; }
+
+/* Custom input wrapper for inline validation icons */
+.qf-rf-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.qf-rf-input-wrapper input {
+  padding-right: 2.75rem !important; /* Ensure space for the tick/cross icon */
+}
+
+.qf-rf-input-icon {
+  position: absolute;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Subtle green border/box-shadow for valid fields */
+.qf-rf-field.is-valid input {
+  border-color: rgba(25, 165, 90, 0.45);
+}
+
+.qf-rf-field.is-valid input:focus {
+  border-color: #19a55a;
+  box-shadow: 0 0 0 3px rgba(25, 165, 90, 0.16);
+}
+
+/* Rate input specific valid border styling */
+.qf-vrf-rate-input.is-valid {
+  border-color: rgba(25, 165, 90, 0.45);
+}
+
+.qf-vrf-rate-input.is-valid:focus-within {
+  border-color: #19a55a;
+  box-shadow: 0 0 0 3px rgba(25, 165, 90, 0.16);
+}
+
+/* Chips selected with cross remove button style */
+.qf-rf-chip-removable {
+  padding-right: 0.6rem !important;
+}
+
+.qf-rf-chip-remove-btn {
+  color: inherit;
+  font-weight: 800;
+  transition: opacity 120ms ease;
+}
+
+.qf-rf-chip-remove-btn:hover {
+  opacity: 0.7;
+}

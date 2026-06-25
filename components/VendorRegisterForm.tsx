@@ -137,6 +137,114 @@ export function VendorRegisterForm() {
   const [done, setDone] = useState(false);
   // Show per-field validation warnings only after the user tries to advance.
   const [showErrors, setShowErrors] = useState(false);
+  // Track individual fields touched by the user.
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // Error state for custom area input in Step 3.
+  const [customAreaError, setCustomAreaError] = useState("");
+
+  const isFieldValid = (field: string): boolean => {
+    switch (field) {
+      case "businessName":
+        return f.businessName.trim().length >= 2;
+      case "ownerName":
+        return f.ownerName.trim().length >= 2;
+      case "phone":
+        return /^\d{10}$/.test(f.phone);
+      case "email":
+        return isEmail(f.email);
+      case "addressLine1":
+        return f.addressLine1.trim().length >= 5;
+      case "state":
+        return f.stateName.trim().length > 0;
+      case "pincode":
+        return /^\d{6}$/.test(f.pincode);
+      default:
+        return true;
+    }
+  };
+
+  function renderInputField({
+    label,
+    fieldKey,
+    type = "text",
+    placeholder,
+    autoComplete,
+    inputMode,
+    maxLength,
+    customOnChange,
+    ref,
+  }: {
+    label: string;
+    fieldKey: string;
+    type?: string;
+    placeholder?: string;
+    autoComplete?: string;
+    inputMode?: "search" | "text" | "none" | "tel" | "url" | "email" | "numeric" | "decimal";
+    maxLength?: number;
+    customOnChange?: (val: string) => void;
+    ref?: React.RefObject<HTMLInputElement>;
+  }) {
+    const val = fieldKey === "state" ? f.stateName : f[fieldKey as keyof WizardState];
+    const valStr = typeof val === "string" ? val : "";
+    const isTouched = touched[fieldKey] || showErrors;
+    const errMsg = fieldError(fieldKey);
+
+    let isValid = false;
+    let isInvalid = false;
+
+    if (fieldKey === "addressLine2" || fieldKey === "landmark") {
+      isValid = valStr.trim().length > 0;
+    } else {
+      const fieldValid = isFieldValid(fieldKey);
+      isValid = fieldValid;
+      isInvalid = isTouched && !fieldValid;
+    }
+
+    const wrapperClass = `qf-rf-field${isInvalid ? " has-error" : ""}${isValid ? " is-valid" : ""}`;
+
+    return (
+      <label className={wrapperClass} ref={bindField(fieldKey)}>
+        <span>{label}</span>
+        <div className="qf-rf-input-wrapper">
+          <input
+            ref={ref}
+            type={type}
+            value={valStr}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (customOnChange) {
+                customOnChange(value);
+              } else {
+                set(fieldKey as keyof WizardState, value);
+              }
+              setTouched((prev) => ({ ...prev, [fieldKey]: true }));
+            }}
+            onBlur={() => setTouched((prev) => ({ ...prev, [fieldKey]: true }))}
+            placeholder={placeholder}
+            autoComplete={autoComplete}
+            inputMode={inputMode}
+            maxLength={maxLength}
+          />
+          {isValid ? (
+            <span className="qf-rf-input-icon qf-rf-input-icon--valid">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#19a55a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </span>
+          ) : isInvalid ? (
+            <span className="qf-rf-input-icon qf-rf-input-icon--invalid">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b4231a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </span>
+          ) : null}
+        </div>
+        {isInvalid && errMsg ? <span className="qf-rf-field-err">{errMsg}</span> : null}
+      </label>
+    );
+  }
+
   // Field wrappers registered for scroll-to-first-error on a failed Continue.
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -229,9 +337,10 @@ export function VendorRegisterForm() {
     const e: FieldError[] = [];
     switch (target) {
       case 0:
-        if (f.businessName.trim().length < 2) e.push({ key: "businessName", message: "Enter your business name" });
+        if (f.businessName.trim().length < 2) e.push({ key: "businessName", message: "Business name must be at least 2 characters." });
+        if (f.ownerName.trim().length < 2) e.push({ key: "ownerName", message: "Owner name must be at least 2 characters." });
         if (f.phone.replace(/\D/g, "").length !== 10) e.push({ key: "phone", message: "Enter a valid 10-digit WhatsApp number." });
-        if (!isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email" });
+        if (!isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email." });
         break;
       case 1:
         if (!selectedMain) e.push({ key: "category", message: "Select your service category" });
@@ -240,10 +349,10 @@ export function VendorRegisterForm() {
         break;
       case 2:
         if (!cityValue) e.push({ key: "city", message: "Select your city." });
-        if (f.addressLine1.trim().length < 3) e.push({ key: "addressLine1", message: "Enter your office / business address" });
-        if (!f.stateName.trim()) e.push({ key: "state", message: "Enter your state" });
-        if (!/^\d{6}$/.test(f.pincode)) e.push({ key: "pincode", message: "Please enter a valid 6-digit pincode." });
-        if (f.areas.length === 0 && !f.customArea.trim()) e.push({ key: "areas", message: "Select at least one service area" });
+        if (f.areas.length === 0) e.push({ key: "areas", message: "Select at least one area where you serve clients." });
+        if (f.addressLine1.trim().length < 5) e.push({ key: "addressLine1", message: "Address must be at least 5 characters." });
+        if (!f.stateName.trim()) e.push({ key: "state", message: "State is required." });
+        if (!/^\d{6}$/.test(f.pincode)) e.push({ key: "pincode", message: "Enter a valid 6-digit pincode." });
         break;
       case 4:
         // Interior categories require a valid per-sqft rate at/above the minimum.
@@ -271,6 +380,29 @@ export function VendorRegisterForm() {
 
   function goNext() {
     if (step >= LAST_STEP) return;
+    
+    // Mark all fields on the current step as touched
+    setTouched((prev) => {
+      const next = { ...prev };
+      if (step === 0) {
+        next.businessName = true;
+        next.ownerName = true;
+        next.phone = true;
+        next.email = true;
+      } else if (step === 2) {
+        next.city = true;
+        next.areas = true;
+        next.addressLine1 = true;
+        next.addressLine2 = true;
+        next.landmark = true;
+        next.state = true;
+        next.pincode = true;
+      } else if (step === 4) {
+        next.rate = true;
+      }
+      return next;
+    });
+
     const errs = stepErrors(step);
     if (errs.length > 0) {
       setShowErrors(true);
@@ -291,7 +423,7 @@ export function VendorRegisterForm() {
   }
 
   const cityValue = f.city;
-  const serviceAreas = [...f.areas, f.customArea.trim()].filter(Boolean);
+  const serviceAreas = f.areas;
   // Step 3: area chips are driven by the chosen preset city (custom cities have
   // none and rely on the free-text area input below).
   const hasCitySelected = Boolean(f.city);
@@ -516,6 +648,27 @@ export function VendorRegisterForm() {
     </div>
   );
 
+  function addCustomArea() {
+    const trimmed = f.customArea.trim();
+    if (trimmed.length < 2) {
+      setCustomAreaError("Enter a valid area name.");
+      return;
+    }
+    const isDuplicate = f.areas.some(
+      (a) => a.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (isDuplicate) {
+      setCustomAreaError("This area is already selected.");
+      return;
+    }
+    setCustomAreaError("");
+    setF((current) => ({
+      ...current,
+      areas: [...current.areas, trimmed],
+      customArea: "",
+    }));
+  }
+
   function renderStep() {
     switch (step) {
       case 0:
@@ -525,38 +678,28 @@ export function VendorRegisterForm() {
             <h3>Tell us about your business</h3>
             <p className="qf-rf-qhint">These details help us create your vendor profile and dashboard access.</p>
             <div className="qf-rf-fields">
-              <label className={`qf-rf-field${fieldError("businessName") ? " has-error" : ""}`} ref={bindField("businessName")}>
-                <span>Business name</span>
-                <input
-                  ref={firstFieldRef}
-                  value={f.businessName}
-                  onChange={(e) => set("businessName", e.target.value)}
-                  placeholder="e.g. UrbanCraft Interiors"
-                  autoComplete="organization"
-                />
-                {fieldError("businessName") ? <span className="qf-rf-field-err">{fieldError("businessName")}</span> : null}
-              </label>
-              <label className="qf-rf-field">
-                <span>Owner name</span>
-                <input
-                  value={f.ownerName}
-                  onChange={(e) => set("ownerName", e.target.value)}
-                  placeholder="Your full name"
-                  autoComplete="name"
-                />
-              </label>
-              <label className={`qf-rf-field${fieldError("phone") ? " has-error" : ""}`} ref={bindField("phone")}>
-                <span>WhatsApp number</span>
-                <input
-                  value={f.phone}
-                  onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                  placeholder="10-digit mobile number"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  maxLength={10}
-                />
-                {fieldError("phone") ? <span className="qf-rf-field-err">{fieldError("phone")}</span> : null}
-              </label>
+              {renderInputField({
+                label: "Business name",
+                fieldKey: "businessName",
+                placeholder: "e.g. UrbanCraft Interiors",
+                autoComplete: "organization",
+                ref: firstFieldRef,
+              })}
+              {renderInputField({
+                label: "Owner name",
+                fieldKey: "ownerName",
+                placeholder: "Your full name",
+                autoComplete: "name",
+              })}
+              {renderInputField({
+                label: "WhatsApp number",
+                fieldKey: "phone",
+                placeholder: "10-digit mobile number",
+                inputMode: "numeric",
+                autoComplete: "tel",
+                maxLength: 10,
+                customOnChange: (val) => set("phone", val.replace(/\D/g, "").slice(0, 10)),
+              })}
               <label className="qf-rf-check">
                 <input
                   type="checkbox"
@@ -568,27 +711,25 @@ export function VendorRegisterForm() {
               {!f.whatsappSame ? (
                 <label className="qf-rf-field">
                   <span>Business contact number</span>
-                  <input
-                    value={f.whatsapp}
-                    onChange={(e) => set("whatsapp", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                    placeholder="10-digit mobile number"
-                    inputMode="numeric"
-                    maxLength={10}
-                  />
+                  <div className="qf-rf-input-wrapper">
+                    <input
+                      value={f.whatsapp}
+                      onChange={(e) => set("whatsapp", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      placeholder="10-digit mobile number"
+                      inputMode="numeric"
+                      maxLength={10}
+                    />
+                  </div>
                 </label>
               ) : null}
-              <label className={`qf-rf-field${fieldError("email") ? " has-error" : ""}`} ref={bindField("email")}>
-                <span>Business email for dashboard access</span>
-                <input
-                  type="email"
-                  value={f.email}
-                  onChange={(e) => set("email", e.target.value)}
-                  placeholder="you@example.com"
-                  inputMode="email"
-                  autoComplete="email"
-                />
-                {fieldError("email") ? <span className="qf-rf-field-err">{fieldError("email")}</span> : null}
-              </label>
+              {renderInputField({
+                label: "Business email for dashboard access",
+                fieldKey: "email",
+                type: "email",
+                placeholder: "you@example.com",
+                inputMode: "email",
+                autoComplete: "email",
+              })}
             </div>
           </div>
         );
@@ -654,6 +795,7 @@ export function VendorRegisterForm() {
             <h3>Where do you serve clients?</h3>
             <p className="qf-rf-qhint">Add your office address and the areas you cover. You can update this later from your dashboard.</p>
 
+            {/* 1. City selection */}
             <div className={`qf-rf-chips${fieldError("city") ? " has-error" : ""}`} ref={bindField("city")}>
               {CITY_OPTIONS.map((city) => {
                 const selected = f.city === city;
@@ -665,7 +807,10 @@ export function VendorRegisterForm() {
                     aria-pressed={selected}
                     // Switching city clears areas picked for the previous city and
                     // pre-fills the state (both serviced cities are in Maharashtra).
-                    onClick={() => setF((c) => ({ ...c, city, areas: [], customArea: "", stateName: "Maharashtra" }))}
+                    onClick={() => {
+                      setF((c) => ({ ...c, city, areas: [], customArea: "", stateName: "Maharashtra" }));
+                      setTouched((prev) => ({ ...prev, city: true }));
+                    }}
                   >
                     {city}
                   </button>
@@ -674,65 +819,10 @@ export function VendorRegisterForm() {
             </div>
             {fieldError("city") ? <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("city")}</p> : null}
 
-            {/* Office / Business Address — captured before service areas. */}
-            <p className="qf-vrf-subhead">Office / Business Address</p>
-            <div className="qf-rf-fields">
-              <label className={`qf-rf-field${fieldError("addressLine1") ? " has-error" : ""}`} ref={bindField("addressLine1")}>
-                <span>Office / Business Address Line 1</span>
-                <input
-                  value={f.addressLine1}
-                  onChange={(e) => set("addressLine1", e.target.value)}
-                  placeholder="Shop / building, street"
-                  autoComplete="address-line1"
-                />
-                {fieldError("addressLine1") ? <span className="qf-rf-field-err">{fieldError("addressLine1")}</span> : null}
-              </label>
-              <label className="qf-rf-field">
-                <span>Address Line 2 (optional)</span>
-                <input
-                  value={f.addressLine2}
-                  onChange={(e) => set("addressLine2", e.target.value)}
-                  placeholder="Area, locality"
-                  autoComplete="address-line2"
-                />
-              </label>
-              <label className="qf-rf-field">
-                <span>Landmark (optional)</span>
-                <input
-                  value={f.landmark}
-                  onChange={(e) => set("landmark", e.target.value)}
-                  placeholder="Near…"
-                />
-              </label>
-              <div className="qf-vrf-field-row">
-                <label className={`qf-rf-field${fieldError("state") ? " has-error" : ""}`} ref={bindField("state")}>
-                  <span>State</span>
-                  <input
-                    value={f.stateName}
-                    onChange={(e) => set("stateName", e.target.value)}
-                    placeholder="Maharashtra"
-                    autoComplete="address-level1"
-                  />
-                  {fieldError("state") ? <span className="qf-rf-field-err">{fieldError("state")}</span> : null}
-                </label>
-                <label className={`qf-rf-field${fieldError("pincode") ? " has-error" : ""}`} ref={bindField("pincode")}>
-                  <span>Pincode</span>
-                  <input
-                    value={f.pincode}
-                    onChange={(e) => set("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="411014"
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    maxLength={6}
-                  />
-                  {fieldError("pincode") ? <span className="qf-rf-field-err">{fieldError("pincode")}</span> : null}
-                </label>
-              </div>
-            </div>
-
+            {/* 2. Service areas */}
             <p className="qf-vrf-subhead">Service areas</p>
             {availableAreas.length > 0 ? (
-              <div className={`qf-rf-chips${fieldError("areas") ? " has-error" : ""}`} ref={bindField("areas")}>
+              <div className="qf-rf-chips">
                 {availableAreas.map((area) => {
                   const selected = f.areas.includes(area);
                   return (
@@ -753,15 +843,121 @@ export function VendorRegisterForm() {
                 Select a city to view service areas.
               </p>
             ) : null}
-            {fieldError("areas") ? <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("areas")}</p> : null}
-            <label className="qf-rf-field" style={{ marginTop: "0.85rem" }}>
+
+            {/* 3. Selected service areas summary */}
+            <p className="qf-vrf-subhead" ref={bindField("areas")}>Selected service areas</p>
+            {f.areas.length > 0 ? (
+              <div className="qf-rf-chips qf-rf-selected-areas">
+                {f.areas.map((area) => (
+                  <span
+                    key={area}
+                    className="qf-rf-chip is-selected qf-rf-chip-removable"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                  >
+                    {area}
+                    <button
+                      type="button"
+                      onClick={() => toggleArea(area)}
+                      className="qf-rf-chip-remove-btn"
+                      aria-label={`Remove ${area}`}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "inherit",
+                        cursor: "pointer",
+                        padding: "0 2px",
+                        fontSize: "1.1em",
+                        lineHeight: 1,
+                        display: "inline-flex",
+                        alignItems: "center"
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="qf-rf-loc-note" style={{ marginTop: "0.25rem", color: showErrors ? "#b4231a" : "#7a6b5c" }}>
+                Select at least one area where you serve clients.
+              </p>
+            )}
+            {fieldError("areas") && f.areas.length === 0 ? (
+              <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("areas")}</p>
+            ) : null}
+
+            {/* 4. Add custom area input */}
+            <div className="qf-rf-field" style={{ marginTop: "1rem" }}>
               <span>Add a custom area (optional)</span>
-              <input
-                value={f.customArea}
-                onChange={(e) => set("customArea", e.target.value)}
-                placeholder="e.g. Magarpatta, Andheri West"
-              />
-            </label>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  value={f.customArea}
+                  onChange={(e) => {
+                    set("customArea", e.target.value);
+                    setCustomAreaError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomArea();
+                    }
+                  }}
+                  placeholder="e.g. Dhanori"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomArea}
+                  className="qf-rf-btn qf-rf-btn--ghost"
+                  style={{ minHeight: "44px", padding: "0 1rem", borderRadius: "14px" }}
+                >
+                  Add
+                </button>
+              </div>
+              {customAreaError ? (
+                <span className="qf-rf-field-err" style={{ marginTop: "0.25rem" }}>{customAreaError}</span>
+              ) : null}
+            </div>
+
+            {/* 5. Office / Business Address */}
+            <p className="qf-vrf-subhead">Office / Business Address</p>
+            <div className="qf-rf-fields">
+              {renderInputField({
+                label: "Office / Business Address Line 1",
+                fieldKey: "addressLine1",
+                placeholder: "Shop / building, street",
+                autoComplete: "address-line1",
+              })}
+              {renderInputField({
+                label: "Address Line 2 (optional)",
+                fieldKey: "addressLine2",
+                placeholder: "Area, locality",
+                autoComplete: "address-line2",
+              })}
+              {renderInputField({
+                label: "Landmark (optional)",
+                fieldKey: "landmark",
+                placeholder: "Near…",
+              })}
+              <div className="qf-vrf-field-row">
+                {renderInputField({
+                  label: "State",
+                  fieldKey: "state",
+                  placeholder: "Maharashtra",
+                  autoComplete: "address-level1",
+                  customOnChange: (val) => set("stateName", val),
+                })}
+                {renderInputField({
+                  label: "Pincode",
+                  fieldKey: "pincode",
+                  placeholder: "411014",
+                  inputMode: "numeric",
+                  autoComplete: "postal-code",
+                  maxLength: 6,
+                  customOnChange: (val) => set("pincode", val.replace(/\D/g, "").slice(0, 6)),
+                })}
+              </div>
+            </div>
           </div>
         );
       case 3:
@@ -826,20 +1022,38 @@ export function VendorRegisterForm() {
                     Enter your approximate starting rate per sqft. This helps clients understand your
                     starting range.
                   </p>
-                  <div className={`qf-vrf-rate-input${rateBelowMin ? " has-error" : ""}`}>
+                  <div className={`qf-vrf-rate-input${(touched.rate || showErrors) && !rateValid ? " has-error" : ""}${rateValid && f.rateValue !== "" ? " is-valid" : ""}`}>
                     <span className="qf-vrf-rate-prefix">₹</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={f.rateValue}
-                      onChange={(e) => set("rateValue", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      onChange={(e) => {
+                        set("rateValue", e.target.value.replace(/\D/g, "").slice(0, 6));
+                        setTouched((prev) => ({ ...prev, rate: true }));
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, rate: true }))}
                       placeholder={minRate != null ? String(minRate) : "0"}
                       aria-label="Starting rate per square foot"
                     />
+                    {rateValid && f.rateValue !== "" ? (
+                      <span className="qf-rf-input-icon qf-rf-input-icon--valid" style={{ position: "static", marginRight: "0.25rem" }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#19a55a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      </span>
+                    ) : (touched.rate || showErrors) && !rateValid ? (
+                      <span className="qf-rf-input-icon qf-rf-input-icon--invalid" style={{ position: "static", marginRight: "0.25rem" }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b4231a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </span>
+                    ) : null}
                     <span className="qf-vrf-rate-suffix">/sqft</span>
                   </div>
                   <p className="qf-vrf-rate-min">Recommended minimum: ₹{minRate}/sqft</p>
-                  {rateBelowMin ? (
+                  {(touched.rate || showErrors) && !rateValid ? (
                     <p className="qf-vrf-rate-error">Minimum starting rate for this category is ₹{minRate}/sqft.</p>
                   ) : null}
                 </>

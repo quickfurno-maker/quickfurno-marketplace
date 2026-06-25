@@ -1631,14 +1631,16 @@ h3 {
   .qf-home-category-card {
     width: auto;
     min-width: 0;
-    min-height: 138px;
+    min-height: 150px;
     height: 100%;
     grid-template-columns: 1fr;
     justify-items: center;
-    align-content: center;
-    gap: 0.3rem;
+    /* Align content to the top so icons line up across the 2×2 row even when
+       descriptions wrap to a different number of lines. */
+    align-content: start;
+    gap: 0.4rem;
     border-radius: 20px;
-    padding: 0.9rem 0.6rem;
+    padding: 1rem 0.55rem;
     text-align: center;
     font-size: 0.84rem;
   }
@@ -1661,21 +1663,37 @@ h3 {
   }
 
   .qf-home-category-label {
+    /* Reset the desktop horizontal-grid placement so the title sits in the
+       single mobile column and stays centered under the icon. */
+    grid-column: 1 / -1;
+    justify-self: center;
     font-size: 0.88rem;
     line-height: 1.2;
     margin-bottom: 0.1rem;
   }
 
-  /* Show service descriptions on mobile with small readable text. */
+  /* Show service descriptions on mobile with small readable text. The text
+     spans the full card width and balances across lines so it stays centered
+     under the title and never collapses into awkward single-word rows. */
   .qf-home-category-tag {
     display: block;
-    max-width: 15ch;
+    /* Override the desktop `grid-column: 2`, which would otherwise push the
+       text into a phantom second column and shift it to one side. */
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100%;
+    max-width: none;
     margin-inline: auto;
-    font-size: 0.68rem;
+    padding-inline: 0.35rem;
+    font-size: 0.66rem;
     line-height: 1.3;
     font-weight: 700;
     color: var(--qf-ink-2);
+    text-align: center;
     text-wrap: balance;
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: none;
   }
 
   .qf-home-category-arrow {
@@ -2356,7 +2374,9 @@ h3 {
    so it overrides the legacy copper/charcoal styling above.
    ============================================================ */
 :root {
-  --qf-navy: #07111f;
+  /* Brand navy — matches the top header/navigation bar, rgb(7, 27, 58).
+     Single source for dark buttons, footer and dark navy accents. */
+  --qf-navy: #071b3a;
   --qf-navy-hover: #0b1f3a;
   --qf-gold: #f5a400;
   --qf-gold-deep: #d99a16;
@@ -2987,7 +3007,7 @@ h3 {
   padding: 1.25rem 0.8rem;
   background:
     radial-gradient(circle at 100% 0%, rgba(245, 164, 0, 0.16), transparent 16rem),
-    linear-gradient(135deg, #07111f, #0b1f3a);
+    linear-gradient(135deg, var(--qf-navy), var(--qf-navy-hover));
   box-shadow: 0 24px 54px -30px rgba(7, 17, 31, 0.6);
 }
 .qf-stat-item {
@@ -3159,7 +3179,7 @@ h3 {
   color: #ffffff;
   background:
     radial-gradient(circle at 100% 0%, rgba(245, 164, 0, 0.22), transparent 18rem),
-    linear-gradient(135deg, #07111f, #0b1f3a);
+    linear-gradient(135deg, var(--qf-navy), var(--qf-navy-hover));
   box-shadow: 0 26px 60px -34px rgba(7, 17, 31, 0.7);
 }
 .qf-client-cta--banner h2 {
@@ -3209,7 +3229,7 @@ h3 {
 
 /* --- Footer → deep navy --- */
 .site-footer {
-  background: #07111f;
+  background: var(--qf-navy);
 }
 .site-footer .bw-furno {
   color: var(--qf-gold);
@@ -4197,6 +4217,16 @@ body::before {
   line-height: 1.25;
 }
 
+/* Minimum starting rate line under the subcategory title — smaller, muted,
+   readable but not loud. Sits clear of the top-right checkmark. */
+.qf-rf-tile-rate {
+  margin-top: -0.1rem;
+  color: #6b7585;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .qf-rf-tile.is-selected {
   border-color: #f5a400;
   background: #fffaf0;
@@ -4315,6 +4345,7 @@ body::before {
 
 .qf-rf-money input {
   padding-left: 1.9rem;
+  padding-right: 2.5rem; /* room for the inline tick/cross on the right */
 }
 
 @media (max-width: 480px) {
@@ -6785,11 +6816,13 @@ body::before {
 }
 
 /* Subtle green border/box-shadow for valid fields */
-.qf-rf-field.is-valid input {
+.qf-rf-field.is-valid input,
+.qf-rf-field.is-valid select {
   border-color: rgba(25, 165, 90, 0.45);
 }
 
-.qf-rf-field.is-valid input:focus {
+.qf-rf-field.is-valid input:focus,
+.qf-rf-field.is-valid select:focus {
   border-color: #19a55a;
   box-shadow: 0 0 0 3px rgba(25, 165, 90, 0.16);
 }

@@ -28,7 +28,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "interior",
     label: "Interior",
-    tagline: "Designers, carpenters, modular & premium interiors",
+    tagline: "Interior designers, carpenters, modular factories, and premium interiors.",
     icon: "home",
     subcategories: [
       { label: "Interior Designers", category: "Interior Designers" },
@@ -40,7 +40,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "sofa",
     label: "Sofa",
-    tagline: "Sofa makers, upholstery & recliner work",
+    tagline: "Sofa makers, upholstery work, and recliner services.",
     icon: "sofa",
     category: "Sofa",
     subcategories: [],
@@ -48,7 +48,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "painter",
     label: "Painter",
-    tagline: "Interior, exterior & texture painting",
+    tagline: "Interior, exterior, and texture painting.",
     icon: "paint",
     category: "Painter",
     subcategories: [],
@@ -56,7 +56,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "civil-work",
     label: "Civil Work",
-    tagline: "Renovation, masonry & repair work",
+    tagline: "Renovation, masonry, and repair work.",
     icon: "civil",
     category: "Civil Work",
     subcategories: [],

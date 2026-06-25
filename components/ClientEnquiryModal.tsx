@@ -44,11 +44,21 @@ const SUBCATEGORY_ICONS: Record<string, IconName> = {
   "Premium Interiors": "grid",
 };
 
+// Minimum starting rate shown on each Interior subcategory card. Display-only
+// guidance for the client form — kept local here so it never touches the shared
+// category source, vendor registration or vendor card logic.
+const SUBCATEGORY_RATES: Record<string, string> = {
+  "Interior Designers": "Starting from ₹1,000/sqft",
+  Carpenters: "Starting from ₹200/sqft",
+  "Modular Factory": "Starting from ₹1,000/sqft",
+  "Premium Interiors": "Starting from ₹1,200/sqft",
+};
+
 const RF_TIMELINES: { label: string; icon: IconName }[] = [
-  { label: "Within one month", icon: "bolt" },
-  { label: "One – two months", icon: "clock" },
-  { label: "Two – three months", icon: "clock" },
-  { label: "More than three months", icon: "search" },
+  { label: "Within One Month", icon: "bolt" },
+  { label: "One–Two Months", icon: "clock" },
+  { label: "Two–Three Months", icon: "clock" },
+  { label: "After Three Months", icon: "search" },
 ];
 
 const PHASES = ["Need", "Details", "Match"] as const;
@@ -100,6 +110,48 @@ const initialState: RFState = {
 };
 
 const inrFormatter = new Intl.NumberFormat("en-IN");
+
+// Indian mobile: exactly 10 digits, first digit 6-9.
+const PHONE_RE = /^[6-9]\d{9}$/;
+
+/**
+ * Strip everything but digits and normalise a pasted Indian number down to a
+ * bare 10-digit mobile (e.g. "+91 98765 43210" or "098765 43210" → "9876543210").
+ */
+function cleanPhone(raw: string): string {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(digits.length - 10);
+  else if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  return digits.slice(0, 10);
+}
+
+function isPhoneValid(digits: string): boolean {
+  return PHONE_RE.test(digits);
+}
+
+/** Inline tick / cross shown inside a field (same look as the vendor form). */
+function ValidationIcon({ state }: { state: "valid" | "invalid" | "none" }) {
+  if (state === "valid") {
+    return (
+      <span className="qf-rf-input-icon qf-rf-input-icon--valid" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#19a55a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </span>
+    );
+  }
+  if (state === "invalid") {
+    return (
+      <span className="qf-rf-input-icon qf-rf-input-icon--invalid" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b4231a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </span>
+    );
+  }
+  return null;
+}
 
 /** Read UTM params + the current page URL for lead-source tracking. */
 function readTrackingContext() {
@@ -210,6 +262,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [locStatus, setLocStatus] = useState<"" | "locating" | "captured" | "denied" | "unsupported">("");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -236,6 +289,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setSubmitting(false);
     setShowConfirm(false);
     setLocStatus("");
+    setTouched({});
     setStep(0);
     setModalOptions(options);
     setForm({
@@ -261,6 +315,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setSuccess(false);
     setSubmitting(false);
     setLocStatus("");
+    setTouched({});
     setStep(0);
     setModalOptions({});
     setForm(initialState);
@@ -268,6 +323,30 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
   function set<K extends keyof RFState>(field: K, value: RFState[K]) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function markTouched(field: string) {
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  }
+
+  // Fields validated inline (tick/cross + per-field message) per step. Tile/chip
+  // steps (category, subcategory, timeline) keep the concise banner instead.
+  const STEP_FIELDS: Record<number, string[]> = {
+    2: ["city", "pincode"],
+    3: ["budgetMin", "budgetMax"],
+    5: ["name", "phone", "whatsapp", "consent"],
+  };
+
+  function markStepTouched(target: number) {
+    const fields = STEP_FIELDS[target];
+    if (!fields) return;
+    setTouched((prev) => {
+      const next = { ...prev };
+      fields.forEach((f) => {
+        next[f] = true;
+      });
+      return next;
+    });
   }
 
   const isInterior = form.categoryId === INTERIOR_ID;
@@ -299,6 +378,32 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   function setBudgetValue(field: "budgetMin" | "budgetMax", raw: string) {
     const digits = raw.replace(/\D/g, "").slice(0, 9);
     setForm((current) => ({ ...current, [field]: digits, budgetNotSure: false }));
+    markTouched(field);
+  }
+
+  function onPhoneChange(raw: string) {
+    const cleaned = cleanPhone(raw);
+    // Keep WhatsApp synced to phone only while the "same as phone" box is ticked.
+    setForm((current) => ({
+      ...current,
+      phone: cleaned,
+      whatsapp: current.whatsappSame ? cleaned : current.whatsapp,
+    }));
+    markTouched("phone");
+  }
+
+  function onWhatsappChange(raw: string) {
+    setForm((current) => ({ ...current, whatsapp: cleanPhone(raw) }));
+    markTouched("whatsapp");
+  }
+
+  function onWhatsappSameChange(checked: boolean) {
+    setForm((current) => ({
+      ...current,
+      whatsappSame: checked,
+      // Ticking the box copies the cleaned phone number into WhatsApp.
+      whatsapp: checked ? current.phone : current.whatsapp,
+    }));
   }
 
   function toggleNotSure() {
@@ -344,7 +449,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       case 1:
         return form.subcategory ? null : "Select an interior service.";
       case 2:
-        return form.city ? null : "Please select your city.";
+        if (!form.city) return "Please select your city.";
+        if (form.pincode !== "" && form.pincode.length !== 6) return "Enter a valid 6-digit pincode.";
+        return null;
       case 3: {
         if (form.budgetNotSure) return null;
         const hasMin = form.budgetMin.trim() !== "";
@@ -361,7 +468,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         return form.timeline ? null : "Select your project timeline.";
       case 5:
         if (form.name.trim().length < 2) return "Please enter your name.";
-        if (form.phone.replace(/\D/g, "").length < 10) return "Please enter a valid phone number.";
+        if (!isPhoneValid(form.phone)) return "Enter a valid 10-digit mobile number.";
+        if (!form.whatsappSame && !isPhoneValid(form.whatsapp))
+          return "Enter a valid 10-digit WhatsApp number.";
         if (!form.shareConsent)
           return "Please accept sharing your details with up to 3 verified teams to continue.";
         return null;
@@ -374,7 +483,14 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     if (step >= LAST_STEP) return;
     const err = stepError(step);
     if (err) {
-      setError(err);
+      // Input-based steps surface inline per-field tick/cross + messages;
+      // tile/chip steps keep the concise banner.
+      if (STEP_FIELDS[step]) {
+        markStepTouched(step);
+        setError("");
+      } else {
+        setError(err);
+      }
       return;
     }
     setError("");
@@ -464,8 +580,13 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     if (submitting) return;
     setError("");
 
-    if (!form.name.trim() || form.phone.replace(/\D/g, "").length < 10 || !form.city || !form.serviceRequired) {
-      setError("Please complete your name, a valid phone number, city and service.");
+    if (!form.name.trim() || !isPhoneValid(form.phone) || !form.city || !form.serviceRequired) {
+      setError("Please complete your name, a valid 10-digit mobile number, city and service.");
+      return;
+    }
+
+    if (!form.whatsappSame && !isPhoneValid(form.whatsapp)) {
+      setError("Enter a valid 10-digit WhatsApp number.");
       return;
     }
 
@@ -542,6 +663,48 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const totalQuestions = isInterior ? 6 : 5;
   const questionNumber = isInterior ? step + 1 : step === 0 ? 1 : step;
 
+  function budgetMinError(): string | null {
+    if (form.budgetNotSure) return null;
+    const hasMin = form.budgetMin.trim() !== "";
+    const hasMax = form.budgetMax.trim() !== "";
+    if (!hasMin && !hasMax) return "Enter your budget range or select Not sure yet.";
+    const min = parseInt(form.budgetMin, 10);
+    if (!hasMin || Number.isNaN(min) || min <= 0) return "Enter a valid minimum budget.";
+    return null;
+  }
+
+  function budgetMaxError(): string | null {
+    if (form.budgetNotSure) return null;
+    const hasMin = form.budgetMin.trim() !== "";
+    const hasMax = form.budgetMax.trim() !== "";
+    if (!hasMin && !hasMax) return null; // surfaced under the minimum field
+    const min = parseInt(form.budgetMin, 10);
+    const max = parseInt(form.budgetMax, 10);
+    if (!hasMax || Number.isNaN(max) || max <= 0) return "Enter a valid maximum budget.";
+    if (max < min) return "Maximum budget should be higher than minimum budget.";
+    return null;
+  }
+
+  /**
+   * Resolve the inline validation state for a field: a green tick once it holds
+   * a valid value, a red cross + message after it's been touched (or Next was
+   * pressed), and nothing while it's pristine. Optional fields never show a
+   * cross when empty.
+   */
+  function fieldUi(name: string, opts: { valid: boolean; value: string; error: string | null; optional?: boolean }) {
+    const isTouched = Boolean(touched[name]);
+    const hasValue = opts.value.trim() !== "";
+    let state: "valid" | "invalid" | "none" = "none";
+    if (opts.valid && hasValue) state = "valid";
+    else if (!opts.valid && isTouched && (!opts.optional || hasValue)) state = "invalid";
+    return {
+      className: `qf-rf-field${state === "invalid" ? " has-error" : ""}${state === "valid" ? " is-valid" : ""}`,
+      iconState: state,
+      showError: state === "invalid" && Boolean(opts.error),
+      error: opts.error,
+    };
+  }
+
   function renderStep() {
     switch (step) {
       case 0:
@@ -594,6 +757,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       <QFIcon name={SUBCATEGORY_ICONS[sub.label] ?? "home"} />
                     </span>
                     <span className="qf-rf-tile-label">{sub.label}</span>
+                    {SUBCATEGORY_RATES[sub.label] ? (
+                      <span className="qf-rf-tile-rate">{SUBCATEGORY_RATES[sub.label]}</span>
+                    ) : null}
                     {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
                   </button>
                 );
@@ -606,37 +772,70 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">Where do you need the service?</h3>
-            <div className="qf-rf-fields">
-              <label className="qf-rf-field">
-                <span>City</span>
-                <select value={form.city} onChange={(e) => set("city", e.target.value)}>
-                  <option value="">Select city</option>
-                  {cities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="qf-rf-field">
-                <span>Area / Locality</span>
-                <input
-                  value={form.area}
-                  onChange={(e) => set("area", e.target.value)}
-                  placeholder="e.g. Kharadi, Baner"
-                  autoComplete="address-level2"
-                />
-              </label>
-              <label className="qf-rf-field">
-                <span>Pincode (optional)</span>
-                <input
-                  value={form.pincode}
-                  onChange={(e) => set("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="411014"
-                  inputMode="numeric"
-                  autoComplete="postal-code"
-                />
-              </label>
+            {(() => {
+              const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
+              const areaUi = fieldUi("area", { valid: form.area.trim().length > 0, value: form.area, error: null, optional: true });
+              const pincodeValid = form.pincode === "" || form.pincode.length === 6;
+              const pincodeUi = fieldUi("pincode", {
+                valid: pincodeValid,
+                value: form.pincode,
+                error: "Enter a valid 6-digit pincode.",
+                optional: true,
+              });
+              return (
+                <div className="qf-rf-fields">
+                  <label className={cityUi.className}>
+                    <span>City</span>
+                    <select
+                      value={form.city}
+                      onChange={(e) => {
+                        set("city", e.target.value);
+                        markTouched("city");
+                      }}
+                      onBlur={() => markTouched("city")}
+                    >
+                      <option value="">Select city</option>
+                      {cities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                    {cityUi.showError ? <span className="qf-rf-field-err">{cityUi.error}</span> : null}
+                  </label>
+                  <label className={areaUi.className}>
+                    <span>Area / Locality</span>
+                    <div className="qf-rf-input-wrapper">
+                      <input
+                        value={form.area}
+                        onChange={(e) => {
+                          set("area", e.target.value);
+                          markTouched("area");
+                        }}
+                        placeholder="e.g. Kharadi, Baner"
+                        autoComplete="address-level2"
+                      />
+                      <ValidationIcon state={areaUi.iconState} />
+                    </div>
+                  </label>
+                  <label className={pincodeUi.className}>
+                    <span>Pincode (optional)</span>
+                    <div className="qf-rf-input-wrapper">
+                      <input
+                        value={form.pincode}
+                        onChange={(e) => {
+                          set("pincode", e.target.value.replace(/\D/g, "").slice(0, 6));
+                          markTouched("pincode");
+                        }}
+                        onBlur={() => markTouched("pincode")}
+                        placeholder="411014"
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                      />
+                      <ValidationIcon state={pincodeUi.iconState} />
+                    </div>
+                    {pincodeUi.showError ? <span className="qf-rf-field-err">{pincodeUi.error}</span> : null}
+                  </label>
               <button type="button" className="qf-rf-loc-btn" onClick={useMyLocation}>
                 <QFIcon name="pin" />
                 {locStatus === "locating" ? "Getting location…" : "Use my current location"}
@@ -650,7 +849,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
               {locStatus === "unsupported" ? (
                 <p className="qf-rf-loc-note">Location isn&apos;t available on this device — please enter city and area.</p>
               ) : null}
-            </div>
+                </div>
+              );
+            })()}
           </div>
         );
       case 3:
@@ -659,46 +860,75 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">What is your approximate budget?</h3>
             <p className="qf-rf-qhint">Enter your expected budget range. This helps us match you with the right team.</p>
-            <div className="qf-rf-fields">
-              <div className="qf-rf-budget-row">
-                <label className="qf-rf-field">
-                  <span>Minimum budget</span>
-                  <div className="qf-rf-money">
-                    <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
-                    <input
-                      value={form.budgetMin}
-                      onChange={(e) => setBudgetValue("budgetMin", e.target.value)}
-                      placeholder="50000"
-                      inputMode="numeric"
-                      aria-label="Minimum budget in rupees"
-                    />
+            {(() => {
+              const minUi = fieldUi("budgetMin", {
+                valid: budgetMinError() === null,
+                value: form.budgetNotSure ? "x" : form.budgetMin,
+                error: budgetMinError(),
+              });
+              const maxUi = fieldUi("budgetMax", {
+                valid: budgetMaxError() === null,
+                value: form.budgetNotSure ? "x" : form.budgetMax,
+                error: budgetMaxError(),
+              });
+              // No tick/cross while "Not sure yet" is selected.
+              const minIcon = form.budgetNotSure ? "none" : minUi.iconState;
+              const maxIcon = form.budgetNotSure ? "none" : maxUi.iconState;
+              return (
+                <div className="qf-rf-fields">
+                  <div className="qf-rf-budget-row">
+                    <label className={form.budgetNotSure ? "qf-rf-field" : minUi.className}>
+                      <span>Minimum budget</span>
+                      <div className="qf-rf-money">
+                        <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
+                        <input
+                          value={form.budgetMin}
+                          onChange={(e) => setBudgetValue("budgetMin", e.target.value)}
+                          onBlur={() => markTouched("budgetMin")}
+                          placeholder="50000"
+                          inputMode="numeric"
+                          disabled={form.budgetNotSure}
+                          aria-label="Minimum budget in rupees"
+                        />
+                        <ValidationIcon state={minIcon} />
+                      </div>
+                      {!form.budgetNotSure && minUi.showError ? (
+                        <span className="qf-rf-field-err">{minUi.error}</span>
+                      ) : null}
+                    </label>
+                    <label className={form.budgetNotSure ? "qf-rf-field" : maxUi.className}>
+                      <span>Up to</span>
+                      <div className="qf-rf-money">
+                        <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
+                        <input
+                          value={form.budgetMax}
+                          onChange={(e) => setBudgetValue("budgetMax", e.target.value)}
+                          onBlur={() => markTouched("budgetMax")}
+                          placeholder="300000"
+                          inputMode="numeric"
+                          disabled={form.budgetNotSure}
+                          aria-label="Maximum budget in rupees"
+                        />
+                        <ValidationIcon state={maxIcon} />
+                      </div>
+                      {!form.budgetNotSure && maxUi.showError ? (
+                        <span className="qf-rf-field-err">{maxUi.error}</span>
+                      ) : null}
+                    </label>
                   </div>
-                </label>
-                <label className="qf-rf-field">
-                  <span>Up to</span>
-                  <div className="qf-rf-money">
-                    <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
-                    <input
-                      value={form.budgetMax}
-                      onChange={(e) => setBudgetValue("budgetMax", e.target.value)}
-                      placeholder="300000"
-                      inputMode="numeric"
-                      aria-label="Maximum budget in rupees"
-                    />
+                  <div className="qf-rf-chips">
+                    <button
+                      type="button"
+                      className={`qf-rf-chip${form.budgetNotSure ? " is-selected" : ""}`}
+                      aria-pressed={form.budgetNotSure}
+                      onClick={toggleNotSure}
+                    >
+                      Not sure yet
+                    </button>
                   </div>
-                </label>
-              </div>
-              <div className="qf-rf-chips">
-                <button
-                  type="button"
-                  className={`qf-rf-chip${form.budgetNotSure ? " is-selected" : ""}`}
-                  aria-pressed={form.budgetNotSure}
-                  onClick={toggleNotSure}
-                >
-                  Not sure yet
-                </button>
-              </div>
-            </div>
+                </div>
+              );
+            })()}
           </div>
         );
       case 4:
@@ -734,70 +964,118 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">Where should teams contact you?</h3>
-            <div className="qf-rf-fields">
-              <label className="qf-rf-field">
-                <span>Name</span>
-                <input
-                  ref={nameInputRef}
-                  value={form.name}
-                  onChange={(e) => set("name", e.target.value)}
-                  placeholder="Your full name"
-                  autoComplete="name"
-                />
-              </label>
-              <label className="qf-rf-field">
-                <span>Phone number</span>
-                <input
-                  value={form.phone}
-                  onChange={(e) => set("phone", e.target.value)}
-                  placeholder="+91"
-                  inputMode="tel"
-                  autoComplete="tel"
-                />
-              </label>
-              <label className="qf-rf-check">
-                <input
-                  type="checkbox"
-                  checked={form.whatsappSame}
-                  onChange={(e) => set("whatsappSame", e.target.checked)}
-                />
-                <span>WhatsApp number same as phone</span>
-              </label>
-              {!form.whatsappSame ? (
-                <label className="qf-rf-field">
-                  <span>WhatsApp number</span>
-                  <input
-                    value={form.whatsapp}
-                    onChange={(e) => set("whatsapp", e.target.value)}
-                    placeholder="+91"
-                    inputMode="tel"
-                  />
-                </label>
-              ) : null}
-              <label className="qf-rf-field">
-                <span>Message / details (optional)</span>
-                <textarea
-                  value={form.message}
-                  onChange={(e) => set("message", e.target.value)}
-                  placeholder="Anything else the teams should know?"
-                  rows={3}
-                />
-              </label>
-              <label className="qf-rf-check qf-rf-consent">
-                <input
-                  type="checkbox"
-                  checked={form.shareConsent}
-                  onChange={(e) => set("shareConsent", e.target.checked)}
-                />
-                <span>
-                  I agree to share my details with up to 3 verified teams so they
-                  can contact me about my requirement. See our{" "}
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
-                  and{" "}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.
-                </span>
-              </label>
-            </div>
+            {(() => {
+              const nameUi = fieldUi("name", {
+                valid: form.name.trim().length >= 2,
+                value: form.name,
+                error: "Please enter your name.",
+              });
+              const phoneUi = fieldUi("phone", {
+                valid: isPhoneValid(form.phone),
+                value: form.phone,
+                error: "Enter a valid 10-digit mobile number.",
+              });
+              const whatsappUi = fieldUi("whatsapp", {
+                valid: isPhoneValid(form.whatsapp),
+                value: form.whatsapp,
+                error: "Enter a valid 10-digit WhatsApp number.",
+              });
+              const consentError = Boolean(touched.consent) && !form.shareConsent;
+              return (
+                <div className="qf-rf-fields">
+                  <label className={nameUi.className}>
+                    <span>Name</span>
+                    <div className="qf-rf-input-wrapper">
+                      <input
+                        ref={nameInputRef}
+                        value={form.name}
+                        onChange={(e) => {
+                          set("name", e.target.value);
+                          markTouched("name");
+                        }}
+                        onBlur={() => markTouched("name")}
+                        placeholder="Your full name"
+                        autoComplete="name"
+                      />
+                      <ValidationIcon state={nameUi.iconState} />
+                    </div>
+                    {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
+                  </label>
+                  <label className={phoneUi.className}>
+                    <span>Phone number</span>
+                    <div className="qf-rf-input-wrapper">
+                      <input
+                        value={form.phone}
+                        onChange={(e) => onPhoneChange(e.target.value)}
+                        onBlur={() => markTouched("phone")}
+                        placeholder="10-digit mobile number"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        maxLength={10}
+                      />
+                      <ValidationIcon state={phoneUi.iconState} />
+                    </div>
+                    {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
+                  </label>
+                  <label className="qf-rf-check">
+                    <input
+                      type="checkbox"
+                      checked={form.whatsappSame}
+                      onChange={(e) => onWhatsappSameChange(e.target.checked)}
+                    />
+                    <span>WhatsApp number same as phone</span>
+                  </label>
+                  {!form.whatsappSame ? (
+                    <label className={whatsappUi.className}>
+                      <span>WhatsApp number</span>
+                      <div className="qf-rf-input-wrapper">
+                        <input
+                          value={form.whatsapp}
+                          onChange={(e) => onWhatsappChange(e.target.value)}
+                          onBlur={() => markTouched("whatsapp")}
+                          placeholder="10-digit WhatsApp number"
+                          inputMode="numeric"
+                          maxLength={10}
+                        />
+                        <ValidationIcon state={whatsappUi.iconState} />
+                      </div>
+                      {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
+                    </label>
+                  ) : null}
+                  <label className="qf-rf-field">
+                    <span>Message / details (optional)</span>
+                    <textarea
+                      value={form.message}
+                      onChange={(e) => set("message", e.target.value)}
+                      placeholder="Anything else the teams should know?"
+                      rows={3}
+                    />
+                  </label>
+                  <label className={`qf-rf-check qf-rf-consent${consentError ? " has-error" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={form.shareConsent}
+                      onChange={(e) => {
+                        set("shareConsent", e.target.checked);
+                        markTouched("consent");
+                      }}
+                    />
+                    <span>
+                      I agree to share my details with up to 3 verified teams so they
+                      can contact me about my requirement. See our{" "}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
+                      and{" "}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.
+                    </span>
+                  </label>
+                  {consentError ? (
+                    <span className="qf-rf-field-err qf-rf-field-err--block">
+                      Please accept sharing your details with up to 3 verified teams to continue.
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
         );
       default:

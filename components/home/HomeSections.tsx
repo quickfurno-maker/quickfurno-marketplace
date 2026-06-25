@@ -154,11 +154,11 @@ export function ClientCTASection() {
       <div className="qf-client-cta-body">
         <h2>Ready to transform your home?</h2>
         <p>
-          Tell us your requirement and get connected with verified home-service
-          teams near you.
+          Tell us your requirement and get connected with Verified Teams
+          near you.
         </p>
         <ul className="qf-cta-points" aria-label="QuickFurno promises">
-          <li>Up to 3 verified matches</li>
+          <li>Up to 3 verified Teams</li>
           <li>Free for homeowners</li>
           <li>Dedicated support</li>
         </ul>
@@ -247,11 +247,11 @@ export function CoverageSection() {
     <section className="qf-home-section" id="coverage">
       <div className="qf-coverage" data-reveal>
         <div>
-          <span className="qf-u-eyebrow">Now serving</span>
+          <span className="qf-u-eyebrow">Now Serving</span>
           <h2>We&apos;re live in Pune &amp; Mumbai</h2>
           <p>
-            QuickFurno connects you with verified local experts across Pune and
-            Mumbai — with more cities on the way.
+            QuickFurno connects homeowners with Verified Teams across Pune and
+            Mumbai — with more cities coming soon.
           </p>
           <div className="qf-coverage-cities">
             <span>Pune</span>

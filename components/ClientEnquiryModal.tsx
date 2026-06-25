@@ -472,7 +472,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         if (!form.whatsappSame && !isPhoneValid(form.whatsapp))
           return "Enter a valid 10-digit WhatsApp number.";
         if (!form.shareConsent)
-          return "Please accept sharing your details with up to 3 verified teams to continue.";
+          return "Please accept sharing your details with up to 3 verified Teams to continue.";
         return null;
       default:
         return null;
@@ -591,7 +591,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
 
     if (!form.shareConsent) {
-      setError("Please accept sharing your details with up to 3 verified teams to continue.");
+      setError("Please accept sharing your details with up to 3 verified Teams to continue.");
       return;
     }
 
@@ -841,7 +841,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 {locStatus === "locating" ? "Getting location…" : "Use my current location"}
               </button>
               {locStatus === "captured" ? (
-                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll match teams near you.</p>
+                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll match you with Verified Teams near you.</p>
               ) : null}
               {locStatus === "denied" ? (
                 <p className="qf-rf-loc-note">No problem — your city and area above are enough.</p>
@@ -1061,7 +1061,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       }}
                     />
                     <span>
-                      I agree to share my details with up to 3 verified teams so they
+                      I agree to share my details with up to 3 verified Teams so they
                       can contact me about my requirement. See our{" "}
                       <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
                       and{" "}
@@ -1070,7 +1070,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   </label>
                   {consentError ? (
                     <span className="qf-rf-field-err qf-rf-field-err--block">
-                      Please accept sharing your details with up to 3 verified teams to continue.
+                      Please accept sharing your details with up to 3 verified Teams to continue.
                     </span>
                   ) : null}
                 </div>
@@ -1082,8 +1082,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Review &amp; confirm</span>
-            <h3 id="qf-rf-title">Get matched with verified teams</h3>
-            <p className="qf-rf-qhint">We&apos;ll connect you with verified teams near your area.</p>
+            <h3 id="qf-rf-title">Get matched with Verified Teams</h3>
+            <p className="qf-rf-qhint">We&apos;ll connect you with Verified Teams near your area.</p>
             <dl className="qf-rf-summary">
               <div>
                 <dt>Service</dt>
@@ -1181,7 +1181,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     ✓
                   </span>
                   <h3 id="qf-rf-title">Requirement submitted</h3>
-                  <p>Your requirement is submitted. QuickFurno will connect you with verified teams shortly.</p>
+                  <p>Your requirement is submitted. QuickFurno will connect you with Verified Teams shortly.</p>
                 </div>
               ) : (
                 <div className="qf-rf-step" key={step}>

@@ -106,7 +106,7 @@ export default function HomePage() {
             <div className="qf-section-head qf-section-head--row">
               <div>
                 <h2>Popular Home Services</h2>
-                <p>Pick a service and get matched with verified teams near you.</p>
+                <p>Pick a service and get matched with Verified Teams near you.</p>
               </div>
               <Link href="#featured" className="qf-section-link">
                 View all <QFIcon name="arrow" />

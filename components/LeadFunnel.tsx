@@ -53,7 +53,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
     }
     if (form.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
     if (!consent) {
-      setError("Please accept sharing your details with up to 3 verified teams to continue.");
+      setError("Please accept sharing your details with up to 3 verified Teams to continue.");
       return;
     }
     setBusy(true);
@@ -171,7 +171,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
               className="mt-0.5 h-4 w-4 accent-gold"
             />
             <span>
-              I agree to share my details with up to 3 verified teams so they can contact me about
+              I agree to share my details with up to 3 verified Teams so they can contact me about
               my requirement. See our{" "}
               <a href="/privacy" className="text-gold underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
               and{" "}

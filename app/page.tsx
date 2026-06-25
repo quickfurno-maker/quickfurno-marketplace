@@ -18,7 +18,7 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 
 // Phase 1A hero trust badges (visual; matches final design direction).
 const heroBadges = [
-  { icon: "shield" as const, label: "Verified vendors" },
+  { icon: "shield" as const, label: "Verified teams" },
   { icon: "tag" as const, label: "Free for homeowners" },
   { icon: "compare" as const, label: "Up to 3 matches" },
   { icon: "pin" as const, label: "Pune & Mumbai" },
@@ -56,7 +56,7 @@ export default function HomePage() {
             <div className="qf-hero-copy">
               <span className="qf-hero-eyebrow">Verified Home Services</span>
               <h1>
-                Get matched with <em>3 verified local vendors</em> for your home project.
+                Get matched with <em>3 verified local teams</em> for your home project.
               </h1>
               <p>
                 Tell us what you need and compare trusted interior designers, carpenters, sofa makers, painters, modular and civil-work experts near you — free for homeowners.
@@ -85,7 +85,7 @@ export default function HomePage() {
                 className="qf-hero-cta-primary"
                 source="Homepage hero"
               >
-                Get Free Vendor Matches <QFIcon name="arrow" />
+                Get Free Team Matches <QFIcon name="arrow" />
               </EnquiryModalTrigger>
               <Link href="#categories" className="qf-hero-cta-secondary">
                 Explore Services
@@ -106,7 +106,7 @@ export default function HomePage() {
             <div className="qf-section-head qf-section-head--row">
               <div>
                 <h2>Popular Home Services</h2>
-                <p>Pick a service and get matched with verified vendors near you.</p>
+                <p>Pick a service and get matched with verified teams near you.</p>
               </div>
               <Link href="#featured" className="qf-section-link">
                 View all <QFIcon name="arrow" />

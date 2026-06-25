@@ -28,7 +28,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "interior",
     label: "Interior",
-    tagline: "Design, woodwork & turnkey homes",
+    tagline: "Designers, carpenters, modular & premium interiors",
     icon: "home",
     subcategories: [
       { label: "Interior Designers", category: "Interior Designers" },
@@ -40,7 +40,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "sofa",
     label: "Sofa",
-    tagline: "Custom sofas, recliners & upholstery",
+    tagline: "Sofa makers, upholstery & recliner work",
     icon: "sofa",
     category: "Sofa",
     subcategories: [],
@@ -48,7 +48,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "painter",
     label: "Painter",
-    tagline: "Interior, texture & waterproofing",
+    tagline: "Interior, exterior & texture painting",
     icon: "paint",
     category: "Painter",
     subcategories: [],
@@ -56,7 +56,7 @@ export const mainCategories: MainCategory[] = [
   {
     id: "civil-work",
     label: "Civil Work",
-    tagline: "Renovation, tiling & masonry",
+    tagline: "Renovation, masonry & repair work",
     icon: "civil",
     category: "Civil Work",
     subcategories: [],

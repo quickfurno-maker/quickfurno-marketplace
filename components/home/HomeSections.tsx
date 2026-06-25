@@ -155,7 +155,7 @@ export function ClientCTASection() {
         <h2>Ready to transform your home?</h2>
         <p>
           Tell us your requirement and get connected with verified home-service
-          vendors near you.
+          teams near you.
         </p>
         <ul className="qf-cta-points" aria-label="QuickFurno promises">
           <li>Up to 3 verified matches</li>
@@ -164,7 +164,7 @@ export function ClientCTASection() {
         </ul>
       </div>
       <EnquiryModalTrigger className="qf-gold-btn" source="Homepage final CTA">
-        Get Free Vendor Matches
+        Get Free Team Matches
       </EnquiryModalTrigger>
     </section>
   );
@@ -212,7 +212,7 @@ export function StatsStrip() {
 // --- Homepage sections ------------------------------------------------------
 
 const trustStripItems = [
-  { icon: "verified-vendors", title: "Verified Vendors", label: "Background-checked pros" },
+  { icon: "verified-vendors", title: "Verified Teams", label: "Background-checked pros" },
   { icon: "fast-response", title: "Fast Response", label: "Matches in minutes" },
   { icon: "transparent-process", title: "Transparent Process", label: "Clear rates, no surprises" },
   { icon: "location-matching", title: "Location-Based Matching", label: "Matched to your area" },

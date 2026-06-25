@@ -13,116 +13,42 @@ import {
 } from "react";
 import { submitLead } from "@/app/actions";
 import { trackEvent } from "@/lib/config";
-import { cities } from "@/lib/quickfurno-data";
+import { cities, enquiryServiceForCategory } from "@/lib/quickfurno-data";
+import { mainCategories } from "@/lib/categories";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 
 // ---------------------------------------------------------------------------
 // "Requirement First" guided multi-step enquiry flow.
 // One question per screen, Typeform-style, mapped to the SAME lead fields the
 // backend already expects (submitLead / leadService.createLead). No Supabase,
-// type, or API changes — the GPS coordinates and extra context fold into the
-// existing `requirement` text field.
+// type, or API changes — the extra context folds into the existing
+// `requirement` text field, and `service_category` keeps the canonical service
+// string so lead↔vendor matching keeps working.
+//
+// Category structure is the single source of truth in lib/categories.ts so the
+// homepage cards, vendor registration and this form never drift apart:
+//   Interior (Interior Designers · Carpenters · Modular Factory · Premium
+//   Interiors) · Sofa · Painter · Civil Work.
 // ---------------------------------------------------------------------------
 
 type IconName = Parameters<typeof QFIcon>[0]["name"];
 
-type NeedTile = {
-  id: string;
-  label: string;
-  icon: IconName;
-  micro: string;
-  /** Canonical service used for lead↔vendor matching (must match lib/config SERVICES). */
-  service: string;
+const INTERIOR_ID = "interior";
+
+// Icons for the four Interior subcategories (the shared category source only
+// carries icons for the main tiles).
+const SUBCATEGORY_ICONS: Record<string, IconName> = {
+  "Interior Designers": "home",
+  Carpenters: "hammer",
+  "Modular Factory": "kitchen",
+  "Premium Interiors": "grid",
 };
-
-type ProjectTile = { label: string; service: string; icon: IconName };
-
-// Step 1 — broad need. `service` is the safe canonical fallback for matching.
-const NEEDS: NeedTile[] = [
-  { id: "interiors", label: "Interiors", icon: "home", micro: "Design & turnkey homes", service: "Full Home Interior" },
-  { id: "carpentry", label: "Carpentry", icon: "hammer", micro: "Wardrobes & woodwork", service: "Carpentry" },
-  { id: "sofa", label: "Sofa", icon: "sofa", micro: "Custom sofas & upholstery", service: "Custom Sofa & Upholstery" },
-  { id: "painting", label: "Painting", icon: "paint", micro: "Interior & exterior", service: "Painting" },
-  { id: "civil", label: "Civil Work", icon: "civil", micro: "Renovation & masonry", service: "Home Renovation" },
-  { id: "modular-kitchen", label: "Modular Kitchen", icon: "kitchen", micro: "Smart modular kitchens", service: "Modular Kitchen" },
-  { id: "wardrobe", label: "Wardrobe", icon: "wardrobe", micro: "Fitted wardrobes", service: "Wardrobe" },
-  { id: "other", label: "Other", icon: "more", micro: "Something else", service: "Other" },
-];
-
-// Step 2 — project type per need. Each maps back to a canonical service.
-const PROJECT_TYPES: Record<string, ProjectTile[]> = {
-  interiors: [
-    { label: "Full Home Interior", service: "Full Home Interior", icon: "home" },
-    { label: "Modular Kitchen", service: "Modular Kitchen", icon: "kitchen" },
-    { label: "Wardrobe", service: "Wardrobe", icon: "wardrobe" },
-    { label: "Living Room", service: "Full Home Interior", icon: "sofa" },
-    { label: "Turnkey Interior", service: "Full Home Interior", icon: "grid" },
-  ],
-  carpentry: [
-    { label: "Custom Furniture", service: "Custom Furniture", icon: "hammer" },
-    { label: "Wardrobe", service: "Wardrobe", icon: "wardrobe" },
-    { label: "TV Unit", service: "Custom Furniture", icon: "grid" },
-    { label: "Kitchen Cabinet", service: "Modular Kitchen", icon: "kitchen" },
-    { label: "Repair Work", service: "Carpentry", icon: "reno" },
-  ],
-  sofa: [
-    { label: "New Sofa", service: "Custom Sofa & Upholstery", icon: "sofa" },
-    { label: "Custom Sofa", service: "Custom Sofa & Upholstery", icon: "sofa" },
-    { label: "Recliner", service: "Custom Sofa & Upholstery", icon: "sofa" },
-    { label: "Sofa Repair", service: "Custom Sofa & Upholstery", icon: "reno" },
-    { label: "Upholstery", service: "Custom Sofa & Upholstery", icon: "tag" },
-  ],
-  painting: [
-    { label: "Interior Painting", service: "Painting", icon: "paint" },
-    { label: "Exterior Painting", service: "Painting", icon: "paint" },
-    { label: "Texture Wall", service: "Painting", icon: "paint" },
-    { label: "Waterproofing", service: "Painting", icon: "pipe" },
-    { label: "Touch-up / Repair", service: "Painting", icon: "reno" },
-  ],
-  civil: [
-    { label: "Home Renovation", service: "Home Renovation", icon: "reno" },
-    { label: "Bathroom Renovation", service: "Home Renovation", icon: "pipe" },
-    { label: "Tiling / Flooring", service: "Home Renovation", icon: "floor" },
-    { label: "Masonry Work", service: "Home Renovation", icon: "civil" },
-    { label: "Structural Work", service: "Home Renovation", icon: "civil" },
-  ],
-  "modular-kitchen": [
-    { label: "New Modular Kitchen", service: "Modular Kitchen", icon: "kitchen" },
-    { label: "L-Shaped Kitchen", service: "Modular Kitchen", icon: "kitchen" },
-    { label: "U-Shaped Kitchen", service: "Modular Kitchen", icon: "kitchen" },
-    { label: "Parallel Kitchen", service: "Modular Kitchen", icon: "kitchen" },
-    { label: "Island Kitchen", service: "Modular Kitchen", icon: "kitchen" },
-  ],
-  wardrobe: [
-    { label: "Sliding Wardrobe", service: "Wardrobe", icon: "wardrobe" },
-    { label: "Hinged Wardrobe", service: "Wardrobe", icon: "wardrobe" },
-    { label: "Walk-in Wardrobe", service: "Wardrobe", icon: "wardrobe" },
-    { label: "Loft / Storage", service: "Wardrobe", icon: "grid" },
-    { label: "Repair / Rework", service: "Wardrobe", icon: "reno" },
-  ],
-  other: [
-    { label: "General Enquiry", service: "Other", icon: "more" },
-    { label: "Repair", service: "Other", icon: "reno" },
-    { label: "Installation", service: "Other", icon: "grid" },
-    { label: "Consultation", service: "Other", icon: "chat" },
-    { label: "Something Else", service: "Other", icon: "more" },
-  ],
-};
-
-const RF_BUDGETS = [
-  "Under ₹50,000",
-  "₹50,000 – ₹1 lakh",
-  "₹1 lakh – ₹3 lakh",
-  "₹3 lakh – ₹5 lakh",
-  "₹5 lakh+",
-  "Not sure yet",
-];
 
 const RF_TIMELINES: { label: string; icon: IconName }[] = [
-  { label: "Immediately", icon: "bolt" },
-  { label: "This week", icon: "clock" },
-  { label: "This month", icon: "clock" },
-  { label: "Just exploring", icon: "search" },
+  { label: "Within one month", icon: "bolt" },
+  { label: "One – two months", icon: "clock" },
+  { label: "Two – three months", icon: "clock" },
+  { label: "More than three months", icon: "search" },
 ];
 
 const PHASES = ["Need", "Details", "Match"] as const;
@@ -130,14 +56,16 @@ const LAST_STEP = 6; // 0..5 questions + 6 = match/summary
 const PHASE_PERCENT = [33, 66, 100];
 
 type RFState = {
-  needId: string;
-  needLabel: string;
-  projectType: string;
+  categoryId: string;
+  categoryLabel: string;
+  subcategory: string;
   serviceRequired: string;
   city: string;
   area: string;
   pincode: string;
-  budget: string;
+  budgetMin: string;
+  budgetMax: string;
+  budgetNotSure: boolean;
   timeline: string;
   name: string;
   phone: string;
@@ -150,14 +78,16 @@ type RFState = {
 };
 
 const initialState: RFState = {
-  needId: "",
-  needLabel: "",
-  projectType: "",
+  categoryId: "",
+  categoryLabel: "",
+  subcategory: "",
   serviceRequired: "",
   city: "",
   area: "",
   pincode: "",
-  budget: "",
+  budgetMin: "",
+  budgetMax: "",
+  budgetNotSure: false,
   timeline: "",
   name: "",
   phone: "",
@@ -168,6 +98,8 @@ const initialState: RFState = {
   lng: null,
   shareConsent: false,
 };
+
+const inrFormatter = new Intl.NumberFormat("en-IN");
 
 /** Read UTM params + the current page URL for lead-source tracking. */
 function readTrackingContext() {
@@ -201,17 +133,23 @@ type EnquiryModalContextValue = {
 
 const EnquiryModalContext = createContext<EnquiryModalContextValue | null>(null);
 
-/** Best-effort map of a category/service string to a Need tile id (pre-selects step 1). */
-function needFromCategory(value?: string): string | null {
+/**
+ * Best-effort map of an incoming category/service string (passed by triggers
+ * across the site) to one of the four approved main categories — and, for
+ * Interior, the closest subcategory — so the modal opens pre-filled.
+ */
+function presetFromCategory(value?: string): { categoryId: string; sub?: string } | null {
   if (!value) return null;
   const v = value.toLowerCase();
-  if (v.includes("paint")) return "painting";
-  if (v.includes("sofa") || v.includes("uphol")) return "sofa";
-  if (v.includes("modular") || v.includes("kitchen")) return "modular-kitchen";
-  if (v.includes("wardrobe")) return "wardrobe";
-  if (v.includes("carpen") || v.includes("furniture")) return "carpentry";
-  if (v.includes("civil") || v.includes("renovat")) return "civil";
-  if (v.includes("interior") || v.includes("ceiling") || v.includes("turnkey")) return "interiors";
+  if (v.includes("paint")) return { categoryId: "painter" };
+  if (v.includes("sofa") || v.includes("uphol")) return { categoryId: "sofa" };
+  if (v.includes("civil") || v.includes("renovat") || v.includes("masonry")) return { categoryId: "civil-work" };
+  if (v.includes("modular") || v.includes("kitchen") || v.includes("wardrobe"))
+    return { categoryId: INTERIOR_ID, sub: "Modular Factory" };
+  if (v.includes("carpen") || v.includes("furniture")) return { categoryId: INTERIOR_ID, sub: "Carpenters" };
+  if (v.includes("premium")) return { categoryId: INTERIOR_ID, sub: "Premium Interiors" };
+  if (v.includes("interior") || v.includes("ceiling") || v.includes("turnkey") || v.includes("design"))
+    return { categoryId: INTERIOR_ID, sub: "Interior Designers" };
   return null;
 }
 
@@ -276,8 +214,22 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const openModal = useCallback((options: EnquiryModalOptions = {}) => {
-    const presetNeedId = needFromCategory(options.serviceCategory);
-    const presetNeed = NEEDS.find((n) => n.id === presetNeedId) ?? null;
+    const preset = presetFromCategory(options.serviceCategory);
+    const presetCat = preset ? mainCategories.find((c) => c.id === preset.categoryId) ?? null : null;
+
+    let presetService = "";
+    let presetSub = "";
+    if (presetCat) {
+      if (presetCat.category) {
+        presetService = enquiryServiceForCategory(presetCat.category);
+      } else if (preset?.sub) {
+        const subItem = presetCat.subcategories.find((s) => s.label === preset.sub);
+        if (subItem) {
+          presetSub = subItem.label;
+          presetService = enquiryServiceForCategory(subItem.category);
+        }
+      }
+    }
 
     setError("");
     setSuccess(false);
@@ -291,9 +243,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       city: options.city ?? "",
       area: options.area ?? "",
       message: options.requirement ?? "",
-      needId: presetNeed?.id ?? "",
-      needLabel: presetNeed?.label ?? "",
-      serviceRequired: presetNeed?.service ?? "",
+      categoryId: presetCat?.id ?? "",
+      categoryLabel: presetCat?.label ?? "",
+      subcategory: presetSub,
+      serviceRequired: presetService,
     });
     setOpen(true);
     trackEvent("requirement_flow_started", { source: options.source ?? "Requirement flow" });
@@ -317,32 +270,64 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  function selectNeed(need: NeedTile) {
+  const isInterior = form.categoryId === INTERIOR_ID;
+
+  function selectCategory(cat: (typeof mainCategories)[number]) {
     setForm((current) =>
-      current.needId === need.id
+      current.categoryId === cat.id
         ? current
         : {
             ...current,
-            needId: need.id,
-            needLabel: need.label,
-            serviceRequired: need.service,
-            projectType: "", // options depend on the need — reset on change
+            categoryId: cat.id,
+            categoryLabel: cat.label,
+            // Interior needs a subcategory before the canonical service is known;
+            // the other three map straight to their service.
+            subcategory: "",
+            serviceRequired: cat.category ? enquiryServiceForCategory(cat.category) : "",
           },
     );
   }
 
-  function selectProjectType(tile: ProjectTile) {
-    setForm((current) => ({ ...current, projectType: tile.label, serviceRequired: tile.service }));
+  function selectSubcategory(sub: { label: string; category: Parameters<typeof enquiryServiceForCategory>[0] }) {
+    setForm((current) => ({
+      ...current,
+      subcategory: sub.label,
+      serviceRequired: enquiryServiceForCategory(sub.category),
+    }));
+  }
+
+  function setBudgetValue(field: "budgetMin" | "budgetMax", raw: string) {
+    const digits = raw.replace(/\D/g, "").slice(0, 9);
+    setForm((current) => ({ ...current, [field]: digits, budgetNotSure: false }));
+  }
+
+  function toggleNotSure() {
+    setForm((current) =>
+      current.budgetNotSure
+        ? { ...current, budgetNotSure: false }
+        : { ...current, budgetNotSure: true, budgetMin: "", budgetMax: "" },
+    );
+  }
+
+  function budgetSummary() {
+    if (form.budgetNotSure) return "Not sure yet";
+    const min = parseInt(form.budgetMin, 10);
+    const max = parseInt(form.budgetMax, 10);
+    if (!form.budgetMin && !form.budgetMax) return "";
+    if (Number.isNaN(min) || Number.isNaN(max)) return "";
+    return `₹${inrFormatter.format(min)} – ₹${inrFormatter.format(max)}`;
   }
 
   function hasData() {
     return Boolean(
-      form.needId ||
-        form.projectType ||
+      form.categoryId ||
+        form.subcategory ||
         form.city ||
         form.area ||
         form.pincode ||
-        form.budget ||
+        form.budgetMin ||
+        form.budgetMax ||
+        form.budgetNotSure ||
         form.timeline ||
         form.name ||
         form.phone ||
@@ -351,39 +336,62 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  function isStepValid(target: number) {
+  /** Validation message for a step, or null when the step is complete. */
+  function stepError(target: number): string | null {
     switch (target) {
       case 0:
-        return Boolean(form.needId);
+        return form.categoryId ? null : "Select a service category.";
       case 1:
-        return Boolean(form.projectType);
+        return form.subcategory ? null : "Select an interior service.";
       case 2:
-        return Boolean(form.city);
-      case 3:
-        return Boolean(form.budget);
+        return form.city ? null : "Please select your city.";
+      case 3: {
+        if (form.budgetNotSure) return null;
+        const hasMin = form.budgetMin.trim() !== "";
+        const hasMax = form.budgetMax.trim() !== "";
+        if (!hasMin && !hasMax) return "Enter your budget range or select Not sure yet.";
+        const min = parseInt(form.budgetMin, 10);
+        const max = parseInt(form.budgetMax, 10);
+        if (!hasMin || Number.isNaN(min) || min <= 0) return "Enter a valid minimum budget.";
+        if (!hasMax || Number.isNaN(max) || max <= 0) return "Enter a valid maximum budget.";
+        if (max < min) return "Maximum budget should be higher than minimum budget.";
+        return null;
+      }
       case 4:
-        return Boolean(form.timeline);
+        return form.timeline ? null : "Select your project timeline.";
       case 5:
-        return (
-          form.name.trim().length > 1 &&
-          form.phone.replace(/\D/g, "").length >= 10 &&
-          form.shareConsent
-        );
+        if (form.name.trim().length < 2) return "Please enter your name.";
+        if (form.phone.replace(/\D/g, "").length < 10) return "Please enter a valid phone number.";
+        if (!form.shareConsent)
+          return "Please accept sharing your details with up to 3 verified teams to continue.";
+        return null;
       default:
-        return true;
+        return null;
     }
   }
 
   function goNext() {
-    if (!isStepValid(step) || step >= LAST_STEP) return;
-    trackEvent("requirement_step_completed", { step: step + 1, phase: PHASES[phaseFor(step)] });
+    if (step >= LAST_STEP) return;
+    const err = stepError(step);
+    if (err) {
+      setError(err);
+      return;
+    }
     setError("");
-    setStep((s) => Math.min(s + 1, LAST_STEP));
+    // Interior is the only category with a subcategory step — skip step 1 for
+    // Sofa / Painter / Civil Work.
+    let next = step + 1;
+    if (step === 0 && !isInterior) next = 2;
+    next = Math.min(next, LAST_STEP);
+    trackEvent("requirement_step_completed", { step: next, phase: PHASES[phaseFor(step)] });
+    setStep(next);
   }
 
   function goBack() {
     setError("");
-    setStep((s) => Math.max(s - 1, 0));
+    let prev = step - 1;
+    if (step === 2 && !isInterior) prev = 0;
+    setStep(Math.max(prev, 0));
   }
 
   function requestClose() {
@@ -462,18 +470,20 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
 
     if (!form.shareConsent) {
-      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
+      setError("Please accept sharing your details with up to 3 verified teams to continue.");
       return;
     }
 
     const requirementParts = [
-      form.needLabel ? `Need: ${form.needLabel}` : "",
-      form.projectType ? `Project type: ${form.projectType}` : "",
+      form.categoryLabel ? `Category: ${form.categoryLabel}` : "",
+      form.subcategory ? `Service: ${form.subcategory}` : "",
       form.pincode ? `Pincode: ${form.pincode}` : "",
       form.whatsappSame ? "WhatsApp: same as phone" : form.whatsapp ? `WhatsApp: ${form.whatsapp}` : "",
       form.message.trim() ? `Notes: ${form.message.trim()}` : "",
       form.lat != null && form.lng != null ? `GPS: ${form.lat.toFixed(5)}, ${form.lng.toFixed(5)}` : "",
     ].filter(Boolean);
+
+    const budgetText = budgetSummary();
 
     const payload = {
       name: form.name.trim(),
@@ -481,7 +491,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       city: form.city,
       area: form.area.trim() || undefined,
       service_category: form.serviceRequired,
-      budget_range: form.budget || undefined,
+      budget_range: budgetText || undefined,
       timeline: form.timeline || undefined,
       requirement: requirementParts.join(" | ") || undefined,
       source: modalOptions.source ?? "Requirement flow",
@@ -525,32 +535,37 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
   const phaseIndex = phaseFor(step);
   const percent = PHASE_PERCENT[phaseIndex];
-  const projectOptions = PROJECT_TYPES[form.needId] ?? [];
+  const interiorCategory = mainCategories.find((c) => c.id === INTERIOR_ID);
+  const subcategoryOptions = interiorCategory?.subcategories ?? [];
+
+  // "Question X of Y" — Interior has 6 questions, the others 5 (no subcategory).
+  const totalQuestions = isInterior ? 6 : 5;
+  const questionNumber = isInterior ? step + 1 : step === 0 ? 1 : step;
 
   function renderStep() {
     switch (step) {
       case 0:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Question 1 of 6</span>
+            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">What service do you need?</h3>
             <p className="qf-rf-qhint">Pick the category closest to your project.</p>
             <div className="qf-rf-tiles">
-              {NEEDS.map((need) => {
-                const selected = form.needId === need.id;
+              {mainCategories.map((cat) => {
+                const selected = form.categoryId === cat.id;
                 return (
                   <button
                     type="button"
-                    key={need.id}
+                    key={cat.id}
                     className={`qf-rf-tile${selected ? " is-selected" : ""}`}
                     aria-pressed={selected}
-                    onClick={() => selectNeed(need)}
+                    onClick={() => selectCategory(cat)}
                   >
                     <span className="qf-rf-tile-icon">
-                      <QFIcon name={need.icon} />
+                      <QFIcon name={cat.icon} />
                     </span>
-                    <span className="qf-rf-tile-label">{need.label}</span>
-                    <small className="qf-rf-tile-micro">{need.micro}</small>
+                    <span className="qf-rf-tile-label">{cat.label}</span>
+                    <small className="qf-rf-tile-micro">{cat.tagline}</small>
                     {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
                   </button>
                 );
@@ -561,24 +576,24 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       case 1:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Question 2 of 6</span>
-            <h3 id="qf-rf-title">What type of work are you planning?</h3>
-            <p className="qf-rf-qhint">For {form.needLabel || "your project"}.</p>
+            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
+            <h3 id="qf-rf-title">Which interior service?</h3>
+            <p className="qf-rf-qhint">Choose the option closest to your project.</p>
             <div className="qf-rf-tiles">
-              {projectOptions.map((tile) => {
-                const selected = form.projectType === tile.label;
+              {subcategoryOptions.map((sub) => {
+                const selected = form.subcategory === sub.label;
                 return (
                   <button
                     type="button"
-                    key={tile.label}
+                    key={sub.label}
                     className={`qf-rf-tile${selected ? " is-selected" : ""}`}
                     aria-pressed={selected}
-                    onClick={() => selectProjectType(tile)}
+                    onClick={() => selectSubcategory(sub)}
                   >
                     <span className="qf-rf-tile-icon">
-                      <QFIcon name={tile.icon} />
+                      <QFIcon name={SUBCATEGORY_ICONS[sub.label] ?? "home"} />
                     </span>
-                    <span className="qf-rf-tile-label">{tile.label}</span>
+                    <span className="qf-rf-tile-label">{sub.label}</span>
                     {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
                   </button>
                 );
@@ -589,7 +604,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       case 2:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Question 3 of 6</span>
+            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">Where do you need the service?</h3>
             <div className="qf-rf-fields">
               <label className="qf-rf-field">
@@ -627,7 +642,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 {locStatus === "locating" ? "Getting location…" : "Use my current location"}
               </button>
               {locStatus === "captured" ? (
-                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll match vendors near you.</p>
+                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll match teams near you.</p>
               ) : null}
               {locStatus === "denied" ? (
                 <p className="qf-rf-loc-note">No problem — your city and area above are enough.</p>
@@ -641,31 +656,57 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       case 3:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Question 4 of 6</span>
+            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">What is your approximate budget?</h3>
-            <div className="qf-rf-chips">
-              {RF_BUDGETS.map((budget) => {
-                const selected = form.budget === budget;
-                return (
-                  <button
-                    type="button"
-                    key={budget}
-                    className={`qf-rf-chip${selected ? " is-selected" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => set("budget", budget)}
-                  >
-                    {budget}
-                  </button>
-                );
-              })}
+            <p className="qf-rf-qhint">Enter your expected budget range. This helps us match you with the right team.</p>
+            <div className="qf-rf-fields">
+              <div className="qf-rf-budget-row">
+                <label className="qf-rf-field">
+                  <span>Minimum budget</span>
+                  <div className="qf-rf-money">
+                    <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
+                    <input
+                      value={form.budgetMin}
+                      onChange={(e) => setBudgetValue("budgetMin", e.target.value)}
+                      placeholder="50000"
+                      inputMode="numeric"
+                      aria-label="Minimum budget in rupees"
+                    />
+                  </div>
+                </label>
+                <label className="qf-rf-field">
+                  <span>Up to</span>
+                  <div className="qf-rf-money">
+                    <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
+                    <input
+                      value={form.budgetMax}
+                      onChange={(e) => setBudgetValue("budgetMax", e.target.value)}
+                      placeholder="300000"
+                      inputMode="numeric"
+                      aria-label="Maximum budget in rupees"
+                    />
+                  </div>
+                </label>
+              </div>
+              <div className="qf-rf-chips">
+                <button
+                  type="button"
+                  className={`qf-rf-chip${form.budgetNotSure ? " is-selected" : ""}`}
+                  aria-pressed={form.budgetNotSure}
+                  onClick={toggleNotSure}
+                >
+                  Not sure yet
+                </button>
+              </div>
             </div>
           </div>
         );
       case 4:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Question 5 of 6</span>
+            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
             <h3 id="qf-rf-title">When do you want to start?</h3>
+            <p className="qf-rf-qhint">Choose the timeline closest to your plan.</p>
             <div className="qf-rf-tiles qf-rf-tiles--wide">
               {RF_TIMELINES.map((tile) => {
                 const selected = form.timeline === tile.label;
@@ -691,8 +732,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       case 5:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Question 6 of 6</span>
-            <h3 id="qf-rf-title">Where should vendors contact you?</h3>
+            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
+            <h3 id="qf-rf-title">Where should teams contact you?</h3>
             <div className="qf-rf-fields">
               <label className="qf-rf-field">
                 <span>Name</span>
@@ -738,7 +779,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 <textarea
                   value={form.message}
                   onChange={(e) => set("message", e.target.value)}
-                  placeholder="Anything else vendors should know?"
+                  placeholder="Anything else the teams should know?"
                   rows={3}
                 />
               </label>
@@ -749,7 +790,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   onChange={(e) => set("shareConsent", e.target.checked)}
                 />
                 <span>
-                  I agree to share my details with up to 3 verified vendors so they
+                  I agree to share my details with up to 3 verified teams so they
                   can contact me about my requirement. See our{" "}
                   <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
                   and{" "}
@@ -763,24 +804,26 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Review &amp; confirm</span>
-            <h3 id="qf-rf-title">Get matched with verified vendors</h3>
-            <p className="qf-rf-qhint">We&apos;ll connect you with verified professionals near your area.</p>
+            <h3 id="qf-rf-title">Get matched with verified teams</h3>
+            <p className="qf-rf-qhint">We&apos;ll connect you with verified teams near your area.</p>
             <dl className="qf-rf-summary">
               <div>
                 <dt>Service</dt>
-                <dd>{form.needLabel || "—"}</dd>
+                <dd>{form.categoryLabel || "—"}</dd>
               </div>
-              <div>
-                <dt>Project type</dt>
-                <dd>{form.projectType || "—"}</dd>
-              </div>
+              {form.subcategory ? (
+                <div>
+                  <dt>Interior service</dt>
+                  <dd>{form.subcategory}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>Area</dt>
                 <dd>{[form.area, form.city].filter(Boolean).join(", ") || form.city || "—"}</dd>
               </div>
               <div>
                 <dt>Budget</dt>
-                <dd>{form.budget || "—"}</dd>
+                <dd>{budgetSummary() || "—"}</dd>
               </div>
               <div>
                 <dt>Timeline</dt>
@@ -812,7 +855,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           >
             <header className="qf-rf-top">
               <div className="qf-rf-top-row">
-                <span className="qf-rf-flow-name">Get Matched With Verified Vendors</span>
+                <span className="qf-rf-flow-name">Get Matched With Verified Teams</span>
                 <button type="button" className="qf-rf-close" aria-label="Close" onClick={requestClose}>
                   ×
                 </button>
@@ -860,7 +903,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     ✓
                   </span>
                   <h3 id="qf-rf-title">Requirement submitted</h3>
-                  <p>Your requirement is submitted. QuickFurno will connect you with verified vendors shortly.</p>
+                  <p>Your requirement is submitted. QuickFurno will connect you with verified teams shortly.</p>
                 </div>
               ) : (
                 <div className="qf-rf-step" key={step}>
@@ -885,12 +928,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   <span className="qf-rf-footer-spacer" />
                 )}
                 {step < LAST_STEP ? (
-                  <button
-                    type="button"
-                    className="qf-rf-btn qf-rf-btn--primary"
-                    disabled={!isStepValid(step)}
-                    onClick={goNext}
-                  >
+                  <button type="button" className="qf-rf-btn qf-rf-btn--primary" onClick={goNext}>
                     Next
                   </button>
                 ) : (
@@ -900,7 +938,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     disabled={submitting}
                     onClick={handleSubmit}
                   >
-                    {submitting ? "Submitting…" : "Get Matched With Vendors"}
+                    {submitting ? "Submitting…" : "Get Matched With Teams"}
                   </button>
                 )}
               </footer>

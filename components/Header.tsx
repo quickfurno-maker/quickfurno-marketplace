@@ -61,7 +61,7 @@ export function Header() {
 
         <div className="qf-header-actions">
           <EnquiryModalTrigger className="qf-header-cta" source="Header CTA">
-            Get Free Vendor Matches
+            Get Free Team Matches
           </EnquiryModalTrigger>
           <button
             type="button"
@@ -94,7 +94,7 @@ export function Header() {
             source="Header CTA"
             onClick={() => setOpen(false)}
           >
-            Get Free Vendor Matches
+            Get Free Team Matches
           </EnquiryModalTrigger>
         </nav>
       ) : null}

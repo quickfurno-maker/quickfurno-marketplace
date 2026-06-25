@@ -18,10 +18,11 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 
 // Phase 1A hero trust badges (visual; matches final design direction).
 const heroBadges = [
-  { icon: "shield" as const, label: "Verified Vendors" },
-  { icon: "tag" as const, label: "Free for Homeowners" },
-  { icon: "clock" as const, label: "Fast Response" },
-  { icon: "lock" as const, label: "Privacy First" },
+  { icon: "shield" as const, label: "Verified vendors" },
+  { icon: "tag" as const, label: "Free for homeowners" },
+  { icon: "compare" as const, label: "Up to 3 matches" },
+  { icon: "pin" as const, label: "Pune & Mumbai" },
+  { icon: "lock" as const, label: "Privacy protected" },
 ];
 
 // Floating trust badges overlapping the hero image (desktop only).
@@ -55,14 +56,12 @@ export default function HomePage() {
             <div className="qf-hero-copy">
               <span className="qf-hero-eyebrow">Verified Home Services</span>
               <h1>
-                Tell us your requirement
+                Tell us your home-service requirement.
                 <br />
-                <em>&amp; get matched.</em>
+                <em>Get matched with 3 verified local vendors.</em>
               </h1>
               <p>
-                Get connected with verified home-service vendors near you. One
-                enquiry is shared with up to 3 verified vendors — free for
-                homeowners.
+                Compare trusted interior designers, carpenters, sofa makers, painters, modular and civil-work experts near you — free for homeowners.
               </p>
             </div>
 

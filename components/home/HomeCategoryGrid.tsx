@@ -56,18 +56,6 @@ export function HomeCategoryGrid() {
           );
         })}
 
-        {/* Mobile-only "More" tile — completes the compact app-style grid.
-            Hidden on tablet/desktop so the 5-card desktop row is unchanged. */}
-        <Link href="#featured" className="qf-home-category-card qf-home-category-card--more">
-          <span className="qf-home-category-icon">
-            <QFIcon name="grid" />
-          </span>
-          <span className="qf-home-category-label">More</span>
-          <small className="qf-home-category-tag">Browse all services</small>
-          <span className="qf-home-category-arrow" aria-hidden="true">
-            <QFIcon name="arrow" />
-          </span>
-        </Link>
       </div>
 
       {active ? (

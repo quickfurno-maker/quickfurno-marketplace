@@ -85,6 +85,7 @@ type WizardState = {
   monthlyCapacity: string;
   rateValue: string;
   businessType: string;
+  coversFullCity: boolean;
 };
 
 const initialState: WizardState = {
@@ -109,6 +110,7 @@ const initialState: WizardState = {
   monthlyCapacity: "",
   rateValue: "",
   businessType: "",
+  coversFullCity: false,
 };
 
 /** Lightweight email sanity check (real validation happens at account creation). */
@@ -349,7 +351,9 @@ export function VendorRegisterForm() {
         break;
       case 2:
         if (!cityValue) e.push({ key: "city", message: "Select your city." });
-        if (f.areas.length === 0) e.push({ key: "areas", message: "Select at least one area where you serve clients." });
+        if (!f.coversFullCity && f.areas.length === 0) {
+          e.push({ key: "areas", message: "Select at least one service area or choose Serve entire city." });
+        }
         if (f.addressLine1.trim().length < 5) e.push({ key: "addressLine1", message: "Address must be at least 5 characters." });
         if (!f.stateName.trim()) e.push({ key: "state", message: "State is required." });
         if (!/^\d{6}$/.test(f.pincode)) e.push({ key: "pincode", message: "Enter a valid 6-digit pincode." });
@@ -508,7 +512,8 @@ export function VendorRegisterForm() {
         office_latitude: loc.status === "granted" ? loc.latitude : null,
         office_longitude: loc.status === "granted" ? loc.longitude : null,
         areas_covered: serviceAreas,
-        covers_full_city: false,
+        covers_full_city: f.coversFullCity,
+        service_radius_km: 20,
         service_categories: matchingServices,
         experience: f.yearsExperience || undefined,
         // Location — exact latitude/longitude + permission status.
@@ -817,7 +822,14 @@ export function VendorRegisterForm() {
                     // Switching city clears areas picked for the previous city and
                     // pre-fills the state (both serviced cities are in Maharashtra).
                     onClick={() => {
-                      setF((c) => ({ ...c, city, areas: [], customArea: "", stateName: "Maharashtra" }));
+                      setF((c) => ({
+                        ...c,
+                        city,
+                        areas: [],
+                        customArea: "",
+                        stateName: "Maharashtra",
+                        coversFullCity: false,
+                      }));
                       setTouched((prev) => ({ ...prev, city: true }));
                     }}
                   >
@@ -827,6 +839,33 @@ export function VendorRegisterForm() {
               })}
             </div>
             {fieldError("city") ? <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("city")}</p> : null}
+
+            {/* Serve entire city checkbox/card */}
+            {hasCitySelected ? (
+              <div className="qf-rf-coverage-wrap" style={{ marginTop: "1rem" }}>
+                <label className={`qf-rf-coverage-card${f.coversFullCity ? " is-selected" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={f.coversFullCity}
+                    onChange={(e) => {
+                      set("coversFullCity", e.target.checked);
+                    }}
+                    className="qf-rf-coverage-checkbox"
+                  />
+                  <div className="qf-rf-coverage-info">
+                    <strong className="qf-rf-coverage-title">Serve entire city</strong>
+                    <span className="qf-rf-coverage-desc">
+                      Receive client matches from any area in this city. Nearby requests will still be prioritised first.
+                    </span>
+                  </div>
+                </label>
+                {f.coversFullCity ? (
+                  <p className="qf-rf-coverage-helper">
+                    “You can still select key areas, but your profile will be eligible across the city.”
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             {/* 2. Service areas */}
             <p className="qf-vrf-subhead">Service areas</p>
@@ -887,11 +926,11 @@ export function VendorRegisterForm() {
                 ))}
               </div>
             ) : (
-              <p className="qf-rf-loc-note" style={{ marginTop: "0.25rem", color: showErrors ? "#b4231a" : "#7a6b5c" }}>
-                Select at least one area where you serve clients.
+              <p className="qf-rf-loc-note" style={{ marginTop: "0.25rem", color: showErrors && !f.coversFullCity ? "#b4231a" : "#7a6b5c" }}>
+                {f.coversFullCity ? "No specific areas selected yet (city-wide coverage is active)." : "Select at least one area where you serve clients."}
               </p>
             )}
-            {fieldError("areas") && f.areas.length === 0 ? (
+            {fieldError("areas") && f.areas.length === 0 && !f.coversFullCity ? (
               <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("areas")}</p>
             ) : null}
 
@@ -1093,6 +1132,10 @@ export function VendorRegisterForm() {
               <SummaryRow label="Category" value={selectedMain?.label || "—"} />
               {f.subCategory ? <SummaryRow label="Specialisation" value={f.subCategory} /> : null}
               <SummaryRow label="City" value={cityValue || "—"} />
+              <SummaryRow
+                label="Coverage"
+                value={f.coversFullCity ? `Entire ${cityValue}` : "Selected areas only"}
+              />
               {f.addressLine1.trim() ? (
                 <SummaryRow
                   label="Office address"

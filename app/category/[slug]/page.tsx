@@ -53,11 +53,11 @@ export default function CategoryPage({ params }: CategoryPageProps) {
             <div className="category-market-stats" aria-label={`${category.name} listing summary`}>
               <span>
                 <strong>Verified</strong>
-                vendor profiles
+                Team Profiles
               </span>
               <span>
                 <strong>Up to 3</strong>
-                vendor matches
+                Team Matches
               </span>
               <span>
                 <strong>Free</strong>
@@ -106,7 +106,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
                 Get Free Assistance
               </EnquiryModalTrigger>
               <ul>
-                <li>Up to 3 relevant vendor matches</li>
+                <li>Up to 3 relevant Team Matches</li>
                 <li>100% verified local experts</li>
                 <li>Free service, no hidden charges</li>
               </ul>
@@ -119,7 +119,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
             <span className="eyebrow">Ready to start?</span>
             <h2>Get matched with verified {category.name.toLowerCase()}.</h2>
             <p>
-              Tell QuickFurno your requirement and get matched with verified vendors in Pune or Mumbai.
+              Tell QuickFurno your requirement and get matched with Verified Teams in Pune or Mumbai.
             </p>
             <div className="hero-cta-row">
               <EnquiryModalTrigger

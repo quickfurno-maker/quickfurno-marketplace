@@ -27,7 +27,7 @@ const listingFilterChips: FilterChipItem[] = [
   { key: "quick-response", label: "Quick Response" },
   { key: "near-me", label: "Near Me" },
   { key: "budget", label: "Budget Friendly" },
-  { key: "premium", label: "Premium Vendors" },
+  { key: "premium", label: "Premium Teams" },
   { key: "available", label: "Available Today" },
 ];
 
@@ -132,9 +132,9 @@ export function VendorCards({
               <span className="vendor-search-icon" aria-hidden="true">Search</span>
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search carpenters, interior designers, painters..."
-                aria-label="Search vendors"
+                aria-label="Search Teams"
               />
             </label>
             <label className="vendor-location-select">
@@ -152,11 +152,11 @@ export function VendorCards({
 
           <div className="vendor-listing-title-row">
             <div>
-              <h1>{selectedCategory ? `${selectedCategory} near you` : "Vendors near you"}</h1>
-              <p>Compare verified vendors, rates, ratings and availability</p>
+              <h1>{selectedCategory ? `${selectedCategory} near you` : "Teams near you"}</h1>
+              <p>Compare Verified Teams, rates, ratings, and availability</p>
             </div>
             <span className="vendor-result-count">
-              {filteredVendors.length} vendor{filteredVendors.length === 1 ? "" : "s"}
+              {filteredVendors.length} {filteredVendors.length === 1 ? "Team" : "Teams"}
             </span>
           </div>
 
@@ -165,7 +165,7 @@ export function VendorCards({
               type="button"
               className={`qf-filter-chip ${sortMode !== "ranked" ? "qf-filter-chip--active" : ""}`}
               onClick={cycleSort}
-              aria-label="Cycle vendor sort"
+              aria-label="Cycle Team sort"
             >
               {sortLabels[sortMode]}
             </button>
@@ -175,7 +175,7 @@ export function VendorCards({
       ) : null}
 
       {showCategoryFilters ? (
-        <div className="filter-row" aria-label="Vendor category filters">
+        <div className="filter-row" aria-label="Team category filters">
           {vendorFilterCategories.map((filter) => (
             <button
               key={filter}
@@ -191,9 +191,9 @@ export function VendorCards({
 
       {filteredVendors.length === 0 ? (
         <div className="vendor-empty-v2">
-          <h3>New verified vendors arriving soon</h3>
+          <h3>New Verified Teams arriving soon</h3>
           <p>
-            We are onboarding verified vendors for this category. Submit a free enquiry and
+            We are onboarding Verified Teams for this category. Submit a free enquiry and
             QuickFurno will match you with suitable experts near you.
           </p>
           <EnquiryModalTrigger
@@ -213,8 +213,8 @@ export function VendorCards({
             {listingMode && index === 2 ? (
               <div className="vendor-native-banner">
                 <div>
-                  <strong>Need help choosing the right vendor?</strong>
-                  <span>QuickFurno can match you with verified vendors near you.</span>
+                  <strong>Need help choosing the right Team?</strong>
+                  <span>QuickFurno can match you with Verified Teams near you.</span>
                 </div>
                 <EnquiryModalTrigger
                   className="qf-banner-link"

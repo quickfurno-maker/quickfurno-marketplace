@@ -321,7 +321,7 @@ function VendorListingCard({ vendor, priority }: { vendor: ListingVendor; priori
             requirement={`Please ask ${vendor.name} to contact me for carpentry work in Pune.`}
             source={`Phase 3B listing callback: ${vendor.slug}`}
           >
-            Ask Vendor to Contact
+            Ask Team to Contact
           </EnquiryModalTrigger>
         )}
       </div>
@@ -373,7 +373,7 @@ export default function CarpentersListingPage() {
               <p>Compare verified carpenters for modular furniture, wardrobes, kitchens, TV units &amp; more.</p>
             </div>
             <div className={styles.heroTrust} aria-label="Listing summary">
-              <span>Verified vendors</span>
+              <span>Verified Teams</span>
               <span>Quick response expected</span>
             </div>
           </section>
@@ -410,7 +410,7 @@ export default function CarpentersListingPage() {
             </button>
             <label>
               <span>Sort by:</span>
-              <select defaultValue="Relevance" aria-label="Sort vendors">
+              <select defaultValue="Relevance" aria-label="Sort Teams">
                 <option>Relevance</option>
                 <option>Top Rated</option>
                 <option>Budget Friendly</option>
@@ -430,7 +430,7 @@ export default function CarpentersListingPage() {
             </div>
           </section>
 
-          <section className={styles.layout} aria-label="Carpenter vendor listings">
+          <section className={styles.layout} aria-label="Carpenter Team listings">
             <aside className={styles.filterSidebar} aria-label="Listing filters">
               <div className={styles.sidebarHeader}>
                 <h2>Filters</h2>
@@ -540,14 +540,14 @@ export default function CarpentersListingPage() {
                   aria-hidden="true"
                 />
                 <div>
-                  <strong>All vendors are background-checked &amp; verified</strong>
+                  <strong>All Teams are background-checked &amp; verified</strong>
                   <span>Your project is in safe hands.</span>
                 </div>
-                <Link href="/#why-quickfurno">Learn how we verify vendors</Link>
+                <Link href="/#why-quickfurno">Learn how we verify Teams</Link>
               </div>
             </div>
 
-            <aside className={styles.matchCard} aria-label="Lead matching card">
+            <aside className={styles.matchCard} aria-label="Team matching card">
               <div className={styles.matchIllustration}>
                 <Image
                   src="/assets/quickfurno/icons/process/matched-vendors.svg"
@@ -558,7 +558,7 @@ export default function CarpentersListingPage() {
                 />
               </div>
               <h2>Let us match you with top carpenters</h2>
-              <p>Share your requirements and get matched with the best verified vendors.</p>
+              <p>Share your requirements and get matched with the best Verified Teams.</p>
 
               <ul className={styles.benefitList}>
                 <li>
@@ -585,7 +585,7 @@ export default function CarpentersListingPage() {
                   />
                   <span>
                     <strong>Personalized Matches</strong>
-                    Only relevant vendors
+                    Only relevant Teams
                   </span>
                 </li>
               </ul>
@@ -625,7 +625,7 @@ export default function CarpentersListingPage() {
 
               <div className={styles.matchRating}>
                 <span>Trusted by homeowners across Pune</span>
-                <strong>Verified vendors</strong>
+                <strong>Verified Teams</strong>
               </div>
             </aside>
           </section>
@@ -634,7 +634,7 @@ export default function CarpentersListingPage() {
         <div className={styles.mobileMatchBar}>
           <div>
             <strong>Let us match you with top carpenters</strong>
-            <span>Share your requirements &amp; get matched vendors.</span>
+            <span>Share your requirements &amp; get matched Teams.</span>
           </div>
           <EnquiryModalTrigger
             className={styles.matchButton}

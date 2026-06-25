@@ -44,7 +44,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       location_permission_status: input.location_permission_status ?? "not_requested",
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
-      service_radius_km: input.service_radius_km ?? 10,
+      service_radius_km: input.service_radius_km ?? 20,
       business_type: input.business_type ?? null,
       team_size: input.team_size ?? null,
       monthly_capacity: input.monthly_capacity ?? null,

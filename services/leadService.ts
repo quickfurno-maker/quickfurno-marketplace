@@ -134,6 +134,15 @@ export async function getEligibleVendors(leadId: string): Promise<Result<PublicV
       .single();
     if (leadErr || !lead) throw appError("LEAD_NOT_FOUND");
 
+    // TODO: Future matching updates will use covers_full_city:
+    // A vendor should match a client request if:
+    // 1. vendor.is_active is true
+    // 2. vendor.public_visibility is true if applicable
+    // 3. vendor.city matches client city
+    // 4. AND one of these is true:
+    //    - vendor.covers_full_city is true
+    //    - client area exists in vendor.areas_covered
+    //    - distance is available and vendor is within service_radius_km (now 20 km)
     // RPC returns the curated safe-field set, filtered to credited + visible vendors
     const { data, error } = await publicClient().rpc("get_public_eligible_vendors", {
       p_city: lead.city,

@@ -18,7 +18,7 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 
 // Phase 1A hero trust badges (visual; matches final design direction).
 const heroBadges = [
-  { icon: "shield" as const, label: "Verified teams" },
+  { icon: "shield" as const, label: "Verified Teams" },
   { icon: "tag" as const, label: "Free for homeowners" },
   { icon: "compare" as const, label: "Up to 3 matches" },
   { icon: "pin" as const, label: "Pune & Mumbai" },
@@ -56,7 +56,7 @@ export default function HomePage() {
             <div className="qf-hero-copy">
               <span className="qf-hero-eyebrow">Verified Home Services</span>
               <h1>
-                Get matched with <em>3 verified local teams</em> for your home project.
+                Get matched with <em>3 Verified Local Teams</em> for your home project.
               </h1>
               <p>
                 Tell us what you need and compare trusted interior designers, carpenters, sofa makers, painters, modular and civil-work experts near you — free for homeowners.

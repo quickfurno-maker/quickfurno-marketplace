@@ -10,6 +10,16 @@ import { mainCategories, type MainCategory } from "@/lib/categories";
 // public category structure never drifts. See lib/categories.ts.
 const homeCategories = mainCategories;
 
+// Minimum starting rate shown on each Interior subcategory card. Display-only
+// guidance — kept local here so it never touches the shared category source,
+// vendor registration or vendor card logic.
+const SUBCATEGORY_RATES: Record<string, string> = {
+  "Interior Designers": "Starting from ₹1,000/sqft",
+  Carpenters: "Starting from ₹200/sqft",
+  "Modular Factory": "Starting from ₹1,000/sqft",
+  "Premium Interiors": "Starting from ₹1,200/sqft",
+};
+
 export function HomeCategoryGrid() {
   const [active, setActive] = useState<MainCategory | null>(null);
 
@@ -71,7 +81,7 @@ export function HomeCategoryGrid() {
             <div className="qf-subcategory-head">
               <div>
                 <h2 id="qf-subcategory-title">{active.label}</h2>
-                <p>Choose a service or open the vendor listing.</p>
+                <p>Choose a service or view matching Teams.</p>
               </div>
               <button type="button" onClick={() => setActive(null)} aria-label="Close subcategory menu">
                 x
@@ -80,7 +90,12 @@ export function HomeCategoryGrid() {
             <div className="qf-subcategory-list">
               {active.subcategories.map((subcategory) => (
                 <Link key={subcategory.label} href={routeFor(subcategory.category)} onClick={() => setActive(null)}>
-                  <span>{subcategory.label}</span>
+                  <span className="qf-subcategory-text">
+                    <span className="qf-subcategory-name">{subcategory.label}</span>
+                    {SUBCATEGORY_RATES[subcategory.label] ? (
+                      <span className="qf-subcategory-rate">{SUBCATEGORY_RATES[subcategory.label]}</span>
+                    ) : null}
+                  </span>
                   <QFIcon name="arrow" />
                 </Link>
               ))}

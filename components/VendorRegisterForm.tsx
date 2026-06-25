@@ -767,18 +767,27 @@ export function VendorRegisterForm() {
                 <p className="qf-rf-qhint" style={{ marginTop: "1.1rem" }}>
                   Which {selectedMain.label.toLowerCase()} service do you offer?
                 </p>
-                <div className={`qf-rf-chips${fieldError("subCategory") ? " has-error" : ""}`} ref={bindField("subCategory")}>
+                <div className={`qf-rf-subcategory-grid${fieldError("subCategory") ? " has-error" : ""}`} ref={bindField("subCategory")}>
                   {selectedMain.subcategories.map((sub) => {
                     const selected = f.subCategory === sub.label;
+                    const minRate = CATEGORY_MIN_RATE[sub.category];
                     return (
                       <button
                         type="button"
                         key={sub.label}
-                        className={`qf-rf-chip${selected ? " is-selected" : ""}`}
+                        className={`qf-rf-subcategory-card${selected ? " is-selected" : ""}`}
                         aria-pressed={selected}
                         onClick={() => selectSubcategory(sub.label)}
                       >
-                        {sub.label}
+                        <span className="qf-rf-subcategory-card-title">{sub.label}</span>
+                        {minRate ? (
+                          <span className="qf-rf-subcategory-card-rate">
+                            Starting from ₹{minRate.toLocaleString("en-IN")}/sqft
+                          </span>
+                        ) : null}
+                        {selected ? (
+                          <span className="qf-rf-subcategory-card-check" aria-hidden="true">✓</span>
+                        ) : null}
                       </button>
                     );
                   })}

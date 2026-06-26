@@ -75,28 +75,49 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
 
     if (error) {
       console.error("Vendor insert error:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.log("Supabase Error Details:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+      }
       logSupabaseInsertError("vendors", error, {
         has_user_id: Boolean(input.user_id),
         has_email: Boolean(input.email),
         service_count: input.service_categories?.length ?? 0,
         area_count: input.areas_covered?.length ?? 0,
       });
-      throw error;
+
+      // Map database error code to distinct readable message
+      let friendlyError = "Something went wrong. Please check your details and try again.";
+      if (error.code === "23505") {
+        friendlyError = "This business email or phone number is already registered. Please use another number or contact QuickFurno.";
+      } else if (error.code === "23502") {
+        friendlyError = "Some required details are missing. Please go back and complete the highlighted fields.";
+      } else if (error.code === "42703") {
+        friendlyError = "We could not save your application due to a system configuration issue. Please contact QuickFurno support.";
+      } else if (error.code && (error.code.startsWith("08") || error.code === "P0001")) {
+        friendlyError = "Network issue while submitting. Please try again.";
+      } else if (error.message) {
+        friendlyError = `Database error: ${error.message}`;
+      }
+
+      return {
+        ok: false,
+        code: error.code || "DB_ERROR",
+        error: friendlyError,
+      };
     }
     return ok({ id: data!.id });
   } catch (e) {
-    // Known validation errors keep their friendly message. For unexpected
-    // (e.g. Postgres) failures, surface the real message in development and a
-    // simple, safe message in production.
     if (e instanceof AppError) return fail(e);
     const message = (e as { message?: string })?.message ?? "Unknown error";
     return {
       ok: false,
       code: "UNKNOWN",
-      error:
-        process.env.NODE_ENV === "development"
-          ? `Something went wrong: ${message}`
-          : "Something went wrong. Please check your details and try again.",
+      error: `Something went wrong: ${message}`,
     };
   }
 }

@@ -512,23 +512,55 @@ export function VendorRegisterForm() {
       }
     }
 
+    // Final review validation before submit
+    const businessNameStr = String(f.businessName ?? "").trim();
+    const ownerNameStr = String(f.ownerName ?? "").trim();
+    const phoneDigits = String(f.phone ?? "").replace(/\D/g, "");
+    const whatsappDigits = f.whatsappSame
+      ? phoneDigits
+      : String(f.whatsapp ?? "").replace(/\D/g, "");
+    const emailStr = String(f.email ?? "").trim();
+    const address1Str = String(f.addressLine1 ?? "").trim();
+    const stateStr = String(f.stateName ?? "").trim();
+    const pincodeDigits = String(f.pincode ?? "").replace(/\D/g, "");
+
+    const isAllValid =
+      businessNameStr.length >= 2 &&
+      ownerNameStr.length >= 2 &&
+      phoneDigits.length === 10 &&
+      whatsappDigits.length === 10 &&
+      isEmail(emailStr) &&
+      selectedMain &&
+      (selectedMain.subcategories.length === 0 || f.subCategory) &&
+      cityValue &&
+      (f.coversFullCity || serviceAreas.length > 0) &&
+      address1Str.length >= 5 &&
+      stateStr.length > 0 &&
+      pincodeDigits.length === 6 &&
+      (!usesSqftRate || rateValid);
+
+    if (!isAllValid) {
+      setError("Some required details are missing. Please go back and complete the highlighted fields.");
+      return;
+    }
+
     setBusy(true);
     try {
       const res = await submitVendorRegistration({
-        business_name: String(f.businessName ?? "").trim(),
-        owner_name: String(f.ownerName ?? "").trim() || undefined,
-        phone: String(f.phone ?? "").trim(),
-        whatsapp_number: (f.whatsappSame ? String(f.phone ?? "").trim() : String(f.whatsapp ?? "").trim()) || undefined,
-        email: String(f.email ?? "").trim(),
+        business_name: businessNameStr,
+        owner_name: ownerNameStr || undefined,
+        phone: phoneDigits,
+        whatsapp_number: whatsappDigits || undefined,
+        email: emailStr,
         city: cityValue,
         // Detailed office / business address (Step 3). office_city mirrors the
         // selected service city; office lat/long mirror the captured GPS.
-        office_address_line1: String(f.addressLine1 ?? "").trim() || undefined,
+        office_address_line1: address1Str || undefined,
         office_address_line2: String(f.addressLine2 ?? "").trim() || undefined,
         office_landmark: String(f.landmark ?? "").trim() || undefined,
         office_city: cityValue || undefined,
-        office_state: String(f.stateName ?? "").trim() || undefined,
-        office_pincode: String(f.pincode ?? "").trim() || undefined,
+        office_state: stateStr || undefined,
+        office_pincode: pincodeDigits || undefined,
         office_latitude: loc.status === "granted" ? loc.latitude : null,
         office_longitude: loc.status === "granted" ? loc.longitude : null,
         areas_covered: serviceAreas,

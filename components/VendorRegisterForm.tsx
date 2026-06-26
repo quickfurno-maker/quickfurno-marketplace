@@ -101,7 +101,7 @@ const initialState: WizardState = {
   addressLine1: "",
   addressLine2: "",
   landmark: "",
-  stateName: "",
+  stateName: "Maharashtra",
   pincode: "",
   areas: [],
   customArea: "",
@@ -145,21 +145,26 @@ export function VendorRegisterForm() {
   const [customAreaError, setCustomAreaError] = useState("");
 
   const isFieldValid = (field: string): boolean => {
+    const valOf = (key: keyof WizardState) => {
+      const v = f[key];
+      return typeof v === "string" ? v : "";
+    };
+
     switch (field) {
       case "businessName":
-        return f.businessName.trim().length >= 2;
+        return valOf("businessName").trim().length >= 2;
       case "ownerName":
-        return f.ownerName.trim().length >= 2;
+        return valOf("ownerName").trim().length >= 2;
       case "phone":
-        return /^\d{10}$/.test(f.phone);
+        return /^\d{10}$/.test(valOf("phone"));
       case "email":
-        return isEmail(f.email);
+        return isEmail(valOf("email"));
       case "addressLine1":
-        return f.addressLine1.trim().length >= 5;
+        return valOf("addressLine1").trim().length >= 5;
       case "state":
-        return f.stateName.trim().length > 0;
+        return valOf("stateName").trim().length > 0;
       case "pincode":
-        return /^\d{6}$/.test(f.pincode);
+        return /^\d{6}$/.test(valOf("pincode"));
       default:
         return true;
     }
@@ -349,15 +354,30 @@ export function VendorRegisterForm() {
         else if (selectedMain.subcategories.length > 0 && !f.subCategory)
           e.push({ key: "subCategory", message: "Select your specialisation" });
         break;
-      case 2:
-        if (!cityValue) e.push({ key: "city", message: "Select your city." });
-        if (!f.coversFullCity && f.areas.length === 0) {
+      case 2: {
+        const cityStr = String(f.city ?? "").trim();
+        const areasArr = Array.isArray(f.areas) ? f.areas : [];
+        const address1Str = String(f.addressLine1 ?? "").trim();
+        const stateStr = String(f.stateName ?? "").trim();
+        const pincodeStr = String(f.pincode ?? "").trim();
+
+        if (!cityStr) {
+          e.push({ key: "city", message: "Select your city." });
+        }
+        if (!f.coversFullCity && areasArr.length === 0) {
           e.push({ key: "areas", message: "Select at least one service area or choose Serve entire city." });
         }
-        if (f.addressLine1.trim().length < 5) e.push({ key: "addressLine1", message: "Address must be at least 5 characters." });
-        if (!f.stateName.trim()) e.push({ key: "state", message: "State is required." });
-        if (!/^\d{6}$/.test(f.pincode)) e.push({ key: "pincode", message: "Enter a valid 6-digit pincode." });
+        if (address1Str.length < 5) {
+          e.push({ key: "addressLine1", message: "Enter your office or business address." });
+        }
+        if (!stateStr) {
+          e.push({ key: "state", message: "Enter your state." });
+        }
+        if (!/^\d{6}$/.test(pincodeStr)) {
+          e.push({ key: "pincode", message: "Enter a valid 6-digit pincode." });
+        }
         break;
+      }
       case 4:
         // Interior categories require a valid per-sqft rate at/above the minimum.
         if (usesSqftRate && !rateValid)
@@ -426,8 +446,8 @@ export function VendorRegisterForm() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  const cityValue = f.city;
-  const serviceAreas = f.areas;
+  const cityValue = String(f.city ?? "").trim();
+  const serviceAreas = Array.isArray(f.areas) ? f.areas : [];
   // Step 3: area chips are driven by the chosen preset city (custom cities have
   // none and rely on the free-text area input below).
   const hasCitySelected = Boolean(f.city);
@@ -495,20 +515,20 @@ export function VendorRegisterForm() {
     setBusy(true);
     try {
       const res = await submitVendorRegistration({
-        business_name: f.businessName.trim(),
-        owner_name: f.ownerName.trim() || undefined,
-        phone: f.phone.trim(),
-        whatsapp_number: (f.whatsappSame ? f.phone.trim() : f.whatsapp.trim()) || undefined,
-        email: f.email.trim(),
+        business_name: String(f.businessName ?? "").trim(),
+        owner_name: String(f.ownerName ?? "").trim() || undefined,
+        phone: String(f.phone ?? "").trim(),
+        whatsapp_number: (f.whatsappSame ? String(f.phone ?? "").trim() : String(f.whatsapp ?? "").trim()) || undefined,
+        email: String(f.email ?? "").trim(),
         city: cityValue,
         // Detailed office / business address (Step 3). office_city mirrors the
         // selected service city; office lat/long mirror the captured GPS.
-        office_address_line1: f.addressLine1.trim() || undefined,
-        office_address_line2: f.addressLine2.trim() || undefined,
-        office_landmark: f.landmark.trim() || undefined,
+        office_address_line1: String(f.addressLine1 ?? "").trim() || undefined,
+        office_address_line2: String(f.addressLine2 ?? "").trim() || undefined,
+        office_landmark: String(f.landmark ?? "").trim() || undefined,
         office_city: cityValue || undefined,
-        office_state: f.stateName.trim() || undefined,
-        office_pincode: f.pincode || undefined,
+        office_state: String(f.stateName ?? "").trim() || undefined,
+        office_pincode: String(f.pincode ?? "").trim() || undefined,
         office_latitude: loc.status === "granted" ? loc.latitude : null,
         office_longitude: loc.status === "granted" ? loc.longitude : null,
         areas_covered: serviceAreas,
@@ -654,13 +674,14 @@ export function VendorRegisterForm() {
   );
 
   function addCustomArea() {
-    const trimmed = f.customArea.trim();
+    const trimmed = String(f.customArea ?? "").trim();
     if (trimmed.length < 2) {
       setCustomAreaError("Enter a valid area name.");
       return;
     }
-    const isDuplicate = f.areas.some(
-      (a) => a.trim().toLowerCase() === trimmed.toLowerCase()
+    const areasArr = Array.isArray(f.areas) ? f.areas : [];
+    const isDuplicate = areasArr.some(
+      (a) => String(a ?? "").trim().toLowerCase() === trimmed.toLowerCase()
     );
     if (isDuplicate) {
       setCustomAreaError("This area is already selected.");
@@ -669,7 +690,7 @@ export function VendorRegisterForm() {
     setCustomAreaError("");
     setF((current) => ({
       ...current,
-      areas: [...current.areas, trimmed],
+      areas: [...areasArr, trimmed],
       customArea: "",
     }));
   }
@@ -872,7 +893,7 @@ export function VendorRegisterForm() {
             {availableAreas.length > 0 ? (
               <div className="qf-rf-chips">
                 {availableAreas.map((area) => {
-                  const selected = f.areas.includes(area);
+                  const selected = serviceAreas.includes(area);
                   return (
                     <button
                       type="button"
@@ -894,9 +915,9 @@ export function VendorRegisterForm() {
 
             {/* 3. Selected service areas summary */}
             <p className="qf-vrf-subhead" ref={bindField("areas")}>Selected service areas</p>
-            {f.areas.length > 0 ? (
+            {serviceAreas.length > 0 ? (
               <div className="qf-rf-chips qf-rf-selected-areas">
-                {f.areas.map((area) => (
+                {serviceAreas.map((area) => (
                   <span
                     key={area}
                     className="qf-rf-chip is-selected qf-rf-chip-removable"
@@ -930,7 +951,7 @@ export function VendorRegisterForm() {
                 {f.coversFullCity ? "No specific areas selected yet (city-wide coverage is active)." : "Select at least one area where you serve clients."}
               </p>
             )}
-            {fieldError("areas") && f.areas.length === 0 && !f.coversFullCity ? (
+            {fieldError("areas") && serviceAreas.length === 0 && !f.coversFullCity ? (
               <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("areas")}</p>
             ) : null}
 
@@ -1136,14 +1157,18 @@ export function VendorRegisterForm() {
                 label="Coverage"
                 value={f.coversFullCity ? `Entire ${cityValue}` : "Selected areas only"}
               />
-              {f.addressLine1.trim() ? (
+              {String(f.addressLine1 ?? "").trim() ? (
                 <SummaryRow
                   label="Office address"
-                  value={[f.addressLine1.trim(), f.addressLine2.trim(), f.landmark.trim()].filter(Boolean).join(", ")}
+                  value={[
+                    String(f.addressLine1 ?? "").trim(),
+                    String(f.addressLine2 ?? "").trim(),
+                    String(f.landmark ?? "").trim()
+                  ].filter(Boolean).join(", ")}
                 />
               ) : null}
-              {f.stateName.trim() ? <SummaryRow label="State" value={f.stateName.trim()} /> : null}
-              {f.pincode ? <SummaryRow label="Pincode" value={f.pincode} /> : null}
+              {String(f.stateName ?? "").trim() ? <SummaryRow label="State" value={String(f.stateName ?? "").trim()} /> : null}
+              {String(f.pincode ?? "").trim() ? <SummaryRow label="Pincode" value={String(f.pincode ?? "").trim()} /> : null}
               <SummaryRow label="Areas" value={serviceAreas.length ? serviceAreas.join(", ") : "—"} />
               <SummaryRow label="Location" value={loc.status === "granted" ? "Shared" : "Not shared"} />
               {f.yearsExperience ? <SummaryRow label="Experience" value={f.yearsExperience} /> : null}

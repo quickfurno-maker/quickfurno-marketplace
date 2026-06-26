@@ -12,24 +12,68 @@ import type {
 /** Public vendor registration. Always lands as Pending + not visible. */
 export async function registerVendor(input: VendorRegistrationInput): Promise<Result<{ id: string }>> {
   try {
-    if (!input.business_name?.trim() || !input.phone?.trim() || !input.city?.trim()) {
-      throw appError("VALIDATION");
+    // 1. Clean phone and whatsapp numbers to 10 digits
+    const cleanedPhone = (input.phone ?? "").replace(/\D/g, "");
+    const cleanedWhatsapp = input.whatsapp_number
+      ? input.whatsapp_number.replace(/\D/g, "")
+      : cleanedPhone;
+
+    // 2. Validate all required fields before database call
+    const businessNameClean = (input.business_name ?? "").trim();
+    const ownerNameClean = (input.owner_name ?? "").trim();
+    const emailClean = (input.email ?? "").trim();
+    const cityClean = (input.city ?? "").trim();
+
+    // Check if it's the full onboarding registration wizard or simple form
+    const isFullOnboarding = Boolean(
+      input.office_address_line1 || 
+      input.whatsapp_number || 
+      input.office_state || 
+      input.office_pincode
+    );
+
+    if (!businessNameClean || !ownerNameClean || cleanedPhone.length !== 10 || !cityClean) {
+      return {
+        ok: false,
+        code: "VALIDATION",
+        error: "Some required details are missing. Please go back and complete the highlighted fields.",
+      };
+    }
+
+    if (isFullOnboarding) {
+      const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean);
+      const pincodeClean = (input.office_pincode ?? "").replace(/\D/g, "");
+
+      if (
+        cleanedWhatsapp.length !== 10 ||
+        !emailClean ||
+        !isEmailValid ||
+        !input.office_address_line1?.trim() ||
+        !input.office_state?.trim() ||
+        pincodeClean.length !== 6
+      ) {
+        return {
+          ok: false,
+          code: "VALIDATION",
+          error: "Some required details are missing. Please go back and complete the highlighted fields.",
+        };
+      }
     }
 
     // Exact column set written to public.vendors (matches the onboarding wizard).
     // Status/consent defaults are forced here regardless of input.
     const payload = {
-      business_name: input.business_name,
-      owner_name: input.owner_name ?? null,
-      phone: input.phone,
-      whatsapp_number: input.whatsapp_number ?? null,
-      email: input.email ?? null,
-      city: input.city,
+      business_name: businessNameClean,
+      owner_name: ownerNameClean,
+      phone: cleanedPhone,
+      whatsapp_number: cleanedWhatsapp || null,
+      email: emailClean || null,
+      city: cityClean,
       // Detailed office / business address (migration 011).
       office_address_line1: input.office_address_line1 ?? null,
       office_address_line2: input.office_address_line2 ?? null,
       office_landmark: input.office_landmark ?? null,
-      office_city: input.office_city ?? null,
+      office_city: input.office_city ?? cityClean,
       office_state: input.office_state ?? null,
       office_pincode: input.office_pincode ?? null,
       office_latitude: input.office_latitude ?? null,
@@ -63,10 +107,14 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       user_id: input.user_id ?? null,
     };
 
-    console.log("Vendor payload:", payload);
+    if (process.env.NODE_ENV === "development") {
+      console.log("Supabase URL exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL));
+      console.log("Supabase Anon Key exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+      console.log("Supabase Service Role Key exists:", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY));
+      console.log("Vendor payload:", payload);
+    }
 
-    // Single insert with the full payload — the vendors table already has every
-    // column, so no fallback (a fallback would silently drop the new fields).
+    // Single insert with the full payload
     const { data, error } = await adminClient()
       .from("vendors")
       .insert(payload)
@@ -91,8 +139,12 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       });
 
       // Map database error code to distinct readable message
-      let friendlyError = "Something went wrong. Please check your details and try again.";
-      if (error.code === "23505") {
+      const errMsg = String(error.message ?? "").toLowerCase();
+      let friendlyError = "Unable to submit right now. Please check your internet connection and try again.";
+
+      if (errMsg.includes("fetch failed") || errMsg.includes("network error") || errMsg.includes("typeerror")) {
+        friendlyError = "Unable to submit right now. Please check your internet connection and try again.";
+      } else if (error.code === "23505") {
         friendlyError = "This business email or phone number is already registered. Please use another number or contact QuickFurno.";
       } else if (error.code === "23502") {
         friendlyError = "Some required details are missing. Please go back and complete the highlighted fields.";
@@ -100,8 +152,9 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
         friendlyError = "We could not save your application due to a system configuration issue. Please contact QuickFurno support.";
       } else if (error.code && (error.code.startsWith("08") || error.code === "P0001")) {
         friendlyError = "Network issue while submitting. Please try again.";
-      } else if (error.message) {
-        friendlyError = `Database error: ${error.message}`;
+      } else if (error.code) {
+        // Any other database error code indicates a schema/constraint issue
+        friendlyError = "We could not save your application due to a system configuration issue. Please contact QuickFurno support.";
       }
 
       return {
@@ -114,10 +167,19 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
   } catch (e) {
     if (e instanceof AppError) return fail(e);
     const message = (e as { message?: string })?.message ?? "Unknown error";
+    const errMsg = message.toLowerCase();
+    
+    let friendlyError = "Unable to submit right now. Please check your internet connection and try again.";
+    if (errMsg.includes("fetch failed") || errMsg.includes("network error") || errMsg.includes("typeerror")) {
+      friendlyError = "Unable to submit right now. Please check your internet connection and try again.";
+    } else {
+      friendlyError = "We could not save your application due to a system configuration issue. Please contact QuickFurno support.";
+    }
+
     return {
       ok: false,
       code: "UNKNOWN",
-      error: `Something went wrong: ${message}`,
+      error: friendlyError,
     };
   }
 }

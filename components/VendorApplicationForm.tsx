@@ -93,7 +93,7 @@ export function VendorApplicationForm() {
       console.error("[vendor application form] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
       });
-      setError("We could not submit your vendor application. Please try again.");
+      setError("Unable to submit right now. Please check your internet connection and try again.");
     } finally {
       setSubmitting(false);
     }

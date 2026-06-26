@@ -594,7 +594,7 @@ export function VendorRegisterForm() {
       console.error("[vendor onboarding] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
       });
-      setError("Something went wrong. Please check your details and try again.");
+      setError("Unable to submit right now. Please check your internet connection and try again.");
     } finally {
       setBusy(false);
     }

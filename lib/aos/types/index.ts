@@ -23,7 +23,22 @@ export type AgentName =
   | "QF-AOS-GrowthRadar"
   | "QF-AOS-ContentCraft"
   | "QF-AOS-AdminCopilot"
-  | "QF-AOS-VaultGuard";
+  | "QF-AOS-VaultGuard"
+  | "QF-AOS-LeadNurture"
+  | "QF-AOS-CalendarSync"
+  | "QF-AOS-SourceTracker"
+  | "QF-AOS-AdBrain"
+  | "QF-AOS-CityScout"
+  | "QF-AOS-VendorOnboard"
+  | "QF-AOS-DealTracker"
+  | "QF-AOS-QualityAudit"
+  | "QF-AOS-PackageAdvisor"
+  | "QF-AOS-WhatsAppPilot"
+  | "QF-AOS-ReplacementDesk"
+  | "QF-AOS-FraudRadar"
+  | "QF-AOS-SEOScout"
+  | "QF-AOS-SalesCoach"
+  | "QF-AOS-ExecutiveBrief";
 
 export interface AgentPermission {
   canReadLeads: boolean;
@@ -107,6 +122,7 @@ export interface AOSEvent {
 }
 
 export type AOSAgentStatus =
+  | "foundation"
   | "testing"
   | "active"
   | "paused"
@@ -129,6 +145,7 @@ export interface AOSAgent {
   purpose: string;
   status: AOSAgentStatus;
   version: string;
+  mode?: AgentMode | "foundation" | "safe_mock" | null;
   last_run_at?: string | null;
   runs_today?: number | null;
   success_rate?: number | null;

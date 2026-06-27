@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import {
   adminApproveVendor,
   adminRejectVendor,
@@ -20,8 +20,10 @@ import {
   InfoGrid,
   PageHeader,
   PrimaryButton,
+  ProgressBar,
   SecondaryButton,
   SelectFilter,
+  SectionCard,
   StatCard,
   StatusBadge,
   Tabs,
@@ -39,6 +41,7 @@ import {
   groupBy,
   includesQuery,
   leadName,
+  maskPhone,
   packageName,
   shortId,
   uniqueOptions,
@@ -49,6 +52,7 @@ import { CRMDashboard } from "./CRMDashboard";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
+const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
 const packageTemplates = [
   { name: "Starter Package", price: "INR 1,250", leads: "5 leads", validity: "30 days", features: ["Basic delivery", "City/category match", "Standard support"] },
   { name: "Growth Package", price: "INR 3,500", leads: "15 leads", validity: "45 days", features: ["Priority delivery", "Daily lead controls", "Renewal alerts"] },
@@ -206,28 +210,42 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
   const [category, setCategory] = useState("All");
   const [status, setStatus] = useState("All");
   const [source, setSource] = useState("All");
+  const [priority, setPriority] = useState("All");
   const [selected, setSelected] = useState<Lead | null>(null);
 
+  const hotLeads = data.leads.filter(isHotLead);
+  const unassignedLeads = data.leads.filter(isUnassignedLead);
   const leads = useMemo(() => data.leads.filter((lead) => {
     const leadCategory = lead.service_required || lead.category || "";
-    return includesQuery([lead.name, lead.phone, lead.city, leadCategory, lead.status], query)
+    const leadSource = lead.source || "Website";
+    const leadPriorityValue = leadPriorityLabel(lead);
+    return includesQuery([lead.name, lead.phone, lead.city, leadCategory, lead.status, leadSource, leadPriorityValue], query)
       && (city === "All" || lead.city === city)
       && (category === "All" || leadCategory === category)
       && (status === "All" || lead.status === status)
-      && (source === "All" || (lead.source || "Website") === source);
-  }), [data.leads, query, city, category, status, source]);
+      && (source === "All" || leadSource === source)
+      && (priority === "All" || leadPriorityValue === priority);
+  }), [data.leads, query, city, category, status, source, priority]);
 
   return (
     <div className="space-y-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="All Leads" value={formatNumber(data.leads.length)} helper="Complete lead database" icon="leads" />
+        <StatCard label="Hot Leads" value={formatNumber(hotLeads.length)} helper="High intent or scored" icon="notifications" tone="amber" />
+        <StatCard label="Unassigned" value={formatNumber(unassignedLeads.length)} helper="Needs vendor matching" icon="distribution" tone="rose" />
+        <StatCard label="Filtered View" value={formatNumber(leads.length)} helper="Rows matching filters" icon="reports" tone="slate" />
+      </section>
+
       <Toolbar
         query={query}
         setQuery={setQuery}
-        placeholder="Search name, phone, city, category..."
+        placeholder="Search name, masked phone, city, category, source..."
         filters={
           <>
             <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(data.leads.map((lead) => lead.city))} />
             <SelectFilter label="Category" value={category} onChange={setCategory} options={uniqueOptions(data.leads.map((lead) => lead.service_required || lead.category))} />
             <SelectFilter label="Status" value={status} onChange={setStatus} options={leadStatuses} />
+            <SelectFilter label="Priority" value={priority} onChange={setPriority} options={["All", "Hot", "High", "Normal", "Low"]} />
             <SelectFilter label="Source" value={source} onChange={setSource} options={uniqueOptions(data.leads.map((lead) => lead.source || "Website"))} />
           </>
         }
@@ -239,13 +257,13 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
         emptyTitle="No leads match this view"
         emptyMessage="Try a different search or filter, or wait for new public form submissions."
         columns={[
-          { header: "Client", cell: (lead) => <Strong title={lead.name || "Unnamed lead"} subtitle={lead.phone || "No phone"} /> },
-          { header: "City", cell: (lead) => <span>{lead.city || "Not set"}</span> },
-          { header: "Category", cell: (lead) => lead.service_required || lead.category || "Not set" },
+          { header: "Client", cell: (lead) => <Strong title={lead.name || "Unnamed lead"} subtitle={maskPhone(lead.phone)} /> },
+          { header: "Requirement", cell: (lead) => <Strong title={lead.service_required || lead.category || "Not set"} subtitle={lead.city || "City not set"} /> },
           { header: "Budget", cell: (lead) => lead.budget || "Not set" },
-          { header: "Source", cell: (lead) => lead.source || "Website" },
+          { header: "Priority", cell: (lead) => <LeadPriorityBadge lead={lead} /> },
+          { header: "Source", cell: (lead) => <SourceBadge value={lead.source || "Website"} /> },
           { header: "Status", cell: (lead) => <StatusBadge value={lead.status || "New"} /> },
-          { header: "Assigned Vendors", cell: (lead) => formatNumber(lead.lead_assignments?.length ?? 0) },
+          { header: "Assigned", cell: (lead) => <StatusBadge value={`${formatNumber(lead.lead_assignments?.length ?? 0)} vendors`} tone={(lead.lead_assignments?.length ?? 0) > 0 ? "emerald" : "amber"} /> },
           { header: "Created", cell: (lead) => formatDate(lead.created_at) },
           {
             header: "Actions",
@@ -272,24 +290,60 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("All");
   const [status, setStatus] = useState("All");
+  const [packageStatus, setPackageStatus] = useState("All");
   const [selected, setSelected] = useState<Vendor | null>(null);
 
-  const vendors = useMemo(() => data.vendors.filter((vendor) =>
-    includesQuery([vendor.business_name, vendor.owner_name, vendor.phone, vendor.city, vendor.status], query)
-    && (city === "All" || vendor.city === city)
-    && (status === "All" || vendor.status === status)
-  ), [data.vendors, query, city, status]);
+  const packageOptions = useMemo(() => uniqueOptions(data.vendors.map((vendor) => vendorPackageStatus(vendor, latestVendorPackage(vendor.id, data.vendorPackages))), "All"), [data.vendors, data.vendorPackages]);
+  const vendors = useMemo(() => data.vendors.filter((vendor) => {
+    const latestPackage = latestVendorPackage(vendor.id, data.vendorPackages);
+    const currentPackageStatus = vendorPackageStatus(vendor, latestPackage);
+    return includesQuery([vendor.business_name, vendor.owner_name, vendor.phone, vendor.city, vendor.status, vendor.service_categories?.join(" "), currentPackageStatus], query)
+      && (city === "All" || vendor.city === city)
+      && (status === "All" || vendor.status === status)
+      && (packageStatus === "All" || currentPackageStatus === packageStatus);
+  }), [data.vendors, data.vendorPackages, query, city, status, packageStatus]);
 
   return (
     <div className="space-y-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Vendors" value={formatNumber(data.vendors.length)} helper="All vendor records" icon="vendors" />
+        <StatCard label="Active Vendors" value={formatNumber(data.stats.active_vendors)} helper="Ready for leads" icon="vendors" tone="emerald" />
+        <StatCard label="Paid Vendors" value={formatNumber(data.stats.paid_vendors)} helper="Package attached" icon="subscriptions" tone="indigo" />
+        <StatCard label="Low Credits" value={formatNumber(data.stats.low_balance_vendors)} helper="Renewal risk" icon="notifications" tone="amber" />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {vendors.slice(0, 4).map((vendor) => (
+          <button
+            key={vendor.id}
+            type="button"
+            onClick={() => setSelected(vendor)}
+            className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <Strong title={vendor.business_name || "Unnamed vendor"} subtitle={vendor.city || "City not set"} />
+              <VendorHealthBadge vendor={vendor} />
+            </div>
+            <div className="mt-4">
+              <CreditsMeter value={Number(vendor.remaining_credits ?? 0)} total={Number(vendor.total_credits ?? 0)} />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <StatusBadge value={vendor.status || "Pending"} />
+              <StatusBadge value={vendorPackageStatus(vendor, latestVendorPackage(vendor.id, data.vendorPackages))} />
+            </div>
+          </button>
+        ))}
+      </section>
+
       <Toolbar
         query={query}
         setQuery={setQuery}
-        placeholder="Search vendor, phone, city, category..."
+        placeholder="Search vendor, masked phone, city, category..."
         filters={
           <>
             <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(data.vendors.map((vendor) => vendor.city))} />
             <SelectFilter label="Status" value={status} onChange={setStatus} options={uniqueOptions(data.vendors.map((vendor) => vendor.status))} />
+            <SelectFilter label="Package" value={packageStatus} onChange={setPackageStatus} options={packageOptions} />
           </>
         }
         action={<SecondaryButton onClick={() => notify("Vendor export placeholder ready.")}>Export Vendors</SecondaryButton>}
@@ -300,12 +354,12 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
         emptyTitle="No vendors match this view"
         emptyMessage="Try different filters or approve vendor registration requests."
         columns={[
-          { header: "Vendor / Business", cell: (vendor) => <Strong title={vendor.business_name || "Unnamed vendor"} subtitle={vendor.owner_name || vendor.phone || "No owner"} /> },
-          { header: "Phone", cell: (vendor) => vendor.phone || "Not set" },
+          { header: "Vendor / Business", cell: (vendor) => <Strong title={vendor.business_name || "Unnamed vendor"} subtitle={`${vendor.owner_name || "No owner"} - ${maskPhone(vendor.phone)}`} /> },
           { header: "City", cell: (vendor) => vendor.city || "Not set" },
-          { header: "Categories", cell: (vendor) => <span className="line-clamp-2 min-w-40">{vendor.service_categories?.join(", ") || "Not set"}</span> },
-          { header: "Package", cell: () => "Current package" },
-          { header: "Leads Remaining", cell: (vendor) => formatNumber(vendor.remaining_credits) },
+          { header: "Categories", cell: (vendor) => <span className="line-clamp-2 min-w-44">{vendor.service_categories?.join(", ") || "Not set"}</span> },
+          { header: "Package", cell: (vendor) => <VendorPackageCell vendor={vendor} data={data} /> },
+          { header: "Credits", cell: (vendor) => <CreditsMeter value={Number(vendor.remaining_credits ?? 0)} total={Number(vendor.total_credits ?? 0)} /> },
+          { header: "Health", cell: (vendor) => <VendorHealthBadge vendor={vendor} /> },
           { header: "Status", cell: (vendor) => <StatusBadge value={vendor.status || "Pending"} /> },
           { header: "Rating", cell: (vendor) => vendor.rating ? `${vendor.rating}/5` : "Not rated" },
           {
@@ -330,25 +384,30 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
 }
 
 function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (message: string) => void; ask: any }) {
+  const activePackages = data.packages.filter((item) => item.is_active !== false).length;
+  const avgLeadPrice = data.packages.length
+    ? Math.round(data.packages.reduce((sum, item) => sum + Number(item.price_per_lead ?? 0), 0) / data.packages.length)
+    : 0;
+
   return (
     <div className="space-y-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Packages" value={formatNumber(data.packages.length || packageTemplates.length)} helper="Live rows or templates" icon="packages" />
+        <StatCard label="Active" value={formatNumber(activePackages)} helper="Visible for sales" icon="subscriptions" tone="emerald" />
+        <StatCard label="Avg Lead Price" value={avgLeadPrice ? formatINR(avgLeadPrice) : "Prepared"} helper="From package rows" icon="payments" tone="indigo" />
+        <StatCard label="Revenue" value={formatINR(data.stats.total_revenue)} helper="Paid collections" icon="reports" tone="amber" />
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {packageTemplates.map((item) => (
-          <article key={item.name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">{item.name}</h2>
-                <p className="mt-2 text-sm text-slate-500">{item.leads} / {item.validity}</p>
-              </div>
-              <ToggleSwitch checked={item.name !== "Enterprise Package"} />
-            </div>
-            <p className="mt-5 text-2xl font-semibold tracking-tight text-slate-950">{item.price}</p>
-            <ul className="mt-5 space-y-2 text-sm text-slate-600">
-              {item.features.map((feature) => <li key={feature}>- {feature}</li>)}
-            </ul>
-            <button type="button" onClick={() => notify("Package editor placeholder ready.")} className="mt-5 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit package</button>
-          </article>
-        ))}
+        {data.packages.length ? (
+          data.packages.map((item) => (
+            <PackageRowCard key={item.id} item={item} notify={notify} ask={ask} />
+          ))
+        ) : (
+          packageTemplates.map((item) => (
+            <PackageTemplateCard key={item.name} item={item} notify={notify} />
+          ))
+        )}
       </section>
 
       <DataTable
@@ -359,8 +418,8 @@ function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (message:
           { header: "Package Name", cell: (item) => <Strong title={item.name || "Unnamed package"} subtitle={`ID ${shortId(item.id)}`} /> },
           { header: "Price", cell: (item) => formatINR(item.total_price || item.display_price) },
           { header: "Leads", cell: (item) => formatNumber(item.lead_count) },
+          { header: "Per Lead", cell: (item) => item.price_per_lead ? formatINR(item.price_per_lead) : "Not set" },
           { header: "Validity", cell: (item) => `${formatNumber(item.validity_days)} days` },
-          { header: "Priority", cell: () => <StatusBadge value="Standard" /> },
           { header: "Status", cell: (item) => <StatusBadge value={item.is_active ? "Active" : "Inactive"} /> },
           {
             header: "Actions",
@@ -379,34 +438,47 @@ function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (message:
 }
 
 function CategoriesPage({ data, notify, ask }: { data: Snapshot; notify: (message: string) => void; ask: any }) {
+  const parentCategories = data.categories.filter((item) => !item.parent_id);
+  const subcategories = data.categories.filter((item) => item.parent_id);
+  const visibleParents = parentCategories.length ? parentCategories : data.categories.slice(0, 5);
+  const tableRows = subcategories.length ? subcategories : data.categories;
+
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {["Interior", "Sofa", "Painter", "Civil Work", "Modular Kitchen"].map((name) => (
-          <article key={name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-950">{name}</h2>
-            <p className="mt-2 text-sm text-slate-500">Homepage-ready parent category</p>
-            <div className="mt-4 flex items-center justify-between">
-              <StatusBadge value="Active" />
-              <ToggleSwitch checked />
-            </div>
-          </article>
-        ))}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Categories" value={formatNumber(data.categories.length)} helper="Service taxonomy" icon="categories" />
+        <StatCard label="Parent Categories" value={formatNumber(parentCategories.length || visibleParents.length)} helper="Top-level services" icon="categories" tone="indigo" />
+        <StatCard label="Subcategories" value={formatNumber(subcategories.length)} helper="Nested service rows" icon="reports" tone="slate" />
+        <StatCard label="Homepage Visible" value={formatNumber(data.categories.filter((item) => item.show_on_homepage !== false).length)} helper="Marked for public display" icon="content" tone="emerald" />
       </section>
 
-      <DataTable
-        rows={data.categories}
-        emptyTitle="No categories found"
-        emptyMessage="Active categories from Supabase will appear here and can power public forms."
-        columns={[
-          { header: "Category", cell: (item) => <Strong title={item.name || "Unnamed category"} subtitle={item.slug || shortId(item.id)} /> },
-          { header: "Subcategories", cell: () => "Prepared" },
-          { header: "Homepage", cell: (item) => <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} /> },
-          { header: "Status", cell: (item) => <StatusBadge value={item.is_active ? "Active" : "Inactive"} /> },
-          { header: "Sort Order", cell: (item) => formatNumber(item.sort_order ?? 100) },
-          { header: "Actions", cell: (item) => <ActionMenu actions={[{ label: "Edit", onClick: () => notify("Category editor placeholder ready.") }, { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update category", "This changes public form visibility for the category.", () => adminSetCategoryActive(item.id, !item.is_active)) }, { label: "Add subcategory", onClick: () => notify("Subcategory drawer placeholder ready.") }]} /> },
-        ]}
-      />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {visibleParents.length ? (
+          visibleParents.map((item) => (
+            <CategoryParentCard key={item.id} item={item} subcategoryCount={subcategories.filter((child) => child.parent_id === item.id).length} />
+          ))
+        ) : (
+          <SectionCard title="Parent Categories" description="Create categories to organize homepage and lead form options.">
+            <p className="text-sm text-slate-500">No category rows available in this snapshot.</p>
+          </SectionCard>
+        )}
+      </section>
+
+      <SectionCard title="Subcategory Table" description="Status, homepage visibility, sort order, and safe actions for category rows.">
+        <DataTable
+          rows={tableRows}
+          emptyTitle="No categories found"
+          emptyMessage="Active categories from Supabase will appear here and can power public forms."
+          columns={[
+            { header: "Category", cell: (item) => <Strong title={item.name || "Unnamed category"} subtitle={item.slug || shortId(item.id)} /> },
+            { header: "Type", cell: (item) => <StatusBadge value={item.parent_id ? "Subcategory" : "Parent"} tone={item.parent_id ? "blue" : "violet"} /> },
+            { header: "Homepage", cell: (item) => <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} /> },
+            { header: "Status", cell: (item) => <StatusBadge value={item.is_active ? "Active" : "Inactive"} /> },
+            { header: "Sort Order", cell: (item) => formatNumber(item.sort_order ?? 100) },
+            { header: "Actions", cell: (item) => <ActionMenu actions={[{ label: "Edit", onClick: () => notify("Category editor placeholder ready.") }, { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update category", "This changes public form visibility for the category.", () => adminSetCategoryActive(item.id, !item.is_active)) }, { label: "Add subcategory", onClick: () => notify("Subcategory drawer placeholder ready.") }]} /> },
+          ]}
+        />
+      </SectionCard>
     </div>
   );
 }
@@ -421,7 +493,13 @@ function CitiesPage({ data, notify, ask }: { data: Snapshot; notify: (message: s
         <StatCard label="Total Cities" value={formatNumber(data.cities.length)} helper="All configured cities" icon="cities" />
         <StatCard label="Active Cities" value={formatNumber(active)} helper="Accepting leads" icon="cities" tone="emerald" />
         <StatCard label="Coming Soon" value={formatNumber(comingSoon)} helper="Visible but paused" icon="notifications" tone="amber" />
-        <StatCard label="Total Localities" value="Prepared" helper="Add localities table to enable live count" icon="reports" tone="slate" />
+        <StatCard label="Locality Manager" value="Prepared" helper="Placeholder UI only" icon="reports" tone="slate" />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {data.cities.slice(0, 6).map((city) => (
+          <CityCoverageCard key={city.id} city={city} data={data} />
+        ))}
       </section>
 
       <DataTable
@@ -431,10 +509,11 @@ function CitiesPage({ data, notify, ask }: { data: Snapshot; notify: (message: s
         columns={[
           { header: "City", cell: (item) => <Strong title={item.name || "Unnamed city"} subtitle={item.slug || shortId(item.id)} /> },
           { header: "State", cell: (item) => item.state || "Maharashtra" },
+          { header: "Demand", cell: (item) => <StatusBadge value={`${formatNumber(cityDemand(item, data))} leads`} tone="blue" /> },
+          { header: "Supply", cell: (item) => <StatusBadge value={`${formatNumber(citySupply(item, data))} vendors`} tone="emerald" /> },
           { header: "Launch Status", cell: (item) => <StatusBadge value={item.launch_status || (item.is_active ? "Active" : "Hidden")} /> },
-          { header: "Active", cell: (item) => <StatusBadge value={item.is_active ? "Active" : "Inactive"} /> },
           { header: "Homepage", cell: (item) => <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} /> },
-          { header: "Localities", cell: () => "Manage" },
+          { header: "Localities", cell: () => <StatusBadge value="Manager prepared" tone="slate" /> },
           { header: "Actions", cell: (item) => <ActionMenu actions={[{ label: "Edit city", onClick: () => notify("City editor placeholder ready.") }, { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update city", "This changes public form city visibility.", () => adminSetCityActive(item.id, !item.is_active)) }, { label: "Manage localities", onClick: () => notify("Locality manager placeholder ready.") }]} /> },
         ]}
       />
@@ -443,31 +522,303 @@ function CitiesPage({ data, notify, ask }: { data: Snapshot; notify: (message: s
 }
 
 function PaymentsPage({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
+  const paidPayments = data.payments.filter((payment) => String(payment.payment_status ?? "").toLowerCase() === "paid");
+  const pendingPayments = data.payments.filter((payment) => String(payment.payment_status ?? "").toLowerCase() === "pending");
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Revenue" value={formatINR(data.stats.total_revenue)} helper="Paid collections" icon="payments" />
-        <StatCard label="Monthly Revenue" value={formatINR(data.stats.revenue_this_month)} helper="This month" icon="reports" />
-        <StatCard label="Pending Collections" value={formatNumber(data.stats.pending_payments)} helper="Needs follow-up" icon="notifications" tone="amber" />
-        <StatCard label="Expired Vendors" value={formatNumber(data.stats.expired_vendors)} helper="Renewal queue" icon="subscriptions" tone="rose" />
+        <StatCard label="Total Revenue" value={formatINR(data.stats.total_revenue)} helper={`${formatNumber(paidPayments.length)} paid payments`} icon="payments" />
+        <StatCard label="Monthly Revenue" value={formatINR(data.stats.revenue_this_month)} helper="This month" icon="reports" tone="emerald" />
+        <StatCard label="Pending Collections" value={formatNumber(pendingPayments.length || data.stats.pending_payments)} helper="Needs follow-up" icon="notifications" tone="amber" />
+        <StatCard label="Renewal Risk" value={formatNumber(data.stats.expired_vendors)} helper="Expired vendors" icon="subscriptions" tone="rose" />
       </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <SectionCard title="Revenue Snapshot" description="Live payment rows summarized for quick finance review.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FinanceTile label="Paid" value={formatNumber(paidPayments.length)} tone="emerald" />
+            <FinanceTile label="Pending" value={formatNumber(pendingPayments.length)} tone="amber" />
+            <FinanceTile label="Gateway" value="Prepared" tone="slate" />
+            <FinanceTile label="Invoice UI" value="Ready" tone="blue" />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Collection Notes" description="Operational placeholders only; no payment logic changed.">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {["Manual collection", "Invoice download", "Renewal follow-up"].map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => notify(`${item} placeholder ready.`)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50/40"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </SectionCard>
+      </section>
+
       <DataTable
         rows={data.payments}
         emptyTitle="No payments found"
         emptyMessage="Manual package payments and future gateway payments will appear here."
         columns={[
-          { header: "Payment ID", cell: (row) => shortId(row.id) },
+          { header: "Payment ID", cell: (row) => <Strong title={shortId(row.id)} subtitle={formatDate(row.created_at)} /> },
           { header: "Vendor", cell: (row) => vendorName(data.vendors, row.vendor_id) },
           { header: "Package", cell: (row) => packageName(data.packages, row.package_id) },
-          { header: "Amount", cell: (row) => formatINR(row.amount) },
-          { header: "Mode", cell: (row) => row.payment_method || "Manual" },
+          { header: "Amount", cell: (row) => <span className="font-semibold text-slate-950">{formatINR(row.amount)}</span> },
+          { header: "Mode", cell: (row) => <StatusBadge value={row.payment_method || "Manual"} tone="slate" /> },
           { header: "Status", cell: (row) => <StatusBadge value={row.payment_status || "Pending"} /> },
-          { header: "Date", cell: (row) => formatDate(row.created_at) },
+          { header: "Transaction", cell: (row) => row.transaction_id || "Not linked" },
           { header: "Actions", cell: () => <SecondaryButton onClick={() => notify("Invoice placeholder ready.")}>Invoice</SecondaryButton> },
         ]}
       />
     </div>
   );
+}
+
+function LeadPriorityBadge({ lead }: { lead: Lead }) {
+  const priority = leadPriorityLabel(lead);
+  return <StatusBadge value={priority} tone={priority === "Hot" || priority === "High" ? "amber" : priority === "Low" ? "slate" : "blue"} />;
+}
+
+function SourceBadge({ value }: { value: string }) {
+  const normalized = value.toLowerCase();
+  const tone = normalized.includes("google") || normalized.includes("ads") ? "violet" : normalized.includes("whatsapp") ? "emerald" : normalized.includes("website") ? "blue" : "slate";
+  return <StatusBadge value={value} tone={tone} />;
+}
+
+function VendorHealthBadge({ vendor }: { vendor: Vendor }) {
+  const score = vendorHealthScore(vendor);
+  return <StatusBadge value={`${score}%`} tone={score >= 75 ? "emerald" : score >= 45 ? "amber" : "rose"} />;
+}
+
+function CreditsMeter({ value, total }: { value: number; total: number }) {
+  const normalizedTotal = Math.max(total, value, 1);
+  const percentage = Math.round((Math.max(value, 0) / normalizedTotal) * 100);
+  const tone = percentage <= 20 ? "rose" : percentage <= 45 ? "amber" : "emerald";
+
+  return (
+    <div className="min-w-36 space-y-1.5">
+      <div className="flex items-center justify-between gap-3 text-xs font-medium">
+        <span className="text-slate-500">Credits</span>
+        <span className="text-slate-900">{formatNumber(value)} / {formatNumber(normalizedTotal)}</span>
+      </div>
+      <ProgressBar value={percentage} tone={tone} />
+    </div>
+  );
+}
+
+function VendorPackageCell({ vendor, data }: { vendor: Vendor; data: Snapshot }) {
+  const latestPackage = latestVendorPackage(vendor.id, data.vendorPackages);
+  const currentPackage = latestPackage ? packageName(data.packages, latestPackage.package_id) : "No package";
+  const status = vendorPackageStatus(vendor, latestPackage);
+
+  return (
+    <div className="min-w-40">
+      <p className="font-semibold text-slate-950">{currentPackage}</p>
+      <div className="mt-1">
+        <StatusBadge value={status} />
+      </div>
+    </div>
+  );
+}
+
+function PackageRowCard({ item, notify, ask }: { item: PackageRow; notify: (message: string) => void; ask: any }) {
+  const features = packageFeatures(item);
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-semibold text-slate-950">{item.name || "Unnamed package"}</h2>
+          <p className="mt-1 text-sm text-slate-500">{formatNumber(item.lead_count)} leads / {formatNumber(item.validity_days)} days</p>
+        </div>
+        <StatusBadge value={item.is_active ? "Active" : "Inactive"} />
+      </div>
+      <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">{formatINR(item.total_price || item.display_price)}</p>
+      <ul className="mt-5 space-y-2 text-sm text-slate-600">
+        {features.map((feature) => (
+          <li key={feature} className="flex items-start gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <ToggleSwitch checked={Boolean(item.is_active)} label="Visible" />
+        <ActionMenu actions={[
+          { label: "Edit", onClick: () => notify("Package edit placeholder ready.") },
+          { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility.", () => adminSetPackageActive(item.id, !item.is_active)) },
+        ]} />
+      </div>
+    </article>
+  );
+}
+
+function PackageTemplateCard({ item, notify }: { item: (typeof packageTemplates)[number]; notify: (message: string) => void }) {
+  return (
+    <article className="rounded-lg border border-dashed border-slate-300 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">{item.name}</h2>
+          <p className="mt-1 text-sm text-slate-500">{item.leads} / {item.validity}</p>
+        </div>
+        <StatusBadge value="Template" tone="slate" />
+      </div>
+      <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">{item.price}</p>
+      <ul className="mt-5 space-y-2 text-sm text-slate-600">
+        {item.features.map((feature) => (
+          <li key={feature} className="flex items-start gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => notify("Package editor placeholder ready.")} className="mt-5 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+        Configure package
+      </button>
+    </article>
+  );
+}
+
+function CategoryParentCard({ item, subcategoryCount }: { item: Category; subcategoryCount: number }) {
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <Strong title={item.name || "Unnamed category"} subtitle={item.slug || shortId(item.id)} />
+        <StatusBadge value={item.is_active ? "Active" : "Inactive"} />
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Subcategories</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatNumber(subcategoryCount)}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Sort</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatNumber(item.sort_order ?? 100)}</p>
+        </div>
+      </div>
+      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span className="text-sm font-semibold text-slate-600">Homepage</span>
+        <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} />
+      </div>
+    </article>
+  );
+}
+
+function CityCoverageCard({ city, data }: { city: City; data: Snapshot }) {
+  const demand = cityDemand(city, data);
+  const supply = citySupply(city, data);
+  const balance = demand ? Math.min(100, Math.round((supply / Math.max(demand, 1)) * 100)) : supply ? 100 : 0;
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <Strong title={city.name || "Unnamed city"} subtitle={city.state || "Maharashtra"} />
+        <StatusBadge value={city.launch_status || (city.is_active ? "Active" : "Hidden")} />
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Demand</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatNumber(demand)}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Supply</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">{formatNumber(supply)}</p>
+        </div>
+      </div>
+      <div className="mt-5 space-y-2">
+        <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+          <span>Demand/supply fit</span>
+          <span>{formatNumber(balance)}%</span>
+        </div>
+        <ProgressBar value={balance} tone={balance >= 60 ? "emerald" : balance >= 30 ? "amber" : "rose"} />
+      </div>
+      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span className="text-sm font-semibold text-slate-600">Localities</span>
+        <StatusBadge value="Prepared" tone="slate" />
+      </div>
+    </article>
+  );
+}
+
+function FinanceTile({ label, value, tone }: { label: string; value: ReactNode; tone: "emerald" | "amber" | "blue" | "slate" }) {
+  const toneClass = {
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    blue: "bg-sky-500",
+    slate: "bg-slate-400",
+  }[tone];
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <p className="text-lg font-semibold text-slate-950">{value}</p>
+        <span className={`h-2.5 w-2.5 rounded-full ${toneClass}`} />
+      </div>
+    </div>
+  );
+}
+
+function isHotLead(lead: Lead) {
+  const priority = String(lead.lead_priority ?? "").toLowerCase();
+  const status = String(lead.status ?? "").toLowerCase();
+  const score = Number(lead.lead_quality_score ?? 0);
+  return priority.includes("hot") || priority.includes("high") || score >= 70 || status.includes("interested") || status.includes("quotation");
+}
+
+function isUnassignedLead(lead: Lead) {
+  const status = String(lead.status ?? "New").toLowerCase();
+  return !closedLeadStatuses.has(status) && (lead.lead_assignments?.length ?? 0) === 0;
+}
+
+function leadPriorityLabel(lead: Lead) {
+  const priority = String(lead.lead_priority ?? "").trim();
+  const score = Number(lead.lead_quality_score ?? 0);
+  if (priority) return priority.charAt(0).toUpperCase() + priority.slice(1);
+  if (isHotLead(lead)) return "Hot";
+  if (score >= 50) return "High";
+  if (score > 0 && score < 30) return "Low";
+  return "Normal";
+}
+
+function latestVendorPackage(vendorId: string, rows: any[]) {
+  return rows.find((row) => row.vendor_id === vendorId) ?? null;
+}
+
+function vendorPackageStatus(vendor: Vendor, latestPackage: any) {
+  const status = String(latestPackage?.status || latestPackage?.payment_status || "").trim();
+  if (status) return status;
+  if (Number(vendor.remaining_credits ?? 0) > 0) return "Active credits";
+  return "No package";
+}
+
+function vendorHealthScore(vendor: Vendor) {
+  const credits = Math.min(40, Number(vendor.remaining_credits ?? 0) * 8);
+  const rating = Math.min(25, Number(vendor.rating ?? 0) * 5);
+  const active = vendor.is_active !== false && ["approved", "active"].includes(String(vendor.status ?? "").toLowerCase()) ? 25 : 8;
+  const visibility = vendor.public_visibility === false ? 0 : 10;
+  return Math.max(8, Math.min(98, Math.round(credits + rating + active + visibility)));
+}
+
+function packageFeatures(item: PackageRow) {
+  return [
+    `${formatNumber(item.lead_count)} verified leads`,
+    `${formatNumber(item.validity_days)} day validity`,
+    item.price_per_lead ? `${formatINR(item.price_per_lead)} per lead` : "Pricing review prepared",
+  ];
+}
+
+function cityDemand(city: City, data: Snapshot) {
+  return data.leads.filter((lead) => String(lead.city ?? "").toLowerCase() === String(city.name ?? "").toLowerCase()).length;
+}
+
+function citySupply(city: City, data: Snapshot) {
+  return data.vendors.filter((vendor) => String(vendor.city ?? "").toLowerCase() === String(city.name ?? "").toLowerCase()).length;
 }
 
 function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {

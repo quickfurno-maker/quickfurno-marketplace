@@ -3466,14 +3466,40 @@ h1, h2, h3 {
 .admin-surface,
 .admin-surface * {
   letter-spacing: normal;
-  word-spacing: 0.04em;
+  word-spacing: normal;
+}
+
+.admin-surface {
+  min-height: 100vh;
+  color: #0f172a;
+  background: #f6f8f5;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 .admin-surface h1,
 .admin-surface h2,
 .admin-surface h3 {
   color: inherit;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
   text-wrap: auto;
+}
+
+.admin-surface button,
+.admin-surface input,
+.admin-surface select,
+.admin-surface textarea {
+  font-family: inherit;
+}
+
+.admin-surface ::selection {
+  background: rgba(16, 185, 129, 0.24);
+}
+
+.admin-surface * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.24) transparent;
 }
 
 /* ============================================================

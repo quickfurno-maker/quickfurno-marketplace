@@ -53,6 +53,11 @@ export type AdminSectionConfig = {
   addLabel: string;
 };
 
+export type AdminNavGroup = {
+  title: string;
+  sections: AdminSectionKey[];
+};
+
 export const adminSections: AdminSectionConfig[] = [
   { key: "dashboard", href: "/admin/dashboard", label: "Dashboard", description: "Marketplace command center", icon: "dashboard", addLabel: "Add Lead" },
   { key: "leads", href: "/admin/leads", label: "Leads", description: "Pipeline, assignments, follow-ups", icon: "leads", addLabel: "Add Lead" },
@@ -75,6 +80,25 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "users", href: "/admin/users", label: "Admin Users", description: "Roles and access control", icon: "users", addLabel: "Add Admin" },
   { key: "settings", href: "/admin/settings", label: "Settings", description: "Global marketplace controls", icon: "settings", addLabel: "Save Settings" },
   { key: "audit-logs", href: "/admin/audit-logs", label: "Audit Logs", description: "Sensitive action history", icon: "audit", addLabel: "Export Logs" },
+];
+
+export const adminNavGroups: AdminNavGroup[] = [
+  {
+    title: "Command Center",
+    sections: ["dashboard", "crm", "leads", "vendors"],
+  },
+  {
+    title: "Business Setup",
+    sections: ["packages", "categories", "cities", "payments", "lead-distribution", "vendor-subscriptions"],
+  },
+  {
+    title: "Automation",
+    sections: ["analytics", "aos", "ai-agents", "automations", "reports"],
+  },
+  {
+    title: "System",
+    sections: ["website-content", "reviews", "notifications", "users", "settings", "audit-logs"],
+  },
 ];
 
 export function getAdminSectionByKey(key: AdminSectionKey) {

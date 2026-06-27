@@ -11,6 +11,8 @@ import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
 import * as admin from "../services/adminService";
+import * as aos from "../services/aosService";
+import type { AosDecisionLogInput } from "../services/aosService";
 import type {
   CreateLeadInput, VendorRegistrationInput, VendorLeadStatus,
 } from "../lib/types";
@@ -220,6 +222,9 @@ async function asAdmin<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
 
 export const adminStats           = async () => asAdmin(() => admin.getAdminDashboardStats());
 export const adminSnapshot        = async () => asAdmin(() => admin.getSuperadminSnapshot());
+// Safe AOS audit logging. Writes to aos_agent_logs if present; otherwise returns
+// a safe fallback. No AI, WhatsApp, credit, or distribution side effects.
+export const adminLogAosDecision  = async (input: AosDecisionLogInput) => asAdmin(() => aos.logAosAgentDecision(input));
 export const adminAllLeads        = async () => asAdmin(() => admin.getAllLeads());
 export const adminUpdateLeadStatus = async (leadId: string, status: string) => asAdmin(() => admin.updateLeadStatus(leadId, status));
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());

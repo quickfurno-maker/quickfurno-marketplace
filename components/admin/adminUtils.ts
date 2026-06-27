@@ -19,6 +19,27 @@ export function shortId(value?: string | null) {
   return value ? value.slice(0, 8).toUpperCase() : "N/A";
 }
 
+// Mask a phone number for list/table/card views. Never expose the full number.
+// Keeps the first 2 and last 2 digits, masks the middle. e.g. 98xxxxxx53
+export function maskPhone(value?: string | null) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return "No phone";
+  if (digits.length <= 4) return "x".repeat(digits.length);
+  const first = digits.slice(0, 2);
+  const last = digits.slice(-2);
+  const middle = "x".repeat(Math.max(4, digits.length - 4));
+  return `${first}${middle}${last}`;
+}
+
+// Mask an email for list/table views, keeping only the first character and domain.
+export function maskEmail(value?: string | null) {
+  const email = String(value ?? "").trim();
+  if (!email || !email.includes("@")) return "No email";
+  const [name, domain] = email.split("@");
+  const head = name.slice(0, 1);
+  return `${head}${"x".repeat(Math.max(3, name.length - 1))}@${domain}`;
+}
+
 export function groupBy<T>(rows: T[], mapper: (row: T) => unknown) {
   const counts = new Map<string, number>();
   rows.forEach((row) => {

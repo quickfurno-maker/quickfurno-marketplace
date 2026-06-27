@@ -44,6 +44,9 @@ import {
   uniqueOptions,
   vendorName,
 } from "./adminUtils";
+import { AOSControlCenter } from "./AOSControlCenter";
+import { CRMDashboard } from "./CRMDashboard";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const packageTemplates = [
@@ -120,7 +123,7 @@ export function AdminSectionPage({ section, snapshot, error }: { section: AdminS
         </div>
       ) : null}
 
-      {renderSection(section, data, { notify, ask, runAction, isPending })}
+      {renderSection(section, data, { notify, ask, runAction, isPending, error: error ?? null })}
 
       {toast ? <Toast message={toast.message} tone={toast.tone} /> : null}
       {confirm ? (
@@ -148,6 +151,7 @@ function renderSection(
     ask: (title: string, message: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
     runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
     isPending: boolean;
+    error: string | null;
   }
 ) {
   switch (section) {
@@ -169,6 +173,12 @@ function renderSection(
       return <SubscriptionsPage data={data} {...helpers} />;
     case "reports":
       return <ReportsPage data={data} />;
+    case "aos":
+      return <AOSControlCenter notify={helpers.notify} data={data} />;
+    case "crm":
+      return <CRMDashboard data={data} notify={helpers.notify} error={helpers.error} />;
+    case "analytics":
+      return <AnalyticsDashboard data={data} />;
     case "ai-agents":
       return <AIAgentsPage />;
     case "automations":

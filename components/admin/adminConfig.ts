@@ -9,6 +9,9 @@ export type AdminSectionKey =
   | "lead-distribution"
   | "vendor-subscriptions"
   | "reports"
+  | "aos"
+  | "crm"
+  | "analytics"
   | "ai-agents"
   | "automations"
   | "website-content"
@@ -29,6 +32,9 @@ export type AdminIconName =
   | "distribution"
   | "subscriptions"
   | "reports"
+  | "aos"
+  | "crm"
+  | "analytics"
   | "ai"
   | "automations"
   | "content"
@@ -58,6 +64,9 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "lead-distribution", href: "/admin/lead-distribution", label: "Lead Distribution", description: "Rules, logs, eligibility", icon: "distribution", addLabel: "Assign Leads" },
   { key: "vendor-subscriptions", href: "/admin/vendor-subscriptions", label: "Vendor Subscriptions", description: "Credits, expiry, renewals", icon: "subscriptions", addLabel: "Renew Package" },
   { key: "reports", href: "/admin/reports", label: "Reports", description: "Exports and business views", icon: "reports", addLabel: "Export Report" },
+  { key: "aos", href: "/admin/aos", label: "AOS Control Center", description: "Agents, versions, tests, approvals", icon: "aos", addLabel: "Create Draft" },
+  { key: "crm", href: "/admin/crm", label: "CRM", description: "Pipeline, follow-ups, nurture, calendar", icon: "crm", addLabel: "Add Lead" },
+  { key: "analytics", href: "/admin/analytics", label: "Analytics", description: "Sources, funnel, services, revenue", icon: "analytics", addLabel: "Export Analytics" },
   { key: "ai-agents", href: "/admin/ai-agents", label: "AI Agents", description: "Future AI control center", icon: "ai", addLabel: "Create Agent" },
   { key: "automations", href: "/admin/automations", label: "Automations", description: "Webhooks and workflows", icon: "automations", addLabel: "Create Automation" },
   { key: "website-content", href: "/admin/website-content", label: "Website Content", description: "CMS-ready content blocks", icon: "content", addLabel: "Save Content" },

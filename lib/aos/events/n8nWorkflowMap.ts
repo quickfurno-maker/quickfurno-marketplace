@@ -3,6 +3,7 @@ import type { QuickFurnoN8nEventType } from "./n8nEventTypes";
 export const QUICKFURNO_N8N_WORKFLOW_MAP: Record<QuickFurnoN8nEventType, string> = {
   "lead.created": "QF-n8n-New-Lead-Intake",
   "lead.qualified": "QF-n8n-Client-Confirmation",
+  "lead.assignment_preview": "QF-n8n-Event-Router",
   "lead.assignment_approved": "QF-n8n-Vendor-Lead-Alert",
   "lead.assigned": "QF-n8n-Client-Followup-Timer",
   "vendor.replied": "QF-n8n-Vendor-Response",

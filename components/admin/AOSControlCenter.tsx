@@ -58,6 +58,7 @@ const tabs = [
 
 const foundationSlugs = new Set(["nexus-kernel", "furno-memory", "lead-lens", "trust-shield", "match-forge", "lead-flow", "ops-brief"]);
 const pausedSlugs = new Set(["whatsapp-pilot"]);
+const safeAgentTestEvents = ["lead.created", "lead.qualified", "lead.assignment_preview", "aos.failure"];
 
 const agents: AOSAgent[] = AOS_AGENT_REGISTRY.map((entry) => {
   const status: AOSDisplayStatus = foundationSlugs.has(entry.slug)
@@ -207,6 +208,7 @@ export function AOSControlCenter({ notify }: AOSControlCenterProps) {
       </section>
 
       <N8nFoundationStatusCard />
+      <SafeAgentTestCard />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Agents Registered" value={agents.length} helper={`${stats.foundation} foundation/testing`} icon="aos" tone="indigo" />
@@ -260,6 +262,36 @@ function N8nFoundationStatusCard() {
         <MiniMetric label="auto assignment" value={String(AUTO_ASSIGNMENT_ENABLED)} />
         <MiniMetric label="credit deduction" value={String(CREDIT_DEDUCTION_ENABLED)} />
         <MiniMetric label="mode" value="development mock" />
+      </div>
+    </section>
+  );
+}
+
+function SafeAgentTestCard() {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950">Safe Agent Test</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            Display-only reference for the `/api/aos/events` preview route. The route runs TrustShield,
+            LeadLens, MatchForge, LeadFlow, and OpsBrief placeholders with all side effects disabled.
+          </p>
+        </div>
+        <StatusBadge value="safe preview" tone="emerald" />
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {safeAgentTestEvents.map((event) => (
+          <MiniMetric key={event} label="supported test event" value={event} />
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <MiniMetric label="WhatsApp" value="false" />
+        <MiniMetric label="credits" value="false" />
+        <MiniMetric label="auto assign" value="false" />
+        <MiniMetric label="database write" value="false" />
+        <MiniMetric label="provider call" value="false" />
+        <MiniMetric label="n8n call" value="env-gated" />
       </div>
     </section>
   );

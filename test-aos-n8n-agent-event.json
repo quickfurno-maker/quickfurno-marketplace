@@ -1,0 +1,12 @@
+{
+  "event": "lead.created",
+  "lead_id": "TEST-AOS-N8N-001",
+  "source": "quickfurno-agent-test",
+  "lead": {
+    "name": "Test Client",
+    "phone": "9999999999",
+    "city": "Pune",
+    "category": "Full Home Interior",
+    "budget": "5-10 lakh"
+  }
+}

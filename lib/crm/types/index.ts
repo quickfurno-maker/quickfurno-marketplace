@@ -47,6 +47,40 @@ export type CRMNurtureReason =
   | "future_project"
   | "other";
 
+export const crmLeadStatuses: CRMLeadStatus[] = [
+  "new",
+  "qualified",
+  "spam_review",
+  "vendor_matching",
+  "assigned",
+  "vendor_contact_pending",
+  "client_contacted",
+  "site_visit_scheduled",
+  "quotation_sent",
+  "won",
+  "lost",
+  "nurture_later",
+  "invalid",
+  "duplicate",
+];
+
+export const crmLeadPriorities: CRMLeadPriority[] = ["hot", "warm", "cold", "weak", "spam"];
+
+export const crmNurtureStages: CRMNurtureStage[] = [
+  "nurture_3_days",
+  "nurture_7_days",
+  "nurture_15_days",
+  "nurture_30_days",
+  "nurture_60_days",
+  "nurture_90_days",
+  "nurture_6_months",
+  "nurture_1_year",
+  "custom_nurture_date",
+  "future_project",
+  "not_ready_now",
+  "reopen_later",
+];
+
 // Lead source / marketing attribution fields prepared for future capture.
 export interface LeadAttribution {
   source?: string | null;
@@ -87,6 +121,7 @@ export interface CRMLead {
   phone_masked: string;
   email_masked?: string | null;
   service?: string | null;
+  category?: string | null;
   subcategory?: string | null;
   city?: string | null;
   area?: string | null;
@@ -115,14 +150,18 @@ export interface CRMLead {
 
 export type CRMActivityType =
   | "lead_created"
+  | "lead_qualified"
   | "status_change"
   | "note_added"
   | "task_created"
   | "call_logged"
   | "whatsapp_logged"
+  | "vendor_matched"
   | "vendor_assigned"
+  | "client_contacted"
   | "nurture_scheduled"
-  | "follow_up_scheduled";
+  | "follow_up_scheduled"
+  | "nurture_moved";
 
 export interface CRMActivity {
   id: string;
@@ -176,6 +215,16 @@ export type CRMCalendarEventType =
   | "nurture_followup"
   | "complaint_followup"
   | "renewal_followup";
+
+export const crmCalendarEventTypes: CRMCalendarEventType[] = [
+  "client_call",
+  "vendor_call",
+  "site_visit",
+  "quotation_followup",
+  "nurture_followup",
+  "complaint_followup",
+  "renewal_followup",
+];
 
 export type CRMCalendarEventStatus = "scheduled" | "due" | "overdue" | "done" | "cancelled";
 

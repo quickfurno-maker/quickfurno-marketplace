@@ -20,10 +20,11 @@ export interface CampaignMetric {
   campaign: string;
   source: string;
   leads: number;
-  hot_leads: number;
-  won_leads: number;
+  hot_leads?: number;
+  won_leads?: number;
   spend_placeholder?: string | null;
   cpl_placeholder?: string | null;
+  conversion_placeholder?: string | null;
   quality_score_placeholder?: string | null;
 }
 
@@ -44,11 +45,14 @@ export interface ServiceMetric {
 }
 
 export interface AreaMetric {
-  area: string;
-  city?: string | null;
+  city: string;
+  locality: string;
+  area?: string | null;
   leads: number;
+  lead_count?: number;
   hot_leads: number;
-  active_vendors: number;
+  active_vendors?: number;
+  vendor_count: number;
   assigned_leads: number;
   unassigned_leads: number;
   demand_supply_gap?: string | null;
@@ -56,6 +60,10 @@ export interface AreaMetric {
 
 export interface VendorMetric {
   vendor: string;
+  assigned_leads: number;
+  response_rate_placeholder?: string | null;
+  package?: string | null;
+  lead_balance_placeholder?: string | null;
   category?: string | null;
   city?: string | null;
   leads_received: number;
@@ -101,4 +109,18 @@ export interface AgentAnalyticsRow {
   error_count: number | string;
   avg_confidence: string;
   last_run: string;
+}
+
+export interface AnalyticsModel {
+  cards: AnalyticsMetric[];
+  sources: SourceMetric[];
+  campaigns: CampaignMetric[];
+  funnel: FunnelMetric[];
+  services: ServiceMetric[];
+  areas: AreaMetric[];
+  vendors: VendorMetric[];
+  revenue: RevenueMetric[];
+  agents: AgentAnalyticsRow[];
+  followUps: AnalyticsMetric[];
+  opsBrief: unknown;
 }

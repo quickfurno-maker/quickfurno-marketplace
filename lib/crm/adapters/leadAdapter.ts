@@ -121,6 +121,7 @@ export function crmLeadAdapter(lead: Lead, phoneFrequency?: Map<string, number>)
     phone_masked: maskPhone(lead.phone),
     email_masked: maskEmail(lead.email),
     service: lead.service_required || lead.category || "Not set",
+    category: lead.category || lead.service_required || "Not set",
     subcategory: lead.subcategory || "Not set",
     city,
     area,

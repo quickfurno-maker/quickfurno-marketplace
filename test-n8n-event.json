@@ -1,5 +1,5 @@
 ﻿{
-  "eventType": "lead.created",
-  "lead_id": "TEST-001",
+  "event": "lead.created",
+  "lead_id": "TEST-N8N-001",
   "source": "manual-test"
 }

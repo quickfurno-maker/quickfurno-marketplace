@@ -14,6 +14,13 @@ import { maskPhoneNumber } from "./whatsappTool";
 
 const N8N_SECRET_HEADER = "x-qf-n8n-secret";
 const N8N_SECRET_ENV_KEY = "QF_N8N_WEBHOOK_SECRET";
+const N8N_WEBHOOK_URL_ENV_KEY = "N8N_WEBHOOK_URL";
+const N8N_WEBHOOK_TIMEOUT_MS = 8_000;
+
+interface SanitizedN8nWebhookUrl {
+  ok: boolean;
+  url?: string;
+}
 
 export interface N8nSecretValidationResult {
   ok: boolean;
@@ -105,13 +112,63 @@ export async function sendEventToN8n(
     return skippedN8nResult(payload, "n8n is disabled. No webhook was called.");
   }
 
-  if (!N8N_OUTBOUND_WEBHOOK_ENABLED) {
+  if (!isN8nOutboundWebhookEnabled()) {
     return skippedN8nResult(payload, "n8n outbound webhook is disabled. No webhook was called.");
   }
 
-  // TODO(qf-n8n-outbound): add reviewed fetch call to a server-side n8n webhook
-  // after QF_N8N_WEBHOOK_SECRET, retry policy, and failure logging are ready.
-  return skippedN8nResult(payload, "n8n outbound integration is not connected in this foundation phase.");
+  const webhookUrl = getSanitizedN8nWebhookUrl();
+  if (!webhookUrl.ok || !webhookUrl.url) {
+    return createSafeN8nWebhookFailureResult(payload);
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), N8N_WEBHOOK_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(webhookUrl.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        // n8n test webhooks can expire or return 404/422 while a workflow is not listening.
+        return createSafeN8nWebhookFailureResult(payload);
+      }
+
+      return {
+        ok: true,
+        status: "accepted",
+        eventType: payload.eventType,
+        workflowName: payload.workflowName,
+        message: "n8n webhook accepted the event. WhatsApp, credits, assignment, and database writes remain disabled.",
+        mockMode: false,
+        sideEffects: {
+          ...createSafeSideEffectReport(),
+          n8nWebhookCalled: true,
+        },
+        details: {
+          httpStatus: response.status,
+          outboundWebhookEnabled: true,
+          databasePersisted: false,
+          whatsappSent: false,
+          providerCalled: false,
+          creditsDeducted: false,
+          leadAutoAssigned: false,
+        },
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch {
+    // n8n unavailable, timed out, malformed, or offline must never break QuickFurno.
+    return createSafeN8nWebhookFailureResult(payload);
+  }
 }
 
 export function logN8nFailure(error: unknown): QuickFurnoN8nEventResult {
@@ -139,7 +196,36 @@ export function logN8nFailure(error: unknown): QuickFurnoN8nEventResult {
 }
 
 export function isN8nEnabled(): boolean {
-  return N8N_ENABLED;
+  return N8N_ENABLED || isEnvFlagEnabled("N8N_ENABLED");
+}
+
+export function isN8nOutboundWebhookEnabled(): boolean {
+  return N8N_OUTBOUND_WEBHOOK_ENABLED || isEnvFlagEnabled("N8N_OUTBOUND_WEBHOOK_ENABLED");
+}
+
+export function createSafeN8nWebhookFailureResult(
+  event: QuickFurnoN8nEventPayload | Record<string, unknown>,
+): QuickFurnoN8nEventResult {
+  const payload = buildN8nEventPayload(event);
+
+  return {
+    ok: true,
+    status: "mocked",
+    eventType: payload.eventType,
+    workflowName: payload.workflowName,
+    message: "n8n webhook call failed safely. No side effects executed.",
+    mockMode: true,
+    // WhatsApp, provider calls, credit deduction, and lead assignment remain disabled here.
+    sideEffects: createSafeSideEffectReport(),
+    details: {
+      databasePersisted: false,
+      outboundWebhookEnabled: isN8nOutboundWebhookEnabled(),
+      security: {
+        mode: "safe_fallback",
+        message: "n8n error handled safely.",
+      },
+    },
+  };
 }
 
 export function maskSensitiveFields(value: unknown, depth = 0): Record<string, unknown> {
@@ -172,10 +258,44 @@ function skippedN8nResult(payload: QuickFurnoN8nEventPayload, message: string): 
     sideEffects: createSafeSideEffectReport(),
     details: {
       payload,
-      outboundWebhookEnabled: N8N_OUTBOUND_WEBHOOK_ENABLED,
+      outboundWebhookEnabled: isN8nOutboundWebhookEnabled(),
       databasePersisted: false,
     },
   };
+}
+
+function getSanitizedN8nWebhookUrl(): SanitizedN8nWebhookUrl {
+  const rawValue = process.env[N8N_WEBHOOK_URL_ENV_KEY];
+  if (!rawValue) return { ok: false };
+
+  const value = removeSurroundingQuotes(rawValue.trim());
+  if (!value) return { ok: false };
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false };
+    return { ok: true, url: url.toString() };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function removeSurroundingQuotes(value: string): string {
+  let nextValue = value.trim();
+
+  while (nextValue.length >= 2) {
+    const first = nextValue[0];
+    const last = nextValue[nextValue.length - 1];
+    if (!first || first !== last || !["\"", "'"].includes(first)) break;
+    nextValue = nextValue.slice(1, -1).trim();
+  }
+
+  return nextValue;
+}
+
+function isEnvFlagEnabled(key: string): boolean {
+  const value = process.env[key];
+  return typeof value === "string" && ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 function maskSensitiveValue(key: string, value: unknown, depth: number): unknown {

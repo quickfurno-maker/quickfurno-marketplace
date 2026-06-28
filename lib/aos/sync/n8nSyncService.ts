@@ -1,8 +1,6 @@
 import {
   AUTO_ASSIGNMENT_ENABLED,
   CREDIT_DEDUCTION_ENABLED,
-  N8N_ENABLED,
-  N8N_OUTBOUND_WEBHOOK_ENABLED,
   WHATSAPP_SENDING_ENABLED,
   AOS_RULE_BASED_FALLBACK_ENABLED,
 } from "@/lib/aos/config/featureFlags";
@@ -21,6 +19,9 @@ import {
 } from "@/lib/aos/events/n8nWorkflowMap";
 import {
   buildN8nEventPayload,
+  createSafeN8nWebhookFailureResult,
+  isN8nEnabled,
+  isN8nOutboundWebhookEnabled,
   logN8nFailure,
   maskSensitiveFields,
   maskSensitiveText,
@@ -34,40 +35,45 @@ import {
 } from "@/lib/aos/tools/whatsappTool";
 
 export type QuickFurnoN8nApiStatus = "accepted" | "mocked" | "blocked";
+export type QuickFurnoN8nApiSecurityMode = N8nSecretValidationResult["mode"] | "safe_fallback";
 
 export interface QuickFurnoN8nApiResponse {
   ok: boolean;
   status: QuickFurnoN8nApiStatus;
   eventType: string;
   workflowName: string;
-  mockMode: true;
+  message: string;
+  mockMode: boolean;
   sideEffects: ReturnType<typeof createSafeSideEffectReport>;
   security: {
-    mode: N8nSecretValidationResult["mode"];
+    mode: QuickFurnoN8nApiSecurityMode;
     message: string;
   };
 }
 
 export function formatN8nApiResponse(
   result: QuickFurnoN8nEventResult,
-  security: Pick<N8nSecretValidationResult, "mode" | "message">,
+  security: { mode: QuickFurnoN8nApiSecurityMode; message: string },
 ): QuickFurnoN8nApiResponse {
+  const responseSecurity = getSecurityOverride(result) ?? security;
+
   return {
     ok: result.ok,
     status: normalizeApiStatus(result.status),
     eventType: result.eventType ?? "unknown",
     workflowName: result.workflowName ?? "unknown",
-    mockMode: true,
+    message: result.message,
+    mockMode: result.mockMode,
     sideEffects: result.sideEffects,
     security: {
-      mode: security.mode,
-      message: security.message,
+      mode: responseSecurity.mode,
+      message: responseSecurity.message,
     },
   };
 }
 
 export function formatN8nBlockedApiResponse(
-  security: Pick<N8nSecretValidationResult, "mode" | "message">,
+  security: { mode: QuickFurnoN8nApiSecurityMode; message: string },
   eventType = "unknown",
   workflowName = "unknown",
 ): QuickFurnoN8nApiResponse {
@@ -76,6 +82,7 @@ export function formatN8nBlockedApiResponse(
     status: "blocked",
     eventType,
     workflowName,
+    message: "n8n request blocked safely. No side effects executed.",
     mockMode: true,
     sideEffects: createSafeSideEffectReport(),
     security: {
@@ -161,7 +168,13 @@ export async function handleWhatsAppStatusUpdate(payload: unknown): Promise<Quic
 }
 
 export async function queueEventForN8n(payload: QuickFurnoN8nEventPayload | Record<string, unknown>): Promise<QuickFurnoN8nEventResult> {
-  const result = await sendEventToN8n(payload);
+  let result: QuickFurnoN8nEventResult;
+
+  try {
+    result = await sendEventToN8n(payload);
+  } catch {
+    result = createSafeN8nWebhookFailureResult(payload);
+  }
 
   return {
     ...result,
@@ -180,8 +193,8 @@ export function getN8nWorkflowMap(): Record<string, string> {
 export function getN8nFoundationStatus() {
   return {
     status: "foundation",
-    n8nEnabled: N8N_ENABLED,
-    n8nOutboundWebhookEnabled: N8N_OUTBOUND_WEBHOOK_ENABLED,
+    n8nEnabled: isN8nEnabled(),
+    n8nOutboundWebhookEnabled: isN8nOutboundWebhookEnabled(),
     whatsappSendingEnabled: WHATSAPP_SENDING_ENABLED,
     autoAssignmentEnabled: AUTO_ASSIGNMENT_ENABLED,
     creditDeductionEnabled: CREDIT_DEDUCTION_ENABLED,
@@ -274,6 +287,14 @@ function blockedResult(message: string): QuickFurnoN8nEventResult {
 function normalizeApiStatus(status: QuickFurnoN8nEventResult["status"]): QuickFurnoN8nApiStatus {
   if (status === "accepted" || status === "blocked" || status === "mocked") return status;
   return "mocked";
+}
+
+function getSecurityOverride(result: QuickFurnoN8nEventResult): { mode: "safe_fallback"; message: string } | null {
+  const details = asRecord(result.details);
+  const security = asRecord(details.security);
+  return security.mode === "safe_fallback" && typeof security.message === "string"
+    ? { mode: "safe_fallback", message: security.message }
+    : null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

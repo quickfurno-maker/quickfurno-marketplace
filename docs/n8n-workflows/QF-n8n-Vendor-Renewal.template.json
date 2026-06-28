@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Vendor-Renewal",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "vendor.low_credit",
+  "description": "Future workflow for vendor low-credit renewal reminders.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive low-credit vendor event",
+    "Check paid and active status",
+    "Prepare approved renewal reminder",
+    "Log future renewal workflow state"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

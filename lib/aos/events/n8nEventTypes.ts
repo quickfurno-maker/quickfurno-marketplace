@@ -27,7 +27,8 @@ export interface QuickFurnoSafeSideEffectReport {
 export interface QuickFurnoN8nEventPayload {
   id?: string;
   eventId?: string;
-  type: QuickFurnoN8nEventType;
+  eventType: QuickFurnoN8nEventType;
+  type?: QuickFurnoN8nEventType;
   source?: string;
   leadId?: string | null;
   vendorId?: string | null;

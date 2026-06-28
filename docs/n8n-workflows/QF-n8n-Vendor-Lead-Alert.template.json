@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Vendor-Lead-Alert",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "lead.assignment_approved",
+  "description": "Future workflow to alert vendors only after AOS/admin approval for an assignment.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive approved assignment payload",
+    "Confirm credit and assignment flags are enabled",
+    "Prepare vendor alert template",
+    "Record future notification state"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

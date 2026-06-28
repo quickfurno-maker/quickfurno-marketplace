@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Complaint-Escalation",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "complaint.created",
+  "description": "Future workflow to escalate new complaints to reviewed admin channels.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive complaint event",
+    "Classify urgency from AOS",
+    "Prepare admin escalation task",
+    "Schedule follow-up if unresolved"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

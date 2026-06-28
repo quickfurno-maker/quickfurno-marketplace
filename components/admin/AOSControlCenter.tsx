@@ -13,6 +13,13 @@ import {
 } from "./AdminPrimitives";
 import type { Snapshot } from "./adminTypes";
 import { AOS_AGENT_REGISTRY } from "@/lib/aos/agents/agentRegistry";
+import {
+  AUTO_ASSIGNMENT_ENABLED,
+  CREDIT_DEDUCTION_ENABLED,
+  N8N_ENABLED,
+  N8N_OUTBOUND_WEBHOOK_ENABLED,
+  WHATSAPP_SENDING_ENABLED,
+} from "@/lib/aos/config/featureFlags";
 import type {
   AOSAgent,
   AOSAgentLog,
@@ -199,6 +206,8 @@ export function AOSControlCenter({ notify }: AOSControlCenterProps) {
         No real AI calls, WhatsApp sends, n8n calls, lead distribution, database edits, or credit deductions are connected here.
       </section>
 
+      <N8nFoundationStatusCard />
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Agents Registered" value={agents.length} helper={`${stats.foundation} foundation/testing`} icon="aos" tone="indigo" />
         <StatCard label="Inactive/Future" value={stats.inactive} helper="No side effects enabled" icon="settings" tone="slate" />
@@ -231,6 +240,28 @@ export function AOSControlCenter({ notify }: AOSControlCenterProps) {
       {active === "Security Permissions" ? <SecurityPermissions /> : null}
       {active === "Rollback Center" ? <RollbackCenter /> : null}
     </div>
+  );
+}
+
+function N8nFoundationStatusCard() {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950">n8n Foundation Status</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">Safe placeholder only. No webhook, WhatsApp, credits, or assignment path is active.</p>
+        </div>
+        <StatusBadge value="development mock" tone="slate" />
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <MiniMetric label="n8n enabled" value={String(N8N_ENABLED)} />
+        <MiniMetric label="outbound webhook" value={String(N8N_OUTBOUND_WEBHOOK_ENABLED)} />
+        <MiniMetric label="WhatsApp sending" value={String(WHATSAPP_SENDING_ENABLED)} />
+        <MiniMetric label="auto assignment" value={String(AUTO_ASSIGNMENT_ENABLED)} />
+        <MiniMetric label="credit deduction" value={String(CREDIT_DEDUCTION_ENABLED)} />
+        <MiniMetric label="mode" value="development mock" />
+      </div>
+    </section>
   );
 }
 

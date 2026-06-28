@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Event-Router",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "router",
+  "description": "Future router workflow that branches by QuickFurno eventType and forwards to specific disabled workflow shells.",
+  "futureTrigger": {
+    "type": "webhook",
+    "path": "not-configured"
+  },
+  "futureSteps": [
+    "Validate x-qf-n8n-secret",
+    "Read eventType",
+    "Route to matching workflow",
+    "Return safe acknowledgement"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

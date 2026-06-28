@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Vendor-Response",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "vendor.replied",
+  "description": "Future workflow for processing vendor replies and sending status back to AOS/CRM.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive vendor reply event",
+    "Normalize reply status",
+    "Notify CRM workflow state later",
+    "Schedule client follow-up if approved"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

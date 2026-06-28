@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Nurture-Followup",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "nurture.due",
+  "description": "Future workflow for dormant lead nurture follow-ups.",
+  "futureTrigger": {
+    "type": "timer_or_segment",
+    "source": "CRM nurture state"
+  },
+  "futureSteps": [
+    "Receive nurture due event",
+    "Check opt-in and lead state",
+    "Prepare approved nurture template",
+    "Return workflow result to AOS"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

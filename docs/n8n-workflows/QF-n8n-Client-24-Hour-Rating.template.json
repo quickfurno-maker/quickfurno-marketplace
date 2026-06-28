@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Client-24-Hour-Rating",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "client.rating_due",
+  "description": "Future delayed workflow to request client rating after completion or follow-up state.",
+  "futureTrigger": {
+    "type": "timer",
+    "delay": "24 hours after completion signal"
+  },
+  "futureSteps": [
+    "Wait for rating due time",
+    "Check CRM completion status",
+    "Prepare approved rating request template",
+    "Record status update later"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

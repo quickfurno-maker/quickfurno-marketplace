@@ -77,14 +77,14 @@ export function validateN8nSecret(request: Request): N8nSecretValidationResult {
 
 export function buildN8nEventPayload(event: QuickFurnoN8nEventPayload | Record<string, unknown>): QuickFurnoN8nEventPayload {
   const record = isRecord(event) ? event : {};
-  const rawType = record.type ?? record.eventType;
+  const rawType = getEventTypeAlias(record);
   const type: QuickFurnoN8nEventType = isQuickFurnoN8nEventType(rawType) ? rawType : "aos.failure";
   const eventId = firstString(record.eventId, record.id) ?? createEventId();
 
   return {
     id: eventId,
     eventId,
-    type,
+    eventType: type,
     source: firstString(record.source) ?? "aos",
     leadId: firstString(record.leadId, record.lead_id),
     vendorId: firstString(record.vendorId, record.vendor_id),
@@ -164,8 +164,8 @@ export function maskSensitiveText(value: string): string {
 function skippedN8nResult(payload: QuickFurnoN8nEventPayload, message: string): QuickFurnoN8nEventResult {
   return {
     ok: true,
-    status: "skipped",
-    eventType: payload.type,
+    status: "mocked",
+    eventType: payload.eventType,
     workflowName: payload.workflowName,
     message,
     mockMode: true,
@@ -211,6 +211,10 @@ function firstString(...values: unknown[]): string | null {
     if (typeof value === "string" && value.trim().length > 0) return value.trim();
   }
   return null;
+}
+
+function getEventTypeAlias(record: Record<string, unknown>): unknown {
+  return record.eventType ?? record.event_type ?? record.event ?? record.type;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

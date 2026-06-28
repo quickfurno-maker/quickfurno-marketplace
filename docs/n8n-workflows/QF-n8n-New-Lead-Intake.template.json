@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-New-Lead-Intake",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "lead.created",
+  "description": "Future workflow for new lead intake after AOS receives a lead.created event.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive masked lead summary",
+    "Wait for AOS qualification state",
+    "Prepare client confirmation task",
+    "Log future workflow state"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

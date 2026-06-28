@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Failure-Handler",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "aos.failure",
+  "description": "Future workflow to collect failures without exposing stack traces, secrets, or full phone numbers.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive masked failure payload",
+    "Classify retryable or blocked",
+    "Notify admin failure center later",
+    "Record dead-letter state after schema review"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

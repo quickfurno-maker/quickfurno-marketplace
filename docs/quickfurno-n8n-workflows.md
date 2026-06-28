@@ -83,9 +83,67 @@ All endpoints are placeholders and return safe JSON.
 | `POST /api/aos/failure` | Accept a failure payload | None |
 | `POST /api/aos/whatsapp-status` | Accept a WhatsApp status payload | None |
 
-Payloads should include `type` or `eventType`, plus optional `leadId`,
-`vendorId`, `clientId`, `data`, and `metadata`. Phone and secret-like fields are
-masked before being returned in responses or logs.
+`POST /api/aos/events` accepts event aliases from `event`, `eventType`,
+`event_type`, or `type`, then normalizes internally to `eventType`. Payloads may
+also include optional `leadId`, `vendorId`, `clientId`, `data`, and `metadata`.
+Phone and secret-like fields are masked before being returned in responses or
+logs.
+
+### Local Mock Tests
+
+Run the app locally first:
+
+```powershell
+npm run dev
+```
+
+Lead created event:
+
+```powershell
+$body = @{
+  event = "lead.created"
+  leadId = "lead_mock_001"
+  source = "local-test"
+  data = @{
+    clientName = "Test Client"
+    phone = "9876543210"
+    service = "Modular kitchen"
+    city = "Pune"
+  }
+} | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/aos/events" -Method POST -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 8
+```
+
+AOS failure event:
+
+```powershell
+$body = @{
+  eventType = "aos.failure"
+  failureId = "failure_mock_001"
+  workflowName = "QF-n8n-Failure-Handler"
+  agentKey = "lead-flow"
+  taskType = "local_mock_failure"
+  errorMessage = "Mock failure for local testing. phone=9876543210 token=fake-token"
+} | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/aos/failure" -Method POST -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 8
+```
+
+WhatsApp status update:
+
+```powershell
+$body = @{
+  event_type = "whatsapp.status_updated"
+  messageId = "wamid.mock-001"
+  provider = "whatsapp_cloud_api_future"
+  status = "delivered"
+  phone = "9876543210"
+  leadId = "lead_mock_001"
+} | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/aos/whatsapp-status" -Method POST -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 8
+```
 
 ## 6. Security Rules
 

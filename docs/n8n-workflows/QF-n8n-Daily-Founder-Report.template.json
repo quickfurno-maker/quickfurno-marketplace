@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Daily-Founder-Report",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "report.daily",
+  "description": "Future scheduled workflow for daily founder summary after AOS/CRM aggregation.",
+  "futureTrigger": {
+    "type": "schedule",
+    "cron": "not-configured"
+  },
+  "futureSteps": [
+    "Request approved aggregate report",
+    "Exclude client phone numbers and secrets",
+    "Prepare founder summary",
+    "Deliver only after messaging channel is reviewed"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

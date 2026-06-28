@@ -25,12 +25,65 @@ import {
   maskSensitiveFields,
   maskSensitiveText,
   sendEventToN8n,
+  type N8nSecretValidationResult,
 } from "@/lib/aos/tools/n8nTool";
 import {
   maskPhoneNumber,
   prepareWhatsAppMessage,
   sendWhatsAppMessage,
 } from "@/lib/aos/tools/whatsappTool";
+
+export type QuickFurnoN8nApiStatus = "accepted" | "mocked" | "blocked";
+
+export interface QuickFurnoN8nApiResponse {
+  ok: boolean;
+  status: QuickFurnoN8nApiStatus;
+  eventType: string;
+  workflowName: string;
+  mockMode: true;
+  sideEffects: ReturnType<typeof createSafeSideEffectReport>;
+  security: {
+    mode: N8nSecretValidationResult["mode"];
+    message: string;
+  };
+}
+
+export function formatN8nApiResponse(
+  result: QuickFurnoN8nEventResult,
+  security: Pick<N8nSecretValidationResult, "mode" | "message">,
+): QuickFurnoN8nApiResponse {
+  return {
+    ok: result.ok,
+    status: normalizeApiStatus(result.status),
+    eventType: result.eventType ?? "unknown",
+    workflowName: result.workflowName ?? "unknown",
+    mockMode: true,
+    sideEffects: result.sideEffects,
+    security: {
+      mode: security.mode,
+      message: security.message,
+    },
+  };
+}
+
+export function formatN8nBlockedApiResponse(
+  security: Pick<N8nSecretValidationResult, "mode" | "message">,
+  eventType = "unknown",
+  workflowName = "unknown",
+): QuickFurnoN8nApiResponse {
+  return {
+    ok: false,
+    status: "blocked",
+    eventType,
+    workflowName,
+    mockMode: true,
+    sideEffects: createSafeSideEffectReport(),
+    security: {
+      mode: security.mode,
+      message: security.message,
+    },
+  };
+}
 
 export async function handleIncomingN8nEvent(payload: unknown): Promise<QuickFurnoN8nEventResult> {
   const normalized = normalizeN8nEventPayload(payload);
@@ -43,7 +96,7 @@ export async function handleIncomingN8nEvent(payload: unknown): Promise<QuickFur
   return {
     ok: true,
     status: "accepted",
-    eventType: event.type,
+    eventType: event.eventType,
     workflowName: event.workflowName,
     message: "Incoming n8n event accepted in safe mock mode. No side effects were executed.",
     mockMode: true,
@@ -148,11 +201,11 @@ export function getN8nFoundationStatus() {
 
 function normalizeN8nEventPayload(payload: unknown): QuickFurnoN8nEventPayload | null {
   const record = asRecord(payload);
-  const rawType = record.type ?? record.eventType;
+  const rawType = getEventTypeAlias(record);
   if (!isQuickFurnoN8nEventType(rawType)) return null;
 
   return {
-    type: rawType,
+    eventType: rawType,
     id: stringOrUndefined(record.id),
     eventId: stringOrUndefined(record.eventId),
     source: stringOrUndefined(record.source) ?? "n8n",
@@ -168,7 +221,7 @@ function normalizeN8nEventPayload(payload: unknown): QuickFurnoN8nEventPayload |
 
 function normalizeFailurePayload(payload: unknown): QuickFurnoAosFailurePayload {
   const record = asRecord(payload);
-  const rawEventType = record.eventType ?? record.type;
+  const rawEventType = getEventTypeAlias(record);
   const eventType = isQuickFurnoN8nEventType(rawEventType) ? rawEventType : "unknown";
 
   return {
@@ -218,8 +271,17 @@ function blockedResult(message: string): QuickFurnoN8nEventResult {
   };
 }
 
+function normalizeApiStatus(status: QuickFurnoN8nEventResult["status"]): QuickFurnoN8nApiStatus {
+  if (status === "accepted" || status === "blocked" || status === "mocked") return status;
+  return "mocked";
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function getEventTypeAlias(record: Record<string, unknown>): unknown {
+  return record.eventType ?? record.event_type ?? record.event ?? record.type;
 }
 
 function stringOrUndefined(value: unknown): string | undefined {

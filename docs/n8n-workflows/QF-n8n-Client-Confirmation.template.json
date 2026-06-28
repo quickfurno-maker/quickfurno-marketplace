@@ -1,0 +1,25 @@
+{
+  "name": "QF-n8n-Client-Confirmation",
+  "templateType": "documentation_only",
+  "enabled": false,
+  "connected": false,
+  "eventType": "lead.qualified",
+  "description": "Future workflow to prepare client confirmation after AOS qualifies a lead.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "futureSteps": [
+    "Receive qualified lead payload",
+    "Select approved client confirmation template",
+    "Queue WhatsApp send only when sending is enabled",
+    "Record delivery intent"
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

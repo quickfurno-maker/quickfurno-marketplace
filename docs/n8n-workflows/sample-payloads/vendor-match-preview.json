@@ -1,0 +1,24 @@
+{
+  "eventType": "vendor.match_preview",
+  "leadId": "lead_mock_003",
+  "source": "local-test",
+  "occurredAt": "2026-06-28T10:10:00.000Z",
+  "data": {
+    "agents": {
+      "matchForge": {
+        "status": "preview",
+        "matchedVendorLimit": 3,
+        "suggestedVendorCount": 0,
+        "notes": ["Vendor matching preview only. No assignment executed."]
+      },
+      "leadFlow": {
+        "status": "preview",
+        "assignmentStatus": "not_assigned"
+      }
+    }
+  },
+  "metadata": {
+    "mode": "safe_agent_preview",
+    "sideEffectsDisabled": true
+  }
+}

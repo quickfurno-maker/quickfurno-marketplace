@@ -13,6 +13,7 @@ import {
 } from "./AdminPrimitives";
 import type { Snapshot } from "./adminTypes";
 import { AOS_AGENT_REGISTRY } from "@/lib/aos/agents/agentRegistry";
+import { getPreviewWorkflowRoutes } from "@/lib/aos/events/n8nPreviewWorkflowMap";
 import {
   AUTO_ASSIGNMENT_ENABLED,
   CREDIT_DEDUCTION_ENABLED,
@@ -59,6 +60,7 @@ const tabs = [
 const foundationSlugs = new Set(["nexus-kernel", "furno-memory", "lead-lens", "trust-shield", "match-forge", "lead-flow", "ops-brief"]);
 const pausedSlugs = new Set(["whatsapp-pilot"]);
 const safeAgentTestEvents = ["lead.created", "lead.qualified", "lead.assignment_preview", "aos.failure"];
+const n8nWorkflowRoutes = getPreviewWorkflowRoutes();
 
 const agents: AOSAgent[] = AOS_AGENT_REGISTRY.map((entry) => {
   const status: AOSDisplayStatus = foundationSlugs.has(entry.slug)
@@ -209,6 +211,7 @@ export function AOSControlCenter({ notify }: AOSControlCenterProps) {
 
       <N8nFoundationStatusCard />
       <SafeAgentTestCard />
+      <N8nWorkflowRoutesCard />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Agents Registered" value={agents.length} helper={`${stats.foundation} foundation/testing`} icon="aos" tone="indigo" />
@@ -293,6 +296,33 @@ function SafeAgentTestCard() {
         <MiniMetric label="provider call" value="false" />
         <MiniMetric label="n8n call" value="env-gated" />
       </div>
+    </section>
+  );
+}
+
+function N8nWorkflowRoutesCard() {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950">n8n Workflow Routes</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            Display-only reference of the preview workflow router. No live trigger buttons exist here.
+            Routing is documented in `lib/aos/events/n8nPreviewWorkflowMap.ts` and the docs/n8n-workflows folder.
+          </p>
+        </div>
+        <StatusBadge value="template-ready" tone="slate" />
+      </div>
+      <DataTable
+        rows={n8nWorkflowRoutes}
+        emptyTitle="No routes"
+        emptyMessage="Preview workflow routes will appear here."
+        columns={[
+          { header: "event type", cell: (row) => row.eventType },
+          { header: "preview workflow", cell: (row) => <span className="block min-w-72">{row.workflowName}</span> },
+          { header: "status", cell: (row) => <StatusBadge value={row.status} tone={row.status === "template-ready" ? "emerald" : "slate"} /> },
+        ]}
+      />
     </section>
   );
 }

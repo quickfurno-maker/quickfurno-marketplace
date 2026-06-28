@@ -1,0 +1,47 @@
+{
+  "name": "QF-n8n-Vendor-Match-Preview",
+  "templateType": "manual_setup_template",
+  "enabled": false,
+  "connected": false,
+  "eventType": ["lead.assignment_preview", "vendor.match_preview"],
+  "description": "Preview workflow that shows a capped (max 3) vendor match list. Does not assign real vendors, deduct credits, or notify vendors.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "expectedInput": {
+    "eventType": "vendor.match_preview",
+    "leadId": "lead_mock_003",
+    "data": {
+      "agents": {
+        "matchForge": { "matchedVendorLimit": 3, "suggestedVendorCount": 0 },
+        "leadFlow": { "assignmentStatus": "not_assigned" }
+      }
+    }
+  },
+  "safePreviewOutput": {
+    "workflow": "QF-n8n-Vendor-Match-Preview",
+    "status": "preview",
+    "matchPreview": {
+      "matchedVendorLimit": 3,
+      "suggestedVendorCount": 0,
+      "candidates": [],
+      "assignmentStatus": "not_assigned"
+    }
+  },
+  "nodes": [
+    { "name": "Execute Workflow Trigger", "type": "trigger", "from": "QF-n8n-Event-Router" },
+    { "name": "Read MatchForge/LeadFlow", "type": "set" },
+    { "name": "Cap Candidates (max 3)", "type": "function" },
+    { "name": "No Assign / No Notify / No Credit", "type": "noop" },
+    { "name": "Respond Preview", "type": "respond" }
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "vendorNotified": false,
+    "databaseWritten": false
+  }
+}

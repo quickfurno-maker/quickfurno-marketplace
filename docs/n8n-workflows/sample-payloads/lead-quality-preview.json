@@ -1,0 +1,25 @@
+{
+  "eventType": "lead.quality_preview",
+  "leadId": "lead_mock_002",
+  "source": "local-test",
+  "occurredAt": "2026-06-28T10:05:00.000Z",
+  "data": {
+    "agents": {
+      "leadLens": {
+        "status": "preview",
+        "leadQuality": "warm",
+        "score": 70,
+        "reasons": ["Budget, city, service present", "No AI provider called"]
+      },
+      "trustShield": {
+        "status": "preview",
+        "spamRisk": "low",
+        "duplicateRisk": "unknown"
+      }
+    }
+  },
+  "metadata": {
+    "mode": "safe_agent_preview",
+    "sideEffectsDisabled": true
+  }
+}

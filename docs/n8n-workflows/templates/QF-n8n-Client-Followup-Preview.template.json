@@ -1,0 +1,47 @@
+{
+  "name": "QF-n8n-Client-Followup-Preview",
+  "templateType": "manual_setup_template",
+  "enabled": false,
+  "connected": false,
+  "eventType": ["client.followup_preview", "nurture.due"],
+  "description": "Preview workflow that prepares a client follow-up / nurture message preview only. Does not send WhatsApp or call any provider.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "expectedInput": {
+    "eventType": "client.followup_preview",
+    "leadId": "lead_mock_004",
+    "clientId": "client_mock_004",
+    "data": {
+      "stage": "post_assignment_2h",
+      "templateKey": "client_followup_preview",
+      "context": { "service": "Modular kitchen", "city": "Pune" }
+    }
+  },
+  "safePreviewOutput": {
+    "workflow": "QF-n8n-Client-Followup-Preview",
+    "status": "preview",
+    "messagePreview": {
+      "channel": "whatsapp_future",
+      "templateKey": "client_followup_preview",
+      "previewText": "Hi! Checking in on your Modular kitchen request in Pune. Reply to continue.",
+      "recipientMasked": "client_mock_004"
+    }
+  },
+  "nodes": [
+    { "name": "Execute Workflow Trigger", "type": "trigger", "from": "QF-n8n-Event-Router" },
+    { "name": "Resolve Template + Context", "type": "set" },
+    { "name": "Render Preview Text", "type": "function" },
+    { "name": "Sending Disabled", "type": "noop" },
+    { "name": "Respond Preview", "type": "respond" }
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "providerCalled": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "databaseWritten": false
+  }
+}

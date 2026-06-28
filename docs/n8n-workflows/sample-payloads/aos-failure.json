@@ -1,0 +1,14 @@
+{
+  "eventType": "aos.failure",
+  "failureId": "failure_mock_001",
+  "workflowName": "QF-n8n-Failure-Handler",
+  "agentKey": "lead-flow",
+  "taskType": "local_mock_failure",
+  "source": "local-test",
+  "occurredAt": "2026-06-28T10:20:00.000Z",
+  "errorMessage": "Mock failure for local testing. No side effects executed.",
+  "metadata": {
+    "mode": "safe_agent_preview",
+    "sideEffectsDisabled": true
+  }
+}

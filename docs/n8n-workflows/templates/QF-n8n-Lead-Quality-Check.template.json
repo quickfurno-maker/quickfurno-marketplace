@@ -1,0 +1,48 @@
+{
+  "name": "QF-n8n-Lead-Quality-Check",
+  "templateType": "manual_setup_template",
+  "enabled": false,
+  "connected": false,
+  "eventType": ["lead.qualified", "lead.quality_preview"],
+  "description": "Preview workflow that summarizes lead quality from LeadLens and TrustShield preview fields. Returns a quality summary only; no lead status is changed.",
+  "futureTrigger": {
+    "type": "router_event",
+    "source": "QF-n8n-Event-Router"
+  },
+  "expectedInput": {
+    "eventType": "lead.quality_preview",
+    "leadId": "lead_mock_002",
+    "data": {
+      "agents": {
+        "leadLens": { "leadQuality": "warm", "score": 70 },
+        "trustShield": { "spamRisk": "low", "duplicateRisk": "unknown" }
+      }
+    }
+  },
+  "safePreviewOutput": {
+    "workflow": "QF-n8n-Lead-Quality-Check",
+    "status": "preview",
+    "qualitySummary": {
+      "leadQuality": "warm",
+      "score": 70,
+      "spamRisk": "low",
+      "duplicateRisk": "unknown",
+      "recommendation": "manual_review"
+    }
+  },
+  "nodes": [
+    { "name": "Execute Workflow Trigger", "type": "trigger", "from": "QF-n8n-Event-Router" },
+    { "name": "Read LeadLens/TrustShield", "type": "set" },
+    { "name": "Build Quality Summary", "type": "function" },
+    { "name": "No Status Write", "type": "noop" },
+    { "name": "Respond Preview", "type": "respond" }
+  ],
+  "safety": {
+    "n8nWebhookCalled": false,
+    "whatsappSent": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "vendorNotified": false,
+    "databaseWritten": false
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "eventType": "report.daily",
+  "source": "local-test",
+  "occurredAt": "2026-06-28T03:30:00.000Z",
+  "data": {
+    "range": "last_24h",
+    "aggregates": {
+      "newLeads": 0,
+      "qualifiedPreview": 0,
+      "matchPreviews": 0,
+      "blockedSideEffects": 0
+    }
+  },
+  "metadata": {
+    "mode": "safe_agent_preview",
+    "sideEffectsDisabled": true
+  }
+}

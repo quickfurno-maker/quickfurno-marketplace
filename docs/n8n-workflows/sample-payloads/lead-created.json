@@ -1,0 +1,21 @@
+{
+  "eventType": "lead.created",
+  "leadId": "lead_mock_001",
+  "source": "local-test",
+  "occurredAt": "2026-06-28T10:00:00.000Z",
+  "data": {
+    "clientName": "Test Client",
+    "service": "Modular kitchen",
+    "city": "Pune",
+    "agentPreviewSummary": {
+      "trustShield": "accepted",
+      "leadLens": "warm:70",
+      "matchForge": "suggestions:0",
+      "leadFlow": "not_assigned"
+    }
+  },
+  "metadata": {
+    "mode": "safe_agent_preview",
+    "sideEffectsDisabled": true
+  }
+}

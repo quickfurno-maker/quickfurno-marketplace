@@ -1,0 +1,19 @@
+{
+  "eventType": "client.followup_preview",
+  "leadId": "lead_mock_004",
+  "clientId": "client_mock_004",
+  "source": "local-test",
+  "occurredAt": "2026-06-28T10:15:00.000Z",
+  "data": {
+    "stage": "post_assignment_2h",
+    "templateKey": "client_followup_preview",
+    "context": {
+      "service": "Modular kitchen",
+      "city": "Pune"
+    }
+  },
+  "metadata": {
+    "mode": "safe_agent_preview",
+    "sideEffectsDisabled": true
+  }
+}

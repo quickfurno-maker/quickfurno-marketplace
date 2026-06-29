@@ -7,6 +7,7 @@ import { adminClient, publicClient } from "../lib/supabase";
 import { appError, fromPgError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
+import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 
 function firstText(...values: Array<string | undefined>): string {
@@ -115,6 +116,25 @@ export async function createLead(input: CreateLeadInput): Promise<Result<{ id: s
       lead_id: data.id,
       is_duplicate: data.is_duplicate,
       source,
+    });
+
+    // ── Phase 9: Real Lead Form → AOS Event Bridge ──────────────────────────
+    // The lead is now safely persisted. Emit a SAFE, non-blocking `lead.created`
+    // AOS event. This is fire-and-forget: it never awaits the user response, has
+    // its own timeout, never throws, and performs no side effects (no WhatsApp,
+    // no credits, no assignment, no extra DB writes). Failures cannot affect the
+    // lead submission, which already succeeded above.
+    void emitLeadCreatedEvent({
+      leadId: data.id,
+      name,
+      phone,
+      city,
+      area: input.area ?? null,
+      category: serviceRequired,
+      budget: budget || null,
+      message: message || null,
+      isDuplicate: Boolean(data.is_duplicate),
+      formSource: source,
     });
 
     return ok({ id: data.id, is_duplicate: data.is_duplicate });

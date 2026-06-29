@@ -1,0 +1,2405 @@
+{
+  "name": "QF-n8n-AOS-Master-Preview-Router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quickfurno/aos/events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "c6d785ef-9b19-4caa-a8d2-d52c99a17c75",
+      "name": "QF AOS Events Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        700
+      ],
+      "webhookId": "eb4c6984-7008-4520-85bf-ec2d01de7a64"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "d300f9aa-6b43-4954-867a-c3d16c2344d2",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "lead.created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lead.created"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "0cd8bed5-7303-4eca-93e2-afc657c3934b",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "lead.qualified",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lead.qualified"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "446f53fc-113d-4363-bad6-25f1447b2052",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "lead.assignment_approved",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lead.assignment_approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "a443067f-68d0-4859-b648-977f803bb968",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "lead.assigned",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lead.assigned"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "01491bf8-9348-4ab0-b2f9-4a9f4a742087",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "vendor.replied",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "vendor.replied"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "7d8645e7-a378-4281-8c66-ed072f3a614e",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "client.followup_due",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "client.followup_due"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "189df258-e9f7-4967-b5e9-3097d5c3d4a5",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "client.rating_due",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "client.rating_due"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "b9b1b922-8fa2-4a34-b4e5-740739592ffa",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "nurture.due",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nurture.due"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "037ae3c9-9985-4db4-a1ee-46d63347c0a0",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "report.daily",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "report.daily"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "09db965e-3221-4a2b-822f-59020b7c1b81",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "vendor.low_credit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "vendor.low_credit"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "5ec623b0-2666-4483-96f5-ade4ed870e9e",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "complaint.created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "complaint.created"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "ba7cdcd9-217d-4d1d-bdce-54a433bdc714",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "lead.source_tracking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lead.source_tracking"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "0d31c68c-fae1-47d1-9d74-cd4cd701d7a5",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "aos.failure",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "aos.failure"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5a1706cd-c8c4-4f61-9163-6db8b29c8cf2",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -300,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5c9ef63d-34ef-4b56-8bba-8595802c1718",
+              "name": "workflow",
+              "value": "QF-n8n-New-Lead-Intake",
+              "type": "string"
+            },
+            {
+              "id": "38e3c1b7-fc8f-4183-9732-fd40a30ff9d4",
+              "name": "eventType",
+              "value": "lead.created",
+              "type": "string"
+            },
+            {
+              "id": "fee50cff-9db7-47bb-abc2-300e82d6c6ca",
+              "name": "messageType",
+              "value": "new_lead_intake_preview",
+              "type": "string"
+            },
+            {
+              "id": "344fcad6-cac1-4c37-ba89-7521f4fdc5c0",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "ec893243-9efe-45b5-b2b7-848add3f3789",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "88b9ab1f-97df-4a53-87f0-94373464fc14",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "e21e2b1a-5586-419f-a0de-ff9f7a94b14b",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "34fd298e-1ef2-40bf-8b05-a52f964e21f7",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fabc3511-1673-40b6-afc6-a3008a2a8895",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "d8206733-f048-4c81-a81f-76fd48e2514a",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "875d3b75-4693-4a56-bfe2-6639729b6d82",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4720484e-0f28-4475-9982-7bd702c02fe7",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "67ba7a27-a5cd-4fe2-a6f4-53bd1d35fb89",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a2a6c94c-f222-4525-a0f0-59bf84d2d5ef",
+              "name": "message",
+              "value": "New lead received safely. AOS process-lead preview will be called next. No side effects executed.",
+              "type": "string"
+            },
+            {
+              "id": "c1a90be1-f00f-4ba8-b28f-97411a3cd044",
+              "name": "agents",
+              "value": "TrustShield, LeadLens, MatchForge, LeadFlow, OpsBrief",
+              "type": "string"
+            },
+            {
+              "id": "1ea76e15-8e75-43a0-ab57-538a59c2d942",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cc12b93d-24ec-4785-bb5f-bc98d35a0774",
+      "name": "New Lead Intake Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "479222f1-fe2b-4d17-a64a-9d483b936336",
+              "name": "workflow",
+              "value": "QF-n8n-Client-Confirmation",
+              "type": "string"
+            },
+            {
+              "id": "f23b323e-7a6a-4583-9bc2-519eaa55fcd6",
+              "name": "eventType",
+              "value": "lead.qualified",
+              "type": "string"
+            },
+            {
+              "id": "ec2fad2a-94df-4655-b6fb-0c9194abac9a",
+              "name": "messageType",
+              "value": "client_confirmation_preview",
+              "type": "string"
+            },
+            {
+              "id": "c9afa28c-f96c-496c-805c-94c59fd96b7d",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "7dd64fdd-61d9-4c69-a359-822e56be2ebf",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "5b514460-28c9-4a5a-b72b-cc904db95230",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "4c68a2ff-6100-4ca4-bf02-71585f6c0ee8",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "5654d09c-bf53-4a4e-8414-d4f11235ab84",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "430f498a-ac3c-4090-92f7-44f4ff7cfe22",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a95c29d6-74b8-4b79-be1e-042cc7a1d63a",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "d2a71f40-6e66-4c6d-8798-5f077610c4ab",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fe512378-bcff-4149-94bf-a10d005ffeae",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "ee954384-8f9e-4e27-bcd5-6f2fdc8ee657",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "5dff6303-4da5-4f64-b20b-4441564b53b8",
+              "name": "message",
+              "value": "Client confirmation preview branch received safely.",
+              "type": "string"
+            },
+            {
+              "id": "9d0c0562-4c78-4355-9897-062f7d08c408",
+              "name": "agents",
+              "value": "ClientCare, LeadFlow",
+              "type": "string"
+            },
+            {
+              "id": "0a136424-17ae-4331-b8b1-128fa870c3a2",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c927e496-2d3d-4522-9e25-308862de8724",
+      "name": "Client Confirmation Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15435d72-f0de-4990-990b-ce80d1b0c54b",
+              "name": "workflow",
+              "value": "QF-n8n-Vendor-Lead-Alert",
+              "type": "string"
+            },
+            {
+              "id": "73d7958d-507b-4cdc-afde-bdae458ff8c6",
+              "name": "eventType",
+              "value": "lead.assignment_approved",
+              "type": "string"
+            },
+            {
+              "id": "85e8e2ea-d9ac-48ed-817c-84b3ff07f031",
+              "name": "messageType",
+              "value": "vendor_lead_alert_preview",
+              "type": "string"
+            },
+            {
+              "id": "1411207d-f785-45a7-9ab7-d8cc17b492cb",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "51480c6a-ee2e-4522-9e19-be16be6394a4",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "a63c4bfa-6663-4b8d-8e7f-026a61ece26b",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "afa1bb91-723d-4858-b91d-824986f156c2",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4f492892-3227-4e2f-9374-32d2342d512c",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "c1d6cf3c-5345-4bb1-922a-1f9f771ada90",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fe037f78-f4b6-453a-afef-4efc1850122e",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "7d95a591-1522-4321-acc1-181fb80757d8",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "367a1bd8-f867-46c7-b35b-a34205fc491d",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "408bd3c7-4b2c-4ce8-a25d-399bb3ca2233",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "eb051ddb-c291-4eae-b90c-89ec11c617b5",
+              "name": "message",
+              "value": "Vendor alert preview received after assignment approval. No vendor notified.",
+              "type": "string"
+            },
+            {
+              "id": "0a1a94f6-dbc1-415b-bc8f-71b9e38e730d",
+              "name": "agents",
+              "value": "MatchForge, LeadFlow, VendorPulse, WhatsAppPilot",
+              "type": "string"
+            },
+            {
+              "id": "5647443e-6b3a-4c41-b1e7-380e14632644",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aa00c59e-f6fb-42bf-94be-c1107539dc93",
+      "name": "Vendor Lead Alert Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0943fc7e-ebe7-4bc5-ab57-a16a4342e713",
+              "name": "workflow",
+              "value": "QF-n8n-Assignment-Tracking",
+              "type": "string"
+            },
+            {
+              "id": "ceb1dbde-1212-4f32-958f-9a0f87f987b6",
+              "name": "eventType",
+              "value": "lead.assigned",
+              "type": "string"
+            },
+            {
+              "id": "b83ab417-ed12-4126-be4f-41e8d9687ac3",
+              "name": "messageType",
+              "value": "assignment_tracking_preview",
+              "type": "string"
+            },
+            {
+              "id": "020b1573-1493-4f79-912c-d03b15f0b03f",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "13f3e6f5-0ebe-46a2-a655-0d70e7ab9379",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "d04d4760-bec4-437f-a053-1bcff9ca255b",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "0cd6848f-2a7c-4d0d-9194-2b020145cd73",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "90700ba0-a56e-4114-bd9e-bdbbdd6072c3",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "bbf6ccd1-2853-4d79-a323-bba600cfa576",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "5d9e2b4a-1eb1-44d9-800d-1e27e5896c18",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "bfe28f7f-3b73-414c-b515-cded31a82e5e",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "b647a59d-8916-4c73-9aca-414709ef8357",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "7cd700b7-b063-49a6-b70b-5eb17e2a44cf",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fe2ec21f-ec40-4832-b51f-8b7ab1e0d50c",
+              "name": "message",
+              "value": "Lead assignment tracking preview completed safely. No timer or WhatsApp started.",
+              "type": "string"
+            },
+            {
+              "id": "8e499e00-98a8-4fe6-b377-e9b512802b7d",
+              "name": "agents",
+              "value": "LeadFlow, VendorPulse, ClientCare",
+              "type": "string"
+            },
+            {
+              "id": "4bbb6e9f-0ff7-4115-b1f6-28e962a5b9e9",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "94793f6f-6dbe-4a4e-93a7-df10726a9c2e",
+      "name": "Assignment Tracking Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24465a85-78c1-4913-9c60-76238cc3cde5",
+              "name": "workflow",
+              "value": "QF-n8n-Vendor-Response",
+              "type": "string"
+            },
+            {
+              "id": "9652305e-09e3-47d3-85d5-ca06952a05b4",
+              "name": "eventType",
+              "value": "vendor.replied",
+              "type": "string"
+            },
+            {
+              "id": "03aaf40a-771f-4761-855c-8afae9a99037",
+              "name": "messageType",
+              "value": "vendor_response_preview",
+              "type": "string"
+            },
+            {
+              "id": "f20cd73d-cdcd-4c6b-a105-20bb8cc7e9ea",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "8487a81e-9dee-4a01-814b-31966b07c741",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "65368c46-50ba-4b09-a377-fe6549b71154",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "9afde82e-f716-4cfd-b904-891b011aaf96",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "d7984a16-a61c-4124-96b6-68f656dfcc5a",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f6b20715-9d90-4780-9702-efa5666f7733",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6c22c21f-0aa6-4cd5-8046-ddc4ca490cf7",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "ed067fa1-faba-4a30-a013-91e3c62bd3ae",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "33160e47-9ad1-463c-8dfc-a22ab4cc8e04",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "be38189e-8708-4a9b-b302-697fc16f0d65",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "9c024ac4-dc22-427e-aa6c-4362a23bea4c",
+              "name": "message",
+              "value": "Vendor response preview captured safely. CRM update is disabled.",
+              "type": "string"
+            },
+            {
+              "id": "ea904246-8084-4344-8b20-5289e6262e28",
+              "name": "agents",
+              "value": "VendorPulse, LeadFlow",
+              "type": "string"
+            },
+            {
+              "id": "28148cd3-5b42-4a3d-a853-a75080e65cd1",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0f376214-3241-4405-baea-688040642771",
+      "name": "Vendor Response Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "26bc614a-f0d7-4d59-85d5-31e864b7cf04",
+              "name": "workflow",
+              "value": "QF-n8n-Client-2-Hour-Followup",
+              "type": "string"
+            },
+            {
+              "id": "a99300dc-ffc6-42ba-8699-afcf0285366d",
+              "name": "eventType",
+              "value": "client.followup_due",
+              "type": "string"
+            },
+            {
+              "id": "eb90ad1a-d9de-485c-a862-6e135d6e77d5",
+              "name": "messageType",
+              "value": "client_followup_preview",
+              "type": "string"
+            },
+            {
+              "id": "b2e0a409-5ff2-4f76-b045-7610ad7979eb",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "f1c5a4a2-b585-4089-9f88-0e81785a38b9",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "b7e463b7-38ea-4893-98a0-c7765e62d861",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "007dd279-ad39-4f68-9871-a4f14497f835",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "08d7f475-2867-4854-ad73-a6e6e75d18ee",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "2e7b0d4b-137f-49c8-8703-28c626cf7edc",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "578ec2a6-ad93-47f3-848d-f70056be5741",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "2cdd4705-5cdb-49ca-9116-9709e38cbe21",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "0a96c540-a5ce-4795-bdaa-63ab19e915d5",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "29d72727-fc5a-4592-a9a2-37b7b79701f1",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6674c440-dc4b-475b-b186-594994a84191",
+              "name": "message",
+              "value": "Client 2-hour follow-up preview prepared safely. No WhatsApp sent.",
+              "type": "string"
+            },
+            {
+              "id": "11a9fffe-1103-4b61-af9b-6314d06a073a",
+              "name": "agents",
+              "value": "ClientCare, LeadFlow",
+              "type": "string"
+            },
+            {
+              "id": "fed389bf-ac16-407b-a451-9882cc9992ab",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "76546e5d-71a9-40e1-b1ac-8008c79059f1",
+      "name": "Client 2-Hour Followup Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "513deb75-95ea-4825-a03d-067ec3f98908",
+              "name": "workflow",
+              "value": "QF-n8n-Client-24-Hour-Rating",
+              "type": "string"
+            },
+            {
+              "id": "77e19937-6900-4a5b-9fc0-bb4ac25ca0b0",
+              "name": "eventType",
+              "value": "client.rating_due",
+              "type": "string"
+            },
+            {
+              "id": "b8474178-cbbc-4900-b8b9-0afe290b71ff",
+              "name": "messageType",
+              "value": "client_rating_preview",
+              "type": "string"
+            },
+            {
+              "id": "d75830f5-75a1-4e9f-b364-5a711ae9219b",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "38a89624-f96a-4459-8d87-3b1b74154795",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "3f97c980-a3ba-4146-be1e-7c63668017b7",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "250da912-01f3-4f86-a309-faf1ccc5ebaa",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "3288004d-08cd-49ff-a5a2-2f41694761ec",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "ee124a01-79f8-4cd0-9f70-9c6101538e0f",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "0e516bf7-4a47-4b2f-92e6-b4ee9efd9c43",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f5a8250e-f056-4142-a792-2be767af7d3d",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "740cd640-6b90-4919-a075-6bfc531449d8",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "448b35d2-7d43-4541-8ce0-ffccb791ffe2",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "418ead81-b7ad-4e33-b94e-2adee0551310",
+              "name": "message",
+              "value": "Client rating request preview prepared safely. No message sent and no rating saved.",
+              "type": "string"
+            },
+            {
+              "id": "db400713-1e08-4e1e-b015-1be4c640635f",
+              "name": "agents",
+              "value": "ClientCare, ReviewShield, VendorPulse",
+              "type": "string"
+            },
+            {
+              "id": "c0e1befa-ceb4-40cd-86b6-4c810c6dfb41",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ce45945a-ca65-4966-92eb-0f393eb4ff99",
+      "name": "Client 24-Hour Rating Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "64d05f01-2b02-4f55-9c5d-477190cae29e",
+              "name": "workflow",
+              "value": "QF-n8n-Nurture-Followup",
+              "type": "string"
+            },
+            {
+              "id": "3c88de8b-3499-44e7-9754-deba7d5b6f8a",
+              "name": "eventType",
+              "value": "nurture.due",
+              "type": "string"
+            },
+            {
+              "id": "aec69b7e-071e-46fa-b190-71db8f6c595a",
+              "name": "messageType",
+              "value": "nurture_followup_preview",
+              "type": "string"
+            },
+            {
+              "id": "a7a23ecc-48ec-467d-bbd9-39891e4c4486",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "ab4de10e-c207-483f-bded-046f40f90369",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "42d04381-2238-4b70-bb39-bf405121bf27",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "7b88306a-2849-4eed-8cef-ccb5ebdc0746",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "0516693b-6b78-4a45-9a5a-355e10f6b944",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "75b1ef0a-7b81-498e-9f9a-f6ad96d6730a",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "b415885c-afb4-4d38-b53f-fa093150520c",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "772d85b1-2a64-4c71-986b-a3bd992bc1a3",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "67e7f879-18be-4edf-b1c6-2aade6ebd15d",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "84ebf259-605f-4aad-a64b-1527effc32c6",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "36d38491-5328-4707-88aa-e345ec8d6b54",
+              "name": "message",
+              "value": "Nurture follow-up preview prepared safely. No client message sent.",
+              "type": "string"
+            },
+            {
+              "id": "8b5527ef-7014-4875-8c56-511357b6776f",
+              "name": "agents",
+              "value": "LeadNurture, ClientCare, CalendarSync",
+              "type": "string"
+            },
+            {
+              "id": "f2dd5215-41a4-4eae-8176-13d457c9b6d1",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f0f467a-fd7a-476b-a0f1-b20492b4bdce",
+      "name": "Nurture Followup Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fa32deaf-2668-4641-8377-a45b3901c579",
+              "name": "workflow",
+              "value": "QF-n8n-Daily-Founder-Report",
+              "type": "string"
+            },
+            {
+              "id": "e0c7b8dc-8bb0-456f-ba96-42ee55d6b0e7",
+              "name": "eventType",
+              "value": "report.daily",
+              "type": "string"
+            },
+            {
+              "id": "474a01e9-38bf-4adb-bc42-32791c07cff0",
+              "name": "messageType",
+              "value": "daily_founder_report_preview",
+              "type": "string"
+            },
+            {
+              "id": "d4eae77c-d4fe-4238-8b84-b41da06522cd",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "e7d94947-a789-4c6f-801d-7a8d384e9263",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "119ac88d-37d9-4ef7-89bc-432bc511271b",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "f1a03d13-25aa-4a5c-beb2-3c3b2665c213",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "60b215d8-ae97-4248-898e-1a3c390812f3",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a44c1494-b2d9-45bd-8480-763d9ae2b989",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6ff35758-eb99-4e77-b3db-737080a2539b",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "5df28705-22c8-4cbc-a888-bcd2d0ddf2c9",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6a3aa924-af48-44b1-a9bf-635d19de8f32",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "836c9e45-3b4a-4241-86c1-94a6407099e5",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fdec0a7c-26d4-4aed-a592-fda2cb521833",
+              "name": "message",
+              "value": "Daily founder report preview generated safely. No WhatsApp or email sent.",
+              "type": "string"
+            },
+            {
+              "id": "bc4e9111-e4cb-44b0-957f-1592f33cf8aa",
+              "name": "agents",
+              "value": "OpsBrief, GrowthRadar, RevenueVault, SourceTracker",
+              "type": "string"
+            },
+            {
+              "id": "e74edcba-8016-45a0-9f2f-aaacc3cc027a",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "caa33acd-dba0-4470-9865-2bd99dc0e692",
+      "name": "Daily Founder Report Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "81bedc73-3ea5-4f25-97bf-0c8ae13780e4",
+              "name": "workflow",
+              "value": "QF-n8n-Vendor-Low-Credit",
+              "type": "string"
+            },
+            {
+              "id": "a0e64fa9-b5df-4131-9690-6ebf9b7d62b8",
+              "name": "eventType",
+              "value": "vendor.low_credit",
+              "type": "string"
+            },
+            {
+              "id": "3dbbe571-0362-4339-a326-8d965a667389",
+              "name": "messageType",
+              "value": "vendor_low_credit_preview",
+              "type": "string"
+            },
+            {
+              "id": "99978b43-3b2a-4349-b39b-42a4b584aee7",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "f180a318-8dc2-4a35-8976-52a64acfe162",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "12e786d9-ce8e-4c9d-a266-201227988049",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "90f09c1c-b4ca-48c8-8fe6-2bfe744275db",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a7230302-1a05-4052-a066-d763b822b10f",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "904a1a23-eb77-4cb1-ae68-7aaffd7a32b6",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "0c5ebd6f-6b43-4798-bb0a-67a1978691eb",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "09855542-aa7b-4189-8a6a-f5a163da2132",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "9e720433-a799-441b-9ac7-d11b3856a969",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "73fa7951-1b6f-4436-b79b-1678a510f0ea",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "c4de8372-6417-4b2a-8913-8f4be34e2c08",
+              "name": "message",
+              "value": "Vendor low credit renewal preview prepared safely. No vendor/admin notification sent.",
+              "type": "string"
+            },
+            {
+              "id": "330a65de-1476-458d-88b5-142b06fd9769",
+              "name": "agents",
+              "value": "RevenueVault, VendorPulse, WhatsAppPilot",
+              "type": "string"
+            },
+            {
+              "id": "a69e57a0-f1d5-4818-a537-c2f127cee9a1",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "893de0f4-3f4a-44e8-9fa7-aaae38e09e4a",
+      "name": "Vendor Low Credit Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "db614ba2-7b2a-47fb-875f-9ad5a6c408cb",
+              "name": "workflow",
+              "value": "QF-n8n-Complaint-Escalation",
+              "type": "string"
+            },
+            {
+              "id": "d749fb50-c612-487c-b4c0-1ac44e357c5c",
+              "name": "eventType",
+              "value": "complaint.created",
+              "type": "string"
+            },
+            {
+              "id": "1fd9e297-ebba-4f78-91a2-4a8d2d1214c6",
+              "name": "messageType",
+              "value": "complaint_escalation_preview",
+              "type": "string"
+            },
+            {
+              "id": "a2a82f50-ddb0-4b65-8b60-897f26edb1bb",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "1c5788d9-0f6e-4b25-a543-5d385116936a",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "b38c0be3-c9bb-4849-961c-c19c9dd44d2a",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "7f99fb79-ce7b-46ba-a5ab-daae0ed01702",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "148b07a6-5ef4-4528-bdab-f32cb51aeea4",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a5b62723-1d08-4d1d-959f-135c32667a20",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6356ca8a-fffe-4a01-8681-d32c9316e8f4",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "7fccc952-2751-4969-96e3-e5067e626931",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "5087148a-f9c8-4291-ac5a-e15bf4bfa85e",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a3431d21-12c0-42fa-ad7b-cb3c63ee15de",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f0a0bc96-6662-4418-bfbc-0a9d7841fd8b",
+              "name": "message",
+              "value": "Complaint escalation preview captured safely. No auto-ban or external alert executed.",
+              "type": "string"
+            },
+            {
+              "id": "6f4714ac-f5c1-44bb-8579-d396dc3b6929",
+              "name": "agents",
+              "value": "ReviewShield, VendorPulse, ClientCare, VaultGuard",
+              "type": "string"
+            },
+            {
+              "id": "092abc40-ec87-42d7-ab4b-99e294f9d2ac",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7776d038-32f2-405d-bc12-793bb8a6b308",
+      "name": "Complaint Escalation Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed284fc4-0eef-4fc4-b84c-3b3e11e84462",
+              "name": "workflow",
+              "value": "QF-n8n-Lead-Source-Tracking",
+              "type": "string"
+            },
+            {
+              "id": "2711f103-ebbb-4170-8e93-b3b16c627c31",
+              "name": "eventType",
+              "value": "lead.source_tracking",
+              "type": "string"
+            },
+            {
+              "id": "ee9b0f58-2f3e-4cb6-9e2c-3afb17844621",
+              "name": "messageType",
+              "value": "lead_source_tracking_preview",
+              "type": "string"
+            },
+            {
+              "id": "f364671a-c96d-4cc1-a133-8140b1d6b8ac",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "0f643697-b0e7-4729-9161-b21fa738e2a2",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "0a8d401d-e617-4dc4-83e8-3da460e559e0",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "17088c00-46e0-47a0-bdf4-9684506d893d",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "ac0cbb6a-4186-41fd-9dd2-c167a561c8d2",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "25d38e6e-b175-4555-8029-a754405f1382",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "3dbc1c3d-b5f8-4b3c-8239-217c5fa75513",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "77e56321-b5d0-46ad-8877-3782e86a218b",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "02d2d735-e1c6-4cf0-9a35-19c3240927f7",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f6ad3ff2-27b1-4de6-bf56-02f193633bb9",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4ce943a4-9c82-47c5-b534-e95950ad66b6",
+              "name": "message",
+              "value": "Lead source/campaign tracking preview completed safely. No analytics database write executed.",
+              "type": "string"
+            },
+            {
+              "id": "ea4cc465-b7dc-4f70-8842-d402a268419d",
+              "name": "agents",
+              "value": "SourceTracker, GrowthRadar",
+              "type": "string"
+            },
+            {
+              "id": "dc01f379-0211-43cb-9a8f-2c1a3f6dbb83",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cd2c64bb-5525-434e-9c13-105bf937831b",
+      "name": "Lead Source Tracking Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2f4b7e65-266c-4b24-a30a-0eaeb5234288",
+              "name": "workflow",
+              "value": "QF-n8n-AOS-Failure-Handler",
+              "type": "string"
+            },
+            {
+              "id": "66bbe1ca-0fdd-4817-afd0-a3eadb4ba6dc",
+              "name": "eventType",
+              "value": "aos.failure",
+              "type": "string"
+            },
+            {
+              "id": "26e5c817-67b9-45ab-9f0d-46c62f636101",
+              "name": "messageType",
+              "value": "failure_handler_preview",
+              "type": "string"
+            },
+            {
+              "id": "7894b5bd-903e-4601-bd1f-152a374d7e63",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "279d86d5-adce-4cd8-9aef-31aa66bfe6a5",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "ec070f1c-18fa-4728-867f-f22d335c0585",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "5e37833e-cbaf-4788-94ef-ba48f0dcef47",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "91257441-e694-4736-88eb-37d1f0b07e90",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "c632ca84-a3b2-426b-ad5c-111ced9cb310",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "8d74243e-76d6-4b63-aa95-7ff34234df99",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4a5fad95-3422-4fde-88ef-ac66d9f24fe3",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "87fc0f8f-7473-4eeb-94c1-667b40527e45",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "9a9f0461-e5af-4e35-9e0c-a36fbae4ecdb",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6ceeb933-1b43-4120-b571-2ae393e9d6e4",
+              "name": "message",
+              "value": "AOS failure event captured safely. No external alert sent.",
+              "type": "string"
+            },
+            {
+              "id": "ccff6992-2a1e-4a14-a14e-484470478bb0",
+              "name": "agents",
+              "value": "VaultGuard, NexusKernel, OpsBrief",
+              "type": "string"
+            },
+            {
+              "id": "e80a50a5-7c17-41ce-ba85-71d27f68c5e8",
+              "name": "input",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e2b9d97a-64d7-4aaa-88e8-6ebd326d424b",
+      "name": "Failure Handler Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickfurno.in/api/aos/process-lead",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-qf-n8n-secret",
+              "value": "dev-test-secret"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  event: $('QF AOS Events Webhook').item.json.body?.event || $('QF AOS Events Webhook').item.json.body?.eventType || $json.event || $json.eventType || \"lead.created\",\n  eventType: $('QF AOS Events Webhook').item.json.body?.eventType || $('QF AOS Events Webhook').item.json.body?.event || $json.eventType || $json.event || \"lead.created\",\n  lead_id: $('QF AOS Events Webhook').item.json.body?.lead_id || $('QF AOS Events Webhook').item.json.body?.leadId || $json.lead_id || $json.leadId || \"N8N-DYNAMIC-LEAD-TEST\",\n  source: $('QF AOS Events Webhook').item.json.body?.source || $json.source || \"n8n-master-preview-router\",\n  lead: $('QF AOS Events Webhook').item.json.body?.lead || $json.lead || {\n    name: $('QF AOS Events Webhook').item.json.body?.name || $json.name || \"Unknown Client\",\n    phone: $('QF AOS Events Webhook').item.json.body?.phone || $json.phone || \"\",\n    city: $('QF AOS Events Webhook').item.json.body?.city || $json.city || \"\",\n    area: $('QF AOS Events Webhook').item.json.body?.area || $json.area || \"\",\n    category: $('QF AOS Events Webhook').item.json.body?.category || $json.category || \"\",\n    budget: $('QF AOS Events Webhook').item.json.body?.budget || $json.budget || \"\"\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "da1a279d-9952-4314-abf0-6f2c8df80447",
+      "name": "Call QuickFurno AOS Process Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "81c59722-0551-4eb7-92e9-b56d27e2bdf4",
+              "name": "workflow",
+              "value": "QF-n8n-New-Lead-Intake-AOS-Process",
+              "type": "string"
+            },
+            {
+              "id": "22c11a23-e664-4548-9b18-b77c7d6e56ff",
+              "name": "eventType",
+              "value": "lead.created",
+              "type": "string"
+            },
+            {
+              "id": "fea42b08-6d87-4a2a-924e-13cdc677b3a8",
+              "name": "messageType",
+              "value": "aos_process_lead_result_preview",
+              "type": "string"
+            },
+            {
+              "id": "fb9aef77-fb7f-4a77-ae35-d50e8dc3e624",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2f82d257-bcf9-48d8-ae7a-7b1335cb7025",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "46e712fc-edec-4343-b5cf-94f46a067499",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "6324c0c1-6c75-43a4-afbb-5dbec93495d2",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "f2841b88-782a-4c52-8f74-f298695bdf19",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "8466278a-1483-4201-bd3b-f21b3afa8ebf",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "e5aafe79-4346-4df8-87f1-88aa0acd4e0b",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "3506eb41-8870-4f1b-8c39-473aecf12d4d",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "89e9332c-f3d7-45fe-955f-7da2b9149a40",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fd9a546e-68d1-4c82-86dd-433961cb858b",
+              "name": "externalApiCalled",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "095e8ccf-3c37-44e4-bee4-e854bcb73cb7",
+              "name": "message",
+              "value": "AOS process-lead API called safely from n8n. No side effects executed.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a771d4e-d298-4604-b38a-1df948926074",
+      "name": "AOS Process Lead Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef7412b0-9982-46b5-abaf-d74d6c75b5a7",
+              "name": "workflow",
+              "value": "QF-n8n-Client-Confirmation-Preview",
+              "type": "string"
+            },
+            {
+              "id": "5fc9e21f-8233-4ceb-aa03-c7d2d9daf916",
+              "name": "eventType",
+              "value": "lead.qualified",
+              "type": "string"
+            },
+            {
+              "id": "91c410c2-a61e-4aec-866f-a94b41015330",
+              "name": "messageType",
+              "value": "client_whatsapp_preview",
+              "type": "string"
+            },
+            {
+              "id": "3dc4e84c-4212-447c-82cd-b643c2fd7dac",
+              "name": "clientName",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.name || $('QF AOS Events Webhook').item.json.body?.name || \"Client\" }}",
+              "type": "string"
+            },
+            {
+              "id": "6f75b125-b845-4c01-a477-bf33558ff4c2",
+              "name": "clientPhone",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.phone || $('QF AOS Events Webhook').item.json.body?.phone || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a6af012a-4ac4-49f3-b46a-77f6fc518e2b",
+              "name": "service",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.category || $('QF AOS Events Webhook').item.json.body?.category || \"home-service\" }}",
+              "type": "string"
+            },
+            {
+              "id": "7bc40d93-b6f0-4523-836f-8bffa7cd8dae",
+              "name": "city",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.city || $('QF AOS Events Webhook').item.json.body?.city || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "8916b1d9-4a2a-46b4-aa65-9bbb94ae0325",
+              "name": "area",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.area || $('QF AOS Events Webhook').item.json.body?.area || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3f0b3105-9c98-4106-8c0a-bbd5bcedd762",
+              "name": "whatsappMessage",
+              "value": "=Hi {{ $('QF AOS Events Webhook').item.json.body?.lead?.name || \"Client\" }}, thanks for contacting QuickFurno. We are connecting you with verified {{ $('QF AOS Events Webhook').item.json.body?.lead?.category || \"home-service\" }} vendors near {{ $('QF AOS Events Webhook').item.json.body?.lead?.area || $('QF AOS Events Webhook').item.json.body?.lead?.city || \"your area\" }}. You may receive calls from selected verified vendors shortly.",
+              "type": "string"
+            },
+            {
+              "id": "cfcf9349-4c0d-4411-b0d0-210f64dbfd88",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c1ed2946-593c-449a-bdc2-af9abf2be94d",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "89d653b3-21e7-4598-96fa-6adcaaca9083",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "0657e28c-5b92-463b-b939-82021e05655f",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "2ecbddde-ca66-4e5e-ac9c-704b8dcce817",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "b0c55254-8aea-4fe9-aa43-3876c4031ad1",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a41d0725-0ab9-4ffd-be2f-20c2a3d35044",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "3382da4d-1134-4381-b661-3f6a690fb8aa",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "e268eb08-e287-498f-8d73-3e1522222c54",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "7b16a6c6-5403-422a-a9bb-73abd4247152",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "97855c1c-e396-471d-9e88-7229cec31875",
+      "name": "Prepare Client WhatsApp Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "efcb2141-aedb-4044-a8ea-2930348f4e1f",
+              "name": "workflow",
+              "value": "QF-n8n-Vendor-Lead-Alert-Preview",
+              "type": "string"
+            },
+            {
+              "id": "c5f57e35-b656-4798-b424-56230abb1cf2",
+              "name": "eventType",
+              "value": "lead.assignment_approved",
+              "type": "string"
+            },
+            {
+              "id": "37ea0438-321c-459f-95ad-38c93437e632",
+              "name": "messageType",
+              "value": "vendor_whatsapp_preview",
+              "type": "string"
+            },
+            {
+              "id": "cb680f4d-bc9d-4b98-82af-2b13db9081ce",
+              "name": "leadId",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead_id || $('QF AOS Events Webhook').item.json.body?.leadId || \"UNKNOWN-LEAD\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a5dd8bf8-b4fd-4b62-8fe7-2ee2b0cab627",
+              "name": "clientName",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.name || \"Preview Client\" }}",
+              "type": "string"
+            },
+            {
+              "id": "71056d9a-035f-4757-af0a-d39d473b4b4d",
+              "name": "clientPhonePolicy",
+              "value": "masked_or_admin_controlled",
+              "type": "string"
+            },
+            {
+              "id": "294e7a49-297c-4029-9603-043ae1a6db40",
+              "name": "service",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.category || \"home-service\" }}",
+              "type": "string"
+            },
+            {
+              "id": "7f97bf9c-52d8-4628-9191-1aca3a775c21",
+              "name": "city",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.city || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "c15822a4-e5db-4f25-a2d2-cb5105f81c2f",
+              "name": "area",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.area || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "194b02f5-b5e7-4a40-b16f-363f1e0e46cf",
+              "name": "budget",
+              "value": "={{ $('QF AOS Events Webhook').item.json.body?.lead?.budget || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b549e563-7f6a-4159-8236-15f752728ac0",
+              "name": "vendorLimit",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "e8280898-aad2-4156-bf45-a867ac82f002",
+              "name": "approvalStatus",
+              "value": "admin_approved_preview",
+              "type": "string"
+            },
+            {
+              "id": "650dab14-ec9c-4344-af10-d7667f5641e0",
+              "name": "vendorWhatsAppMessage",
+              "value": "=New QuickFurno Lead. Service: {{ $('QF AOS Events Webhook').item.json.body?.lead?.category || \"home-service\" }}. Area: {{ $('QF AOS Events Webhook').item.json.body?.lead?.area || \"\" }}, {{ $('QF AOS Events Webhook').item.json.body?.lead?.city || \"\" }}. Budget: {{ $('QF AOS Events Webhook').item.json.body?.lead?.budget || \"\" }}. Client: {{ $('QF AOS Events Webhook').item.json.body?.lead?.name || \"Preview Client\" }}. Phone: Masked / shown only as per admin policy. Reply: 1 - I will contact now, 2 - Not interested, 3 - Already contacted, 4 - Client not reachable. Preview only. No WhatsApp sent.",
+              "type": "string"
+            },
+            {
+              "id": "67b21a65-17f9-49fc-a92c-52f0bfd415ac",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "67189fbb-cb19-4e1f-a23e-02081d56fc03",
+              "name": "received",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "78dc5b40-8a34-47da-9d92-cd33ec6ae35e",
+              "name": "safePreviewOnly",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "0007b1c8-cfb6-4f27-983f-30c1f815e88d",
+              "name": "whatsappSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "8ff90cad-8fc6-4a72-bf01-63c1042e9f3b",
+              "name": "emailSent",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "6c5c136e-4644-489e-9a98-99385e48934b",
+              "name": "creditsDeducted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "8193fe4c-ecfd-4209-8470-5e3e27de7e47",
+              "name": "leadAutoAssigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4c6bd54a-fcea-4d15-ae1f-c39b93785dfa",
+              "name": "vendorNotified",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "0664a57e-cda0-4e15-a6cf-c3f105950ff2",
+              "name": "databaseWritten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "bfe14d10-f19f-47f4-a4d7-ad1d724f2a17",
+              "name": "externalApiCalled",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8a146d88-8ee4-46f5-a22b-3671c4c6a8fb",
+      "name": "Prepare Vendor WhatsApp Preview",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "QF AOS Events Webhook": {
+      "main": [
+        [
+          {
+            "node": "Route by Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Event Type": {
+      "main": [
+        [
+          {
+            "node": "New Lead Intake Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Client Confirmation Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vendor Lead Alert Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assignment Tracking Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vendor Response Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Client 2-Hour Followup Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Client 24-Hour Rating Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nurture Followup Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Daily Founder Report Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vendor Low Credit Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Complaint Escalation Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lead Source Tracking Preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failure Handler Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Lead Intake Preview": {
+      "main": [
+        [
+          {
+            "node": "Call QuickFurno AOS Process Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call QuickFurno AOS Process Lead": {
+      "main": [
+        [
+          {
+            "node": "AOS Process Lead Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client Confirmation Preview": {
+      "main": [
+        [
+          {
+            "node": "Prepare Client WhatsApp Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendor Lead Alert Preview": {
+      "main": [
+        [
+          {
+            "node": "Prepare Vendor WhatsApp Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

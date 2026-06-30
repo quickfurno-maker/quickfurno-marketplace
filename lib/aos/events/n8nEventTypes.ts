@@ -20,6 +20,7 @@ export type QuickFurnoN8nEventType = (typeof QUICKFURNO_N8N_EVENT_TYPES)[number]
 export interface QuickFurnoSafeSideEffectReport {
   n8nWebhookCalled: boolean;
   whatsappSent: boolean;
+  vendorNotified: boolean;
   providerCalled: boolean;
   creditsDeducted: boolean;
   leadAutoAssigned: boolean;
@@ -90,6 +91,7 @@ export function createSafeSideEffectReport(): QuickFurnoSafeSideEffectReport {
   return {
     n8nWebhookCalled: false,
     whatsappSent: false,
+    vendorNotified: false,
     providerCalled: false,
     creditsDeducted: false,
     leadAutoAssigned: false,

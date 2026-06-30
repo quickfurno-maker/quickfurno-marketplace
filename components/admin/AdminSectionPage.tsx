@@ -50,6 +50,7 @@ import {
 import { AOSControlCenter } from "./AOSControlCenter";
 import { CRMDashboard } from "./CRMDashboard";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
+import { AosAutomationControl } from "./AosAutomationControl";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
@@ -994,23 +995,28 @@ function AIAgentsPage() {
   );
 }
 
-function AutomationsPage({ notify }: { notify: (message: string) => void }) {
+function AutomationsPage({ notify }: { notify: (message: string, tone?: "success" | "error" | "info") => void }) {
   return (
-    <DataTable
-      rows={automationRows}
-      emptyTitle="No automations"
-      emptyMessage="Automation workflows will appear here after the automations table is connected."
-      columns={[
-        { header: "Automation", cell: (row) => <Strong title={row[0]} subtitle={row[1]} /> },
-        { header: "Trigger", cell: (row) => row[1] },
-        { header: "Action", cell: (row) => row[2] },
-        { header: "Status", cell: (row) => <StatusBadge value={row[3]} /> },
-        { header: "Last Run", cell: () => "Not run" },
-        { header: "Success", cell: () => "0" },
-        { header: "Failed", cell: () => "0" },
-        { header: "Actions", cell: () => <ActionMenu actions={[{ label: "Test webhook", onClick: () => notify("Webhook test placeholder ready.") }, { label: "Enable/disable", onClick: () => notify("Automation toggle placeholder ready.") }]} /> },
-      ]}
-    />
+    <div className="space-y-5">
+      <AosAutomationControl notify={notify} />
+      <SectionCard title="Automation Workflows" description="Placeholder workflow catalog. n8n forwarding is governed by the AOS / n8n control above.">
+        <DataTable
+          rows={automationRows}
+          emptyTitle="No automations"
+          emptyMessage="Automation workflows will appear here after the automations table is connected."
+          columns={[
+            { header: "Automation", cell: (row) => <Strong title={row[0]} subtitle={row[1]} /> },
+            { header: "Trigger", cell: (row) => row[1] },
+            { header: "Action", cell: (row) => row[2] },
+            { header: "Status", cell: (row) => <StatusBadge value={row[3]} /> },
+            { header: "Last Run", cell: () => "Not run" },
+            { header: "Success", cell: () => "0" },
+            { header: "Failed", cell: () => "0" },
+            { header: "Actions", cell: () => <ActionMenu actions={[{ label: "Test webhook", onClick: () => notify("Webhook test placeholder ready.") }, { label: "Enable/disable", onClick: () => notify("Automation toggle placeholder ready.") }]} /> },
+          ]}
+        />
+      </SectionCard>
+    </div>
   );
 }
 

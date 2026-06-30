@@ -1,6 +1,7 @@
-import { createSafeSideEffectReport, isQuickFurnoN8nEventType, type QuickFurnoSafeSideEffectReport } from "@/lib/aos/events/n8nEventTypes";
+import { createSafeSideEffectReport, isQuickFurnoN8nEventType, type QuickFurnoN8nEventResult, type QuickFurnoSafeSideEffectReport } from "@/lib/aos/events/n8nEventTypes";
 import { getWorkflowForN8nEvent } from "@/lib/aos/events/n8nWorkflowMap";
 import { queueEventForN8n } from "@/lib/aos/sync/n8nSyncService";
+import { resolveAosN8nActivation, type AosRuntimeMode } from "@/lib/aos/runtime/aosRuntimeSettings";
 
 type SafeAgentEventType = "lead.created" | "lead.qualified" | "lead.assignment_preview" | "aos.failure";
 
@@ -46,6 +47,8 @@ export interface SafeAgentEventResponse {
   agents: SafeAgentPreviewResult;
   n8nWebhookCalled: boolean;
   mockMode: boolean;
+  runtimeAutomationEnabled: boolean;
+  runtimeAutomationMode: AosRuntimeMode;
   sideEffects: QuickFurnoSafeSideEffectReport;
   message: string;
   n8n: {
@@ -72,25 +75,31 @@ export async function runSafeAgentEventPipeline(payload: unknown): Promise<SafeA
     const agents = buildSafeAgentPreview(normalized.eventType);
     const workflowName = getWorkflowForN8nEvent(normalized.eventType);
 
-    const n8nResult = await queueEventForN8n({
-      eventType: normalized.eventType,
-      leadId: normalized.leadId,
-      source: normalized.source,
-      occurredAt: normalized.timestamp,
-      data: {
-        eventType: normalized.eventType,
-        workflowName,
-        leadId: normalized.leadId,
-        source: normalized.source,
-        timestamp: normalized.timestamp,
-        agentPreviewSummary: summarizeAgents(agents),
-        agents,
-      },
-      metadata: {
-        mode: "safe_agent_preview",
-        sideEffectsDisabled: true,
-      },
-    });
+    // Two-lock safety gate (Lock 1 = server env, Lock 2 = admin runtime switch).
+    // Only when BOTH locks are ON do we even attempt the outbound webhook.
+    const activation = await resolveAosN8nActivation();
+
+    const n8nResult = activation.shouldCallN8n
+      ? await queueEventForN8n({
+          eventType: normalized.eventType,
+          leadId: normalized.leadId,
+          source: normalized.source,
+          occurredAt: normalized.timestamp,
+          data: {
+            eventType: normalized.eventType,
+            workflowName,
+            leadId: normalized.leadId,
+            source: normalized.source,
+            timestamp: normalized.timestamp,
+            agentPreviewSummary: summarizeAgents(agents),
+            agents,
+          },
+          metadata: {
+            mode: "safe_agent_preview",
+            sideEffectsDisabled: true,
+          },
+        })
+      : buildLockedN8nResult(normalized.eventType, workflowName, activation.reason);
 
     const sideEffects: QuickFurnoSafeSideEffectReport = {
       ...createSafeSideEffectReport(),
@@ -108,6 +117,8 @@ export async function runSafeAgentEventPipeline(payload: unknown): Promise<SafeA
       agents,
       n8nWebhookCalled: sideEffects.n8nWebhookCalled,
       mockMode: !sideEffects.n8nWebhookCalled,
+      runtimeAutomationEnabled: activation.runtime.enabled,
+      runtimeAutomationMode: activation.runtime.mode,
       sideEffects,
       message: sideEffects.n8nWebhookCalled
         ? "Safe AOS agent preview completed and n8n accepted the event. All other side effects remain disabled."
@@ -133,6 +144,8 @@ export async function runSafeAgentEventPipeline(payload: unknown): Promise<SafeA
       agents,
       n8nWebhookCalled: false,
       mockMode: true,
+      runtimeAutomationEnabled: false,
+      runtimeAutomationMode: "off",
       sideEffects,
       message: "Malformed AOS event handled safely. No side effects executed.",
       n8n: {
@@ -142,6 +155,32 @@ export async function runSafeAgentEventPipeline(payload: unknown): Promise<SafeA
       },
     };
   }
+}
+
+/**
+ * Result used when the two-lock gate blocks the outbound webhook. No webhook is
+ * attempted; all side effects remain disabled. This keeps AOS in safe mock mode
+ * whenever Lock 1 (env) or Lock 2 (admin runtime switch) is OFF.
+ */
+function buildLockedN8nResult(
+  eventType: SafeAgentEventType,
+  workflowName: string,
+  reason: string,
+): QuickFurnoN8nEventResult {
+  return {
+    ok: true,
+    status: "mocked",
+    eventType: isQuickFurnoN8nEventType(eventType) ? eventType : "aos.failure",
+    workflowName,
+    message: reason,
+    mockMode: true,
+    sideEffects: createSafeSideEffectReport(),
+    details: {
+      gate: "two_lock",
+      n8nWebhookCalled: false,
+      databasePersisted: false,
+    },
+  };
 }
 
 function normalizeSafeAgentEventPayload(payload: unknown) {

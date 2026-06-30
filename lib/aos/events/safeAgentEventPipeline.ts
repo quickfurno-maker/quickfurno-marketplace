@@ -3,7 +3,12 @@ import { getWorkflowForN8nEvent } from "@/lib/aos/events/n8nWorkflowMap";
 import { queueEventForN8n } from "@/lib/aos/sync/n8nSyncService";
 import { resolveAosN8nActivation, type AosRuntimeMode } from "@/lib/aos/runtime/aosRuntimeSettings";
 
-type SafeAgentEventType = "lead.created" | "lead.qualified" | "lead.assignment_preview" | "aos.failure";
+type SafeAgentEventType =
+  | "lead.created"
+  | "lead.qualified"
+  | "lead.assignment_preview"
+  | "lead.assignment_approved"
+  | "aos.failure";
 
 export interface SafeAgentPreviewResult {
   trustShield: {
@@ -62,6 +67,7 @@ const supportedSafeAgentEvents: SafeAgentEventType[] = [
   "lead.created",
   "lead.qualified",
   "lead.assignment_preview",
+  "lead.assignment_approved",
   "aos.failure",
 ];
 
@@ -201,6 +207,7 @@ function normalizeSafeAgentEventPayload(payload: unknown) {
 
 function normalizeSafeEventType(value: string | null): SafeAgentEventType {
   if (value === "lead.assignment_preview") return "lead.assignment_preview";
+  if (value === "lead.assignment_approved") return "lead.assignment_approved";
   if (value && supportedSafeAgentEvents.includes(value as SafeAgentEventType) && isQuickFurnoN8nEventType(value)) {
     return value as SafeAgentEventType;
   }

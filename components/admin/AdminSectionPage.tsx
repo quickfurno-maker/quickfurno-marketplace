@@ -1,15 +1,14 @@
 "use client";
 
-import { type ReactNode, useMemo, useState, useTransition } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
-  adminApproveVendor,
-  adminRejectVendor,
   adminSetCategoryActive,
   adminSetCityActive,
   adminSetPackageActive,
-  adminSuspendVendor,
   adminUpdateLeadStatus,
 } from "@/app/actions";
+import { evaluateVendorEligibility, type VendorEligibility } from "@/lib/vendors/vendorEligibility";
 import {
   ActionMenu,
   ChartCard,
@@ -51,6 +50,7 @@ import { AOSControlCenter } from "./AOSControlCenter";
 import { CRMDashboard } from "./CRMDashboard";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { AosAutomationControl } from "./AosAutomationControl";
+import { LeadAssignmentApprovalControl } from "./LeadAssignmentApprovalControl";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
@@ -287,29 +287,71 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
   );
 }
 
-function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void; ask: any }) {
+function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("All");
   const [status, setStatus] = useState("All");
   const [packageStatus, setPackageStatus] = useState("All");
+  const [eligibility, setEligibility] = useState("All");
   const [selected, setSelected] = useState<Vendor | null>(null);
+  const [creditsFor, setCreditsFor] = useState<Vendor | null>(null);
+  const [packageFor, setPackageFor] = useState<Vendor | null>(null);
+  const [logFor, setLogFor] = useState<Vendor | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const packageOptions = useMemo(() => uniqueOptions(data.vendors.map((vendor) => vendorPackageStatus(vendor, latestVendorPackage(vendor.id, data.vendorPackages))), "All"), [data.vendors, data.vendorPackages]);
+  // Phase 13B: ONE shared eligibility helper, same as the Lead Assignment
+  // Approval Preview, so the two surfaces always agree.
+  const eligibilityById = useMemo(() => {
+    const map = new Map<string, VendorEligibility>();
+    data.vendors.forEach((vendor) => map.set(vendor.id, evaluateVendorEligibility(vendor as Record<string, unknown>)));
+    return map;
+  }, [data.vendors]);
+
+  const packageOptions = useMemo(() => uniqueOptions(data.vendors.map((vendor) => vendorRowPackageStatus(vendor)), "All"), [data.vendors]);
   const vendors = useMemo(() => data.vendors.filter((vendor) => {
-    const latestPackage = latestVendorPackage(vendor.id, data.vendorPackages);
-    const currentPackageStatus = vendorPackageStatus(vendor, latestPackage);
+    const currentPackageStatus = vendorRowPackageStatus(vendor);
+    const isEligible = eligibilityById.get(vendor.id)?.eligible ?? false;
     return includesQuery([vendor.business_name, vendor.owner_name, vendor.phone, vendor.city, vendor.status, vendor.service_categories?.join(" "), currentPackageStatus], query)
       && (city === "All" || vendor.city === city)
       && (status === "All" || vendor.status === status)
-      && (packageStatus === "All" || currentPackageStatus === packageStatus);
-  }), [data.vendors, data.vendorPackages, query, city, status, packageStatus]);
+      && (packageStatus === "All" || currentPackageStatus === packageStatus)
+      && (eligibility === "All" || (eligibility === "Eligible" ? isEligible : !isEligible));
+  }), [data.vendors, eligibilityById, query, city, status, packageStatus, eligibility]);
+
+  const eligibleCount = useMemo(() => [...eligibilityById.values()].filter((e) => e.eligible).length, [eligibilityById]);
+
+  // Mutations go through the Phase 13B admin APIs, then refresh the snapshot.
+  const mutate = useCallback(async (vendorId: string, path: string, body: Record<string, unknown>, successMsg: string) => {
+    setBusyId(vendorId);
+    try {
+      const res = await fetch(`/api/admin/vendors/${vendorId}/${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !result?.ok) {
+        notify(result?.error ?? "Action failed.", "error");
+        return false;
+      }
+      notify(successMsg, "success");
+      router.refresh();
+      return true;
+    } catch {
+      notify("Action failed. Please try again.", "error");
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  }, [notify, router]);
 
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Vendors" value={formatNumber(data.vendors.length)} helper="All vendor records" icon="vendors" />
-        <StatCard label="Active Vendors" value={formatNumber(data.stats.active_vendors)} helper="Ready for leads" icon="vendors" tone="emerald" />
-        <StatCard label="Paid Vendors" value={formatNumber(data.stats.paid_vendors)} helper="Package attached" icon="subscriptions" tone="indigo" />
+        <StatCard label="Eligible for Preview" value={formatNumber(eligibleCount)} helper="Approved, active, package + credits" icon="vendors" tone="emerald" />
+        <StatCard label="Active Vendors" value={formatNumber(data.stats.active_vendors)} helper="Ready for leads" icon="vendors" tone="indigo" />
         <StatCard label="Low Credits" value={formatNumber(data.stats.low_balance_vendors)} helper="Renewal risk" icon="notifications" tone="amber" />
       </section>
 
@@ -323,14 +365,15 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
           >
             <div className="flex items-start justify-between gap-3">
               <Strong title={vendor.business_name || "Unnamed vendor"} subtitle={vendor.city || "City not set"} />
-              <VendorHealthBadge vendor={vendor} />
+              <VendorEligibilityBadge eligibility={eligibilityById.get(vendor.id)} />
             </div>
             <div className="mt-4">
               <CreditsMeter value={Number(vendor.remaining_credits ?? 0)} total={Number(vendor.total_credits ?? 0)} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusBadge value={vendor.status || "Pending"} />
-              <StatusBadge value={vendorPackageStatus(vendor, latestVendorPackage(vendor.id, data.vendorPackages))} />
+              <StatusBadge value={vendor.is_active === false ? "Inactive" : "Active"} tone={vendor.is_active === false ? "rose" : "emerald"} />
+              <StatusBadge value={`Pkg: ${vendorRowPackageStatus(vendor)}`} tone={isLivePackage(vendor) ? "emerald" : "slate"} />
             </div>
           </button>
         ))}
@@ -345,6 +388,7 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
             <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(data.vendors.map((vendor) => vendor.city))} />
             <SelectFilter label="Status" value={status} onChange={setStatus} options={uniqueOptions(data.vendors.map((vendor) => vendor.status))} />
             <SelectFilter label="Package" value={packageStatus} onChange={setPackageStatus} options={packageOptions} />
+            <SelectFilter label="Eligibility" value={eligibility} onChange={setEligibility} options={["All", "Eligible", "Not eligible"]} />
           </>
         }
         action={<SecondaryButton onClick={() => notify("Vendor export placeholder ready.")}>Export Vendors</SecondaryButton>}
@@ -358,20 +402,26 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
           { header: "Vendor / Business", cell: (vendor) => <Strong title={vendor.business_name || "Unnamed vendor"} subtitle={`${vendor.owner_name || "No owner"} - ${maskPhone(vendor.phone)}`} /> },
           { header: "City", cell: (vendor) => vendor.city || "Not set" },
           { header: "Categories", cell: (vendor) => <span className="line-clamp-2 min-w-44">{vendor.service_categories?.join(", ") || "Not set"}</span> },
-          { header: "Package", cell: (vendor) => <VendorPackageCell vendor={vendor} data={data} /> },
+          { header: "Package", cell: (vendor) => <VendorRowPackageCell vendor={vendor} /> },
           { header: "Credits", cell: (vendor) => <CreditsMeter value={Number(vendor.remaining_credits ?? 0)} total={Number(vendor.total_credits ?? 0)} /> },
-          { header: "Health", cell: (vendor) => <VendorHealthBadge vendor={vendor} /> },
+          { header: "Active", cell: (vendor) => <StatusBadge value={vendor.is_active === false ? "Inactive" : "Active"} tone={vendor.is_active === false ? "rose" : "emerald"} /> },
           { header: "Status", cell: (vendor) => <StatusBadge value={vendor.status || "Pending"} /> },
-          { header: "Rating", cell: (vendor) => vendor.rating ? `${vendor.rating}/5` : "Not rated" },
+          { header: "Eligibility", cell: (vendor) => <VendorEligibilityBadge eligibility={eligibilityById.get(vendor.id)} /> },
           {
             header: "Actions",
             cell: (vendor) => (
               <ActionMenu
                 actions={[
                   { label: "View vendor", onClick: () => setSelected(vendor) },
-                  { label: "Approve", onClick: () => ask("Approve vendor", "This will mark the vendor as approved.", () => adminApproveVendor(vendor.id)) },
-                  { label: "Reject", onClick: () => ask("Reject vendor", "This will reject the vendor application.", () => adminRejectVendor(vendor.id)) },
-                  { label: "Suspend", onClick: () => ask("Suspend vendor", "This will suspend vendor visibility and operations.", () => adminSuspendVendor(vendor.id)) },
+                  { label: "Approve vendor", onClick: () => void mutate(vendor.id, "status", { action: "approve" }, "Vendor approved.") },
+                  { label: "Reject vendor", onClick: () => void mutate(vendor.id, "status", { action: "reject" }, "Vendor rejected.") },
+                  { label: "Suspend vendor", onClick: () => void mutate(vendor.id, "status", { action: "suspend" }, "Vendor suspended.") },
+                  { label: "Activate vendor", onClick: () => void mutate(vendor.id, "status", { action: "activate" }, "Vendor activated.") },
+                  { label: "Deactivate vendor", onClick: () => void mutate(vendor.id, "status", { action: "deactivate" }, "Vendor deactivated.") },
+                  { label: "Manage Credits", onClick: () => setCreditsFor(vendor) },
+                  { label: "Assign / Update Package", onClick: () => setPackageFor(vendor) },
+                  { label: "Mark Package Expired", onClick: () => void mutate(vendor.id, "package", { packageStatus: "expired", packageName: vendor.package_name ?? null }, "Package marked expired.") },
+                  { label: "View Credit Log", onClick: () => setLogFor(vendor) },
                 ]}
               />
             ),
@@ -379,8 +429,189 @@ function VendorsPage({ data, notify, ask }: { data: Snapshot; notify: (message: 
         ]}
       />
 
-      {selected ? <VendorDetailDrawer vendor={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? <VendorDetailDrawer vendor={selected} eligibility={eligibilityById.get(selected.id)} onClose={() => setSelected(null)} /> : null}
+      {creditsFor ? <ManageCreditsModal vendor={creditsFor} busy={busyId === creditsFor.id} onClose={() => setCreditsFor(null)} onSave={(body) => mutate(creditsFor.id, "credits", body, "Credits updated.").then((ok) => { if (ok) setCreditsFor(null); })} /> : null}
+      {packageFor ? <AssignPackageModal vendor={packageFor} busy={busyId === packageFor.id} onClose={() => setPackageFor(null)} onSave={(body) => mutate(packageFor.id, "package", body, "Package updated.").then((ok) => { if (ok) setPackageFor(null); })} /> : null}
+      {logFor ? <CreditLogModal vendor={logFor} notify={notify} onClose={() => setLogFor(null)} /> : null}
     </div>
+  );
+}
+
+/** Denormalized package status from the vendor row (Phase 13B). */
+function vendorRowPackageStatus(vendor: Vendor): string {
+  const value = (vendor as Record<string, unknown>).package_status;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim().toLowerCase() : "none";
+}
+
+function isLivePackage(vendor: Vendor): boolean {
+  const status = vendorRowPackageStatus(vendor);
+  return status === "active" || status === "trial";
+}
+
+function VendorEligibilityBadge({ eligibility }: { eligibility?: VendorEligibility }) {
+  if (!eligibility) return <StatusBadge value="Unknown" tone="slate" />;
+  if (eligibility.eligible) return <StatusBadge value="Eligible for lead preview" tone="emerald" />;
+  const reason = eligibility.reasons[0] ?? "Not eligible";
+  return (
+    <span title={eligibility.reasons.join(" · ")}>
+      <StatusBadge value={`Not eligible: ${reason}`} tone="rose" />
+    </span>
+  );
+}
+
+function VendorRowPackageCell({ vendor }: { vendor: Vendor }) {
+  const status = vendorRowPackageStatus(vendor);
+  const name = (vendor as Record<string, unknown>).package_name;
+  return (
+    <div className="min-w-40">
+      <p className="font-semibold text-slate-950">{typeof name === "string" && name ? name : "No package"}</p>
+      <div className="mt-1">
+        <StatusBadge value={status} tone={isLivePackage(vendor) ? "emerald" : status === "expired" ? "rose" : "slate"} />
+      </div>
+    </div>
+  );
+}
+
+function ModalShell({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Close</button>
+        </div>
+        <div className="mt-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ManageCreditsModal({ vendor, busy, onClose, onSave }: { vendor: Vendor; busy: boolean; onClose: () => void; onSave: (body: Record<string, unknown>) => void }) {
+  const [mode, setMode] = useState<"add" | "set">("add");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const current = Number(vendor.remaining_credits ?? 0);
+  const parsed = Number(amount);
+  const valid = Number.isFinite(parsed) && (mode === "add" ? true : parsed >= 0);
+
+  return (
+    <ModalShell title="Manage Credits" subtitle={vendor.business_name || "Vendor"} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Current credits</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950">{formatNumber(current)}</p>
+        </div>
+        <div className="inline-flex gap-2 rounded-xl border border-slate-200 bg-white p-1">
+          {(["add", "set"] as const).map((option) => (
+            <button key={option} type="button" onClick={() => setMode(option)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${mode === option ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+              {option === "add" ? "Add credits" : "Set credits"}
+            </button>
+          ))}
+        </div>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase text-slate-500">{mode === "add" ? "Credits to add (negative removes)" : "Set credits to"}</span>
+          <input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase text-slate-500">Reason</span>
+          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Manual top-up after payment" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+        </label>
+        <p className="text-xs text-slate-500">No credits are ever deducted automatically. This change is logged.</p>
+        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton onClick={() => { if (valid) onSave({ mode, amount: parsed, reason: reason.trim() || null }); }}>{busy ? "Saving..." : "Save"}</PrimaryButton>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function AssignPackageModal({ vendor, busy, onClose, onSave }: { vendor: Vendor; busy: boolean; onClose: () => void; onSave: (body: Record<string, unknown>) => void }) {
+  const row = vendor as Record<string, unknown>;
+  const [packageName, setPackageName] = useState(typeof row.package_name === "string" ? row.package_name : "");
+  const [packageStatus, setPackageStatus] = useState(vendorRowPackageStatus(vendor));
+  const [creditsToAdd, setCreditsToAdd] = useState("");
+  const [expiresAt, setExpiresAt] = useState(typeof row.package_expires_at === "string" ? String(row.package_expires_at).slice(0, 10) : "");
+  const statuses = ["none", "trial", "active", "expired", "cancelled"];
+
+  return (
+    <ModalShell title="Assign / Update Package" subtitle={vendor.business_name || "Vendor"} onClose={onClose}>
+      <div className="space-y-4">
+        <label className="block">
+          <span className="text-xs font-semibold uppercase text-slate-500">Package name</span>
+          <input value={packageName} onChange={(event) => setPackageName(event.target.value)} placeholder="e.g. Growth Package" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase text-slate-500">Package status</span>
+          <select value={packageStatus} onChange={(event) => setPackageStatus(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100">
+            {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase text-slate-500">Credits to add (optional)</span>
+          <input value={creditsToAdd} onChange={(event) => setCreditsToAdd(event.target.value)} type="number" placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase text-slate-500">Expiry date (optional)</span>
+          <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} type="date" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+        </label>
+        <p className="text-xs text-slate-500">Updating the package never notifies the vendor and never triggers n8n.</p>
+        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton onClick={() => onSave({ packageName: packageName.trim() || null, packageStatus, creditsToAdd: Number(creditsToAdd) || 0, packageExpiresAt: expiresAt || null })}>{busy ? "Saving..." : "Save"}</PrimaryButton>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function CreditLogModal({ vendor, notify, onClose }: { vendor: Vendor; notify: (message: string, tone?: "success" | "error" | "info") => void; onClose: () => void }) {
+  const [rows, setRows] = useState<Array<Record<string, any>> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/vendors/${vendor.id}/credit-log`, { cache: "no-store" });
+        const data = (await res.json()) as { ok?: boolean; log?: Array<Record<string, any>>; error?: string };
+        if (!active) return;
+        if (!res.ok || !data?.ok) {
+          notify(data?.error ?? "Could not load the credit log.", "error");
+          setRows([]);
+          return;
+        }
+        setRows(data.log ?? []);
+      } catch {
+        if (active) { notify("Could not load the credit log.", "error"); setRows([]); }
+      }
+    })();
+    return () => { active = false; };
+  }, [vendor.id, notify]);
+
+  return (
+    <ModalShell title="Credit Log" subtitle={vendor.business_name || "Vendor"} onClose={onClose}>
+      {rows === null ? (
+        <p className="text-sm text-slate-500">Loading credit log...</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-slate-500">No credit changes recorded yet for this vendor.</p>
+      ) : (
+        <div className="max-h-80 space-y-2 overflow-y-auto">
+          {rows.map((row, index) => (
+            <div key={row.id ?? index} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <StatusBadge value={String(row.changeType ?? "change")} tone={Number(row.creditsDelta ?? 0) >= 0 ? "emerald" : "rose"} />
+                <span className="font-semibold text-slate-900">{Number(row.creditsBefore ?? 0)} → {Number(row.creditsAfter ?? 0)}</span>
+              </div>
+              {row.reason ? <p className="mt-1 text-xs text-slate-500">{row.reason}</p> : null}
+              <p className="mt-1 text-xs text-slate-400">{row.updatedBy ? `${row.updatedBy} · ` : ""}{formatDate(row.createdAt)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </ModalShell>
   );
 }
 
@@ -591,11 +822,6 @@ function SourceBadge({ value }: { value: string }) {
   return <StatusBadge value={value} tone={tone} />;
 }
 
-function VendorHealthBadge({ vendor }: { vendor: Vendor }) {
-  const score = vendorHealthScore(vendor);
-  return <StatusBadge value={`${score}%`} tone={score >= 75 ? "emerald" : score >= 45 ? "amber" : "rose"} />;
-}
-
 function CreditsMeter({ value, total }: { value: number; total: number }) {
   const normalizedTotal = Math.max(total, value, 1);
   const percentage = Math.round((Math.max(value, 0) / normalizedTotal) * 100);
@@ -608,21 +834,6 @@ function CreditsMeter({ value, total }: { value: number; total: number }) {
         <span className="text-slate-900">{formatNumber(value)} / {formatNumber(normalizedTotal)}</span>
       </div>
       <ProgressBar value={percentage} tone={tone} />
-    </div>
-  );
-}
-
-function VendorPackageCell({ vendor, data }: { vendor: Vendor; data: Snapshot }) {
-  const latestPackage = latestVendorPackage(vendor.id, data.vendorPackages);
-  const currentPackage = latestPackage ? packageName(data.packages, latestPackage.package_id) : "No package";
-  const status = vendorPackageStatus(vendor, latestPackage);
-
-  return (
-    <div className="min-w-40">
-      <p className="font-semibold text-slate-950">{currentPackage}</p>
-      <div className="mt-1">
-        <StatusBadge value={status} />
-      </div>
     </div>
   );
 }
@@ -787,25 +998,6 @@ function leadPriorityLabel(lead: Lead) {
   return "Normal";
 }
 
-function latestVendorPackage(vendorId: string, rows: any[]) {
-  return rows.find((row) => row.vendor_id === vendorId) ?? null;
-}
-
-function vendorPackageStatus(vendor: Vendor, latestPackage: any) {
-  const status = String(latestPackage?.status || latestPackage?.payment_status || "").trim();
-  if (status) return status;
-  if (Number(vendor.remaining_credits ?? 0) > 0) return "Active credits";
-  return "No package";
-}
-
-function vendorHealthScore(vendor: Vendor) {
-  const credits = Math.min(40, Number(vendor.remaining_credits ?? 0) * 8);
-  const rating = Math.min(25, Number(vendor.rating ?? 0) * 5);
-  const active = vendor.is_active !== false && ["approved", "active"].includes(String(vendor.status ?? "").toLowerCase()) ? 25 : 8;
-  const visibility = vendor.public_visibility === false ? 0 : 10;
-  return Math.max(8, Math.min(98, Math.round(credits + rating + active + visibility)));
-}
-
 function packageFeatures(item: PackageRow) {
   return [
     `${formatNumber(item.lead_count)} verified leads`,
@@ -822,14 +1014,16 @@ function citySupply(city: City, data: Snapshot) {
   return data.vendors.filter((vendor) => String(vendor.city ?? "").toLowerCase() === String(city.name ?? "").toLowerCase()).length;
 }
 
-function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
+function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
   const [tab, setTab] = useState("Rules & Settings");
-  const tabs = ["Rules & Settings", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
+  const tabs = ["Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
 
   return (
     <div className="space-y-5">
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
-      {tab === "Rules & Settings" ? (
+      {tab === "Assignment Approval Preview" ? (
+        <LeadAssignmentApprovalControl leads={data.leads} notify={notify} />
+      ) : tab === "Rules & Settings" ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {["Auto assignment", "Match by city", "Match by locality", "Verified vendors only", "Paid vendors only", "Remaining leads required", "Duplicate protection", "Fair rotation"].map((rule, index) => (
             <article key={rule} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -876,7 +1070,11 @@ function AssignmentsTable({ data, rows, failed = false }: { data: Snapshot; rows
 function EligibilityChecker({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
   const [city, setCity] = useState(data.cities[0]?.name || "Pune");
   const [category, setCategory] = useState(data.categories[0]?.name || "Interior");
-  const eligible = data.vendors.filter((vendor) => vendor.city === city && (vendor.service_categories ?? []).some((item) => item === category) && Number(vendor.remaining_credits ?? 0) > 0);
+  // Phase 13B: same shared eligibility helper the Lead Assignment Approval
+  // Preview uses, so this checker agrees with it exactly.
+  const eligible = data.vendors.filter(
+    (vendor) => evaluateVendorEligibility(vendor as Record<string, unknown>, { leadCity: city, leadCategory: category }).eligible,
+  );
 
   return (
     <section className="grid gap-5 xl:grid-cols-[360px_1fr]">
@@ -1162,19 +1360,37 @@ function LeadDetailDrawer({ lead, vendors, onClose }: { lead: Lead; vendors: Ven
   );
 }
 
-function VendorDetailDrawer({ vendor, onClose }: { vendor: Vendor; onClose: () => void }) {
+function VendorDetailDrawer({ vendor, eligibility, onClose }: { vendor: Vendor; eligibility?: VendorEligibility; onClose: () => void }) {
+  const row = vendor as Record<string, unknown>;
   return (
     <Drawer title={vendor.business_name || "Vendor details"} subtitle={`Vendor ID ${shortId(vendor.id)}`} onClose={onClose}>
-      <InfoGrid rows={[
-        ["Owner", vendor.owner_name || "Not provided"],
-        ["Phone", vendor.phone || "Not provided"],
-        ["Email", vendor.email || "Not provided"],
-        ["City", vendor.city || "Not provided"],
-        ["Categories", vendor.service_categories?.join(", ") || "Not provided"],
-        ["Areas", vendor.areas_covered?.join(", ") || "Not provided"],
-        ["Leads Remaining", formatNumber(vendor.remaining_credits)],
-        ["Status", <StatusBadge key="status" value={vendor.status || "Pending"} />],
-      ]} />
+      <div className="space-y-5">
+        <InfoGrid rows={[
+          ["Owner", vendor.owner_name || "Not provided"],
+          ["Phone", vendor.phone || "Not provided"],
+          ["Email", vendor.email || "Not provided"],
+          ["City", vendor.city || "Not provided"],
+          ["Categories", vendor.service_categories?.join(", ") || "Not provided"],
+          ["Areas", vendor.areas_covered?.join(", ") || "Not provided"],
+          ["Leads Remaining", formatNumber(vendor.remaining_credits)],
+          ["Status", <StatusBadge key="status" value={vendor.status || "Pending"} />],
+          ["Active", <StatusBadge key="active" value={vendor.is_active === false ? "Inactive" : "Active"} tone={vendor.is_active === false ? "rose" : "emerald"} />],
+          ["Package", `${typeof row.package_name === "string" && row.package_name ? `${row.package_name} · ` : ""}${vendorRowPackageStatus(vendor)}`],
+        ]} />
+        {eligibility ? (
+          <article className={`rounded-2xl border p-4 ${eligibility.eligible ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-950">Lead preview eligibility</h3>
+              <VendorEligibilityBadge eligibility={eligibility} />
+            </div>
+            {eligibility.eligible ? (
+              <p className="mt-2 text-sm text-emerald-800">This vendor will appear as selectable in the Lead Assignment Approval Preview when city and category match.</p>
+            ) : (
+              <p className="mt-2 text-sm text-rose-800">Not eligible: {eligibility.reasons.join(", ")}.</p>
+            )}
+          </article>
+        ) : null}
+      </div>
     </Drawer>
   );
 }

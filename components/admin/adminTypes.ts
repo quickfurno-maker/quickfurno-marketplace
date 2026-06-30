@@ -51,6 +51,11 @@ export type Vendor = {
   public_visibility?: boolean | null;
   last_assigned_at?: string | null;
   gst_number?: string | null;
+  paid_status?: string | null;
+  // Phase 13B: denormalized package fields used by preview eligibility.
+  package_name?: string | null;
+  package_status?: string | null;
+  package_expires_at?: string | null;
 };
 
 export type PackageRow = {

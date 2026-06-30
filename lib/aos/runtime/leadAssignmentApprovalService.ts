@@ -323,31 +323,50 @@ export async function createLeadAssignmentApprovalPreview(
   try {
     const db = adminClient();
 
-    // Confirm the lead exists before saving a preview approval for it.
-    const { data: leadRow } = await db.from("leads").select("id").eq("id", leadId).maybeSingle();
+    // Confirm the lead exists and capture a readable snapshot for the ledger.
+    const { data: leadRow } = await db
+      .from("leads")
+      .select("id, name, city, area, service_required, budget")
+      .eq("id", leadId)
+      .maybeSingle();
     if (!leadRow) {
       return { ok: false, error: "Lead not found.", code: "LEAD_NOT_FOUND" };
     }
 
+    const leadSnapshot = buildLeadSnapshot(leadRow as Record<string, unknown>);
+    const vendorSnapshot = await buildVendorSnapshot(selectedVendorIds);
+
     // 1) Save the PREVIEW approval record first (marked preview/draft).
     const initialSideEffects = buildSideEffects(false);
-    const { data: inserted, error: insertErr } = await db
-      .from("lead_assignment_approvals")
-      .insert({
-        lead_id: leadId,
-        selected_vendor_ids: selectedVendorIds,
-        selected_vendor_count: selectedVendorCount,
-        status: "preview_approved",
-        mode: "preview",
-        approval_note: approvalNote,
-        approved_by: approvedBy,
-        aos_event_emitted: false,
-        n8n_webhook_called: false,
-        side_effects: initialSideEffects,
-        updated_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
+    const baseRecord = {
+      lead_id: leadId,
+      selected_vendor_ids: selectedVendorIds,
+      selected_vendor_count: selectedVendorCount,
+      status: "preview_approved",
+      mode: "preview",
+      approval_note: approvalNote,
+      approved_by: approvedBy,
+      aos_event_emitted: false,
+      n8n_webhook_called: false,
+      side_effects: initialSideEffects,
+      updated_at: new Date().toISOString(),
+    };
+    // Phase 14 ledger snapshot columns (migration 019). If they are not present
+    // yet, fall back to the base record so Phase 13 approval never breaks.
+    const ledgerRecord = {
+      ...baseRecord,
+      lead_snapshot: leadSnapshot,
+      vendor_snapshot: vendorSnapshot,
+      approval_source: "admin_preview",
+    };
+
+    const insertRow = (payload: Record<string, unknown>) =>
+      db.from("lead_assignment_approvals").insert(payload).select("id").single();
+
+    let { data: inserted, error: insertErr } = await insertRow(ledgerRecord);
+    if (insertErr && isMissingColumnError(insertErr)) {
+      ({ data: inserted, error: insertErr } = await insertRow(baseRecord));
+    }
 
     if (insertErr || !inserted?.id) {
       return {
@@ -375,6 +394,7 @@ export async function createLeadAssignmentApprovalPreview(
       : "preview_approved";
     const finalSideEffects = buildSideEffects(emit.n8nWebhookCalled);
 
+    // Core update — only columns guaranteed by migration 017.
     await db
       .from("lead_assignment_approvals")
       .update({
@@ -385,6 +405,28 @@ export async function createLeadAssignmentApprovalPreview(
         updated_at: new Date().toISOString(),
       })
       .eq("id", assignmentApprovalId);
+
+    // Best-effort: store the safe AOS emit summary on the ledger (migration 019).
+    // No secrets are included. Failure here never affects the approval result.
+    try {
+      await db
+        .from("lead_assignment_approvals")
+        .update({
+          event_response: {
+            status: emit.status,
+            workflowName: emit.workflowName,
+            n8nWebhookCalled: emit.n8nWebhookCalled,
+            mockMode: emit.mockMode,
+            runtimeAutomationEnabled: emit.runtimeAutomationEnabled,
+            runtimeAutomationMode: emit.runtimeAutomationMode,
+            reason: emit.reason,
+            message: emit.message,
+          },
+        })
+        .eq("id", assignmentApprovalId);
+    } catch {
+      /* event_response column not present yet — safe to ignore. */
+    }
 
     return {
       ok: true,
@@ -418,6 +460,70 @@ function buildSideEffects(n8nWebhookCalled: boolean): AssignmentApprovalSideEffe
     n8nWebhookCalled,
     databaseWritten: "preview_approval_record_only",
   };
+}
+
+/** Phase 14: readable lead snapshot saved on the approval ledger record. */
+function buildLeadSnapshot(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name: asText(row.name),
+    city: asText(row.city),
+    area: asText(row.area),
+    category: asText(row.service_required),
+    budget: asText(row.budget),
+  };
+}
+
+/**
+ * Phase 14: readable snapshot of the selected vendors (name/city/package/credits
+ * at approval time), preserving selection order. Falls back gracefully if the
+ * Phase 13B package_status column is not present yet.
+ */
+async function buildVendorSnapshot(vendorIds: string[]): Promise<Array<Record<string, unknown>>> {
+  if (vendorIds.length === 0) return [];
+
+  const minimal = () =>
+    vendorIds.map((id) => ({ id, businessName: null, city: null, packageStatus: "none", credits: 0, paidStatus: null }));
+
+  try {
+    const db = adminClient();
+    const fullColumns = "id, business_name, city, package_status, remaining_credits, paid_status";
+    const baseColumns = "id, business_name, city, remaining_credits, paid_status";
+
+    const primary = await db.from("vendors").select(fullColumns).in("id", vendorIds);
+    let rowsData: unknown = primary.data;
+    let queryError = primary.error;
+    if (queryError && isMissingColumnError(queryError)) {
+      const fallback = await db.from("vendors").select(baseColumns).in("id", vendorIds);
+      rowsData = fallback.data;
+      queryError = fallback.error;
+    }
+    if (queryError || !Array.isArray(rowsData)) return minimal();
+
+    const rows = rowsData as Array<Record<string, unknown>>;
+    return vendorIds.map((id) => {
+      const row = rows.find((candidate) => String(candidate.id) === id);
+      if (!row) return { id, businessName: null, city: null, packageStatus: "none", credits: 0, paidStatus: null };
+      const pkg = typeof row.package_status === "string" && row.package_status.trim() ? row.package_status.trim().toLowerCase() : "none";
+      return {
+        id,
+        businessName: asText(row.business_name),
+        city: asText(row.city),
+        packageStatus: pkg,
+        credits: asNumber(row.remaining_credits),
+        paidStatus: asText(row.paid_status),
+      };
+    });
+  } catch {
+    return minimal();
+  }
+}
+
+/** Postgres/PostgREST "column does not exist" — migration not applied yet. */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
 }
 
 async function countLeadAssignments(leadId: string): Promise<number> {

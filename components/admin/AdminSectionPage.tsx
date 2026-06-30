@@ -51,6 +51,7 @@ import { CRMDashboard } from "./CRMDashboard";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { AosAutomationControl } from "./AosAutomationControl";
 import { LeadAssignmentApprovalControl } from "./LeadAssignmentApprovalControl";
+import { DistributionLogsPanel, FailedAssignmentsPanel, RecentAssignmentsPanel } from "./AssignmentLedgerPanels";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
@@ -1036,66 +1037,64 @@ function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (messa
           ))}
         </section>
       ) : tab === "Recent Assignments" ? (
-        <AssignmentsTable data={data} rows={data.assignments.slice(0, 20)} />
+        <RecentAssignmentsPanel notify={notify} />
       ) : tab === "Failed Assignments" ? (
-        <AssignmentsTable data={data} rows={data.assignments.filter((row) => String(row.vendor_status || "").toLowerCase().includes("failed"))} failed />
+        <FailedAssignmentsPanel notify={notify} />
       ) : tab === "Vendor Eligibility Checker" ? (
         <EligibilityChecker data={data} notify={notify} />
       ) : (
-        <AssignmentsTable data={data} rows={data.assignments.slice(0, 20)} />
+        <DistributionLogsPanel notify={notify} />
       )}
     </div>
-  );
-}
-
-function AssignmentsTable({ data, rows, failed = false }: { data: Snapshot; rows: any[]; failed?: boolean }) {
-  return (
-    <DataTable
-      rows={rows}
-      emptyTitle={failed ? "No failed assignments" : "No assignments yet"}
-      emptyMessage="Assignment records will appear here after lead distribution runs."
-      columns={[
-        { header: "Lead", cell: (row) => leadName(data.leads, row.lead_id) },
-        { header: "Category", cell: (row) => data.leads.find((lead) => lead.id === row.lead_id)?.service_required || "Not set" },
-        { header: "City", cell: (row) => data.leads.find((lead) => lead.id === row.lead_id)?.city || "Not set" },
-        { header: "Assigned Vendor", cell: (row) => vendorName(data.vendors, row.vendor_id) },
-        { header: "Status", cell: (row) => <StatusBadge value={assignmentStatus(row)} /> },
-        { header: "Credits", cell: () => "1 deducted" },
-        { header: "Time", cell: (row) => formatDate(row.assigned_at || row.created_at) },
-      ]}
-    />
   );
 }
 
 function EligibilityChecker({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
   const [city, setCity] = useState(data.cities[0]?.name || "Pune");
   const [category, setCategory] = useState(data.categories[0]?.name || "Interior");
-  // Phase 13B: same shared eligibility helper the Lead Assignment Approval
-  // Preview uses, so this checker agrees with it exactly.
-  const eligible = data.vendors.filter(
-    (vendor) => evaluateVendorEligibility(vendor as Record<string, unknown>, { leadCity: city, leadCategory: category }).eligible,
+  // Phase 14: show full eligibility reasoning for every vendor in the selected
+  // city using the SAME shared helper the Lead Assignment Approval Preview uses.
+  const vendorsInCity = useMemo(
+    () =>
+      data.vendors
+        .filter((vendor) => String(vendor.city ?? "").trim().toLowerCase() === city.trim().toLowerCase())
+        .map((vendor) => ({
+          vendor,
+          eligibility: evaluateVendorEligibility(vendor as Record<string, unknown>, { leadCity: city, leadCategory: category }),
+        })),
+    [data.vendors, city, category],
   );
+  const eligibleCount = vendorsInCity.filter((row) => row.eligibility.eligible).length;
 
   return (
     <section className="grid gap-5 xl:grid-cols-[360px_1fr]">
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-950">Eligibility Checker</h2>
+        <p className="mt-2 text-sm text-slate-500">Uses the shared vendorEligibility helper — the same logic as the Lead Assignment Approval Preview.</p>
         <div className="mt-5 space-y-3">
           <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(data.cities.map((item) => item.name), city)} />
           <SelectFilter label="Category" value={category} onChange={setCategory} options={uniqueOptions(data.categories.map((item) => item.name), category)} />
-          <PrimaryButton onClick={() => notify("Eligibility check refreshed.")}>Check Vendors</PrimaryButton>
+          <PrimaryButton onClick={() => notify(`${eligibleCount} eligible vendor(s) in ${city} for ${category}.`)}>Check Vendors</PrimaryButton>
+        </div>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <p className="font-semibold text-slate-900">{eligibleCount} eligible</p>
+          <p className="mt-1 text-slate-500">of {vendorsInCity.length} vendor(s) in {city}</p>
         </div>
       </div>
       <DataTable
-        rows={eligible}
-        emptyTitle="No eligible vendors"
-        emptyMessage="Skipped vendor reasons include city mismatch, category mismatch, no leads remaining, paused status, or verification gaps."
+        rows={vendorsInCity}
+        emptyTitle="No vendors in this city"
+        emptyMessage="No vendor records match the selected city. Eligibility requires approved + active + active package + credits, and (for a lead) city + category match."
         columns={[
-          { header: "Vendor", cell: (vendor) => vendor.business_name || "Unnamed vendor" },
-          { header: "City", cell: (vendor) => vendor.city || "Not set" },
-          { header: "Credits", cell: (vendor) => formatNumber(vendor.remaining_credits) },
-          { header: "Status", cell: (vendor) => <StatusBadge value={vendor.status || "Pending"} /> },
-          { header: "Score", cell: (vendor) => `${Math.min(98, 65 + Number(vendor.rating ?? 0) * 5)}%` },
+          { header: "Vendor", cell: (row) => row.vendor.business_name || "Unnamed vendor" },
+          { header: "Eligible", cell: (row) => <StatusBadge value={row.eligibility.eligible ? "Eligible" : "Not eligible"} tone={row.eligibility.eligible ? "emerald" : "rose"} /> },
+          { header: "Reasons", cell: (row) => <span className="line-clamp-2 min-w-44 text-xs text-slate-500">{row.eligibility.reasons.length ? row.eligibility.reasons.join(", ") : "All checks passed"}</span> },
+          { header: "Status", cell: (row) => <StatusBadge value={row.eligibility.status} /> },
+          { header: "Active", cell: (row) => <StatusBadge value={row.eligibility.isActive ? "Active" : "Inactive"} tone={row.eligibility.isActive ? "emerald" : "rose"} /> },
+          { header: "Package", cell: (row) => <StatusBadge value={row.eligibility.packageStatus} tone={row.eligibility.packageStatus === "active" || row.eligibility.packageStatus === "trial" ? "emerald" : "slate"} /> },
+          { header: "Credits", cell: (row) => formatNumber(row.eligibility.credits) },
+          { header: "City match", cell: (row) => <StatusBadge value={row.eligibility.cityMatch ? "Yes" : "No"} tone={row.eligibility.cityMatch ? "emerald" : "rose"} /> },
+          { header: "Category match", cell: (row) => <StatusBadge value={row.eligibility.categoryMatch ? "Yes" : "No"} tone={row.eligibility.categoryMatch ? "emerald" : "rose"} /> },
         ]}
       />
     </section>

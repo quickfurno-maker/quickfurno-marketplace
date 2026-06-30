@@ -52,6 +52,7 @@ import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { AosAutomationControl } from "./AosAutomationControl";
 import { LeadAssignmentApprovalControl } from "./LeadAssignmentApprovalControl";
 import { DistributionLogsPanel, FailedAssignmentsPanel, RecentAssignmentsPanel } from "./AssignmentLedgerPanels";
+import { CategoryManager } from "./CategoryManager";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
@@ -292,6 +293,7 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("All");
+  const [category, setCategory] = useState("All");
   const [status, setStatus] = useState("All");
   const [packageStatus, setPackageStatus] = useState("All");
   const [eligibility, setEligibility] = useState("All");
@@ -315,10 +317,11 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
     const isEligible = eligibilityById.get(vendor.id)?.eligible ?? false;
     return includesQuery([vendor.business_name, vendor.owner_name, vendor.phone, vendor.city, vendor.status, vendor.service_categories?.join(" "), currentPackageStatus], query)
       && (city === "All" || vendor.city === city)
+      && (category === "All" || (vendor.service_categories ?? []).includes(category))
       && (status === "All" || vendor.status === status)
       && (packageStatus === "All" || currentPackageStatus === packageStatus)
       && (eligibility === "All" || (eligibility === "Eligible" ? isEligible : !isEligible));
-  }), [data.vendors, eligibilityById, query, city, status, packageStatus, eligibility]);
+  }), [data.vendors, eligibilityById, query, city, category, status, packageStatus, eligibility]);
 
   const eligibleCount = useMemo(() => [...eligibilityById.values()].filter((e) => e.eligible).length, [eligibilityById]);
 
@@ -386,7 +389,8 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
         placeholder="Search vendor, masked phone, city, category..."
         filters={
           <>
-            <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(data.vendors.map((vendor) => vendor.city))} />
+            <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(activeCityNames(data.cities), "All")} />
+            <SelectFilter label="Category" value={category} onChange={setCategory} options={uniqueOptions(activeCategoryNames(data.categories), "All")} />
             <SelectFilter label="Status" value={status} onChange={setStatus} options={uniqueOptions(data.vendors.map((vendor) => vendor.status))} />
             <SelectFilter label="Package" value={packageStatus} onChange={setPackageStatus} options={packageOptions} />
             <SelectFilter label="Eligibility" value={eligibility} onChange={setEligibility} options={["All", "Eligible", "Not eligible"]} />
@@ -670,50 +674,9 @@ function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (message:
   );
 }
 
-function CategoriesPage({ data, notify, ask }: { data: Snapshot; notify: (message: string) => void; ask: any }) {
-  const parentCategories = data.categories.filter((item) => !item.parent_id);
-  const subcategories = data.categories.filter((item) => item.parent_id);
-  const visibleParents = parentCategories.length ? parentCategories : data.categories.slice(0, 5);
-  const tableRows = subcategories.length ? subcategories : data.categories;
-
-  return (
-    <div className="space-y-5">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Categories" value={formatNumber(data.categories.length)} helper="Service taxonomy" icon="categories" />
-        <StatCard label="Parent Categories" value={formatNumber(parentCategories.length || visibleParents.length)} helper="Top-level services" icon="categories" tone="indigo" />
-        <StatCard label="Subcategories" value={formatNumber(subcategories.length)} helper="Nested service rows" icon="reports" tone="slate" />
-        <StatCard label="Homepage Visible" value={formatNumber(data.categories.filter((item) => item.show_on_homepage !== false).length)} helper="Marked for public display" icon="content" tone="emerald" />
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {visibleParents.length ? (
-          visibleParents.map((item) => (
-            <CategoryParentCard key={item.id} item={item} subcategoryCount={subcategories.filter((child) => child.parent_id === item.id).length} />
-          ))
-        ) : (
-          <SectionCard title="Parent Categories" description="Create categories to organize homepage and lead form options.">
-            <p className="text-sm text-slate-500">No category rows available in this snapshot.</p>
-          </SectionCard>
-        )}
-      </section>
-
-      <SectionCard title="Subcategory Table" description="Status, homepage visibility, sort order, and safe actions for category rows.">
-        <DataTable
-          rows={tableRows}
-          emptyTitle="No categories found"
-          emptyMessage="Active categories from Supabase will appear here and can power public forms."
-          columns={[
-            { header: "Category", cell: (item) => <Strong title={item.name || "Unnamed category"} subtitle={item.slug || shortId(item.id)} /> },
-            { header: "Type", cell: (item) => <StatusBadge value={item.parent_id ? "Subcategory" : "Parent"} tone={item.parent_id ? "blue" : "violet"} /> },
-            { header: "Homepage", cell: (item) => <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} /> },
-            { header: "Status", cell: (item) => <StatusBadge value={item.is_active ? "Active" : "Inactive"} /> },
-            { header: "Sort Order", cell: (item) => formatNumber(item.sort_order ?? 100) },
-            { header: "Actions", cell: (item) => <ActionMenu actions={[{ label: "Edit", onClick: () => notify("Category editor placeholder ready.") }, { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update category", "This changes public form visibility for the category.", () => adminSetCategoryActive(item.id, !item.is_active)) }, { label: "Add subcategory", onClick: () => notify("Subcategory drawer placeholder ready.") }]} /> },
-          ]}
-        />
-      </SectionCard>
-    </div>
-  );
+function CategoriesPage({ data, notify }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
+  // Phase 14C governance: full admin-only category/subcategory management.
+  return <CategoryManager categories={data.categories} notify={notify} />;
 }
 
 function CitiesPage({ data, notify, ask }: { data: Snapshot; notify: (message: string) => void; ask: any }) {
@@ -1049,9 +1012,56 @@ function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (messa
   );
 }
 
+/** Phase 14B: active admin-managed city names — the single source of truth. */
+function activeCityNames(cities: City[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of cities) {
+    if (c.is_active !== true) continue;
+    const name = (c.name ?? "").trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    out.push(name);
+  }
+  return out;
+}
+
+/**
+ * Phase 14C: selectable active category names (the single source of truth).
+ * Subcategories + childless top-level categories; a parent that has active
+ * subcategories is a grouping, not a selectable service, so it is excluded.
+ * (On a flat schema with no parent_id, every active category is selectable.)
+ */
+function activeCategoryNames(categories: Category[]): string[] {
+  const activeParentIds = new Set(
+    categories.filter((c) => c.is_active === true && c.parent_id).map((c) => c.parent_id as string),
+  );
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of categories) {
+    if (c.is_active !== true) continue;
+    if (activeParentIds.has(c.id)) continue;
+    const name = (c.name ?? "").trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    out.push(name);
+  }
+  return out;
+}
+
 function EligibilityChecker({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
-  const [city, setCity] = useState(data.cities[0]?.name || "Pune");
-  const [category, setCategory] = useState(data.categories[0]?.name || "Interior");
+  // Phase 14B/14C: city + category options come ONLY from admin-managed active
+  // cities (public.cities) and active categories (public.service_categories).
+  const activeCities = useMemo(() => activeCityNames(data.cities), [data.cities]);
+  const activeCategories = useMemo(() => activeCategoryNames(data.categories), [data.categories]);
+  const [city, setCity] = useState(() => activeCities[0] ?? "");
+  const [category, setCategory] = useState(() => activeCategories[0] ?? "");
+  useEffect(() => {
+    if (activeCities.length && !activeCities.includes(city)) setCity(activeCities[0]);
+  }, [activeCities, city]);
+  useEffect(() => {
+    if (activeCategories.length && !activeCategories.includes(category)) setCategory(activeCategories[0]);
+  }, [activeCategories, category]);
   // Phase 14: show full eligibility reasoning for every vendor in the selected
   // city using the SAME shared helper the Lead Assignment Approval Preview uses.
   const vendorsInCity = useMemo(
@@ -1072,9 +1082,17 @@ function EligibilityChecker({ data, notify }: { data: Snapshot; notify: (message
         <h2 className="text-lg font-semibold text-slate-950">Eligibility Checker</h2>
         <p className="mt-2 text-sm text-slate-500">Uses the shared vendorEligibility helper — the same logic as the Lead Assignment Approval Preview.</p>
         <div className="mt-5 space-y-3">
-          <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(data.cities.map((item) => item.name), city)} />
-          <SelectFilter label="Category" value={category} onChange={setCategory} options={uniqueOptions(data.categories.map((item) => item.name), category)} />
-          <PrimaryButton onClick={() => notify(`${eligibleCount} eligible vendor(s) in ${city} for ${category}.`)}>Check Vendors</PrimaryButton>
+          {activeCities.length === 0 ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">No active cities configured. Add cities from Admin → Cities & Locations.</p>
+          ) : (
+            <SelectFilter label="City" value={city} onChange={setCity} options={activeCities} />
+          )}
+          {activeCategories.length === 0 ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">No active categories configured. Add categories from Admin → Categories.</p>
+          ) : (
+            <SelectFilter label="Category" value={category} onChange={setCategory} options={activeCategories} />
+          )}
+          <PrimaryButton onClick={() => notify(`${eligibleCount} eligible vendor(s) in ${city || "—"} for ${category || "—"}.`)}>Check Vendors</PrimaryButton>
         </div>
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
           <p className="font-semibold text-slate-900">{eligibleCount} eligible</p>

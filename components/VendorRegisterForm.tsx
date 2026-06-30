@@ -5,7 +5,8 @@ import { submitVendorRegistration } from "@/app/actions";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, type MainCategory } from "@/lib/categories";
-import { cities, enquiryServiceForCategory, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import { enquiryServiceForCategory, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 
 // ---------------------------------------------------------------------------
 // Guided vendor onboarding wizard.
@@ -33,9 +34,9 @@ const CITY_SERVICE_AREAS: Record<string, string[]> = {
     "Nerul", "Kharghar", "Mira Road", "Mulund", "Bhandup",
   ],
 };
-// Active cities come from the shared source used on the homepage / client
-// enquiry modal, so the vendor form never drifts. No custom-city entry allowed.
-const CITY_OPTIONS = cities;
+// Phase 14B: active cities come from the admin-managed cities table (via the
+// shared useActiveCities hook), so the vendor form never drifts from the
+// homepage / client enquiry modal. No custom-city entry allowed.
 
 const EXPERIENCE_OPTIONS = ["Less than 1 year", "1–3 years", "3–5 years", "5–10 years", "10+ years"];
 const TEAM_OPTIONS = ["1–5", "6–10", "11–25", "25+"];
@@ -134,6 +135,8 @@ function readTracking() {
 export function VendorRegisterForm() {
   const [step, setStep] = useState(0);
   const [f, setF] = useState<WizardState>(initialState);
+  // Phase 14B: city chips come only from admin-managed active cities.
+  const { cities: activeCities, loading: citiesLoading } = useActiveCities();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -864,32 +867,36 @@ export function VendorRegisterForm() {
 
             {/* 1. City selection */}
             <div className={`qf-rf-chips${fieldError("city") ? " has-error" : ""}`} ref={bindField("city")}>
-              {CITY_OPTIONS.map((city) => {
-                const selected = f.city === city;
-                return (
-                  <button
-                    type="button"
-                    key={city}
-                    className={`qf-rf-chip${selected ? " is-selected" : ""}`}
-                    aria-pressed={selected}
-                    // Switching city clears areas picked for the previous city and
-                    // pre-fills the state (both serviced cities are in Maharashtra).
-                    onClick={() => {
-                      setF((c) => ({
-                        ...c,
-                        city,
-                        areas: [],
-                        customArea: "",
-                        stateName: "Maharashtra",
-                        coversFullCity: false,
-                      }));
-                      setTouched((prev) => ({ ...prev, city: true }));
-                    }}
-                  >
-                    {city}
-                  </button>
-                );
-              })}
+              {activeCities.length === 0 ? (
+                <p className="qf-rf-qhint">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</p>
+              ) : (
+                activeCities.map((city) => {
+                  const selected = f.city === city;
+                  return (
+                    <button
+                      type="button"
+                      key={city}
+                      className={`qf-rf-chip${selected ? " is-selected" : ""}`}
+                      aria-pressed={selected}
+                      // Switching city clears areas picked for the previous city and
+                      // pre-fills the state (both serviced cities are in Maharashtra).
+                      onClick={() => {
+                        setF((c) => ({
+                          ...c,
+                          city,
+                          areas: [],
+                          customArea: "",
+                          stateName: "Maharashtra",
+                          coversFullCity: false,
+                        }));
+                        setTouched((prev) => ({ ...prev, city: true }));
+                      }}
+                    >
+                      {city}
+                    </button>
+                  );
+                })
+              )}
             </div>
             {fieldError("city") ? <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("city")}</p> : null}
 

@@ -1,22 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { submitLead } from "@/app/actions";
-import { CITY, ENQUIRY_SERVICES, BUDGETS, TIMELINES, trackEvent } from "@/lib/config";
-
-const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
+import { ENQUIRY_SERVICES, BUDGETS, TIMELINES, trackEvent } from "@/lib/config";
+import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 
 export function HomeEnquiryForm({ defaultService }: { defaultService?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  // Phase 14B: cities come only from admin-managed active cities.
+  const { cities: activeCities, loading: citiesLoading } = useActiveCities();
+
   const [f, setF] = useState({
-    name: "", phone: "", city: CITY, area: "",
+    name: "", phone: "", city: "", area: "",
     service_required: defaultService && (ENQUIRY_SERVICES as readonly string[]).includes(defaultService) ? defaultService : ENQUIRY_SERVICES[0],
     budget: "", timeline: "", message: "",
   });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
+
+  // Default to the first active city once the list loads; keep the user's pick
+  // if it is still active.
+  useEffect(() => {
+    if (!activeCities.length) return;
+    setF((s) => (activeCities.includes(s.city) ? s : { ...s, city: activeCities[0] }));
+  }, [activeCities]);
 
   async function onSubmit() {
     if (busy) return;
@@ -76,7 +85,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <L label="Full name"><input className="field" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Your name" /></L>
         <L label="Phone number"><input className="field" value={f.phone} onChange={(e) => set("phone", e.target.value)} inputMode="tel" placeholder="+91…" /></L>
-        <L label="City"><select className="field" value={f.city} onChange={(e) => set("city", e.target.value)}>{CITIES.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
+        <L label="City"><select className="field" value={f.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
         <L label="Area / locality"><input className="field" value={f.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" /></L>
         <L label="Service required"><select className="field" value={f.service_required} onChange={(e) => set("service_required", e.target.value)}>{ENQUIRY_SERVICES.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}</select></L>
         <L label="Budget"><select className="field" value={f.budget} onChange={(e) => set("budget", e.target.value)}><option value="" className="bg-navy-deep">Select budget</option>{BUDGETS.map((b) => <option key={b} className="bg-navy-deep">{b}</option>)}</select></L>

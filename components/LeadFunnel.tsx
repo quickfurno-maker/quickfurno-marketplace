@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { submitLead, fetchEligibleVendors, assignLead } from "@/app/actions";
 import type { PublicVendorCard } from "@/lib/types";
-import { CITY, ENQUIRY_SERVICES, BUDGETS, MAX_VENDORS_PER_LEAD } from "@/lib/config";
-
-const CITIES = [CITY, "Mumbai", "Bengaluru", "Hyderabad", "Delhi", "Nagpur", "Nashik"];
-const SERVICES = ENQUIRY_SERVICES;
+import { BUDGETS, MAX_VENDORS_PER_LEAD } from "@/lib/config";
+import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
+import { useActiveCategories, NO_ACTIVE_CATEGORIES_MESSAGE } from "@/lib/categories/useActiveCategories";
 
 type Step = "form" | "pick" | "done";
 
@@ -15,11 +14,32 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Phase 14B/14C: cities + services come only from admin-managed active
+  // cities and active categories.
+  const { cities: activeCities, loading: citiesLoading } = useActiveCities();
+  const { categories: activeCategories, loading: categoriesLoading } = useActiveCategories();
+
   const [form, setForm] = useState({
-    name: "", phone: "", city: CITY,
-    service_required: defaultService && (SERVICES as readonly string[]).includes(defaultService) ? defaultService : "Modular Kitchen",
+    name: "", phone: "", city: "",
+    service_required: "",
     area: "", budget: "", property_type: "", timeline: "", message: "",
   });
+
+  // Default to the first active city once loaded; keep the user's pick if active.
+  useEffect(() => {
+    if (!activeCities.length) return;
+    setForm((f) => (activeCities.includes(f.city) ? f : { ...f, city: activeCities[0] }));
+  }, [activeCities]);
+
+  // Default to defaultService (if active) or the first active category.
+  useEffect(() => {
+    if (!activeCategories.length) return;
+    setForm((f) => {
+      if (activeCategories.includes(f.service_required)) return f;
+      const preferred = defaultService && activeCategories.includes(defaultService) ? defaultService : activeCategories[0];
+      return { ...f, service_required: preferred };
+    });
+  }, [activeCategories, defaultService]);
 
   const [leadId, setLeadId] = useState<string | null>(null);
   const [vendors, setVendors] = useState<PublicVendorCard[]>([]);
@@ -135,16 +155,20 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
               <input className="field" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+91…" inputMode="tel" />
             </Field>
             <Field label="City">
-              <select className="field" value={form.city} onChange={(e) => set("city", e.target.value)}>
-                {CITIES.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}
+              <select className="field" value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>
+                {activeCities.length === 0
+                  ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option>
+                  : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}
               </select>
             </Field>
             <Field label="Area / locality">
               <input className="field" value={form.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" />
             </Field>
             <Field label="Service needed">
-              <select className="field" value={form.service_required} onChange={(e) => set("service_required", e.target.value)}>
-                {SERVICES.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}
+              <select className="field" value={form.service_required} onChange={(e) => set("service_required", e.target.value)} disabled={activeCategories.length === 0}>
+                {activeCategories.length === 0
+                  ? <option value="" className="bg-navy-deep">{categoriesLoading ? "Loading services…" : NO_ACTIVE_CATEGORIES_MESSAGE}</option>
+                  : activeCategories.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}
               </select>
             </Field>
             <Field label="Budget (optional)">

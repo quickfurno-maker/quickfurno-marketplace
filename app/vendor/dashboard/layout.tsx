@@ -4,11 +4,12 @@ import { getMyRole } from "@/app/actions";
 import { SignOut } from "@/components/SignOut";
 
 const NAV = [
-  { label: "Dashboard", href: "#welcome" },
-  { label: "Status", href: "#status" },
-  { label: "Leads", href: "#leads" },
-  { label: "Profile", href: "#profile" },
-  { label: "Support", href: "#support" },
+  { label: "Dashboard", href: "/vendor/dashboard" },
+  { label: "Leads", href: "/vendor/dashboard/leads" },
+  { label: "Package / Recharge", href: "/vendor/dashboard/package" },
+  { label: "Profile Approval", href: "/vendor/dashboard/profile" },
+  { label: "Notifications", href: "/vendor/dashboard/notifications" },
+  { label: "Support", href: "/vendor/dashboard/support" },
 ];
 
 export default async function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -25,7 +26,7 @@ export default async function VendorDashboardLayout({ children }: { children: Re
         <span className="qf-vd-brand-tag">Vendor Portal</span>
         <nav className="qf-vd-nav" aria-label="Vendor sections">
           {NAV.map((item) => (
-            <a key={item.label} href={item.href}>{item.label}</a>
+            <Link key={item.label} href={item.href}>{item.label}</Link>
           ))}
         </nav>
         <div className="qf-vd-sidebar-foot">
@@ -48,10 +49,10 @@ export default async function VendorDashboardLayout({ children }: { children: Re
         <main className="qf-vd-content">{children}</main>
 
         <nav className="qf-vd-bottomnav" aria-label="Vendor navigation">
-          <a href="#welcome">Home</a>
-          <a href="#leads">Leads</a>
-          <a href="#profile">Profile</a>
-          <a href="#support">Support</a>
+          <Link href="/vendor/dashboard">Home</Link>
+          <Link href="/vendor/dashboard/leads">Leads</Link>
+          <Link href="/vendor/dashboard/package">Package</Link>
+          <Link href="/vendor/dashboard/support">Support</Link>
         </nav>
       </div>
     </div>

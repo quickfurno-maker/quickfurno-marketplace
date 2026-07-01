@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { getMyVendor, vendorDashboard, vendorLeads } from "@/app/actions";
+import { VendorNoProfileFallback } from "@/app/vendor/dashboard/_components/VendorNoProfileFallback";
 import { VendorDashboard } from "@/components/VendorDashboard";
 import type { VendorDashboardStats } from "@/lib/types";
 
@@ -11,18 +11,7 @@ export default async function VendorDashboardPage() {
   const vendor = me.ok ? me.data : null;
 
   if (!vendor) {
-    return (
-      <div className="qf-vd-empty-profile">
-        <h1>No vendor profile yet</h1>
-        <p>
-          Your account isn't linked to a vendor profile yet. Complete your application to get
-          started -- our team will verify your details and enable dashboard access.
-        </p>
-        <Link href="/vendors/register" className="qf-vd-btn qf-vd-btn--primary">
-          Complete application
-        </Link>
-      </div>
-    );
+    return <VendorNoProfileFallback />;
   }
 
   const [statsRes, leadsRes] = await Promise.all([vendorDashboard(vendor.id), vendorLeads(vendor.id)]);

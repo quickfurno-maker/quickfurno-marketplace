@@ -5,11 +5,14 @@
 // ============================================================================
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { adminClient, serverClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
+import * as vendorPackageOrders from "../services/vendorPackageOrderService";
 import * as admin from "../services/adminService";
 import * as aos from "../services/aosService";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
@@ -218,6 +221,20 @@ export async function vendorReportBadLead(
 ) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
   return vendors.reportBadLead(assignmentId, reason, description);
+}
+
+export async function vendorCreatePackageOrder(formData: FormData) {
+  const packageId = String(formData.get("packageId") ?? "");
+  if (!packageId) redirect("/vendor/dashboard/package?order=invalid");
+
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/package?order=no-vendor");
+
+  const result = await vendorPackageOrders.createVendorPackageOrder(me.data.id, packageId);
+  revalidatePath("/vendor/dashboard/package");
+
+  if (!result.ok) redirect(`/vendor/dashboard/package?order=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/package?order=created");
 }
 
 // --------------------------------------------------------------------------

@@ -81,6 +81,29 @@ export type Payment = {
   admin_notes?: string | null;
 };
 
+export type VendorPackageOrder = {
+  id: string;
+  vendor_id?: string | null;
+  package_id?: string | null;
+  package_name?: string | null;
+  package_price?: number | null;
+  package_currency?: string | null;
+  credits_included?: number | null;
+  validity_days?: number | null;
+  order_status?: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  payment_provider?: string | null;
+  provider_order_id?: string | null;
+  provider_payment_id?: string | null;
+  paid_at?: string | null;
+  activated_at?: string | null;
+  activation_status?: string | null;
+  failure_reason?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Assignment = {
   id: string;
   lead_id?: string | null;
@@ -214,6 +237,7 @@ export type Snapshot = {
   packages: PackageRow[];
   payments: Payment[];
   vendorPackages: any[];
+  vendorPackageOrders: VendorPackageOrder[];
   assignments: Assignment[];
   categories: Category[];
   cities: City[];
@@ -236,6 +260,7 @@ export function emptySnapshot(): Snapshot {
     packages: [],
     payments: [],
     vendorPackages: [],
+    vendorPackageOrders: [],
     assignments: [],
     categories: [],
     cities: [],

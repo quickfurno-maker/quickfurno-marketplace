@@ -165,6 +165,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       packages,
       payments,
       vendorPackages,
+      vendorPackageOrders,
       assignments,
       categories,
       cities,
@@ -181,6 +182,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       safeSelect("packages", db.from("packages").select("*").order("lead_count", { ascending: true })),
       safeSelect("payments", db.from("payments").select("*").order("created_at", { ascending: false })),
       safeSelect("vendor_packages", db.from("vendor_packages").select("*").order("purchase_date", { ascending: false })),
+      safeSelect("vendor_package_orders", db.from("vendor_package_orders").select("*").order("created_at", { ascending: false })),
       safeSelect("lead_assignments", db.from("lead_assignments").select("*").order("assigned_at", { ascending: false })),
       safeSelect("service_categories", db.from("service_categories").select("*").order("name", { ascending: true })),
       safeSelect("cities", db.from("cities").select("*").order("name", { ascending: true })),
@@ -198,6 +200,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const packageRows = packages;
     const paymentRows = payments;
     const vendorPackageRows = vendorPackages;
+    const vendorPackageOrderRows = vendorPackageOrders;
     const assignmentRows = assignments;
     const categoryRows = categories;
     const cityRows = cities;
@@ -266,6 +269,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       packages: packageRows,
       payments: paymentRows,
       vendorPackages: vendorPackageRows,
+      vendorPackageOrders: vendorPackageOrderRows,
       assignments: assignmentRows,
       categories: categoryRows,
       cities: cityRows,

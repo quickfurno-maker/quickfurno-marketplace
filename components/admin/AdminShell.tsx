@@ -24,7 +24,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="admin-surface min-h-screen bg-[#f6f8f5] font-sans text-slate-950">
+    <div className="admin-surface min-h-screen bg-[#f4f6fa] font-sans text-slate-950">
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
@@ -37,18 +37,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} onSignOut={signOut} />
 
       <div className="lg:pl-[296px]">
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-[#f6f8f5]/88 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#f4f6fa]/85 px-4 py-3.5 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="flex min-h-14 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 pl-14 lg:pl-0">
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-                <span>Superadmin</span>
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600">
+                  Superadmin
+                </span>
                 <span className="h-1 w-1 rounded-full bg-slate-300" />
-                <span>{current.label}</span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                <span className="truncate">{current.label}</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   Live snapshot
                 </span>
               </div>
-              <h1 className="mt-1 truncate text-xl font-semibold tracking-tight text-slate-950">
+              <h1 className="mt-1.5 truncate text-2xl font-semibold tracking-tight text-slate-950">
                 {current.label}
               </h1>
             </div>
@@ -88,7 +91,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1680px] px-4 py-5 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>
@@ -101,14 +104,14 @@ function Sidebar({ open, onClose, onSignOut }: { open: boolean; onClose: () => v
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[296px] border-r border-white/10 bg-[#071410] text-white lg:block">
+      <aside className="qf-sidebar fixed inset-y-0 left-0 z-50 hidden w-[296px] border-r border-white/5 text-white lg:block">
         <SidebarContent pathname={pathname} onSignOut={onSignOut} />
       </aside>
 
       {open ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={onClose} />
-          <aside className="absolute inset-y-0 left-0 w-[min(21rem,88vw)] border-r border-white/10 bg-[#071410] text-white shadow-2xl">
+          <aside className="qf-sidebar absolute inset-y-0 left-0 w-[min(21rem,88vw)] border-r border-white/5 text-white shadow-2xl">
             <SidebarContent pathname={pathname} onNavigate={onClose} onSignOut={onSignOut} />
           </aside>
         </div>
@@ -130,7 +133,7 @@ function SidebarContent({
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-white/10 px-5 py-5">
         <Link href="/admin/dashboard" onClick={onNavigate} className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-400 text-sm font-black text-[#071410] shadow-lg shadow-emerald-950/20">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-400 text-sm font-black text-[#0a0f1c] shadow-lg shadow-emerald-950/30">
             QF
           </span>
           <div className="min-w-0">
@@ -138,22 +141,25 @@ function SidebarContent({
             <p className="truncate text-xs font-medium text-slate-400">Superadmin Command Center</p>
           </div>
         </Link>
-        <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-slate-400">Marketplace health</span>
-            <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">Online</span>
+            <span className="text-xs font-semibold text-slate-300">Preview-safe mode</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Safe
+            </span>
           </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <span className="block h-full w-[76%] rounded-full bg-emerald-400" />
-          </div>
+          <p className="mt-2 text-[11px] leading-4 text-slate-400">
+            No WhatsApp · No vendor notification · No credit deduction · No auto-assignment.
+          </p>
         </div>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        <div className="space-y-5">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
+        <div className="space-y-6">
           {adminNavGroups.map((group) => (
             <div key={group.title}>
-              <p className="px-3 text-[11px] font-semibold uppercase text-slate-500">
+              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 {group.title}
               </p>
               <div className="mt-2 space-y-1">
@@ -169,18 +175,28 @@ function SidebarContent({
                       key={section.key}
                       href={section.href}
                       onClick={onNavigate}
-                      className={`group flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                      aria-current={active ? "page" : undefined}
+                      className={`group relative flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                         active
-                          ? "bg-white text-slate-950 shadow-sm"
-                          : "text-slate-300 hover:bg-white/8 hover:text-white"
+                          ? "bg-white text-slate-950 shadow-sm shadow-emerald-950/10"
+                          : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
                       }`}
                     >
-                      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${active ? "bg-emerald-100 text-emerald-700" : "bg-white/5 text-slate-400 group-hover:text-emerald-200"}`}>
+                      {active ? (
+                        <span className="absolute inset-y-2 left-0 w-1 rounded-full bg-emerald-400" />
+                      ) : null}
+                      <span
+                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
+                          active
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-white/[0.06] text-slate-400 group-hover:bg-white/10 group-hover:text-emerald-200"
+                        }`}
+                      >
                         <AdminIcon name={section.icon} className="h-4 w-4" />
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate">{section.label}</span>
-                        <span className={`block truncate text-xs ${active ? "text-slate-500" : "text-slate-500"}`}>
+                        <span className={`block truncate text-xs ${active ? "text-slate-500" : "text-slate-400/80"}`}>
                           {section.description}
                         </span>
                       </span>
@@ -194,10 +210,16 @@ function SidebarContent({
       </nav>
 
       <div className="border-t border-white/10 p-4">
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-          <p className="text-xs font-semibold uppercase text-slate-500">Role</p>
-          <p className="mt-1 text-sm font-semibold text-white">Superadmin</p>
-          <p className="mt-2 text-xs leading-5 text-slate-400">Full access. Auth is managed in Supabase.</p>
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-xs font-bold text-white ring-1 ring-white/10">
+              SA
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">Superadmin</p>
+              <p className="truncate text-[11px] text-slate-400">Full access · Auth via Supabase</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onSignOut}

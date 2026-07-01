@@ -3503,6 +3503,53 @@ h1, h2, h3 {
 }
 
 /* ============================================================
+   Phase 15A — Premium admin UI polish.
+   All rules are scoped to .admin-surface, so the public website
+   (which never has this class) is completely unaffected. UI only.
+   ============================================================ */
+.admin-surface {
+  background: #f4f6fa;
+}
+
+.admin-surface ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.admin-surface ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.admin-surface ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.3);
+  background-clip: content-box;
+}
+
+/* Calm, consistent transitions on interactive admin elements. */
+.admin-surface a,
+.admin-surface button,
+.admin-surface input,
+.admin-surface select,
+.admin-surface textarea {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+/* Reusable premium card shadow so every admin card clearly floats. */
+.admin-surface .qf-card-shadow {
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 16px 38px -18px rgba(15, 23, 42, 0.28);
+}
+.admin-surface .qf-card-hover:hover {
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08), 0 28px 56px -20px rgba(15, 23, 42, 0.38);
+}
+
+/* Deep navy premium sidebar (clearly blue, not the old near-black green). */
+.admin-surface .qf-sidebar {
+  background: linear-gradient(180deg, #14264a 0%, #0d1a35 52%, #081124 100%);
+}
+
+/* ============================================================
    QuickFurno premium homepage v2
    ============================================================ */
 

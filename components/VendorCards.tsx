@@ -9,11 +9,11 @@ import {
   cities,
   enquiryServiceForCategory,
   getVendorListingMeta,
+  getVisibleVendors,
   getVendorsByCategory,
   rankVendors,
   vendorFilterCategories,
   vendorResponseScore,
-  visibleVendors,
   type QuickFurnoCategory,
   type Vendor,
 } from "@/lib/quickfurno-data";
@@ -81,12 +81,18 @@ export function VendorCards({
   excludeSlug,
   limit,
   mode = category && !compact ? "listing" : "preview",
+  showFreeVendorsPublicly = true,
+  vendors,
 }: {
   compact?: boolean;
   category?: QuickFurnoCategory;
   excludeSlug?: string;
   limit?: number;
   mode?: "listing" | "preview";
+  showFreeVendorsPublicly?: boolean;
+  /** Pre-filtered public vendors (e.g. from Supabase). When omitted, the static
+   *  catalog is used. Already visibility-filtered upstream. */
+  vendors?: Vendor[];
 }) {
   const [activeFilter, setActiveFilter] = useState<VendorFilter>(category ?? "All");
   const [query, setQuery] = useState("");
@@ -99,13 +105,18 @@ export function VendorCards({
   const showCategoryFilters = !listingMode && !compact && !category && !limit;
 
   const filteredVendors = useMemo(() => {
-    const base = selectedCategory ? getVendorsByCategory(selectedCategory) : visibleVendors;
+    const visibilityOptions = { showFreeVendorsPublicly };
+    const base = vendors
+      ? vendors
+      : selectedCategory
+        ? getVendorsByCategory(selectedCategory, visibilityOptions)
+        : getVisibleVendors(visibilityOptions);
     const filtered = base.filter((vendor) => vendor.slug !== excludeSlug)
       .filter((vendor) => matchesQuery(vendor, query))
       .filter((vendor) => applyFilters(vendor, activeChips, selectedCity));
     const sorted = sortVendors(filtered, sortMode);
     return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
-  }, [activeChips, excludeSlug, limit, query, selectedCategory, selectedCity, sortMode]);
+  }, [activeChips, excludeSlug, limit, query, selectedCategory, selectedCity, showFreeVendorsPublicly, sortMode, vendors]);
 
   function toggleChip(key: string) {
     setActiveChips((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));

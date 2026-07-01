@@ -171,6 +171,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       badReports,
       settings,
       profiles,
+      marketplaceSettings,
+      freeVendorInterests,
+      leadAssignmentQueue,
+      autoAssignmentLogs,
     ] = await Promise.all([
       safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)").order("created_at", { ascending: false }), db.from("leads").select("*").order("created_at", { ascending: false })),
       safeSelect("vendors", db.from("vendors").select("*").order("created_at", { ascending: false })),
@@ -183,6 +187,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       safeSelect("bad_lead_reports", db.from("bad_lead_reports").select("*").order("created_at", { ascending: false })),
       safeSelect("app_settings", db.from("app_settings").select("*").order("key", { ascending: true })),
       safeSelect("profiles", db.from("profiles").select("id, created_at, full_name, phone, role, is_active").order("created_at", { ascending: false })),
+      safeSelect("marketplace_runtime_settings", db.from("marketplace_runtime_settings").select("*").order("key", { ascending: true })),
+      safeSelect("free_vendor_profile_interests", db.from("free_vendor_profile_interests").select("*").order("created_at", { ascending: false })),
+      safeSelect("lead_assignment_queue", db.from("lead_assignment_queue").select("*").order("created_at", { ascending: false })),
+      safeSelect("lead_auto_assignment_logs", db.from("lead_auto_assignment_logs").select("*").order("created_at", { ascending: false })),
     ]);
 
     const leadRows = leads;
@@ -264,6 +272,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       badReports: badReportRows,
       settings,
       profiles: profileRows,
+      marketplaceSettings,
+      freeVendorInterests,
+      leadAssignmentQueue,
+      autoAssignmentLogs,
       generatedAt: new Date().toISOString(),
       warnings,
     });

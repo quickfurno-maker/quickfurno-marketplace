@@ -5,7 +5,7 @@ import { submitVendorRegistration } from "@/app/actions";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, type MainCategory } from "@/lib/categories";
-import { enquiryServiceForCategory, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import { type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 
 // ---------------------------------------------------------------------------
@@ -15,9 +15,9 @@ import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useAc
 // and shares lead-access options afterwards.
 //
 // Step 2 categories come from the SHARED source of truth (lib/categories.ts) so
-// they always match the homepage. The selected leaf category is mapped to its
-// canonical service tag (enquiryServiceForCategory) for service_categories, so
-// the existing lead↔vendor matching RPC keeps working unchanged.
+// they always match the homepage. The selected leaf category (a public category
+// name, e.g. "Modular Factory") is stored directly in service_categories so Admin
+// and public category pages show the correct category.
 // ---------------------------------------------------------------------------
 
 // Service areas are city-specific — selecting a city filters the chips below so a
@@ -463,7 +463,10 @@ export function VendorRegisterForm() {
     selectedMain && selectedMain.subcategories.length > 0
       ? selectedSubItem?.category ?? null
       : selectedMain?.category ?? null;
-  const matchingServices = finalCategory ? [enquiryServiceForCategory(finalCategory)] : [];
+  // Store the selected PUBLIC category name (e.g. "Modular Factory") in
+  // service_categories — not the enquiry service tag ("Modular Kitchen"), which
+  // is not a public category and made Admin/listings show the wrong label.
+  const matchingServices = finalCategory ? [finalCategory] : [];
   const finalCategoryLabel = selectedSubItem?.label ?? selectedMain?.category ?? selectedMain?.label ?? "";
 
   // Per-sqft rate only applies to interior categories that have a minimum.

@@ -116,7 +116,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
           <div className="grid gap-3">
             {priorityLeads.length ? (
               priorityLeads.map((lead) => (
-                <div key={lead.id} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div key={lead.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-slate-950">{lead.name || "Unnamed lead"}</p>
@@ -140,7 +140,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         <SectionCard title="Pending Actions" description="Operations queues that need a human decision.">
           <div className="space-y-3">
             {pendingActions.map((item) => (
-              <Link key={item.label} href={item.href} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3 transition hover:border-emerald-200 hover:bg-emerald-50/30">
+              <Link key={item.label} href={item.href} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5 transition hover:border-emerald-200 hover:bg-emerald-50/30">
                 <span className="text-sm font-semibold text-slate-700">{item.label}</span>
                 <StatusBadge value={formatNumber(item.value)} tone={item.tone} />
               </Link>
@@ -164,7 +164,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
                     key={vendor.id}
                     type="button"
                     onClick={() => setSelectedVendor(vendor)}
-                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/30"
+                    className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50/30"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -201,7 +201,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
           <div className="space-y-3">
             {recentActivity.length ? (
               recentActivity.map((item) => (
-                <div key={`${item.type}-${item.id}`} className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <div key={`${item.type}-${item.id}`} className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge value={item.type} tone={item.tone} />
@@ -229,7 +229,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
 
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:-translate-y-0.5 hover:bg-emerald-700">
+    <Link href={href} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-700">
       {children}
     </Link>
   );
@@ -237,9 +237,9 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 
 function MetricPill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-base font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

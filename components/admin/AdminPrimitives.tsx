@@ -38,12 +38,12 @@ export function PageHeader({
   meta?: ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 bg-gradient-to-r from-white via-white to-emerald-50/70 px-5 py-5 sm:px-6">
+    <div className="qf-card-shadow overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+      <div className="border-b border-slate-100 bg-gradient-to-r from-white via-white to-emerald-50/60 px-5 py-6 sm:px-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             {meta ? <div className="mb-3 flex flex-wrap gap-2">{meta}</div> : null}
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{title}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-[28px]">{title}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
           </div>
           {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
@@ -58,7 +58,7 @@ export function PrimaryButton({ children, onClick }: { children: ReactNode; onCl
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:-translate-y-0.5 hover:bg-emerald-700 focus-visible:outline-emerald-500"
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 active:translate-y-0"
     >
       {children}
     </button>
@@ -70,7 +70,7 @@ export function SecondaryButton({ children, onClick }: { children: ReactNode; on
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-emerald-500"
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 active:translate-y-0"
     >
       {children}
     </button>
@@ -101,13 +101,13 @@ export function StatCard({
   }[tone];
 
   return (
-    <article className="group min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-5">
+    <article className="qf-card-shadow qf-card-hover group min-w-0 rounded-2xl border border-slate-200/80 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-200">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <div className="mt-3 truncate text-2xl font-semibold tracking-tight text-slate-950">{value}</div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+          <div className="mt-3 truncate text-[28px] font-semibold leading-none tracking-tight text-slate-950">{value}</div>
         </div>
-        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ring-1 ${toneClass}`}>
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ring-1 ${toneClass}`}>
           <AdminIcon name={icon} className="h-5 w-5" />
         </span>
       </div>
@@ -124,7 +124,7 @@ export function StatusBadge({ value, tone }: { value?: string | null; tone?: Bad
   const badgeTone = tone ?? toneFromValue(label);
 
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeToneClasses[badgeTone]}`}>
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${badgeToneClasses[badgeTone]}`}>
       {label}
     </span>
   );
@@ -144,7 +144,7 @@ export function Toolbar({
   placeholder?: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+    <div className="qf-card-shadow rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="relative min-w-0 flex-1">
           <AdminIcon name="reports" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -152,7 +152,7 @@ export function Toolbar({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
-            className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100"
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -176,7 +176,7 @@ export function SelectFilter({
   label: string;
 }) {
   return (
-    <label className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm">
+    <label className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm">
       <span className="hidden sm:inline">{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)} className="bg-transparent text-sm font-semibold text-slate-800 outline-none">
         {options.map((option) => (
@@ -201,13 +201,13 @@ export function DataTable<T>({
   emptyMessage: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div className="qf-card-shadow overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
       <div className="overflow-x-auto">
         <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
             <tr>
               {columns.map((column) => (
-                <th key={column.header} className={`whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase text-slate-500 ${column.className ?? ""}`}>
+                <th key={column.header} className={`whitespace-nowrap border-b border-slate-200 px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ${column.className ?? ""}`}>
                   {column.header}
                 </th>
               ))}
@@ -216,7 +216,7 @@ export function DataTable<T>({
           <tbody>
             {rows.length > 0 ? (
               rows.map((row, index) => (
-                <tr key={index} className="group transition hover:bg-emerald-50/30">
+                <tr key={index} className="group transition hover:bg-emerald-50/40">
                   {columns.map((column) => (
                     <td key={column.header} className={`border-b border-slate-100 px-4 py-4 align-middle text-slate-700 last:border-b-0 ${column.className ?? ""}`}>
                       {column.cell(row)}
@@ -252,9 +252,9 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm ${className}`}>
+    <section className={`qf-card-shadow min-w-0 rounded-2xl border border-slate-200/80 bg-white ${className}`}>
       {title || description || action ? (
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
           <div className="min-w-0">
             {title ? <h2 className="text-base font-semibold tracking-tight text-slate-950">{title}</h2> : null}
             {description ? <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p> : null}
@@ -262,7 +262,7 @@ export function SectionCard({
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       ) : null}
-      <div className="p-5">{children}</div>
+      <div className="p-5 sm:p-6">{children}</div>
     </section>
   );
 }
@@ -309,11 +309,11 @@ export function ChartCard({ title, rows }: { title: string; rows: Array<{ label:
 
 export function EmptyState({ title, message, compact = false }: { title: string; message: string; compact?: boolean }) {
   return (
-    <div className={`mx-auto max-w-md text-center ${compact ? "" : "rounded-lg border border-dashed border-slate-300 bg-white p-8 shadow-sm"}`}>
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-slate-100 text-slate-500">
+    <div className={`mx-auto max-w-md text-center ${compact ? "py-6" : "rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-10"}`}>
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-400 shadow-sm ring-1 ring-slate-200">
         <AdminIcon name="reports" className="h-5 w-5" />
       </div>
-      <h3 className="mt-4 text-base font-semibold text-slate-950">{title}</h3>
+      <h3 className="mt-4 text-base font-semibold text-slate-900">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
     </div>
   );
@@ -378,7 +378,7 @@ export function ConfirmDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
         <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
         <div className="mt-6 flex justify-end gap-2">
@@ -417,13 +417,13 @@ export function Tabs({
   onChange: (tab: string) => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+    <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm">
       {tabs.map((tab) => (
         <button
           key={tab}
           type="button"
           onClick={() => onChange(tab)}
-          className={`shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition ${active === tab ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${active === tab ? "bg-slate-950 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}
         >
           {tab}
         </button>
@@ -436,11 +436,11 @@ export function ActionMenu({ actions }: { actions: Array<{ label: string; onClic
   const [open, setOpen] = useState(false);
   return (
     <div className="relative inline-flex">
-      <button type="button" onClick={() => setOpen((value) => !value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50">
+      <button type="button" onClick={() => setOpen((value) => !value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50">
         Actions
       </button>
       {open ? (
-        <div className="absolute right-0 top-11 z-20 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+        <div className="absolute right-0 top-11 z-20 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
           {actions.map((action) => (
             <button
               key={action.label}
@@ -464,8 +464,8 @@ export function InfoGrid({ rows }: { rows: Array<[string, ReactNode]> }) {
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
       {rows.map(([label, value]) => (
-        <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <dt className="text-xs font-semibold uppercase text-slate-500">{label}</dt>
+        <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
           <dd className="mt-1 text-sm font-semibold text-slate-900">{value || "Not provided"}</dd>
         </div>
       ))}
@@ -476,7 +476,7 @@ export function InfoGrid({ rows }: { rows: Array<[string, ReactNode]> }) {
 export function Toast({ message, tone = "info" }: { message: string; tone?: "success" | "error" | "info" }) {
   const color = tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : tone === "error" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-slate-200 bg-white text-slate-800";
   return (
-    <div className={`fixed bottom-5 right-5 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm font-semibold shadow-2xl ${color}`}>
+    <div className={`fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border px-4 py-3 text-sm font-semibold shadow-2xl ${color}`}>
       {message}
     </div>
   );

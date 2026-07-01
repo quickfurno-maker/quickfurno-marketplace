@@ -137,6 +137,76 @@ export type Setting = {
   updated_at?: string | null;
 };
 
+export type MarketplaceRuntimeSetting = {
+  id?: string;
+  key: string;
+  value: unknown;
+  description?: string | null;
+  updated_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type FreeVendorProfileInterest = {
+  id: string;
+  vendor_id: string;
+  lead_id?: string | null;
+  client_name?: string | null;
+  client_phone_masked?: string | null;
+  client_phone_hash?: string | null;
+  city?: string | null;
+  area?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  interest_type?: string | null;
+  status?: string | null;
+  vendor_notified?: boolean | null;
+  vendor_notified_at?: string | null;
+  aos_event_id?: string | null;
+  n8n_preview_called?: boolean | null;
+  unlocked_after_payment?: boolean | null;
+  admin_note?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type LeadAssignmentQueueRow = {
+  id: string;
+  lead_id: string;
+  city?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  queue_status?: string | null;
+  queue_reason?: string | null;
+  required_vendor_count?: number | null;
+  eligible_vendor_count?: number | null;
+  selected_vendor_ids?: string[] | null;
+  rejected_vendor_reasons?: Record<string, string[]> | null;
+  last_checked_at?: string | null;
+  next_retry_at?: string | null;
+  matching_attempt_count?: number | null;
+  resolved_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type LeadAutoAssignmentLog = {
+  id: string;
+  lead_id: string;
+  mode?: string | null;
+  status?: string | null;
+  city?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  eligible_vendor_count?: number | null;
+  selected_vendor_ids?: string[] | null;
+  rejected_vendor_reasons?: Record<string, string[]> | null;
+  scoring_snapshot?: Record<string, unknown> | null;
+  queue_reason?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
+};
+
 export type Snapshot = {
   stats: Record<string, number | string>;
   leads: Lead[];
@@ -150,6 +220,10 @@ export type Snapshot = {
   badReports: BadReport[];
   settings: Setting[];
   profiles: Profile[];
+  marketplaceSettings?: MarketplaceRuntimeSetting[];
+  freeVendorInterests?: FreeVendorProfileInterest[];
+  leadAssignmentQueue?: LeadAssignmentQueueRow[];
+  autoAssignmentLogs?: LeadAutoAssignmentLog[];
   generatedAt?: string;
   warnings?: string[];
 };
@@ -168,6 +242,10 @@ export function emptySnapshot(): Snapshot {
     badReports: [],
     settings: [],
     profiles: [],
+    marketplaceSettings: [],
+    freeVendorInterests: [],
+    leadAssignmentQueue: [],
+    autoAssignmentLogs: [],
     warnings: [],
   };
 }

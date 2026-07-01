@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
+import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
 import { CONTACT_TEL, whatsappLink } from "@/lib/config";
 import { categoryImage } from "@/lib/images";
 import {
@@ -13,8 +14,21 @@ import {
 
 export function VendorDetailHeader({ vendor }: { vendor: Vendor }) {
   const meta = getVendorListingMeta(vendor);
-  const services = getVendorServiceChips(vendor).slice(0, 3);
   const enquiryService = enquiryServiceForCategory(vendor.category);
+  // Paid/trial vendors keep the standard QuickFurno-brokered contact actions;
+  // free/unpaid vendors only expose the gated interest capture (no direct/private
+  // contact, no WhatsApp) — consistent with the profile side card + mobile CTA.
+  const isPaidOrTrialEligible = vendor.activePaidPlan;
+
+  // Real Supabase vendors must not show static/demo service chips or direct
+  // Call/WhatsApp. They use real canonical services (if any) and route contact
+  // through QuickFurno only.
+  const isSupabaseVendor = vendor.source === "supabase";
+  const showDirectContact = !isSupabaseVendor && isPaidOrTrialEligible;
+  const thumbChips = isSupabaseVendor
+    ? (vendor.serviceCategories ?? []).slice(0, 3)
+    : getVendorServiceChips(vendor).slice(0, 3).map((service) => service.label);
+  const isNewSupabaseVendor = isSupabaseVendor && vendor.reviews === 0;
 
   return (
     <section className="vendor-detail-header">
@@ -30,8 +44,8 @@ export function VendorDetailHeader({ vendor }: { vendor: Vendor }) {
           />
         </div>
         <div className="vendor-detail-thumbs" aria-hidden="true">
-          {services.map((service) => (
-            <span key={service.label}>{service.label}</span>
+          {thumbChips.map((label) => (
+            <span key={label}>{label}</span>
           ))}
         </div>
       </div>
@@ -40,19 +54,28 @@ export function VendorDetailHeader({ vendor }: { vendor: Vendor }) {
         <div className="vendor-detail-badge-row">
           {vendor.verified ? <span className="qf-mini-badge qf-mini-badge--verified">Verified</span> : null}
           {vendor.activePaidPlan ? <span className="qf-mini-badge qf-mini-badge--premium">Premium</span> : null}
-          <span className="qf-mini-badge">{meta.openStatus}</span>
+          {/* Response status is real only for static demo vendors; hide it for Supabase. */}
+          {!isSupabaseVendor ? <span className="qf-mini-badge">{meta.openStatus}</span> : null}
         </div>
 
         <h1>{vendor.businessName}</h1>
         <p className="vendor-detail-subtitle">
-          {vendor.category} · {vendor.subCategory} · {meta.locality}
+          {isSupabaseVendor
+            ? `${vendor.category} · ${meta.locality}`
+            : `${vendor.category} · ${vendor.subCategory} · ${meta.locality}`}
         </p>
 
         <div className="vendor-detail-proof">
-          <span className="vendor-rating-pill">
-            {vendor.rating.toFixed(1)} <span aria-hidden="true">&#9733;</span>
-          </span>
-          <span>{vendor.reviews} reviews</span>
+          {isNewSupabaseVendor ? (
+            <span className="vendor-rating-pill">New on QuickFurno</span>
+          ) : (
+            <>
+              <span className="vendor-rating-pill">
+                {vendor.rating.toFixed(1)} <span aria-hidden="true">&#9733;</span>
+              </span>
+              <span>{vendor.reviews} reviews</span>
+            </>
+          )}
           <span>{vendor.experience} experience</span>
           <span>{meta.distance}</span>
         </div>
@@ -60,28 +83,48 @@ export function VendorDetailHeader({ vendor }: { vendor: Vendor }) {
         <p className="vendor-detail-description">{vendor.description}</p>
 
         <div className="vendor-detail-actions">
-          <a className="qf-action-btn qf-action-btn--call" href={CONTACT_TEL}>
-            Call Now
-          </a>
-          <a
-            className="qf-action-btn qf-action-btn--whatsapp"
-            href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp
-          </a>
-          <EnquiryModalTrigger
-            className="qf-action-btn qf-action-btn--enquiry"
-            modalTitle={`Get quote from ${vendor.businessName}`}
-            serviceCategory={enquiryService}
-            city={vendor.city}
-            area={meta.locality.split(",")[0]}
-            requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
-            source={`Vendor profile enquiry: ${vendor.slug}`}
-          >
-            Send Enquiry
-          </EnquiryModalTrigger>
+          {isPaidOrTrialEligible ? (
+            <>
+              {showDirectContact ? (
+                <>
+                  <a className="qf-action-btn qf-action-btn--call" href={CONTACT_TEL}>
+                    Call Now
+                  </a>
+                  <a
+                    className="qf-action-btn qf-action-btn--whatsapp"
+                    href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    WhatsApp
+                  </a>
+                </>
+              ) : null}
+              <EnquiryModalTrigger
+                className="qf-action-btn qf-action-btn--enquiry"
+                modalTitle={`Get quote from ${vendor.businessName}`}
+                serviceCategory={enquiryService}
+                city={vendor.city}
+                area={meta.locality.split(",")[0]}
+                requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
+                source={`Vendor profile enquiry: ${vendor.slug}`}
+              >
+                Send Enquiry
+              </EnquiryModalTrigger>
+            </>
+          ) : (
+            <FreeVendorInterestButton
+              className="qf-action-btn qf-action-btn--enquiry"
+              vendorId={vendor.slug}
+              vendorName={vendor.businessName}
+              city={vendor.city}
+              area={meta.locality.split(",")[0]}
+              category={vendor.category}
+              subcategory={vendor.subCategory}
+            >
+              Request Callback
+            </FreeVendorInterestButton>
+          )}
         </div>
       </div>
     </section>

@@ -30,6 +30,13 @@ export type Vendor = {
   imageTone: string;
   /** Vendor-uploaded logo/profile image; when absent the card shows an initials avatar. */
   imageUrl?: string;
+  /** Origin of this record. "supabase" = real vendor row; "static"/undefined = demo catalog.
+   *  The profile page uses this to avoid showing static/demo content for real vendors. */
+  source?: "supabase" | "static";
+  /** Real, canonical public service categories the vendor provides (Supabase only; may be []). */
+  serviceCategories?: string[];
+  /** Real vendor-uploaded portfolio image URLs (Supabase only; may be []). */
+  portfolioImages?: string[];
 };
 
 export type VendorServiceChip = {
@@ -360,6 +367,15 @@ export function isVendorVisible(vendor: Vendor) {
   return vendor.status !== "inactive" && vendor.status !== "disabled";
 }
 
+export function isVendorPubliclyVisible(
+  vendor: Vendor,
+  options: { showFreeVendorsPublicly?: boolean } = {},
+) {
+  if (!isVendorVisible(vendor)) return false;
+  if (vendor.activePaidPlan) return true;
+  return options.showFreeVendorsPublicly !== false;
+}
+
 export function vendorResponseScore(vendor: Vendor) {
   if (typeof vendor.responseScore === "number") return vendor.responseScore;
   const hours = /(\d+)\s*hr/i.exec(vendor.responseTime)?.[1];
@@ -369,8 +385,8 @@ export function vendorResponseScore(vendor: Vendor) {
   return 55;
 }
 
-export function rankVendors(vendorList: Vendor[]) {
-  return [...vendorList].filter(isVendorVisible).sort((a, b) => {
+export function rankVendors(vendorList: Vendor[], options: { showFreeVendorsPublicly?: boolean } = {}) {
+  return [...vendorList].filter((vendor) => isVendorPubliclyVisible(vendor, options)).sort((a, b) => {
     if (Number(b.activePaidPlan) !== Number(a.activePaidPlan)) {
       return Number(b.activePaidPlan) - Number(a.activePaidPlan);
     }
@@ -383,15 +399,19 @@ export function rankVendors(vendorList: Vendor[]) {
   });
 }
 
-export const visibleVendors = rankVendors(vendors);
-export const activePaidVendors = visibleVendors.filter((vendor) => vendor.activePaidPlan);
-
-export function getVendorBySlug(slug: string) {
-  return visibleVendors.find((vendor) => vendor.slug === slug);
+export function getVisibleVendors(options: { showFreeVendorsPublicly?: boolean } = {}) {
+  return rankVendors(vendors, options);
 }
 
-export function getVendorsByCategory(category?: QuickFurnoCategory) {
-  return rankVendors(category ? vendors.filter((vendor) => vendor.category === category) : vendors);
+export const visibleVendors = getVisibleVendors();
+export const activePaidVendors = visibleVendors.filter((vendor) => vendor.activePaidPlan);
+
+export function getVendorBySlug(slug: string, options: { showFreeVendorsPublicly?: boolean } = {}) {
+  return getVisibleVendors(options).find((vendor) => vendor.slug === slug);
+}
+
+export function getVendorsByCategory(category?: QuickFurnoCategory, options: { showFreeVendorsPublicly?: boolean } = {}) {
+  return rankVendors(category ? vendors.filter((vendor) => vendor.category === category) : vendors, options);
 }
 
 export function getVendorListingMeta(vendor: Vendor) {

@@ -8,6 +8,10 @@ type SafeAgentEventType =
   | "lead.qualified"
   | "lead.assignment_preview"
   | "lead.assignment_approved"
+  | "lead.assignment_queued"
+  | "lead.assignment_queue_rechecked"
+  | "vendor.profile_interest_captured"
+  | "vendor.recharge_prompt_preview"
   | "aos.failure";
 
 export interface SafeAgentPreviewResult {
@@ -68,6 +72,10 @@ const supportedSafeAgentEvents: SafeAgentEventType[] = [
   "lead.qualified",
   "lead.assignment_preview",
   "lead.assignment_approved",
+  "lead.assignment_queued",
+  "lead.assignment_queue_rechecked",
+  "vendor.profile_interest_captured",
+  "vendor.recharge_prompt_preview",
   "aos.failure",
 ];
 
@@ -208,6 +216,10 @@ function normalizeSafeAgentEventPayload(payload: unknown) {
 function normalizeSafeEventType(value: string | null): SafeAgentEventType {
   if (value === "lead.assignment_preview") return "lead.assignment_preview";
   if (value === "lead.assignment_approved") return "lead.assignment_approved";
+  if (value === "lead.assignment_queued") return "lead.assignment_queued";
+  if (value === "lead.assignment_queue_rechecked") return "lead.assignment_queue_rechecked";
+  if (value === "vendor.profile_interest_captured") return "vendor.profile_interest_captured";
+  if (value === "vendor.recharge_prompt_preview") return "vendor.recharge_prompt_preview";
   if (value && supportedSafeAgentEvents.includes(value as SafeAgentEventType) && isQuickFurnoN8nEventType(value)) {
     return value as SafeAgentEventType;
   }
@@ -242,13 +254,13 @@ function buildSafeAgentPreview(eventType: SafeAgentEventType): SafeAgentPreviewR
     matchForge: {
       status: "preview",
       matchedVendorLimit: 3,
-      suggestedVendorCount: 0,
-      notes: ["Vendor matching preview only. No assignment executed."],
+      suggestedVendorCount: eventType === "lead.assignment_queued" || eventType === "lead.assignment_queue_rechecked" ? 0 : 0,
+      notes: [`${eventType} is preview-only. No assignment executed.`],
     },
     leadFlow: {
       status: "preview",
       assignmentStatus: "not_assigned",
-      notes: ["No credits deducted. No vendor notified."],
+      notes: ["No credits deducted. No vendor notified. No WhatsApp sent."],
     },
     opsBrief: {
       status: "placeholder",

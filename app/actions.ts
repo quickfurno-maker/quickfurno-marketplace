@@ -12,6 +12,10 @@ import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
 import * as admin from "../services/adminService";
 import * as aos from "../services/aosService";
+import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
+import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
+import { captureFreeVendorInterest, markInterestStatus, type CaptureFreeVendorInterestInput } from "../lib/lead-assignment/freeVendorInterestService";
+import { updateMarketplaceRuntimeSetting } from "../lib/lead-assignment/runtimeSettings";
 import type { AosDecisionLogInput } from "../services/aosService";
 import type {
   CreateLeadInput, VendorRegistrationInput, VendorLeadStatus,
@@ -131,6 +135,10 @@ export async function submitVendorRegistration(input: VendorRegistrationInput) {
   return vendors.registerVendor(input);
 }
 
+export async function submitFreeVendorProfileInterest(input: CaptureFreeVendorInterestInput) {
+  return captureFreeVendorInterest(input);
+}
+
 export async function submitVendorAccountRegistration(input: VendorRegistrationInput & { password: string }) {
   let createdUserId: string | null = null;
 
@@ -246,6 +254,27 @@ export const adminSetCityActive = async (id: string, isActive: boolean) =>
 export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin(() => admin.approveBadLeadReport(id, note));
 export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());
+
+export const adminUpdateMarketplaceRuntimeSetting = async (key: string, value: unknown) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    return updateMarketplaceRuntimeSetting(key, value, user.id);
+  });
+
+export const adminRunAutoMatchPreview = async (leadId: string) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    return runAutoAssignmentPreviewForLead(leadId, { createdBy: user.id, source: "admin_preview" });
+  });
+
+export const adminRecheckLeadAssignmentQueue = async (queueIdOrLeadId: string) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    return recheckQueuedLead(queueIdOrLeadId, user.id);
+  });
+
+export const adminMarkFreeVendorInterestStatus = async (interestId: string, status: string, note?: string) =>
+  asAdmin(() => markInterestStatus(interestId, status, note));
 
 export const adminCreatePayment = async (vendorId: string, packageId: string, amount: number, method: string, txn?: string) =>
   asAdmin(() => packages.createManualPayment(vendorId, packageId, amount, method, txn));

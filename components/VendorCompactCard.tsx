@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
+import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
 import { useVendorCompare } from "@/components/VendorCompare";
 import { CONTACT_TEL, whatsappLink } from "@/lib/config";
 import {
@@ -40,6 +41,7 @@ export function VendorCompactCard({
   // Starting rate: Price on request if missing
   const startingRateDisplay = trust.startingPrice.replace("Starting at", "").trim();
   const startingRateText = startingRateDisplay || "Price on request";
+  const isPaidOrTrialEligible = vendor.activePaidPlan;
 
   return (
     <article className={`qf-vcard${vendor.activePaidPlan ? " qf-vcard--premium" : ""}`}>
@@ -125,31 +127,61 @@ export function VendorCompactCard({
       {/* Bottom/Right: Action Buttons */}
       <div className="qf-vcard-actions-row">
         <div className="qf-vcard-main-buttons">
-          <a className="qf-vcard-action-btn qf-vcard-action-btn--call" href={CONTACT_TEL}>
-            Call Now
-          </a>
-          <EnquiryModalTrigger
-            className="qf-vcard-action-btn qf-vcard-action-btn--enquiry"
-            modalTitle={`Get quote from ${vendor.businessName}`}
-            serviceCategory={enquiryService}
-            city={vendor.city}
-            area={meta.locality.split(",")[0]}
-            requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
-            source={`Vendor card enquiry: ${vendor.slug}`}
-          >
-            Send Enquiry
-          </EnquiryModalTrigger>
+          {isPaidOrTrialEligible ? (
+            <>
+              <a className="qf-vcard-action-btn qf-vcard-action-btn--call" href={CONTACT_TEL}>
+                Call Now
+              </a>
+              <EnquiryModalTrigger
+                className="qf-vcard-action-btn qf-vcard-action-btn--enquiry"
+                modalTitle={`Get quote from ${vendor.businessName}`}
+                serviceCategory={enquiryService}
+                city={vendor.city}
+                area={meta.locality.split(",")[0]}
+                requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
+                source={`Vendor card enquiry: ${vendor.slug}`}
+              >
+                Send Enquiry
+              </EnquiryModalTrigger>
+            </>
+          ) : (
+            <FreeVendorInterestButton
+              className="qf-vcard-action-btn qf-vcard-action-btn--enquiry"
+              vendorId={vendor.slug}
+              vendorName={vendor.businessName}
+              city={vendor.city}
+              area={meta.locality.split(",")[0]}
+              category={vendor.category}
+              subcategory={vendor.subCategory}
+            >
+              Request Callback
+            </FreeVendorInterestButton>
+          )}
         </div>
 
         <div className="qf-vcard-sub-actions">
-          <a
-            className="qf-vcard-sub-btn qf-vcard-sub-btn--wa"
-            href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp
-          </a>
+          {isPaidOrTrialEligible ? (
+            <a
+              className="qf-vcard-sub-btn qf-vcard-sub-btn--wa"
+              href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp
+            </a>
+          ) : (
+            <FreeVendorInterestButton
+              className="qf-vcard-sub-btn qf-vcard-sub-btn--wa"
+              vendorId={vendor.slug}
+              vendorName={vendor.businessName}
+              city={vendor.city}
+              area={meta.locality.split(",")[0]}
+              category={vendor.category}
+              subcategory={vendor.subCategory}
+            >
+              Contact through QuickFurno
+            </FreeVendorInterestButton>
+          )}
           <Link className="qf-vcard-sub-btn qf-vcard-sub-btn--profile" href={profileHref}>
             View Profile
           </Link>

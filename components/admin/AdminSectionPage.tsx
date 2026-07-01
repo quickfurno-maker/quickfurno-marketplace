@@ -6,9 +6,14 @@ import {
   adminSetCategoryActive,
   adminSetCityActive,
   adminSetPackageActive,
+  adminMarkFreeVendorInterestStatus,
+  adminRecheckLeadAssignmentQueue,
+  adminRunAutoMatchPreview,
+  adminUpdateMarketplaceRuntimeSetting,
   adminUpdateLeadStatus,
 } from "@/app/actions";
-import { evaluateVendorEligibility, type VendorEligibility } from "@/lib/vendors/vendorEligibility";
+import { evaluateVendorEligibility, evaluateVendorLeadAssignmentEligibility, type VendorEligibility, type VendorLeadAssignmentEligibility } from "@/lib/vendors/vendorEligibility";
+import { getVendorPublicVisibility, type VendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import {
   ActionMenu,
   ChartCard,
@@ -31,7 +36,7 @@ import {
   Toolbar,
 } from "./AdminPrimitives";
 import { getAdminSectionByKey, type AdminSectionKey } from "./adminConfig";
-import { emptySnapshot, type Category, type City, type Lead, type PackageRow, type Snapshot, type Vendor } from "./adminTypes";
+import { emptySnapshot, type Category, type City, type Lead, type MarketplaceRuntimeSetting, type PackageRow, type Snapshot, type Vendor } from "./adminTypes";
 import {
   assignmentStatus,
   formatDate,
@@ -87,6 +92,7 @@ const automationRows = [
 export function AdminSectionPage({ section, snapshot, error }: { section: AdminSectionKey; snapshot: Snapshot | null; error?: string | null }) {
   const data = snapshot ?? emptySnapshot();
   const config = getAdminSectionByKey(section);
+  const router = useRouter();
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => Promise<{ ok: boolean; error?: string }> } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -104,6 +110,7 @@ export function AdminSectionPage({ section, snapshot, error }: { section: AdminS
         return;
       }
       notify(`${title} completed.`, "success");
+      router.refresh();
     });
   }
 
@@ -199,7 +206,7 @@ function renderSection(
     case "users":
       return <AdminUsersPage data={data} />;
     case "settings":
-      return <SettingsPage notify={helpers.notify} />;
+      return <SettingsPage data={data} notify={helpers.notify} runAction={helpers.runAction} />;
     case "audit-logs":
       return <AuditLogsPage data={data} />;
     default:
@@ -302,6 +309,7 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
   const [packageFor, setPackageFor] = useState<Vendor | null>(null);
   const [logFor, setLogFor] = useState<Vendor | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const marketplaceSettings = useMemo(() => marketplaceSettingsObject(data.marketplaceSettings), [data.marketplaceSettings]);
 
   // Phase 13B: ONE shared eligibility helper, same as the Lead Assignment
   // Approval Preview, so the two surfaces always agree.
@@ -310,20 +318,30 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
     data.vendors.forEach((vendor) => map.set(vendor.id, evaluateVendorEligibility(vendor as Record<string, unknown>)));
     return map;
   }, [data.vendors]);
+  const assignmentEligibilityById = useMemo(() => {
+    const map = new Map<string, VendorLeadAssignmentEligibility>();
+    data.vendors.forEach((vendor) => map.set(vendor.id, evaluateVendorLeadAssignmentEligibility(vendor as Record<string, unknown>, null, marketplaceSettings)));
+    return map;
+  }, [data.vendors, marketplaceSettings]);
+  const publicVisibilityById = useMemo(() => {
+    const map = new Map<string, VendorPublicVisibility>();
+    data.vendors.forEach((vendor) => map.set(vendor.id, getVendorPublicVisibility(vendor as Record<string, unknown>, marketplaceSettings)));
+    return map;
+  }, [data.vendors, marketplaceSettings]);
 
   const packageOptions = useMemo(() => uniqueOptions(data.vendors.map((vendor) => vendorRowPackageStatus(vendor)), "All"), [data.vendors]);
   const vendors = useMemo(() => data.vendors.filter((vendor) => {
     const currentPackageStatus = vendorRowPackageStatus(vendor);
-    const isEligible = eligibilityById.get(vendor.id)?.eligible ?? false;
+    const isEligible = assignmentEligibilityById.get(vendor.id)?.eligible ?? false;
     return includesQuery([vendor.business_name, vendor.owner_name, vendor.phone, vendor.city, vendor.status, vendor.service_categories?.join(" "), currentPackageStatus], query)
       && (city === "All" || vendor.city === city)
       && (category === "All" || (vendor.service_categories ?? []).includes(category))
       && (status === "All" || vendor.status === status)
       && (packageStatus === "All" || currentPackageStatus === packageStatus)
       && (eligibility === "All" || (eligibility === "Eligible" ? isEligible : !isEligible));
-  }), [data.vendors, eligibilityById, query, city, category, status, packageStatus, eligibility]);
+  }), [data.vendors, assignmentEligibilityById, query, city, category, status, packageStatus, eligibility]);
 
-  const eligibleCount = useMemo(() => [...eligibilityById.values()].filter((e) => e.eligible).length, [eligibilityById]);
+  const eligibleCount = useMemo(() => [...assignmentEligibilityById.values()].filter((e) => e.eligible).length, [assignmentEligibilityById]);
 
   // Mutations go through the Phase 13B admin APIs, then refresh the snapshot.
   const mutate = useCallback(async (vendorId: string, path: string, body: Record<string, unknown>, successMsg: string) => {
@@ -354,7 +372,7 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Vendors" value={formatNumber(data.vendors.length)} helper="All vendor records" icon="vendors" />
-        <StatCard label="Eligible for Preview" value={formatNumber(eligibleCount)} helper="Approved, active, package + credits" icon="vendors" tone="emerald" />
+        <StatCard label="Paid Lead Eligible" value={formatNumber(eligibleCount)} helper="Paid/trial, active, with credits" icon="vendors" tone="emerald" />
         <StatCard label="Active Vendors" value={formatNumber(data.stats.active_vendors)} helper="Ready for leads" icon="vendors" tone="indigo" />
         <StatCard label="Low Credits" value={formatNumber(data.stats.low_balance_vendors)} helper="Renewal risk" icon="notifications" tone="amber" />
       </section>
@@ -365,7 +383,7 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
             key={vendor.id}
             type="button"
             onClick={() => setSelected(vendor)}
-            className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+            className="qf-card-shadow qf-card-hover rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-emerald-200"
           >
             <div className="flex items-start justify-between gap-3">
               <Strong title={vendor.business_name || "Unnamed vendor"} subtitle={vendor.city || "City not set"} />
@@ -378,6 +396,12 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
               <StatusBadge value={vendor.status || "Pending"} />
               <StatusBadge value={vendor.is_active === false ? "Inactive" : "Active"} tone={vendor.is_active === false ? "rose" : "emerald"} />
               <StatusBadge value={`Pkg: ${vendorRowPackageStatus(vendor)}`} tone={isLivePackage(vendor) ? "emerald" : "slate"} />
+            </div>
+            <div className="mt-3">
+              <VendorInternalBadges
+                visibility={publicVisibilityById.get(vendor.id)}
+                assignmentEligibility={assignmentEligibilityById.get(vendor.id)}
+              />
             </div>
           </button>
         ))}
@@ -411,7 +435,8 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
           { header: "Credits", cell: (vendor) => <CreditsMeter value={Number(vendor.remaining_credits ?? 0)} total={Number(vendor.total_credits ?? 0)} /> },
           { header: "Active", cell: (vendor) => <StatusBadge value={vendor.is_active === false ? "Inactive" : "Active"} tone={vendor.is_active === false ? "rose" : "emerald"} /> },
           { header: "Status", cell: (vendor) => <StatusBadge value={vendor.status || "Pending"} /> },
-          { header: "Eligibility", cell: (vendor) => <VendorEligibilityBadge eligibility={eligibilityById.get(vendor.id)} /> },
+          { header: "Assignment", cell: (vendor) => <VendorAssignmentEligibilityBadge eligibility={assignmentEligibilityById.get(vendor.id)} /> },
+          { header: "Internal Badges", cell: (vendor) => <VendorInternalBadges visibility={publicVisibilityById.get(vendor.id)} assignmentEligibility={assignmentEligibilityById.get(vendor.id)} /> },
           {
             header: "Actions",
             cell: (vendor) => (
@@ -434,7 +459,15 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
         ]}
       />
 
-      {selected ? <VendorDetailDrawer vendor={selected} eligibility={eligibilityById.get(selected.id)} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <VendorDetailDrawer
+          vendor={selected}
+          eligibility={eligibilityById.get(selected.id)}
+          publicVisibility={publicVisibilityById.get(selected.id)}
+          leadAssignmentEligibility={assignmentEligibilityById.get(selected.id)}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
       {creditsFor ? <ManageCreditsModal vendor={creditsFor} busy={busyId === creditsFor.id} onClose={() => setCreditsFor(null)} onSave={(body) => mutate(creditsFor.id, "credits", body, "Credits updated.").then((ok) => { if (ok) setCreditsFor(null); })} /> : null}
       {packageFor ? <AssignPackageModal vendor={packageFor} busy={busyId === packageFor.id} onClose={() => setPackageFor(null)} onSave={(body) => mutate(packageFor.id, "package", body, "Package updated.").then((ok) => { if (ok) setPackageFor(null); })} /> : null}
       {logFor ? <CreditLogModal vendor={logFor} notify={notify} onClose={() => setLogFor(null)} /> : null}
@@ -462,6 +495,56 @@ function VendorEligibilityBadge({ eligibility }: { eligibility?: VendorEligibili
       <StatusBadge value={`Not eligible: ${reason}`} tone="rose" />
     </span>
   );
+}
+
+function VendorAssignmentEligibilityBadge({ eligibility }: { eligibility?: VendorLeadAssignmentEligibility }) {
+  if (!eligibility) return <StatusBadge value="Unknown" tone="slate" />;
+  if (eligibility.eligible) return <StatusBadge value="Paid lead eligible" tone="emerald" />;
+  const reason = eligibility.reasons[0] ? assignmentReasonLabel(eligibility.reasons[0]) : "Not eligible for assignment";
+  return (
+    <span title={eligibility.reasons.map(assignmentReasonLabel).join(" - ")}>
+      <StatusBadge value={reason} tone={eligibility.reasons.includes("no_credits") ? "amber" : "rose"} />
+    </span>
+  );
+}
+
+function VendorInternalBadges({
+  visibility,
+  assignmentEligibility,
+}: {
+  visibility?: VendorPublicVisibility;
+  assignmentEligibility?: VendorLeadAssignmentEligibility;
+}) {
+  const badges: Array<{ label: string; tone: "emerald" | "amber" | "rose" | "slate" | "blue" }> = [];
+  if (visibility?.isPubliclyVisible) badges.push({ label: "Publicly visible", tone: "blue" });
+  if (visibility?.visibilityType === "free_visible") badges.push({ label: "Free visible only", tone: "amber" });
+  if (assignmentEligibility?.eligible) badges.push({ label: "Paid lead eligible", tone: "emerald" });
+  if (assignmentEligibility && !assignmentEligibility.eligible) badges.push({ label: "Not eligible for assignment", tone: "rose" });
+  if (assignmentEligibility?.reasons.includes("no_credits")) badges.push({ label: "No credits", tone: "amber" });
+  if (assignmentEligibility?.reasons.includes("package_expired")) badges.push({ label: "Package expired", tone: "rose" });
+
+  const unique = badges.filter((badge, index) => badges.findIndex((item) => item.label === badge.label) === index);
+  if (unique.length === 0) return <StatusBadge value="Hidden" tone="slate" />;
+  return (
+    <div className="flex min-w-44 flex-wrap gap-1.5">
+      {unique.map((badge) => <StatusBadge key={badge.label} value={badge.label} tone={badge.tone} />)}
+    </div>
+  );
+}
+
+function assignmentReasonLabel(reason: string): string {
+  const labels: Record<string, string> = {
+    free_unpaid_vendor_not_eligible_for_assignment: "Not eligible for assignment",
+    package_expired: "Package expired",
+    no_credits: "No credits",
+    city_mismatch: "City mismatch",
+    category_mismatch: "Category mismatch",
+    subcategory_mismatch: "Subcategory mismatch",
+    vendor_inactive: "Inactive",
+    vendor_pending_approval: "Pending approval",
+    vendor_suspended: "Suspended",
+  };
+  return labels[reason] ?? reason;
 }
 
 function VendorRowPackageCell({ vendor }: { vendor: Vendor }) {
@@ -806,7 +889,7 @@ function PackageRowCard({ item, notify, ask }: { item: PackageRow; notify: (mess
   const features = packageFeatures(item);
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+    <article className="qf-card-shadow qf-card-hover rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-200">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold text-slate-950">{item.name || "Unnamed package"}</h2>
@@ -862,7 +945,7 @@ function PackageTemplateCard({ item, notify }: { item: (typeof packageTemplates)
 
 function CategoryParentCard({ item, subcategoryCount }: { item: Category; subcategoryCount: number }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+    <article className="qf-card-shadow qf-card-hover rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-200">
       <div className="flex items-start justify-between gap-3">
         <Strong title={item.name || "Unnamed category"} subtitle={item.slug || shortId(item.id)} />
         <StatusBadge value={item.is_active ? "Active" : "Inactive"} />
@@ -891,7 +974,7 @@ function CityCoverageCard({ city, data }: { city: City; data: Snapshot }) {
   const balance = demand ? Math.min(100, Math.round((supply / Math.max(demand, 1)) * 100)) : supply ? 100 : 0;
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+    <article className="qf-card-shadow qf-card-hover rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-200">
       <div className="flex items-start justify-between gap-3">
         <Strong title={city.name || "Unnamed city"} subtitle={city.state || "Maharashtra"} />
         <StatusBadge value={city.launch_status || (city.is_active ? "Active" : "Hidden")} />
@@ -978,14 +1061,24 @@ function citySupply(city: City, data: Snapshot) {
   return data.vendors.filter((vendor) => String(vendor.city ?? "").toLowerCase() === String(city.name ?? "").toLowerCase()).length;
 }
 
-function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
-  const [tab, setTab] = useState("Rules & Settings");
-  const tabs = ["Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
+function LeadDistributionPage({
+  data,
+  notify,
+  runAction,
+}: {
+  data: Snapshot;
+  notify: (message: string, tone?: "success" | "error" | "info") => void;
+  runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
+}) {
+  const [tab, setTab] = useState("Auto Matching & Queue");
+  const tabs = ["Auto Matching & Queue", "Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
 
   return (
     <div className="space-y-5">
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
-      {tab === "Assignment Approval Preview" ? (
+      {tab === "Auto Matching & Queue" ? (
+        <AutoMatchingQueuePanel data={data} notify={notify} runAction={runAction} />
+      ) : tab === "Assignment Approval Preview" ? (
         <LeadAssignmentApprovalControl leads={data.leads} notify={notify} />
       ) : tab === "Rules & Settings" ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1013,6 +1106,119 @@ function LeadDistributionPage({ data, notify }: { data: Snapshot; notify: (messa
 }
 
 /** Phase 14B: active admin-managed city names — the single source of truth. */
+function AutoMatchingQueuePanel({
+  data,
+  notify,
+  runAction,
+}: {
+  data: Snapshot;
+  notify: (message: string, tone?: "success" | "error" | "info") => void;
+  runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
+}) {
+  const queuedRows = data.leadAssignmentQueue ?? [];
+  const autoLogs = data.autoAssignmentLogs ?? [];
+  const freeInterests = data.freeVendorInterests ?? [];
+  const unassignedLeads = data.leads.filter(isUnassignedLead).slice(0, 8);
+  const matchedPreviewCount = queuedRows.filter((row) => row.queue_status === "matched_preview").length;
+  const suggestedCount = autoLogs.filter((row) => row.status === "auto_suggested").length;
+
+  return (
+    <div className="space-y-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Queued Leads" value={formatNumber(queuedRows.length)} helper="Awaiting paid vendor supply" icon="distribution" tone="amber" />
+        <StatCard label="Matched Preview" value={formatNumber(matchedPreviewCount)} helper="Suggestions ready, not assigned" icon="vendors" tone="emerald" />
+        <StatCard label="Auto Suggestions" value={formatNumber(suggestedCount)} helper="Preview logs only" icon="reports" tone="indigo" />
+        <StatCard label="Free Vendor Interests" value={formatNumber(freeInterests.length)} helper="Masked client contact only" icon="notifications" tone="slate" />
+      </section>
+
+      <SectionCard title="Queued Leads" description="Recheck is manual in this phase. Matched previews are not final assignments.">
+        <DataTable
+          rows={queuedRows}
+          emptyTitle="No queued leads"
+          emptyMessage="Leads will appear here when paid-only preview matching cannot find enough eligible vendors."
+          columns={[
+            { header: "Lead", cell: (row) => <Strong title={leadName(data.leads, row.lead_id)} subtitle={shortId(row.lead_id)} /> },
+            { header: "Reason", cell: (row) => <StatusBadge value={row.queue_reason || "queued"} tone={row.queue_status === "matched_preview" ? "emerald" : "amber"} /> },
+            { header: "Eligible Paid", cell: (row) => `${formatNumber(row.eligible_vendor_count ?? 0)} / ${formatNumber(row.required_vendor_count ?? 1)}` },
+            { header: "Selected Preview", cell: (row) => <span className="line-clamp-2 min-w-44 text-xs text-slate-500">{selectedVendorNames(row.selected_vendor_ids ?? [], data.vendors)}</span> },
+            { header: "Attempts", cell: (row) => formatNumber(row.matching_attempt_count ?? 0) },
+            { header: "Last Checked", cell: (row) => formatDate(row.last_checked_at) },
+            {
+              header: "Actions",
+              cell: (row) => (
+                <ActionMenu
+                  actions={[
+                    { label: "Recheck paid vendors", onClick: () => runAction("Queue recheck", () => adminRecheckLeadAssignmentQueue(row.id)) },
+                    { label: "Copy lead id", onClick: () => notify(`Lead id: ${row.lead_id}`) },
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+      </SectionCard>
+
+      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+        <SectionCard title="Run Preview For Unassigned Leads" description="Preview-only. No assignment, vendor notification, credit deduction, or WhatsApp.">
+          <DataTable
+            rows={unassignedLeads}
+            emptyTitle="No unassigned leads"
+            emptyMessage="Open unassigned leads will appear here for manual preview."
+            columns={[
+              { header: "Lead", cell: (lead) => <Strong title={lead.name || "Unnamed lead"} subtitle={maskPhone(lead.phone)} /> },
+              { header: "Requirement", cell: (lead) => <Strong title={lead.service_required || lead.category || "Not set"} subtitle={lead.city || "City not set"} /> },
+              { header: "Created", cell: (lead) => formatDate(lead.created_at) },
+              { header: "Action", cell: (lead) => <SecondaryButton onClick={() => runAction("Auto match preview", () => adminRunAutoMatchPreview(lead.id))}>Preview</SecondaryButton> },
+            ]}
+          />
+        </SectionCard>
+
+        <SectionCard title="Preview Logs" description="Records from lead_auto_assignment_logs. Suggestions are not final assignments.">
+          <DataTable
+            rows={autoLogs.slice(0, 8)}
+            emptyTitle="No preview logs"
+            emptyMessage="Auto matching preview runs will be logged after the migration is applied."
+            columns={[
+              { header: "Lead", cell: (row) => <Strong title={leadName(data.leads, row.lead_id)} subtitle={shortId(row.lead_id)} /> },
+              { header: "Status", cell: (row) => <StatusBadge value={row.status || "preview"} tone={row.status === "auto_suggested" ? "emerald" : "amber"} /> },
+              { header: "Eligible", cell: (row) => formatNumber(row.eligible_vendor_count ?? 0) },
+              { header: "Selected", cell: (row) => <span className="line-clamp-2 min-w-36 text-xs text-slate-500">{selectedVendorNames(row.selected_vendor_ids ?? [], data.vendors)}</span> },
+              { header: "Date", cell: (row) => formatDate(row.created_at) },
+            ]}
+          />
+        </SectionCard>
+      </section>
+
+      <SectionCard title="Free Vendor Interest Capture" description="Client phones are masked/hashed. No vendor receives client contact in this phase.">
+        <DataTable
+          rows={freeInterests.slice(0, 10)}
+          emptyTitle="No free vendor interests"
+          emptyMessage="Requests from gated free vendor profiles will appear here after capture."
+          columns={[
+            { header: "Vendor", cell: (row) => <Strong title={vendorName(data.vendors, row.vendor_id)} subtitle={shortId(row.vendor_id)} /> },
+            { header: "Client", cell: (row) => <Strong title={row.client_name || "Client"} subtitle={row.client_phone_masked || "masked"} /> },
+            { header: "Requirement", cell: (row) => <Strong title={row.category || "Not set"} subtitle={[row.area, row.city].filter(Boolean).join(", ") || "Area not set"} /> },
+            { header: "Status", cell: (row) => <StatusBadge value={row.status || "interest_captured"} /> },
+            { header: "n8n Preview", cell: (row) => <StatusBadge value={row.n8n_preview_called ? "Preview called" : "Mock only"} tone={row.n8n_preview_called ? "blue" : "slate"} /> },
+            { header: "Created", cell: (row) => formatDate(row.created_at) },
+            {
+              header: "Actions",
+              cell: (row) => (
+                <ActionMenu
+                  actions={[
+                    { label: "Mark reviewed", onClick: () => runAction("Interest status update", () => adminMarkFreeVendorInterestStatus(row.id, "reviewed")) },
+                    { label: "Mark team followed up", onClick: () => runAction("Interest status update", () => adminMarkFreeVendorInterestStatus(row.id, "team_followed_up")) },
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
 function activeCityNames(cities: City[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -1047,6 +1253,37 @@ function activeCategoryNames(categories: Category[]): string[] {
     out.push(name);
   }
   return out;
+}
+
+function marketplaceSettingsObject(rows?: MarketplaceRuntimeSetting[]): MarketplaceSettingsView {
+  const settings = { ...marketplaceSettingDefaults };
+  (rows ?? []).forEach((row) => {
+    const key = row.key as keyof MarketplaceSettingsView;
+    if (!(key in settings)) return;
+    const fallback = settings[key];
+    if (typeof fallback === "boolean") {
+      settings[key] = readBooleanValue(row.value, fallback) as never;
+    } else if (typeof fallback === "number") {
+      const value = Number(row.value);
+      settings[key] = (Number.isFinite(value) ? value : fallback) as never;
+    } else if (key === "auto_assignment_mode") {
+      const value = String(row.value ?? "").trim();
+      settings[key] = (value === "off" || value === "preview" || value === "auto_suggest" ? value : fallback) as never;
+    }
+  });
+  return settings;
+}
+
+function readBooleanValue(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value.trim().toLowerCase() === "true";
+  return fallback;
+}
+
+function selectedVendorNames(ids: string[] | null | undefined, vendors: Vendor[]): string {
+  const list = Array.isArray(ids) ? ids : [];
+  if (list.length === 0) return "No vendor selected";
+  return list.map((id) => vendorName(vendors, id)).join(", ");
 }
 
 function EligibilityChecker({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
@@ -1310,27 +1547,157 @@ function AdminUsersPage({ data }: { data: Snapshot }) {
   );
 }
 
-function SettingsPage({ notify }: { notify: (message: string) => void }) {
+type MarketplaceSettingsView = {
+  show_free_vendors_publicly: boolean;
+  allow_free_vendor_interest_capture: boolean;
+  notify_free_vendor_recharge_interest: boolean;
+  allow_trial_vendors_for_assignment: boolean;
+  minimum_paid_vendors_required_for_auto_assignment: number;
+  max_vendors_per_lead: number;
+  auto_assignment_mode: "off" | "preview" | "auto_suggest";
+};
+
+const marketplaceSettingDefaults: MarketplaceSettingsView = {
+  show_free_vendors_publicly: true,
+  allow_free_vendor_interest_capture: true,
+  notify_free_vendor_recharge_interest: true,
+  allow_trial_vendors_for_assignment: true,
+  minimum_paid_vendors_required_for_auto_assignment: 1,
+  max_vendors_per_lead: 3,
+  auto_assignment_mode: "preview",
+};
+
+function MarketplaceRuntimeSettingsPanel({
+  settingsRows,
+  runAction,
+}: {
+  settingsRows: MarketplaceRuntimeSetting[];
+  runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
+}) {
+  const [settings, setSettings] = useState(() => marketplaceSettingsObject(settingsRows));
+  useEffect(() => {
+    setSettings(marketplaceSettingsObject(settingsRows));
+  }, [settingsRows]);
+
+  function save<K extends keyof MarketplaceSettingsView>(key: K, value: MarketplaceSettingsView[K]) {
+    setSettings((current) => ({ ...current, [key]: value }));
+    runAction("Marketplace setting update", () => adminUpdateMarketplaceRuntimeSetting(key, value));
+  }
+
+  return (
+    <SectionCard title="Paid-Only Auto Matching Controls" description="These switches separate public visibility from paid/trial lead assignment. Changes are stored in marketplace_runtime_settings.">
+      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
+        <div className="grid gap-3 md:grid-cols-2">
+          <MarketplaceToggle
+            label="Show approved free vendors publicly"
+            checked={settings.show_free_vendors_publicly}
+            onChange={(value) => save("show_free_vendors_publicly", value)}
+          />
+          <MarketplaceToggle
+            label="Allow free vendor interest capture"
+            checked={settings.allow_free_vendor_interest_capture}
+            onChange={(value) => save("allow_free_vendor_interest_capture", value)}
+          />
+          <MarketplaceToggle
+            label="Notify free vendor to recharge on interest"
+            checked={settings.notify_free_vendor_recharge_interest}
+            onChange={(value) => save("notify_free_vendor_recharge_interest", value)}
+          />
+          <MarketplaceToggle
+            label="Allow trial vendors for assignment"
+            checked={settings.allow_trial_vendors_for_assignment}
+            onChange={(value) => save("allow_trial_vendors_for_assignment", value)}
+          />
+        </div>
+
+        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold uppercase text-slate-500">Minimum paid vendors required</span>
+            <input
+              type="number"
+              min={1}
+              value={settings.minimum_paid_vendors_required_for_auto_assignment}
+              onChange={(event) => save("minimum_paid_vendors_required_for_auto_assignment", Math.max(1, Number(event.target.value) || 1))}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold uppercase text-slate-500">Max vendors per lead</span>
+            <input
+              type="number"
+              min={1}
+              max={3}
+              value={settings.max_vendors_per_lead}
+              onChange={(event) => save("max_vendors_per_lead", Math.max(1, Math.min(3, Number(event.target.value) || 1)))}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold uppercase text-slate-500">Auto assignment mode</span>
+            <select
+              value={settings.auto_assignment_mode}
+              onChange={(event) => save("auto_assignment_mode", event.target.value as MarketplaceSettingsView["auto_assignment_mode"])}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+            >
+              <option value="off">off</option>
+              <option value="preview">preview</option>
+              <option value="auto_suggest">auto_suggest</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function MarketplaceToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/30"
+      aria-pressed={checked}
+    >
+      <span className="text-sm font-semibold text-slate-800">{label}</span>
+      <span className={`flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition ${checked ? "bg-emerald-500" : "bg-slate-200"}`}>
+        <span className={`h-4 w-4 rounded-full bg-white shadow transition ${checked ? "translate-x-5" : ""}`} />
+      </span>
+    </button>
+  );
+}
+
+function SettingsPage({
+  data,
+  notify,
+  runAction,
+}: {
+  data: Snapshot;
+  notify: (message: string) => void;
+  runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
+}) {
   const groups = ["Business Settings", "Lead Settings", "Vendor Settings", "Distribution Settings", "AI Settings", "Automation Settings", "Security Settings"];
   return (
-    <section className="grid gap-4 xl:grid-cols-2">
-      {groups.map((group, index) => (
-        <article key={group} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold text-slate-950">{group}</h2>
-              <p className="mt-2 text-sm text-slate-500">Global marketplace controls prepared for Supabase persistence.</p>
+    <div className="space-y-5">
+      <MarketplaceRuntimeSettingsPanel settingsRows={data.marketplaceSettings ?? []} runAction={runAction} />
+      <section className="grid gap-4 xl:grid-cols-2">
+        {groups.map((group, index) => (
+          <article key={group} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">{group}</h2>
+                <p className="mt-2 text-sm text-slate-500">Global marketplace controls prepared for Supabase persistence.</p>
+              </div>
+              <ToggleSwitch checked={index < 4} />
             </div>
-            <ToggleSwitch checked={index < 4} />
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <input className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder="Setting key" />
-            <input className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder="Setting value" />
-          </div>
-          <button type="button" onClick={() => notify(`${group} save placeholder ready.`)} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Save</button>
-        </article>
-      ))}
-    </section>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <input className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder="Setting key" />
+              <input className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder="Setting value" />
+            </div>
+            <button type="button" onClick={() => notify(`${group} save placeholder ready.`)} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Save</button>
+          </article>
+        ))}
+      </section>
+    </div>
   );
 }
 
@@ -1377,7 +1744,19 @@ function LeadDetailDrawer({ lead, vendors, onClose }: { lead: Lead; vendors: Ven
   );
 }
 
-function VendorDetailDrawer({ vendor, eligibility, onClose }: { vendor: Vendor; eligibility?: VendorEligibility; onClose: () => void }) {
+function VendorDetailDrawer({
+  vendor,
+  eligibility,
+  publicVisibility,
+  leadAssignmentEligibility,
+  onClose,
+}: {
+  vendor: Vendor;
+  eligibility?: VendorEligibility;
+  publicVisibility?: VendorPublicVisibility;
+  leadAssignmentEligibility?: VendorLeadAssignmentEligibility;
+  onClose: () => void;
+}) {
   const row = vendor as Record<string, unknown>;
   return (
     <Drawer title={vendor.business_name || "Vendor details"} subtitle={`Vendor ID ${shortId(vendor.id)}`} onClose={onClose}>
@@ -1407,6 +1786,22 @@ function VendorDetailDrawer({ vendor, eligibility, onClose }: { vendor: Vendor; 
             )}
           </article>
         ) : null}
+        <article className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-950">Phase 25A internal status</h3>
+              <p className="mt-1 text-xs text-slate-500">Public visibility is separate from paid lead assignment.</p>
+            </div>
+            <VendorInternalBadges visibility={publicVisibility} assignmentEligibility={leadAssignmentEligibility} />
+          </div>
+          <div className="mt-3 grid gap-2 text-xs text-slate-600">
+            <p>Visibility: {publicVisibility?.visibilityType ?? "hidden"}</p>
+            <p>Assignment: {leadAssignmentEligibility?.eligible ? "eligible" : "not eligible"}</p>
+            {leadAssignmentEligibility?.reasons.length ? (
+              <p>Reasons: {leadAssignmentEligibility.reasons.map(assignmentReasonLabel).join(", ")}</p>
+            ) : null}
+          </div>
+        </article>
       </div>
     </Drawer>
   );

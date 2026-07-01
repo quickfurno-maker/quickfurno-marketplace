@@ -5,18 +5,17 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { VendorCards } from "@/components/VendorCards";
+import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+import { getPublicVendorsForCategory } from "@/services/publicVendorService";
 import {
-  categories,
-  categorySlug,
   enquiryServiceForCategory,
   getCategoryBySlug,
 } from "@/lib/quickfurno-data";
 
 type CategoryPageProps = { params: { slug: string } };
 
-export function generateStaticParams() {
-  return categories.map((category) => ({ slug: categorySlug(category.name) }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export function generateMetadata({ params }: CategoryPageProps): Metadata {
   const category = getCategoryBySlug(params.slug);
@@ -32,11 +31,16 @@ export function generateMetadata({ params }: CategoryPageProps): Metadata {
   };
 }
 
-export default function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage({ params }: CategoryPageProps) {
   const category = getCategoryBySlug(params.slug);
   if (!category) notFound();
 
+  const settings = await loadMarketplaceRuntimeSettings();
   const enquiryService = enquiryServiceForCategory(category.name);
+
+  // Prefer approved/active Supabase vendors; `null` means the table read failed,
+  // so we let VendorCards fall back to the static listing without crashing.
+  const publicVendors = await getPublicVendorsForCategory(category.name, settings);
 
   return (
     <>
@@ -88,7 +92,12 @@ export default function CategoryPage({ params }: CategoryPageProps) {
             </aside>
 
             <div className="listing-results-panel">
-              <VendorCards category={category.name} mode="listing" />
+              <VendorCards
+                category={category.name}
+                mode="listing"
+                vendors={publicVendors ?? undefined}
+                showFreeVendorsPublicly={settings.show_free_vendors_publicly}
+              />
             </div>
 
             <aside className="listing-assist-card" aria-label="QuickFurno assistance">

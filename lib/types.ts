@@ -46,6 +46,17 @@ export interface CreateLeadInput {
   // "client_selected_vendor" tells createLead to SKIP the immediate max-3 auto
   // match so the client-selected priority + 1-hour window can run instead.
   assignment_intent?: string;
+  // Phase 1 preferred-vendor routing. When lead_intent === "preferred_vendor"
+  // and target_vendor_id is set, createLead routes the lead FIRST to that single
+  // vendor (no normal auto-match, no fallback fan-out in Phase 1). All optional
+  // so every existing general CTA keeps its current auto-match behaviour.
+  lead_intent?: "general_auto_match" | "preferred_vendor";
+  target_vendor_id?: string;
+  target_vendor_name?: string;
+  target_vendor_category?: string;
+  target_vendor_subcategory?: string;
+  // Reserved for Phase 2 delayed remaining-slot fill. Not acted on in Phase 1.
+  fallback_allowed?: boolean;
 }
 
 export interface PublicVendorCard {

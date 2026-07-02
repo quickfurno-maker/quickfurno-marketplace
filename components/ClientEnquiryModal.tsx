@@ -175,6 +175,14 @@ type EnquiryModalOptions = {
   area?: string;
   requirement?: string;
   source?: string;
+  // Phase 1 preferred-vendor routing. When leadIntent === "preferred_vendor" the
+  // enquiry is routed FIRST to the picked vendor (see leadService.createLead).
+  // Defaults (undefined / "general_auto_match") keep the normal auto-match flow.
+  leadIntent?: "general_auto_match" | "preferred_vendor";
+  targetVendorId?: string;
+  targetVendorName?: string;
+  targetVendorCategory?: string;
+  targetVendorSubcategory?: string;
 };
 
 const OPEN_EVENT = "quickfurno:open-enquiry-modal";
@@ -217,6 +225,11 @@ export function EnquiryModalTrigger({
   area,
   requirement,
   source,
+  leadIntent,
+  targetVendorId,
+  targetVendorName,
+  targetVendorCategory,
+  targetVendorSubcategory,
   onClick,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & EnquiryModalOptions & { modalTitle?: string }) {
@@ -228,6 +241,11 @@ export function EnquiryModalTrigger({
     area,
     requirement,
     source,
+    leadIntent,
+    targetVendorId,
+    targetVendorName,
+    targetVendorCategory,
+    targetVendorSubcategory,
   };
 
   return (
@@ -259,6 +277,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [modalOptions, setModalOptions] = useState<EnquiryModalOptions>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [locStatus, setLocStatus] = useState<"" | "locating" | "captured" | "denied" | "unsupported">("");
@@ -286,6 +305,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
     setError("");
     setSuccess(false);
+    setSuccessMessage("");
     setSubmitting(false);
     setShowConfirm(false);
     setLocStatus("");
@@ -313,6 +333,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setShowConfirm(false);
     setError("");
     setSuccess(false);
+    setSuccessMessage("");
     setSubmitting(false);
     setLocStatus("");
     setTouched({});
@@ -606,6 +627,20 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
     const budgetText = budgetSummary();
 
+    // Phase 1 preferred-vendor routing: when a specific paid/trial vendor CTA
+    // opened this modal, route the lead FIRST to that vendor (see
+    // leadService.createLead). General CTAs keep normal QuickFurno auto-matching.
+    const isPreferred = modalOptions.leadIntent === "preferred_vendor" && Boolean(modalOptions.targetVendorId);
+    const preferredPayload = isPreferred
+      ? {
+          lead_intent: "preferred_vendor" as const,
+          target_vendor_id: modalOptions.targetVendorId,
+          target_vendor_name: modalOptions.targetVendorName,
+          target_vendor_category: modalOptions.targetVendorCategory,
+          target_vendor_subcategory: modalOptions.targetVendorSubcategory,
+        }
+      : {};
+
     const payload = {
       name: form.name.trim(),
       phone: form.phone.trim(),
@@ -619,6 +654,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       location_consent: form.lat != null && form.lng != null,
       share_consent: form.shareConsent,
       ...readTrackingContext(),
+      ...preferredPayload,
     };
 
     setSubmitting(true);
@@ -637,6 +673,18 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         budget: payload.budget_range,
         timeline: payload.timeline,
       });
+
+      // Minimal success-copy variants (no layout change).
+      if (isPreferred) {
+        const vendorName = modalOptions.targetVendorName || result.data.preferred_vendor?.vendor_name || "this vendor";
+        setSuccessMessage(
+          result.data.preferred_vendor?.assigned
+            ? `Your enquiry has been sent to ${vendorName}. QuickFurno will help coordinate the next step.`
+            : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we will connect you with better matching verified vendors.`,
+        );
+      } else {
+        setSuccessMessage("Your requirement has been submitted. QuickFurno will connect you with up to 3 verified vendors near you.");
+      }
       setSuccess(true);
     } catch (err) {
       console.error("[requirement flow] submission error", {
@@ -1180,7 +1228,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     ✓
                   </span>
                   <h3 id="qf-rf-title">Requirement submitted</h3>
-                  <p>Your requirement is submitted. QuickFurno will connect you with Verified Teams shortly.</p>
+                  <p>{successMessage || "Your requirement has been submitted. QuickFurno will connect you with up to 3 verified vendors near you."}</p>
                 </div>
               ) : (
                 <div className="qf-rf-step" key={step}>

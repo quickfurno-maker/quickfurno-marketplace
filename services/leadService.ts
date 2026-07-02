@@ -9,6 +9,7 @@ import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
 import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
+import { routePreferredVendorLead, type PreferredVendorRoutingResult } from "./preferredVendorLeadService";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 
 function firstText(...values: Array<string | undefined>): string {
@@ -25,7 +26,9 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
 }
 
 /** Create a client lead. De-dupes by phone+service+city within the configured window. */
-export async function createLead(input: CreateLeadInput): Promise<Result<{ id: string; is_duplicate: boolean }>> {
+export async function createLead(
+  input: CreateLeadInput,
+): Promise<Result<{ id: string; is_duplicate: boolean; preferred_vendor?: PreferredVendorRoutingResult }>> {
   try {
     const name = firstText(input.name);
     const phone = firstText(input.phone);
@@ -151,7 +154,29 @@ export async function createLead(input: CreateLeadInput): Promise<Result<{ id: s
     // immediate max-3 auto match — the client-selected priority + 1-hour
     // auto-fill window (clientRequirementGroupService) owns that lead instead.
     const isClientSelectedIntent = input.assignment_intent === "client_selected_vendor";
-    if (input.share_consent && !isClientSelectedIntent) {
+    // Phase 1 preferred-vendor routing: a specific-vendor CTA routes the lead
+    // FIRST (and only) to the client-picked vendor — never the normal max-3 auto
+    // match, and never a fan-out to other vendors in this phase.
+    const preferredVendorId = firstText(input.target_vendor_id);
+    const isPreferredVendorIntent = input.lead_intent === "preferred_vendor" && Boolean(preferredVendorId);
+
+    let preferredVendor: PreferredVendorRoutingResult | undefined;
+
+    if (isPreferredVendorIntent) {
+      if (input.share_consent) {
+        preferredVendor = await routePreferredVendorLead({
+          leadId: data.id,
+          vendorId: preferredVendorId,
+          vendorName: input.target_vendor_name,
+          city,
+          serviceRequired,
+          category: input.target_vendor_category,
+          subcategory: input.target_vendor_subcategory ?? input.subcategory,
+          isDuplicate: Boolean(data.is_duplicate),
+          fallbackAllowed: input.fallback_allowed,
+        });
+      }
+    } else if (input.share_consent && !isClientSelectedIntent) {
       const matching = await runAutoLeadMatchingForLead(data.id);
       if (!matching.ok) {
         console.warn("[lead matching] auto matching failed without blocking lead submission", {
@@ -162,7 +187,7 @@ export async function createLead(input: CreateLeadInput): Promise<Result<{ id: s
       }
     }
 
-    return ok({ id: data.id, is_duplicate: data.is_duplicate });
+    return ok({ id: data.id, is_duplicate: data.is_duplicate, preferred_vendor: preferredVendor });
   } catch (e) {
     return fail(e);
   }

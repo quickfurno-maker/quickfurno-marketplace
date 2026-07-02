@@ -11,6 +11,8 @@ import {
   adminListRequirementGroups,
   adminProcessDueRequirementAutoFills,
   adminProcessRequirementAutoFill,
+  adminProcessPreferredVendorWindow,
+  adminProcessPreferredVendorRechargeWindows,
 } from "@/app/actions";
 
 type GroupCounts = {
@@ -36,9 +38,21 @@ type GroupRow = {
   auto_fill_enabled: boolean | null;
   auto_fill_status: string | null;
   status: string | null;
+  preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
+  preferred_vendor_status: string | null;
+  preferred_vendor_status_reason: string | null;
+  preferred_vendor_recharge_deadline_at: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: string | null;
   derived: GroupCounts;
 };
+
+/** Read the package-audit warning (vendor has credits but no active package). */
+function packageAuditWarning(metadata: Record<string, unknown> | null): string | null {
+  const warning = (metadata as { package_audit_warning?: { message?: string } } | null)?.package_audit_warning;
+  return warning && typeof warning.message === "string" ? warning.message : null;
+}
 
 const FILTERS = [
   "All",
@@ -46,6 +60,7 @@ const FILTERS = [
   "Sofa",
   "Painting",
   "Civil Work",
+  "Preferred vendor waiting",
   "Waiting for client selection",
   "Auto-fill due",
   "Auto-fill failed",
@@ -70,6 +85,23 @@ function fmt(value: string | null): string {
 
 function stateLabel(state: string): string {
   return state.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function preferredStatusLabel(status: string | null): string {
+  switch (status) {
+    case "assigned_immediately":
+      return "Assigned immediately";
+    case "waiting_for_recharge":
+      return "Waiting for recharge";
+    case "assigned_after_recharge":
+      return "Assigned after recharge";
+    case "expired":
+      return "Expired · auto-fill started";
+    case "not_eligible":
+      return "Not eligible";
+    default:
+      return status ? status.replace(/_/g, " ") : "—";
+  }
 }
 
 export function RequirementGroupsPanel({
@@ -112,6 +144,8 @@ export function RequirementGroupsPanel({
         case "Painting":
         case "Civil Work":
           return group === filter;
+        case "Preferred vendor waiting":
+          return row.preferred_vendor_status === "waiting_for_recharge";
         case "Waiting for client selection":
           return state === "waiting_for_client_selection";
         case "Auto-fill due":
@@ -156,6 +190,32 @@ export function RequirementGroupsPanel({
     });
   }
 
+  function processPreferredDue() {
+    startTransition(async () => {
+      const res = await adminProcessPreferredVendorRechargeWindows();
+      if (!res.ok) {
+        notify(res.error, "error");
+        return;
+      }
+      const processed = (res.data as { processed?: unknown[] }).processed ?? [];
+      notify(`Processed ${processed.length} preferred-vendor window(s).`, "success");
+      await load();
+    });
+  }
+
+  function processPreferred(groupId: string) {
+    startTransition(async () => {
+      const res = await adminProcessPreferredVendorWindow(groupId);
+      if (!res.ok) {
+        notify(res.error, "error");
+        return;
+      }
+      const data = res.data as { status?: string; assigned?: boolean; message?: string };
+      notify(data.message ?? `Preferred window ${data.status ?? "processed"}.`, data.assigned ? "success" : "info");
+      await load();
+    });
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -166,14 +226,24 @@ export function RequirementGroupsPanel({
             1-hour client selection window lapses — it never exceeds 3. Recovery above 3 stays admin-only.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={processDue}
-          disabled={pending}
-          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
-        >
-          {pending ? "Processing…" : "Process due auto-fills"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={processPreferredDue}
+            disabled={pending}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 disabled:opacity-50"
+          >
+            {pending ? "Processing…" : "Process due preferred windows"}
+          </button>
+          <button
+            type="button"
+            onClick={processDue}
+            disabled={pending}
+            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            {pending ? "Processing…" : "Process due auto-fills"}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -205,6 +275,7 @@ export function RequirementGroupsPanel({
             <tr>
               <th className="px-3 py-2">Group</th>
               <th className="px-3 py-2">Client / City</th>
+              <th className="px-3 py-2">Preferred vendor</th>
               <th className="px-3 py-2">Selected / Auto / Manual</th>
               <th className="px-3 py-2">Primary</th>
               <th className="px-3 py-2">Pending</th>
@@ -219,13 +290,13 @@ export function RequirementGroupsPanel({
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={12} className="px-3 py-6 text-center text-slate-400">
                   Loading requirement groups…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={12} className="px-3 py-6 text-center text-slate-400">
                   No requirement groups for this filter yet.
                 </td>
               </tr>
@@ -245,6 +316,31 @@ export function RequirementGroupsPanel({
                       <div className="text-[11px] text-slate-500">{maskPhone(row.client_phone)}</div>
                       <div className="text-[11px] text-slate-500">{row.city || "—"}</div>
                     </td>
+                    <td className="px-3 py-2">
+                      {row.preferred_vendor_id ? (
+                        <>
+                          <div className="text-slate-700">{row.preferred_vendor_name || "Vendor"}</div>
+                          <div className="text-[11px] font-medium text-slate-600">{preferredStatusLabel(row.preferred_vendor_status)}</div>
+                          {row.preferred_vendor_status_reason ? (
+                            <div className="text-[11px] text-slate-500">{row.preferred_vendor_status_reason.replace(/_/g, " ")}</div>
+                          ) : null}
+                          {row.preferred_vendor_status === "waiting_for_recharge" ? (
+                            <div className="text-[11px] text-amber-600">recharge by {fmt(row.preferred_vendor_recharge_deadline_at)}</div>
+                          ) : null}
+                          {packageAuditWarning(row.metadata) ? (
+                            <div className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-1 text-[11px] text-amber-700">
+                              ⚠ {packageAuditWarning(row.metadata)}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : packageAuditWarning(row.metadata) ? (
+                        <div className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-1 text-[11px] text-amber-700">
+                          ⚠ {packageAuditWarning(row.metadata)}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-slate-700">
                       {c.client_selected ?? 0} / {c.auto_assigned ?? 0} / {c.manual_assigned ?? 0}
                     </td>
@@ -260,18 +356,31 @@ export function RequirementGroupsPanel({
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      {canAutoFill ? (
-                        <button
-                          type="button"
-                          onClick={() => processOne(row.id)}
-                          disabled={pending}
-                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
-                        >
-                          Process auto-fill
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">—</span>
-                      )}
+                      <div className="flex flex-col gap-1.5">
+                        {row.preferred_vendor_status === "waiting_for_recharge" ? (
+                          <button
+                            type="button"
+                            onClick={() => processPreferred(row.id)}
+                            disabled={pending}
+                            className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 transition hover:border-amber-400 disabled:opacity-50"
+                          >
+                            Process preferred window
+                          </button>
+                        ) : null}
+                        {canAutoFill ? (
+                          <button
+                            type="button"
+                            onClick={() => processOne(row.id)}
+                            disabled={pending}
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
+                          >
+                            Assign alternate now
+                          </button>
+                        ) : null}
+                        {row.preferred_vendor_status !== "waiting_for_recharge" && !canAutoFill ? (
+                          <span className="text-[11px] text-slate-400">—</span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );

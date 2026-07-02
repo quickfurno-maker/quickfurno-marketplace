@@ -6273,12 +6273,27 @@ body::before {
   font-weight: 700;
   color: var(--qf-ink, #1f2937);
 }
-.qf-cs-enquiry-field input {
+.qf-cs-enquiry-field input,
+.qf-cs-enquiry-field select,
+.qf-cs-enquiry-field textarea {
   padding: 0.55rem 0.7rem;
   border: 1px solid #d1d5db;
   border-radius: 0.6rem;
   font-size: 0.9rem;
   font-weight: 500;
+  font-family: inherit;
+}
+.qf-cs-enquiry-locked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.6rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--qf-ink, #334155);
 }
 .qf-cs-enquiry-consent {
   display: flex;

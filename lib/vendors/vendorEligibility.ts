@@ -172,6 +172,84 @@ export function evaluateVendorLeadAssignmentEligibility(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Phase 26A-2E: client-selected (vendor-profile) eligibility.
+// For a vendor the CLIENT explicitly picked, an active package is NOT required —
+// remaining_credits > 0 is the paid-access signal. Approved + Verified + active +
+// not suspended + (public_visibility if present) + credits > 0. PURE, no I/O.
+// ---------------------------------------------------------------------------
+export type ClientSelectedVendorReason =
+  | "not_approved"
+  | "suspended"
+  | "inactive"
+  | "not_verified"
+  | "not_visible"
+  | "no_credits";
+
+export interface ClientSelectedVendorEligibility {
+  eligible: boolean;
+  reasonCode: ClientSelectedVendorReason | null;
+  reason: string | null;
+  credits: number;
+  /** Paid + credits but no package row — surface as an admin audit warning. */
+  packageMissingButCredits: boolean;
+}
+
+const CLIENT_SELECTED_REASON_LABEL: Record<ClientSelectedVendorReason, string> = {
+  not_approved: "not approved",
+  suspended: "suspended",
+  inactive: "inactive",
+  not_verified: "not verified",
+  not_visible: "profile not public",
+  no_credits: "no credits",
+};
+
+const BAD_VERIFICATION = new Set(["pending", "rejected", "unverified", "not verified", "failed", "in review"]);
+
+export function evaluateClientSelectedVendorEligibility(
+  vendor: Record<string, unknown> | null | undefined,
+): ClientSelectedVendorEligibility {
+  const row = isRecord(vendor) ? vendor : {};
+  const status = normalizeStatus(row.status);
+  const isActive = normalizeActive(row);
+  const credits = normalizeCredits(row);
+  const rawPackageStatus = typeof row.package_status === "string" ? row.package_status.trim().toLowerCase() : "";
+
+  // Verification: block only when it EXPLICITLY says not-verified; absent = ok.
+  const verificationRaw = typeof row.verification_status === "string" ? row.verification_status.trim().toLowerCase() : "";
+  const verificationBad = verificationRaw.length > 0 && BAD_VERIFICATION.has(verificationRaw);
+
+  // Public visibility: block only when the field EXISTS and is explicitly false.
+  const hasVisibilityField = "public_visibility" in row && row.public_visibility !== null && row.public_visibility !== undefined;
+  const notVisible = hasVisibilityField && (row.public_visibility === false || row.public_visibility === "false" || row.public_visibility === 0);
+
+  let reasonCode: ClientSelectedVendorReason | null = null;
+  if (status === "suspended") reasonCode = "suspended";
+  else if (status !== "approved") reasonCode = "not_approved";
+  else if (!isActive) reasonCode = "inactive";
+  else if (verificationBad) reasonCode = "not_verified";
+  else if (notVisible) reasonCode = "not_visible";
+  else if (credits <= 0) reasonCode = "no_credits";
+
+  // Admin audit signal (never a blocker): the vendor has credits but no active
+  // package row — package_status is none/expired/missing/empty. paid_status is
+  // irrelevant here; credits are the paid-access signal for a client pick.
+  const packageInactive =
+    rawPackageStatus === "" ||
+    rawPackageStatus === "none" ||
+    rawPackageStatus === "missing" ||
+    rawPackageStatus === "expired";
+  const packageMissingButCredits = credits > 0 && packageInactive;
+
+  return {
+    eligible: reasonCode === null,
+    reasonCode,
+    reason: reasonCode ? CLIENT_SELECTED_REASON_LABEL[reasonCode] : null,
+    credits,
+    packageMissingButCredits,
+  };
+}
+
 /** Normalized vendor status: pending | approved | rejected | suspended. */
 export function normalizeStatus(value: unknown): string {
   const text = typeof value === "string" ? value.trim().toLowerCase() : "";

@@ -92,6 +92,8 @@ export async function createLead(input: CreateLeadInput): Promise<Result<{ id: s
       selected_vendor_id: input.selected_vendor_id ?? null,
       selected_vendor_name: input.selected_vendor_name ?? null,
       assignment_intent: input.assignment_intent ?? null,
+      // Phase 26A-2E: vendor subcategory carried from the vendor profile.
+      subcategory: input.subcategory ?? null,
     };
 
     const insertLead = (payload: Record<string, unknown>) =>

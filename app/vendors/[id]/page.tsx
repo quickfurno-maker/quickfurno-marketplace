@@ -11,6 +11,7 @@ import { VendorCards } from "@/components/VendorCards";
 import { VendorDetailHeader } from "@/components/VendorDetailHeader";
 import { CONTACT_TEL, whatsappLink } from "@/lib/config";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+import { getParentCategoryGroup } from "@/lib/vendors/categoryMatching";
 import { getPublicVendorProfileBySlugOrId } from "@/services/publicVendorService";
 import {
   enquiryServiceForCategory,
@@ -310,8 +311,10 @@ export default async function VendorProfilePage({ params }: VendorPageProps) {
                       vendorId={vendor.slug}
                       vendorName={vendor.businessName}
                       city={vendor.city}
-                      area={meta.locality.split(",")[0]}
+                      area={serviceAreas[0] ?? meta.locality.split(",")[0]}
                       serviceCategory={enquiryService}
+                      subcategory={vendor.subCategory}
+                      parentCategoryGroup={getParentCategoryGroup(enquiryService)}
                     />
                   ) : (
                     <EnquiryModalTrigger

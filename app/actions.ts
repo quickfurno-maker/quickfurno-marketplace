@@ -632,6 +632,27 @@ export const adminProcessRequirementAutoFill = async (groupId: string) =>
     return result;
   });
 
+// Phase 26A-2E — preferred-vendor 1-hour recharge window (manual trigger).
+export const adminProcessPreferredVendorWindow = async (groupId: string) =>
+  asAdmin(async () => {
+    await requireSuperadmin();
+    const result = await requirementGroups.processPreferredVendorWindow(groupId);
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard");
+    return result;
+  });
+
+export const adminProcessPreferredVendorRechargeWindows = async () =>
+  asAdmin(async () => {
+    await requireSuperadmin();
+    const result = await requirementGroups.processDuePreferredVendorRechargeWindows();
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard");
+    return result;
+  });
+
 /** One-shot: record a manual payment, mark it Paid, and credit the vendor's pack. */
 export const adminCreditVendorNow = async (
   vendorId: string, packageId: string, amount: number, method: string, txn?: string

@@ -25,7 +25,10 @@ import {
   getParentCategoryGroup,
   vendorMatchesParentGroup,
 } from "../lib/vendors/categoryMatching";
-import { evaluateVendorLeadAssignmentEligibility } from "../lib/vendors/vendorEligibility";
+import {
+  evaluateVendorLeadAssignmentEligibility,
+  evaluateClientSelectedVendorEligibility,
+} from "../lib/vendors/vendorEligibility";
 import {
   createClientAssignedVendorsPreview,
   createVendorLeadWhatsappPreview,
@@ -36,6 +39,8 @@ import { createVendorNotification } from "./vendorNotificationService";
 
 export const MIGRATION_HINT =
   "Apply migration 20260701000032_phase26a2d_client_requirement_groups.sql on the live database.";
+export const MIGRATION_HINT_2E =
+  "Apply migration 20260701000033_phase26a2e_preferred_vendor_recharge_window.sql on the live database.";
 
 // Assignment sources used across the requirement-group flow.
 export const ASSIGNMENT_SOURCE = {
@@ -67,12 +72,20 @@ export type RequirementGroupRow = {
   auto_fill_status: string | null;
   status: string | null;
   metadata: Record<string, unknown> | null;
+  // Phase 26A-2E preferred-vendor recharge window.
+  preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
+  preferred_vendor_status: string | null;
+  preferred_vendor_status_reason: string | null;
+  preferred_vendor_recharge_deadline_at: string | null;
+  preferred_vendor_processed_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 export type RequirementGroupState =
   | "waiting_for_client_selection"
+  | "waiting_preferred_vendor_recharge"
   | "auto_fill_due"
   | "auto_fill_completed"
   | "auto_fill_failed"
@@ -109,8 +122,18 @@ export type RecordClientSelectedResult = {
   counts: RequirementGroupCounts;
   client_selection_deadline_at: string | null;
   message: string;
+  preferred_vendor_status?: string;
   preferred_vendor_not_eligible?: boolean;
   ineligible_reason?: string | null;
+};
+
+export type PreferredVendorWindowResult = {
+  group_id: string;
+  preferred_vendor_id: string | null;
+  status: string;
+  assigned: boolean;
+  auto_fill: AutoFillGroupResult | null;
+  message: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -144,6 +167,7 @@ export function deriveGroupCounts(group: RequirementGroupRow): RequirementGroupC
   if (total >= 9) state = "max_manual_assignment_reached";
   else if (recovery > 0) state = "recovery_active";
   else if (primary >= NORMAL_PRIMARY_VENDOR_LIMIT) state = "fully_assigned";
+  else if (group.preferred_vendor_status === "waiting_for_recharge") state = "waiting_preferred_vendor_recharge";
   else if (autoFillStatus === "failed") state = "auto_fill_failed";
   else if (autoFillStatus === "completed") state = "auto_fill_completed";
   else if (group.auto_fill_enabled && deadline !== null && deadline <= now) state = "auto_fill_due";
@@ -399,11 +423,12 @@ async function deliverAssignment(leadId: string, vendorId: string, source: strin
 // ---------------------------------------------------------------------------
 
 /**
- * Record a client-selected vendor for a group: prioritise + assign that vendor
- * immediately if eligible (occupying one primary slot, deducting one credit via
- * the safe RPC), start/keep the 1-hour selection window, and enable auto-fill.
- * If the vendor is NOT eligible, no contact is shared, no credit is deducted,
- * and the preferred-vendor metadata is saved for admin review.
+ * Phase 26A-2E — record a client-selected vendor. Eligibility for the SELECTED
+ * vendor is credit-based (active package NOT required; remaining_credits > 0 is
+ * the paid signal). If eligible → assign immediately (one credit via the safe
+ * relaxed RPC) + start the 1-hour window for the remaining slots. If the vendor
+ * is offline/no-credits → assign nothing, deduct nothing, share no contact, and
+ * open a 1-hour preferred-vendor recharge window (admin/processor resolves it).
  */
 export async function recordClientSelectedVendor(
   groupId: string,
@@ -414,91 +439,317 @@ export async function recordClientSelectedVendor(
     const db = adminClient();
     const groupResult = await getRequirementGroup(groupId);
     if (!groupResult.ok) return groupResult;
+    const group = groupResult.data;
 
-    // First selection starts the 1-hour window + enables auto-fill.
     const nowIso = new Date().toISOString();
     const deadlineIso = new Date(Date.now() + CLIENT_SELECTION_WINDOW_MINUTES * 60 * 1000).toISOString();
-    const isFirstSelection = !groupResult.data.first_selection_at;
-    if (isFirstSelection) {
-      await db
-        .from("client_requirement_groups")
-        .update({
-          first_selection_at: nowIso,
-          client_selection_deadline_at: deadlineIso,
-          auto_fill_enabled: true,
-          auto_fill_status: "waiting_for_client_selection",
-          updated_at: nowIso,
-        })
-        .eq("id", groupId);
-      await db.from("leads").update({ client_selection_deadline_at: deadlineIso }).eq("id", leadId);
-    }
+    const isFirstSelection = !group.first_selection_at;
+    const effectiveSelectionDeadline = group.client_selection_deadline_at ?? deadlineIso;
 
-    // Server-side eligibility gate BEFORE any assignment / credit movement.
-    const canAssign = await canAssignVendorToRequirementGroup(groupId, vendorId);
-    if (!canAssign.ok) return canAssign;
-
-    if (!canAssign.data.eligible) {
-      // Save preferred-but-ineligible vendor metadata; share nothing, deduct nothing.
-      const { data: vendorRow } = await db.from("vendors").select("business_name").eq("id", vendorId).maybeSingle();
-      const vendorName = (vendorRow as { business_name?: string } | null)?.business_name ?? null;
-      await db
-        .from("leads")
-        .update({ selected_vendor_id: vendorId, selected_vendor_name: vendorName, assignment_intent: "client_selected_vendor" })
-        .eq("id", leadId);
-      await mergeGroupMetadata(groupId, {
-        preferred_vendor_not_eligible: {
-          vendor_id: vendorId,
-          vendor_name: vendorName,
-          reason: canAssign.data.reason,
-          at: nowIso,
-        },
-      });
-      const counts = await reloadCounts(groupId);
+    // Group already full (3/3) — never assign a 4th normal vendor.
+    const preCounts = deriveGroupCounts(group);
+    if (preCounts.primary >= NORMAL_PRIMARY_VENDOR_LIMIT) {
       return ok({
-        status: "preferred_vendor_not_eligible",
+        status: "group_full",
         assigned: false,
         group_id: groupId,
         vendor_id: vendorId,
         lead_id: leadId,
-        counts,
-        client_selection_deadline_at: deadlineIso,
-        preferred_vendor_not_eligible: true,
-        ineligible_reason: canAssign.data.reason,
-        message:
-          "Your preferred vendor is not available right now. QuickFurno will connect you with other suitable verified vendors.",
+        counts: preCounts,
+        client_selection_deadline_at: effectiveSelectionDeadline,
+        message: "You are already connected with 3 verified vendors for this requirement. Our team will help if you need more support.",
       });
     }
 
-    // Eligible → assign through the credit-safe RPC (one primary slot).
-    const assign = await callGroupAssignRpc(groupId, leadId, vendorId, ASSIGNMENT_SOURCE.clientSelected, "client_selected");
-    if (!assign.ok) return assign;
+    // Load the selected vendor + credit-based (relaxed) eligibility.
+    const { data: vendorRow, error: vendorError } = await db.from("vendors").select("*").eq("id", vendorId).maybeSingle();
+    if (vendorError) throw vendorError;
+    if (!vendorRow) return { ok: false, code: "VENDOR_NOT_FOUND", error: "Vendor not found." };
+    const vendor = vendorRow as Record<string, unknown>;
+    const vendorName = asText(vendor.business_name);
+    const elig = evaluateClientSelectedVendorEligibility(vendor);
+    const parentOk = vendorMatchesParentGroup(vendor, group.parent_category_group ?? "");
+    const alreadyInGroup = (await loadGroupVendorIds(groupId)).has(vendorId);
 
-    if (assign.data.assigned) {
-      const { data: vendorRow } = await db.from("vendors").select("business_name").eq("id", vendorId).maybeSingle();
-      const vendorName = (vendorRow as { business_name?: string } | null)?.business_name ?? null;
-      await db
-        .from("leads")
-        .update({ selected_vendor_id: vendorId, selected_vendor_name: vendorName, assignment_intent: "client_selected_vendor" })
-        .eq("id", leadId);
-      await deliverAssignment(leadId, vendorId, ASSIGNMENT_SOURCE.clientSelected, "A client selected your profile");
-      await createClientAssignedVendorsPreview(leadId, await loadGroupDeliveredVendors(leadId));
+    const eligibleNow = elig.eligible && parentOk && !alreadyInGroup;
+
+    if (eligibleNow) {
+      // Immediate assignment — first selected vendor never waits 1 hour.
+      if (isFirstSelection) {
+        await db.from("client_requirement_groups").update({
+          first_selection_at: nowIso,
+          client_selection_deadline_at: deadlineIso,
+          auto_fill_enabled: true,
+          updated_at: nowIso,
+        }).eq("id", groupId);
+        await db.from("leads").update({ client_selection_deadline_at: deadlineIso }).eq("id", leadId);
+      }
+
+      const assign = await callClientSelectedAssignRpc(groupId, leadId, vendorId);
+      if (!assign.ok) return assign;
+
+      if (assign.data.assigned) {
+        await db.from("leads").update({
+          selected_vendor_id: vendorId,
+          selected_vendor_name: vendorName,
+          assignment_intent: "client_selected_vendor",
+          preferred_vendor_id: vendorId,
+          preferred_vendor_status: "assigned_immediately",
+          preferred_vendor_status_reason: null,
+        }).eq("id", leadId);
+        // Only the FIRST selected vendor owns the group-level preferred slot, so
+        // a later eligible pick never clobbers an earlier preferred-recharge window.
+        if (isFirstSelection || !group.preferred_vendor_id) {
+          await db.from("client_requirement_groups").update({
+            preferred_vendor_id: vendorId,
+            preferred_vendor_name: vendorName,
+            preferred_vendor_status: "assigned_immediately",
+            preferred_vendor_status_reason: null,
+            preferred_vendor_processed_at: nowIso,
+            auto_fill_status: "waiting_for_client_selection",
+            updated_at: nowIso,
+          }).eq("id", groupId);
+        }
+        await deliverAssignment(leadId, vendorId, ASSIGNMENT_SOURCE.clientSelected, "A client selected your profile");
+        await createClientAssignedVendorsPreview(leadId, await loadGroupDeliveredVendors(leadId));
+        // Admin audit warning when the vendor is Paid + credits but no package row.
+        if (elig.packageMissingButCredits) {
+          await mergeGroupMetadata(groupId, {
+            package_audit_warning: {
+              vendor_id: vendorId,
+              vendor_name: vendorName,
+              message: "Package status missing or inactive, but vendor has credits. Please audit vendor package record.",
+              at: nowIso,
+            },
+          });
+        }
+      }
+
+      const counts = await reloadCounts(groupId);
+      const message = counts.pending_primary_slots > 0
+        ? `Your enquiry has been sent to this vendor. You can select ${counts.pending_primary_slots} more verified vendor(s) within 1 hour, or QuickFurno will auto-connect you with suitable vendors.`
+        : "You are already connected with 3 verified vendors for this requirement. Our team will help if you need more support.";
+
+      return ok({
+        status: assign.data.status,
+        assigned: assign.data.assigned,
+        group_id: groupId,
+        vendor_id: vendorId,
+        lead_id: leadId,
+        counts,
+        client_selection_deadline_at: effectiveSelectionDeadline,
+        message,
+        preferred_vendor_status: "assigned_immediately",
+      });
     }
 
-    const counts = await reloadCounts(groupId);
-    const message = counts.pending_primary_slots > 0
-      ? `Your enquiry has been sent to this vendor. You can select ${counts.pending_primary_slots} more vendor(s) within 1 hour, or QuickFurno will auto-connect you with suitable verified vendors.`
-      : "You are already connected with 3 verified vendors for this requirement. Our team will help if you need more support.";
+    // Offline / no-credits / inactive / suspended / not-approved (or category
+    // mismatch): open a 1-hour preferred-vendor recharge window. No assignment,
+    // no credit deducted, no client contact shared.
+    const reasonCode = !parentOk ? "parent_category_mismatch" : (elig.reasonCode ?? "not_eligible");
+    const rechargeDeadline = new Date(Date.now() + CLIENT_SELECTION_WINDOW_MINUTES * 60 * 1000).toISOString();
 
+    await db.from("leads").update({
+      selected_vendor_id: vendorId,
+      selected_vendor_name: vendorName,
+      assignment_intent: "client_selected_vendor",
+      preferred_vendor_id: vendorId,
+      preferred_vendor_status: "waiting_for_recharge",
+      preferred_vendor_status_reason: reasonCode,
+      client_selection_deadline_at: effectiveSelectionDeadline,
+    }).eq("id", leadId);
+
+    await db.from("client_requirement_groups").update({
+      preferred_vendor_id: vendorId,
+      preferred_vendor_name: vendorName,
+      preferred_vendor_status: "waiting_for_recharge",
+      preferred_vendor_status_reason: reasonCode,
+      preferred_vendor_recharge_deadline_at: rechargeDeadline,
+      first_selection_at: group.first_selection_at ?? nowIso,
+      client_selection_deadline_at: effectiveSelectionDeadline,
+      auto_fill_enabled: true,
+      auto_fill_status: "waiting_preferred_vendor_recharge",
+      updated_at: nowIso,
+    }).eq("id", groupId);
+
+    await mergeGroupMetadata(groupId, {
+      preferred_vendor_offline: {
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        reason: reasonCode,
+        recharge_deadline_at: rechargeDeadline,
+        at: nowIso,
+      },
+    });
+
+    // Vendor notification / preview log only — never live WhatsApp, no contact.
+    await createVendorNotification(vendorId, {
+      title: "A client selected your profile",
+      message: "A client selected your profile, but your lead access is inactive or credits are unavailable. Recharge within 1 hour to receive this enquiry.",
+      type: "lead_selected_recharge",
+      priority: "high",
+      cta_label: "Recharge now",
+      cta_url: "/vendor/dashboard/package",
+    });
+
+    const counts = await reloadCounts(groupId);
     return ok({
-      status: assign.data.status,
-      assigned: assign.data.assigned,
+      status: "preferred_vendor_waiting",
+      assigned: false,
       group_id: groupId,
       vendor_id: vendorId,
       lead_id: leadId,
       counts,
-      client_selection_deadline_at: deadlineIso,
-      message,
+      client_selection_deadline_at: rechargeDeadline,
+      preferred_vendor_status: "waiting_for_recharge",
+      preferred_vendor_not_eligible: true,
+      ineligible_reason: reasonCode,
+      message: "This vendor is offline right now. Your enquiry is safe with QuickFurno. Our team will connect you with suitable verified vendors within 1 hour.",
     });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+type RpcAssignResult2E = { status: string; assigned: boolean; assigned_count?: number };
+
+/** Credit-based client-selected assignment RPC (active package not required). */
+async function callClientSelectedAssignRpc(groupId: string, leadId: string, vendorId: string): Promise<Result<RpcAssignResult2E>> {
+  try {
+    const { data, error } = await adminClient().rpc("assign_client_selected_vendor_to_group", {
+      p_group_id: groupId,
+      p_lead_id: leadId,
+      p_vendor_id: vendorId,
+      p_total_limit: NORMAL_PRIMARY_VENDOR_LIMIT,
+    });
+    if (error) {
+      const missing = (error as { code?: string }).code === "42883" || /schema cache|could not find the function/i.test(error.message ?? "");
+      if (missing) return { ok: false, code: "MIGRATION_NOT_APPLIED", error: `assign_client_selected_vendor_to_group is missing. ${MIGRATION_HINT_2E}` };
+      return { ok: false, code: error.message ?? "RPC_ERROR", error: error.message ?? "Assignment failed." };
+    }
+    const record = (data ?? {}) as Record<string, unknown>;
+    return ok({
+      status: typeof record.status === "string" ? record.status : "unknown",
+      assigned: record.assigned === true,
+      assigned_count: Number(record.assigned_count ?? 0),
+    });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Phase 26A-2E preferred-vendor recharge processor for one group.
+ *  - preferred vendor now eligible → assign it (credit-based RPC).
+ *  - still ineligible + window open → do nothing.
+ *  - still ineligible + window lapsed → mark expired + auto-fill other vendors.
+ */
+export async function processPreferredVendorWindow(groupId: string): Promise<Result<PreferredVendorWindowResult>> {
+  try {
+    const db = adminClient();
+    const groupResult = await getRequirementGroup(groupId);
+    if (!groupResult.ok) return groupResult;
+    const group = groupResult.data;
+
+    const base: PreferredVendorWindowResult = {
+      group_id: groupId,
+      preferred_vendor_id: group.preferred_vendor_id,
+      status: "skipped",
+      assigned: false,
+      auto_fill: null,
+      message: "",
+    };
+
+    if (!group.preferred_vendor_id || group.preferred_vendor_status !== "waiting_for_recharge") {
+      return ok({ ...base, message: "No preferred vendor waiting for this group." });
+    }
+    const leadId = group.first_lead_id;
+    if (!leadId) {
+      return ok({ ...base, status: "failed", message: "No lead is linked to this group." });
+    }
+
+    const now = Date.now();
+    const deadline = group.preferred_vendor_recharge_deadline_at ? Date.parse(group.preferred_vendor_recharge_deadline_at) : now;
+
+    const { data: vendorRow } = await db.from("vendors").select("*").eq("id", group.preferred_vendor_id).maybeSingle();
+    const vendor = (vendorRow as Record<string, unknown> | null) ?? null;
+    const elig = vendor ? evaluateClientSelectedVendorEligibility(vendor) : null;
+    const parentOk = vendor ? vendorMatchesParentGroup(vendor, group.parent_category_group ?? "") : false;
+    const vendorName = asText(vendor?.business_name);
+
+    // Recharged → assign the preferred vendor now (whether or not the window lapsed).
+    if (vendor && elig?.eligible && parentOk) {
+      const assign = await callClientSelectedAssignRpc(groupId, leadId, group.preferred_vendor_id);
+      if (!assign.ok) return assign;
+      if (assign.data.assigned) {
+        const ts = new Date().toISOString();
+        await db.from("client_requirement_groups").update({
+          preferred_vendor_status: "assigned_after_recharge",
+          preferred_vendor_processed_at: ts,
+          auto_fill_status: "waiting_for_client_selection",
+          updated_at: ts,
+        }).eq("id", groupId);
+        await db.from("leads").update({ preferred_vendor_status: "assigned_after_recharge" }).eq("id", leadId);
+        await deliverAssignment(leadId, group.preferred_vendor_id, ASSIGNMENT_SOURCE.clientSelected, "A client selected your profile");
+        await createClientAssignedVendorsPreview(leadId, await loadGroupDeliveredVendors(leadId));
+        return ok({ ...base, status: "assigned_after_recharge", assigned: true, message: `Preferred vendor ${vendorName ?? ""} recharged and was assigned.` });
+      }
+      await setPreferredStatus(groupId, "not_eligible");
+      return ok({ ...base, status: assign.data.status, message: `Preferred vendor could not be assigned (${assign.data.status}).` });
+    }
+
+    // Not recharged, window still open → wait.
+    if (now < deadline) {
+      return ok({ ...base, status: "waiting_for_recharge", message: "Recharge window still open; no action taken." });
+    }
+
+    // Window lapsed → expire the preferred vendor + auto-fill the remaining slots.
+    const ts = new Date().toISOString();
+    await db.from("client_requirement_groups").update({
+      preferred_vendor_status: "expired",
+      preferred_vendor_processed_at: ts,
+      auto_fill_status: "auto_fill_due",
+      updated_at: ts,
+    }).eq("id", groupId);
+    await db.from("leads").update({ preferred_vendor_status: "expired" }).eq("id", leadId);
+
+    const autoFill = await processRequirementAutoFill(groupId);
+    return ok({
+      ...base,
+      status: "expired_auto_fill_started",
+      assigned: false,
+      auto_fill: autoFill.ok ? autoFill.data : null,
+      message: autoFill.ok ? `Preferred vendor expired. ${autoFill.data.message}` : "Preferred vendor expired; auto-fill could not run.",
+    });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Process every preferred-vendor window whose recharge deadline has lapsed. */
+export async function processDuePreferredVendorRechargeWindows(limit = 25): Promise<Result<{ processed: PreferredVendorWindowResult[] }>> {
+  try {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await adminClient()
+      .from("client_requirement_groups")
+      .select("id")
+      .eq("status", "active")
+      .eq("preferred_vendor_status", "waiting_for_recharge")
+      .lte("preferred_vendor_recharge_deadline_at", nowIso)
+      .order("preferred_vendor_recharge_deadline_at", { ascending: true })
+      .limit(limit);
+    if (error) {
+      if (isMissingRelationError(error)) return migrationNotApplied();
+      throw error;
+    }
+
+    const processed: PreferredVendorWindowResult[] = [];
+    for (const row of (data ?? []) as Array<{ id: string }>) {
+      const result = await processPreferredVendorWindow(String(row.id));
+      if (result.ok) processed.push(result.data);
+      else if (result.code === "MIGRATION_NOT_APPLIED") return result;
+    }
+    return ok({ processed });
   } catch (e) {
     return fail(e);
   }
@@ -723,6 +974,17 @@ async function setAutoFillStatus(groupId: string, status: string): Promise<void>
     .from("client_requirement_groups")
     .update({ auto_fill_status: status, updated_at: new Date().toISOString() })
     .eq("id", groupId);
+}
+
+async function setPreferredStatus(groupId: string, status: string): Promise<void> {
+  await adminClient()
+    .from("client_requirement_groups")
+    .update({ preferred_vendor_status: status, preferred_vendor_processed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", groupId);
+}
+
+function asText(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 async function mergeGroupMetadata(groupId: string, patch: Record<string, unknown>): Promise<void> {

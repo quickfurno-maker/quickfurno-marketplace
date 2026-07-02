@@ -18,6 +18,7 @@ export interface CreateLeadInput {
   service_required?: string;
   service_category?: string;
   serviceCategory?: string;
+  subcategory?: string;
   budget?: string;
   budget_range?: string;
   budgetRange?: string;

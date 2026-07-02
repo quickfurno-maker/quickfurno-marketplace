@@ -1061,7 +1061,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       }}
                     />
                     <span>
-                      I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for my selected service. See our{" "}
+                      I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request. See our{" "}
                       <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
                       and{" "}
                       <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.

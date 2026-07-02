@@ -205,6 +205,8 @@ export type BadReport = {
   description?: string | null;
   vendor_id?: string | null;
   lead_assignment_id?: string | null;
+  reason_code?: string | null;
+  reason_label?: string | null;
   admin_decision?: string | null;
   admin_notes?: string | null;
   credit_restored?: boolean | null;
@@ -223,8 +225,23 @@ export type BadLeadReportComment = {
   created_at?: string | null;
 };
 
-// Phase 26A-2B manual lead-assignment candidate + preview (client-safe view
+// Phase 26A-2C manual lead-assignment candidate + preview (client-safe view
 // mirrors services/manualLeadAssignmentService.ts).
+export type ManualMatchTypeView = "best_match" | "interior_fallback" | "recovery_eligible" | "not_eligible";
+export type ManualAssignmentModeView = "primary" | "recovery" | "max";
+export type LeadAssignmentStateView =
+  | "unassigned" | "needs_top_up" | "primary_full" | "recovery_active" | "max_manual_assignment_reached";
+
+export type LeadAssignmentCountsView = {
+  total: number;
+  primary: number;
+  recovery: number;
+  pending_primary_slots: number;
+  recovery_used: number;
+  recovery_slots_remaining: number;
+  state: LeadAssignmentStateView;
+};
+
 export type ManualCandidateVendorView = {
   id: string;
   business_name: string | null;
@@ -237,16 +254,26 @@ export type ManualCandidateVendorView = {
   package_status: string | null;
   remaining_credits: number;
   visibility_type: string;
-  eligible: boolean;
   already_assigned: boolean;
-  reasons: string[];
+  match_type: ManualMatchTypeView;
+  match_score: number;
+  match_reason: string;
+  assignable: boolean;
+  hard_block_reasons: string[];
+  soft_block_reasons: string[];
 };
 
 export type ManualPreviewView = {
   lead: Record<string, unknown> | null;
-  existing_assignment_count: number;
   auto_matching_status: string | null;
-  max_vendors: number;
+  counts: LeadAssignmentCountsView;
+  mode: ManualAssignmentModeView;
+  max_selectable: number;
+  consent_ok: boolean;
+  fallback_enabled: boolean;
+  exact_match_count: number;
+  primary_limit: number;
+  total_limit: number;
   candidates: ManualCandidateVendorView[];
 };
 

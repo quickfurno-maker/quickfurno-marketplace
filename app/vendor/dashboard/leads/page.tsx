@@ -1,12 +1,16 @@
 import Link from "next/link";
-import { getMyVendor, vendorLeads, vendorReportBadLeadFromForm, vendorUpdateLeadStatusFromForm } from "@/app/actions";
+import { getMyVendor, vendorLeads, vendorUpdateLeadStatusFromForm } from "@/app/actions";
 import { VendorNoProfileFallback } from "@/app/vendor/dashboard/_components/VendorNoProfileFallback";
+import { VendorLeadReportForm } from "@/components/vendors/VendorLeadReportForm";
 import type { VendorLeadStatus, VendorProfileSummary } from "@/lib/types";
 
 export const metadata = { title: "Vendor leads - QuickFurno" };
 export const dynamic = "force-dynamic";
 
-const statuses: VendorLeadStatus[] = ["New", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Won", "Lost"];
+// CRM statuses only. "Lost" is a CRM state — it never refunds credit, removes
+// the assignment, or triggers reassignment. Vendors cannot accept/reject/decline
+// an assigned lead; issues are raised via the structured Report lead issue form.
+const statuses: VendorLeadStatus[] = ["New", "Contacted", "Follow-up Needed", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost"];
 
 type VendorLeadsPageProps = {
   searchParams?: {
@@ -126,33 +130,10 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
                       <div className="qf-vd-report">
                         {assignment.is_bad_lead_reported ? (
                           <span className="qf-vd-report-done">
-                            Bad lead report submitted. QuickFurno admin will review your reason. Credit is not refunded automatically.
+                            Your report has been submitted for admin review. Reporting a lead does not automatically reverse lead credit.
                           </span>
                         ) : (
-                          <form action={vendorReportBadLeadFromForm} className="qf-vd-bad-lead-form">
-                            <input type="hidden" name="assignmentId" value={assignment.id} />
-                            <label>
-                              Report type
-                              <select name="report_type" required defaultValue="">
-                                <option value="" disabled>Select type</option>
-                                <option value="wrong_contact">Wrong contact</option>
-                                <option value="not_relevant">Not relevant</option>
-                                <option value="out_of_area">Out of area</option>
-                                <option value="duplicate_or_spam">Duplicate or spam</option>
-                              </select>
-                            </label>
-                            <label>
-                              Reason
-                              <input name="report_reason" required maxLength={160} placeholder="Example: Client number is not reachable" />
-                            </label>
-                            <label>
-                              Comment
-                              <textarea name="vendor_comment" required maxLength={700} rows={3} placeholder="Add details for admin review." />
-                            </label>
-                            <button className="qf-vd-btn qf-vd-btn--ghost" type="submit">
-                              Report bad lead
-                            </button>
-                          </form>
+                          <VendorLeadReportForm vendorId={vendor.id} assignmentId={assignment.id} />
                         )}
                       </div>
                     </div>

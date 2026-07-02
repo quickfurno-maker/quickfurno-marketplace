@@ -230,6 +230,18 @@ export async function vendorReportBadLead(
   return vendors.reportBadLead(vendorId, assignmentId, reportType, reason, comment);
 }
 
+/** Phase 26A-2C structured lead-issue report. No refund, no reassignment, no WhatsApp. */
+export async function vendorSubmitLeadReport(
+  vendorId: string, assignmentId: string, reasonCode: string, comment?: string
+) {
+  try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
+  const result = await vendors.submitStructuredLeadReport(vendorId, assignmentId, reasonCode, comment);
+  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard");
+  revalidatePath("/admin/leads");
+  return result;
+}
+
 export async function vendorUpdateLeadStatusFromForm(formData: FormData) {
   const me = await getMyVendor();
   if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");

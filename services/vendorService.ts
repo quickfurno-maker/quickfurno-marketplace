@@ -337,6 +337,89 @@ export async function reportBadLead(
   }
 }
 
+// Phase 26A-2C: structured vendor lead-issue reasons. Codes are machine-
+// readable so later WhatsApp/AI automation can follow up with the client.
+export const LEAD_REPORT_REASONS = [
+  { code: "client_not_reachable", label: "Client not reachable after multiple attempts", commentRequired: false },
+  { code: "requirement_already_closed", label: "Client says requirement is already closed", commentRequired: false },
+  { code: "service_mismatch", label: "Client requirement does not match selected service", commentRequired: true },
+  { code: "outside_service_area", label: "Client location is outside my service area", commentRequired: true },
+  { code: "invalid_wrong_phone", label: "Invalid or wrong phone number", commentRequired: true },
+  { code: "other", label: "Other reason", commentRequired: true },
+] as const;
+
+export type LeadReportReasonCode = (typeof LEAD_REPORT_REASONS)[number]["code"];
+
+const REPORT_COMMENT_MIN = 20;
+
+/**
+ * Structured vendor lead-issue report. Never refunds/removes credit, never
+ * removes the assignment, never auto-reassigns, never sends WhatsApp. One
+ * active report per assignment is enforced in-service (plus a DB partial
+ * unique index when migration 031 is applied).
+ */
+export async function submitStructuredLeadReport(
+  vendorId: string,
+  assignmentId: string,
+  reasonCode: string,
+  comment?: string,
+): Promise<Result<{ id: string }>> {
+  try {
+    const reason = LEAD_REPORT_REASONS.find((r) => r.code === reasonCode);
+    if (!reason) throw appError("VALIDATION");
+    const trimmed = (comment ?? "").trim();
+    if (reason.commentRequired && trimmed.length < REPORT_COMMENT_MIN) throw appError("VALIDATION");
+
+    const db = adminClient();
+    const { data: a, error: aErr } = await db
+      .from("lead_assignments")
+      .select("id, vendor_id, is_bad_lead_reported")
+      .eq("id", assignmentId)
+      .eq("vendor_id", vendorId)
+      .single();
+    if (aErr || !a) throw appError("UNKNOWN");
+
+    // Duplicate-report guard: one active report per assignment.
+    const { data: existing } = await db
+      .from("bad_lead_reports")
+      .select("id, status")
+      .eq("lead_assignment_id", assignmentId)
+      .in("status", ["Pending", "Under Review"])
+      .limit(1);
+    if ((existing ?? []).length > 0 || a.is_bad_lead_reported) {
+      return { ok: false, code: "REPORT_EXISTS", error: "You already have an active report for this lead under admin review." };
+    }
+
+    const base = {
+      lead_assignment_id: assignmentId,
+      vendor_id: a.vendor_id,
+      reason: reason.label,
+      description: trimmed || null,
+      report_type: reason.code,
+      report_reason: reason.label,
+      vendor_comment: trimmed || null,
+      status: "Pending",
+      credit_restored: false,
+    };
+
+    // Prefer the structured columns; fall back gracefully if migration 031
+    // (reason_code / reason_label) has not been applied on this database.
+    let inserted = await db.from("bad_lead_reports").insert({ ...base, reason_code: reason.code, reason_label: reason.label }).select("id").single();
+    if (inserted.error && /reason_code|reason_label|column/i.test(inserted.error.message ?? "")) {
+      inserted = await db.from("bad_lead_reports").insert(base).select("id").single();
+    }
+    if (inserted.error) {
+      logSupabaseInsertError("bad_lead_reports", inserted.error, { assignment_id: assignmentId, vendor_id: a.vendor_id, reason_code: reason.code });
+      throw inserted.error;
+    }
+
+    await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", assignmentId);
+    return ok({ id: inserted.data.id });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 async function canVendorViewLeadContact(vendorId: string): Promise<Result<boolean>> {
   try {
     const { data, error } = await adminClient()

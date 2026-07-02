@@ -207,7 +207,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
           onChange={(event) => setShareConsent(event.target.checked)}
         />
         <span>
-          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for my selected service.
+          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request.
         </span>
       </label>
 

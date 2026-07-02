@@ -7,7 +7,7 @@ export type LeadStatus =
   | "New" | "Assigned" | "Contacted" | "Site Visit Scheduled"
   | "Quotation Sent" | "Won" | "Lost" | "Duplicate";
 export type VendorLeadStatus =
-  | "New" | "Contacted" | "Site Visit Scheduled" | "Quotation Sent" | "Won" | "Lost";
+  | "New" | "Contacted" | "Follow-up Needed" | "Site Visit Scheduled" | "Quotation Sent" | "Converted" | "Won" | "Lost";
 export type AssignmentType = "client_selected" | "auto_assigned" | "admin_assigned";
 
 export interface CreateLeadInput {

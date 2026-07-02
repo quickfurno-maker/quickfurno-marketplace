@@ -10,10 +10,13 @@
 --      selected_category, so the RPC fails at runtime without them.
 --   3) lead_matching_runs / lead_delivery_logs / client_notification_logs:
 --      an earlier draft created these tables with different columns, so 027's
---      "create table if not exists" silently kept the wrong shape. They are
---      rebuilt ONLY when empty and missing the expected columns; if they ever
---      hold rows the migration aborts for manual review instead of dropping.
+--      "create table if not exists" silently kept the wrong shape. This
+--      migration repairs them ADDITIVELY ONLY — every missing column is added
+--      with "alter table ... add column if not exists". No table is ever
+--      removed, cleared, or rebuilt, regardless of row count. Existing data
+--      is preserved.
 -- Idempotent. No-op on databases created from repo migrations 001 -> 027.
+-- SAFETY: additive only — no destructive DDL/DML against any data table.
 -- ============================================================================
 
 -- 1) leads: re-apply migration 006 enrichment block --------------------------
@@ -75,43 +78,13 @@ alter table public.vendors
   add column if not exists utm_medium                 text,
   add column if not exists utm_campaign               text;
 
--- 3) rebuild drifted, EMPTY Phase 26A log tables ------------------------------
-do $$
-declare
-  v_table text;
-  v_expected_column text;
-  v_row_count bigint;
-begin
-  for v_table, v_expected_column in
-    select tbl, col from (values
-      ('lead_matching_runs', 'run_status'),
-      ('lead_delivery_logs', 'whatsapp_status'),
-      ('client_notification_logs', 'vendor_snapshot')
-    ) as drift(tbl, col)
-  loop
-    if exists (
-         select 1 from information_schema.tables
-         where table_schema = 'public' and table_name = v_table
-       )
-       and not exists (
-         select 1 from information_schema.columns
-         where table_schema = 'public' and table_name = v_table
-           and column_name = v_expected_column
-       )
-    then
-      execute format('select count(*) from public.%I', v_table) into v_row_count;
-      if v_row_count = 0 then
-        execute format('drop table public.%I', v_table);
-        raise notice 'Dropped drifted empty table public.% (missing column %)', v_table, v_expected_column;
-      else
-        raise exception 'public.% has % rows but not the Phase 26A shape (missing %). Manual review required — not dropping.',
-          v_table, v_row_count, v_expected_column;
-      end if;
-    end if;
-  end loop;
-end $$;
-
--- Recreate with the exact migration 027 shape.
+-- 3) repair drifted Phase 26A log tables — ADDITIVE ONLY ----------------------
+-- Never drops a table. "create table if not exists" builds the canonical shape
+-- on a fresh DB (no-op if the table already exists), then the
+-- "add column if not exists" blocks below add any columns the drifted live
+-- tables are missing. On a drifted table the create is a no-op and the alters
+-- do the repair; on a fresh table the create does the work and the alters are
+-- no-ops. Either way no existing row or column is touched.
 create table if not exists public.lead_matching_runs (
   id uuid primary key default gen_random_uuid(),
   lead_id uuid not null references public.leads(id) on delete cascade,
@@ -153,6 +126,56 @@ create table if not exists public.client_notification_logs (
   whatsapp_status text not null default 'preview_only',
   created_at timestamptz not null default now()
 );
+
+-- Additive repair for lead_matching_runs. Columns are added nullable-with-
+-- default (not NOT NULL) so the add is always safe on a table that already has
+-- rows. id + primary key are supplied by the create above. matching_snapshot
+-- and assigned_vendor_ids are the columns the matching engine actually writes,
+-- so they are ensured here even though they are not in the summarised count set.
+alter table public.lead_matching_runs
+  add column if not exists lead_id uuid references public.leads(id) on delete cascade,
+  add column if not exists run_status text default 'started',
+  add column if not exists consent_confirmed boolean default false,
+  add column if not exists max_vendors integer default 3,
+  add column if not exists eligible_vendor_count integer default 0,
+  add column if not exists matched_vendor_count integer default 0,
+  add column if not exists delivered_vendor_count integer default 0,
+  add column if not exists failed_vendor_count integer default 0,
+  add column if not exists skipped_vendor_count integer default 0,
+  add column if not exists selected_vendor_ids uuid[] default '{}',
+  add column if not exists assigned_vendor_ids uuid[] default '{}',
+  add column if not exists skipped_reasons jsonb default '{}'::jsonb,
+  add column if not exists metadata jsonb default '{}'::jsonb,
+  add column if not exists matching_snapshot jsonb default '{}'::jsonb,
+  add column if not exists failure_reason text,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+-- Additive repair for lead_delivery_logs (migration 027 shape; 029/030 add
+-- their own failure_reason / credit_log_id / assignment_source columns later).
+alter table public.lead_delivery_logs
+  add column if not exists lead_id uuid references public.leads(id) on delete cascade,
+  add column if not exists vendor_id uuid references public.vendors(id) on delete cascade,
+  add column if not exists assignment_id uuid references public.lead_assignments(id) on delete set null,
+  add column if not exists delivery_channel text default 'vendor_dashboard',
+  add column if not exists delivery_status text default 'pending',
+  add column if not exists contact_shared boolean default false,
+  add column if not exists credit_deducted boolean default false,
+  add column if not exists whatsapp_preview_message text,
+  add column if not exists whatsapp_status text default 'preview_only',
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+-- Additive repair for client_notification_logs (migration 027 shape).
+alter table public.client_notification_logs
+  add column if not exists lead_id uuid references public.leads(id) on delete cascade,
+  add column if not exists notification_type text default 'assigned_vendors_preview',
+  add column if not exists channel text default 'dashboard_preview',
+  add column if not exists status text default 'preview_created',
+  add column if not exists message text,
+  add column if not exists vendor_snapshot jsonb default '[]'::jsonb,
+  add column if not exists whatsapp_status text default 'preview_only',
+  add column if not exists created_at timestamptz default now();
 
 create index if not exists idx_lead_matching_runs_lead_created
   on public.lead_matching_runs(lead_id, created_at desc);

@@ -23,6 +23,7 @@ type VendorLeadRow = {
   id: string;
   assigned_at: string | null;
   assignment_type: string | null;
+  assignment_source: string | null;
   vendor_status: VendorLeadStatus;
   is_bad_lead_reported: boolean | null;
   lead: {
@@ -96,6 +97,10 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
                     <div>
                       <strong>{lead.name || "Client"}</strong>
                       <span>{lead.service_required || "Requirement"}</span>
+                      {(() => {
+                        const badge = assignmentSourceBadge(assignment.assignment_source, assignment.assignment_type);
+                        return badge ? <span className={`qf-vd-lead-source ${badge.tone}`}>{badge.label}</span> : null;
+                      })()}
                     </div>
                     <span className="qf-vd-lead-status" data-status={assignment.vendor_status}>
                       {assignment.vendor_status || "New"}
@@ -185,4 +190,25 @@ function canViewClientContact(vendor: VendorProfileSummary) {
   return String(vendor.status ?? "").toLowerCase() === "approved"
     && vendor.is_active !== false
     && String(vendor.paid_status ?? "").toLowerCase() === "paid";
+}
+
+/**
+ * Phase 26A-2D: how this lead reached the vendor. Prefers assignment_source
+ * (requirement-group flow); falls back to the legacy assignment_type.
+ */
+function assignmentSourceBadge(
+  source: string | null,
+  type: string | null,
+): { label: string; tone: string } | null {
+  const s = (source ?? "").toLowerCase();
+  if (s === "client_selected_vendor") return { label: "Client selected your profile", tone: "is-client-selected" };
+  if (s === "auto_fill" || s === "auto_assigned") return { label: "QuickFurno matched this lead", tone: "is-auto" };
+  if (s.includes("recovery")) return { label: "Recovery assignment", tone: "is-recovery" };
+  if (s.startsWith("manual") || s === "admin_assigned") return { label: "Admin assigned", tone: "is-admin" };
+
+  const t = (type ?? "").toLowerCase();
+  if (t === "client_selected") return { label: "Client selected your profile", tone: "is-client-selected" };
+  if (t === "auto_assigned") return { label: "QuickFurno matched this lead", tone: "is-auto" };
+  if (t === "admin_assigned") return { label: "Admin assigned", tone: "is-admin" };
+  return null;
 }

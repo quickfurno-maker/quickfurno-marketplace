@@ -6220,6 +6220,109 @@ body::before {
   font-weight: 850;
 }
 
+/* Phase 26A-2D: how the lead reached the vendor (source badge). */
+.qf-vd-lead-source {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: #eef2ff;
+  color: #3730a3;
+}
+.qf-vd-lead-source.is-client-selected {
+  background: #ecfdf5;
+  color: #047857;
+}
+.qf-vd-lead-source.is-auto {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.qf-vd-lead-source.is-admin {
+  background: #fff7ed;
+  color: #c2410c;
+}
+.qf-vd-lead-source.is-recovery {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* Phase 26A-2D: client-selected vendor enquiry (vendor profile side card). */
+.qf-cs-enquiry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.qf-cs-enquiry-hint,
+.qf-cs-enquiry-multi {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--qf-ink-soft, #6b7280);
+}
+.qf-cs-enquiry-form {
+  gap: 0.7rem;
+}
+.qf-cs-enquiry-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--qf-ink, #1f2937);
+}
+.qf-cs-enquiry-field input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.qf-cs-enquiry-consent {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--qf-ink-soft, #6b7280);
+}
+.qf-cs-enquiry-consent input {
+  margin-top: 0.2rem;
+}
+.qf-cs-enquiry-error {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.qf-cs-enquiry--done {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.7rem;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.qf-cs-enquiry-check {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: #047857;
+  color: #fff;
+  font-size: 0.85rem;
+  flex: 0 0 auto;
+}
+
 .qf-vd-lead-meta {
   display: flex;
   flex-wrap: wrap;

@@ -19,7 +19,9 @@ import * as vendorSupport from "../services/vendorSupportService";
 import * as admin from "../services/adminService";
 import * as audit from "../services/adminAuditService";
 import * as manualAssign from "../services/manualLeadAssignmentService";
+import * as requirementGroups from "../services/clientRequirementGroupService";
 import * as aos from "../services/aosService";
+import { getParentCategoryGroup } from "../lib/vendors/categoryMatching";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
 import { captureFreeVendorInterest, markInterestStatus, type CaptureFreeVendorInterestInput } from "../lib/lead-assignment/freeVendorInterestService";
@@ -133,6 +135,86 @@ export async function fetchEligibleVendors(leadId: string) {
 
 export async function assignLead(leadId: string, selectedVendorIds: string[]) {
   return leads.assignLeadToVendors(leadId, selectedVendorIds);
+}
+
+/**
+ * Phase 26A-2D — PUBLIC (no auth). Client picks a specific vendor from a vendor
+ * profile. Creates the lead WITHOUT the immediate max-3 auto match, finds/creates
+ * the correct per-parent-category requirement group, and prioritises the selected
+ * vendor (assigned + one credit via the safe RPC if eligible; otherwise no contact
+ * shared, no credit deducted, preferred-vendor metadata saved for admin). Starts
+ * the 1-hour selection window + enables auto-fill.
+ */
+export async function sendClientSelectedVendorEnquiry(
+  input: CreateLeadInput & { vendor_id: string; vendor_name?: string },
+): Promise<Result<{
+  lead_id: string;
+  assigned: boolean;
+  status: string;
+  message: string;
+  pending_primary_slots: number;
+  preferred_vendor_not_eligible: boolean;
+}>> {
+  try {
+    const vendorId = String(input.vendor_id ?? "").trim();
+    if (!vendorId) return fail(appError("VALIDATION"));
+    if (!input.share_consent) {
+      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the consent to share your enquiry with verified vendors." };
+    }
+    const serviceCategory = input.service_category ?? input.serviceCategory ?? input.service_required ?? "";
+    const parentGroup = getParentCategoryGroup(serviceCategory);
+
+    const created = await leads.createLead({
+      ...input,
+      assignment_intent: "client_selected_vendor",
+      parent_category_group: parentGroup,
+      selected_vendor_id: vendorId,
+      selected_vendor_name: input.vendor_name,
+    });
+    if (!created.ok) return created;
+    const leadId = created.data.id;
+
+    const group = await requirementGroups.findOrCreateRequirementGroup({
+      phone: input.phone,
+      city: input.city,
+      categoryOrService: serviceCategory,
+      name: input.name,
+      leadId,
+    });
+    if (!group.ok) {
+      // Lead is already captured; degrade gracefully so the client is never blocked.
+      if (group.code === "MIGRATION_NOT_APPLIED") {
+        return ok({
+          lead_id: leadId,
+          assigned: false,
+          status: "captured_no_group",
+          message: "Your enquiry has been received. QuickFurno will connect you with verified vendors shortly.",
+          pending_primary_slots: 3,
+          preferred_vendor_not_eligible: false,
+        });
+      }
+      return group;
+    }
+
+    await adminClient().from("leads").update({ requirement_group_id: group.data.id }).eq("id", leadId);
+
+    const recorded = await requirementGroups.recordClientSelectedVendor(group.data.id, vendorId, leadId);
+    if (!recorded.ok) return recorded;
+
+    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard");
+    revalidatePath("/admin/lead-distribution");
+    return ok({
+      lead_id: leadId,
+      assigned: recorded.data.assigned,
+      status: recorded.data.status,
+      message: recorded.data.message,
+      pending_primary_slots: recorded.data.counts.pending_primary_slots,
+      preferred_vendor_not_eligible: recorded.data.preferred_vendor_not_eligible ?? false,
+    });
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function fetchPackages() {
@@ -519,6 +601,34 @@ export const adminAssignLeadManually = async (leadId: string, vendorIds: string[
     revalidatePath("/admin/lead-distribution");
     revalidatePath("/admin/leads");
     revalidatePath("/vendor/dashboard/leads");
+    return result;
+  });
+
+// --------------------------------------------------------------------------
+// ADMIN — Phase 26A-2D requirement groups + 1-hour auto-fill foundation.
+// Auto-fill is triggered manually (no cron this phase); it only tops groups up
+// to 3 primary vendors, never beyond, via the credit-safe group assign RPC.
+// --------------------------------------------------------------------------
+export const adminListRequirementGroups = async (limit?: number) =>
+  asAdmin(() => requirementGroups.listRequirementGroups(limit));
+
+export const adminProcessDueRequirementAutoFills = async () =>
+  asAdmin(async () => {
+    await requireSuperadmin();
+    const result = await requirementGroups.processDueRequirementAutoFills();
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard");
+    return result;
+  });
+
+export const adminProcessRequirementAutoFill = async (groupId: string) =>
+  asAdmin(async () => {
+    await requireSuperadmin();
+    const result = await requirementGroups.processRequirementAutoFill(groupId);
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard");
     return result;
   });
 

@@ -209,3 +209,78 @@ export function isInteriorFallbackCompatible(lead: LeadLike, vendor: VendorLike)
     reason: `Same interior parent group (lead ${leadSub} ↔ vendor ${vendorSub})`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Phase 26A-2D: Parent category groups.
+// One client is capped at 3 vendors PER PARENT CATEGORY GROUP (not globally and
+// not per subcategory). All interior subcategories share one Interior cap;
+// Sofa / Painting / Civil Work are separate groups. Unknown categories become
+// their own group so they never collide with a mapped one. PURE + client-safe.
+// ---------------------------------------------------------------------------
+export const KNOWN_PARENT_CATEGORY_GROUPS = ["Interior", "Sofa", "Painting", "Civil Work"] as const;
+export type KnownParentCategoryGroup = (typeof KNOWN_PARENT_CATEGORY_GROUPS)[number];
+
+// Seed labels per group (normalised on load, so plural/case variants fold in).
+const PARENT_GROUP_DEFINITIONS: Record<KnownParentCategoryGroup, string[]> = {
+  Interior: [
+    "full home interior", "home interior", "interiors", "interior", "interior designers",
+    "interior designer", "premium interiors", "premium interior", "carpenters", "carpenter",
+    "carpentry", "modular factory", "modular kitchen", "modular furniture", "wardrobe",
+    "wood work", "woodwork", "furniture work", "false ceiling", "turnkey interior",
+    "complete interior", "kitchen carpenter",
+  ],
+  Sofa: [
+    "sofa", "sofa maker", "upholstery", "sofa repair", "sofa cleaning",
+    "custom sofa & upholstery", "custom sofa and upholstery",
+  ],
+  Painting: ["painter", "painting", "wall painting", "texture painting"],
+  "Civil Work": [
+    "civil work", "renovation", "home renovation", "masonry", "tile work",
+    "plumbing civil", "plumbing",
+  ],
+};
+
+const LABEL_TO_PARENT_GROUP: Map<string, KnownParentCategoryGroup> = (() => {
+  const map = new Map<string, KnownParentCategoryGroup>();
+  for (const [group, labels] of Object.entries(PARENT_GROUP_DEFINITIONS) as [KnownParentCategoryGroup, string[]][]) {
+    for (const label of labels) map.set(normalizeCategory(label), group);
+  }
+  return map;
+})();
+
+function titleCaseWords(normalized: string): string {
+  return normalized
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * The parent category GROUP for a category/service label (or array of labels).
+ * Returns one of KNOWN_PARENT_CATEGORY_GROUPS, or — for unmapped categories — a
+ * stable Title-Cased label so that category keeps its own separate group.
+ * "General" is only returned when there is no category information at all.
+ */
+export function getParentCategoryGroup(value: unknown): string {
+  const terms = collectTerms(value);
+  for (const term of terms) {
+    const group = LABEL_TO_PARENT_GROUP.get(term);
+    if (group) return group;
+  }
+  // Interior backstop (covers synonym-only interior labels).
+  for (const term of terms) {
+    if (isInteriorParentCategory(term)) return "Interior";
+  }
+  const first = terms[0];
+  return first ? titleCaseWords(first) : "General";
+}
+
+/** Does the vendor's service offering belong to the given parent category group? */
+export function vendorMatchesParentGroup(vendor: VendorLike, group: string): boolean {
+  const terms = vendorTermList(vendor);
+  for (const term of terms) {
+    if (getParentCategoryGroup(term) === group) return true;
+  }
+  return false;
+}

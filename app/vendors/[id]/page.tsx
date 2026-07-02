@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
+import { ClientSelectedVendorEnquiry } from "@/components/vendors/ClientSelectedVendorEnquiry";
 import { Footer } from "@/components/Footer";
 import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
 import { Header } from "@/components/Header";
@@ -301,17 +302,30 @@ export default async function VendorProfilePage({ params }: VendorPageProps) {
               <p>Compare this vendor with suitable options near {vendor.city} before you finalise.</p>
               {isPaidOrTrialEligible ? (
                 <>
-                  <EnquiryModalTrigger
-                    className="btn btn-primary"
-                    modalTitle={`Get quote from ${vendor.businessName}`}
-                    serviceCategory={enquiryService}
-                    city={vendor.city}
-                    area={meta.locality.split(",")[0]}
-                    requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
-                    source={`Vendor side card: ${vendor.slug}`}
-                  >
-                    Send Enquiry
-                  </EnquiryModalTrigger>
+                  {isRealSupabaseVendor ? (
+                    // Phase 26A-2D: real vendors get client-selected priority + the
+                    // 1-hour auto-fill window (vendor.slug is the real vendor UUID).
+                    <ClientSelectedVendorEnquiry
+                      className="btn btn-primary"
+                      vendorId={vendor.slug}
+                      vendorName={vendor.businessName}
+                      city={vendor.city}
+                      area={meta.locality.split(",")[0]}
+                      serviceCategory={enquiryService}
+                    />
+                  ) : (
+                    <EnquiryModalTrigger
+                      className="btn btn-primary"
+                      modalTitle={`Get quote from ${vendor.businessName}`}
+                      serviceCategory={enquiryService}
+                      city={vendor.city}
+                      area={meta.locality.split(",")[0]}
+                      requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
+                      source={`Vendor side card: ${vendor.slug}`}
+                    >
+                      Send Enquiry
+                    </EnquiryModalTrigger>
+                  )}
                   {showDirectContact ? (
                     <>
                       <a className="btn btn-secondary" href={CONTACT_TEL}>

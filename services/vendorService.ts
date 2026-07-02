@@ -223,6 +223,14 @@ export async function getVendorDashboardStats(vendorId: string): Promise<Result<
 }
 
 /** Leads assigned to a vendor, newest first. Client contact is returned only for paid, active, approved vendors. */
+/** PostgREST/Postgres "column does not exist" (migration not applied yet). */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
+}
+
 export async function getVendorAssignedLeads(vendorId: string): Promise<Result<unknown[]>> {
   try {
     const contactEligible = await canVendorViewLeadContact(vendorId);
@@ -232,14 +240,20 @@ export async function getVendorAssignedLeads(vendorId: string): Promise<Result<u
       ? "id, name, phone, city, area, service_required, budget, property_type, timeline, message, created_at"
       : "id, name, city, area, service_required, budget, property_type, timeline, message, created_at";
 
-    const { data, error } = await adminClient()
-      .from("lead_assignments")
-      .select(`
-        id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported,
-        lead:leads ( ${leadSelect} )
-      `)
-      .eq("vendor_id", vendorId)
-      .order("assigned_at", { ascending: false });
+    // assignment_source is a Phase 26A-2D column. Try to read it; if the
+    // migration is not applied yet, fall back so the vendor dashboard never
+    // breaks (badge just shows the generic label).
+    const runQuery = (columns: string) =>
+      adminClient()
+        .from("lead_assignments")
+        .select(`${columns}, lead:leads ( ${leadSelect} )`)
+        .eq("vendor_id", vendorId)
+        .order("assigned_at", { ascending: false });
+
+    let { data, error } = await runQuery("id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported");
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await runQuery("id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported"));
+    }
     if (error) throw error;
     return ok(data ?? []);
   } catch (e) {

@@ -68,6 +68,7 @@ import {
   PreviewMessagesPanel,
 } from "./LeadMatchingAuditPanels";
 import { ManualLeadAssignmentPanel } from "./ManualLeadAssignmentPanel";
+import { RequirementGroupsPanel } from "./RequirementGroupsPanel";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
@@ -1203,7 +1204,7 @@ function LeadDistributionPage({
   runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
 }) {
   const [tab, setTab] = useState("Auto Matching & Queue");
-  const tabs = ["Auto Matching & Queue", "Manual Assignment", "Matching Audit", "Delivery Logs", "Preview Messages", "Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
+  const tabs = ["Auto Matching & Queue", "Manual Assignment", "Requirement Groups", "Matching Audit", "Delivery Logs", "Preview Messages", "Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
 
   return (
     <div className="space-y-5">
@@ -1212,6 +1213,8 @@ function LeadDistributionPage({
         <AutoMatchingQueuePanel data={data} notify={notify} runAction={runAction} />
       ) : tab === "Manual Assignment" ? (
         <ManualLeadAssignmentPanel data={data} notify={notify} />
+      ) : tab === "Requirement Groups" ? (
+        <RequirementGroupsPanel notify={notify} />
       ) : tab === "Matching Audit" ? (
         <MatchingRunsAuditPanel data={data} notify={notify} />
       ) : tab === "Delivery Logs" ? (

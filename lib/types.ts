@@ -35,6 +35,16 @@ export interface CreateLeadInput {
   utm_content?: string;
   location_consent?: boolean;
   share_consent?: boolean;
+  // Phase 26A-2D: requirement-group / client-selected-vendor context. Persisted
+  // once 20260701000032_phase26a2d_client_requirement_groups.sql runs; ignored
+  // gracefully if the columns are not there yet.
+  parent_category_group?: string;
+  requirement_group_id?: string;
+  selected_vendor_id?: string;
+  selected_vendor_name?: string;
+  // "client_selected_vendor" tells createLead to SKIP the immediate max-3 auto
+  // match so the client-selected priority + 1-hour window can run instead.
+  assignment_intent?: string;
 }
 
 export interface PublicVendorCard {

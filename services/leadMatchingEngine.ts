@@ -47,9 +47,24 @@ export type AutoLeadMatchingResult = {
   failureReason?: string;
 };
 
+export type SkippedVendorAudit = {
+  vendor_id: string;
+  business_name?: string | null;
+  reasons: string[];
+};
+
+export type VendorMatchEvaluation = {
+  eligible: EligibleMatchedVendor[];
+  skipped: SkippedVendorAudit[];
+  skippedReasonCounts: Record<string, number>;
+};
+
 const MAX_VENDOR_MATCHES = 3;
 const VENDOR_PAGE_SIZE = 500;
 const MAX_VENDOR_SCAN = 5000;
+// Audit snapshots list per-vendor skip reasons up to this cap; reason counts
+// always cover every evaluated vendor.
+const MAX_SKIPPED_AUDIT_ENTRIES = 40;
 
 export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result<AutoLeadMatchingResult>> {
   let runId: string | null = null;
@@ -105,10 +120,18 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       });
     }
 
-    const eligible = await getEligibleVendorsForLead(leadRow);
-    if (!eligible.ok) return { ok: false, code: eligible.code, error: eligible.error };
+    const evaluation = await evaluateVendorsForLead(leadRow);
+    if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
+    const { eligible, skipped, skippedReasonCounts } = evaluation.data;
 
-    const selectedVendorIds = eligible.data.slice(0, MAX_VENDOR_MATCHES).map((vendor) => vendor.id);
+    const selectedVendorIds = eligible.slice(0, MAX_VENDOR_MATCHES).map((vendor) => vendor.id);
+    // Audit-only: who was evaluated and why they were not selected. Eligible
+    // vendors beyond the cap of 3 are recorded as max_vendor_cap_reached.
+    const matchAudit = {
+      skipped,
+      skipped_reason_counts: skippedReasonCounts,
+      max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_VENDOR_MATCHES).map((vendor) => vendor.id),
+    };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
       await updateMatchingRun(runId, {
@@ -117,7 +140,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
         selected_vendor_ids: [],
         assigned_vendor_ids: [],
         failure_reason: "no_eligible_paid_or_trial_vendors",
-        matching_snapshot: { lead: summarizeLead(leadRow), selected: [], eligible: [] },
+        matching_snapshot: { lead: summarizeLead(leadRow), selected: [], eligible: [], ...matchAudit },
       });
       return ok({
         leadId,
@@ -133,10 +156,10 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     if (!assignment.ok) {
       await updateMatchingRun(runId, {
         run_status: "failed",
-        eligible_vendor_count: eligible.data.length,
+        eligible_vendor_count: eligible.length,
         selected_vendor_ids: selectedVendorIds,
         failure_reason: assignment.code,
-        matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible: eligible.data },
+        matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit },
       });
       return { ok: false, code: assignment.code, error: assignment.error };
     }
@@ -146,16 +169,16 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       await createClientAssignedVendorsPreview(leadId, []);
       await updateMatchingRun(runId, {
         run_status: "waiting",
-        eligible_vendor_count: eligible.data.length,
+        eligible_vendor_count: eligible.length,
         selected_vendor_ids: selectedVendorIds,
         assigned_vendor_ids: [],
         failure_reason: assignment.data.status,
-        matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible: eligible.data, assignment: assignment.data },
+        matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit, assignment: assignment.data },
       });
       return ok({
         leadId,
         status: "waiting",
-        eligibleVendorCount: eligible.data.length,
+        eligibleVendorCount: eligible.length,
         selectedVendorIds,
         assignedVendors: [],
         failureReason: assignment.data.status,
@@ -170,17 +193,17 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
 
     await updateMatchingRun(runId, {
       run_status: "matched",
-      eligible_vendor_count: eligible.data.length,
+      eligible_vendor_count: eligible.length,
       selected_vendor_ids: selectedVendorIds,
       assigned_vendor_ids: assigned.map((vendor) => vendor.vendor_id),
       failure_reason: null,
-      matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible: eligible.data, assignment: assignment.data },
+      matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit, assignment: assignment.data },
     });
 
     return ok({
       leadId,
       status: "matched",
-      eligibleVendorCount: eligible.data.length,
+      eligibleVendorCount: eligible.length,
       selectedVendorIds,
       assignedVendors: assigned,
     });
@@ -194,6 +217,13 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
 }
 
 export async function getEligibleVendorsForLead(lead: LeadForMatching): Promise<Result<EligibleMatchedVendor[]>> {
+  const evaluation = await evaluateVendorsForLead(lead);
+  if (!evaluation.ok) return evaluation;
+  return ok(evaluation.data.eligible);
+}
+
+/** Full eligible + skipped-with-reasons evaluation, used for audit snapshots. */
+export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Result<VendorMatchEvaluation>> {
   try {
     // Eligibility rules read loosely-aliased columns (city/office_city, several
     // credit/package aliases), so filtering happens in JS via the shared helper.
@@ -214,31 +244,48 @@ export async function getEligibleVendorsForLead(lead: LeadForMatching): Promise<
         console.warn("[lead matching] vendor scan hit safety cap", { scanned: rows.length, cap: MAX_VENDOR_SCAN });
       }
     }
-    const matched = rows.flatMap((vendor) => {
+
+    const eligible: EligibleMatchedVendor[] = [];
+    const skipped: SkippedVendorAudit[] = [];
+    const skippedReasonCounts: Record<string, number> = {};
+
+    for (const vendor of rows) {
       const id = asText(vendor.id);
-      if (!id) return [];
+      if (!id) continue;
 
       const eligibility = evaluateVendorLeadAssignmentEligibility(vendor, lead as Record<string, unknown>, {
         allow_trial_vendors_for_assignment: true,
       });
-      if (!eligibility.eligible) return [];
-      if (!serviceAreaMatches(vendor, lead)) return [];
+      const reasons = [...eligibility.reasons];
+      if (eligibility.eligible && !serviceAreaMatches(vendor, lead)) reasons.push("service_area_mismatch");
 
-      return [{
+      if (reasons.length > 0) {
+        for (const reason of reasons) {
+          skippedReasonCounts[reason] = (skippedReasonCounts[reason] ?? 0) + 1;
+        }
+        if (skipped.length < MAX_SKIPPED_AUDIT_ENTRIES) {
+          skipped.push({ vendor_id: id, business_name: asText(vendor.business_name), reasons });
+        }
+        continue;
+      }
+
+      eligible.push({
         id,
         business_name: asText(vendor.business_name),
         score: scoreVendor(vendor, lead, eligibility.visibilityType),
         credits: eligibility.credits,
         packageStatus: eligibility.packageStatus,
         visibilityType: eligibility.visibilityType ?? "paid",
-      }];
-    });
+      });
+    }
 
-    return ok(matched.sort((a, b) => {
+    eligible.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       if (b.credits !== a.credits) return b.credits - a.credits;
       return a.id.localeCompare(b.id);
-    }));
+    });
+
+    return ok({ eligible, skipped, skippedReasonCounts });
   } catch (e) {
     return fail(e);
   }

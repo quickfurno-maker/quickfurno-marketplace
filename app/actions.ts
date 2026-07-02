@@ -17,6 +17,8 @@ import * as vendorProfileChanges from "../services/vendorProfileChangeService";
 import * as vendorNotifications from "../services/vendorNotificationService";
 import * as vendorSupport from "../services/vendorSupportService";
 import * as admin from "../services/adminService";
+import * as audit from "../services/adminAuditService";
+import * as manualAssign from "../services/manualLeadAssignmentService";
 import * as aos from "../services/aosService";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
@@ -420,6 +422,37 @@ export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin
 export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());
 
+// --------------------------------------------------------------------------
+// ADMIN — Phase 26A-2 audit layer (read-mostly; review actions never touch
+// credits, never send WhatsApp, never approve/reject package purchases).
+// --------------------------------------------------------------------------
+export const adminListLeadMatchingRuns = async (limit?: number) =>
+  asAdmin(() => audit.listLeadMatchingRuns(limit));
+export const adminListLeadDeliveryLogs = async (limit?: number) =>
+  asAdmin(() => audit.listLeadDeliveryLogs(limit));
+export const adminListClientNotificationLogs = async (limit?: number) =>
+  asAdmin(() => audit.listClientNotificationLogs(limit));
+export const adminGetLeadMatchingAuditDetails = async (leadId: string) =>
+  asAdmin(() => audit.getLeadMatchingAuditDetails(leadId));
+export const adminListVendorLeadReports = async (limit?: number) =>
+  asAdmin(() => audit.listVendorLeadReports(limit));
+export const adminUpdateVendorLeadReportStatus = async (reportId: string, input: { status: string; adminNotes?: string | null }) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await audit.updateVendorLeadReportStatus(reportId, input, user.id);
+    revalidatePath("/admin/leads");
+    return result;
+  });
+export const adminAddVendorLeadReportComment = async (reportId: string, comment: string, isInternal = false) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await audit.addVendorLeadReportComment(reportId, comment, user.id, isInternal);
+    revalidatePath("/admin/leads");
+    return result;
+  });
+export const adminListPackageOrdersAuditOnly = async (limit?: number) =>
+  asAdmin(() => audit.listPackageOrdersAuditOnly(limit));
+
 export const adminUpdateMarketplaceRuntimeSetting = async (key: string, value: unknown) =>
   asAdmin(async () => {
     const user = await requireSuperadmin();
@@ -451,6 +484,31 @@ export const adminAssignPackage = async (paymentId: string) =>
 /** Admin manually assigns/overrides a lead (can include flagged duplicates). */
 export const adminAssignLead = async (leadId: string, vendorIds: string[], allowDuplicate = false) =>
   asAdmin(() => leads.assignLeadToVendors(leadId, vendorIds, { allowDuplicate, assignmentType: "admin_assigned" }));
+
+// --------------------------------------------------------------------------
+// ADMIN — Phase 26A-2B manual lead-assignment fallback. Reuses the existing
+// safe assign_lead_to_vendors RPC (credit deduction handled there); adds only
+// audit + preview logs. WhatsApp stays preview/log only.
+// --------------------------------------------------------------------------
+export const adminPreviewManualLeadAssignment = async (leadId: string) =>
+  asAdmin(() => manualAssign.getManualAssignmentPreview(leadId));
+
+export const adminListManualAssignmentCandidates = async (leadId: string) =>
+  asAdmin(async () => {
+    const preview = await manualAssign.getManualAssignmentPreview(leadId);
+    if (!preview.ok) return preview;
+    return ok(preview.data.candidates);
+  });
+
+export const adminAssignLeadManually = async (leadId: string, vendorIds: string[]) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await manualAssign.assignLeadManually(leadId, vendorIds, user.id);
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/admin/leads");
+    revalidatePath("/vendor/dashboard/leads");
+    return result;
+  });
 
 /** One-shot: record a manual payment, mark it Paid, and credit the vendor's pack. */
 export const adminCreditVendorNow = async (

@@ -6,8 +6,6 @@ import {
   adminApproveVendorProfileChangeRequest,
   adminRejectVendorProfileChangeRequest,
   adminReplyVendorSupportThread,
-  adminApproveBadLead,
-  adminRejectBadLead,
   adminSetCategoryActive,
   adminSetCityActive,
   adminSetPackageActive,
@@ -63,6 +61,13 @@ import { AosAutomationControl } from "./AosAutomationControl";
 import { LeadAssignmentApprovalControl } from "./LeadAssignmentApprovalControl";
 import { DistributionLogsPanel, FailedAssignmentsPanel, RecentAssignmentsPanel } from "./AssignmentLedgerPanels";
 import { CategoryManager } from "./CategoryManager";
+import {
+  BadLeadReportsReviewPanel,
+  DeliveryLogsAuditPanel,
+  MatchingRunsAuditPanel,
+  PreviewMessagesPanel,
+} from "./LeadMatchingAuditPanels";
+import { ManualLeadAssignmentPanel } from "./ManualLeadAssignmentPanel";
 
 const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
@@ -230,10 +235,6 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
 
   const hotLeads = data.leads.filter(isHotLead);
   const unassignedLeads = data.leads.filter(isUnassignedLead);
-  const pendingBadReports = useMemo(
-    () => data.badReports.filter((report) => String(report.status ?? "").toLowerCase() === "pending"),
-    [data.badReports],
-  );
   const leads = useMemo(() => data.leads.filter((lead) => {
     const leadCategory = lead.service_required || lead.category || "";
     const leadSource = lead.source || "Website";
@@ -245,18 +246,6 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
       && (source === "All" || leadSource === source)
       && (priority === "All" || leadPriorityValue === priority);
   }), [data.leads, query, city, category, status, source, priority]);
-
-  function reviewBadReport(reportId: string, decision: "approve" | "reject") {
-    const note = window.prompt(decision === "approve" ? "Approval note for bad lead report" : "Rejection reason for bad lead report");
-    if (!note?.trim()) {
-      notify("Admin note is required.", "error");
-      return;
-    }
-    runAction(
-      decision === "approve" ? "Bad lead report approval" : "Bad lead report rejection",
-      () => decision === "approve" ? adminApproveBadLead(reportId, note) : adminRejectBadLead(reportId, note),
-    );
-  }
 
   return (
     <div className="space-y-5">
@@ -283,31 +272,7 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
         action={<SecondaryButton onClick={() => notify("CSV export placeholder ready.")}>Export CSV</SecondaryButton>}
       />
 
-      <SectionCard
-        title="Bad Lead Reports"
-        description="Admin review queue. Approval records the decision only; credit is not refunded automatically."
-      >
-        <DataTable
-          rows={pendingBadReports}
-          emptyTitle="No pending bad-lead reports"
-          emptyMessage="Vendor bad-lead reports that require admin review will appear here."
-          columns={[
-            { header: "Vendor", cell: (report) => <Strong title={vendorName(data.vendors, report.vendor_id)} subtitle={formatDate(report.created_at)} /> },
-            { header: "Type", cell: (report) => <StatusBadge value={report.report_type || report.reason || "Not set"} tone="amber" /> },
-            { header: "Reason", cell: (report) => <Strong title={report.report_reason || report.reason || "Not set"} subtitle={report.vendor_comment || report.description || "No comment"} /> },
-            { header: "Credit", cell: (report) => <StatusBadge value={report.credit_restored ? "Restored" : "No auto refund"} tone={report.credit_restored ? "emerald" : "slate"} /> },
-            {
-              header: "Actions",
-              cell: (report) => (
-                <div className="flex flex-wrap gap-2">
-                  <SecondaryButton onClick={() => reviewBadReport(report.id, "approve")}>Approve</SecondaryButton>
-                  <SecondaryButton onClick={() => reviewBadReport(report.id, "reject")}>Reject</SecondaryButton>
-                </div>
-              ),
-            },
-          ]}
-        />
-      </SectionCard>
+      <BadLeadReportsReviewPanel data={data} notify={notify} runAction={runAction} />
 
       <DataTable
         rows={leads}
@@ -1238,13 +1203,21 @@ function LeadDistributionPage({
   runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
 }) {
   const [tab, setTab] = useState("Auto Matching & Queue");
-  const tabs = ["Auto Matching & Queue", "Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
+  const tabs = ["Auto Matching & Queue", "Manual Assignment", "Matching Audit", "Delivery Logs", "Preview Messages", "Rules & Settings", "Assignment Approval Preview", "Recent Assignments", "Failed Assignments", "Vendor Eligibility Checker", "Distribution Logs"];
 
   return (
     <div className="space-y-5">
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
       {tab === "Auto Matching & Queue" ? (
         <AutoMatchingQueuePanel data={data} notify={notify} runAction={runAction} />
+      ) : tab === "Manual Assignment" ? (
+        <ManualLeadAssignmentPanel data={data} notify={notify} />
+      ) : tab === "Matching Audit" ? (
+        <MatchingRunsAuditPanel data={data} notify={notify} />
+      ) : tab === "Delivery Logs" ? (
+        <DeliveryLogsAuditPanel data={data} />
+      ) : tab === "Preview Messages" ? (
+        <PreviewMessagesPanel data={data} />
       ) : tab === "Assignment Approval Preview" ? (
         <LeadAssignmentApprovalControl leads={data.leads} notify={notify} />
       ) : tab === "Rules & Settings" ? (
@@ -1555,7 +1528,7 @@ function SubscriptionsPage({ data, notify }: { data: Snapshot; notify: (message:
         <DataTable
           rows={packageOrders}
           emptyTitle="No package orders found"
-          emptyMessage="Vendor-created package orders will appear here after vendors click Buy Package / Recharge."
+          emptyMessage="Package order audit will appear here after package order tracking is enabled."
           columns={[
             { header: "Order", cell: (row) => <Strong title={shortId(row.id)} subtitle={formatDate(row.created_at)} /> },
             { header: "Vendor", cell: (row) => vendorName(data.vendors, row.vendor_id) },
@@ -1565,6 +1538,15 @@ function SubscriptionsPage({ data, notify }: { data: Snapshot; notify: (message:
             { header: "Payment", cell: (row) => <StatusBadge value={row.payment_status || "not_started"} tone="amber" /> },
             { header: "Activation", cell: (row) => <StatusBadge value={row.activation_status || "not_activated"} tone="slate" /> },
             { header: "Provider", cell: (row) => row.payment_provider || "not_connected" },
+            {
+              header: "Provider Refs",
+              cell: (row) => (
+                <div className="min-w-36 text-xs text-slate-500">
+                  <p>Order: {row.provider_order_id || "—"}</p>
+                  <p className="mt-0.5">Payment: {row.provider_payment_id || "—"}</p>
+                </div>
+              ),
+            },
           ]}
         />
       </SectionCard>

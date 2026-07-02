@@ -3,7 +3,7 @@
 // Admin dashboard metrics, vendor moderation, bad-lead resolution.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
-import { appError, type Result, ok, fail } from "../lib/errors";
+import { appError, type Result, ok, fail, isMissingRelationError } from "../lib/errors";
 import type { AdminDashboardStats } from "../lib/types";
 
 const head = (q: any) => q.select("id", { count: "exact", head: true });
@@ -141,6 +141,17 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const db = adminClient();
     const warnings: string[] = [];
 
+    // A missing relation means an optional table's migration has not been
+    // applied yet. That is expected, not an error, so we log it server-side and
+    // return an empty set WITHOUT pushing a scary admin-facing warning.
+    function noteUnavailable(label: string, error: { code?: string; message?: string }) {
+      if (isMissingRelationError(error)) {
+        console.info(`[admin snapshot] ${label} not available yet (relation missing); using empty set.`, { code: error.code });
+        return;
+      }
+      warnings.push(`${label}: ${error.message}`);
+    }
+
     async function safeSelect<T>(label: string, query: PromiseLike<{ data: T[] | null; error: any }>, fallback?: PromiseLike<{ data: T[] | null; error: any }>) {
       const result = await query;
       if (!result.error) return result.data ?? [];
@@ -151,11 +162,11 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
           warnings.push(`${label}: primary query unavailable; loaded fallback columns.`);
           return fallbackResult.data ?? [];
         }
-        warnings.push(`${label}: ${fallbackResult.error.message}`);
+        noteUnavailable(label, fallbackResult.error);
         return [];
       }
 
-      warnings.push(`${label}: ${result.error.message}`);
+      noteUnavailable(label, result.error);
       return [];
     }
 
@@ -180,6 +191,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       freeVendorInterests,
       leadAssignmentQueue,
       autoAssignmentLogs,
+      leadMatchingRuns,
+      leadDeliveryLogs,
+      clientNotificationLogs,
+      badLeadReportComments,
     ] = await Promise.all([
       safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)").order("created_at", { ascending: false }), db.from("leads").select("*").order("created_at", { ascending: false })),
       safeSelect("vendors", db.from("vendors").select("*").order("created_at", { ascending: false })),
@@ -201,6 +216,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       safeSelect("free_vendor_profile_interests", db.from("free_vendor_profile_interests").select("*").order("created_at", { ascending: false })),
       safeSelect("lead_assignment_queue", db.from("lead_assignment_queue").select("*").order("created_at", { ascending: false })),
       safeSelect("lead_auto_assignment_logs", db.from("lead_auto_assignment_logs").select("*").order("created_at", { ascending: false })),
+      safeSelect("lead_matching_runs", db.from("lead_matching_runs").select("*").order("created_at", { ascending: false }).limit(200)),
+      safeSelect("lead_delivery_logs", db.from("lead_delivery_logs").select("*").order("created_at", { ascending: false }).limit(300)),
+      safeSelect("client_notification_logs", db.from("client_notification_logs").select("*").order("created_at", { ascending: false }).limit(200)),
+      safeSelect("bad_lead_report_comments", db.from("bad_lead_report_comments").select("*").order("created_at", { ascending: true }).limit(500)),
     ]);
 
     const leadRows = leads;
@@ -296,6 +315,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       freeVendorInterests,
       leadAssignmentQueue,
       autoAssignmentLogs,
+      leadMatchingRuns,
+      leadDeliveryLogs,
+      clientNotificationLogs,
+      badLeadReportComments,
       generatedAt: new Date().toISOString(),
       warnings,
     });

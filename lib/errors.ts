@@ -43,6 +43,22 @@ export function appError(code: keyof typeof MESSAGES): AppError {
   return new AppError(code, MESSAGES[code] ?? MESSAGES.UNKNOWN);
 }
 
+/**
+ * True when a Supabase/PostgREST error means the table/relation does not exist
+ * yet — e.g. a migration has not been applied. Callers can safely degrade to an
+ * empty result instead of surfacing a scary error.
+ *   42P01    — Postgres undefined_table
+ *   PGRST205 — PostgREST: table not found in schema cache
+ *   PGRST204 — PostgREST: column/table not found in schema cache
+ */
+export function isMissingRelationError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  const code = e?.code ?? "";
+  if (code === "42P01" || code === "PGRST205" || code === "PGRST204") return true;
+  const message = e?.message ?? "";
+  return /schema cache|could not find the table/i.test(message);
+}
+
 export type Result<T> =
   | { ok: true; data: T }
   | { ok: false; code: string; error: string };

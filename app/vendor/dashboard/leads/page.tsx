@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getMyVendor, vendorLeads, vendorUpdateLeadStatusFromForm } from "@/app/actions";
 import { VendorNoProfileFallback } from "@/app/vendor/dashboard/_components/VendorNoProfileFallback";
 import { VendorLeadReportForm } from "@/components/vendors/VendorLeadReportForm";
+import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+import { evaluateVendorContactAccessEligibility, type VendorContactAccessEligibility } from "@/lib/vendors/vendorEligibility";
 import type { VendorLeadStatus, VendorProfileSummary } from "@/lib/types";
 
 export const metadata = { title: "Vendor leads - QuickFurno" };
@@ -50,7 +52,9 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
     return <VendorNoProfileFallback />;
   }
 
-  const eligible = canViewClientContact(vendor);
+  const runtimeSettings = await loadMarketplaceRuntimeSettings();
+  const contactAccess = evaluateVendorContactAccessEligibility(vendor as unknown as Record<string, unknown>, runtimeSettings);
+  const eligible = contactAccess.eligible;
   const leadsResult = await vendorLeads(vendor.id);
   const leads = leadsResult.ok ? (leadsResult.data as VendorLeadRow[]) : [];
 
@@ -80,7 +84,7 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
         ) : null}
         {!leadsResult.ok ? <p className="qf-vd-error">Assigned leads are not available right now.</p> : null}
 
-        {!eligible ? <LeadAccessNotice vendor={vendor} /> : null}
+        {!eligible ? <LeadAccessNotice vendor={vendor} contactAccess={contactAccess} /> : null}
 
         {leads.length === 0 ? (
           <div className="qf-vd-empty">
@@ -159,16 +163,18 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
   );
 }
 
-function LeadAccessNotice({ vendor }: { vendor: VendorProfileSummary }) {
+function LeadAccessNotice({ vendor, contactAccess }: { vendor: VendorProfileSummary; contactAccess: VendorContactAccessEligibility }) {
   const approved = String(vendor.status ?? "").toLowerCase() === "approved";
   const active = vendor.is_active !== false;
-  const paid = String(vendor.paid_status ?? "").toLowerCase() === "paid";
+  const hasPaidAccess = contactAccess.visibilityType === "paid" || contactAccess.visibilityType === "trial";
   const message = !approved
     ? "Your vendor profile must be approved before client contact is visible."
     : !active
       ? "Your vendor account is inactive. Contact QuickFurno support to restore lead access."
-      : !paid
+      : !hasPaidAccess
         ? "Activate a package to view assigned lead contact details."
+        : contactAccess.credits <= 0
+          ? "Recharge your lead credits to view assigned lead contact details."
         : "Lead contact access is currently restricted.";
 
   return (
@@ -177,19 +183,13 @@ function LeadAccessNotice({ vendor }: { vendor: VendorProfileSummary }) {
         <strong>Lead contact is hidden</strong>
         <p>{message}</p>
       </div>
-      {!paid ? (
+      {!hasPaidAccess || contactAccess.credits <= 0 ? (
         <Link className="qf-vd-btn qf-vd-btn--primary" href="/vendor/dashboard/package">
-          Activate package
+          {!hasPaidAccess ? "Activate package" : "Recharge credits"}
         </Link>
       ) : null}
     </div>
   );
-}
-
-function canViewClientContact(vendor: VendorProfileSummary) {
-  return String(vendor.status ?? "").toLowerCase() === "approved"
-    && vendor.is_active !== false
-    && String(vendor.paid_status ?? "").toLowerCase() === "paid";
 }
 
 /**

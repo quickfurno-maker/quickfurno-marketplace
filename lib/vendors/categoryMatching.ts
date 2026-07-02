@@ -14,31 +14,49 @@ export interface CategoryMatchResult {
   reason: string;
 }
 
-// Synonym groups from the Phase 26A-2C brief. Each canonical group lists the
-// labels that should be treated as the same service family.
-const SYNONYM_GROUPS: Record<string, string[]> = {
-  "Full Home Interior": [
-    "full home interior", "interiors", "interior", "interior designers",
-    "premium interiors", "home interior", "turnkey interior", "complete interior",
+// Canonical service groups. Public category labels and enquiry service labels
+// both fold into these groups so organic leads can match paid/trial vendors
+// even when the two sides store different but equivalent labels.
+export const CANONICAL_CATEGORY_GROUPS: Record<string, string[]> = {
+  "Interior Designers": [
+    "interior designers", "full home interior", "home interior",
+    "interior design", "interior designer", "interior", "interiors",
+    "false ceiling",
   ],
-  "Carpenters": [
-    "carpenters", "carpenter", "carpentry", "wood work", "woodwork",
-    "furniture work", "wardrobe", "kitchen carpenter",
+  Carpenters: [
+    "carpenters", "carpentry", "carpenter", "custom furniture",
+    "furniture", "woodwork", "wood work", "wardrobe",
   ],
   "Modular Factory": [
-    "modular factory", "modular kitchen", "modular furniture",
-    "factory made furniture", "machine finish furniture",
+    "modular factory", "modular kitchen", "kitchen", "factory finish",
+    "factory made furniture", "machine finish furniture", "modular furniture",
+    "wardrobe",
   ],
-  "Sofa": ["sofa", "sofa maker", "upholstery", "sofa repair"],
-  "Painter": ["painter", "painting", "wall painting", "texture painting"],
-  "Civil Work": ["civil work", "renovation", "masonry", "plumbing civil", "tile work"],
+  "Premium Interiors": [
+    "premium interiors", "premium interior", "premium interior design",
+    "luxury interior",
+  ],
+  Sofa: [
+    "sofa", "sofa maker", "sofa makers", "custom sofa & upholstery",
+    "custom sofa and upholstery", "upholstery", "recliner", "sofa repair",
+  ],
+  Painter: ["painter", "painting", "paint", "texture painting", "wall painting"],
+  "Civil Work": [
+    "civil work", "civil", "home renovation", "renovation", "tiling",
+    "tile work", "masonry", "pop", "plumbing civil", "waterproofing",
+  ],
 };
 
-// normalized label -> canonical group name
-const LABEL_TO_GROUP: Map<string, string> = (() => {
-  const map = new Map<string, string>();
-  for (const [group, labels] of Object.entries(SYNONYM_GROUPS)) {
-    for (const label of labels) map.set(normalizeCategory(label), group);
+// normalized label -> canonical group names. Some services (for example
+// Wardrobe) legitimately sit in more than one supply group.
+const LABEL_TO_GROUPS: Map<string, string[]> = (() => {
+  const map = new Map<string, string[]>();
+  for (const [group, labels] of Object.entries(CANONICAL_CATEGORY_GROUPS)) {
+    for (const label of labels) {
+      const key = normalizeCategory(label);
+      const groups = map.get(key) ?? [];
+      if (!groups.includes(group)) map.set(key, [...groups, group]);
+    }
   }
   return map;
 })();
@@ -46,16 +64,24 @@ const LABEL_TO_GROUP: Map<string, string> = (() => {
 /** lowercase, trim, collapse whitespace, light singular/plural fold. */
 export function normalizeCategory(value: unknown): string {
   if (typeof value !== "string") return "";
-  let text = value.trim().toLowerCase().replace(/\s+/g, " ");
+  let text = value.trim().toLowerCase().replace(/&/g, " and ").replace(/\s+/g, " ");
   if (!text) return "";
   // Light plural fold so "carpenters" == "carpenter", "interiors" == "interior".
   if (text.length > 4 && text.endsWith("s") && !text.endsWith("ss")) text = text.slice(0, -1);
   return text;
 }
 
-function groupOf(normalized: string): string | null {
-  if (!normalized) return null;
-  return LABEL_TO_GROUP.get(normalized) ?? null;
+export function getCanonicalCategoryGroups(value: unknown): string[] {
+  const normalized = normalizeCategory(value);
+  if (!normalized) return [];
+  return LABEL_TO_GROUPS.get(normalized) ?? [];
+}
+
+export function categoriesShareCanonicalGroup(left: unknown, right: unknown): boolean {
+  const leftGroups = getCanonicalCategoryGroups(left);
+  if (leftGroups.length === 0) return false;
+  const rightGroups = new Set(getCanonicalCategoryGroups(right));
+  return leftGroups.some((group) => rightGroups.has(group));
 }
 
 function collectTerms(...values: unknown[]): string[] {
@@ -123,12 +149,13 @@ export function isLeadVendorCategoryCompatible(lead: LeadLike, vendor: VendorLik
   // 3) synonym-group overlap
   const vendorGroups = new Map<string, string>(); // group -> vendor label
   for (const term of vendorTerms) {
-    const group = groupOf(term);
-    if (group && !vendorGroups.has(group)) vendorGroups.set(group, term);
+    for (const group of getCanonicalCategoryGroups(term)) {
+      if (!vendorGroups.has(group)) vendorGroups.set(group, term);
+    }
   }
   for (const term of leadTerms) {
-    const group = groupOf(term);
-    if (group && vendorGroups.has(group)) {
+    const group = getCanonicalCategoryGroups(term).find((candidate) => vendorGroups.has(candidate));
+    if (group) {
       return {
         compatible: true,
         matchType: "synonym",
@@ -283,4 +310,23 @@ export function vendorMatchesParentGroup(vendor: VendorLike, group: string): boo
     if (getParentCategoryGroup(term) === group) return true;
   }
   return false;
+}
+
+export const CATEGORY_MATCHING_SMOKE_CASES = [
+  ["Modular Kitchen", "Modular Factory"],
+  ["Carpentry", "Carpenters"],
+  ["Painting", "Painter"],
+  ["Home Renovation", "Civil Work"],
+  ["Premium Interior Design", "Premium Interiors"],
+  ["Custom Sofa & Upholstery", "Sofa"],
+  ["Full Home Interior", "Interior Designers"],
+] as const;
+
+export function verifyCategoryMatchingSmokeCases(): CategoryMatchResult[] {
+  return CATEGORY_MATCHING_SMOKE_CASES.map(([leadService, vendorCategory]) =>
+    isLeadVendorCategoryCompatible(
+      { service_required: leadService },
+      { service_categories: [vendorCategory] },
+    ),
+  );
 }

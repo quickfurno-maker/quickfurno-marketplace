@@ -1,4 +1,5 @@
 // ============================================================================
+import { isLeadVendorCategoryCompatible } from "@/lib/vendors/categoryMatching";
 // QuickFurno — Phase 13B: Shared Vendor Eligibility Helper
 //
 // ONE source of truth for "is this vendor eligible for a lead preview?". Used by
@@ -64,6 +65,8 @@ export interface VendorLeadAssignmentEligibility {
   visibilityType?: string;
 }
 
+export interface VendorContactAccessEligibility extends VendorLeadAssignmentEligibility {}
+
 export interface VendorLeadAssignmentSettings {
   allow_trial_vendors_for_assignment?: boolean | null;
 }
@@ -72,7 +75,6 @@ const ACTIVE_PACKAGE_STATUSES = new Set(["active", "trial"]);
 const PAID_STATUSES = new Set(["paid", "active", "premium", "priority"]);
 const TRIAL_STATUSES = new Set(["trial"]);
 const FREE_OR_UNPAID_STATUSES = new Set(["", "none", "free", "unpaid", "inactive", "expired", "cancelled", "canceled"]);
-const INTERIOR_SUBCATEGORIES = new Set(["interior designers", "carpenters", "modular factory", "premium interiors"]);
 
 /**
  * Evaluate a vendor's eligibility for a lead preview. `vendor` is any record
@@ -170,6 +172,17 @@ export function evaluateVendorLeadAssignmentEligibility(
     credits,
     visibilityType: visibilityType === "free" ? (paidStatus || "free") : visibilityType,
   };
+}
+
+/**
+ * Contact access uses the same paid/trial/status/credit gate as automatic
+ * assignment, without lead-specific city/category checks.
+ */
+export function evaluateVendorContactAccessEligibility(
+  vendor: Record<string, unknown> | null | undefined,
+  settings: VendorLeadAssignmentSettings | Record<string, unknown> | null | undefined = {},
+): VendorContactAccessEligibility {
+  return evaluateVendorLeadAssignmentEligibility(vendor, null, settings);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,32 +351,25 @@ function collectVendorCategories(row: Record<string, unknown>): string[] {
 
 function categoryMatches(vendorCategories: string[], leadCategory: string, leadSubcategory?: string | null): boolean {
   if (vendorCategories.length === 0) return false;
-  const leadKey = normalizeCategoryKey(leadCategory);
-  const leadSubKey = leadSubcategory ? normalizeCategoryKey(leadSubcategory) : "";
-
-  return vendorCategories.some((category) => {
-    const key = normalizeCategoryKey(category);
-    if (key === leadKey) return true;
-    if (leadKey === "interior" && INTERIOR_SUBCATEGORIES.has(key)) return true;
-    if (INTERIOR_SUBCATEGORIES.has(leadKey) && (key === "interior" || key === leadKey)) return true;
-    if (leadSubKey && key === leadSubKey) return true;
-    return false;
-  });
+  return isLeadVendorCategoryCompatible(
+    { category: leadCategory, service_required: leadCategory, subcategory: leadSubcategory },
+    {
+      service_categories: vendorCategories,
+      selected_category: vendorCategories[0],
+    },
+  ).compatible;
 }
 
 function subcategoryMatches(vendorCategories: string[], leadSubcategory: string): boolean {
-  const leadKey = normalizeCategoryKey(leadSubcategory);
-  return vendorCategories.some((category) => normalizeCategoryKey(category) === leadKey);
-}
-
-function normalizeCategoryKey(value: unknown): string {
-  const text = typeof value === "string" ? value.trim().toLowerCase() : "";
-  if (INTERIOR_SUBCATEGORIES.has(text)) return text;
-  if (text === "interior" || text === "interiors") return "interior";
-  if (text === "sofa") return "sofa";
-  if (text === "painter") return "painter";
-  if (text === "civil work" || text === "civil") return "civil work";
-  return text;
+  if (vendorCategories.length === 0) return false;
+  return isLeadVendorCategoryCompatible({
+    category: leadSubcategory,
+    service_required: leadSubcategory,
+    subcategory: leadSubcategory,
+  }, {
+    service_categories: vendorCategories,
+    selected_category: vendorCategories[0],
+  }).compatible;
 }
 
 function isPackageDateExpired(value: unknown): boolean {

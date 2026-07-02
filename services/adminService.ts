@@ -480,7 +480,7 @@ export async function setCityActive(id: string, isActive: boolean): Promise<Resu
   }
 }
 
-/** Approve a bad-lead report → restore 1 credit, flag the assignment. */
+/** Approve a bad-lead report. MVP does not auto-refund credits; any refund is a separate manual admin action. */
 export async function approveBadLeadReport(reportId: string, decision?: string): Promise<Result<null>> {
   try {
     const db = adminClient();

@@ -5,6 +5,8 @@
 import { adminClient } from "../lib/supabase";
 import { appError, AppError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
+import { loadMarketplaceRuntimeSettings } from "../lib/lead-assignment/runtimeSettings";
+import { evaluateVendorContactAccessEligibility } from "../lib/vendors/vendorEligibility";
 import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
@@ -222,7 +224,7 @@ export async function getVendorDashboardStats(vendorId: string): Promise<Result<
   }
 }
 
-/** Leads assigned to a vendor, newest first. Client contact is returned only for paid, active, approved vendors. */
+/** Leads assigned to a vendor, newest first. Client contact is returned only for assignment-eligible paid/trial vendors. */
 /** PostgREST/Postgres "column does not exist" (migration not applied yet). */
 function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
@@ -436,17 +438,23 @@ export async function submitStructuredLeadReport(
 
 async function canVendorViewLeadContact(vendorId: string): Promise<Result<boolean>> {
   try {
-    const { data, error } = await adminClient()
+    const settings = await loadMarketplaceRuntimeSettings();
+    let { data, error } = await adminClient()
       .from("vendors")
-      .select("status, is_active, paid_status")
+      .select("status, is_active, paid_status, package_status, package_expires_at, remaining_credits")
       .eq("id", vendorId)
       .maybeSingle();
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await adminClient()
+        .from("vendors")
+        .select("status, is_active, paid_status, remaining_credits")
+        .eq("id", vendorId)
+        .maybeSingle());
+    }
     if (error) throw error;
     if (!data) throw appError("UNKNOWN");
 
-    const status = String((data as any).status ?? "").toLowerCase();
-    const paidStatus = String((data as any).paid_status ?? "").toLowerCase();
-    return ok(status === "approved" && (data as any).is_active !== false && paidStatus === "paid");
+    return ok(evaluateVendorContactAccessEligibility(data as Record<string, unknown>, settings).eligible);
   } catch (e) {
     return fail(e);
   }

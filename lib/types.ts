@@ -150,6 +150,8 @@ export interface VendorProfileSummary {
   status: string;
   verification_status: string | null;
   paid_status: string | null;
+  package_status?: string | null;
+  package_expires_at?: string | null;
   remaining_credits: number;
   total_credits: number;
   public_visibility: boolean;

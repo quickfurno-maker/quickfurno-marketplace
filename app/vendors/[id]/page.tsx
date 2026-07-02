@@ -63,7 +63,9 @@ export default async function VendorProfilePage({ params }: VendorPageProps) {
 
   const meta = getVendorListingMeta(vendor);
   const enquiryService = enquiryServiceForCategory(vendor.category);
-  const serviceAreas = [meta.locality, vendor.city === "Pune" ? "Baner" : "Andheri", vendor.city === "Pune" ? "Wakad" : "Thane"];
+  const serviceAreas = vendor.serviceAreaSummary
+    ? vendor.serviceAreaSummary.split(",").map((area) => area.trim()).filter(Boolean)
+    : [meta.locality, vendor.city === "Pune" ? "Baner" : "Andheri", vendor.city === "Pune" ? "Wakad" : "Thane"];
   const isPaidOrTrialEligible = vendor.activePaidPlan;
 
   // Real Supabase vendors must not borrow static demo content (services, prices,
@@ -246,7 +248,7 @@ export default async function VendorProfilePage({ params }: VendorPageProps) {
 
               <section id="hours" className="vendor-detail-panel">
                 <h2>Business Hours</h2>
-                <p>Mon - Sun, 10:00 am - 9:00 pm</p>
+                <p>{vendor.businessHours || "Mon - Sun, 10:00 am - 9:00 pm"}</p>
                 <span className="vendor-detail-note">{meta.openStatus}</span>
               </section>
 

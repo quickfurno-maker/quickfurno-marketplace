@@ -5,12 +5,20 @@
 // ============================================================================
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { adminClient, serverClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
+import * as vendorPackageOrders from "../services/vendorPackageOrderService";
+import * as vendorProfileChanges from "../services/vendorProfileChangeService";
+import * as vendorNotifications from "../services/vendorNotificationService";
+import * as vendorSupport from "../services/vendorSupportService";
 import * as admin from "../services/adminService";
+import * as audit from "../services/adminAuditService";
+import * as manualAssign from "../services/manualLeadAssignmentService";
 import * as aos from "../services/aosService";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
@@ -210,14 +218,173 @@ export async function vendorUpdateLeadStatus(
   vendorId: string, assignmentId: string, status: VendorLeadStatus, notes?: string
 ) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
-  return vendors.updateVendorLeadStatus(assignmentId, status, notes);
+  return vendors.updateVendorLeadStatus(vendorId, assignmentId, status, notes);
 }
 
 export async function vendorReportBadLead(
-  vendorId: string, assignmentId: string, reason: string, description?: string
+  vendorId: string, assignmentId: string, reportType: string, reportReason?: string, vendorComment?: string
 ) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
-  return vendors.reportBadLead(assignmentId, reason, description);
+  const reason = reportReason ?? reportType;
+  const comment = vendorComment ?? "";
+  return vendors.reportBadLead(vendorId, assignmentId, reportType, reason, comment);
+}
+
+export async function vendorUpdateLeadStatusFromForm(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const status = String(formData.get("status") ?? "") as VendorLeadStatus;
+  const result = await vendorUpdateLeadStatus(me.data.id, assignmentId, status);
+
+  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard");
+  if (!result.ok) redirect(`/vendor/dashboard/leads?lead=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/leads?lead=status-updated");
+}
+
+export async function vendorReportBadLeadFromForm(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const reportType = String(formData.get("report_type") ?? "");
+  const reportReason = String(formData.get("report_reason") ?? "");
+  const vendorComment = String(formData.get("vendor_comment") ?? "");
+  const result = await vendorReportBadLead(me.data.id, assignmentId, reportType, reportReason, vendorComment);
+
+  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard");
+  revalidatePath("/admin/leads");
+  if (!result.ok) redirect(`/vendor/dashboard/leads?lead=report-failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/leads?lead=bad-lead-submitted");
+}
+
+export async function vendorCreatePackageOrder(formData: FormData) {
+  const packageId = String(formData.get("packageId") ?? "");
+  if (!packageId) redirect("/vendor/dashboard/package?order=invalid");
+
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/package?order=no-vendor");
+
+  const result = await vendorPackageOrders.createVendorPackageOrder(me.data.id, packageId);
+  revalidatePath("/vendor/dashboard/package");
+
+  if (!result.ok) redirect(`/vendor/dashboard/package?order=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/package?order=created");
+}
+
+export async function vendorSubmitProfileChangeRequest(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
+
+  const u = await currentUser();
+  const result = await vendorProfileChanges.createVendorProfileChangeRequest(me.data.id, u?.id ?? null, {
+    public_business_name: String(formData.get("public_business_name") ?? ""),
+    public_description: String(formData.get("public_description") ?? ""),
+    public_category: String(formData.get("public_category") ?? ""),
+    services_offered: String(formData.get("services_offered") ?? "").split(/\r?\n|,/),
+    starting_price: String(formData.get("starting_price") ?? ""),
+    business_hours: String(formData.get("business_hours") ?? ""),
+    service_area_summary: String(formData.get("service_area_summary") ?? ""),
+    profile_image_url: String(formData.get("profile_image_url") ?? ""),
+    cover_image_url: String(formData.get("cover_image_url") ?? ""),
+    portfolio_image_urls: String(formData.get("portfolio_image_urls") ?? "").split(/\r?\n|,/),
+  });
+
+  revalidatePath("/vendor/dashboard/profile");
+  if (!result.ok) redirect(`/vendor/dashboard/profile?request=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/profile?request=submitted");
+}
+
+export async function vendorMarkNotificationRead(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/notifications");
+
+  const notificationId = String(formData.get("notificationId") ?? "");
+  const result = await vendorNotifications.markVendorNotificationRead(me.data.id, notificationId);
+
+  revalidatePath("/vendor/dashboard/notifications");
+  if (!result.ok) redirect(`/vendor/dashboard/notifications?notice=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/notifications?notice=read");
+}
+
+export async function vendorMarkAllNotificationsRead() {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/notifications");
+
+  const result = await vendorNotifications.markAllVendorNotificationsRead(me.data.id);
+
+  revalidatePath("/vendor/dashboard/notifications");
+  if (!result.ok) redirect(`/vendor/dashboard/notifications?notice=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/notifications?notice=all-read");
+}
+
+export async function vendorCreateSupportThread(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/support?support=no-vendor");
+
+  const u = await currentUser();
+  const result = await vendorSupport.createVendorSupportThread(me.data.id, u?.id ?? null, {
+    subject: String(formData.get("subject") ?? ""),
+    topic: String(formData.get("topic") ?? "general"),
+    message: String(formData.get("message") ?? ""),
+  });
+
+  revalidatePath("/vendor/dashboard/support");
+  revalidatePath("/admin/vendors");
+  if (!result.ok) redirect(`/vendor/dashboard/support?support=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/support?support=created");
+}
+
+export async function vendorSendSupportMessage(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/support?support=no-vendor");
+
+  const u = await currentUser();
+  const threadId = String(formData.get("threadId") ?? "");
+  const result = await vendorSupport.createVendorSupportMessage(
+    me.data.id,
+    threadId,
+    u?.id ?? null,
+    String(formData.get("message") ?? ""),
+  );
+
+  revalidatePath("/vendor/dashboard/support");
+  revalidatePath("/admin/vendors");
+  if (!result.ok) redirect(`/vendor/dashboard/support?support=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/support?support=sent");
+}
+
+export async function adminApproveVendorProfileChangeRequest(requestId: string, adminNotes?: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorProfileChanges.approveVendorProfileChangeRequest(requestId, user.id, adminNotes);
+    revalidatePath("/admin/vendors");
+    revalidatePath("/vendors");
+    return result;
+  });
+}
+
+export async function adminRejectVendorProfileChangeRequest(requestId: string, rejectionReason: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorProfileChanges.rejectVendorProfileChangeRequest(requestId, user.id, rejectionReason);
+    revalidatePath("/admin/vendors");
+    return result;
+  });
+}
+
+export async function adminReplyVendorSupportThread(threadId: string, message: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorSupport.createAdminSupportReply(threadId, user.id, message);
+    revalidatePath("/admin/vendors");
+    revalidatePath("/vendor/dashboard/support");
+    revalidatePath("/vendor/dashboard/notifications");
+    return result;
+  });
 }
 
 // --------------------------------------------------------------------------
@@ -255,6 +422,37 @@ export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin
 export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());
 
+// --------------------------------------------------------------------------
+// ADMIN — Phase 26A-2 audit layer (read-mostly; review actions never touch
+// credits, never send WhatsApp, never approve/reject package purchases).
+// --------------------------------------------------------------------------
+export const adminListLeadMatchingRuns = async (limit?: number) =>
+  asAdmin(() => audit.listLeadMatchingRuns(limit));
+export const adminListLeadDeliveryLogs = async (limit?: number) =>
+  asAdmin(() => audit.listLeadDeliveryLogs(limit));
+export const adminListClientNotificationLogs = async (limit?: number) =>
+  asAdmin(() => audit.listClientNotificationLogs(limit));
+export const adminGetLeadMatchingAuditDetails = async (leadId: string) =>
+  asAdmin(() => audit.getLeadMatchingAuditDetails(leadId));
+export const adminListVendorLeadReports = async (limit?: number) =>
+  asAdmin(() => audit.listVendorLeadReports(limit));
+export const adminUpdateVendorLeadReportStatus = async (reportId: string, input: { status: string; adminNotes?: string | null }) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await audit.updateVendorLeadReportStatus(reportId, input, user.id);
+    revalidatePath("/admin/leads");
+    return result;
+  });
+export const adminAddVendorLeadReportComment = async (reportId: string, comment: string, isInternal = false) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await audit.addVendorLeadReportComment(reportId, comment, user.id, isInternal);
+    revalidatePath("/admin/leads");
+    return result;
+  });
+export const adminListPackageOrdersAuditOnly = async (limit?: number) =>
+  asAdmin(() => audit.listPackageOrdersAuditOnly(limit));
+
 export const adminUpdateMarketplaceRuntimeSetting = async (key: string, value: unknown) =>
   asAdmin(async () => {
     const user = await requireSuperadmin();
@@ -286,6 +484,31 @@ export const adminAssignPackage = async (paymentId: string) =>
 /** Admin manually assigns/overrides a lead (can include flagged duplicates). */
 export const adminAssignLead = async (leadId: string, vendorIds: string[], allowDuplicate = false) =>
   asAdmin(() => leads.assignLeadToVendors(leadId, vendorIds, { allowDuplicate, assignmentType: "admin_assigned" }));
+
+// --------------------------------------------------------------------------
+// ADMIN — Phase 26A-2B manual lead-assignment fallback. Reuses the existing
+// safe assign_lead_to_vendors RPC (credit deduction handled there); adds only
+// audit + preview logs. WhatsApp stays preview/log only.
+// --------------------------------------------------------------------------
+export const adminPreviewManualLeadAssignment = async (leadId: string) =>
+  asAdmin(() => manualAssign.getManualAssignmentPreview(leadId));
+
+export const adminListManualAssignmentCandidates = async (leadId: string) =>
+  asAdmin(async () => {
+    const preview = await manualAssign.getManualAssignmentPreview(leadId);
+    if (!preview.ok) return preview;
+    return ok(preview.data.candidates);
+  });
+
+export const adminAssignLeadManually = async (leadId: string, vendorIds: string[]) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await manualAssign.assignLeadManually(leadId, vendorIds, user.id);
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/admin/leads");
+    revalidatePath("/vendor/dashboard/leads");
+    return result;
+  });
 
 /** One-shot: record a manual payment, mark it Paid, and credit the vendor's pack. */
 export const adminCreditVendorNow = async (

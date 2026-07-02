@@ -9,6 +9,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [shareConsent, setShareConsent] = useState(false);
 
   // Phase 14B: cities come only from admin-managed active cities.
   const { cities: activeCities, loading: citiesLoading } = useActiveCities();
@@ -36,6 +37,10 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
       return;
     }
     if (f.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
+    if (!shareConsent) {
+      setError("Please agree to share your enquiry with up to 3 verified vendors.");
+      return;
+    }
     setBusy(true);
     try {
       console.info("[home enquiry form] submitting", {
@@ -45,7 +50,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         has_budget_range: Boolean(f.budget),
         has_requirement: Boolean(f.message),
       });
-      const res = await submitLead({ ...f, source: "Homepage" });
+      const res = await submitLead({ ...f, source: "Homepage", share_consent: shareConsent });
       if (!res.ok) { setError(res.error); return; }
       console.info("[home enquiry form] submission confirmed", {
         lead_id: res.data.id,
@@ -92,6 +97,18 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         <L label="Timeline"><select className="field" value={f.timeline} onChange={(e) => set("timeline", e.target.value)}><option value="" className="bg-navy-deep">Select timeline</option>{TIMELINES.map((t) => <option key={t} className="bg-navy-deep">{t}</option>)}</select></L>
       </div>
       <L label="Project details (optional)"><textarea className="field min-h-[84px]" value={f.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell us about your space…" /></L>
+
+      <label className="mt-5 flex items-start gap-3 font-sans text-xs leading-5 text-muted">
+        <input
+          type="checkbox"
+          checked={shareConsent}
+          onChange={(e) => setShareConsent(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-gold"
+        />
+        <span>
+          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for my selected service.
+        </span>
+      </label>
 
       <button onClick={onSubmit} disabled={busy} className="btn-gold mt-5 w-full">
         {busy ? "Sending…" : "Get Free Quotes"}

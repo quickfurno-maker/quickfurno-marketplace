@@ -3,7 +3,7 @@
 // Admin dashboard metrics, vendor moderation, bad-lead resolution.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
-import { appError, type Result, ok, fail } from "../lib/errors";
+import { appError, type Result, ok, fail, isMissingRelationError } from "../lib/errors";
 import type { AdminDashboardStats } from "../lib/types";
 
 const head = (q: any) => q.select("id", { count: "exact", head: true });
@@ -141,6 +141,17 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const db = adminClient();
     const warnings: string[] = [];
 
+    // A missing relation means an optional table's migration has not been
+    // applied yet. That is expected, not an error, so we log it server-side and
+    // return an empty set WITHOUT pushing a scary admin-facing warning.
+    function noteUnavailable(label: string, error: { code?: string; message?: string }) {
+      if (isMissingRelationError(error)) {
+        console.info(`[admin snapshot] ${label} not available yet (relation missing); using empty set.`, { code: error.code });
+        return;
+      }
+      warnings.push(`${label}: ${error.message}`);
+    }
+
     async function safeSelect<T>(label: string, query: PromiseLike<{ data: T[] | null; error: any }>, fallback?: PromiseLike<{ data: T[] | null; error: any }>) {
       const result = await query;
       if (!result.error) return result.data ?? [];
@@ -151,11 +162,11 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
           warnings.push(`${label}: primary query unavailable; loaded fallback columns.`);
           return fallbackResult.data ?? [];
         }
-        warnings.push(`${label}: ${fallbackResult.error.message}`);
+        noteUnavailable(label, fallbackResult.error);
         return [];
       }
 
-      warnings.push(`${label}: ${result.error.message}`);
+      noteUnavailable(label, result.error);
       return [];
     }
 
@@ -165,6 +176,11 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       packages,
       payments,
       vendorPackages,
+      vendorPackageOrders,
+      vendorProfileChangeRequests,
+      vendorNotifications,
+      vendorSupportThreads,
+      vendorSupportMessages,
       assignments,
       categories,
       cities,
@@ -175,12 +191,21 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       freeVendorInterests,
       leadAssignmentQueue,
       autoAssignmentLogs,
+      leadMatchingRuns,
+      leadDeliveryLogs,
+      clientNotificationLogs,
+      badLeadReportComments,
     ] = await Promise.all([
       safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)").order("created_at", { ascending: false }), db.from("leads").select("*").order("created_at", { ascending: false })),
       safeSelect("vendors", db.from("vendors").select("*").order("created_at", { ascending: false })),
       safeSelect("packages", db.from("packages").select("*").order("lead_count", { ascending: true })),
       safeSelect("payments", db.from("payments").select("*").order("created_at", { ascending: false })),
       safeSelect("vendor_packages", db.from("vendor_packages").select("*").order("purchase_date", { ascending: false })),
+      safeSelect("vendor_package_orders", db.from("vendor_package_orders").select("*").order("created_at", { ascending: false })),
+      safeSelect("vendor_profile_change_requests", db.from("vendor_profile_change_requests").select("*").order("created_at", { ascending: false })),
+      safeSelect("vendor_notifications", db.from("vendor_notifications").select("*").order("created_at", { ascending: false })),
+      safeSelect("vendor_support_threads", db.from("vendor_support_threads").select("*").order("updated_at", { ascending: false })),
+      safeSelect("vendor_support_messages", db.from("vendor_support_messages").select("*").order("created_at", { ascending: true })),
       safeSelect("lead_assignments", db.from("lead_assignments").select("*").order("assigned_at", { ascending: false })),
       safeSelect("service_categories", db.from("service_categories").select("*").order("name", { ascending: true })),
       safeSelect("cities", db.from("cities").select("*").order("name", { ascending: true })),
@@ -191,6 +216,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       safeSelect("free_vendor_profile_interests", db.from("free_vendor_profile_interests").select("*").order("created_at", { ascending: false })),
       safeSelect("lead_assignment_queue", db.from("lead_assignment_queue").select("*").order("created_at", { ascending: false })),
       safeSelect("lead_auto_assignment_logs", db.from("lead_auto_assignment_logs").select("*").order("created_at", { ascending: false })),
+      safeSelect("lead_matching_runs", db.from("lead_matching_runs").select("*").order("created_at", { ascending: false }).limit(200)),
+      safeSelect("lead_delivery_logs", db.from("lead_delivery_logs").select("*").order("created_at", { ascending: false }).limit(300)),
+      safeSelect("client_notification_logs", db.from("client_notification_logs").select("*").order("created_at", { ascending: false }).limit(200)),
+      safeSelect("bad_lead_report_comments", db.from("bad_lead_report_comments").select("*").order("created_at", { ascending: true }).limit(500)),
     ]);
 
     const leadRows = leads;
@@ -198,6 +227,11 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const packageRows = packages;
     const paymentRows = payments;
     const vendorPackageRows = vendorPackages;
+    const vendorPackageOrderRows = vendorPackageOrders;
+    const vendorProfileChangeRequestRows = vendorProfileChangeRequests;
+    const vendorNotificationRows = vendorNotifications;
+    const vendorSupportThreadRows = vendorSupportThreads;
+    const vendorSupportMessageRows = vendorSupportMessages;
     const assignmentRows = assignments;
     const categoryRows = categories;
     const cityRows = cities;
@@ -266,6 +300,11 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       packages: packageRows,
       payments: paymentRows,
       vendorPackages: vendorPackageRows,
+      vendorPackageOrders: vendorPackageOrderRows,
+      vendorProfileChangeRequests: vendorProfileChangeRequestRows,
+      vendorNotifications: vendorNotificationRows,
+      vendorSupportThreads: vendorSupportThreadRows,
+      vendorSupportMessages: vendorSupportMessageRows,
       assignments: assignmentRows,
       categories: categoryRows,
       cities: cityRows,
@@ -276,6 +315,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       freeVendorInterests,
       leadAssignmentQueue,
       autoAssignmentLogs,
+      leadMatchingRuns,
+      leadDeliveryLogs,
+      clientNotificationLogs,
+      badLeadReportComments,
       generatedAt: new Date().toISOString(),
       warnings,
     });
@@ -446,11 +489,12 @@ export async function approveBadLeadReport(reportId: string, decision?: string):
     if (error || !r) throw appError("UNKNOWN");
     if (r.status !== "Pending") return ok(null); // idempotent
 
-    const { error: rpcErr } = await db.rpc("restore_vendor_credit", { p_vendor_id: r.vendor_id });
-    if (rpcErr) throw rpcErr;
-
     await db.from("bad_lead_reports").update({
-      status: "Approved", credit_restored: true, admin_decision: decision ?? "Credit restored.",
+      status: "Approved",
+      credit_restored: false,
+      admin_decision: decision ?? "Approved after admin review. Credit was not refunded automatically.",
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }).eq("id", reportId);
 
     await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", r.lead_assignment_id);
@@ -464,7 +508,12 @@ export async function rejectBadLeadReport(reportId: string, decision?: string): 
   try {
     const { error } = await adminClient()
       .from("bad_lead_reports")
-      .update({ status: "Rejected", admin_decision: decision ?? "Report rejected." })
+      .update({
+        status: "Rejected",
+        admin_decision: decision ?? "Report rejected.",
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", reportId);
     if (error) throw error;
     return ok(null);

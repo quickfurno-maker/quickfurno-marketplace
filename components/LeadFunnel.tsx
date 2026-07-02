@@ -73,7 +73,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
     }
     if (form.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
     if (!consent) {
-      setError("Please accept sharing your details with up to 3 verified Teams to continue.");
+      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
       return;
     }
     setBusy(true);
@@ -97,10 +97,8 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         is_duplicate: res.data.is_duplicate,
       });
       setLeadId(res.data.id);
-      const elig = await fetchEligibleVendors(res.data.id);
-      if (!elig.ok) { setError(elig.error); return; }
-      setVendors(elig.data);
-      setStep("pick");
+      setAssignedCount(0);
+      setStep("done");
     } catch (err) {
       console.error("[lead funnel] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
@@ -195,8 +193,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
               className="mt-0.5 h-4 w-4 accent-gold"
             />
             <span>
-              I agree to share my details with up to 3 verified Teams so they can contact me about
-              my requirement. See our{" "}
+              I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for my selected service. See our{" "}
               <a href="/privacy" className="text-gold underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
               and{" "}
               <a href="/terms" className="text-gold underline" target="_blank" rel="noopener noreferrer">Terms</a>.
@@ -259,9 +256,9 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       {step === "done" && (
         <div className="mt-6 panel p-8 text-center">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-gold/50 bg-gold/[0.15] text-gold">✓</div>
-          <h2 className="mt-5 text-2xl text-ivory">You’re matched with {assignedCount} {assignedCount === 1 ? "studio" : "studios"}</h2>
+          <h2 className="mt-5 text-2xl text-ivory">Your enquiry is submitted</h2>
           <p className="mx-auto mt-3 max-w-md font-sans text-sm text-muted">
-            They’ll reach out on WhatsApp shortly. Keep your phone handy — and feel free to ask each for a detailed quote.
+            QuickFurno will share your requirement with up to 3 eligible verified vendors. WhatsApp remains preview-only in this phase.
           </p>
           <a href="/" className="btn-ghost mt-6">Back to home</a>
         </div>

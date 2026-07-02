@@ -264,6 +264,9 @@ function mapToPublicVendor(
   const rating = Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : 4.2;
 
   const startingPrice = asText(row.starting_price);
+  const publicDescription = asText(row.public_description);
+  const serviceAreaSummary = asText(row.public_service_area_summary);
+  const businessHours = asText(row.public_business_hours);
   const experience = asText(row.experience) ?? asText(row.years_experience) ?? "Verified Team";
   // Real, canonical public service labels the vendor actually provides. Legacy
   // service tags ("Modular Kitchen", "Carpentry", …) are folded to their public
@@ -286,12 +289,15 @@ function mapToPublicVendor(
     activePaidPlan,
     verified: normalizeStatus(row.status) === "approved",
     status: "active",
-    description: `Verified local QuickFurno ${category.toLowerCase()} for home-service requirements in ${city}.`,
+    description: publicDescription ?? `Verified local QuickFurno ${category.toLowerCase()} for home-service requirements in ${city}.`,
     imageTone: IMAGE_TONE_BY_CATEGORY[category] ?? "warm-suite",
     // Only expose LOCAL image paths. External/storage URLs are dropped so
     // next/image never renders a host that isn't whitelisted (would crash the
     // profile header); the card/header fall back to category imagery instead.
     imageUrl: localImageUrl(row.profile_image_url),
+    coverImageUrl: localImageUrl(row.cover_image_url),
+    businessHours,
+    serviceAreaSummary,
     source: "supabase",
     serviceCategories,
     portfolioImages: realPortfolioImages(row),

@@ -21,7 +21,7 @@ export function LoginForm() {
     const isAdmin = profile?.role === "admin";
 
     router.refresh();
-    router.push(isAdmin ? "/admin/dashboard" : "/vendor");
+    router.push(isAdmin ? "/admin/dashboard" : "/vendor/dashboard");
   }
 
   return (

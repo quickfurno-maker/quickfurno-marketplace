@@ -81,6 +81,78 @@ export type Payment = {
   admin_notes?: string | null;
 };
 
+export type VendorPackageOrder = {
+  id: string;
+  vendor_id?: string | null;
+  package_id?: string | null;
+  package_name?: string | null;
+  package_price?: number | null;
+  package_currency?: string | null;
+  credits_included?: number | null;
+  validity_days?: number | null;
+  order_status?: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  payment_provider?: string | null;
+  provider_order_id?: string | null;
+  provider_payment_id?: string | null;
+  paid_at?: string | null;
+  activated_at?: string | null;
+  activation_status?: string | null;
+  failure_reason?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorProfileChangeRequest = {
+  id: string;
+  vendor_id?: string | null;
+  requested_by?: string | null;
+  request_type?: string | null;
+  proposed_changes?: Record<string, unknown> | null;
+  current_snapshot?: Record<string, unknown> | null;
+  status?: "pending" | "approved" | "rejected" | "cancelled" | string | null;
+  admin_notes?: string | null;
+  rejection_reason?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorNotification = {
+  id: string;
+  vendor_id?: string | null;
+  title?: string | null;
+  message?: string | null;
+  type?: string | null;
+  priority?: string | null;
+  is_read?: boolean | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorSupportThread = {
+  id: string;
+  vendor_id?: string | null;
+  subject?: string | null;
+  topic?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorSupportMessage = {
+  id: string;
+  thread_id?: string | null;
+  sender_type?: string | null;
+  sender_id?: string | null;
+  message?: string | null;
+  created_at?: string | null;
+};
+
 export type Assignment = {
   id: string;
   lead_id?: string | null;
@@ -126,9 +198,102 @@ export type BadReport = {
   id: string;
   created_at?: string | null;
   reason?: string | null;
+  report_type?: string | null;
+  report_reason?: string | null;
+  vendor_comment?: string | null;
   status?: string | null;
   description?: string | null;
   vendor_id?: string | null;
+  lead_assignment_id?: string | null;
+  admin_decision?: string | null;
+  admin_notes?: string | null;
+  credit_restored?: boolean | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type BadLeadReportComment = {
+  id: string;
+  report_id?: string | null;
+  sender_type?: string | null;
+  sender_id?: string | null;
+  comment?: string | null;
+  is_internal?: boolean | null;
+  created_at?: string | null;
+};
+
+// Phase 26A-2B manual lead-assignment candidate + preview (client-safe view
+// mirrors services/manualLeadAssignmentService.ts).
+export type ManualCandidateVendorView = {
+  id: string;
+  business_name: string | null;
+  city: string | null;
+  service_categories: string[];
+  areas_covered: string[];
+  covers_full_city: boolean;
+  status: string | null;
+  paid_status: string | null;
+  package_status: string | null;
+  remaining_credits: number;
+  visibility_type: string;
+  eligible: boolean;
+  already_assigned: boolean;
+  reasons: string[];
+};
+
+export type ManualPreviewView = {
+  lead: Record<string, unknown> | null;
+  existing_assignment_count: number;
+  auto_matching_status: string | null;
+  max_vendors: number;
+  candidates: ManualCandidateVendorView[];
+};
+
+// Phase 26A audit rows (lead_matching_runs / lead_delivery_logs /
+// client_notification_logs). Loosely typed: snapshots carry jsonb payloads.
+export type LeadMatchingRun = {
+  id: string;
+  lead_id?: string | null;
+  run_status?: string | null;
+  consent_confirmed?: boolean | null;
+  max_vendors?: number | null;
+  eligible_vendor_count?: number | null;
+  selected_vendor_ids?: string[] | null;
+  assigned_vendor_ids?: string[] | null;
+  failure_reason?: string | null;
+  matching_snapshot?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type LeadDeliveryLog = {
+  id: string;
+  lead_id?: string | null;
+  vendor_id?: string | null;
+  assignment_id?: string | null;
+  delivery_channel?: string | null;
+  delivery_status?: string | null;
+  contact_shared?: boolean | null;
+  credit_deducted?: boolean | null;
+  credit_log_id?: string | null;
+  failure_reason?: string | null;
+  whatsapp_preview_message?: string | null;
+  whatsapp_status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type ClientNotificationLog = {
+  id: string;
+  lead_id?: string | null;
+  notification_type?: string | null;
+  channel?: string | null;
+  status?: string | null;
+  message?: string | null;
+  vendor_snapshot?: Array<Record<string, unknown>> | null;
+  whatsapp_status?: string | null;
+  created_at?: string | null;
 };
 
 export type Setting = {
@@ -214,6 +379,11 @@ export type Snapshot = {
   packages: PackageRow[];
   payments: Payment[];
   vendorPackages: any[];
+  vendorPackageOrders: VendorPackageOrder[];
+  vendorProfileChangeRequests: VendorProfileChangeRequest[];
+  vendorNotifications: VendorNotification[];
+  vendorSupportThreads: VendorSupportThread[];
+  vendorSupportMessages: VendorSupportMessage[];
   assignments: Assignment[];
   categories: Category[];
   cities: City[];
@@ -224,6 +394,10 @@ export type Snapshot = {
   freeVendorInterests?: FreeVendorProfileInterest[];
   leadAssignmentQueue?: LeadAssignmentQueueRow[];
   autoAssignmentLogs?: LeadAutoAssignmentLog[];
+  leadMatchingRuns?: LeadMatchingRun[];
+  leadDeliveryLogs?: LeadDeliveryLog[];
+  clientNotificationLogs?: ClientNotificationLog[];
+  badLeadReportComments?: BadLeadReportComment[];
   generatedAt?: string;
   warnings?: string[];
 };
@@ -236,6 +410,11 @@ export function emptySnapshot(): Snapshot {
     packages: [],
     payments: [],
     vendorPackages: [],
+    vendorPackageOrders: [],
+    vendorProfileChangeRequests: [],
+    vendorNotifications: [],
+    vendorSupportThreads: [],
+    vendorSupportMessages: [],
     assignments: [],
     categories: [],
     cities: [],
@@ -246,6 +425,10 @@ export function emptySnapshot(): Snapshot {
     freeVendorInterests: [],
     leadAssignmentQueue: [],
     autoAssignmentLogs: [],
+    leadMatchingRuns: [],
+    leadDeliveryLogs: [],
+    clientNotificationLogs: [],
+    badLeadReportComments: [],
     warnings: [],
   };
 }

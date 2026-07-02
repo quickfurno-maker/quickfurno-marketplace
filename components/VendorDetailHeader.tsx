@@ -35,7 +35,7 @@ export function VendorDetailHeader({ vendor }: { vendor: Vendor }) {
       <div className="vendor-detail-gallery">
         <div className="vendor-detail-main-img">
           <Image
-            src={vendor.imageUrl ?? categoryImage(vendor.category)}
+            src={vendor.coverImageUrl ?? vendor.imageUrl ?? categoryImage(vendor.category)}
             alt={`${vendor.businessName} project preview`}
             fill
             sizes="(max-width: 760px) 100vw, 460px"

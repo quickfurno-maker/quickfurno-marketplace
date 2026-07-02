@@ -10,7 +10,7 @@ const STATUSES: VendorLeadStatus[] = ["New", "Contacted", "Site Visit Scheduled"
 
 type Lead = {
   id: string; assigned_at: string; assignment_type: string; vendor_status: VendorLeadStatus; is_bad_lead_reported: boolean;
-  lead: { id: string; name: string; phone: string; city: string; area: string | null; service_required: string; budget: string | null; property_type: string | null; timeline: string | null; message: string | null; created_at: string } | null;
+  lead: { id: string; name: string; phone?: string | null; city: string; area: string | null; service_required: string; budget: string | null; property_type: string | null; timeline: string | null; message: string | null; created_at: string } | null;
 };
 
 export function VendorDashboard({
@@ -22,6 +22,7 @@ export function VendorDashboard({
 
   const isVerified = vendor.verification_status === "Verified" || vendor.status === "Approved";
   const isPaid = (vendor.paid_status ?? "Unpaid") === "Paid";
+  const canViewClientContact = vendor.status === "Approved" && vendor.is_active !== false && isPaid;
   const verificationLabel = vendor.verification_status || vendor.status || "Pending";
   const paymentLabel = vendor.paid_status || "Unpaid";
   const serviceAreas = (vendor.areas_covered ?? []).filter(Boolean);
@@ -50,9 +51,13 @@ export function VendorDashboard({
     router.refresh();
   }
 
-  async function report(assignmentId: string, reason: string) {
+  async function report(assignmentId: string, reportType: string) {
+    const reason = window.prompt("Reason for reporting this lead");
+    if (!reason?.trim()) return alert("Reason is required.");
+    const comment = window.prompt("Comment for QuickFurno admin review");
+    if (!comment?.trim()) return alert("Comment is required.");
     setBusyId(assignmentId);
-    const res = await vendorReportBadLead(vendor.id, assignmentId, reason);
+    const res = await vendorReportBadLead(vendor.id, assignmentId, reportType, reason, comment);
     setBusyId(null); setReporting(null);
     if (!res.ok) alert(res.error); else router.refresh();
   }
@@ -142,15 +147,11 @@ export function VendorDashboard({
                       {l.message ? <p className="qf-vd-lead-msg">“{l.message}”</p> : null}
 
                       <div className="qf-vd-lead-actions">
-                        <a className="qf-vd-btn qf-vd-btn--primary" href={`tel:${l.phone}`}>Call client</a>
-                        <a
-                          className="qf-vd-btn qf-vd-btn--ghost"
-                          href={whatsappLink(`Hi ${l.name}, this is ${vendor.business_name} from QuickFurno regarding your ${l.service_required} requirement.`)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          WhatsApp
-                        </a>
+                        {canViewClientContact && l.phone ? (
+                          <a className="qf-vd-btn qf-vd-btn--primary" href={`tel:${l.phone}`}>Call client</a>
+                        ) : (
+                          <span className="qf-vd-note">Client contact hidden until approved paid access is active.</span>
+                        )}
                       </div>
 
                       <div className="qf-vd-lead-foot">

@@ -8,6 +8,7 @@ import { appError, fromPgError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
+import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 
 function firstText(...values: Array<string | undefined>): string {
@@ -136,6 +137,17 @@ export async function createLead(input: CreateLeadInput): Promise<Result<{ id: s
       isDuplicate: Boolean(data.is_duplicate),
       formSource: source,
     });
+
+    if (input.share_consent) {
+      const matching = await runAutoLeadMatchingForLead(data.id);
+      if (!matching.ok) {
+        console.warn("[lead matching] auto matching failed without blocking lead submission", {
+          lead_id: data.id,
+          code: matching.code,
+          error: matching.error,
+        });
+      }
+    }
 
     return ok({ id: data.id, is_duplicate: data.is_duplicate });
   } catch (e) {

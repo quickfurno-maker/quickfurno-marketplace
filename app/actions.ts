@@ -13,6 +13,9 @@ import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
 import * as vendorPackageOrders from "../services/vendorPackageOrderService";
+import * as vendorProfileChanges from "../services/vendorProfileChangeService";
+import * as vendorNotifications from "../services/vendorNotificationService";
+import * as vendorSupport from "../services/vendorSupportService";
 import * as admin from "../services/adminService";
 import * as aos from "../services/aosService";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
@@ -213,14 +216,47 @@ export async function vendorUpdateLeadStatus(
   vendorId: string, assignmentId: string, status: VendorLeadStatus, notes?: string
 ) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
-  return vendors.updateVendorLeadStatus(assignmentId, status, notes);
+  return vendors.updateVendorLeadStatus(vendorId, assignmentId, status, notes);
 }
 
 export async function vendorReportBadLead(
-  vendorId: string, assignmentId: string, reason: string, description?: string
+  vendorId: string, assignmentId: string, reportType: string, reportReason?: string, vendorComment?: string
 ) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
-  return vendors.reportBadLead(assignmentId, reason, description);
+  const reason = reportReason ?? reportType;
+  const comment = vendorComment ?? "";
+  return vendors.reportBadLead(vendorId, assignmentId, reportType, reason, comment);
+}
+
+export async function vendorUpdateLeadStatusFromForm(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const status = String(formData.get("status") ?? "") as VendorLeadStatus;
+  const result = await vendorUpdateLeadStatus(me.data.id, assignmentId, status);
+
+  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard");
+  if (!result.ok) redirect(`/vendor/dashboard/leads?lead=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/leads?lead=status-updated");
+}
+
+export async function vendorReportBadLeadFromForm(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const reportType = String(formData.get("report_type") ?? "");
+  const reportReason = String(formData.get("report_reason") ?? "");
+  const vendorComment = String(formData.get("vendor_comment") ?? "");
+  const result = await vendorReportBadLead(me.data.id, assignmentId, reportType, reportReason, vendorComment);
+
+  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard");
+  revalidatePath("/admin/leads");
+  if (!result.ok) redirect(`/vendor/dashboard/leads?lead=report-failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/leads?lead=bad-lead-submitted");
 }
 
 export async function vendorCreatePackageOrder(formData: FormData) {
@@ -235,6 +271,118 @@ export async function vendorCreatePackageOrder(formData: FormData) {
 
   if (!result.ok) redirect(`/vendor/dashboard/package?order=failed&code=${encodeURIComponent(result.code)}`);
   redirect("/vendor/dashboard/package?order=created");
+}
+
+export async function vendorSubmitProfileChangeRequest(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
+
+  const u = await currentUser();
+  const result = await vendorProfileChanges.createVendorProfileChangeRequest(me.data.id, u?.id ?? null, {
+    public_business_name: String(formData.get("public_business_name") ?? ""),
+    public_description: String(formData.get("public_description") ?? ""),
+    public_category: String(formData.get("public_category") ?? ""),
+    services_offered: String(formData.get("services_offered") ?? "").split(/\r?\n|,/),
+    starting_price: String(formData.get("starting_price") ?? ""),
+    business_hours: String(formData.get("business_hours") ?? ""),
+    service_area_summary: String(formData.get("service_area_summary") ?? ""),
+    profile_image_url: String(formData.get("profile_image_url") ?? ""),
+    cover_image_url: String(formData.get("cover_image_url") ?? ""),
+    portfolio_image_urls: String(formData.get("portfolio_image_urls") ?? "").split(/\r?\n|,/),
+  });
+
+  revalidatePath("/vendor/dashboard/profile");
+  if (!result.ok) redirect(`/vendor/dashboard/profile?request=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/profile?request=submitted");
+}
+
+export async function vendorMarkNotificationRead(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/notifications");
+
+  const notificationId = String(formData.get("notificationId") ?? "");
+  const result = await vendorNotifications.markVendorNotificationRead(me.data.id, notificationId);
+
+  revalidatePath("/vendor/dashboard/notifications");
+  if (!result.ok) redirect(`/vendor/dashboard/notifications?notice=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/notifications?notice=read");
+}
+
+export async function vendorMarkAllNotificationsRead() {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/notifications");
+
+  const result = await vendorNotifications.markAllVendorNotificationsRead(me.data.id);
+
+  revalidatePath("/vendor/dashboard/notifications");
+  if (!result.ok) redirect(`/vendor/dashboard/notifications?notice=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/notifications?notice=all-read");
+}
+
+export async function vendorCreateSupportThread(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/support?support=no-vendor");
+
+  const u = await currentUser();
+  const result = await vendorSupport.createVendorSupportThread(me.data.id, u?.id ?? null, {
+    subject: String(formData.get("subject") ?? ""),
+    topic: String(formData.get("topic") ?? "general"),
+    message: String(formData.get("message") ?? ""),
+  });
+
+  revalidatePath("/vendor/dashboard/support");
+  revalidatePath("/admin/vendors");
+  if (!result.ok) redirect(`/vendor/dashboard/support?support=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/support?support=created");
+}
+
+export async function vendorSendSupportMessage(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/support?support=no-vendor");
+
+  const u = await currentUser();
+  const threadId = String(formData.get("threadId") ?? "");
+  const result = await vendorSupport.createVendorSupportMessage(
+    me.data.id,
+    threadId,
+    u?.id ?? null,
+    String(formData.get("message") ?? ""),
+  );
+
+  revalidatePath("/vendor/dashboard/support");
+  revalidatePath("/admin/vendors");
+  if (!result.ok) redirect(`/vendor/dashboard/support?support=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/support?support=sent");
+}
+
+export async function adminApproveVendorProfileChangeRequest(requestId: string, adminNotes?: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorProfileChanges.approveVendorProfileChangeRequest(requestId, user.id, adminNotes);
+    revalidatePath("/admin/vendors");
+    revalidatePath("/vendors");
+    return result;
+  });
+}
+
+export async function adminRejectVendorProfileChangeRequest(requestId: string, rejectionReason: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorProfileChanges.rejectVendorProfileChangeRequest(requestId, user.id, rejectionReason);
+    revalidatePath("/admin/vendors");
+    return result;
+  });
+}
+
+export async function adminReplyVendorSupportThread(threadId: string, message: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorSupport.createAdminSupportReply(threadId, user.id, message);
+    revalidatePath("/admin/vendors");
+    revalidatePath("/vendor/dashboard/support");
+    revalidatePath("/vendor/dashboard/notifications");
+    return result;
+  });
 }
 
 // --------------------------------------------------------------------------

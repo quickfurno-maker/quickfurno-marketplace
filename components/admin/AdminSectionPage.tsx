@@ -3,6 +3,11 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  adminApproveVendorProfileChangeRequest,
+  adminRejectVendorProfileChangeRequest,
+  adminReplyVendorSupportThread,
+  adminApproveBadLead,
+  adminRejectBadLead,
   adminSetCategoryActive,
   adminSetCityActive,
   adminSetPackageActive,
@@ -36,7 +41,7 @@ import {
   Toolbar,
 } from "./AdminPrimitives";
 import { getAdminSectionByKey, type AdminSectionKey } from "./adminConfig";
-import { emptySnapshot, type Category, type City, type Lead, type MarketplaceRuntimeSetting, type PackageRow, type Snapshot, type Vendor } from "./adminTypes";
+import { emptySnapshot, type Category, type City, type Lead, type MarketplaceRuntimeSetting, type PackageRow, type Snapshot, type Vendor, type VendorProfileChangeRequest, type VendorSupportMessage, type VendorSupportThread } from "./adminTypes";
 import {
   assignmentStatus,
   formatDate,
@@ -225,6 +230,10 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
 
   const hotLeads = data.leads.filter(isHotLead);
   const unassignedLeads = data.leads.filter(isUnassignedLead);
+  const pendingBadReports = useMemo(
+    () => data.badReports.filter((report) => String(report.status ?? "").toLowerCase() === "pending"),
+    [data.badReports],
+  );
   const leads = useMemo(() => data.leads.filter((lead) => {
     const leadCategory = lead.service_required || lead.category || "";
     const leadSource = lead.source || "Website";
@@ -236,6 +245,18 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
       && (source === "All" || leadSource === source)
       && (priority === "All" || leadPriorityValue === priority);
   }), [data.leads, query, city, category, status, source, priority]);
+
+  function reviewBadReport(reportId: string, decision: "approve" | "reject") {
+    const note = window.prompt(decision === "approve" ? "Approval note for bad lead report" : "Rejection reason for bad lead report");
+    if (!note?.trim()) {
+      notify("Admin note is required.", "error");
+      return;
+    }
+    runAction(
+      decision === "approve" ? "Bad lead report approval" : "Bad lead report rejection",
+      () => decision === "approve" ? adminApproveBadLead(reportId, note) : adminRejectBadLead(reportId, note),
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -261,6 +282,32 @@ function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify: (messa
         }
         action={<SecondaryButton onClick={() => notify("CSV export placeholder ready.")}>Export CSV</SecondaryButton>}
       />
+
+      <SectionCard
+        title="Bad Lead Reports"
+        description="Admin review queue. Approval records the decision only; credit is not refunded automatically."
+      >
+        <DataTable
+          rows={pendingBadReports}
+          emptyTitle="No pending bad-lead reports"
+          emptyMessage="Vendor bad-lead reports that require admin review will appear here."
+          columns={[
+            { header: "Vendor", cell: (report) => <Strong title={vendorName(data.vendors, report.vendor_id)} subtitle={formatDate(report.created_at)} /> },
+            { header: "Type", cell: (report) => <StatusBadge value={report.report_type || report.reason || "Not set"} tone="amber" /> },
+            { header: "Reason", cell: (report) => <Strong title={report.report_reason || report.reason || "Not set"} subtitle={report.vendor_comment || report.description || "No comment"} /> },
+            { header: "Credit", cell: (report) => <StatusBadge value={report.credit_restored ? "Restored" : "No auto refund"} tone={report.credit_restored ? "emerald" : "slate"} /> },
+            {
+              header: "Actions",
+              cell: (report) => (
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton onClick={() => reviewBadReport(report.id, "approve")}>Approve</SecondaryButton>
+                  <SecondaryButton onClick={() => reviewBadReport(report.id, "reject")}>Reject</SecondaryButton>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </SectionCard>
 
       <DataTable
         rows={leads}
@@ -342,6 +389,24 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
   }), [data.vendors, assignmentEligibilityById, query, city, category, status, packageStatus, eligibility]);
 
   const eligibleCount = useMemo(() => [...assignmentEligibilityById.values()].filter((e) => e.eligible).length, [assignmentEligibilityById]);
+  const profileChangeRequests = useMemo(
+    () => (data.vendorProfileChangeRequests ?? []).filter((request) => request.status === "pending"),
+    [data.vendorProfileChangeRequests],
+  );
+  const supportThreads = useMemo(
+    () => (data.vendorSupportThreads ?? []).filter((thread) => (thread.status ?? "open") !== "closed"),
+    [data.vendorSupportThreads],
+  );
+  const supportMessagesByThread = useMemo(() => {
+    const map = new Map<string, VendorSupportMessage[]>();
+    (data.vendorSupportMessages ?? []).forEach((message) => {
+      if (!message.thread_id) return;
+      const current = map.get(message.thread_id) ?? [];
+      current.push(message);
+      map.set(message.thread_id, current);
+    });
+    return map;
+  }, [data.vendorSupportMessages]);
 
   // Mutations go through the Phase 13B admin APIs, then refresh the snapshot.
   const mutate = useCallback(async (vendorId: string, path: string, body: Record<string, unknown>, successMsg: string) => {
@@ -366,6 +431,52 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
     } finally {
       setBusyId(null);
     }
+  }, [notify, router]);
+
+  const approveProfileRequest = useCallback(async (requestId: string) => {
+    setBusyId(requestId);
+    const result = await adminApproveVendorProfileChangeRequest(requestId);
+    setBusyId(null);
+    if (!result.ok) {
+      notify(result.error ?? "Profile request approval failed.", "error");
+      return;
+    }
+    notify("Profile changes approved.", "success");
+    router.refresh();
+  }, [notify, router]);
+
+  const rejectProfileRequest = useCallback(async (requestId: string) => {
+    const reason = window.prompt("Rejection reason for the vendor");
+    if (!reason?.trim()) {
+      notify("Rejection reason is required.", "error");
+      return;
+    }
+    setBusyId(requestId);
+    const result = await adminRejectVendorProfileChangeRequest(requestId, reason);
+    setBusyId(null);
+    if (!result.ok) {
+      notify(result.error ?? "Profile request rejection failed.", "error");
+      return;
+    }
+    notify("Profile changes rejected.", "success");
+    router.refresh();
+  }, [notify, router]);
+
+  const replySupportThread = useCallback(async (threadId: string) => {
+    const message = window.prompt("Reply to vendor support thread");
+    if (!message?.trim()) {
+      notify("Reply message is required.", "error");
+      return;
+    }
+    setBusyId(threadId);
+    const result = await adminReplyVendorSupportThread(threadId, message);
+    setBusyId(null);
+    if (!result.ok) {
+      notify(result.error ?? "Support reply failed.", "error");
+      return;
+    }
+    notify("Support reply sent.", "success");
+    router.refresh();
   }, [notify, router]);
 
   return (
@@ -422,6 +533,62 @@ function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: strin
         }
         action={<SecondaryButton onClick={() => notify("Vendor export placeholder ready.")}>Export Vendors</SecondaryButton>}
       />
+
+      <SectionCard
+        title="Profile Change Requests"
+        description="Review vendor-submitted public profile changes. Approval applies only safe public fields."
+      >
+        <DataTable
+          rows={profileChangeRequests}
+          emptyTitle="No pending profile change requests"
+          emptyMessage="Vendor profile edits that need approval will appear here."
+          columns={[
+            { header: "Vendor", cell: (request) => <Strong title={vendorName(data.vendors, request.vendor_id)} subtitle={formatDate(request.created_at)} /> },
+            { header: "Current", cell: (request) => <ProfileChangeSnapshot value={request.current_snapshot} /> },
+            { header: "Proposed", cell: (request) => <ProfileChangeSnapshot value={request.proposed_changes} /> },
+            { header: "Status", cell: (request) => <StatusBadge value={request.status || "pending"} tone="amber" /> },
+            {
+              header: "Actions",
+              cell: (request) => (
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton onClick={() => void approveProfileRequest(request.id)}>{busyId === request.id ? "Working..." : "Approve"}</SecondaryButton>
+                  <SecondaryButton onClick={() => void rejectProfileRequest(request.id)}>Reject</SecondaryButton>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard
+        title="Vendor Support Inbox"
+        description="View vendor support threads and reply. Replies create a vendor dashboard notification."
+      >
+        <DataTable
+          rows={supportThreads}
+          emptyTitle="No active support threads"
+          emptyMessage="Vendor support threads will appear here after vendors create them."
+          columns={[
+            { header: "Vendor", cell: (thread) => <Strong title={vendorName(data.vendors, thread.vendor_id)} subtitle={formatDate(thread.updated_at)} /> },
+            { header: "Subject", cell: (thread) => <Strong title={thread.subject || "Support thread"} subtitle={thread.topic || "general"} /> },
+            { header: "Status", cell: (thread) => <StatusBadge value={thread.status || "open"} tone={thread.status === "admin_replied" ? "emerald" : "amber"} /> },
+            {
+              header: "Conversation",
+              cell: (thread) => (
+                <SupportThreadMessages messages={supportMessagesByThread.get(thread.id) ?? []} />
+              ),
+            },
+            {
+              header: "Actions",
+              cell: (thread) => (
+                <SecondaryButton onClick={() => void replySupportThread(thread.id)}>
+                  {busyId === thread.id ? "Sending..." : "Reply"}
+                </SecondaryButton>
+              ),
+            },
+          ]}
+        />
+      </SectionCard>
 
       <DataTable
         rows={vendors}
@@ -1835,4 +2002,49 @@ function Strong({ title, subtitle }: { title: string; subtitle?: string }) {
       {subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}
     </div>
   );
+}
+
+function SupportThreadMessages({ messages }: { messages: VendorSupportMessage[] }) {
+  const visible = messages.slice(-3);
+  if (!visible.length) return <span className="text-xs text-slate-500">No messages yet</span>;
+  return (
+    <div className="grid min-w-72 gap-2 text-xs text-slate-600">
+      {visible.map((message) => (
+        <div key={message.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <p className="font-semibold text-slate-800">
+            {message.sender_type === "admin" ? "Admin" : "Vendor"} - {formatDate(message.created_at)}
+          </p>
+          <p className="mt-1 line-clamp-3">{message.message || "No message"}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProfileChangeSnapshot({ value }: { value?: Record<string, unknown> | null }) {
+  const entries = Object.entries(value ?? {}).slice(0, 6);
+  if (!entries.length) return <span className="text-xs text-slate-500">No values</span>;
+  return (
+    <div className="grid min-w-64 gap-1 text-xs text-slate-600">
+      {entries.map(([key, item]) => (
+        <p key={key} className="line-clamp-2">
+          <span className="font-semibold text-slate-800">{profileChangeLabel(key)}:</span>{" "}
+          {profileChangeValue(item)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function profileChangeLabel(key: string) {
+  return key
+    .replace(/^public_/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function profileChangeValue(value: unknown) {
+  if (Array.isArray(value)) return value.join(", ");
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return String(value ?? "Not set");
 }

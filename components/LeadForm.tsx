@@ -34,6 +34,7 @@ const initialState: LeadFormState = {
 
 export function LeadForm({ compact = false }: { compact?: boolean }) {
   const [form, setForm] = useState<LeadFormState>(initialState);
+  const [shareConsent, setShareConsent] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +59,10 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       setError("Please enter a valid 10 digit phone number.");
       return;
     }
+    if (!shareConsent) {
+      setError("Please agree to share your enquiry with up to 3 verified vendors.");
+      return;
+    }
 
     const payload = {
       name: form.name.trim(),
@@ -67,6 +72,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       budget_range: form.budgetRange,
       requirement: form.requirement.trim() || undefined,
       source: compact ? "Homepage compact lead form" : "Homepage lead form",
+      share_consent: shareConsent,
     };
 
     console.info("[lead form] submitting", {
@@ -92,6 +98,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       });
       setSuccess("Thank you. QuickFurno will match you with 3 verified vendors shortly.");
       setForm(initialState);
+      setShareConsent(false);
     } catch (err) {
       console.error("[lead form] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
@@ -192,6 +199,17 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
           />
         </label>
       </div>
+
+      <label className="form-consent">
+        <input
+          type="checkbox"
+          checked={shareConsent}
+          onChange={(event) => setShareConsent(event.target.checked)}
+        />
+        <span>
+          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for my selected service.
+        </span>
+      </label>
 
       <button className="btn btn-primary form-submit" type="submit" disabled={submitting}>
         {submitting ? "Matching vendors..." : "Get 3 Verified Quotes"}

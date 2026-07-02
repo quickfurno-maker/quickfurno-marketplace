@@ -166,6 +166,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       payments,
       vendorPackages,
       vendorPackageOrders,
+      vendorProfileChangeRequests,
+      vendorNotifications,
+      vendorSupportThreads,
+      vendorSupportMessages,
       assignments,
       categories,
       cities,
@@ -183,6 +187,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       safeSelect("payments", db.from("payments").select("*").order("created_at", { ascending: false })),
       safeSelect("vendor_packages", db.from("vendor_packages").select("*").order("purchase_date", { ascending: false })),
       safeSelect("vendor_package_orders", db.from("vendor_package_orders").select("*").order("created_at", { ascending: false })),
+      safeSelect("vendor_profile_change_requests", db.from("vendor_profile_change_requests").select("*").order("created_at", { ascending: false })),
+      safeSelect("vendor_notifications", db.from("vendor_notifications").select("*").order("created_at", { ascending: false })),
+      safeSelect("vendor_support_threads", db.from("vendor_support_threads").select("*").order("updated_at", { ascending: false })),
+      safeSelect("vendor_support_messages", db.from("vendor_support_messages").select("*").order("created_at", { ascending: true })),
       safeSelect("lead_assignments", db.from("lead_assignments").select("*").order("assigned_at", { ascending: false })),
       safeSelect("service_categories", db.from("service_categories").select("*").order("name", { ascending: true })),
       safeSelect("cities", db.from("cities").select("*").order("name", { ascending: true })),
@@ -201,6 +209,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const paymentRows = payments;
     const vendorPackageRows = vendorPackages;
     const vendorPackageOrderRows = vendorPackageOrders;
+    const vendorProfileChangeRequestRows = vendorProfileChangeRequests;
+    const vendorNotificationRows = vendorNotifications;
+    const vendorSupportThreadRows = vendorSupportThreads;
+    const vendorSupportMessageRows = vendorSupportMessages;
     const assignmentRows = assignments;
     const categoryRows = categories;
     const cityRows = cities;
@@ -270,6 +282,10 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       payments: paymentRows,
       vendorPackages: vendorPackageRows,
       vendorPackageOrders: vendorPackageOrderRows,
+      vendorProfileChangeRequests: vendorProfileChangeRequestRows,
+      vendorNotifications: vendorNotificationRows,
+      vendorSupportThreads: vendorSupportThreadRows,
+      vendorSupportMessages: vendorSupportMessageRows,
       assignments: assignmentRows,
       categories: categoryRows,
       cities: cityRows,
@@ -450,11 +466,12 @@ export async function approveBadLeadReport(reportId: string, decision?: string):
     if (error || !r) throw appError("UNKNOWN");
     if (r.status !== "Pending") return ok(null); // idempotent
 
-    const { error: rpcErr } = await db.rpc("restore_vendor_credit", { p_vendor_id: r.vendor_id });
-    if (rpcErr) throw rpcErr;
-
     await db.from("bad_lead_reports").update({
-      status: "Approved", credit_restored: true, admin_decision: decision ?? "Credit restored.",
+      status: "Approved",
+      credit_restored: false,
+      admin_decision: decision ?? "Approved after admin review. Credit was not refunded automatically.",
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }).eq("id", reportId);
 
     await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", r.lead_assignment_id);
@@ -468,7 +485,12 @@ export async function rejectBadLeadReport(reportId: string, decision?: string): 
   try {
     const { error } = await adminClient()
       .from("bad_lead_reports")
-      .update({ status: "Rejected", admin_decision: decision ?? "Report rejected." })
+      .update({
+        status: "Rejected",
+        admin_decision: decision ?? "Report rejected.",
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", reportId);
     if (error) throw error;
     return ok(null);

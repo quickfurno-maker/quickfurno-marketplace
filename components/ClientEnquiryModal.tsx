@@ -472,7 +472,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         if (!form.whatsappSame && !isPhoneValid(form.whatsapp))
           return "Enter a valid 10-digit WhatsApp number.";
         if (!form.shareConsent)
-          return "Please accept sharing your details with up to 3 verified Teams to continue.";
+          return "Please accept sharing your details with up to 3 verified vendors to continue.";
         return null;
       default:
         return null;
@@ -591,7 +591,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
 
     if (!form.shareConsent) {
-      setError("Please accept sharing your details with up to 3 verified Teams to continue.");
+      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
       return;
     }
 
@@ -1061,8 +1061,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       }}
                     />
                     <span>
-                      I agree to share my details with up to 3 verified Teams so they
-                      can contact me about my requirement. See our{" "}
+                      I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for my selected service. See our{" "}
                       <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
                       and{" "}
                       <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.
@@ -1070,7 +1069,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   </label>
                   {consentError ? (
                     <span className="qf-rf-field-err qf-rf-field-err--block">
-                      Please accept sharing your details with up to 3 verified Teams to continue.
+                      Please accept sharing your details with up to 3 verified vendors to continue.
                     </span>
                   ) : null}
                 </div>

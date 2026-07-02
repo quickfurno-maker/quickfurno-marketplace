@@ -30,11 +30,17 @@ export type Vendor = {
   imageTone: string;
   /** Vendor-uploaded logo/profile image; when absent the card shows an initials avatar. */
   imageUrl?: string;
+  /** Approved cover/hero image for the public profile, if provided. */
+  coverImageUrl?: string;
   /** Origin of this record. "supabase" = real vendor row; "static"/undefined = demo catalog.
    *  The profile page uses this to avoid showing static/demo content for real vendors. */
   source?: "supabase" | "static";
   /** Real, canonical public service categories the vendor provides (Supabase only; may be []). */
   serviceCategories?: string[];
+  /** Approved public business hours (Supabase only; optional). */
+  businessHours?: string | null;
+  /** Approved public service area summary (Supabase only; optional). */
+  serviceAreaSummary?: string | null;
   /** Real vendor-uploaded portfolio image URLs (Supabase only; may be []). */
   portfolioImages?: string[];
 };

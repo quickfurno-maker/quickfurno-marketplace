@@ -104,6 +104,55 @@ export type VendorPackageOrder = {
   updated_at?: string | null;
 };
 
+export type VendorProfileChangeRequest = {
+  id: string;
+  vendor_id?: string | null;
+  requested_by?: string | null;
+  request_type?: string | null;
+  proposed_changes?: Record<string, unknown> | null;
+  current_snapshot?: Record<string, unknown> | null;
+  status?: "pending" | "approved" | "rejected" | "cancelled" | string | null;
+  admin_notes?: string | null;
+  rejection_reason?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorNotification = {
+  id: string;
+  vendor_id?: string | null;
+  title?: string | null;
+  message?: string | null;
+  type?: string | null;
+  priority?: string | null;
+  is_read?: boolean | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorSupportThread = {
+  id: string;
+  vendor_id?: string | null;
+  subject?: string | null;
+  topic?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type VendorSupportMessage = {
+  id: string;
+  thread_id?: string | null;
+  sender_type?: string | null;
+  sender_id?: string | null;
+  message?: string | null;
+  created_at?: string | null;
+};
+
 export type Assignment = {
   id: string;
   lead_id?: string | null;
@@ -149,9 +198,17 @@ export type BadReport = {
   id: string;
   created_at?: string | null;
   reason?: string | null;
+  report_type?: string | null;
+  report_reason?: string | null;
+  vendor_comment?: string | null;
   status?: string | null;
   description?: string | null;
   vendor_id?: string | null;
+  lead_assignment_id?: string | null;
+  admin_decision?: string | null;
+  credit_restored?: boolean | null;
+  reviewed_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type Setting = {
@@ -238,6 +295,10 @@ export type Snapshot = {
   payments: Payment[];
   vendorPackages: any[];
   vendorPackageOrders: VendorPackageOrder[];
+  vendorProfileChangeRequests: VendorProfileChangeRequest[];
+  vendorNotifications: VendorNotification[];
+  vendorSupportThreads: VendorSupportThread[];
+  vendorSupportMessages: VendorSupportMessage[];
   assignments: Assignment[];
   categories: Category[];
   cities: City[];
@@ -261,6 +322,10 @@ export function emptySnapshot(): Snapshot {
     payments: [],
     vendorPackages: [],
     vendorPackageOrders: [],
+    vendorProfileChangeRequests: [],
+    vendorNotifications: [],
+    vendorSupportThreads: [],
+    vendorSupportMessages: [],
     assignments: [],
     categories: [],
     cities: [],

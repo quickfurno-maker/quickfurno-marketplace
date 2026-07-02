@@ -222,14 +222,21 @@ export async function getVendorDashboardStats(vendorId: string): Promise<Result<
   }
 }
 
-/** Leads assigned to a vendor, newest first, with the (now permitted) client contact. */
+/** Leads assigned to a vendor, newest first. Client contact is returned only for paid, active, approved vendors. */
 export async function getVendorAssignedLeads(vendorId: string): Promise<Result<unknown[]>> {
   try {
+    const contactEligible = await canVendorViewLeadContact(vendorId);
+    if (!contactEligible.ok) return contactEligible;
+
+    const leadSelect = contactEligible.data
+      ? "id, name, phone, city, area, service_required, budget, property_type, timeline, message, created_at"
+      : "id, name, city, area, service_required, budget, property_type, timeline, message, created_at";
+
     const { data, error } = await adminClient()
       .from("lead_assignments")
       .select(`
         id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported,
-        lead:leads ( id, name, phone, city, area, service_required, budget, property_type, timeline, message, created_at )
+        lead:leads ( ${leadSelect} )
       `)
       .eq("vendor_id", vendorId)
       .order("assigned_at", { ascending: false });
@@ -242,12 +249,16 @@ export async function getVendorAssignedLeads(vendorId: string): Promise<Result<u
 
 /** Vendor updates their pipeline status for a lead + logs it to the timeline. */
 export async function updateVendorLeadStatus(
-  assignmentId: string, status: VendorLeadStatus, notes?: string
+  vendorId: string, assignmentId: string, status: VendorLeadStatus, notes?: string
 ): Promise<Result<null>> {
   try {
     const db = adminClient();
     const { data: a, error: aErr } = await db
-      .from("lead_assignments").select("id, vendor_id").eq("id", assignmentId).single();
+      .from("lead_assignments")
+      .select("id, vendor_id")
+      .eq("id", assignmentId)
+      .eq("vendor_id", vendorId)
+      .single();
     if (aErr || !a) throw appError("UNKNOWN");
 
     const { error: upErr } = await db
@@ -273,13 +284,26 @@ export async function updateVendorLeadStatus(
 
 /** Report a bad lead — only within app_settings.bad_lead_report_window_hours. */
 export async function reportBadLead(
-  assignmentId: string, reason: string, description?: string
+  vendorId: string,
+  assignmentId: string,
+  reportType: string,
+  reportReason: string,
+  vendorComment: string,
 ): Promise<Result<{ id: string }>> {
   try {
+    const type = reportType.trim();
+    const reason = reportReason.trim();
+    const comment = vendorComment.trim();
+    if (!type || !reason || !comment) throw appError("VALIDATION");
+
     const db = adminClient();
 
     const { data: a, error: aErr } = await db
-      .from("lead_assignments").select("id, vendor_id, assigned_at").eq("id", assignmentId).single();
+      .from("lead_assignments")
+      .select("id, vendor_id, assigned_at")
+      .eq("id", assignmentId)
+      .eq("vendor_id", vendorId)
+      .single();
     if (aErr || !a) throw appError("UNKNOWN");
 
     const { data: windowH } = await db.rpc("get_setting_int", {
@@ -292,7 +316,8 @@ export async function reportBadLead(
       .from("bad_lead_reports")
       .insert({
         lead_assignment_id: assignmentId, vendor_id: a.vendor_id,
-        reason, description: description ?? null, status: "Pending",
+        reason, description: comment, report_type: type, report_reason: reason, vendor_comment: comment, status: "Pending",
+        credit_restored: false,
       })
       .select("id")
       .single();
@@ -300,13 +325,31 @@ export async function reportBadLead(
       logSupabaseInsertError("bad_lead_reports", error, {
         assignment_id: assignmentId,
         vendor_id: a.vendor_id,
-        has_description: Boolean(description),
+        has_description: Boolean(comment),
       });
       throw error;
     }
 
     await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", assignmentId);
     return ok({ id: data.id });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function canVendorViewLeadContact(vendorId: string): Promise<Result<boolean>> {
+  try {
+    const { data, error } = await adminClient()
+      .from("vendors")
+      .select("status, is_active, paid_status")
+      .eq("id", vendorId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw appError("UNKNOWN");
+
+    const status = String((data as any).status ?? "").toLowerCase();
+    const paidStatus = String((data as any).paid_status ?? "").toLowerCase();
+    return ok(status === "approved" && (data as any).is_active !== false && paidStatus === "paid");
   } catch (e) {
     return fail(e);
   }

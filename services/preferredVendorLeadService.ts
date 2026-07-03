@@ -25,6 +25,7 @@ import {
   deliverLeadToVendorDashboard,
 } from "./leadDeliveryService";
 import { createVendorNotification } from "./vendorNotificationService";
+import { queuePreferredVendorDelayedFill } from "./delayedLeadFillService";
 
 export const PREFERRED_VENDOR_MIGRATION_HINT =
   "Apply migration 20260702000035_preferred_vendor_lead_intent.sql on the live database.";
@@ -47,6 +48,8 @@ export type PreferredVendorRoutingResult = {
   reason: string | null;
   /** true only when a lead_assignments row was created (contact is shared). */
   contact_shared: boolean;
+  /** Phase 2: true when a delayed remaining-slot fill was queued for this lead. */
+  queued_for_delayed_fill: boolean;
 };
 
 export type RoutePreferredVendorInput = {
@@ -135,9 +138,12 @@ export async function routePreferredVendorLead(
     }
     if (commercialBlocks.length > 0) {
       // Only credit/package reasons remain → no-credits path (no contact shared).
+      // Phase 2: queue a 1-hour fallback so the preferred vendor gets a second
+      // chance (recharge) before better matching vendors fill the slots.
       await notifyVendorRechargeSafe(vendorId);
+      const queued = await queueDelayedFillSafe(input, vendorId, false);
       await markLeadPreferred(input, "preferred_vendor_no_credits", "no_credits", vendorName);
-      return result("preferred_vendor_no_credits", false, vendorId, vendorName, "no_credits");
+      return result("preferred_vendor_no_credits", false, vendorId, vendorName, "no_credits", false, queued);
     }
 
     // Eligible → atomic single-vendor assignment + one credit deduction.
@@ -145,14 +151,18 @@ export async function routePreferredVendorLead(
 
     if (assign.status === "assigned_to_preferred_vendor" || assign.status === "already_assigned") {
       await deliverPreferredAssignment(input.leadId, vendorId, vendorName);
+      // Phase 2: preferred vendor already has the lead — queue the remaining ≤2
+      // slots to be filled after 1 hour (up to a hard cap of 3 total).
+      const queued = await queueDelayedFillSafe(input, vendorId, true);
       await markLeadPreferred(input, "assigned_immediately", null, vendorName);
-      return result("assigned_to_preferred_vendor", true, vendorId, vendorName, null, true);
+      return result("assigned_to_preferred_vendor", true, vendorId, vendorName, null, true, queued);
     }
 
     if (assign.status === "preferred_vendor_no_credits") {
       await notifyVendorRechargeSafe(vendorId);
+      const queued = await queueDelayedFillSafe(input, vendorId, false);
       await markLeadPreferred(input, "preferred_vendor_no_credits", "no_credits", vendorName);
-      return result("preferred_vendor_no_credits", false, vendorId, vendorName, "no_credits");
+      return result("preferred_vendor_no_credits", false, vendorId, vendorName, "no_credits", false, queued);
     }
     if (assign.status === "preferred_vendor_not_eligible") {
       await markLeadPreferred(input, "preferred_vendor_not_eligible", assign.reason ?? "not_eligible", vendorName);
@@ -222,6 +232,37 @@ async function deliverPreferredAssignment(leadId: string, vendorId: string, vend
     cta_url: "/vendor/dashboard/leads",
   });
   if (!notify.ok) console.warn("[preferred vendor] vendor notification skipped", { code: notify.code });
+}
+
+/**
+ * Phase 2: queue this preferred-vendor lead for delayed remaining-slot fill.
+ * Honours the `fallbackAllowed` flag (default on) and never throws — a queue
+ * failure must never affect the already-completed routing/lead submission.
+ * Returns whether a queue row was created.
+ */
+async function queueDelayedFillSafe(
+  input: RoutePreferredVendorInput,
+  vendorId: string,
+  preferredAssigned: boolean,
+): Promise<boolean> {
+  if (input.fallbackAllowed === false) return false;
+  try {
+    const queued = await queuePreferredVendorDelayedFill({
+      leadId: input.leadId,
+      preferredVendorId: vendorId,
+      preferredAssigned,
+      city: input.city ?? null,
+      category: input.category ?? input.serviceRequired ?? null,
+      subcategory: input.subcategory ?? null,
+    });
+    return queued.ok ? queued.data.queued : false;
+  } catch (error) {
+    console.warn("[preferred vendor] delayed-fill queue skipped", {
+      lead_id: input.leadId,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return false;
+  }
 }
 
 /** No-credits notification — never contains client contact. Best-effort. */
@@ -300,8 +341,17 @@ function result(
   vendorName: string | null,
   reason: string | null,
   contactShared = false,
+  queuedForDelayedFill = false,
 ): PreferredVendorRoutingResult {
-  return { status, assigned, vendor_id: vendorId, vendor_name: vendorName, reason, contact_shared: contactShared };
+  return {
+    status,
+    assigned,
+    vendor_id: vendorId,
+    vendor_name: vendorName,
+    reason,
+    contact_shared: contactShared,
+    queued_for_delayed_fill: queuedForDelayedFill,
+  };
 }
 
 function asText(value: unknown): string | null {

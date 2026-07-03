@@ -24,6 +24,7 @@ import * as aos from "../services/aosService";
 import { getParentCategoryGroup } from "../lib/vendors/categoryMatching";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
+import { processDueLeadAssignmentQueue } from "../services/delayedLeadFillService";
 import { captureFreeVendorInterest, markInterestStatus, type CaptureFreeVendorInterestInput } from "../lib/lead-assignment/freeVendorInterestService";
 import { updateMarketplaceRuntimeSetting } from "../lib/lead-assignment/runtimeSettings";
 import type { AosDecisionLogInput } from "../services/aosService";
@@ -563,6 +564,21 @@ export const adminRecheckLeadAssignmentQueue = async (queueIdOrLeadId: string) =
   asAdmin(async () => {
     const user = await requireSuperadmin();
     return recheckQueuedLead(queueIdOrLeadId, user.id);
+  });
+
+// Phase 2: process due preferred-vendor delayed-fill queue rows. Fills each
+// lead's remaining slots (up to 3 total) with best matching eligible vendors
+// once the 1-hour window has lapsed. Superadmin-guarded; also callable by the
+// server-only cron route (app/api/admin/process-due-lead-assignment-queue).
+export const adminProcessDueLeadAssignmentQueue = async (limit?: number) =>
+  asAdmin(async () => {
+    await requireSuperadmin();
+    const result = await processDueLeadAssignmentQueue(limit);
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/admin/leads");
+    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard");
+    return result;
   });
 
 export const adminMarkFreeVendorInterestStatus = async (interestId: string, status: string, note?: string) =>

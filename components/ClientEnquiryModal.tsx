@@ -679,7 +679,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         const vendorName = modalOptions.targetVendorName || result.data.preferred_vendor?.vendor_name || "this vendor";
         setSuccessMessage(
           result.data.preferred_vendor?.assigned
-            ? `Your enquiry has been sent to ${vendorName}. QuickFurno will help coordinate the next step.`
+            ? `Your enquiry has been sent to ${vendorName}. If needed, QuickFurno may connect you with up to 2 more suitable verified vendors after some time.`
             : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we will connect you with better matching verified vendors.`,
         );
       } else {

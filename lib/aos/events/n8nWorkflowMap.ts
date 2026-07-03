@@ -4,7 +4,7 @@ export const QUICKFURNO_N8N_WORKFLOW_MAP: Record<QuickFurnoN8nEventType, string>
   "lead.created": "QF-n8n-New-Lead-Intake",
   "lead.scored": "QF-n8n-Lead-Scored-Preview",
   "lead.qualified": "QF-n8n-Client-Confirmation",
-  "lead.clarification_required": "QF-n8n-Lead-Clarification-Preview",
+  "lead.clarification_required": "QF-n8n-B-Lead-Clarification-Preview",
   "lead.rejected_quality": "QF-n8n-Lead-Rejected-Quality-Preview",
   "lead.assignment_preview": "QF-n8n-Event-Router",
   "lead.assignment_approved": "QF-n8n-Vendor-Lead-Alert",

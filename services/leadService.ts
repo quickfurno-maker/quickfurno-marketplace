@@ -8,7 +8,9 @@ import { appError, fromPgError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
+import { emitLeadClarificationRequiredEvent } from "../lib/aos/events/emitLeadClarificationRequiredEvent";
 import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
+import { createClarificationRequestForLead, shouldCreateClarificationForLead } from "./leadClarificationService";
 import { canAutoDistributeLead, scoreAndStoreLead, type LeadQualityScoreResult } from "./leadQualityService";
 import {
   holdPreferredVendorForQualityGate,
@@ -182,19 +184,43 @@ export async function createLead(
         formSource: "lead.quality.preview",
         eventType: "lead.scored",
       });
-      void emitLeadCreatedEvent({
-        leadId: data.id,
-        name,
-        phone,
-        city,
-        area: input.area ?? null,
-        category: serviceRequired,
-        budget: budget || null,
-        message: message || null,
-        isDuplicate: Boolean(data.is_duplicate),
-        formSource: "lead.quality.preview",
-        eventType: qualityEventType(scoreResult),
-      });
+      if (shouldCreateClarificationForLead({ is_duplicate: Boolean(data.is_duplicate) }, scoreResult)) {
+        const clarification = await createClarificationRequestForLead(data.id);
+        if (clarification.ok) {
+          void emitLeadClarificationRequiredEvent({
+            leadId: data.id,
+            score: scoreResult.total_score,
+            scoreClass: scoreResult.score_class,
+            missingFields: clarification.data.missing_fields ?? [],
+            parentCategoryGroup: clarification.data.parent_category_group,
+            marketplaceCategory: clarification.data.marketplace_category,
+            serviceRequired: clarification.data.service_required,
+            previewMessage: clarification.data.preview_message,
+            questionsCount: clarification.data.questions_json?.length ?? 0,
+            source: "lead.quality.preview",
+          });
+        } else {
+          console.warn("[lead clarification] preview preparation skipped", {
+            lead_id: data.id,
+            code: clarification.code,
+            error: clarification.error,
+          });
+        }
+      } else {
+        void emitLeadCreatedEvent({
+          leadId: data.id,
+          name,
+          phone,
+          city,
+          area: input.area ?? null,
+          category: serviceRequired,
+          budget: budget || null,
+          message: message || null,
+          isDuplicate: Boolean(data.is_duplicate),
+          formSource: "lead.quality.preview",
+          eventType: qualityEventType(scoreResult),
+        });
+      }
     } catch (qualityError) {
       console.warn("[lead quality] scoring failed; distribution held to protect vendor trust", {
         lead_id: data.id,

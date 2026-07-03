@@ -14,7 +14,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adminUpdateLeadStatus } from "@/app/actions";
+import { adminPrepareLeadClarification, adminUpdateLeadStatus } from "@/app/actions";
 import {
   ActionMenu,
   ChartCard,
@@ -34,6 +34,7 @@ import type {
   ClientNotificationLog,
   Lead,
   LeadAssignmentQueueRow,
+  LeadClarificationRequest,
   LeadDeliveryLog,
   Snapshot,
   Vendor,
@@ -87,6 +88,7 @@ type CrmRow = {
   isPreferred: boolean;
   preferredBadge: PreferredBadge;
   qualityBadge: QualityBadge;
+  latestClarification: LeadClarificationRequest | null;
   assignedCount: number;
   assignments: Assignment[];
   priority: CrmPriority;
@@ -229,6 +231,7 @@ function followUpDue(value?: string | null): boolean {
 
 function buildRows(data: Snapshot): CrmRow[] {
   const leads = data.leads ?? [];
+  const clarificationByLead = latestClarificationByLead(data.leadClarificationRequests ?? []);
   const phoneFrequency = new Map<string, number>();
   leads.forEach((lead) => {
     const d = digitsOnly(lead.phone);
@@ -258,6 +261,7 @@ function buildRows(data: Snapshot): CrmRow[] {
         isPreferred: String(lead.lead_intent ?? "").toLowerCase() === "preferred_vendor",
         preferredBadge: preferredBadge(lead, assignedCount),
         qualityBadge: leadQualityBadge(lead),
+        latestClarification: clarificationByLead.get(lead.id) ?? null,
         assignedCount,
         assignments,
         priority: computePriority(lead, signals),
@@ -277,6 +281,23 @@ function countByField(rows: CrmRow[], pick: (row: CrmRow) => string): Array<{ la
     map.set(key, (map.get(key) ?? 0) + 1);
   });
   return [...map.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+}
+
+function latestClarificationByLead(rows: LeadClarificationRequest[]): Map<string, LeadClarificationRequest> {
+  const map = new Map<string, LeadClarificationRequest>();
+  rows.forEach((request) => {
+    const leadId = String(request.lead_id ?? "");
+    if (!leadId || map.has(leadId)) return;
+    map.set(leadId, request);
+  });
+  return map;
+}
+
+function clarificationLabel(row: CrmRow): string {
+  const status = row.latestClarification?.status ?? row.lead.clarification_status;
+  const missingCount = row.lead.clarification_missing_fields?.length ?? row.latestClarification?.missing_fields?.length ?? 0;
+  if (!status && !row.lead.clarification_required) return "Not prepared";
+  return `${String(status ?? "required").replace(/_/g, " ")}${missingCount ? ` (${missingCount})` : ""}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +328,18 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
         return;
       }
       notify(`Lead marked ${status}.`, "success");
+      router.refresh();
+    });
+  }
+
+  function prepareClarification(leadId: string) {
+    startTransition(async () => {
+      const result = await adminPrepareLeadClarification(leadId);
+      if (!result.ok) {
+        notify(result.error ?? "Could not prepare clarification preview.", "error");
+        return;
+      }
+      notify("Clarification preview prepared.", "success");
       router.refresh();
     });
   }
@@ -372,6 +405,8 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
           vendorsById={vendorsById}
           deliveryLogs={deliveryByLead.get(selected.id) ?? []}
           notificationLogs={notifByLead.get(selected.id) ?? []}
+          onPrepareClarification={prepareClarification}
+          isPending={isPending}
           onClose={() => setSelected(null)}
         />
       ) : null}
@@ -540,6 +575,7 @@ function LeadInbox({
           { header: "Quality", cell: (row) => row.qualityBadge
             ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} />
             : <StatusBadge value="Not scored" tone="slate" /> },
+          { header: "Clarification", cell: (row) => <StatusBadge value={clarificationLabel(row)} tone={row.lead.clarification_required ? "amber" : "slate"} /> },
           { header: "Client", cell: (row) => (
             <div className="min-w-40">
               <p className="font-semibold text-slate-900">{row.name}</p>
@@ -790,12 +826,16 @@ function LeadDrawer({
   vendorsById,
   deliveryLogs,
   notificationLogs,
+  onPrepareClarification,
+  isPending,
   onClose,
 }: {
   row: CrmRow;
   vendorsById: Map<string, Vendor>;
   deliveryLogs: LeadDeliveryLog[];
   notificationLogs: ClientNotificationLog[];
+  onPrepareClarification: (leadId: string) => void;
+  isPending: boolean;
   onClose: () => void;
 }) {
   const lead = row.lead;
@@ -845,6 +885,60 @@ function LeadDrawer({
             ["Checked at", lead.lead_quality_checked_at ? formatDate(lead.lead_quality_checked_at) : "Not checked"],
             ["Breakdown", "Latest score summary is mirrored here. TODO: load restricted lead_scores history for detailed breakdown."],
           ]} />
+        </DrawerSection>
+
+        <DrawerSection title="WhatsApp Clarification">
+          <div className="space-y-3">
+            <InfoGrid rows={[
+              ["Required", lead.clarification_required ? "Yes" : "No"],
+              ["Status", clarificationLabel(row)],
+              ["Missing fields", (lead.clarification_missing_fields ?? row.latestClarification?.missing_fields ?? []).join(", ") || "None"],
+              ["Score before", row.latestClarification?.score_before != null ? `${row.latestClarification.score_before}/100` : "Not captured"],
+              ["Class before", row.latestClarification?.score_class_before || "Not captured"],
+              ["Parent category", row.latestClarification?.parent_category_group || "Not set"],
+              ["Marketplace category", row.latestClarification?.marketplace_category || "Not set"],
+              ["Service required", row.latestClarification?.service_required || "Not set"],
+              ["Response status", row.latestClarification?.response_received_at ? "Response received" : "No response yet"],
+            ]} />
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onPrepareClarification(row.id)}
+                disabled={isPending || Boolean(row.latestClarification)}
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {row.latestClarification ? "Preview already prepared" : "Prepare clarification preview"}
+              </button>
+              <button
+                type="button"
+                disabled
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500 opacity-70"
+              >
+                Send WhatsApp disabled in this phase
+              </button>
+            </div>
+
+            {row.latestClarification?.preview_message ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Preview message</p>
+                <pre className="whitespace-pre-wrap text-xs leading-5 text-slate-700">{row.latestClarification.preview_message}</pre>
+              </div>
+            ) : (
+              <EmptyState title="No clarification preview" message="Prepare a preview for B leads before any WhatsApp sending is enabled." compact />
+            )}
+
+            {row.latestClarification?.questions_json?.length ? (
+              <div className="space-y-2">
+                {row.latestClarification.questions_json.map((question, index) => (
+                  <div key={String(question.key ?? index)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <p className="font-semibold text-slate-900">{index + 1}. {String(question.text ?? "Question")}</p>
+                    <p className="mt-1 text-xs text-slate-500">Options: {questionOptions(question)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </DrawerSection>
 
         <DrawerSection title="Source & attribution">
@@ -979,6 +1073,16 @@ function groupByLead<T extends { lead_id?: string | null }>(rows: T[]): Map<stri
     map.set(key, current);
   });
   return map;
+}
+
+function questionOptions(question: Record<string, unknown>): string {
+  const options = Array.isArray(question.options) ? question.options : [];
+  const labels = options.map((option) => {
+    if (typeof option === "string") return option;
+    if (option && typeof option === "object" && "label" in option) return String((option as { label?: unknown }).label ?? "");
+    return "";
+  }).filter(Boolean);
+  return labels.join(", ") || "Free text";
 }
 
 function cap(value: string): string {

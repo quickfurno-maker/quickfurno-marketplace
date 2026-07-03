@@ -111,6 +111,7 @@ export async function runSafeAgentEventPipeline(payload: unknown): Promise<SafeA
             leadId: normalized.leadId,
             source: normalized.source,
             timestamp: normalized.timestamp,
+            ...normalized.safeData,
             agentPreviewSummary: summarizeAgents(agents),
             agents,
           },
@@ -210,12 +211,14 @@ function normalizeSafeAgentEventPayload(payload: unknown) {
   const leadId = firstString(record.lead_id, record.leadId, record.id);
   const source = firstString(record.source) ?? "quickfurno-aos";
   const timestamp = firstString(record.timestamp, record.occurredAt, record.createdAt) ?? new Date().toISOString();
+  const safeData = normalizeClarificationSafeData(record);
 
   return {
     eventType,
     leadId,
     source,
     timestamp,
+    safeData,
   };
 }
 
@@ -289,9 +292,37 @@ function summarizeAgents(agents: SafeAgentPreviewResult) {
   };
 }
 
+function normalizeClarificationSafeData(record: Record<string, unknown>): Record<string, unknown> {
+  const eventType = firstString(record.event, record.eventType, record.event_type, record.type);
+  if (eventType !== "lead.clarification_required") return {};
+  const missingFields = Array.isArray(record.missingFields)
+    ? record.missingFields.map(String).slice(0, 10)
+    : Array.isArray(record.missing_fields)
+      ? record.missing_fields.map(String).slice(0, 10)
+      : [];
+  return {
+    scoreClass: firstString(record.scoreClass, record.score_class),
+    score: numberOrNull(record.score),
+    missingFields,
+    parentCategoryGroup: firstString(record.parentCategoryGroup, record.parent_category_group),
+    marketplaceCategory: firstString(record.marketplaceCategory, record.marketplace_category),
+    serviceRequired: firstString(record.serviceRequired, record.service_required),
+    previewMessage: firstString(record.previewMessage, record.preview_message),
+    questionsCount: numberOrNull(record.questionsCount, record.questions_count),
+  };
+}
+
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
     if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return null;
+}
+
+function numberOrNull(...values: unknown[]): number | null {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
   }
   return null;
 }

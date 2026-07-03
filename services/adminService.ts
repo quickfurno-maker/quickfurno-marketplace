@@ -239,6 +239,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       leadMatchingRuns,
       leadDeliveryLogs,
       clientNotificationLogs,
+      leadClarificationRequests,
       badLeadReportComments,
     ] = await Promise.all([
       // Leads: latest N only (primary embeds each lead's assignments; fallback
@@ -267,6 +268,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       safeSelect("lead_matching_runs", db.from("lead_matching_runs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
       safeSelect("lead_delivery_logs", db.from("lead_delivery_logs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
       safeSelect("client_notification_logs", db.from("client_notification_logs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
+      safeSelect("lead_clarification_requests", db.from("lead_clarification_requests").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
       safeSelect("bad_lead_report_comments", db.from("bad_lead_report_comments").select("*").order("created_at", { ascending: true }).limit(LOG_ROW_LIMIT)),
     ]);
 
@@ -385,6 +387,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
         lead_matching_runs: (leadMatchingRuns as any[]).length,
         lead_delivery_logs: (leadDeliveryLogs as any[]).length,
         client_notification_logs: (clientNotificationLogs as any[]).length,
+        lead_clarification_requests: (leadClarificationRequests as any[]).length,
         free_vendor_profile_interests: (freeVendorInterests as any[]).length,
         bad_lead_reports: badReportRows.length,
       },
@@ -416,6 +419,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       leadMatchingRuns,
       leadDeliveryLogs,
       clientNotificationLogs,
+      leadClarificationRequests,
       badLeadReportComments,
       generatedAt: new Date().toISOString(),
       warnings,

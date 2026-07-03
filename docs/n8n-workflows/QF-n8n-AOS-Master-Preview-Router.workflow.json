@@ -82,6 +82,31 @@
                 },
                 "conditions": [
                   {
+                    "id": "b3d4f7d0-0a0f-4d2b-8a3e-b-lead-clarification",
+                    "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
+                    "rightValue": "lead.clarification_required",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lead.clarification_required"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
                     "id": "446f53fc-113d-4363-bad6-25f1447b2052",
                     "leftValue": "={{ $json.body.event || $json.body.eventType || $json.body.event_type || $json.body.type || $json.body.data?.eventType || $json.event || $json.eventType }}",
                     "rightValue": "lead.assignment_approved",
@@ -2401,5 +2426,18 @@
     "executionOrder": "v1"
   },
   "pinData": {},
-  "tags": []
+  "tags": [],
+  "meta": {
+    "quickfurnoPhase15": {
+      "route": "lead.clarification_required",
+      "workflowName": "QF-n8n-B-Lead-Clarification-Preview",
+      "safePreviewOnly": true,
+      "whatsappSent": false,
+      "databaseWritten": false,
+      "creditsDeducted": false,
+      "leadAutoAssigned": false,
+      "vendorNotified": false,
+      "externalApiCalled": false
+    }
+  }
 }

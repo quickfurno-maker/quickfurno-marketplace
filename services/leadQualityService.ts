@@ -34,6 +34,7 @@ export type LeadQualityInput = {
   budget?: string | null;
   budget_range?: string | null;
   budgetRange?: string | null;
+  property_type?: string | null;
   timeline?: string | null;
   message?: string | null;
   requirement?: string | null;

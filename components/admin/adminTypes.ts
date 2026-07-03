@@ -27,6 +27,11 @@ export type Lead = {
   lead_quality_hard_block_reason?: string | null;
   lead_quality_recommended_action?: string | null;
   lead_quality_checked_at?: string | null;
+  clarification_status?: string | null;
+  clarification_required?: boolean | null;
+  clarification_missing_fields?: string[] | null;
+  clarification_last_request_id?: string | null;
+  clarification_checked_at?: string | null;
   lead_priority?: string | null;
   status?: string | null;
   verification_status?: string | null;
@@ -414,6 +419,27 @@ export type LeadAutoAssignmentLog = {
   created_at?: string | null;
 };
 
+export type LeadClarificationRequest = {
+  id: string;
+  lead_id?: string | null;
+  score_before?: number | null;
+  score_class_before?: string | null;
+  parent_category_group?: string | null;
+  marketplace_category?: string | null;
+  service_required?: string | null;
+  subcategory?: string | null;
+  missing_fields?: string[] | null;
+  questions_json?: Array<Record<string, unknown>> | null;
+  preview_message?: string | null;
+  status?: string | null;
+  sent_preview_at?: string | null;
+  sent_at?: string | null;
+  response_received_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 // Row-limit metadata for the shared admin snapshot. Lets the dashboard/CRM show
 // a subtle "showing latest N of M" note while KPI totals stay accurate (counted
 // server-side, independent of these row limits).
@@ -452,6 +478,7 @@ export type Snapshot = {
   leadMatchingRuns?: LeadMatchingRun[];
   leadDeliveryLogs?: LeadDeliveryLog[];
   clientNotificationLogs?: ClientNotificationLog[];
+  leadClarificationRequests?: LeadClarificationRequest[];
   badLeadReportComments?: BadLeadReportComment[];
   generatedAt?: string;
   warnings?: string[];
@@ -483,6 +510,7 @@ export function emptySnapshot(): Snapshot {
     leadMatchingRuns: [],
     leadDeliveryLogs: [],
     clientNotificationLogs: [],
+    leadClarificationRequests: [],
     badLeadReportComments: [],
     warnings: [],
   };

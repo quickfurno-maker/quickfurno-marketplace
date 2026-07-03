@@ -1,0 +1,27 @@
+{
+  "workflowName": "QF-n8n-B-Lead-Clarification-Preview",
+  "eventType": "lead.clarification_required",
+  "description": "Preview-only B-lead clarification branch. QuickFurno remains source of truth.",
+  "safePreviewOnly": true,
+  "sideEffects": {
+    "whatsappSent": false,
+    "databaseWritten": false,
+    "creditsDeducted": false,
+    "leadAutoAssigned": false,
+    "vendorNotified": false,
+    "externalApiCalled": false
+  },
+  "expectedPayload": {
+    "eventType": "lead.clarification_required",
+    "leadId": "uuid",
+    "scoreClass": "B",
+    "score": 62,
+    "missingFields": ["budget", "timeline"],
+    "parentCategoryGroup": "Interior",
+    "marketplaceCategory": "Interior Designers",
+    "serviceRequired": "Full Home Interior",
+    "previewMessage": "WhatsApp-ready preview text prepared by QuickFurno",
+    "questionsCount": 3,
+    "source": "lead.quality.preview"
+  }
+}

@@ -20,6 +20,7 @@ import * as admin from "../services/adminService";
 import * as audit from "../services/adminAuditService";
 import * as manualAssign from "../services/manualLeadAssignmentService";
 import * as requirementGroups from "../services/clientRequirementGroupService";
+import * as leadClarifications from "../services/leadClarificationService";
 import * as aos from "../services/aosService";
 import { getParentCategoryGroup } from "../lib/vendors/categoryMatching";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
@@ -544,6 +545,14 @@ export const adminSnapshot        = async () => asAdmin(() => admin.getSuperadmi
 export const adminLogAosDecision  = async (input: AosDecisionLogInput) => asAdmin(() => aos.logAosAgentDecision(input));
 export const adminAllLeads        = async () => asAdmin(() => admin.getAllLeads());
 export const adminUpdateLeadStatus = async (leadId: string, status: string) => asAdmin(() => admin.updateLeadStatus(leadId, status));
+export const adminPrepareLeadClarification = async (leadId: string) =>
+  asAdmin(async () => {
+    const result = await leadClarifications.createClarificationRequestForLead(leadId);
+    revalidatePath("/admin/crm");
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/leads");
+    return result;
+  });
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());
 export const adminApproveVendor   = async (id: string) => asAdmin(() => admin.approveVendor(id));
 export const adminRejectVendor    = async (id: string) => asAdmin(() => admin.rejectVendor(id));

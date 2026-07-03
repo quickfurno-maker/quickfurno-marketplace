@@ -26,6 +26,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
+  // Protect only the vendor dashboard — the public vendor portal (/vendor,
+  // /vendor?mode=login|signup) and public vendor profiles (/vendors/[id]) stay
+  // open. Logged-out users are sent to the portal's login tab.
+  if (path.startsWith("/vendor/dashboard") && !user) {
+    return NextResponse.redirect(new URL("/vendor?mode=login", req.url));
+  }
+
   return res;
 }
 

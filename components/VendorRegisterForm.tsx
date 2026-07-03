@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { submitVendorRegistration } from "@/app/actions";
+import { submitVendorAccountRegistration } from "@/app/actions";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, type MainCategory } from "@/lib/categories";
@@ -11,8 +11,9 @@ import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useAc
 // ---------------------------------------------------------------------------
 // Guided vendor onboarding wizard.
 // One focused screen per step, mirroring the premium "requirement first" client
-// flow. Application-only (no account creation) — the team verifies the vendor
-// and shares lead-access options afterwards.
+// flow. Creates a vendor LOGIN account (email + password) AND the vendor profile
+// in one submit via submitVendorAccountRegistration — the profile still lands as
+// Pending / Unpaid / not publicly visible until the team verifies and credits it.
 //
 // Step 2 categories come from the SHARED source of truth (lib/categories.ts) so
 // they always match the homepage. The selected leaf category (a public category
@@ -71,6 +72,8 @@ type WizardState = {
   whatsappSame: boolean;
   whatsapp: string;
   email: string;
+  password: string;
+  confirmPassword: string;
   categoryId: string;
   subCategory: string;
   city: string;
@@ -96,6 +99,8 @@ const initialState: WizardState = {
   whatsappSame: true,
   whatsapp: "",
   email: "",
+  password: "",
+  confirmPassword: "",
   categoryId: "",
   subCategory: "",
   city: "",
@@ -162,6 +167,10 @@ export function VendorRegisterForm() {
         return /^\d{10}$/.test(valOf("phone"));
       case "email":
         return isEmail(valOf("email"));
+      case "password":
+        return valOf("password").length >= 6;
+      case "confirmPassword":
+        return valOf("confirmPassword").length >= 6 && valOf("confirmPassword") === valOf("password");
       case "addressLine1":
         return valOf("addressLine1").trim().length >= 5;
       case "state":
@@ -351,6 +360,8 @@ export function VendorRegisterForm() {
         if (f.ownerName.trim().length < 2) e.push({ key: "ownerName", message: "Owner name must be at least 2 characters." });
         if (f.phone.replace(/\D/g, "").length !== 10) e.push({ key: "phone", message: "Enter a valid 10-digit WhatsApp number." });
         if (!isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email." });
+        if (f.password.length < 6) e.push({ key: "password", message: "Password must be at least 6 characters." });
+        if (f.confirmPassword !== f.password) e.push({ key: "confirmPassword", message: "Passwords do not match." });
         break;
       case 1:
         if (!selectedMain) e.push({ key: "category", message: "Select your service category" });
@@ -416,6 +427,8 @@ export function VendorRegisterForm() {
         next.ownerName = true;
         next.phone = true;
         next.email = true;
+        next.password = true;
+        next.confirmPassword = true;
       } else if (step === 2) {
         next.city = true;
         next.areas = true;
@@ -536,6 +549,8 @@ export function VendorRegisterForm() {
       phoneDigits.length === 10 &&
       whatsappDigits.length === 10 &&
       isEmail(emailStr) &&
+      f.password.length >= 6 &&
+      f.confirmPassword === f.password &&
       selectedMain &&
       (selectedMain.subcategories.length === 0 || f.subCategory) &&
       cityValue &&
@@ -552,7 +567,11 @@ export function VendorRegisterForm() {
 
     setBusy(true);
     try {
-      const res = await submitVendorRegistration({
+      const res = await submitVendorAccountRegistration({
+        // Creates the Supabase auth login (email + password) AND the vendor
+        // profile in one call. The profile still lands Pending / Unpaid / not
+        // publicly visible (enforced by registerVendor) until admin approval.
+        password: f.password,
         business_name: businessNameStr,
         owner_name: ownerNameStr || undefined,
         phone: phoneDigits,
@@ -611,16 +630,21 @@ export function VendorRegisterForm() {
       <div className="qf-vrf qf-vrf--done">
         <div className="qf-rf-success">
           <span className="qf-rf-success-mark" aria-hidden="true">✓</span>
-          <h3>Application received</h3>
+          <h3>Vendor account created</h3>
           <p>
-            QuickFurno team will verify your details and share the next steps. Keep your phone
-            handy — we&apos;ll reach out on WhatsApp.
+            Your vendor account and application have been submitted. QuickFurno will review your
+            profile. Once approved and credited, leads will appear in your dashboard. You can log
+            in from this page.
           </p>
+          <a className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full" href="/vendor?mode=login">
+            Go to vendor login
+          </a>
           <a
-            className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full"
-            href={whatsappLink("Hi QuickFurno team, I just submitted my vendor application and would like to know the next steps.")}
+            className="qf-rf-btn qf-rf-btn--ghost qf-rf-btn--full"
+            href={whatsappLink("Hi QuickFurno team, I just created my vendor account and submitted my application. I'd like to know the next steps.")}
             target="_blank"
             rel="noopener noreferrer"
+            style={{ marginTop: "0.6rem" }}
           >
             Chat with QuickFurno Team
           </a>
@@ -787,12 +811,26 @@ export function VendorRegisterForm() {
                 </label>
               ) : null}
               {renderInputField({
-                label: "Business email for dashboard access",
+                label: "Business email for dashboard login",
                 fieldKey: "email",
                 type: "email",
                 placeholder: "you@example.com",
                 inputMode: "email",
                 autoComplete: "email",
+              })}
+              {renderInputField({
+                label: "Create password",
+                fieldKey: "password",
+                type: "password",
+                placeholder: "At least 6 characters",
+                autoComplete: "new-password",
+              })}
+              {renderInputField({
+                label: "Confirm password",
+                fieldKey: "confirmPassword",
+                type: "password",
+                placeholder: "Re-enter password",
+                autoComplete: "new-password",
               })}
             </div>
           </div>

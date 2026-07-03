@@ -7,7 +7,7 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 import { VendorHeroStats } from "@/components/vendors/VendorHeroStats";
 import styles from "./vendors.module.css";
 
-const registerHref = "/vendors/register";
+const registerHref = "/vendor?mode=signup";
 
 export const metadata: Metadata = {
   title: "For Vendors | QuickFurno",

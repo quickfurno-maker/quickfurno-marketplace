@@ -6,7 +6,7 @@ export function SignOut() {
   const router = useRouter();
   return (
     <button
-      onClick={async () => { await browserClient().auth.signOut(); router.refresh(); router.push("/login"); }}
+      onClick={async () => { await browserClient().auth.signOut(); router.refresh(); router.push("/vendor?mode=login"); }}
       className="font-sans text-sm text-muted transition hover:text-gold"
     >
       Sign out

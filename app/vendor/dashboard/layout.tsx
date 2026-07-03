@@ -14,7 +14,7 @@ const NAV = [
 
 export default async function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
   const role = await getMyRole();
-  if (!role) redirect("/login");
+  if (!role) redirect("/vendor?mode=login");
 
   return (
     <div className="qf-vd-shell">

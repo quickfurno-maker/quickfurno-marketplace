@@ -28,6 +28,16 @@ export type Lead = {
   internal_notes?: string | null;
   follow_up_date?: string | null;
   is_duplicate?: boolean | null;
+  // Preferred-vendor routing context (additive; present when the client picked a
+  // specific vendor CTA). Selected via leads.* in the admin snapshot.
+  lead_intent?: string | null;
+  target_vendor_id?: string | null;
+  target_vendor_name?: string | null;
+  target_vendor_category?: string | null;
+  target_vendor_subcategory?: string | null;
+  preferred_vendor_id?: string | null;
+  preferred_vendor_status?: string | null;
+  preferred_vendor_status_reason?: string | null;
   lead_assignments?: Assignment[];
 };
 

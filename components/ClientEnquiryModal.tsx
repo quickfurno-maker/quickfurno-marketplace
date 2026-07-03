@@ -213,6 +213,51 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
   return null;
 }
 
+/**
+ * Resolve a client-picked vendor's canonical category into the modal's own
+ * category structure (parent id/label + interior subcategory + enquiry service).
+ * `targetVendorCategory` is one of the seven QuickFurnoCategory leaves: the four
+ * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work
+ * are their own main category. Returns null when the label can't be resolved, so
+ * the caller safely falls back to the normal category picker.
+ */
+function resolvePreferredSelection(targetVendorCategory?: string): {
+  categoryId: string;
+  categoryLabel: string;
+  subcategory: string;
+  serviceRequired: string;
+} | null {
+  const wanted = targetVendorCategory?.trim().toLowerCase();
+  if (!wanted) return null;
+
+  // Leaf that is its own main category (Sofa / Painter / Civil Work).
+  const leafMain = mainCategories.find((c) => c.category && c.category.toLowerCase() === wanted);
+  if (leafMain && leafMain.category) {
+    const leafCategory = leafMain.category;
+    return {
+      categoryId: leafMain.id,
+      categoryLabel: leafMain.label,
+      subcategory: "",
+      serviceRequired: enquiryServiceForCategory(leafCategory),
+    };
+  }
+
+  // Interior leaf (Interior Designers / Carpenters / Modular Factory / Premium Interiors).
+  for (const main of mainCategories) {
+    const sub = main.subcategories.find((s) => s.category.toLowerCase() === wanted);
+    if (sub) {
+      return {
+        categoryId: main.id,
+        categoryLabel: main.label,
+        subcategory: sub.label,
+        serviceRequired: enquiryServiceForCategory(sub.category),
+      };
+    }
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Trigger button — UNCHANGED public API. Every existing CTA keeps working.
 // ---------------------------------------------------------------------------
@@ -282,16 +327,33 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [locStatus, setLocStatus] = useState<"" | "locating" | "captured" | "denied" | "unsupported">("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // First step the client may navigate back to. 0 for the normal flow; for a
+  // resolved preferred-vendor flow it is the first step the client still has to
+  // fill, so category/subcategory (and prefilled city) stay locked/hidden.
+  const [minStep, setMinStep] = useState(0);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const openModal = useCallback((options: EnquiryModalOptions = {}) => {
-    const preset = presetFromCategory(options.serviceCategory);
-    const presetCat = preset ? mainCategories.find((c) => c.id === preset.categoryId) ?? null : null;
+    // Preferred-vendor flow: the vendor's category/subcategory are the source of
+    // truth (not the free-text serviceCategory). Resolve them into the modal's
+    // own structure; fall back to the normal preset when they can't be resolved.
+    const isPreferred = options.leadIntent === "preferred_vendor" && Boolean(options.targetVendorId);
+    const preferredSelection = isPreferred ? resolvePreferredSelection(options.targetVendorCategory) : null;
+
+    const preset = preferredSelection ? null : presetFromCategory(options.serviceCategory);
+    const presetCat = preferredSelection
+      ? mainCategories.find((c) => c.id === preferredSelection.categoryId) ?? null
+      : preset
+        ? mainCategories.find((c) => c.id === preset.categoryId) ?? null
+        : null;
 
     let presetService = "";
     let presetSub = "";
-    if (presetCat) {
+    if (preferredSelection) {
+      presetService = preferredSelection.serviceRequired;
+      presetSub = preferredSelection.subcategory;
+    } else if (presetCat) {
       if (presetCat.category) {
         presetService = enquiryServiceForCategory(presetCat.category);
       } else if (preset?.sub) {
@@ -303,6 +365,12 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Option A: skip category/subcategory (and city, when the vendor prefills it)
+    // for a resolved preferred-vendor flow — land on the first field the client
+    // still has to complete (budget when city is known, else the city/area step).
+    const hasCity = Boolean(options.city && options.city.trim());
+    const startStep = preferredSelection ? (hasCity ? 3 : 2) : 0;
+
     setError("");
     setSuccess(false);
     setSuccessMessage("");
@@ -310,7 +378,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setShowConfirm(false);
     setLocStatus("");
     setTouched({});
-    setStep(0);
+    setMinStep(preferredSelection ? startStep : 0);
+    setStep(startStep);
     setModalOptions(options);
     setForm({
       ...initialState,
@@ -323,7 +392,21 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       serviceRequired: presetService,
     });
     setOpen(true);
-    trackEvent("requirement_flow_started", { source: options.source ?? "Requirement flow" });
+    if (preferredSelection) {
+      // Safe debug only — never logs the client's name/phone.
+      console.info("[requirement flow] preferred-vendor prefill", {
+        source: options.source ?? "Vendor CTA",
+        category: preferredSelection.categoryLabel,
+        subcategory: options.targetVendorSubcategory ?? presetSub ?? null,
+        has_city: hasCity,
+        has_area: Boolean(options.area && options.area.trim()),
+        start_step: startStep,
+      });
+    }
+    trackEvent("requirement_flow_started", {
+      source: options.source ?? "Requirement flow",
+      intent: isPreferred ? "preferred_vendor" : "general_auto_match",
+    });
   }, []);
 
   const contextValue = useMemo(() => ({ openModal }), [openModal]);
@@ -338,6 +421,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setLocStatus("");
     setTouched({});
     setStep(0);
+    setMinStep(0);
     setModalOptions({});
     setForm(initialState);
   }, []);
@@ -464,6 +548,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
   /** Validation message for a step, or null when the step is complete. */
   function stepError(target: number): string | null {
+    // Preferred-vendor flow: category + subcategory are prefilled from the vendor,
+    // so those steps always pass (the client never navigates to them).
+    if (minStep > 0 && (target === 0 || target === 1)) return null;
     switch (target) {
       case 0:
         return form.categoryId ? null : "Select a service category.";
@@ -528,7 +615,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setError("");
     let prev = step - 1;
     if (step === 2 && !isInterior) prev = 0;
-    setStep(Math.max(prev, 0));
+    // Never step back past minStep — in the preferred-vendor flow this keeps the
+    // prefilled category/subcategory (and city) steps locked away from the client.
+    setStep(Math.max(prev, minStep, 0));
   }
 
   function requestClose() {
@@ -1231,9 +1320,38 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   <p>{successMessage || "Your requirement has been submitted. QuickFurno will connect you with up to 3 verified vendors near you."}</p>
                 </div>
               ) : (
-                <div className="qf-rf-step" key={step}>
-                  {renderStep()}
-                </div>
+                <>
+                  {minStep > 0 ? (
+                    <div
+                      className="qf-rf-preferred-summary"
+                      style={{
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 12,
+                        padding: "12px 14px",
+                        marginBottom: 16,
+                        background: "#f9fafb",
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      <strong style={{ display: "block", marginBottom: 4 }}>
+                        You are requesting a quote from {modalOptions.targetVendorName || "this vendor"}
+                      </strong>
+                      <div style={{ color: "#4b5563" }}>
+                        Service: {modalOptions.targetVendorCategory || form.serviceRequired || "—"}
+                        {modalOptions.targetVendorSubcategory ? ` / ${modalOptions.targetVendorSubcategory}` : ""}
+                      </div>
+                      {form.area || form.city ? (
+                        <div style={{ color: "#4b5563" }}>
+                          Area: {[form.area, form.city].filter(Boolean).join(", ")}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="qf-rf-step" key={step}>
+                    {renderStep()}
+                  </div>
+                </>
               )}
             </div>
 
@@ -1245,7 +1363,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
               </footer>
             ) : (
               <footer className="qf-rf-footer">
-                {step > 0 ? (
+                {step > minStep ? (
                   <button type="button" className="qf-rf-btn qf-rf-btn--ghost" onClick={goBack}>
                     Back
                   </button>

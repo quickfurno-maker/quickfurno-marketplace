@@ -12,9 +12,14 @@
 // only and are never persisted.
 // ============================================================================
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adminPrepareLeadClarification, adminUpdateLeadStatus } from "@/app/actions";
+import {
+  adminGetLeadClarificationResponses,
+  adminPrepareLeadClarification,
+  adminSaveLeadClarificationResponses,
+  adminUpdateLeadStatus,
+} from "@/app/actions";
 import {
   ActionMenu,
   ChartCard,
@@ -35,6 +40,7 @@ import type {
   Lead,
   LeadAssignmentQueueRow,
   LeadClarificationRequest,
+  LeadClarificationResponseRow,
   LeadDeliveryLog,
   Snapshot,
   Vendor,
@@ -300,6 +306,16 @@ function clarificationLabel(row: CrmRow): string {
   return `${String(status ?? "required").replace(/_/g, " ")}${missingCount ? ` (${missingCount})` : ""}`;
 }
 
+// Phase 1.6 — compact status badge for the lead list/table and drawer header.
+function clarificationBadge(row: CrmRow): { label: string; tone: BadgeTone } {
+  const status = String(row.latestClarification?.status ?? row.lead.clarification_status ?? "").toLowerCase();
+  if (status === "completed_upgraded") return { label: "Clarified - Review", tone: "emerald" };
+  if (status === "completed_still_incomplete") return { label: "Still Incomplete", tone: "rose" };
+  if (status === "preview_prepared" || status === "preview_sent") return { label: "B Clarification", tone: "amber" };
+  if (!status && !row.lead.clarification_required) return { label: "Not prepared", tone: "slate" };
+  return { label: clarificationLabel(row), tone: row.lead.clarification_required ? "amber" : "slate" };
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -406,6 +422,8 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
           deliveryLogs={deliveryByLead.get(selected.id) ?? []}
           notificationLogs={notifByLead.get(selected.id) ?? []}
           onPrepareClarification={prepareClarification}
+          onRefresh={() => router.refresh()}
+          notify={notify}
           isPending={isPending}
           onClose={() => setSelected(null)}
         />
@@ -575,7 +593,7 @@ function LeadInbox({
           { header: "Quality", cell: (row) => row.qualityBadge
             ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} />
             : <StatusBadge value="Not scored" tone="slate" /> },
-          { header: "Clarification", cell: (row) => <StatusBadge value={clarificationLabel(row)} tone={row.lead.clarification_required ? "amber" : "slate"} /> },
+          { header: "Clarification", cell: (row) => { const b = clarificationBadge(row); return <StatusBadge value={b.label} tone={b.tone} />; } },
           { header: "Client", cell: (row) => (
             <div className="min-w-40">
               <p className="font-semibold text-slate-900">{row.name}</p>
@@ -827,6 +845,8 @@ function LeadDrawer({
   deliveryLogs,
   notificationLogs,
   onPrepareClarification,
+  onRefresh,
+  notify,
   isPending,
   onClose,
 }: {
@@ -835,10 +855,82 @@ function LeadDrawer({
   deliveryLogs: LeadDeliveryLog[];
   notificationLogs: ClientNotificationLog[];
   onPrepareClarification: (leadId: string) => void;
+  onRefresh: () => void;
+  notify: (message: string, tone?: "success" | "error" | "info") => void;
   isPending: boolean;
   onClose: () => void;
 }) {
   const lead = row.lead;
+
+  // Phase 1.6 — admin-entered clarification answers (preview ingestion).
+  const requestId = row.latestClarification?.id ?? null;
+  const questions = normalizeClarificationQuestions(row.latestClarification?.questions_json);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [responses, setResponses] = useState<LeadClarificationResponseRow[]>([]);
+  const clarify = clarificationBadge(row);
+
+  useEffect(() => {
+    let active = true;
+    setAnswers({});
+    setSaveResult(null);
+    if (!row.id || !requestId) {
+      setResponses([]);
+      return;
+    }
+    adminGetLeadClarificationResponses(row.id, requestId)
+      .then((result) => { if (active) setResponses(result.ok ? result.data : []); })
+      .catch(() => { if (active) setResponses([]); });
+    return () => { active = false; };
+  }, [row.id, requestId]);
+
+  function handleSaveResponses() {
+    if (!requestId) return;
+    const payload = questions
+      .map((question) => {
+        const value = (answers[question.key] ?? "").trim();
+        if (!value) return null;
+        const label = question.options.find((option) => option.value === value)?.label ?? value;
+        return { question_key: question.key, answer_value: value, answer_label: label };
+      })
+      .filter((entry): entry is { question_key: string; answer_value: string; answer_label: string } => entry !== null);
+
+    if (payload.length === 0) {
+      setSaveResult({ tone: "error", message: "Select or enter at least one answer before saving." });
+      return;
+    }
+
+    setSaving(true);
+    setSaveResult(null);
+    adminSaveLeadClarificationResponses(row.id, requestId, payload)
+      .then((result) => {
+        if (!result.ok) {
+          const message = result.error ?? "Could not save clarification answers.";
+          setSaveResult({ tone: "error", message });
+          notify(message, "error");
+          return;
+        }
+        const { score, status } = result.data;
+        const upgraded = status === "completed_upgraded";
+        setSaveResult({
+          tone: "success",
+          message: `Saved. New score ${score.total_score}/100 (class ${score.score_class}). ${upgraded ? "Lead upgraded to Manual Review." : "Still incomplete — clarification still required."}`,
+        });
+        notify(upgraded ? "Clarification saved — lead upgraded to Manual Review." : "Clarification saved — lead still incomplete.", "success");
+        setAnswers({});
+        adminGetLeadClarificationResponses(row.id, requestId)
+          .then((refetch) => { if (refetch.ok) setResponses(refetch.data); })
+          .catch(() => {});
+        onRefresh();
+      })
+      .catch(() => {
+        setSaveResult({ tone: "error", message: "Could not save clarification answers." });
+        notify("Could not save clarification answers.", "error");
+      })
+      .finally(() => setSaving(false));
+  }
+
   return (
     <Drawer title={row.name} subtitle={`${row.service} · ${row.city}`} onClose={onClose}>
       <div className="space-y-5">
@@ -936,6 +1028,87 @@ function LeadDrawer({
                     <p className="mt-1 text-xs text-slate-500">Options: {questionOptions(question)}</p>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {/* Phase 1.6 — admin-only manual ingestion of the client's answers. */}
+            {requestId ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Record Client Clarification Answers</p>
+                  <StatusBadge value={clarify.label} tone={clarify.tone} />
+                </div>
+                <p className="mb-3 text-xs text-emerald-800/80">
+                  Admin-only preview ingestion. Saving applies these answers to the lead and recalculates the quality score.
+                  No WhatsApp is sent, no vendor is assigned, and no credits are deducted.
+                </p>
+
+                {questions.length ? (
+                  <div className="space-y-3">
+                    {questions.map((question, index) => (
+                      <div key={question.key} className="space-y-1">
+                        <label className="block text-xs font-semibold text-slate-700">{index + 1}. {question.text}</label>
+                        {question.type === "single_choice" && question.options.length ? (
+                          <select
+                            value={answers[question.key] ?? ""}
+                            onChange={(event) => setAnswers((prev) => ({ ...prev, [question.key]: event.target.value }))}
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                          >
+                            <option value="">Select an answer…</option>
+                            {question.options.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={answers[question.key] ?? ""}
+                            onChange={(event) => setAnswers((prev) => ({ ...prev, [question.key]: event.target.value }))}
+                            placeholder="Type the client's answer…"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                          />
+                        )}
+                      </div>
+                    ))}
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveResponses}
+                        disabled={saving}
+                        className="rounded-lg border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {saving ? "Saving…" : "Save clarification answers & rescore"}
+                      </button>
+                      {saveResult ? (
+                        <span className={`text-xs font-semibold ${saveResult.tone === "success" ? "text-emerald-700" : "text-rose-600"}`}>
+                          {saveResult.message}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState title="No structured questions" message="This preview has no structured questions to answer." compact />
+                )}
+              </div>
+            ) : null}
+
+            {/* Phase 1.6 — saved answer history from lead_clarification_responses. */}
+            {responses.length ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Saved clarification answers ({responses.length})</p>
+                <div className="space-y-2">
+                  {responses.map((response) => (
+                    <div key={response.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                      <p className="font-semibold text-slate-900">{response.answer_label || response.answer_value}</p>
+                      <p className="mt-0.5 text-slate-500">Question: {response.question_key}</p>
+                      {response.mapped_field ? (
+                        <p className="mt-0.5 text-slate-500">Mapped: {response.mapped_field} → {response.mapped_value || response.answer_value}</p>
+                      ) : null}
+                      <p className="mt-0.5 text-slate-400">{formatDate(response.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>
@@ -1083,6 +1256,40 @@ function questionOptions(question: Record<string, unknown>): string {
     return "";
   }).filter(Boolean);
   return labels.join(", ") || "Free text";
+}
+
+// Phase 1.6 — normalise the stored questions_json into a typed shape the drawer
+// answer form can render (single_choice → <select>, free_text_later → text input).
+type DrawerClarificationQuestion = {
+  key: string;
+  text: string;
+  type: string;
+  options: Array<{ value: string; label: string }>;
+};
+
+function normalizeClarificationQuestions(
+  raw: Array<Record<string, unknown>> | null | undefined,
+): DrawerClarificationQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item, index) => {
+    const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const options = Array.isArray(record.options) ? record.options : [];
+    return {
+      key: String(record.key ?? `question_${index}`),
+      text: String(record.text ?? "Question"),
+      type: String(record.type ?? "single_choice"),
+      options: options
+        .map((option) => {
+          if (typeof option === "string") return { value: option, label: option };
+          if (option && typeof option === "object") {
+            const o = option as { value?: unknown; label?: unknown };
+            return { value: String(o.value ?? o.label ?? ""), label: String(o.label ?? o.value ?? "") };
+          }
+          return { value: "", label: "" };
+        })
+        .filter((option) => option.value),
+    };
+  });
 }
 
 function cap(value: string): string {

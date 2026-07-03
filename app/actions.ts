@@ -553,6 +553,40 @@ export const adminPrepareLeadClarification = async (leadId: string) =>
     revalidatePath("/admin/leads");
     return result;
   });
+
+// Phase 1.6 — Clarification Response Ingestion (PREVIEW, superadmin-only).
+// Records the client's clarification answers that an admin entered manually in
+// the CRM, applies them to the lead, and re-scores. Deliberately has NO vendor
+// assignment, NO credit deduction, NO WhatsApp send, and NO vendor notification.
+export const adminSaveLeadClarificationResponses = async (
+  leadId: string,
+  requestId: string,
+  responses: Array<{ question_key: string; answer_value: string; answer_label?: string | null }>,
+) =>
+  asAdmin(async () => {
+    const cleanLeadId = String(leadId ?? "").trim();
+    const cleanRequestId = String(requestId ?? "").trim();
+    if (!cleanLeadId || !cleanRequestId) return fail(appError("VALIDATION"));
+
+    const cleaned: leadClarifications.ClarificationResponseInput[] = (Array.isArray(responses) ? responses : [])
+      .map((response) => ({
+        question_key: String(response?.question_key ?? "").trim(),
+        answer_value: String(response?.answer_value ?? "").trim(),
+        answer_label: response?.answer_label != null ? String(response.answer_label).trim() : null,
+      }))
+      .filter((response) => response.question_key && response.answer_value);
+    if (cleaned.length === 0) return fail(appError("VALIDATION"));
+
+    const result = await leadClarifications.saveClarificationResponses(cleanLeadId, cleanRequestId, cleaned);
+    revalidatePath("/admin/crm");
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/leads");
+    return result;
+  });
+
+// Phase 1.6 — read-only history of saved clarification answers for the drawer.
+export const adminGetLeadClarificationResponses = async (leadId: string, requestId?: string) =>
+  asAdmin(() => leadClarifications.getClarificationResponses(leadId, requestId));
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());
 export const adminApproveVendor   = async (id: string) => asAdmin(() => admin.approveVendor(id));
 export const adminRejectVendor    = async (id: string) => asAdmin(() => admin.rejectVendor(id));

@@ -440,6 +440,19 @@ export type LeadClarificationRequest = {
   updated_at?: string | null;
 };
 
+// Phase 1.6 — one saved clarification answer (admin-entered, preview flow).
+export type LeadClarificationResponseRow = {
+  id: string;
+  lead_id?: string | null;
+  request_id?: string | null;
+  question_key: string;
+  answer_value: string;
+  answer_label?: string | null;
+  mapped_field?: string | null;
+  mapped_value?: string | null;
+  created_at?: string | null;
+};
+
 // Row-limit metadata for the shared admin snapshot. Lets the dashboard/CRM show
 // a subtle "showing latest N of M" note while KPI totals stay accurate (counted
 // server-side, independent of these row limits).

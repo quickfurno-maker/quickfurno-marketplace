@@ -35,6 +35,18 @@ export type ClarificationResponseInput = {
   raw_payload?: Record<string, unknown>;
 };
 
+export type LeadClarificationResponseRow = {
+  id: string;
+  lead_id: string;
+  request_id: string;
+  question_key: string;
+  answer_value: string;
+  answer_label: string | null;
+  mapped_field: string | null;
+  mapped_value: string | null;
+  created_at: string | null;
+};
+
 type LeadRow = ClarificationLeadLike & {
   id: string;
   phone?: string | null;
@@ -121,6 +133,32 @@ export async function getLatestClarificationRequest(leadId: string): Promise<Res
       .limit(1);
     if (error) throw error;
     return ok(data?.[0] ? normalizeRequest(data[0]) : null);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Phase 1.6 — read-only response history for the CRM drawer. Returns the saved
+ * clarification answers for a lead (optionally scoped to one request), newest
+ * first. No side effects: pure select from lead_clarification_responses.
+ */
+export async function getClarificationResponses(
+  leadId: string,
+  requestId?: string | null,
+): Promise<Result<LeadClarificationResponseRow[]>> {
+  try {
+    if (!leadId) throw appError("VALIDATION");
+    let query = adminClient()
+      .from("lead_clarification_responses")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false });
+    if (requestId) query = query.eq("request_id", requestId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return ok((data ?? []).map(normalizeResponseRow));
   } catch (e) {
     return fail(e);
   }
@@ -269,6 +307,21 @@ function normalizeRequest(value: unknown): LeadClarificationRequest {
     status: stringOrNull(record.status),
     created_at: stringOrNull(record.created_at),
     updated_at: stringOrNull(record.updated_at),
+  };
+}
+
+function normalizeResponseRow(value: unknown): LeadClarificationResponseRow {
+  const record = isRecord(value) ? value : {};
+  return {
+    id: String(record.id ?? ""),
+    lead_id: String(record.lead_id ?? ""),
+    request_id: String(record.request_id ?? ""),
+    question_key: String(record.question_key ?? ""),
+    answer_value: String(record.answer_value ?? ""),
+    answer_label: stringOrNull(record.answer_label),
+    mapped_field: stringOrNull(record.mapped_field),
+    mapped_value: stringOrNull(record.mapped_value),
+    created_at: stringOrNull(record.created_at),
   };
 }
 

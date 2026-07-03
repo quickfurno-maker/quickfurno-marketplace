@@ -67,6 +67,10 @@ type PreferredBadge =
   | { label: string; tone: BadgeTone }
   | null;
 
+type QualityBadge =
+  | { label: string; tone: BadgeTone }
+  | null;
+
 type CrmRow = {
   lead: Lead;
   id: string;
@@ -82,6 +86,7 @@ type CrmRow = {
   intent: string;
   isPreferred: boolean;
   preferredBadge: PreferredBadge;
+  qualityBadge: QualityBadge;
   assignedCount: number;
   assignments: Assignment[];
   priority: CrmPriority;
@@ -150,6 +155,11 @@ function waNumber(digits: string): string {
 
 function computePriority(lead: Lead, signals: LeadScoringSignals): CrmPriority {
   if (lead.is_duplicate) return "duplicate";
+  const qualityClass = String(lead.lead_quality_class ?? "").toUpperCase();
+  if (qualityClass === "A+" || qualityClass === "A") return "hot";
+  if (qualityClass === "B") return "warm";
+  if (qualityClass === "C") return "weak";
+  if (qualityClass === "D") return "spam";
   const status = String(lead.status ?? "").toLowerCase();
   if (/spam|bad|invalid|junk/.test(status)) return "spam";
   if (signals.looks_like_test_name || (signals.blank_requirement && !signals.has_valid_phone)) return "weak";
@@ -161,7 +171,7 @@ function computePriority(lead: Lead, signals: LeadScoringSignals): CrmPriority {
 function statusBucket(lead: Lead, assignedCount: number): CrmStatusBucket {
   const s = String(lead.status ?? "").toLowerCase();
   if (lead.is_duplicate || s.includes("duplicate")) return "duplicate";
-  if (/spam|bad|invalid|junk/.test(s)) return "spam";
+  if (/spam|bad|invalid|junk|rejected quality/.test(s) || String(lead.lead_quality_class ?? "").toUpperCase() === "D") return "spam";
   if (s.includes("won") || s.includes("convert")) return "won";
   if (s.includes("lost")) return "lost";
   if (s.includes("quotation")) return "quotation";
@@ -169,6 +179,22 @@ function statusBucket(lead: Lead, assignedCount: number): CrmStatusBucket {
   if (s.includes("contact")) return "contacted";
   if (s.includes("assign") || assignedCount > 0) return "assigned";
   return "new";
+}
+
+function leadQualityBadge(lead: Lead): QualityBadge {
+  if (lead.is_duplicate) return { label: "Duplicate", tone: "violet" };
+  const action = String(lead.lead_quality_recommended_action ?? "").toLowerCase();
+  const hardBlock = String(lead.lead_quality_hard_block_reason ?? "").toLowerCase();
+  if (action.includes("consent_required") || hardBlock.includes("share_consent")) {
+    return { label: "No Consent", tone: "amber" };
+  }
+  const qualityClass = String(lead.lead_quality_class ?? "").toUpperCase();
+  if (qualityClass === "A+") return { label: "A+ Hot", tone: "rose" };
+  if (qualityClass === "A") return { label: "A Verified", tone: "emerald" };
+  if (qualityClass === "B") return { label: "B Clarification", tone: "amber" };
+  if (qualityClass === "C") return { label: "C Weak", tone: "slate" };
+  if (qualityClass === "D") return { label: "D Reject/Spam", tone: "rose" };
+  return null;
 }
 
 function preferredBadge(lead: Lead, assignedCount: number): PreferredBadge {
@@ -231,6 +257,7 @@ function buildRows(data: Snapshot): CrmRow[] {
         intent: String(lead.lead_intent ?? "general_auto_match"),
         isPreferred: String(lead.lead_intent ?? "").toLowerCase() === "preferred_vendor",
         preferredBadge: preferredBadge(lead, assignedCount),
+        qualityBadge: leadQualityBadge(lead),
         assignedCount,
         assignments,
         priority: computePriority(lead, signals),
@@ -291,11 +318,22 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
 
   const kpis = useMemo(() => buildKpis(rows), [rows]);
 
+  // Row-limit note: the snapshot returns the LATEST leads only (see
+  // services/adminService.ts). KPI totals shown across admin stay accurate via
+  // server-side count queries. TODO(pagination): move CRM lists to server-side
+  // pagination + filters so all leads become browsable.
+  const meta = data.snapshotMeta;
+  const totalLeads = meta?.totals?.total_leads ?? rows.length;
+  const isLimited = Boolean(meta && meta.rowsLoaded?.leads < totalLeads);
+
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-900">
-        Operations CRM — live from your lead pipeline ({formatNumber(rows.length)} leads). Priority labels are
+        Operations CRM — live from your lead pipeline. Priority labels are
         computed for display only and are never written to the database.
+        {isLimited
+          ? ` Showing the latest ${formatNumber(rows.length)} of ${formatNumber(totalLeads)} leads — KPI totals below are accurate.`
+          : ` Showing ${formatNumber(rows.length)} leads.`}
         {error ? ` Some data was limited: ${error}` : ""}
       </div>
 
@@ -452,7 +490,7 @@ function LeadInbox({
 
   const filtered = useMemo(() => rows.filter((row) => {
     return passesQuickFilter(row, quickFilter)
-      && includesQuery([row.name, row.phone, row.city, row.area, row.service, row.statusLabel, row.source, row.priority], query)
+      && includesQuery([row.name, row.phone, row.city, row.area, row.service, row.statusLabel, row.source, row.priority, row.qualityBadge?.label], query)
       && (city === "All" || row.city === city)
       && (service === "All" || row.service === service)
       && (priority === "All" || row.priority === priority.toLowerCase())
@@ -499,6 +537,9 @@ function LeadInbox({
         emptyMessage="Adjust the filters, clear the quick filter, or wait for new lead submissions."
         columns={[
           { header: "Priority", cell: (row) => <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} /> },
+          { header: "Quality", cell: (row) => row.qualityBadge
+            ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} />
+            : <StatusBadge value="Not scored" tone="slate" /> },
           { header: "Client", cell: (row) => (
             <div className="min-w-40">
               <p className="font-semibold text-slate-900">{row.name}</p>
@@ -763,6 +804,7 @@ function LeadDrawer({
       <div className="space-y-5">
         <div className="flex flex-wrap gap-2">
           <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} />
+          {row.qualityBadge ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} /> : null}
           <StatusBadge value={row.statusLabel} />
           {row.preferredBadge ? <StatusBadge value={row.preferredBadge.label} tone={row.preferredBadge.tone} /> : null}
           {row.phoneDigits ? (
@@ -790,6 +832,18 @@ function LeadDrawer({
             ["Timeline", row.timeline],
             ["Property type", lead.property_type || "Not set"],
             ["Message", lead.message || "None"],
+          ]} />
+        </DrawerSection>
+
+        <DrawerSection title="Lead quality">
+          <InfoGrid rows={[
+            ["Score", lead.lead_quality_score != null ? `${lead.lead_quality_score}/100` : "Not scored"],
+            ["Class", lead.lead_quality_class || "Not scored"],
+            ["Quality status", (lead.lead_quality_status || "Not set").replace(/_/g, " ")],
+            ["Recommended action", (lead.lead_quality_recommended_action || "Not set").replace(/_/g, " ")],
+            ["Hard block", (lead.lead_quality_hard_block_reason || "None").replace(/_/g, " ")],
+            ["Checked at", lead.lead_quality_checked_at ? formatDate(lead.lead_quality_checked_at) : "Not checked"],
+            ["Breakdown", "Latest score summary is mirrored here. TODO: load restricted lead_scores history for detailed breakdown."],
           ]} />
         </DrawerSection>
 

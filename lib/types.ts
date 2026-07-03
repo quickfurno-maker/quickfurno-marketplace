@@ -5,7 +5,8 @@
 export type VendorStatus = "Pending" | "Approved" | "Rejected" | "Suspended";
 export type LeadStatus =
   | "New" | "Assigned" | "Contacted" | "Site Visit Scheduled"
-  | "Quotation Sent" | "Won" | "Lost" | "Duplicate";
+  | "Quotation Sent" | "Won" | "Lost" | "Duplicate"
+  | "Quality Checked" | "Clarification Required" | "Hot Lead" | "Nurture" | "Rejected Quality";
 export type VendorLeadStatus =
   | "New" | "Contacted" | "Follow-up Needed" | "Site Visit Scheduled" | "Quotation Sent" | "Converted" | "Won" | "Lost";
 export type AssignmentType = "client_selected" | "auto_assigned" | "admin_assigned";
@@ -13,8 +14,11 @@ export type AssignmentType = "client_selected" | "auto_assigned" | "admin_assign
 export interface CreateLeadInput {
   name: string;
   phone: string;
+  email?: string;
   city: string;
   area?: string;
+  pincode?: string;
+  address?: string;
   service_required?: string;
   service_category?: string;
   serviceCategory?: string;

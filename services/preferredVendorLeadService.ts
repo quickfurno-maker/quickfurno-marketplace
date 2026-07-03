@@ -42,6 +42,7 @@ export type PreferredVendorRoutingStatus =
   | "preferred_vendor_not_eligible"
   | "preferred_vendor_not_found"
   | "preferred_vendor_pending"
+  | "quality_gate_hold"
   | "failed";
 
 export type PreferredVendorRoutingResult = {
@@ -229,6 +230,24 @@ export async function routePreferredVendorLead(
     });
     return result("failed", false, vendorId || null, fallbackName, "unexpected_error");
   }
+}
+
+/**
+ * Preferred-vendor lead was captured, but Phase 1 quality gate held it before
+ * any credit deduction/contact share. This does not call the assignment RPC.
+ */
+export async function holdPreferredVendorForQualityGate(
+  input: RoutePreferredVendorInput & { reason?: string | null },
+): Promise<PreferredVendorRoutingResult> {
+  const vendorId = String(input.vendorId ?? "").trim();
+  const reason = asText(input.reason) ?? "lead_quality_gate_hold";
+  const vendorName = asText(input.vendorName);
+  try {
+    await markLeadPreferred(input, "quality_gate_hold", reason, vendorName);
+  } catch {
+    // Lead submission must remain successful even if this audit write is skipped.
+  }
+  return result("quality_gate_hold", false, vendorId || null, vendorName, reason);
 }
 
 type RpcResult = { status: string; assigned: boolean; reason: string | null; assignment_id: string | null };

@@ -23,6 +23,7 @@ const AOS_EMIT_TIMEOUT_MS = 3_000;
 const LEAD_CREATED_SOURCE = "quickfurno-real-lead-form";
 
 export interface EmitLeadCreatedInput {
+  eventType?: "lead.created" | "lead.scored" | "lead.qualified" | "lead.clarification_required" | "lead.rejected_quality";
   /** The actual saved lead id from Supabase, when available. */
   leadId?: string | null;
   name?: string | null;
@@ -45,12 +46,13 @@ export interface EmitLeadCreatedInput {
 export async function emitLeadCreatedEvent(input: EmitLeadCreatedInput): Promise<boolean> {
   try {
     const leadId = nonEmpty(input.leadId) ?? generateFallbackLeadId();
+    const eventType = input.eventType ?? "lead.created";
 
     // Assemble the safe event. The pipeline masks PII before any dispatch and
     // only forwards a safe summary when n8n is explicitly enabled.
     const payload = {
-      event: "lead.created" as const,
-      eventType: "lead.created" as const,
+      event: eventType,
+      eventType,
       lead_id: leadId,
       source: LEAD_CREATED_SOURCE,
       lead: {
@@ -77,8 +79,9 @@ export async function emitLeadCreatedEvent(input: EmitLeadCreatedInput): Promise
       return false;
     }
 
-    console.info("[aos][lead.created] safe event emitted", {
+    console.info("[aos][lead] safe event emitted", {
       leadId,
+      eventType,
       status: result.status,
       n8nWebhookCalled: result.n8nWebhookCalled,
       mockMode: result.mockMode,

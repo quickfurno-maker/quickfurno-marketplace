@@ -5,7 +5,10 @@ import { resolveAosN8nActivation, type AosRuntimeMode } from "@/lib/aos/runtime/
 
 type SafeAgentEventType =
   | "lead.created"
+  | "lead.scored"
   | "lead.qualified"
+  | "lead.clarification_required"
+  | "lead.rejected_quality"
   | "lead.assignment_preview"
   | "lead.assignment_approved"
   | "lead.assignment_queued"
@@ -69,7 +72,10 @@ export interface SafeAgentEventResponse {
 
 const supportedSafeAgentEvents: SafeAgentEventType[] = [
   "lead.created",
+  "lead.scored",
   "lead.qualified",
+  "lead.clarification_required",
+  "lead.rejected_quality",
   "lead.assignment_preview",
   "lead.assignment_approved",
   "lead.assignment_queued",
@@ -215,6 +221,10 @@ function normalizeSafeAgentEventPayload(payload: unknown) {
 
 function normalizeSafeEventType(value: string | null): SafeAgentEventType {
   if (value === "lead.assignment_preview") return "lead.assignment_preview";
+  if (value === "lead.scored") return "lead.scored";
+  if (value === "lead.qualified") return "lead.qualified";
+  if (value === "lead.clarification_required") return "lead.clarification_required";
+  if (value === "lead.rejected_quality") return "lead.rejected_quality";
   if (value === "lead.assignment_approved") return "lead.assignment_approved";
   if (value === "lead.assignment_queued") return "lead.assignment_queued";
   if (value === "lead.assignment_queue_rechecked") return "lead.assignment_queue_rechecked";

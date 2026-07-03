@@ -8,6 +8,19 @@ import type { AdminDashboardStats } from "../lib/types";
 
 const head = (q: any) => q.select("id", { count: "exact", head: true });
 
+// ── Admin snapshot row limits ──────────────────────────────────────────────
+// The shared admin snapshot powers /admin/dashboard, /admin/crm and every
+// /admin/[section] page. It returns only the LATEST rows per table so page load
+// stays fast as leads/vendors/logs grow. Accurate KPI totals do NOT come from
+// these limited arrays — they come from separate count(head) + tiny aggregate
+// queries in getSuperadminSnapshot.
+// TODO(pagination): move CRM + admin lists to server-side pagination + filters.
+// This phase intentionally uses "latest N rows + accurate aggregate counts".
+const DEFAULT_ADMIN_ROW_LIMIT = 50;
+const LOG_ROW_LIMIT = 100;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const LARGE_LOG_ROW_LIMIT = 200; // reserved for future high-volume log views
+
 type AdminPackageInput = {
   name: string;
   lead_count: number;
@@ -170,6 +183,38 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       return [];
     }
 
+    // Count-only (head) query wrapper. Never throws: returns 0 if the table /
+    // filter is unavailable. Counts are accurate and independent of the row
+    // limits applied to the snapshot arrays below.
+    async function safeCount(label: string, query: PromiseLike<{ count: number | null; error: any }>): Promise<number> {
+      try {
+        const { count, error } = await query;
+        if (error) {
+          if (!isMissingRelationError(error)) console.warn(`[admin snapshot] count ${label} failed`, { message: error.message });
+          return 0;
+        }
+        return count ?? 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    // Tiny column-only projection (no row limit) used only for accurate sums /
+    // distinct counts (e.g. amount, remaining_credits, vendor_id). Returns [] on
+    // error so KPI totals degrade gracefully.
+    async function safeAggregateRows(label: string, query: PromiseLike<{ data: Array<Record<string, any>> | null; error: any }>): Promise<Array<Record<string, any>>> {
+      try {
+        const { data, error } = await query;
+        if (error) {
+          if (!isMissingRelationError(error)) console.warn(`[admin snapshot] aggregate ${label} failed`, { message: error.message });
+          return [];
+        }
+        return data ?? [];
+      } catch {
+        return [];
+      }
+    }
+
     const [
       leads,
       vendors,
@@ -196,30 +241,33 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       clientNotificationLogs,
       badLeadReportComments,
     ] = await Promise.all([
-      safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)").order("created_at", { ascending: false }), db.from("leads").select("*").order("created_at", { ascending: false })),
-      safeSelect("vendors", db.from("vendors").select("*").order("created_at", { ascending: false })),
+      // Leads: latest N only (primary embeds each lead's assignments; fallback
+      // drops the embed). Accurate lead totals come from count queries below.
+      safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT), db.from("leads").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendors", db.from("vendors").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      // packages / categories / cities / settings are small config tables — unlimited.
       safeSelect("packages", db.from("packages").select("*").order("lead_count", { ascending: true })),
-      safeSelect("payments", db.from("payments").select("*").order("created_at", { ascending: false })),
-      safeSelect("vendor_packages", db.from("vendor_packages").select("*").order("purchase_date", { ascending: false })),
-      safeSelect("vendor_package_orders", db.from("vendor_package_orders").select("*").order("created_at", { ascending: false })),
-      safeSelect("vendor_profile_change_requests", db.from("vendor_profile_change_requests").select("*").order("created_at", { ascending: false })),
-      safeSelect("vendor_notifications", db.from("vendor_notifications").select("*").order("created_at", { ascending: false })),
-      safeSelect("vendor_support_threads", db.from("vendor_support_threads").select("*").order("updated_at", { ascending: false })),
-      safeSelect("vendor_support_messages", db.from("vendor_support_messages").select("*").order("created_at", { ascending: true })),
-      safeSelect("lead_assignments", db.from("lead_assignments").select("*").order("assigned_at", { ascending: false })),
+      safeSelect("payments", db.from("payments").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendor_packages", db.from("vendor_packages").select("*").order("purchase_date", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendor_package_orders", db.from("vendor_package_orders").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendor_profile_change_requests", db.from("vendor_profile_change_requests").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendor_notifications", db.from("vendor_notifications").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendor_support_threads", db.from("vendor_support_threads").select("*").order("updated_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("vendor_support_messages", db.from("vendor_support_messages").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
+      safeSelect("lead_assignments", db.from("lead_assignments").select("*").order("assigned_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
       safeSelect("service_categories", db.from("service_categories").select("*").order("name", { ascending: true })),
       safeSelect("cities", db.from("cities").select("*").order("name", { ascending: true })),
-      safeSelect("bad_lead_reports", db.from("bad_lead_reports").select("*").order("created_at", { ascending: false })),
+      safeSelect("bad_lead_reports", db.from("bad_lead_reports").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
       safeSelect("app_settings", db.from("app_settings").select("*").order("key", { ascending: true })),
-      safeSelect("profiles", db.from("profiles").select("id, created_at, full_name, phone, role, is_active").order("created_at", { ascending: false })),
+      safeSelect("profiles", db.from("profiles").select("id, created_at, full_name, phone, role, is_active").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
       safeSelect("marketplace_runtime_settings", db.from("marketplace_runtime_settings").select("*").order("key", { ascending: true })),
-      safeSelect("free_vendor_profile_interests", db.from("free_vendor_profile_interests").select("*").order("created_at", { ascending: false })),
-      safeSelect("lead_assignment_queue", db.from("lead_assignment_queue").select("*").order("created_at", { ascending: false })),
-      safeSelect("lead_auto_assignment_logs", db.from("lead_auto_assignment_logs").select("*").order("created_at", { ascending: false })),
-      safeSelect("lead_matching_runs", db.from("lead_matching_runs").select("*").order("created_at", { ascending: false }).limit(200)),
-      safeSelect("lead_delivery_logs", db.from("lead_delivery_logs").select("*").order("created_at", { ascending: false }).limit(300)),
-      safeSelect("client_notification_logs", db.from("client_notification_logs").select("*").order("created_at", { ascending: false }).limit(200)),
-      safeSelect("bad_lead_report_comments", db.from("bad_lead_report_comments").select("*").order("created_at", { ascending: true }).limit(500)),
+      safeSelect("free_vendor_profile_interests", db.from("free_vendor_profile_interests").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("lead_assignment_queue", db.from("lead_assignment_queue").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("lead_auto_assignment_logs", db.from("lead_auto_assignment_logs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
+      safeSelect("lead_matching_runs", db.from("lead_matching_runs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
+      safeSelect("lead_delivery_logs", db.from("lead_delivery_logs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
+      safeSelect("client_notification_logs", db.from("client_notification_logs").select("*").order("created_at", { ascending: false }).limit(LOG_ROW_LIMIT)),
+      safeSelect("bad_lead_report_comments", db.from("bad_lead_report_comments").select("*").order("created_at", { ascending: true }).limit(LOG_ROW_LIMIT)),
     ]);
 
     const leadRows = leads;
@@ -239,62 +287,112 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const profileRows = profiles;
 
     const now = new Date();
-    const today = startOfDay(now);
-    const week = startOfWeek(now);
     const month = startOfMonth(now);
-    const paidPayments = paymentRows.filter((payment: any) => payment.payment_status === "Paid");
-    const monthPayments = paidPayments.filter((payment: any) => {
-      const date = safeDate(payment.created_at);
-      return date ? date >= month : false;
-    });
-    const assignedLeads = leadRows.filter((lead: any) =>
-      ["Assigned", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won"].includes(lead.status)
+    const todayIso = startOfDay(now).toISOString();
+    const weekIso = startOfWeek(now).toISOString();
+    const monthIso = month.toISOString();
+
+    const ASSIGNED_STATUSES = ["Assigned", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won"];
+    const FOLLOWUP_STATUSES = ["New", "Verified", "Assigned", "Contacted"];
+
+    // ── Accurate KPI totals via count(head) queries ──────────────────────────
+    // These are counted server-side and are NOT capped by the row limits above.
+    const [
+      cTotalLeads, cLeadsToday, cLeadsWeek, cLeadsMonth,
+      cAssignedLeads, cConvertedLeads, cDuplicateLeads, cPendingFollowups,
+      cTotalVendors, cApprovedVendors, cActiveVendors, cPendingVendors,
+      cLowBalanceVendors, cExpiredVendors, cPendingPayments, cBadReportsPending, cLeadsDistributed,
+    ] = await Promise.all([
+      safeCount("leads.total", head(db.from("leads"))),
+      safeCount("leads.today", head(db.from("leads")).gte("created_at", todayIso)),
+      safeCount("leads.week", head(db.from("leads")).gte("created_at", weekIso)),
+      safeCount("leads.month", head(db.from("leads")).gte("created_at", monthIso)),
+      safeCount("leads.assigned", head(db.from("leads")).in("status", ASSIGNED_STATUSES)),
+      safeCount("leads.converted", head(db.from("leads")).in("status", ["Converted", "Won"])),
+      safeCount("leads.duplicate", head(db.from("leads")).or("is_duplicate.eq.true,status.eq.Duplicate")),
+      safeCount("leads.followups", head(db.from("leads")).in("status", FOLLOWUP_STATUSES)),
+      safeCount("vendors.total", head(db.from("vendors"))),
+      safeCount("vendors.approved", head(db.from("vendors")).eq("status", "Approved")),
+      safeCount("vendors.active", head(db.from("vendors")).eq("is_active", true).in("status", ["Approved", "Active"])),
+      safeCount("vendors.pending", head(db.from("vendors")).eq("status", "Pending")),
+      safeCount("vendors.lowbalance", head(db.from("vendors")).lte("remaining_credits", 3)),
+      safeCount("vendors.expired", head(db.from("vendors")).or("status.eq.Suspended,remaining_credits.lte.0")),
+      safeCount("payments.pending", head(db.from("payments")).eq("payment_status", "Pending")),
+      safeCount("badreports.pending", head(db.from("bad_lead_reports")).eq("status", "Pending")),
+      safeCount("assignments.total", head(db.from("lead_assignments"))),
+    ]);
+
+    // ── Accurate money + credit sums via tiny column-only projections ────────
+    // Only the needed columns are fetched (no select("*"), no row limit), so
+    // totals stay correct while transfer size stays small.
+    const [paidPaymentRowsAll, vendorCreditRowsAll, paidPackageVendorRows] = await Promise.all([
+      safeAggregateRows("payments.paid", db.from("payments").select("amount, created_at").eq("payment_status", "Paid")),
+      safeAggregateRows("vendors.credits", db.from("vendors").select("remaining_credits")),
+      safeAggregateRows("vendor_packages.paid", db.from("vendor_packages").select("vendor_id").or("payment_status.eq.Paid,status.eq.Active")),
+    ]);
+
+    const totalRevenue = sumNumbers(paidPaymentRowsAll, (p) => p.amount);
+    const revenueThisMonth = sumNumbers(
+      paidPaymentRowsAll.filter((p) => { const d = safeDate(p.created_at); return d ? d >= month : false; }),
+      (p) => p.amount,
     );
-    const convertedLeads = leadRows.filter((lead: any) => ["Converted", "Won"].includes(lead.status));
-    const activeVendors = vendorRows.filter((vendor: any) => vendor.is_active && ["Approved", "Active"].includes(vendor.status));
-    const paidVendorIds = new Set(vendorPackageRows.filter((row: any) => row.payment_status === "Paid" || row.status === "Active").map((row: any) => row.vendor_id));
-    const expiredVendors = vendorRows.filter((vendor: any) => vendor.status === "Suspended" || vendor.remaining_credits <= 0);
-    const pendingFollowUps = leadRows.filter((lead: any) => ["New", "Verified", "Assigned", "Contacted"].includes(lead.status)).length;
+    const remainingVendorCredits = sumNumbers(vendorCreditRowsAll, (v) => v.remaining_credits);
+    const paidVendors = new Set(paidPackageVendorRows.map((r) => r.vendor_id).filter(Boolean)).size;
 
     const stats = {
-      total_leads: leadRows.length,
-      leads_today: leadRows.filter((lead: any) => {
-        const date = safeDate(lead.created_at);
-        return date ? date >= today : false;
-      }).length,
-      leads_this_week: leadRows.filter((lead: any) => {
-        const date = safeDate(lead.created_at);
-        return date ? date >= week : false;
-      }).length,
-      leads_this_month: leadRows.filter((lead: any) => {
-        const date = safeDate(lead.created_at);
-        return date ? date >= month : false;
-      }).length,
-      assigned_leads: assignedLeads.length,
-      duplicate_leads: leadRows.filter((lead: any) => lead.is_duplicate || lead.status === "Duplicate").length,
-      total_vendors: vendorRows.length,
-      approved_vendors: vendorRows.filter((vendor: any) => vendor.status === "Approved").length,
-      active_vendors: activeVendors.length,
-      paid_vendors: paidVendorIds.size,
-      pending_vendors: vendorRows.filter((vendor: any) => vendor.status === "Pending").length,
-      expired_vendors: expiredVendors.length,
-      total_revenue: sumNumbers(paidPayments, (payment: any) => payment.amount),
-      revenue_this_month: sumNumbers(monthPayments, (payment: any) => payment.amount),
-      pending_payments: paymentRows.filter((payment: any) => payment.payment_status === "Pending").length,
-      low_balance_vendors: vendorRows.filter((vendor: any) => Number(vendor.remaining_credits ?? 0) <= 3).length,
+      total_leads: cTotalLeads,
+      leads_today: cLeadsToday,
+      leads_this_week: cLeadsWeek,
+      leads_this_month: cLeadsMonth,
+      assigned_leads: cAssignedLeads,
+      duplicate_leads: cDuplicateLeads,
+      total_vendors: cTotalVendors,
+      approved_vendors: cApprovedVendors,
+      active_vendors: cActiveVendors,
+      paid_vendors: paidVendors,
+      pending_vendors: cPendingVendors,
+      expired_vendors: cExpiredVendors,
+      total_revenue: totalRevenue,
+      revenue_this_month: revenueThisMonth,
+      pending_payments: cPendingPayments,
+      low_balance_vendors: cLowBalanceVendors,
       active_cities: cityRows.filter((city: any) => city.is_active).length,
+      // top_category / top_city are a display hint derived from the latest limited
+      // leads (NOT a KPI total) — documented as approximate.
       top_category: topValue(leadRows, (lead: any) => lead.service_required),
       top_city: topValue(leadRows, (lead: any) => lead.city),
-      pending_followups: pendingFollowUps,
-      conversion_rate: leadRows.length ? Math.round((convertedLeads.length / leadRows.length) * 100) : 0,
-      lead_distribution_success_rate: leadRows.length ? Math.round((assignedLeads.length / leadRows.length) * 100) : 0,
-      leads_distributed: assignmentRows.length,
-      remaining_vendor_credits: sumNumbers(vendorRows, (vendor: any) => vendor.remaining_credits),
-      bad_lead_reports_pending: badReportRows.filter((report: any) => report.status === "Pending").length,
+      pending_followups: cPendingFollowups,
+      conversion_rate: cTotalLeads ? Math.round((cConvertedLeads / cTotalLeads) * 100) : 0,
+      lead_distribution_success_rate: cTotalLeads ? Math.round((cAssignedLeads / cTotalLeads) * 100) : 0,
+      leads_distributed: cLeadsDistributed,
+      remaining_vendor_credits: remainingVendorCredits,
+      bad_lead_reports_pending: cBadReportsPending,
+    };
+
+    const snapshotMeta = {
+      generatedAt: new Date().toISOString(),
+      leadsLimit: DEFAULT_ADMIN_ROW_LIMIT,
+      vendorsLimit: DEFAULT_ADMIN_ROW_LIMIT,
+      logsLimit: LOG_ROW_LIMIT,
+      totals: { total_leads: cTotalLeads, total_vendors: cTotalVendors },
+      rowsLoaded: {
+        leads: leadRows.length,
+        vendors: vendorRows.length,
+        payments: paymentRows.length,
+        lead_assignments: assignmentRows.length,
+        lead_assignment_queue: (leadAssignmentQueue as any[]).length,
+        lead_auto_assignment_logs: (autoAssignmentLogs as any[]).length,
+        lead_matching_runs: (leadMatchingRuns as any[]).length,
+        lead_delivery_logs: (leadDeliveryLogs as any[]).length,
+        client_notification_logs: (clientNotificationLogs as any[]).length,
+        free_vendor_profile_interests: (freeVendorInterests as any[]).length,
+        bad_lead_reports: badReportRows.length,
+      },
     };
 
     return ok({
       stats,
+      snapshotMeta,
       leads: leadRows,
       vendors: vendorRows,
       packages: packageRows,

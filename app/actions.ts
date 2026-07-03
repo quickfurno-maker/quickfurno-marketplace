@@ -46,6 +46,13 @@ type CurrentUser = {
   adminRole: AdminRoleName | null;
 };
 
+type LeadQualityGateMirror = {
+  lead_quality_score?: number | null;
+  lead_quality_class?: string | null;
+  lead_quality_hard_block_reason?: string | null;
+  lead_quality_recommended_action?: string | null;
+};
+
 // --------------------------------------------------------------------------
 // Auth guards
 // --------------------------------------------------------------------------
@@ -71,6 +78,28 @@ async function requireSuperadmin() {
   const u = await requireAdmin();
   if (u.adminRole !== "Superadmin") throw appError("UNAUTHORIZED");
   return u;
+}
+
+async function leadPassesQualityGate(leadId: string): Promise<{ pass: boolean; reason: string }> {
+  const { data, error } = await adminClient()
+    .from("leads")
+    .select("lead_quality_score, lead_quality_class, lead_quality_hard_block_reason, lead_quality_recommended_action")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (error || !data) return { pass: false, reason: "lead_quality_unavailable" };
+
+  const lead = data as LeadQualityGateMirror;
+  const score = Number(lead.lead_quality_score ?? 0);
+  const qualityClass = String(lead.lead_quality_class ?? "").toUpperCase();
+  const hardBlock = String(lead.lead_quality_hard_block_reason ?? "").trim();
+  const action = String(lead.lead_quality_recommended_action ?? "").trim();
+
+  const pass = score >= 70
+    && (qualityClass === "A" || qualityClass === "A+")
+    && !hardBlock
+    && action === "auto_distribute";
+
+  return { pass, reason: hardBlock || action || "lead_quality_hold" };
 }
 
 /** Ensure the signed-in user owns the given vendor row. */
@@ -174,6 +203,24 @@ export async function sendClientSelectedVendorEnquiry(
     });
     if (!created.ok) return created;
     const leadId = created.data.id;
+
+    const qualityGate = await leadPassesQualityGate(leadId);
+    if (!qualityGate.pass) {
+      await adminClient().from("leads").update({
+        preferred_vendor_status: "quality_gate_hold",
+        preferred_vendor_status_reason: qualityGate.reason,
+        preferred_vendor_checked_at: new Date().toISOString(),
+      }).eq("id", leadId);
+
+      return ok({
+        lead_id: leadId,
+        assigned: false,
+        status: "quality_gate_hold",
+        message: "Your request has been received. QuickFurno will verify your requirement and connect you shortly.",
+        pending_primary_slots: 3,
+        preferred_vendor_not_eligible: false,
+      });
+    }
 
     const group = await requirementGroups.findOrCreateRequirementGroup({
       phone: input.phone,

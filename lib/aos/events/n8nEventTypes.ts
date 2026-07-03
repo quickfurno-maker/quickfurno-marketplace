@@ -1,6 +1,9 @@
 export const QUICKFURNO_N8N_EVENT_TYPES = [
   "lead.created",
+  "lead.scored",
   "lead.qualified",
+  "lead.clarification_required",
+  "lead.rejected_quality",
   "lead.assignment_preview",
   "lead.assignment_approved",
   "lead.assignment_queued",

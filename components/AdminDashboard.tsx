@@ -33,6 +33,10 @@ const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "sp
 export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null; error?: string | null }) {
   const data = snapshot ?? emptySnapshot();
   const stats = data.stats ?? {};
+  // The snapshot returns the latest limited rows (see services/adminService.ts);
+  // KPI totals below come from accurate server-side count queries.
+  const meta = data.snapshotMeta;
+  const totalLeads = meta?.totals?.total_leads ?? Number(stats.total_leads ?? data.leads.length);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
 
@@ -72,7 +76,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         meta={
           <>
             <StatusBadge value="Superadmin" tone="slate" />
-            <StatusBadge value={`${formatNumber(data.leads.length)} leads indexed`} tone="emerald" />
+            <StatusBadge value={`${formatNumber(totalLeads)} leads`} tone="emerald" />
             <StatusBadge value={`Updated ${formatDate(data.generatedAt)}`} tone="blue" />
           </>
         }
@@ -106,6 +110,14 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
           <StatCard key={label} label={label} value={value} helper={helper} icon={icon} tone={tone} />
         ))}
       </section>
+
+      {meta ? (
+        <p className="text-xs text-slate-400">
+          Showing the latest {formatNumber(meta.rowsLoaded?.leads ?? data.leads.length)} of {formatNumber(totalLeads)} leads
+          and latest {formatNumber(meta.rowsLoaded?.vendors ?? data.vendors.length)} of {formatNumber(meta.totals?.total_vendors ?? data.vendors.length)} vendors.
+          KPI totals are counted live and stay accurate.
+        </p>
+      ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <SectionCard

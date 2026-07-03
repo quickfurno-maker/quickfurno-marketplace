@@ -9,7 +9,12 @@ import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
 import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
-import { routePreferredVendorLead, type PreferredVendorRoutingResult } from "./preferredVendorLeadService";
+import { canAutoDistributeLead, scoreAndStoreLead, type LeadQualityScoreResult } from "./leadQualityService";
+import {
+  holdPreferredVendorForQualityGate,
+  routePreferredVendorLead,
+  type PreferredVendorRoutingResult,
+} from "./preferredVendorLeadService";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 
 function firstText(...values: Array<string | undefined>): string {
@@ -71,7 +76,7 @@ export async function createLead(
       timeline: input.timeline ?? null,
       message: message || null,
       source,
-      verification_status: "Verified", // MVP placeholder (OTP comes later)
+      verification_status: isDuplicate ? "Manual Review" : "Quality Pending",
       is_duplicate: isDuplicate,
       duplicate_of: isDuplicate ? dupId : null,
       status: isDuplicate ? "Duplicate" : "New",
@@ -86,6 +91,7 @@ export async function createLead(
       utm_campaign: input.utm_campaign ?? null,
       utm_term: input.utm_term ?? null,
       utm_content: input.utm_content ?? null,
+      email: input.email ?? null,
       location_consent: input.location_consent ?? false,
       share_consent: input.share_consent ?? false,
       // Phase 26A-2D requirement-group context (additive; the missing-column
@@ -150,6 +156,52 @@ export async function createLead(
       formSource: source,
     });
 
+    let scoreResult: LeadQualityScoreResult | null = null;
+    try {
+      scoreResult = await scoreAndStoreLead(data.id, {
+        ...input,
+        name,
+        phone,
+        city,
+        area: input.area ?? null,
+        service_required: serviceRequired,
+        budget,
+        message,
+        is_duplicate: Boolean(data.is_duplicate),
+      });
+      void emitLeadCreatedEvent({
+        leadId: data.id,
+        name,
+        phone,
+        city,
+        area: input.area ?? null,
+        category: serviceRequired,
+        budget: budget || null,
+        message: message || null,
+        isDuplicate: Boolean(data.is_duplicate),
+        formSource: "lead.quality.preview",
+        eventType: "lead.scored",
+      });
+      void emitLeadCreatedEvent({
+        leadId: data.id,
+        name,
+        phone,
+        city,
+        area: input.area ?? null,
+        category: serviceRequired,
+        budget: budget || null,
+        message: message || null,
+        isDuplicate: Boolean(data.is_duplicate),
+        formSource: "lead.quality.preview",
+        eventType: qualityEventType(scoreResult),
+      });
+    } catch (qualityError) {
+      console.warn("[lead quality] scoring failed; distribution held to protect vendor trust", {
+        lead_id: data.id,
+        message: qualityError instanceof Error ? qualityError.message : "Unknown error",
+      });
+    }
+
     // Phase 26A-2D: a client-selected-vendor enquiry must NOT trigger the
     // immediate max-3 auto match — the client-selected priority + 1-hour
     // auto-fill window (clientRequirementGroupService) owns that lead instead.
@@ -159,11 +211,12 @@ export async function createLead(
     // match, and never a fan-out to other vendors in this phase.
     const preferredVendorId = firstText(input.target_vendor_id);
     const isPreferredVendorIntent = input.lead_intent === "preferred_vendor" && Boolean(preferredVendorId);
+    const qualityGatePassed = scoreResult ? canAutoDistributeLead(scoreResult) : false;
 
     let preferredVendor: PreferredVendorRoutingResult | undefined;
 
     if (isPreferredVendorIntent) {
-      if (input.share_consent) {
+      if (qualityGatePassed) {
         preferredVendor = await routePreferredVendorLead({
           leadId: data.id,
           vendorId: preferredVendorId,
@@ -175,8 +228,21 @@ export async function createLead(
           isDuplicate: Boolean(data.is_duplicate),
           fallbackAllowed: input.fallback_allowed,
         });
+      } else {
+        preferredVendor = await holdPreferredVendorForQualityGate({
+          leadId: data.id,
+          vendorId: preferredVendorId,
+          vendorName: input.target_vendor_name,
+          city,
+          serviceRequired,
+          category: input.target_vendor_category,
+          subcategory: input.target_vendor_subcategory ?? input.subcategory,
+          isDuplicate: Boolean(data.is_duplicate),
+          fallbackAllowed: input.fallback_allowed,
+          reason: scoreResult?.hard_block_reason ?? "lead_quality_scoring_unavailable",
+        });
       }
-    } else if (input.share_consent && !isClientSelectedIntent) {
+    } else if (qualityGatePassed && !isClientSelectedIntent) {
       const matching = await runAutoLeadMatchingForLead(data.id);
       if (!matching.ok) {
         console.warn("[lead matching] auto matching failed without blocking lead submission", {
@@ -191,6 +257,12 @@ export async function createLead(
   } catch (e) {
     return fail(e);
   }
+}
+
+function qualityEventType(scoreResult: LeadQualityScoreResult): "lead.qualified" | "lead.clarification_required" | "lead.rejected_quality" {
+  if (canAutoDistributeLead(scoreResult)) return "lead.qualified";
+  if (scoreResult.recommended_action === "clarification_required") return "lead.clarification_required";
+  return "lead.rejected_quality";
 }
 
 /** Vendors eligible for a lead — safe public fields only (no phone/email). */

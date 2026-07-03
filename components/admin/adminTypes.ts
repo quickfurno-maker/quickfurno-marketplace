@@ -22,6 +22,11 @@ export type Lead = {
   utm_medium?: string | null;
   page_url?: string | null;
   lead_quality_score?: number | null;
+  lead_quality_class?: string | null;
+  lead_quality_status?: string | null;
+  lead_quality_hard_block_reason?: string | null;
+  lead_quality_recommended_action?: string | null;
+  lead_quality_checked_at?: string | null;
   lead_priority?: string | null;
   status?: string | null;
   verification_status?: string | null;
@@ -409,8 +414,21 @@ export type LeadAutoAssignmentLog = {
   created_at?: string | null;
 };
 
+// Row-limit metadata for the shared admin snapshot. Lets the dashboard/CRM show
+// a subtle "showing latest N of M" note while KPI totals stay accurate (counted
+// server-side, independent of these row limits).
+export type AdminSnapshotMeta = {
+  generatedAt: string;
+  leadsLimit: number;
+  vendorsLimit: number;
+  logsLimit: number;
+  totals: { total_leads: number; total_vendors: number };
+  rowsLoaded: Record<string, number>;
+};
+
 export type Snapshot = {
   stats: Record<string, number | string>;
+  snapshotMeta?: AdminSnapshotMeta;
   leads: Lead[];
   vendors: Vendor[];
   packages: PackageRow[];

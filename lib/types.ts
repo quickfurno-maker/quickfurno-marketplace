@@ -7,7 +7,7 @@ export type LeadStatus =
   | "New" | "Assigned" | "Contacted" | "Site Visit Scheduled"
   | "Quotation Sent" | "Won" | "Lost" | "Duplicate";
 export type VendorLeadStatus =
-  | "New" | "Contacted" | "Site Visit Scheduled" | "Quotation Sent" | "Won" | "Lost";
+  | "New" | "Contacted" | "Follow-up Needed" | "Site Visit Scheduled" | "Quotation Sent" | "Converted" | "Won" | "Lost";
 export type AssignmentType = "client_selected" | "auto_assigned" | "admin_assigned";
 
 export interface CreateLeadInput {
@@ -18,6 +18,7 @@ export interface CreateLeadInput {
   service_required?: string;
   service_category?: string;
   serviceCategory?: string;
+  subcategory?: string;
   budget?: string;
   budget_range?: string;
   budgetRange?: string;
@@ -35,6 +36,27 @@ export interface CreateLeadInput {
   utm_content?: string;
   location_consent?: boolean;
   share_consent?: boolean;
+  // Phase 26A-2D: requirement-group / client-selected-vendor context. Persisted
+  // once 20260701000032_phase26a2d_client_requirement_groups.sql runs; ignored
+  // gracefully if the columns are not there yet.
+  parent_category_group?: string;
+  requirement_group_id?: string;
+  selected_vendor_id?: string;
+  selected_vendor_name?: string;
+  // "client_selected_vendor" tells createLead to SKIP the immediate max-3 auto
+  // match so the client-selected priority + 1-hour window can run instead.
+  assignment_intent?: string;
+  // Phase 1 preferred-vendor routing. When lead_intent === "preferred_vendor"
+  // and target_vendor_id is set, createLead routes the lead FIRST to that single
+  // vendor (no normal auto-match, no fallback fan-out in Phase 1). All optional
+  // so every existing general CTA keeps its current auto-match behaviour.
+  lead_intent?: "general_auto_match" | "preferred_vendor";
+  target_vendor_id?: string;
+  target_vendor_name?: string;
+  target_vendor_category?: string;
+  target_vendor_subcategory?: string;
+  // Reserved for Phase 2 delayed remaining-slot fill. Not acted on in Phase 1.
+  fallback_allowed?: boolean;
 }
 
 export interface PublicVendorCard {
@@ -139,6 +161,8 @@ export interface VendorProfileSummary {
   status: string;
   verification_status: string | null;
   paid_status: string | null;
+  package_status?: string | null;
+  package_expires_at?: string | null;
   remaining_credits: number;
   total_credits: number;
   public_visibility: boolean;

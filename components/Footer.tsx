@@ -38,9 +38,9 @@ const sections: FooterSection[] = [
     id: "vendors",
     title: "For Vendors",
     links: [
-      { label: "Become a Vendor", href: "/vendors/register" },
-      { label: "Vendor Login", href: "/login" },
-      { label: "Vendor Dashboard", href: "/vendor" },
+      { label: "Vendor Portal", href: "/vendor" },
+      { label: "Login as Vendor", href: "/vendor?mode=login" },
+      { label: "Create Vendor Account", href: "/vendor?mode=signup" },
     ],
   },
   {

@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { getMyVendor, vendorLeads, vendorReportBadLeadFromForm, vendorUpdateLeadStatusFromForm } from "@/app/actions";
+import { getMyVendor, vendorLeads, vendorUpdateLeadStatusFromForm } from "@/app/actions";
 import { VendorNoProfileFallback } from "@/app/vendor/dashboard/_components/VendorNoProfileFallback";
+import { VendorLeadReportForm } from "@/components/vendors/VendorLeadReportForm";
+import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+import { evaluateVendorContactAccessEligibility, type VendorContactAccessEligibility } from "@/lib/vendors/vendorEligibility";
 import type { VendorLeadStatus, VendorProfileSummary } from "@/lib/types";
 
 export const metadata = { title: "Vendor leads - QuickFurno" };
 export const dynamic = "force-dynamic";
 
-const statuses: VendorLeadStatus[] = ["New", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Won", "Lost"];
+// CRM statuses only. "Lost" is a CRM state — it never refunds credit, removes
+// the assignment, or triggers reassignment. Vendors cannot accept/reject/decline
+// an assigned lead; issues are raised via the structured Report lead issue form.
+const statuses: VendorLeadStatus[] = ["New", "Contacted", "Follow-up Needed", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost"];
 
 type VendorLeadsPageProps = {
   searchParams?: {
@@ -19,6 +25,7 @@ type VendorLeadRow = {
   id: string;
   assigned_at: string | null;
   assignment_type: string | null;
+  assignment_source: string | null;
   vendor_status: VendorLeadStatus;
   is_bad_lead_reported: boolean | null;
   lead: {
@@ -45,7 +52,9 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
     return <VendorNoProfileFallback />;
   }
 
-  const eligible = canViewClientContact(vendor);
+  const runtimeSettings = await loadMarketplaceRuntimeSettings();
+  const contactAccess = evaluateVendorContactAccessEligibility(vendor as unknown as Record<string, unknown>, runtimeSettings);
+  const eligible = contactAccess.eligible;
   const leadsResult = await vendorLeads(vendor.id);
   const leads = leadsResult.ok ? (leadsResult.data as VendorLeadRow[]) : [];
 
@@ -75,7 +84,7 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
         ) : null}
         {!leadsResult.ok ? <p className="qf-vd-error">Assigned leads are not available right now.</p> : null}
 
-        {!eligible ? <LeadAccessNotice vendor={vendor} /> : null}
+        {!eligible ? <LeadAccessNotice vendor={vendor} contactAccess={contactAccess} /> : null}
 
         {leads.length === 0 ? (
           <div className="qf-vd-empty">
@@ -92,6 +101,10 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
                     <div>
                       <strong>{lead.name || "Client"}</strong>
                       <span>{lead.service_required || "Requirement"}</span>
+                      {(() => {
+                        const badge = assignmentSourceBadge(assignment.assignment_source, assignment.assignment_type);
+                        return badge ? <span className={`qf-vd-lead-source ${badge.tone}`}>{badge.label}</span> : null;
+                      })()}
                     </div>
                     <span className="qf-vd-lead-status" data-status={assignment.vendor_status}>
                       {assignment.vendor_status || "New"}
@@ -126,33 +139,10 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
                       <div className="qf-vd-report">
                         {assignment.is_bad_lead_reported ? (
                           <span className="qf-vd-report-done">
-                            Bad lead report submitted. QuickFurno admin will review your reason. Credit is not refunded automatically.
+                            Your report has been submitted for admin review. Reporting a lead does not automatically reverse lead credit.
                           </span>
                         ) : (
-                          <form action={vendorReportBadLeadFromForm} className="qf-vd-bad-lead-form">
-                            <input type="hidden" name="assignmentId" value={assignment.id} />
-                            <label>
-                              Report type
-                              <select name="report_type" required defaultValue="">
-                                <option value="" disabled>Select type</option>
-                                <option value="wrong_contact">Wrong contact</option>
-                                <option value="not_relevant">Not relevant</option>
-                                <option value="out_of_area">Out of area</option>
-                                <option value="duplicate_or_spam">Duplicate or spam</option>
-                              </select>
-                            </label>
-                            <label>
-                              Reason
-                              <input name="report_reason" required maxLength={160} placeholder="Example: Client number is not reachable" />
-                            </label>
-                            <label>
-                              Comment
-                              <textarea name="vendor_comment" required maxLength={700} rows={3} placeholder="Add details for admin review." />
-                            </label>
-                            <button className="qf-vd-btn qf-vd-btn--ghost" type="submit">
-                              Report bad lead
-                            </button>
-                          </form>
+                          <VendorLeadReportForm vendorId={vendor.id} assignmentId={assignment.id} />
                         )}
                       </div>
                     </div>
@@ -173,16 +163,18 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
   );
 }
 
-function LeadAccessNotice({ vendor }: { vendor: VendorProfileSummary }) {
+function LeadAccessNotice({ vendor, contactAccess }: { vendor: VendorProfileSummary; contactAccess: VendorContactAccessEligibility }) {
   const approved = String(vendor.status ?? "").toLowerCase() === "approved";
   const active = vendor.is_active !== false;
-  const paid = String(vendor.paid_status ?? "").toLowerCase() === "paid";
+  const hasPaidAccess = contactAccess.visibilityType === "paid" || contactAccess.visibilityType === "trial";
   const message = !approved
     ? "Your vendor profile must be approved before client contact is visible."
     : !active
       ? "Your vendor account is inactive. Contact QuickFurno support to restore lead access."
-      : !paid
+      : !hasPaidAccess
         ? "Activate a package to view assigned lead contact details."
+        : contactAccess.credits <= 0
+          ? "Recharge your lead credits to view assigned lead contact details."
         : "Lead contact access is currently restricted.";
 
   return (
@@ -191,17 +183,32 @@ function LeadAccessNotice({ vendor }: { vendor: VendorProfileSummary }) {
         <strong>Lead contact is hidden</strong>
         <p>{message}</p>
       </div>
-      {!paid ? (
+      {!hasPaidAccess || contactAccess.credits <= 0 ? (
         <Link className="qf-vd-btn qf-vd-btn--primary" href="/vendor/dashboard/package">
-          Activate package
+          {!hasPaidAccess ? "Activate package" : "Recharge credits"}
         </Link>
       ) : null}
     </div>
   );
 }
 
-function canViewClientContact(vendor: VendorProfileSummary) {
-  return String(vendor.status ?? "").toLowerCase() === "approved"
-    && vendor.is_active !== false
-    && String(vendor.paid_status ?? "").toLowerCase() === "paid";
+/**
+ * Phase 26A-2D: how this lead reached the vendor. Prefers assignment_source
+ * (requirement-group flow); falls back to the legacy assignment_type.
+ */
+function assignmentSourceBadge(
+  source: string | null,
+  type: string | null,
+): { label: string; tone: string } | null {
+  const s = (source ?? "").toLowerCase();
+  if (s === "client_selected_vendor") return { label: "Client selected your profile", tone: "is-client-selected" };
+  if (s === "auto_fill" || s === "auto_assigned") return { label: "QuickFurno matched this lead", tone: "is-auto" };
+  if (s.includes("recovery")) return { label: "Recovery assignment", tone: "is-recovery" };
+  if (s.startsWith("manual") || s === "admin_assigned") return { label: "Admin assigned", tone: "is-admin" };
+
+  const t = (type ?? "").toLowerCase();
+  if (t === "client_selected") return { label: "Client selected your profile", tone: "is-client-selected" };
+  if (t === "auto_assigned") return { label: "QuickFurno matched this lead", tone: "is-auto" };
+  if (t === "admin_assigned") return { label: "Admin assigned", tone: "is-admin" };
+  return null;
 }

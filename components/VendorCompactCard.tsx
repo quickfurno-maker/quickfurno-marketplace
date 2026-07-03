@@ -140,6 +140,11 @@ export function VendorCompactCard({
                 area={meta.locality.split(",")[0]}
                 requirement={`I want a quote from ${vendor.businessName} for ${vendor.category}.`}
                 source={`Vendor card enquiry: ${vendor.slug}`}
+                leadIntent="preferred_vendor"
+                targetVendorId={vendor.slug}
+                targetVendorName={vendor.businessName}
+                targetVendorCategory={vendor.category}
+                targetVendorSubcategory={vendor.subCategory}
               >
                 Send Enquiry
               </EnquiryModalTrigger>

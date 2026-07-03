@@ -72,6 +72,7 @@ export async function deliverLeadToVendorDashboard(
   leadId: string,
   vendorId: string,
   assignmentId: string,
+  opts: { assignmentSource?: string } = {},
 ): Promise<Result<null>> {
   try {
     const { error } = await adminClient().from("lead_delivery_logs").insert({
@@ -83,6 +84,7 @@ export async function deliverLeadToVendorDashboard(
       contact_shared: true,
       credit_deducted: true,
       whatsapp_status: "preview_only",
+      ...(opts.assignmentSource ? { assignment_source: opts.assignmentSource } : {}),
     });
     if (error) throw error;
     return ok(null);
@@ -95,6 +97,7 @@ export async function createVendorLeadWhatsappPreview(
   leadId: string,
   vendorId: string,
   assignmentId: string,
+  opts: { assignmentSource?: string } = {},
 ): Promise<Result<null>> {
   try {
     const [leadResult, vendorResult] = await Promise.all([
@@ -128,6 +131,7 @@ export async function createVendorLeadWhatsappPreview(
       credit_deducted: false,
       whatsapp_preview_message: message,
       whatsapp_status: "preview_only",
+      ...(opts.assignmentSource ? { assignment_source: opts.assignmentSource } : {}),
     });
     if (error) throw error;
     return ok(null);

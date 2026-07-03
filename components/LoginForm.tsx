@@ -4,7 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabaseBrowser";
 
-export function LoginForm() {
+// Role-based sign-in used by the vendor portal (/vendor). The redirect stays
+// role-based: admins go to /admin/dashboard even if they sign in here, everyone
+// else goes to /vendor/dashboard. The signup link is configurable so the same
+// form can point vendors at the portal's signup tab.
+export function LoginForm({
+  signupHref = "/vendor?mode=signup",
+  signupLabel = "Create a vendor account",
+  showSignupLink = true,
+}: {
+  signupHref?: string;
+  signupLabel?: string;
+  showSignupLink?: boolean;
+} = {}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +33,8 @@ export function LoginForm() {
     const isAdmin = profile?.role === "admin";
 
     router.refresh();
+    // If an admin signs in from the vendor portal by mistake, still send them to
+    // the admin dashboard; vendors go to their dashboard.
     router.push(isAdmin ? "/admin/dashboard" : "/vendor/dashboard");
   }
 
@@ -34,9 +48,11 @@ export function LoginForm() {
         <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onSubmit()} />
       </label>
       <button onClick={onSubmit} disabled={busy} className="btn-gold mt-6 w-full">{busy ? "Signing in…" : "Sign in"}</button>
-      <p className="mt-4 text-center font-sans text-xs text-muted">
-        New studio? <a href="/vendors/register" className="text-gold hover:underline">Apply to join</a>
-      </p>
+      {showSignupLink ? (
+        <p className="mt-4 text-center font-sans text-xs text-muted">
+          New to QuickFurno? <a href={signupHref} className="text-gold hover:underline">{signupLabel}</a>
+        </p>
+      ) : null}
     </div>
   );
 }

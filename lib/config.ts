@@ -106,6 +106,23 @@ export const PACKAGES_PREVIEW: { name: string; price: number; leads: number; tag
 export const MAX_VENDORS_PER_LEAD = 3;
 export const MAX_COMPARE_VENDORS = 3;
 
+// ---- Phase 26A-2C manual assignment limits ---------------------------------
+// Auto matching NEVER exceeds NORMAL_PRIMARY_VENDOR_LIMIT. Only admin manual
+// recovery mode may add vendors beyond the primary limit, up to the total cap.
+export const NORMAL_PRIMARY_VENDOR_LIMIT = 3;
+export const ADMIN_MANUAL_TOTAL_VENDOR_LIMIT = 9;
+// Temporary startup fallback so interior leads are not stranded when exact
+// subcategory vendors are scarce. Disable once supply per subcategory is deep.
+export const MANUAL_INTERIOR_FALLBACK_ENABLED = true;
+
+// ---- Phase 26A-2D requirement groups + client-selected vendor priority -----
+// One client is capped at NORMAL_PRIMARY_VENDOR_LIMIT (3) vendors PER PARENT
+// CATEGORY GROUP within a 3-day window. After the client picks their first
+// vendor they get a 1-hour window to pick more; when it lapses, auto-fill tops
+// the group up to 3 (never beyond). Only admin recovery may exceed 3.
+export const REQUIREMENT_GROUP_WINDOW_DAYS = 3;
+export const CLIENT_SELECTION_WINDOW_MINUTES = 60;
+
 // ---- Admin lead workflow statuses ------------------------------------------
 export const LEAD_STATUSES = [
   "New",

@@ -1,21 +1,9 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { LoginForm } from "@/components/LoginForm";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Sign in — QuickFurno" };
-
-export default function LoginPage() {
-  return (
-    <>
-      <Header />
-      <section className="mx-auto max-w-6xl px-5 pt-16 pb-10 text-center">
-        <p className="eyebrow">Studio &amp; admin access</p>
-        <h1 className="mt-4 text-3xl font-semibold text-ivory">Welcome back</h1>
-      </section>
-      <section className="mx-auto max-w-6xl px-5 pb-20">
-        <LoginForm />
-      </section>
-      <Footer />
-    </>
-  );
+// The generic sign-in page has moved. Vendors now log in from the vendor portal
+// at /vendor?mode=login; admins have a separate login at /admin/login (a vendor
+// portal sign-in still routes an admin to /admin/dashboard by role). This keeps
+// old /login bookmarks working by forwarding to the vendor portal login tab.
+export default function LoginRedirectPage() {
+  redirect("/vendor?mode=login");
 }

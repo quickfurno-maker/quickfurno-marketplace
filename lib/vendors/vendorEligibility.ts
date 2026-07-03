@@ -1,4 +1,5 @@
 // ============================================================================
+import { isLeadVendorCategoryCompatible } from "@/lib/vendors/categoryMatching";
 // QuickFurno — Phase 13B: Shared Vendor Eligibility Helper
 //
 // ONE source of truth for "is this vendor eligible for a lead preview?". Used by
@@ -64,6 +65,8 @@ export interface VendorLeadAssignmentEligibility {
   visibilityType?: string;
 }
 
+export interface VendorContactAccessEligibility extends VendorLeadAssignmentEligibility {}
+
 export interface VendorLeadAssignmentSettings {
   allow_trial_vendors_for_assignment?: boolean | null;
 }
@@ -72,7 +75,6 @@ const ACTIVE_PACKAGE_STATUSES = new Set(["active", "trial"]);
 const PAID_STATUSES = new Set(["paid", "active", "premium", "priority"]);
 const TRIAL_STATUSES = new Set(["trial"]);
 const FREE_OR_UNPAID_STATUSES = new Set(["", "none", "free", "unpaid", "inactive", "expired", "cancelled", "canceled"]);
-const INTERIOR_SUBCATEGORIES = new Set(["interior designers", "carpenters", "modular factory", "premium interiors"]);
 
 /**
  * Evaluate a vendor's eligibility for a lead preview. `vendor` is any record
@@ -172,6 +174,95 @@ export function evaluateVendorLeadAssignmentEligibility(
   };
 }
 
+/**
+ * Contact access uses the same paid/trial/status/credit gate as automatic
+ * assignment, without lead-specific city/category checks.
+ */
+export function evaluateVendorContactAccessEligibility(
+  vendor: Record<string, unknown> | null | undefined,
+  settings: VendorLeadAssignmentSettings | Record<string, unknown> | null | undefined = {},
+): VendorContactAccessEligibility {
+  return evaluateVendorLeadAssignmentEligibility(vendor, null, settings);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 26A-2E: client-selected (vendor-profile) eligibility.
+// For a vendor the CLIENT explicitly picked, an active package is NOT required —
+// remaining_credits > 0 is the paid-access signal. Approved + Verified + active +
+// not suspended + (public_visibility if present) + credits > 0. PURE, no I/O.
+// ---------------------------------------------------------------------------
+export type ClientSelectedVendorReason =
+  | "not_approved"
+  | "suspended"
+  | "inactive"
+  | "not_verified"
+  | "not_visible"
+  | "no_credits";
+
+export interface ClientSelectedVendorEligibility {
+  eligible: boolean;
+  reasonCode: ClientSelectedVendorReason | null;
+  reason: string | null;
+  credits: number;
+  /** Paid + credits but no package row — surface as an admin audit warning. */
+  packageMissingButCredits: boolean;
+}
+
+const CLIENT_SELECTED_REASON_LABEL: Record<ClientSelectedVendorReason, string> = {
+  not_approved: "not approved",
+  suspended: "suspended",
+  inactive: "inactive",
+  not_verified: "not verified",
+  not_visible: "profile not public",
+  no_credits: "no credits",
+};
+
+const BAD_VERIFICATION = new Set(["pending", "rejected", "unverified", "not verified", "failed", "in review"]);
+
+export function evaluateClientSelectedVendorEligibility(
+  vendor: Record<string, unknown> | null | undefined,
+): ClientSelectedVendorEligibility {
+  const row = isRecord(vendor) ? vendor : {};
+  const status = normalizeStatus(row.status);
+  const isActive = normalizeActive(row);
+  const credits = normalizeCredits(row);
+  const rawPackageStatus = typeof row.package_status === "string" ? row.package_status.trim().toLowerCase() : "";
+
+  // Verification: block only when it EXPLICITLY says not-verified; absent = ok.
+  const verificationRaw = typeof row.verification_status === "string" ? row.verification_status.trim().toLowerCase() : "";
+  const verificationBad = verificationRaw.length > 0 && BAD_VERIFICATION.has(verificationRaw);
+
+  // Public visibility: block only when the field EXISTS and is explicitly false.
+  const hasVisibilityField = "public_visibility" in row && row.public_visibility !== null && row.public_visibility !== undefined;
+  const notVisible = hasVisibilityField && (row.public_visibility === false || row.public_visibility === "false" || row.public_visibility === 0);
+
+  let reasonCode: ClientSelectedVendorReason | null = null;
+  if (status === "suspended") reasonCode = "suspended";
+  else if (status !== "approved") reasonCode = "not_approved";
+  else if (!isActive) reasonCode = "inactive";
+  else if (verificationBad) reasonCode = "not_verified";
+  else if (notVisible) reasonCode = "not_visible";
+  else if (credits <= 0) reasonCode = "no_credits";
+
+  // Admin audit signal (never a blocker): the vendor has credits but no active
+  // package row — package_status is none/expired/missing/empty. paid_status is
+  // irrelevant here; credits are the paid-access signal for a client pick.
+  const packageInactive =
+    rawPackageStatus === "" ||
+    rawPackageStatus === "none" ||
+    rawPackageStatus === "missing" ||
+    rawPackageStatus === "expired";
+  const packageMissingButCredits = credits > 0 && packageInactive;
+
+  return {
+    eligible: reasonCode === null,
+    reasonCode,
+    reason: reasonCode ? CLIENT_SELECTED_REASON_LABEL[reasonCode] : null,
+    credits,
+    packageMissingButCredits,
+  };
+}
+
 /** Normalized vendor status: pending | approved | rejected | suspended. */
 export function normalizeStatus(value: unknown): string {
   const text = typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -260,32 +351,25 @@ function collectVendorCategories(row: Record<string, unknown>): string[] {
 
 function categoryMatches(vendorCategories: string[], leadCategory: string, leadSubcategory?: string | null): boolean {
   if (vendorCategories.length === 0) return false;
-  const leadKey = normalizeCategoryKey(leadCategory);
-  const leadSubKey = leadSubcategory ? normalizeCategoryKey(leadSubcategory) : "";
-
-  return vendorCategories.some((category) => {
-    const key = normalizeCategoryKey(category);
-    if (key === leadKey) return true;
-    if (leadKey === "interior" && INTERIOR_SUBCATEGORIES.has(key)) return true;
-    if (INTERIOR_SUBCATEGORIES.has(leadKey) && (key === "interior" || key === leadKey)) return true;
-    if (leadSubKey && key === leadSubKey) return true;
-    return false;
-  });
+  return isLeadVendorCategoryCompatible(
+    { category: leadCategory, service_required: leadCategory, subcategory: leadSubcategory },
+    {
+      service_categories: vendorCategories,
+      selected_category: vendorCategories[0],
+    },
+  ).compatible;
 }
 
 function subcategoryMatches(vendorCategories: string[], leadSubcategory: string): boolean {
-  const leadKey = normalizeCategoryKey(leadSubcategory);
-  return vendorCategories.some((category) => normalizeCategoryKey(category) === leadKey);
-}
-
-function normalizeCategoryKey(value: unknown): string {
-  const text = typeof value === "string" ? value.trim().toLowerCase() : "";
-  if (INTERIOR_SUBCATEGORIES.has(text)) return text;
-  if (text === "interior" || text === "interiors") return "interior";
-  if (text === "sofa") return "sofa";
-  if (text === "painter") return "painter";
-  if (text === "civil work" || text === "civil") return "civil work";
-  return text;
+  if (vendorCategories.length === 0) return false;
+  return isLeadVendorCategoryCompatible({
+    category: leadSubcategory,
+    service_required: leadSubcategory,
+    subcategory: leadSubcategory,
+  }, {
+    service_categories: vendorCategories,
+    selected_category: vendorCategories[0],
+  }).compatible;
 }
 
 function isPackageDateExpired(value: unknown): boolean {

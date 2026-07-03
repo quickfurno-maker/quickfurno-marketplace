@@ -509,14 +509,19 @@ export function BadLeadReportsReviewPanel({
               );
             },
           },
-          { header: "Type", cell: (report: BadReport) => <StatusBadge value={report.report_type || report.reason || "Not set"} tone="amber" /> },
           {
-            header: "Reason / Comment",
+            header: "Reason",
             cell: (report: BadReport) => (
-              <div className="min-w-56 text-xs text-slate-600">
-                <p className="font-semibold text-slate-800">{report.report_reason || report.reason || "Not set"}</p>
-                <p className="mt-1 line-clamp-2">{report.vendor_comment || report.description || "No vendor comment"}</p>
+              <div className="min-w-44 text-xs text-slate-600">
+                <p className="font-semibold text-slate-800">{report.reason_label || report.report_reason || report.reason || "Not set"}</p>
+                <p className="mt-1 font-mono text-[11px] text-slate-400">{report.reason_code || report.report_type || "—"}</p>
               </div>
+            ),
+          },
+          {
+            header: "Vendor Comment",
+            cell: (report: BadReport) => (
+              <p className="line-clamp-3 min-w-48 text-xs text-slate-600">{report.vendor_comment || report.description || "No vendor comment"}</p>
             ),
           },
           {

@@ -5,6 +5,8 @@
 import { adminClient } from "../lib/supabase";
 import { appError, AppError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
+import { loadMarketplaceRuntimeSettings } from "../lib/lead-assignment/runtimeSettings";
+import { evaluateVendorContactAccessEligibility } from "../lib/vendors/vendorEligibility";
 import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
@@ -222,7 +224,15 @@ export async function getVendorDashboardStats(vendorId: string): Promise<Result<
   }
 }
 
-/** Leads assigned to a vendor, newest first. Client contact is returned only for paid, active, approved vendors. */
+/** Leads assigned to a vendor, newest first. Client contact is returned only for assignment-eligible paid/trial vendors. */
+/** PostgREST/Postgres "column does not exist" (migration not applied yet). */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? "";
+  const message = (error.message ?? "").toLowerCase();
+  return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
+}
+
 export async function getVendorAssignedLeads(vendorId: string): Promise<Result<unknown[]>> {
   try {
     const contactEligible = await canVendorViewLeadContact(vendorId);
@@ -232,14 +242,20 @@ export async function getVendorAssignedLeads(vendorId: string): Promise<Result<u
       ? "id, name, phone, city, area, service_required, budget, property_type, timeline, message, created_at"
       : "id, name, city, area, service_required, budget, property_type, timeline, message, created_at";
 
-    const { data, error } = await adminClient()
-      .from("lead_assignments")
-      .select(`
-        id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported,
-        lead:leads ( ${leadSelect} )
-      `)
-      .eq("vendor_id", vendorId)
-      .order("assigned_at", { ascending: false });
+    // assignment_source is a Phase 26A-2D column. Try to read it; if the
+    // migration is not applied yet, fall back so the vendor dashboard never
+    // breaks (badge just shows the generic label).
+    const runQuery = (columns: string) =>
+      adminClient()
+        .from("lead_assignments")
+        .select(`${columns}, lead:leads ( ${leadSelect} )`)
+        .eq("vendor_id", vendorId)
+        .order("assigned_at", { ascending: false });
+
+    let { data, error } = await runQuery("id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported");
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await runQuery("id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported"));
+    }
     if (error) throw error;
     return ok(data ?? []);
   } catch (e) {
@@ -337,19 +353,108 @@ export async function reportBadLead(
   }
 }
 
+// Phase 26A-2C: structured vendor lead-issue reasons. Codes are machine-
+// readable so later WhatsApp/AI automation can follow up with the client.
+export const LEAD_REPORT_REASONS = [
+  { code: "client_not_reachable", label: "Client not reachable after multiple attempts", commentRequired: false },
+  { code: "requirement_already_closed", label: "Client says requirement is already closed", commentRequired: false },
+  { code: "service_mismatch", label: "Client requirement does not match selected service", commentRequired: true },
+  { code: "outside_service_area", label: "Client location is outside my service area", commentRequired: true },
+  { code: "invalid_wrong_phone", label: "Invalid or wrong phone number", commentRequired: true },
+  { code: "other", label: "Other reason", commentRequired: true },
+] as const;
+
+export type LeadReportReasonCode = (typeof LEAD_REPORT_REASONS)[number]["code"];
+
+const REPORT_COMMENT_MIN = 20;
+
+/**
+ * Structured vendor lead-issue report. Never refunds/removes credit, never
+ * removes the assignment, never auto-reassigns, never sends WhatsApp. One
+ * active report per assignment is enforced in-service (plus a DB partial
+ * unique index when migration 031 is applied).
+ */
+export async function submitStructuredLeadReport(
+  vendorId: string,
+  assignmentId: string,
+  reasonCode: string,
+  comment?: string,
+): Promise<Result<{ id: string }>> {
+  try {
+    const reason = LEAD_REPORT_REASONS.find((r) => r.code === reasonCode);
+    if (!reason) throw appError("VALIDATION");
+    const trimmed = (comment ?? "").trim();
+    if (reason.commentRequired && trimmed.length < REPORT_COMMENT_MIN) throw appError("VALIDATION");
+
+    const db = adminClient();
+    const { data: a, error: aErr } = await db
+      .from("lead_assignments")
+      .select("id, vendor_id, is_bad_lead_reported")
+      .eq("id", assignmentId)
+      .eq("vendor_id", vendorId)
+      .single();
+    if (aErr || !a) throw appError("UNKNOWN");
+
+    // Duplicate-report guard: one active report per assignment.
+    const { data: existing } = await db
+      .from("bad_lead_reports")
+      .select("id, status")
+      .eq("lead_assignment_id", assignmentId)
+      .in("status", ["Pending", "Under Review"])
+      .limit(1);
+    if ((existing ?? []).length > 0 || a.is_bad_lead_reported) {
+      return { ok: false, code: "REPORT_EXISTS", error: "You already have an active report for this lead under admin review." };
+    }
+
+    const base = {
+      lead_assignment_id: assignmentId,
+      vendor_id: a.vendor_id,
+      reason: reason.label,
+      description: trimmed || null,
+      report_type: reason.code,
+      report_reason: reason.label,
+      vendor_comment: trimmed || null,
+      status: "Pending",
+      credit_restored: false,
+    };
+
+    // Prefer the structured columns; fall back gracefully if migration 031
+    // (reason_code / reason_label) has not been applied on this database.
+    let inserted = await db.from("bad_lead_reports").insert({ ...base, reason_code: reason.code, reason_label: reason.label }).select("id").single();
+    if (inserted.error && /reason_code|reason_label|column/i.test(inserted.error.message ?? "")) {
+      inserted = await db.from("bad_lead_reports").insert(base).select("id").single();
+    }
+    if (inserted.error) {
+      logSupabaseInsertError("bad_lead_reports", inserted.error, { assignment_id: assignmentId, vendor_id: a.vendor_id, reason_code: reason.code });
+      throw inserted.error;
+    }
+
+    await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", assignmentId);
+    return ok({ id: inserted.data.id });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 async function canVendorViewLeadContact(vendorId: string): Promise<Result<boolean>> {
   try {
-    const { data, error } = await adminClient()
+    const settings = await loadMarketplaceRuntimeSettings();
+    let { data, error } = await adminClient()
       .from("vendors")
-      .select("status, is_active, paid_status")
+      .select("status, is_active, paid_status, package_status, package_expires_at, remaining_credits")
       .eq("id", vendorId)
       .maybeSingle();
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await adminClient()
+        .from("vendors")
+        .select("status, is_active, paid_status, remaining_credits")
+        .eq("id", vendorId)
+        .maybeSingle());
+    }
     if (error) throw error;
     if (!data) throw appError("UNKNOWN");
 
-    const status = String((data as any).status ?? "").toLowerCase();
-    const paidStatus = String((data as any).paid_status ?? "").toLowerCase();
-    return ok(status === "approved" && (data as any).is_active !== false && paidStatus === "paid");
+    return ok(evaluateVendorContactAccessEligibility(data as Record<string, unknown>, settings).eligible);
   } catch (e) {
     return fail(e);
   }

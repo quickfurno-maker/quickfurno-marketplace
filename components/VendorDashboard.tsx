@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { vendorUpdateLeadStatus, vendorReportBadLead } from "@/app/actions";
+import { vendorUpdateLeadStatus } from "@/app/actions";
+import { VendorLeadReportForm } from "@/components/vendors/VendorLeadReportForm";
 import { whatsappLink, CONTACT_TEL } from "@/lib/config";
 import type { VendorDashboardStats, VendorLeadStatus, VendorProfileSummary } from "@/lib/types";
 
-const STATUSES: VendorLeadStatus[] = ["New", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Won", "Lost"];
+// CRM statuses only. Vendors cannot accept/reject/decline an assigned lead;
+// "Lost" is a CRM state that never refunds credit or removes the assignment.
+const STATUSES: VendorLeadStatus[] = ["New", "Contacted", "Follow-up Needed", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost"];
 
 type Lead = {
   id: string; assigned_at: string; assignment_type: string; vendor_status: VendorLeadStatus; is_bad_lead_reported: boolean;
@@ -18,7 +21,6 @@ export function VendorDashboard({
 }: { vendor: VendorProfileSummary; stats: VendorDashboardStats; leads: Lead[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [reporting, setReporting] = useState<string | null>(null);
 
   const isVerified = vendor.verification_status === "Verified" || vendor.status === "Approved";
   const isPaid = (vendor.paid_status ?? "Unpaid") === "Paid";
@@ -49,17 +51,6 @@ export function VendorDashboard({
     await vendorUpdateLeadStatus(vendor.id, assignmentId, s);
     setBusyId(null);
     router.refresh();
-  }
-
-  async function report(assignmentId: string, reportType: string) {
-    const reason = window.prompt("Reason for reporting this lead");
-    if (!reason?.trim()) return alert("Reason is required.");
-    const comment = window.prompt("Comment for QuickFurno admin review");
-    if (!comment?.trim()) return alert("Comment is required.");
-    setBusyId(assignmentId);
-    const res = await vendorReportBadLead(vendor.id, assignmentId, reportType, reason, comment);
-    setBusyId(null); setReporting(null);
-    if (!res.ok) alert(res.error); else router.refresh();
   }
 
   const supportHref = whatsappLink(
@@ -171,18 +162,11 @@ export function VendorDashboard({
                         </div>
                         <div className="qf-vd-report">
                           {a.is_bad_lead_reported ? (
-                            <span className="qf-vd-report-done">Bad-lead report submitted.</span>
-                          ) : reporting === a.id ? (
-                            <div className="qf-vd-pills">
-                              {["Wrong number", "Not interested", "Out of area", "Spam"].map((r) => (
-                                <button key={r} type="button" disabled={busyId === a.id} onClick={() => report(a.id, r)} className="qf-vd-pill">{r}</button>
-                              ))}
-                              <button type="button" onClick={() => setReporting(null)} className="qf-vd-link">cancel</button>
-                            </div>
+                            <span className="qf-vd-report-done">
+                              Your report has been submitted for admin review. Reporting a lead does not automatically reverse lead credit.
+                            </span>
                           ) : (
-                            <button type="button" onClick={() => setReporting(a.id)} className="qf-vd-link">
-                              Report a bad lead (within 24h)
-                            </button>
+                            <VendorLeadReportForm vendorId={vendor.id} assignmentId={a.id} />
                           )}
                         </div>
                       </div>

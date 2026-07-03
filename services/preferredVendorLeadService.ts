@@ -2,23 +2,27 @@
 // QuickFurno — services/preferredVendorLeadService.ts
 // Phase 1: Safe preferred-vendor enquiry routing.
 //
-// When a client picks a specific paid/trial vendor CTA, the lead is routed
-// FIRST to that one vendor. This service:
+// When a client picks a specific vendor CTA, the lead is routed FIRST to that
+// one vendor. This service:
 //   * loads the target vendor
-//   * checks eligibility (evaluateVendorLeadAssignmentEligibility) — a client-
-//     picked vendor is never blocked by category/area, only by commercial gates
-//   * if eligible + credits → assigns ONLY that vendor and deducts one credit via
-//     the atomic assign_lead_to_preferred_vendor RPC, then delivers the dashboard
-//     + WhatsApp-preview + client-preview logs (WhatsApp stays preview/log only)
-//   * if no credits / not eligible → assigns nothing, deducts nothing, shares NO
-//     client contact, and marks the lead for admin follow-up
-//   * NEVER fans out to other vendors in Phase 1 (delayed fill is Phase 2)
+//   * runs a DIRECT commercial check — the client already picked this vendor from
+//     its public CTA, so it is NEVER blocked on public_visibility, package_status,
+//     paid_status, or category/area. Only the essentials gate it: status is
+//     approved/active (case-insensitive), verification is not rejected/pending/
+//     failed/unverified, is_active (default true), and remaining_credits > 0.
+//   * if eligible → assigns ONLY that vendor and deducts one credit via the atomic
+//     assign_lead_to_preferred_vendor RPC, then delivers the dashboard +
+//     WhatsApp-preview + client-preview logs (WhatsApp stays preview/log only)
+//   * if no credits → assigns nothing, deducts nothing, shares NO client contact,
+//     notifies the vendor to recharge, and queues the delayed fallback (Phase 2)
+//   * if not approved/verified/active → assigns nothing and marks for admin review
+//   * NEVER fans out to other vendors here (delayed fill is Phase 2)
 //
 // It never throws: every failure resolves to a safe result so lead submission is
 // never blocked. Credits are only ever touched by the tested DB RPC/primitives.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
-import { evaluateVendorLeadAssignmentEligibility } from "../lib/vendors/vendorEligibility";
+import { normalizeCredits } from "../lib/vendors/vendorEligibility";
 import {
   createClientAssignedVendorsPreview,
   createVendorLeadWhatsappPreview,
@@ -65,20 +69,60 @@ export type RoutePreferredVendorInput = {
   fallbackAllowed?: boolean;
 };
 
-// Commercial gates that make a client-picked vendor unassignable. City / category
-// / subcategory mismatches are intentionally IGNORED here: the client explicitly
-// chose this vendor, and the CTA prefills the vendor's own city.
-const COMMERCIAL_BLOCK_REASONS = new Set([
-  "vendor_pending_approval",
-  "vendor_suspended",
-  "vendor_inactive",
-  "free_unpaid_vendor_not_eligible_for_assignment",
-  "package_expired",
-  "no_credits",
-]);
-const NO_CREDIT_REASONS = new Set(["no_credits", "package_expired"]);
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// verification_status values that block a direct assignment (case-insensitive).
+// A missing/blank verification is treated as verified (default trust).
+const BAD_VERIFICATION_STATUSES = new Set([
+  "pending",
+  "rejected",
+  "unverified",
+  "not verified",
+  "failed",
+  "in review",
+]);
+
+type PreferredDirectBlockReason =
+  | "vendor_not_approved_or_active"
+  | "vendor_not_verified"
+  | "vendor_inactive"
+  | "no_credits";
+
+/**
+ * Direct commercial eligibility for a CLIENT-PICKED vendor. The client already
+ * chose this vendor from its public CTA, so this deliberately does NOT gate on
+ * public_visibility, package_status, paid_status, or category/city — only the
+ * commercial essentials. `blockReason` is null when the vendor is assignable.
+ */
+function evaluatePreferredVendorDirectEligibility(
+  vendor: Record<string, unknown>,
+): { eligible: boolean; blockReason: PreferredDirectBlockReason | null } {
+  const statusText = typeof vendor.status === "string" ? vendor.status.trim().toLowerCase() : "";
+  if (statusText !== "approved" && statusText !== "active") {
+    return { eligible: false, blockReason: "vendor_not_approved_or_active" };
+  }
+
+  const rawVerification = typeof vendor.verification_status === "string" ? vendor.verification_status.trim() : "";
+  const verificationText = rawVerification.length > 0 ? rawVerification.toLowerCase() : "verified";
+  if (BAD_VERIFICATION_STATUSES.has(verificationText)) {
+    return { eligible: false, blockReason: "vendor_not_verified" };
+  }
+
+  // is_active defaults to true only when the field is entirely absent/null.
+  const isActive =
+    vendor.is_active === undefined || vendor.is_active === null
+      ? true
+      : vendor.is_active === true || vendor.is_active === "true" || vendor.is_active === 1;
+  if (!isActive) {
+    return { eligible: false, blockReason: "vendor_inactive" };
+  }
+
+  if (normalizeCredits(vendor) <= 0) {
+    return { eligible: false, blockReason: "no_credits" };
+  }
+
+  return { eligible: true, blockReason: null };
+}
 
 /**
  * Route one lead to a single preferred vendor. Always resolves (never throws).
@@ -118,32 +162,33 @@ export async function routePreferredVendorLead(
     const vendor = vendorRow as Record<string, unknown>;
     const vendorName = asText(vendor.business_name) ?? fallbackName;
 
-    // Server-side eligibility (never trust the client). Trial vendors allowed.
-    const eligibility = evaluateVendorLeadAssignmentEligibility(
-      vendor,
-      {
-        city: input.city ?? vendor.city ?? null,
-        service_required: input.serviceRequired ?? null,
-        category: input.category ?? null,
-        subcategory: input.subcategory ?? null,
-      },
-      { allow_trial_vendors_for_assignment: true },
-    );
-    const commercialBlocks = eligibility.reasons.filter((reason) => COMMERCIAL_BLOCK_REASONS.has(reason));
-    const nonCreditBlocks = commercialBlocks.filter((reason) => !NO_CREDIT_REASONS.has(reason));
+    // Direct commercial check (never trust the client). A client-picked vendor is
+    // NOT gated on public_visibility / package_status / paid_status / category —
+    // only status, verification, active, and credits decide a direct assignment.
+    const eligibility = evaluatePreferredVendorDirectEligibility(vendor);
 
-    if (nonCreditBlocks.length > 0) {
-      await markLeadPreferred(input, "preferred_vendor_not_eligible", nonCreditBlocks[0], vendorName);
-      return result("preferred_vendor_not_eligible", false, vendorId, vendorName, nonCreditBlocks[0]);
-    }
-    if (commercialBlocks.length > 0) {
-      // Only credit/package reasons remain → no-credits path (no contact shared).
-      // Phase 2: queue a 1-hour fallback so the preferred vendor gets a second
-      // chance (recharge) before better matching vendors fill the slots.
+    if (eligibility.blockReason === "no_credits") {
+      // No credits → assign nothing, share NO client contact. Notify the vendor to
+      // recharge and queue the 1-hour delayed fallback (Phase 2).
+      console.warn("[preferred vendor] direct assignment held — no credits", {
+        lead_id: input.leadId,
+        vendor_id: vendorId,
+        reason: "no_credits",
+      });
       await notifyVendorRechargeSafe(vendorId);
       const queued = await queueDelayedFillSafe(input, vendorId, false);
       await markLeadPreferred(input, "preferred_vendor_no_credits", "no_credits", vendorName);
       return result("preferred_vendor_no_credits", false, vendorId, vendorName, "no_credits", false, queued);
+    }
+    if (eligibility.blockReason) {
+      // Not approved/verified/active → do not assign, keep for admin review.
+      console.warn("[preferred vendor] direct assignment blocked — vendor not eligible", {
+        lead_id: input.leadId,
+        vendor_id: vendorId,
+        reason: eligibility.blockReason,
+      });
+      await markLeadPreferred(input, "preferred_vendor_not_eligible", eligibility.blockReason, vendorName);
+      return result("preferred_vendor_not_eligible", false, vendorId, vendorName, eligibility.blockReason);
     }
 
     // Eligible → atomic single-vendor assignment + one credit deduction.

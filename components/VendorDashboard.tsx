@@ -36,11 +36,12 @@ export function VendorDashboard({
     .map((p) => p?.trim())
     .filter(Boolean)
     .join(", ");
-  const cityStatePin = [
-    [vendor.office_city || vendor.city, vendor.office_state].map((p) => p?.trim()).filter(Boolean).join(", "),
-    vendor.office_pincode?.trim() ? `- ${vendor.office_pincode.trim()}` : "",
-  ].filter(Boolean).join(" ");
-  const hasAddress = Boolean(addressLine || vendor.office_pincode?.trim());
+  // Pincode removed from the dashboard address (Phase 1). City + state only.
+  const cityState = [vendor.office_city || vendor.city, vendor.office_state]
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(", ");
+  const hasAddress = Boolean(addressLine || cityState);
   const mapHref =
     vendor.office_latitude != null && vendor.office_longitude != null
       ? `https://www.google.com/maps?q=${vendor.office_latitude},${vendor.office_longitude}`
@@ -202,7 +203,7 @@ export function VendorDashboard({
                 <span className="qf-vd-address-icon" aria-hidden="true">📍</span>
                 <span className="qf-vd-address-text">
                   {addressLine ? <span>{addressLine}</span> : null}
-                  {cityStatePin ? <span>{cityStatePin}</span> : null}
+                  {cityState ? <span>{cityState}</span> : null}
                 </span>
               </address>
               {mapHref ? (

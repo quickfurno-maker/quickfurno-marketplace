@@ -17,7 +17,8 @@ export interface CreateLeadInput {
   email?: string;
   city: string;
   area?: string;
-  pincode?: string;
+  // Pincode removed as an active product/validation/quality/matching signal
+  // (Phase 1 Google location foundation). Legacy `address` remains optional.
   address?: string;
   service_required?: string;
   service_category?: string;
@@ -77,7 +78,6 @@ export interface CreateLeadInput {
   area_normalized?: string;
   sublocality?: string;
   neighborhood?: string;
-  postal_code?: string;
 }
 
 export interface PublicVendorCard {
@@ -125,7 +125,6 @@ export interface VendorRegistrationInput {
   location_captured_at?: string;
   service_radius_km?: number;
   base_area?: string;
-  base_pincode?: string;
   // Guided onboarding wizard fields (stored once 009_vendor_onboarding.sql /
   // 010_vendor_exact_columns.sql run; registerVendor falls back gracefully if
   // the columns are missing).
@@ -141,7 +140,8 @@ export interface VendorRegistrationInput {
   office_landmark?: string;
   office_city?: string;
   office_state?: string;
-  office_pincode?: string;
+  // office_pincode removed from the active vendor input contract (Phase 1). The
+  // legacy DB column is left in place; new onboarding no longer writes it.
   office_latitude?: number | null;
   office_longitude?: number | null;
   location_permission_status?: string;
@@ -186,7 +186,8 @@ export interface VendorProfileSummary {
   office_landmark: string | null;
   office_city: string | null;
   office_state: string | null;
-  office_pincode: string | null;
+  // office_pincode removed from the active dashboard summary type (Phase 1).
+  // The legacy DB column still exists but is no longer selected or displayed.
   office_latitude: number | null;
   office_longitude: number | null;
   status: string;

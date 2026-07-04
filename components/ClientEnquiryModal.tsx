@@ -81,7 +81,6 @@ type RFState = {
   serviceRequired: string;
   city: string;
   area: string;
-  pincode: string;
   budgetMin: string;
   budgetMax: string;
   budgetNotSure: boolean;
@@ -115,7 +114,6 @@ const initialState: RFState = {
   serviceRequired: "",
   city: "",
   area: "",
-  pincode: "",
   budgetMin: "",
   budgetMax: "",
   budgetNotSure: false,
@@ -470,7 +468,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   // Fields validated inline (tick/cross + per-field message) per step. Tile/chip
   // steps (category, subcategory, timeline) keep the concise banner instead.
   const STEP_FIELDS: Record<number, string[]> = {
-    2: ["city", "area", "pincode"],
+    2: ["city", "area"],
     3: ["budgetMin", "budgetMax"],
     5: ["name", "phone", "whatsapp", "consent"],
   };
@@ -567,7 +565,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         form.subcategory ||
         form.city ||
         form.area ||
-        form.pincode ||
         form.budgetMin ||
         form.budgetMax ||
         form.budgetNotSure ||
@@ -591,7 +588,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         return form.subcategory ? null : "Select an interior service.";
       case 2: {
         if (!form.city) return "Please select your city.";
-        if (form.pincode !== "" && form.pincode.length !== 6) return "Enter a valid 6-digit pincode.";
         // Location completeness: require at least one location signal so future
         // matching has something to work with — manual area OR browser-GPS coords
         // (a Google selection provides one/both). Google is never required.
@@ -718,14 +714,14 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     markTouched("area");
   }
 
-  // A Google prediction was picked: fill structured location, and update pincode
-  // / city only when they are safe (valid pincode; city we actually serve).
+  // A Google prediction was picked: fill structured location and update city only
+  // when it is safe (a city we actually serve). Pincode is no longer captured.
   //
-  // STRICT CITY CONSISTENCY (Part 4): if the client already chose a city and the
-  // picked place clearly belongs to a different city, we DO NOT overwrite ANY
-  // field (area/pincode/city/lat/lng/placeId/formattedAddress/areaNormalized) —
-  // we surface a message and let them pick again or type an area manually. This
-  // prevents ever saving city = X with coordinates from another city.
+  // STRICT CITY CONSISTENCY: if the client already chose a city and the picked
+  // place clearly belongs to a different city, we DO NOT overwrite ANY field
+  // (area/city/lat/lng/placeId/formattedAddress/areaNormalized) — we surface a
+  // message and let them pick again or type an area manually. This prevents ever
+  // saving city = X with coordinates from another city.
   function onAreaPlaceSelected(place: NormalizedGooglePlace) {
     if (form.city && !isPlaceCompatibleWithSelectedCity(place, form.city)) {
       setError(`Please select an area within ${form.city}.`);
@@ -733,8 +729,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
     setError("");
     setForm((current) => {
-      const nextPincode =
-        place.postalCode && /^\d{6}$/.test(place.postalCode) ? place.postalCode : current.pincode;
       // Only accept a place city that is one of the admin-managed active cities
       // (case-insensitive), and store it in the canonical casing from that list.
       const matchedCity = place.city
@@ -744,7 +738,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       return {
         ...current,
         area: place.area ?? current.area,
-        pincode: nextPincode,
         city: nextCity,
         lat: place.lat ?? current.lat,
         lng: place.lng ?? current.lng,
@@ -853,7 +846,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     const requirementParts = [
       form.categoryLabel ? `Category: ${form.categoryLabel}` : "",
       form.subcategory ? `Service: ${form.subcategory}` : "",
-      form.pincode ? `Pincode: ${form.pincode}` : "",
       form.whatsappSame ? "WhatsApp: same as phone" : form.whatsapp ? `WhatsApp: ${form.whatsapp}` : "",
       form.message.trim() ? `Notes: ${form.message.trim()}` : "",
       form.lat != null && form.lng != null ? `GPS: ${form.lat.toFixed(5)}, ${form.lng.toFixed(5)}` : "",
@@ -889,7 +881,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       area_normalized: form.areaNormalized || undefined,
       sublocality: form.sublocality || undefined,
       neighborhood: form.neighborhood || undefined,
-      postal_code: form.pincode || undefined,
     };
 
     const payload = {
@@ -1084,13 +1075,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 value: form.area,
                 error: "Enter your area/locality or use your current location.",
               });
-              const pincodeValid = form.pincode === "" || form.pincode.length === 6;
-              const pincodeUi = fieldUi("pincode", {
-                valid: pincodeValid,
-                value: form.pincode,
-                error: "Enter a valid 6-digit pincode.",
-                optional: true,
-              });
               return (
                 <div className="qf-rf-fields">
                   <label className={cityUi.className}>
@@ -1143,24 +1127,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       <ValidationIcon state={areaUi.iconState} />
                     </div>
                     {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
-                  </label>
-                  <label className={pincodeUi.className}>
-                    <span>Pincode (optional)</span>
-                    <div className="qf-rf-input-wrapper">
-                      <input
-                        value={form.pincode}
-                        onChange={(e) => {
-                          set("pincode", e.target.value.replace(/\D/g, "").slice(0, 6));
-                          markTouched("pincode");
-                        }}
-                        onBlur={() => markTouched("pincode")}
-                        placeholder="411014"
-                        inputMode="numeric"
-                        autoComplete="postal-code"
-                      />
-                      <ValidationIcon state={pincodeUi.iconState} />
-                    </div>
-                    {pincodeUi.showError ? <span className="qf-rf-field-err">{pincodeUi.error}</span> : null}
                   </label>
               <button type="button" className="qf-rf-loc-btn" onClick={useMyLocation}>
                 <QFIcon name="pin" />

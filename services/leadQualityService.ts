@@ -24,8 +24,19 @@ export type LeadQualityInput = {
   city?: string | null;
   area?: string | null;
   locality?: string | null;
-  pincode?: string | null;
   address?: string | null;
+  // Structured Google/location evidence (Phase 1). Replaces the retired pincode
+  // signal; used only to award the structured-location-detail location point.
+  // NOTE: `area_normalized` is intentionally NOT a qualifying signal (it can be
+  // set from manually typed area text); it is kept here only to accept the field.
+  latitude?: number | null;
+  longitude?: number | null;
+  google_place_id?: string | null;
+  formatted_address?: string | null;
+  area_normalized?: string | null;
+  sublocality?: string | null;
+  neighborhood?: string | null;
+  location_source?: string | null;
   service_required?: string | null;
   service_category?: string | null;
   serviceCategory?: string | null;
@@ -89,7 +100,25 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
   const budget = firstText(input.budget, input.budget_range, input.budgetRange);
   const timeline = firstText(input.timeline);
   const message = firstText(input.message, input.requirement);
-  const pincodeOrAddress = firstText(input.pincode, input.address) || hasPincode(message);
+  // Structured, TRUSTWORTHY location evidence (Phase 1) — replaces the retired
+  // pincode/free-text-address signal. Awarded ONLY for Google/GPS-backed data.
+  // IMPORTANT: `area_normalized` is deliberately excluded — a manual area entry
+  // sets it from the client's own typed text, which is NOT trustworthy evidence.
+  // Qualifying signals: a Google place id, valid coordinates, a Google formatted
+  // address, Google-derived sublocality/neighborhood, or a location_source that
+  // is google_place / browser_gps. NOT pincode, NOT arbitrary text.
+  const validLat = typeof input.latitude === "number" && Number.isFinite(input.latitude);
+  const validLng = typeof input.longitude === "number" && Number.isFinite(input.longitude);
+  const locationSource = String(input.location_source ?? "").trim().toLowerCase();
+  const trustedLocationSource = locationSource === "google_place" || locationSource === "browser_gps";
+  const structuredLocationDetail = Boolean(
+    firstText(input.google_place_id) ||
+      (validLat && validLng) ||
+      firstText(input.formatted_address) ||
+      firstText(input.sublocality) ||
+      firstText(input.neighborhood) ||
+      trustedLocationSource,
+  );
   const isDuplicate = Boolean(input.is_duplicate);
   const shareConsent = input.share_consent === true;
   const locationConsent = input.location_consent === true;
@@ -114,7 +143,7 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
   if (city) addScore("city_present", 5, locationReasons, (value) => { locationScore += value; });
   if (activeCityKnown) addScore("serviceable_city", 5, locationReasons, (value) => { locationScore += value; });
   if (area) addScore("area_or_locality_present", 5, locationReasons, (value) => { locationScore += value; });
-  if (pincodeOrAddress) addScore("pincode_or_address_detail_present", 3, locationReasons, (value) => { locationScore += value; });
+  if (structuredLocationDetail) addScore("structured_location_detail_present", 3, locationReasons, (value) => { locationScore += value; });
   if (locationConsent) addScore("location_consent", 2, locationReasons, (value) => { locationScore += value; });
   locationScore = Math.min(20, locationScore);
 
@@ -366,10 +395,6 @@ function looksSpamMessage(value: string): boolean {
   if (/https?:\/\/|www\./i.test(text) && text.length < 80) return true;
   if (/^(.)\1{6,}$/i.test(text.replace(/\s/g, ""))) return true;
   return false;
-}
-
-function hasPincode(value: string): string {
-  return /\b\d{6}\b/.test(value) ? "pincode_in_message" : "";
 }
 
 function isUrgentTimeline(timeline: string, message: string): boolean {

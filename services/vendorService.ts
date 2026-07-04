@@ -26,12 +26,12 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
     const emailClean = (input.email ?? "").trim();
     const cityClean = (input.city ?? "").trim();
 
-    // Check if it's the full onboarding registration wizard or simple form
+    // Check if it's the full onboarding registration wizard or simple form.
+    // (Pincode removed from this signal in Phase 1 — location is now Google-based.)
     const isFullOnboarding = Boolean(
-      input.office_address_line1 || 
-      input.whatsapp_number || 
-      input.office_state || 
-      input.office_pincode
+      input.office_address_line1 ||
+      input.whatsapp_number ||
+      input.office_state
     );
 
     if (!businessNameClean || !ownerNameClean || cleanedPhone.length !== 10 || !cityClean) {
@@ -44,15 +44,15 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
 
     if (isFullOnboarding) {
       const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean);
-      const pincodeClean = (input.office_pincode ?? "").replace(/\D/g, "");
 
+      // Pincode is no longer required/validated (Phase 1). Location is captured
+      // via the Google business base area/locality instead.
       if (
         cleanedWhatsapp.length !== 10 ||
         !emailClean ||
         !isEmailValid ||
         !input.office_address_line1?.trim() ||
-        !input.office_state?.trim() ||
-        pincodeClean.length !== 6
+        !input.office_state?.trim()
       ) {
         return {
           ok: false,
@@ -77,7 +77,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       office_landmark: input.office_landmark ?? null,
       office_city: input.office_city ?? cityClean,
       office_state: input.office_state ?? null,
-      office_pincode: input.office_pincode ?? null,
+      // office_pincode intentionally not written (Phase 1: pincode retired). The
+      // legacy column stays in the schema; existing vendor rows are untouched.
       office_latitude: input.office_latitude ?? null,
       office_longitude: input.office_longitude ?? null,
       areas_covered: input.areas_covered ?? [],
@@ -90,7 +91,10 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       location_permission_status: input.location_permission_status ?? "not_requested",
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
-      service_radius_km: input.service_radius_km ?? 20,
+      // service_radius_km no longer hardcoded to 20 (Phase 1). Only written when
+      // explicitly provided; otherwise the DB column default applies. Matching
+      // does not use this value in Phase 1.
+      ...(input.service_radius_km != null ? { service_radius_km: input.service_radius_km } : {}),
       business_type: input.business_type ?? null,
       team_size: input.team_size ?? null,
       monthly_capacity: input.monthly_capacity ?? null,

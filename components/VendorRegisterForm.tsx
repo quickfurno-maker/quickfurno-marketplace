@@ -7,6 +7,11 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, type MainCategory } from "@/lib/categories";
 import { type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
+// Phase 1: reuse the SAME Google autocomplete the client form uses (no second
+// system) for the vendor's Google business base area / locality.
+import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
+import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 // ---------------------------------------------------------------------------
 // Guided vendor onboarding wizard.
@@ -21,20 +26,9 @@ import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useAc
 // and public category pages show the correct category.
 // ---------------------------------------------------------------------------
 
-// Service areas are city-specific — selecting a city filters the chips below so a
-// Mumbai vendor never sees Pune areas (and vice versa).
-const CITY_SERVICE_AREAS: Record<string, string[]> = {
-  Pune: [
-    "Kharadi", "Viman Nagar", "Hadapsar", "Baner", "Wakad", "Hinjewadi", "Pimpri-Chinchwad",
-    "Magarpatta", "Aundh", "Kalyani Nagar", "Wagholi", "Undri", "NIBM", "Kondhwa",
-    "Shivaji Nagar", "Koregaon Park",
-  ],
-  Mumbai: [
-    "Andheri West", "Andheri East", "Bandra", "Borivali", "Kandivali", "Malad", "Goregaon",
-    "Powai", "Ghatkopar", "Chembur", "Dadar", "Lower Parel", "Thane", "Navi Mumbai", "Vashi",
-    "Nerul", "Kharghar", "Mira Road", "Mulund", "Bhandup",
-  ],
-};
+// Phase 1: static per-city service-area chips (CITY_SERVICE_AREAS) were removed.
+// Vendors now set a single Google business base area/locality (with manual
+// fallback), which produces canonical base coordinates for future matching.
 // Phase 14B: active cities come from the admin-managed cities table (via the
 // shared useActiveCities hook), so the vendor form never drifts from the
 // homepage / client enquiry modal. No custom-city entry allowed.
@@ -56,7 +50,7 @@ const BUSINESS_TYPE_OPTIONS = ["Showroom", "Factory", "Studio", "Workshop", "Hom
 const STEP_NAMES = [
   "Business Identity",
   "Service Category",
-  "City & Areas",
+  "City & Base Area",
   "Location",
   "Business Strength",
   "Review",
@@ -81,9 +75,15 @@ type WizardState = {
   addressLine2: string;
   landmark: string;
   stateName: string;
-  pincode: string;
-  areas: string[];
-  customArea: string;
+  // Google business base area / locality (Phase 1). Manual fallback preserved.
+  baseArea: string;
+  baseAreaNormalized: string;
+  googlePlaceId: string;
+  formattedAddress: string;
+  sublocality: string;
+  neighborhood: string;
+  baseLatitude: number | null;
+  baseLongitude: number | null;
   yearsExperience: string;
   teamSize: string;
   monthlyCapacity: string;
@@ -108,9 +108,14 @@ const initialState: WizardState = {
   addressLine2: "",
   landmark: "",
   stateName: "Maharashtra",
-  pincode: "",
-  areas: [],
-  customArea: "",
+  baseArea: "",
+  baseAreaNormalized: "",
+  googlePlaceId: "",
+  formattedAddress: "",
+  sublocality: "",
+  neighborhood: "",
+  baseLatitude: null,
+  baseLongitude: null,
   yearsExperience: "",
   teamSize: "",
   monthlyCapacity: "",
@@ -149,8 +154,6 @@ export function VendorRegisterForm() {
   const [showErrors, setShowErrors] = useState(false);
   // Track individual fields touched by the user.
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  // Error state for custom area input in Step 3.
-  const [customAreaError, setCustomAreaError] = useState("");
 
   const isFieldValid = (field: string): boolean => {
     const valOf = (key: keyof WizardState) => {
@@ -175,8 +178,6 @@ export function VendorRegisterForm() {
         return valOf("addressLine1").trim().length >= 5;
       case "state":
         return valOf("stateName").trim().length > 0;
-      case "pincode":
-        return /^\d{6}$/.test(valOf("pincode"));
       default:
         return true;
     }
@@ -313,13 +314,46 @@ export function VendorRegisterForm() {
     }));
   }
 
-  function toggleArea(area: string) {
+  // ── Phase 1: Google business base area / locality (manual fallback preserved) ──
+  // Manual typing keeps a free-text base area and clears any stale Google identity
+  // + canonical coordinates so the saved text never disagrees with a picked place.
+  function onBaseAreaManual(value: string) {
+    setError("");
     setF((current) => ({
       ...current,
-      areas: current.areas.includes(area)
-        ? current.areas.filter((a) => a !== area)
-        : [...current.areas, area],
+      baseArea: value,
+      baseAreaNormalized: value.trim().toLowerCase(),
+      googlePlaceId: "",
+      formattedAddress: "",
+      sublocality: "",
+      neighborhood: "",
+      baseLatitude: null,
+      baseLongitude: null,
     }));
+    setTouched((prev) => ({ ...prev, baseArea: true }));
+  }
+
+  // A Google place was picked. City-consistency guard: never overwrite anything
+  // if the place clearly belongs to a different city than the one selected.
+  function onBaseAreaPlace(place: NormalizedGooglePlace) {
+    if (f.city && !isPlaceCompatibleWithSelectedCity(place, f.city)) {
+      setError(`Please select a base area within ${f.city}.`);
+      return;
+    }
+    setError("");
+    setF((current) => ({
+      ...current,
+      baseArea: place.area ?? current.baseArea,
+      baseAreaNormalized: place.areaNormalized ?? (place.area ? place.area.toLowerCase() : ""),
+      googlePlaceId: place.placeId ?? "",
+      formattedAddress: place.formattedAddress ?? "",
+      sublocality: place.sublocality ?? "",
+      neighborhood: place.neighborhood ?? "",
+      // Canonical vendor base coordinates come from the Google place.
+      baseLatitude: place.lat ?? current.baseLatitude,
+      baseLongitude: place.lng ?? current.baseLongitude,
+    }));
+    setTouched((prev) => ({ ...prev, baseArea: true }));
   }
 
   function requestLocation() {
@@ -370,25 +404,21 @@ export function VendorRegisterForm() {
         break;
       case 2: {
         const cityStr = String(f.city ?? "").trim();
-        const areasArr = Array.isArray(f.areas) ? f.areas : [];
+        const baseAreaStr = String(f.baseArea ?? "").trim();
         const address1Str = String(f.addressLine1 ?? "").trim();
         const stateStr = String(f.stateName ?? "").trim();
-        const pincodeStr = String(f.pincode ?? "").trim();
 
         if (!cityStr) {
           e.push({ key: "city", message: "Select your city." });
         }
-        if (!f.coversFullCity && areasArr.length === 0) {
-          e.push({ key: "areas", message: "Select at least one service area or choose Serve entire city." });
+        if (baseAreaStr.length < 2) {
+          e.push({ key: "baseArea", message: "Enter your business base area / locality." });
         }
         if (address1Str.length < 5) {
           e.push({ key: "addressLine1", message: "Enter your office or business address." });
         }
         if (!stateStr) {
           e.push({ key: "state", message: "Enter your state." });
-        }
-        if (!/^\d{6}$/.test(pincodeStr)) {
-          e.push({ key: "pincode", message: "Enter a valid 6-digit pincode." });
         }
         break;
       }
@@ -431,12 +461,11 @@ export function VendorRegisterForm() {
         next.confirmPassword = true;
       } else if (step === 2) {
         next.city = true;
-        next.areas = true;
+        next.baseArea = true;
         next.addressLine1 = true;
         next.addressLine2 = true;
         next.landmark = true;
         next.state = true;
-        next.pincode = true;
       } else if (step === 4) {
         next.rate = true;
       }
@@ -463,11 +492,12 @@ export function VendorRegisterForm() {
   }
 
   const cityValue = String(f.city ?? "").trim();
-  const serviceAreas = Array.isArray(f.areas) ? f.areas : [];
-  // Step 3: area chips are driven by the chosen preset city (custom cities have
-  // none and rely on the free-text area input below).
+  const baseAreaValue = String(f.baseArea ?? "").trim();
   const hasCitySelected = Boolean(f.city);
-  const availableAreas = CITY_SERVICE_AREAS[f.city] ?? [];
+  // Phase 1: areas_covered is derived from the single Google business base area
+  // (keeps the existing exact-area match path alive without touching the RPC).
+  // covers_full_city continues to widen coverage city-wide.
+  const derivedAreasCovered = baseAreaValue ? [baseAreaValue] : [];
 
   // Resolve the final marketplace category (leaf or chosen subcategory), then map
   // it to the canonical service tag used by lead↔vendor matching.
@@ -541,7 +571,6 @@ export function VendorRegisterForm() {
     const emailStr = String(f.email ?? "").trim();
     const address1Str = String(f.addressLine1 ?? "").trim();
     const stateStr = String(f.stateName ?? "").trim();
-    const pincodeDigits = String(f.pincode ?? "").replace(/\D/g, "");
 
     const isAllValid =
       businessNameStr.length >= 2 &&
@@ -554,10 +583,9 @@ export function VendorRegisterForm() {
       selectedMain &&
       (selectedMain.subcategories.length === 0 || f.subCategory) &&
       cityValue &&
-      (f.coversFullCity || serviceAreas.length > 0) &&
+      baseAreaValue.length >= 2 &&
       address1Str.length >= 5 &&
       stateStr.length > 0 &&
-      pincodeDigits.length === 6 &&
       (!usesSqftRate || rateValid);
 
     if (!isAllValid) {
@@ -578,22 +606,31 @@ export function VendorRegisterForm() {
         whatsapp_number: whatsappDigits || undefined,
         email: emailStr,
         city: cityValue,
-        // Detailed office / business address (Step 3). office_city mirrors the
-        // selected service city; office lat/long mirror the captured GPS.
+        // Detailed office / business address (Step 3) — kept for profile/contact
+        // only; it does NOT drive matching. office_city mirrors the service city.
+        // Pincode removed (Phase 1). office_lat/long are now the CANONICAL vendor
+        // base coordinates, sourced from the Google business base area place.
         office_address_line1: address1Str || undefined,
         office_address_line2: String(f.addressLine2 ?? "").trim() || undefined,
         office_landmark: String(f.landmark ?? "").trim() || undefined,
         office_city: cityValue || undefined,
         office_state: stateStr || undefined,
-        office_pincode: pincodeDigits || undefined,
-        office_latitude: loc.status === "granted" ? loc.latitude : null,
-        office_longitude: loc.status === "granted" ? loc.longitude : null,
-        areas_covered: serviceAreas,
+        office_latitude: f.baseLatitude,
+        office_longitude: f.baseLongitude,
+        // Phase 1: derived from the single Google base area (keeps existing
+        // area-match path). covers_full_city still widens coverage city-wide.
+        areas_covered: derivedAreasCovered,
         covers_full_city: f.coversFullCity,
-        service_radius_km: 20,
+        // service_radius_km intentionally not sent (no hardcoded 20; DB default applies).
         service_categories: matchingServices,
         experience: f.yearsExperience || undefined,
-        // Location — exact latitude/longitude + permission status.
+        // Google business base area — structured identity + normalized fields.
+        google_place_id: f.googlePlaceId || undefined,
+        formatted_address: f.formattedAddress || undefined,
+        area_normalized: f.baseAreaNormalized || undefined,
+        sublocality: f.sublocality || undefined,
+        neighborhood: f.neighborhood || undefined,
+        // Legacy fallback coordinates from optional browser GPS (Step 4).
         location_permission_status: locationPermissionStatus,
         latitude: loc.status === "granted" ? loc.latitude : null,
         longitude: loc.status === "granted" ? loc.longitude : null,
@@ -734,28 +771,6 @@ export function VendorRegisterForm() {
       </footer>
     </div>
   );
-
-  function addCustomArea() {
-    const trimmed = String(f.customArea ?? "").trim();
-    if (trimmed.length < 2) {
-      setCustomAreaError("Enter a valid area name.");
-      return;
-    }
-    const areasArr = Array.isArray(f.areas) ? f.areas : [];
-    const isDuplicate = areasArr.some(
-      (a) => String(a ?? "").trim().toLowerCase() === trimmed.toLowerCase()
-    );
-    if (isDuplicate) {
-      setCustomAreaError("This area is already selected.");
-      return;
-    }
-    setCustomAreaError("");
-    setF((current) => ({
-      ...current,
-      areas: [...areasArr, trimmed],
-      customArea: "",
-    }));
-  }
 
   function renderStep() {
     switch (step) {
@@ -904,7 +919,7 @@ export function VendorRegisterForm() {
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 3 of 6</span>
             <h3>Where do you serve clients?</h3>
-            <p className="qf-rf-qhint">Add your office address and the areas you cover. You can update this later from your dashboard.</p>
+            <p className="qf-rf-qhint">Pick your city and your business base area. You can update this later from your dashboard.</p>
 
             {/* 1. City selection */}
             <div className={`qf-rf-chips${fieldError("city") ? " has-error" : ""}`} ref={bindField("city")}>
@@ -919,17 +934,24 @@ export function VendorRegisterForm() {
                       key={city}
                       className={`qf-rf-chip${selected ? " is-selected" : ""}`}
                       aria-pressed={selected}
-                      // Switching city clears areas picked for the previous city and
-                      // pre-fills the state (both serviced cities are in Maharashtra).
+                      // Switching city clears the base area picked for the previous
+                      // city (incl. Google identity + coords) and pre-fills state.
                       onClick={() => {
                         setF((c) => ({
                           ...c,
                           city,
-                          areas: [],
-                          customArea: "",
+                          baseArea: "",
+                          baseAreaNormalized: "",
+                          googlePlaceId: "",
+                          formattedAddress: "",
+                          sublocality: "",
+                          neighborhood: "",
+                          baseLatitude: null,
+                          baseLongitude: null,
                           stateName: "Maharashtra",
                           coversFullCity: false,
                         }));
+                        setError("");
                         setTouched((prev) => ({ ...prev, city: true }));
                       }}
                     >
@@ -968,107 +990,60 @@ export function VendorRegisterForm() {
               </div>
             ) : null}
 
-            {/* 2. Service areas */}
-            <p className="qf-vrf-subhead">Service areas</p>
-            {availableAreas.length > 0 ? (
-              <div className="qf-rf-chips">
-                {availableAreas.map((area) => {
-                  const selected = serviceAreas.includes(area);
-                  return (
-                    <button
-                      type="button"
-                      key={area}
-                      className={`qf-rf-chip${selected ? " is-selected" : ""}`}
-                      aria-pressed={selected}
-                      onClick={() => toggleArea(area)}
-                    >
-                      {area}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : !hasCitySelected ? (
-              <p className="qf-rf-loc-note" style={{ marginTop: "0.1rem" }}>
-                Select a city to view service areas.
-              </p>
-            ) : null}
+            {/* 2. Google business base area / locality (manual fallback preserved) */}
+            <p className="qf-vrf-subhead">Business base area / locality</p>
+            {(() => {
+              const baseTouched = touched.baseArea || showErrors;
+              const baseValid = baseAreaValue.length >= 2;
+              const baseInvalid = baseTouched && !baseValid;
+              const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${baseValid ? " is-valid" : ""}`;
+              return (
+                <label className={wrapperClass} ref={bindField("baseArea")}>
+                  <span>Business base area / locality</span>
+                  <div className="qf-rf-input-wrapper">
+                    <GooglePlaceAutocomplete
+                      value={f.baseArea}
+                      city={f.city}
+                      mode="locality"
+                      onManualChange={onBaseAreaManual}
+                      onPlaceSelected={onBaseAreaPlace}
+                      onBlur={() => setTouched((prev) => ({ ...prev, baseArea: true }))}
+                      placeholder={hasCitySelected ? "e.g. Baner, Kharadi" : "Select a city first"}
+                      disabled={!hasCitySelected}
+                      autoComplete="off"
+                    />
+                    {baseValid ? (
+                      <span className="qf-rf-input-icon qf-rf-input-icon--valid">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#19a55a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      </span>
+                    ) : baseInvalid ? (
+                      <span className="qf-rf-input-icon qf-rf-input-icon--invalid">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b4231a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </span>
+                    ) : null}
+                  </div>
+                  {baseInvalid && fieldError("baseArea") ? (
+                    <span className="qf-rf-field-err">{fieldError("baseArea")}</span>
+                  ) : null}
+                  {f.baseLatitude != null && f.baseLongitude != null ? (
+                    <span className="qf-rf-loc-note qf-rf-loc-note--ok" style={{ marginTop: "0.25rem" }}>
+                      Base location set from your selected area.
+                    </span>
+                  ) : (
+                    <span className="qf-rf-loc-note" style={{ marginTop: "0.25rem" }}>
+                      Pick a suggestion for precise matching, or type your area manually.
+                    </span>
+                  )}
+                </label>
+              );
+            })()}
 
-            {/* 3. Selected service areas summary */}
-            <p className="qf-vrf-subhead" ref={bindField("areas")}>Selected service areas</p>
-            {serviceAreas.length > 0 ? (
-              <div className="qf-rf-chips qf-rf-selected-areas">
-                {serviceAreas.map((area) => (
-                  <span
-                    key={area}
-                    className="qf-rf-chip is-selected qf-rf-chip-removable"
-                    style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
-                  >
-                    {area}
-                    <button
-                      type="button"
-                      onClick={() => toggleArea(area)}
-                      className="qf-rf-chip-remove-btn"
-                      aria-label={`Remove ${area}`}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "inherit",
-                        cursor: "pointer",
-                        padding: "0 2px",
-                        fontSize: "1.1em",
-                        lineHeight: 1,
-                        display: "inline-flex",
-                        alignItems: "center"
-                      }}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="qf-rf-loc-note" style={{ marginTop: "0.25rem", color: showErrors && !f.coversFullCity ? "#b4231a" : "#7a6b5c" }}>
-                {f.coversFullCity ? "No specific areas selected yet (city-wide coverage is active)." : "Select at least one area where you serve clients."}
-              </p>
-            )}
-            {fieldError("areas") && serviceAreas.length === 0 && !f.coversFullCity ? (
-              <p className="qf-rf-field-err qf-rf-field-err--block">{fieldError("areas")}</p>
-            ) : null}
-
-            {/* 4. Add custom area input */}
-            <div className="qf-rf-field" style={{ marginTop: "1rem" }}>
-              <span>Add a custom area (optional)</span>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  value={f.customArea}
-                  onChange={(e) => {
-                    set("customArea", e.target.value);
-                    setCustomAreaError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addCustomArea();
-                    }
-                  }}
-                  placeholder="e.g. Dhanori"
-                  style={{ flex: 1 }}
-                />
-                <button
-                  type="button"
-                  onClick={addCustomArea}
-                  className="qf-rf-btn qf-rf-btn--ghost"
-                  style={{ minHeight: "44px", padding: "0 1rem", borderRadius: "14px" }}
-                >
-                  Add
-                </button>
-              </div>
-              {customAreaError ? (
-                <span className="qf-rf-field-err" style={{ marginTop: "0.25rem" }}>{customAreaError}</span>
-              ) : null}
-            </div>
-
-            {/* 5. Office / Business Address */}
+            {/* 3. Office / Business Address (profile/contact only — not matching) */}
             <p className="qf-vrf-subhead">Office / Business Address</p>
             <div className="qf-rf-fields">
               {renderInputField({
@@ -1088,24 +1063,13 @@ export function VendorRegisterForm() {
                 fieldKey: "landmark",
                 placeholder: "Near…",
               })}
-              <div className="qf-vrf-field-row">
-                {renderInputField({
-                  label: "State",
-                  fieldKey: "state",
-                  placeholder: "Maharashtra",
-                  autoComplete: "address-level1",
-                  customOnChange: (val) => set("stateName", val),
-                })}
-                {renderInputField({
-                  label: "Pincode",
-                  fieldKey: "pincode",
-                  placeholder: "411014",
-                  inputMode: "numeric",
-                  autoComplete: "postal-code",
-                  maxLength: 6,
-                  customOnChange: (val) => set("pincode", val.replace(/\D/g, "").slice(0, 6)),
-                })}
-              </div>
+              {renderInputField({
+                label: "State",
+                fieldKey: "state",
+                placeholder: "Maharashtra",
+                autoComplete: "address-level1",
+                customOnChange: (val) => set("stateName", val),
+              })}
             </div>
           </div>
         );
@@ -1248,8 +1212,7 @@ export function VendorRegisterForm() {
                 />
               ) : null}
               {String(f.stateName ?? "").trim() ? <SummaryRow label="State" value={String(f.stateName ?? "").trim()} /> : null}
-              {String(f.pincode ?? "").trim() ? <SummaryRow label="Pincode" value={String(f.pincode ?? "").trim()} /> : null}
-              <SummaryRow label="Areas" value={serviceAreas.length ? serviceAreas.join(", ") : "—"} />
+              <SummaryRow label="Base area" value={baseAreaValue || "—"} />
               <SummaryRow label="Location" value={loc.status === "granted" ? "Shared" : "Not shared"} />
               {f.yearsExperience ? <SummaryRow label="Experience" value={f.yearsExperience} /> : null}
               {f.teamSize ? <SummaryRow label="Team size" value={f.teamSize} /> : null}

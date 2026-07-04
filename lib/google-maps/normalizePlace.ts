@@ -4,8 +4,9 @@
 //
 // Turns a raw Google place (Places NEW `Place`, or a legacy `PlaceResult`) into
 // the app's NormalizedGooglePlace shape: a stable city / area / sublocality /
-// neighborhood / state / pincode / lat-lng bundle with a lowercased
-// `areaNormalized`. Pure and defensive — any missing piece simply stays null.
+// neighborhood / state / lat-lng bundle with a lowercased `areaNormalized`.
+// Pure and defensive — any missing piece simply stays null. Pincode/postal_code
+// is intentionally NOT surfaced (QuickFurno no longer uses it as a location signal).
 //
 // Also exposes isPlaceCompatibleWithSelectedCity(): a defensive, case-insensitive
 // guard so we NEVER save city = X with coordinates that clearly belong to a
@@ -76,7 +77,6 @@ export function normalizeGooglePlace(
     "sublocality_level_2",
   );
   const neighborhood = componentFor(components, "neighborhood");
-  const postalCode = componentFor(components, "postal_code");
   const placeName = clean(place?.displayName ?? place?.name);
 
   // City is Google-derived evidence ONLY (never the selected form city): a real
@@ -104,8 +104,6 @@ export function normalizeGooglePlace(
     sublocality,
     neighborhood,
     state,
-    // Keep only a well-formed 6-digit Indian pincode; anything else → null.
-    postalCode: postalCode && /^\d{6}$/.test(postalCode) ? postalCode : null,
     lat,
     lng,
   };

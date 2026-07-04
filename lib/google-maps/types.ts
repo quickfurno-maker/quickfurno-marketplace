@@ -117,7 +117,6 @@ export interface NormalizedGooglePlace {
   sublocality: string | null;
   neighborhood: string | null;
   state: string | null;
-  postalCode: string | null;
   lat: number | null;
   lng: number | null;
 }

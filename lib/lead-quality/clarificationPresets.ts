@@ -22,7 +22,6 @@ export type ClarificationLeadLike = {
   city?: string | null;
   area?: string | null;
   locality?: string | null;
-  pincode?: string | null;
   service_required?: string | null;
   service_category?: string | null;
   serviceCategory?: string | null;
@@ -106,7 +105,9 @@ export function detectMissingClarificationFields(lead: ClarificationLeadLike): s
   if (category === "Civil Work" && !subcategory) missing.push("civil_work_type");
   if (!text(lead.budget, lead.budget_range, lead.budgetRange)) missing.push("budget");
   if (!text(lead.timeline)) missing.push("timeline");
-  if (!text(lead.area, lead.locality, lead.pincode) && !hasPincode(text(lead.message, lead.requirement))) missing.push("area_pincode");
+  // Location clarity asks for area/locality only (never pincode). Uses the new
+  // `area_location` key; no dependency on lead.pincode or 6-digit message text.
+  if (!text(lead.area, lead.locality)) missing.push("area_location");
 
   if ((parent === "Interior" || category === "Painter") && !text(lead.property_type, lead.project_size)) {
     missing.push(category === "Painter" ? "property_size" : "property_type");
@@ -190,10 +191,10 @@ export function buildClarificationQuestions(lead: ClarificationLeadLike): Clarif
   if (missing.includes("timeline")) {
     questions.push(choice("timeline", "Timeline?", [...TIMELINES], "timeline"));
   }
-  if (missing.includes("area_pincode")) {
+  if (missing.includes("area_location")) {
     questions.push({
-      key: "area_pincode",
-      text: "Please share area or pincode",
+      key: "area_location",
+      text: "Please share your area / locality",
       type: "free_text_later",
       mapped_field: "area",
     });
@@ -247,6 +248,11 @@ export function mapClarificationAnswerToLeadField(questionKey: string, answerVal
   if (questionKey === "budget") return simplePatch("budget", value);
   if (questionKey === "timeline") return simplePatch("timeline", value);
   if (questionKey === "property_type" || questionKey === "property_size" || questionKey === "site_type") return simplePatch("property_type", value);
+  // New location clarification key → always maps to the lead's area.
+  if (questionKey === "area_location") return simplePatch("area", value);
+  // BACKWARD-COMPATIBILITY ALIAS: already-persisted `area_pincode` clarification
+  // records (pre-Phase 1) must remain ingestable. No NEW request uses this key;
+  // its answer is mapped exactly as before so historical records reproduce.
   if (questionKey === "area_pincode") return simplePatch(hasPincode(value) ? "message" : "area", value);
   if (questionKey === "sofa_size" || questionKey === "photo_available") return detailPatch(questionKey, value);
   return detailPatch(questionKey, value);
@@ -349,6 +355,9 @@ function text(...values: Array<string | null | undefined>): string {
   return values.map((value) => value?.trim()).find(Boolean) ?? "";
 }
 
+// Retained ONLY for the legacy `area_pincode` answer-mapping alias above, to keep
+// already-persisted clarification records ingestable. Not used by any new
+// clarification question or any missing-field / scoring / matching decision.
 function hasPincode(value: string): boolean {
   return /\b\d{6}\b/.test(value);
 }

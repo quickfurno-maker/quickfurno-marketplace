@@ -124,7 +124,8 @@ export async function createLead(
       area_normalized: input.area_normalized ?? null,
       sublocality: input.sublocality ?? null,
       neighborhood: input.neighborhood ?? null,
-      postal_code: input.postal_code ?? null,
+      // postal_code intentionally not written (Phase 1: pincode retired as a
+      // location signal). Legacy DB column remains, unused for new leads.
     };
 
     const insertLead = (payload: Record<string, unknown>) =>

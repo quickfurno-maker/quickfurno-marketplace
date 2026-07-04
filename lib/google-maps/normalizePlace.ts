@@ -51,18 +51,22 @@ function readCoord(value: number | (() => number) | undefined): number | null {
 }
 
 /**
- * Normalize a Google place. `fallbackCity` is the city already chosen in the
- * form — used only when the place itself carries no locality.
- * `mode` mildly changes which field wins for the human-facing `area` label.
+ * Normalize a Google place. `mode` mildly changes which field wins for the
+ * human-facing `area` label.
+ *
+ * IMPORTANT: `city` is derived from Google address components ONLY. The selected
+ * form city is deliberately NOT used as a fallback here — otherwise the downstream
+ * isPlaceCompatibleWithSelectedCity() check could be satisfied by the very city
+ * the client chose, with no independent Google evidence.
  */
 export function normalizeGooglePlace(
   place: PlaceLike | null | undefined,
-  fallbackCity?: string,
   mode: "locality" | "address" = "locality",
 ): NormalizedGooglePlace {
   const components = place?.addressComponents ?? place?.address_components ?? null;
 
   const locality = componentFor(components, "locality");
+  const postalTown = componentFor(components, "postal_town");
   const adminArea2 = componentFor(components, "administrative_area_level_2");
   const state = componentFor(components, "administrative_area_level_1");
   const sublocality = componentFor(
@@ -75,9 +79,10 @@ export function normalizeGooglePlace(
   const postalCode = componentFor(components, "postal_code");
   const placeName = clean(place?.displayName ?? place?.name);
 
-  // City must be an actual city, never a sublocality: prefer locality, then the
-  // administrative district, then whatever the form already had selected.
-  const city = locality ?? adminArea2 ?? clean(fallbackCity);
+  // City is Google-derived evidence ONLY (never the selected form city): a real
+  // city component — locality, else postal_town, else the district as a defensive
+  // fallback. If Google provides none of these, city stays null.
+  const city = locality ?? postalTown ?? adminArea2;
 
   // Human-facing "area" label. In locality mode the picked prediction name is
   // the best answer (e.g. "Baner"); in address mode prefer the finer locality.

@@ -677,6 +677,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   //   CASE B (previous Google place, or no GPS): clear ALL Google-derived data,
   //           INCLUDING the now-stale locationCapturedAt, and mark source manual.
   function onAreaManualChange(value: string) {
+    // Clear any stale "select an area within <city>" mismatch banner the moment
+    // the client starts typing a manual area (this handler is only wired to the
+    // step-2 area field, so it never touches submission errors on other steps).
+    setError("");
     setForm((current) => {
       const keepGpsCoords =
         current.locationSource === "browser_gps" &&

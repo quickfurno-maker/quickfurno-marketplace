@@ -16,7 +16,9 @@
 //   • suggestions are debounced (~300ms) and only requested for >= 3 chars.
 //   • one AutocompleteSessionToken per typing-to-selection session (refreshed
 //     after each completed selection).
-//   • stale async responses are dropped (monotonic request sequence).
+//   • a single monotonic interaction version invalidates ALL stale async results
+//     — both suggestion fetches and place-detail (fetchFields) selections — so no
+//     out-of-order response can overwrite newer state.
 //   • keyboard: ArrowUp/Down move, Enter selects, Escape closes; Enter never
 //     submits the enquiry form. Mouse select + outside-click-to-close supported.
 // ============================================================================
@@ -25,6 +27,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -80,11 +83,19 @@ export default function GooglePlaceAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const placesRef = useRef<PlacesLibrary | null>(null);
   const sessionTokenRef = useRef<unknown>(null);
-  const reqSeqRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Single monotonic interaction version. It is bumped on EVERY manual edit and
+  // at the START of a selection. Any async result (a suggestions fetch OR a
+  // place-detail fetchFields) that captured an older version is stale and must
+  // NOT touch state — this defeats every out-of-order race (typing over a slow
+  // request, clearing the field, or picking A then typing before A resolves).
+  const interactionVersionRef = useRef(0);
 
   // Latest callbacks/props read by async handlers without re-subscribing.
   const onPlaceSelectedRef = useRef(onPlaceSelected);
+  // Reserved for FUTURE city-specific request biasing (locationBias). It is
+  // intentionally NOT passed to normalizeGooglePlace — the selected form city must
+  // never manufacture Google city evidence for the compatibility check.
   const cityRef = useRef(city);
   const modeRef = useRef(mode);
   onPlaceSelectedRef.current = onPlaceSelected;
@@ -129,16 +140,20 @@ export default function GooglePlaceAutocomplete({
     setActiveIndex(-1);
   }, []);
 
-  const fetchSuggestions = useCallback(async (input: string) => {
+  // `version` is captured when the debounce was scheduled; if a newer interaction
+  // has happened by the time we resolve, we abandon this response entirely.
+  const fetchSuggestions = useCallback(async (input: string, version: number) => {
+    const isCurrent = () => version === interactionVersionRef.current;
     const places = placesRef.current;
     const query = input.trim();
     if (!places || query.length < MIN_CHARS) {
-      setSuggestions([]);
-      closeDropdown();
+      if (isCurrent()) {
+        setSuggestions([]);
+        closeDropdown();
+      }
       return;
     }
 
-    const seq = ++reqSeqRef.current;
     const baseRequest: AutocompleteRequest = {
       input: query,
       sessionToken: ensureSessionToken() ?? undefined,
@@ -163,7 +178,7 @@ export default function GooglePlaceAutocomplete({
         void _omit;
         response = await run(rest);
       } catch {
-        if (seq === reqSeqRef.current) {
+        if (isCurrent()) {
           setSuggestions([]);
           closeDropdown();
         }
@@ -171,8 +186,8 @@ export default function GooglePlaceAutocomplete({
       }
     }
 
-    // Drop stale responses: only the newest request may update the UI.
-    if (seq !== reqSeqRef.current) return;
+    // Drop stale responses: only the newest interaction may update the UI.
+    if (!isCurrent()) return;
 
     const items: Suggestion[] = (response?.suggestions ?? [])
       .map((s) => s.placePrediction)
@@ -193,6 +208,9 @@ export default function GooglePlaceAutocomplete({
 
   const handleManualChange = useCallback(
     (raw: string) => {
+      // Every manual edit is a new interaction: bump the version so any in-flight
+      // suggestion fetch OR pending place-detail selection is invalidated.
+      const version = ++interactionVersionRef.current;
       onManualChange(raw); // immediate fallback — never gated on Google
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (!placesRef.current || raw.trim().length < MIN_CHARS) {
@@ -200,12 +218,15 @@ export default function GooglePlaceAutocomplete({
         closeDropdown();
         return;
       }
-      debounceRef.current = setTimeout(() => void fetchSuggestions(raw), DEBOUNCE_MS);
+      debounceRef.current = setTimeout(() => void fetchSuggestions(raw, version), DEBOUNCE_MS);
     },
     [onManualChange, fetchSuggestions, closeDropdown],
   );
 
   const selectSuggestion = useCallback(async (suggestion: Suggestion) => {
+    // Selection is itself a new interaction: bump + capture the version, then
+    // cancel any pending suggestion fetch and close the list immediately.
+    const version = ++interactionVersionRef.current;
     closeDropdown();
     setSuggestions([]);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -217,7 +238,10 @@ export default function GooglePlaceAutocomplete({
       await place.fetchFields({
         fields: ["id", "displayName", "formattedAddress", "addressComponents", "location"],
       });
-      const normalized = normalizeGooglePlace(place, cityRef.current, modeRef.current);
+      // If the user interacted (typed a new area, cleared, picked again) while
+      // fetchFields was in flight, this detail result is stale — do NOT apply it.
+      if (version !== interactionVersionRef.current) return;
+      const normalized = normalizeGooglePlace(place, modeRef.current);
       onPlaceSelectedRef.current(normalized);
     } catch {
       // fetchFields failed — the manually typed value stands; do nothing.
@@ -274,7 +298,10 @@ export default function GooglePlaceAutocomplete({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open, closeDropdown]);
 
-  const listboxId = "qf-place-suggest-list";
+  // Unique per-instance ARIA ids so multiple mounted autocompletes never collide.
+  const uid = useId();
+  const listboxId = `qf-place-list-${uid}`;
+  const optionId = (i: number) => `qf-place-opt-${uid}-${i}`;
   const showList = open && suggestions.length > 0;
 
   return (
@@ -291,7 +318,7 @@ export default function GooglePlaceAutocomplete({
         aria-controls={listboxId}
         aria-autocomplete="list"
         aria-activedescendant={
-          showList && activeIndex >= 0 ? `qf-place-opt-${activeIndex}` : undefined
+          showList && activeIndex >= 0 ? optionId(activeIndex) : undefined
         }
         autoComplete={inputProps.autoComplete ?? "off"}
       />
@@ -300,7 +327,7 @@ export default function GooglePlaceAutocomplete({
           {suggestions.map((s, i) => (
             <li
               key={s.id}
-              id={`qf-place-opt-${i}`}
+              id={optionId(i)}
               role="option"
               aria-selected={i === activeIndex}
               className={`qf-place-suggest-item${i === activeIndex ? " is-active" : ""}`}

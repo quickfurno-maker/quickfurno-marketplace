@@ -304,21 +304,23 @@ export function getLeadQualityDecision(scoreResult: LeadQualityScoreResult): Lea
 }
 
 async function isServiceableCity(city?: string | null): Promise<boolean | null> {
-  const cityName = firstText(city);
+  // Live public.cities contract is exactly: id, name, slug, is_active.
+  // There is NO launch_status column — selecting it made PostgREST error and
+  // return null, silently dropping serviceable_city:+5 for real active cities.
+  const cityName = firstText(city); // firstText trims; "" when city is blank
   if (!cityName) return false;
   try {
     const { data, error } = await adminClient()
       .from("cities")
-      .select("id, is_active, launch_status")
-      .ilike("name", cityName)
+      .select("is_active")            // only existing required column
+      .ilike("name", cityName)        // case-insensitive exact name match (no wildcards)
       .limit(1);
-    if (error) return null;
-    const row = (data ?? [])[0] as { is_active?: boolean | null; launch_status?: string | null } | undefined;
-    if (!row) return null;
-    const launchStatus = String(row.launch_status ?? "").toLowerCase();
-    return row.is_active === true || ["active", "launched", "serviceable", "live"].includes(launchStatus);
+    if (error) return null;           // genuine query/system failure only
+    const row = (data ?? [])[0] as { is_active?: boolean | null } | undefined;
+    if (!row) return false;           // no such city → not serviceable (not a failure)
+    return row.is_active === true;    // true only when the matched city is active
   } catch {
-    return null;
+    return null;                      // genuine system failure only
   }
 }
 
@@ -404,9 +406,22 @@ function isUrgentTimeline(timeline: string, message: string): boolean {
   return days !== null && days <= 7;
 }
 
+/** Lowercase, collapse whitespace, and fold every dash/hyphen variant to a space. */
+function normalizeTimelineText(value: string): string {
+  return value
+    .toLowerCase()
+    // hyphen-minus (U+002D) + Unicode hyphens/dashes (U+2010–U+2015) + minus (U+2212)
+    .replace(/[-‐-―−]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isTimelineWithin30Days(timeline: string): boolean {
-  const text = timeline.toLowerCase();
+  const text = normalizeTimelineText(timeline);
   if (!text) return false;
+  // Current client label "Within One Month" (and "within 1 month"). Anchored on
+  // "within … month" so it never matches "One–Two/Two–Three/After Three Months".
+  if (/\bwithin (one|1) month\b/.test(text)) return true;
   if (/\b(this month|within 30|30 days|2 weeks|3 weeks|4 weeks|15 days)\b/.test(text)) return true;
   const days = extractDays(text);
   return days !== null && days <= 30;

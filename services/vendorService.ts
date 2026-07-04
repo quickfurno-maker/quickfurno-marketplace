@@ -109,19 +109,42 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       user_id: input.user_id ?? null,
     };
 
+    // Phase 1 (Google area foundation): optional Google Place identity + normalized
+    // location fields. Additive and non-required. Split out so a not-yet-migrated
+    // database (20260704000040_google_area_location_foundation.sql) still saves the
+    // vendor via the missing-column fallback below. Not used by matching yet.
+    const googleLocationPayload = {
+      google_place_id: input.google_place_id ?? null,
+      formatted_address: input.formatted_address ?? null,
+      area_normalized: input.area_normalized ?? null,
+      sublocality: input.sublocality ?? null,
+      neighborhood: input.neighborhood ?? null,
+    };
+
     if (process.env.NODE_ENV === "development") {
       console.log("Supabase URL exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL));
       console.log("Supabase Anon Key exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
       console.log("Supabase Service Role Key exists:", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY));
-      console.log("Vendor payload:", payload);
+      console.log("Vendor payload:", { ...payload, ...googleLocationPayload });
     }
 
-    // Single insert with the full payload
-    const { data, error } = await adminClient()
+    // Single insert with the full payload (base + Phase 1 Google/location fields).
+    let { data, error } = await adminClient()
       .from("vendors")
-      .insert(payload)
+      .insert({ ...payload, ...googleLocationPayload })
       .select("id")
       .single();
+
+    // Graceful fallback: if the Phase 1 Google/location columns aren't migrated
+    // yet, retry with the base payload only so vendor registration is never broken.
+    if (error && isMissingColumnError(error)) {
+      console.warn("[vendors] Google area/location columns missing — run 20260704000040_google_area_location_foundation.sql; saving vendor without them.");
+      ({ data, error } = await adminClient()
+        .from("vendors")
+        .insert(payload)
+        .select("id")
+        .single());
+    }
 
     if (error) {
       console.error("Vendor insert error:", error);

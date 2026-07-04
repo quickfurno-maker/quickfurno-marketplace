@@ -107,15 +107,35 @@ export async function createLead(
       subcategory: input.subcategory ?? null,
     };
 
+    // Phase 1 (Google area foundation): structured lead location + Google Place
+    // identity. Additive/optional — persisted once migration
+    // 20260704000040_google_area_location_foundation.sql runs. The existing
+    // missing-column fallback below drops these together with the tracking
+    // fields, so lead capture is never blocked on a not-yet-migrated database.
+    // Foundation only: matching/quality/duplicate logic is unchanged this phase.
+    const locationPayload = {
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      location_accuracy_meters: input.location_accuracy_meters ?? null,
+      location_source: input.location_source ?? null,
+      location_captured_at: input.location_captured_at ?? null,
+      google_place_id: input.google_place_id ?? null,
+      formatted_address: input.formatted_address ?? null,
+      area_normalized: input.area_normalized ?? null,
+      sublocality: input.sublocality ?? null,
+      neighborhood: input.neighborhood ?? null,
+      postal_code: input.postal_code ?? null,
+    };
+
     const insertLead = (payload: Record<string, unknown>) =>
       db.from("leads").insert(payload).select("id, is_duplicate").single();
 
-    let { data, error } = await insertLead({ ...basePayload, ...trackingPayload });
+    let { data, error } = await insertLead({ ...basePayload, ...trackingPayload, ...locationPayload });
 
-    // Graceful fallback: if the tracking/consent columns aren't migrated yet,
-    // insert without them so lead capture is never blocked.
+    // Graceful fallback: if the tracking/consent OR Phase 1 location columns
+    // aren't migrated yet, insert base fields only so lead capture is never blocked.
     if (error && isMissingColumnError(error)) {
-      console.warn("[leads] tracking/consent columns missing — run 008_lead_capture_consent.sql; saving lead without them.");
+      console.warn("[leads] tracking/consent or location columns missing — run 008_lead_capture_consent.sql / 20260704000040_google_area_location_foundation.sql; saving lead without them.");
       ({ data, error } = await insertLead(basePayload));
     }
 

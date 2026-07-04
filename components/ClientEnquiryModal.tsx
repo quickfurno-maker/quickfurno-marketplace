@@ -16,6 +16,11 @@ import { trackEvent } from "@/lib/config";
 import { cities, enquiryServiceForCategory } from "@/lib/quickfurno-data";
 import { mainCategories } from "@/lib/categories";
 import { QFIcon } from "@/components/QuickFurnoIcons";
+// Google area enhancement; manual fallback preserved. The Area / Locality input
+// upgrades to Google Places suggestions when a public key is present, and stays a
+// plain input (unchanged behaviour) whenever Google is missing or blocked.
+import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 // ---------------------------------------------------------------------------
 // "Requirement First" guided multi-step enquiry flow.
@@ -85,6 +90,18 @@ type RFState = {
   lat: number | null;
   lng: number | null;
   shareConsent: boolean;
+  // ── Phase 2: Google area enhancement (manual fallback preserved) ──────────
+  // Optional structured location captured from Google Places or browser GPS.
+  // These map to the Phase 1 optional CreateLeadInput fields; when empty they
+  // are simply omitted from the payload, so the manual flow is unchanged.
+  googlePlaceId: string;
+  formattedAddress: string;
+  areaNormalized: string;
+  sublocality: string;
+  neighborhood: string;
+  locationAccuracyMeters: number | null;
+  locationSource: "" | "manual" | "browser_gps" | "google_place" | "reverse_geocode";
+  locationCapturedAt: string;
 };
 
 const initialState: RFState = {
@@ -107,6 +124,15 @@ const initialState: RFState = {
   lat: null,
   lng: null,
   shareConsent: false,
+  // Phase 2 structured-location defaults (empty = manual-only, unchanged flow).
+  googlePlaceId: "",
+  formattedAddress: "",
+  areaNormalized: "",
+  sublocality: "",
+  neighborhood: "",
+  locationAccuracyMeters: null,
+  locationSource: "",
+  locationCapturedAt: "",
 };
 
 const inrFormatter = new Intl.NumberFormat("en-IN");
@@ -628,6 +654,60 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setShowConfirm(true);
   }
 
+  // ── Phase 2: Area / Locality — Google area enhancement (manual fallback) ────
+  // Manual typing keeps the exact old behaviour (free-text area). We also mark
+  // the source as "manual" and drop any stale structured Google identity so the
+  // saved area text never disagrees with a previously-picked place. Browser-GPS
+  // coordinates (if any) are kept, since typing an area doesn't invalidate them.
+  function onAreaManualChange(value: string) {
+    setForm((current) => {
+      const keepGpsCoords = current.locationSource === "browser_gps" && current.lat != null && current.lng != null;
+      return {
+        ...current,
+        area: value,
+        areaNormalized: value.trim().toLowerCase(),
+        googlePlaceId: "",
+        formattedAddress: "",
+        sublocality: "",
+        neighborhood: "",
+        lat: keepGpsCoords ? current.lat : null,
+        lng: keepGpsCoords ? current.lng : null,
+        locationAccuracyMeters: keepGpsCoords ? current.locationAccuracyMeters : null,
+        locationSource: keepGpsCoords ? "browser_gps" : "manual",
+      };
+    });
+    markTouched("area");
+  }
+
+  // A Google prediction was picked: fill structured location, and update pincode
+  // / city only when they are safe (valid pincode; city that we actually serve).
+  function onAreaPlaceSelected(place: NormalizedGooglePlace) {
+    setForm((current) => {
+      const nextPincode =
+        place.postalCode && /^\d{6}$/.test(place.postalCode) ? place.postalCode : current.pincode;
+      const nextCity =
+        place.city && (cities as readonly string[]).includes(place.city) ? place.city : current.city;
+      return {
+        ...current,
+        area: place.area ?? current.area,
+        pincode: nextPincode,
+        city: nextCity,
+        lat: place.lat ?? current.lat,
+        lng: place.lng ?? current.lng,
+        googlePlaceId: place.placeId ?? "",
+        formattedAddress: place.formattedAddress ?? "",
+        areaNormalized: place.areaNormalized ?? (place.area ? place.area.toLowerCase() : ""),
+        sublocality: place.sublocality ?? "",
+        neighborhood: place.neighborhood ?? "",
+        locationAccuracyMeters: null, // a precise place is not a GPS accuracy radius
+        locationSource: "google_place",
+        locationCapturedAt: new Date().toISOString(),
+      };
+    });
+    markTouched("area");
+    markTouched("city");
+  }
+
   function useMyLocation() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setLocStatus("unsupported");
@@ -636,7 +716,18 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setLocStatus("locating");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setForm((current) => ({ ...current, lat: pos.coords.latitude, lng: pos.coords.longitude }));
+        // Keep existing behaviour (store lat/lng) and additionally tag the
+        // structured source + accuracy + timestamp. No reverse geocoding here.
+        setForm((current) => ({
+          ...current,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          locationAccuracyMeters: Number.isFinite(pos.coords.accuracy)
+            ? pos.coords.accuracy
+            : current.locationAccuracyMeters,
+          locationSource: "browser_gps",
+          locationCapturedAt: new Date().toISOString(),
+        }));
         setLocStatus("captured");
       },
       () => setLocStatus("denied"),
@@ -730,6 +821,23 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         }
       : {};
 
+    // Google area enhancement; manual fallback preserved. These structured
+    // location fields are optional (Phase 1 CreateLeadInput); each is omitted
+    // when empty, so a manual-only submission looks exactly like before.
+    const locationPayload = {
+      latitude: form.lat ?? undefined,
+      longitude: form.lng ?? undefined,
+      location_accuracy_meters: form.locationAccuracyMeters ?? undefined,
+      location_source: form.locationSource || undefined,
+      location_captured_at: form.locationCapturedAt || undefined,
+      google_place_id: form.googlePlaceId || undefined,
+      formatted_address: form.formattedAddress || undefined,
+      area_normalized: form.areaNormalized || undefined,
+      sublocality: form.sublocality || undefined,
+      neighborhood: form.neighborhood || undefined,
+      postal_code: form.pincode || undefined,
+    };
+
     const payload = {
       name: form.name.trim(),
       phone: form.phone.trim(),
@@ -742,6 +850,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       source: modalOptions.source ?? "Requirement flow",
       location_consent: form.lat != null && form.lng != null,
       share_consent: form.shareConsent,
+      ...locationPayload,
       ...readTrackingContext(),
       ...preferredPayload,
     };
@@ -943,12 +1052,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   <label className={areaUi.className}>
                     <span>Area / Locality</span>
                     <div className="qf-rf-input-wrapper">
-                      <input
+                      {/* Google area enhancement; manual fallback preserved.
+                          Same label, wrapper, validation icon and placeholder —
+                          only the input gains optional Google Places suggestions. */}
+                      <GooglePlaceAutocomplete
                         value={form.area}
-                        onChange={(e) => {
-                          set("area", e.target.value);
-                          markTouched("area");
-                        }}
+                        city={form.city}
+                        mode="locality"
+                        onManualChange={onAreaManualChange}
+                        onPlaceSelected={onAreaPlaceSelected}
+                        onBlur={() => markTouched("area")}
                         placeholder="e.g. Kharadi, Baner"
                         autoComplete="address-level2"
                       />

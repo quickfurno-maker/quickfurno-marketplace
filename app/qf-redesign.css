@@ -4002,6 +4002,14 @@ body::before {
   animation: qfRfBackdropIn 0.25s ease both;
 }
 
+/* Google area enhancement; manual fallback preserved.
+   Google Places renders its suggestions dropdown (.pac-container) on <body>;
+   keep it above the enquiry modal (backdrop z-index 140). Purely additive —
+   has no effect when Google isn't loaded. */
+.pac-container {
+  z-index: 100000 !important;
+}
+
 @keyframes qfRfBackdropIn {
   from { opacity: 0; }
   to { opacity: 1; }

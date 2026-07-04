@@ -61,6 +61,23 @@ export interface CreateLeadInput {
   target_vendor_subcategory?: string;
   // Reserved for Phase 2 delayed remaining-slot fill. Not acted on in Phase 1.
   fallback_allowed?: boolean;
+  // ── Phase 1: Google area / structured-location foundation ─────────────────
+  // Optional, backward-compatible structured location + Google Place identity.
+  // Captured best-effort by the client form; persisted once migration
+  // 20260704000040_google_area_location_foundation.sql runs (leadService drops
+  // them via its missing-column fallback if the columns are not there yet).
+  // NOT used by matching yet — this phase only lays the data foundation.
+  latitude?: number | null;
+  longitude?: number | null;
+  location_accuracy_meters?: number | null;
+  location_source?: "manual" | "browser_gps" | "google_place" | "reverse_geocode" | string;
+  location_captured_at?: string;
+  google_place_id?: string;
+  formatted_address?: string;
+  area_normalized?: string;
+  sublocality?: string;
+  neighborhood?: string;
+  postal_code?: string;
 }
 
 export interface PublicVendorCard {
@@ -138,6 +155,16 @@ export interface VendorRegistrationInput {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  // ── Phase 1: Google identity / normalized-location foundation ─────────────
+  // Optional, backward-compatible. Persisted once migration
+  // 20260704000040_google_area_location_foundation.sql runs; registerVendor
+  // falls back gracefully (retries without them) if the columns are missing.
+  // Not required for registration and not used by matching yet.
+  google_place_id?: string;
+  formatted_address?: string;
+  area_normalized?: string;
+  sublocality?: string;
+  neighborhood?: string;
 }
 
 /** Read-only profile summary shown on the vendor dashboard (display fields). */

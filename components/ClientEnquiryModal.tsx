@@ -739,8 +739,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         ...current,
         area: place.area ?? current.area,
         city: nextCity,
-        lat: place.lat ?? current.lat,
-        lng: place.lng ?? current.lng,
+        // Coordinates belong to THIS place only. If the newly picked place has no
+        // coordinates we store null — never retain the previous place's coords,
+        // so place identity + area + coordinates stay internally consistent.
+        lat: place.lat,
+        lng: place.lng,
         googlePlaceId: place.placeId ?? "",
         formattedAddress: place.formattedAddress ?? "",
         areaNormalized: place.areaNormalized ?? (place.area ? place.area.toLowerCase() : ""),
@@ -889,6 +892,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       city: form.city,
       area: form.area.trim() || undefined,
       service_category: form.serviceRequired,
+      // Structured subcategory (e.g. the chosen interior service). Additive —
+      // persisted via leadService; does not change category-selection behavior.
+      subcategory: form.subcategory || undefined,
       budget_range: budgetText || undefined,
       timeline: form.timeline || undefined,
       requirement: requirementParts.join(" | ") || undefined,

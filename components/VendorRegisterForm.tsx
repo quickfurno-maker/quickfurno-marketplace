@@ -349,9 +349,11 @@ export function VendorRegisterForm() {
       formattedAddress: place.formattedAddress ?? "",
       sublocality: place.sublocality ?? "",
       neighborhood: place.neighborhood ?? "",
-      // Canonical vendor base coordinates come from the Google place.
-      baseLatitude: place.lat ?? current.baseLatitude,
-      baseLongitude: place.lng ?? current.baseLongitude,
+      // Canonical vendor base coordinates come from THIS place only. If the newly
+      // picked place has no coordinates we store null — never retain the previous
+      // place's coords, so base identity + area + coordinates stay consistent.
+      baseLatitude: place.lat,
+      baseLongitude: place.lng,
     }));
     setTouched((prev) => ({ ...prev, baseArea: true }));
   }
@@ -984,7 +986,7 @@ export function VendorRegisterForm() {
                 </label>
                 {f.coversFullCity ? (
                   <p className="qf-rf-coverage-helper">
-                    “You can still select key areas, but your profile will be eligible across the city.”
+                    “Your profile will be eligible across the city. Your business base area is still used to prioritise nearby requests.”
                   </p>
                 ) : null}
               </div>
@@ -1111,7 +1113,7 @@ export function VendorRegisterForm() {
               </p>
             ) : (
               <p className="qf-rf-loc-note">
-                Prefer not to share location? You can continue by selecting service areas manually.
+                Prefer not to share location? You can continue — your business base area is enough.
               </p>
             )}
           </div>
@@ -1199,7 +1201,7 @@ export function VendorRegisterForm() {
               <SummaryRow label="City" value={cityValue || "—"} />
               <SummaryRow
                 label="Coverage"
-                value={f.coversFullCity ? `Entire ${cityValue}` : "Selected areas only"}
+                value={f.coversFullCity ? `Entire ${cityValue}` : "Base area only"}
               />
               {String(f.addressLine1 ?? "").trim() ? (
                 <SummaryRow
@@ -1222,7 +1224,7 @@ export function VendorRegisterForm() {
             </dl>
             <p className="qf-rf-qhint" style={{ marginTop: "0.9rem" }}>
               After verification, our team will share suitable matching options for your city,
-              category and service area.
+              category and base area.
             </p>
           </div>
         );

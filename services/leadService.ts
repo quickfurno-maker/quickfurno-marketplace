@@ -130,13 +130,24 @@ export async function createLead(
     const insertLead = (payload: Record<string, unknown>) =>
       db.from("leads").insert(payload).select("id, is_duplicate").single();
 
+    // Graceful, LAYERED fallback so a partially-migrated schema never blocks a
+    // lead AND never silently drops the consent/tracking columns the matching
+    // engine relies on (share_consent gates auto-distribution). We peel off ONE
+    // additive layer at a time, and only ever retry on a missing-column error:
+    //   ATTEMPT 1: base + tracking + location   (fully-migrated schema)
+    //   ATTEMPT 2: base + tracking              (no Google location columns yet)
+    //   ATTEMPT 3: base                         (very old schema, no tracking)
+    // Any unrelated DB error stops the chain immediately (no blind retries).
     let { data, error } = await insertLead({ ...basePayload, ...trackingPayload, ...locationPayload });
 
-    // Graceful fallback: if the tracking/consent OR Phase 1 location columns
-    // aren't migrated yet, insert base fields only so lead capture is never blocked.
     if (error && isMissingColumnError(error)) {
-      console.warn("[leads] tracking/consent or location columns missing — run 008_lead_capture_consent.sql / 20260704000040_google_area_location_foundation.sql; saving lead without them.");
-      ({ data, error } = await insertLead(basePayload));
+      console.warn("[leads] Google location columns missing — run 20260704000040_google_area_location_foundation.sql; retrying with base + tracking (consent/UTM preserved).");
+      ({ data, error } = await insertLead({ ...basePayload, ...trackingPayload }));
+
+      if (error && isMissingColumnError(error)) {
+        console.warn("[leads] tracking/consent columns missing — run 008_lead_capture_consent.sql; retrying with base fields only.");
+        ({ data, error } = await insertLead(basePayload));
+      }
     }
 
     if (error) {

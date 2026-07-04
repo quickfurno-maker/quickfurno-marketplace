@@ -13,13 +13,17 @@ import {
 } from "react";
 import { submitLead } from "@/app/actions";
 import { trackEvent } from "@/lib/config";
-import { cities, enquiryServiceForCategory } from "@/lib/quickfurno-data";
+import { enquiryServiceForCategory } from "@/lib/quickfurno-data";
 import { mainCategories } from "@/lib/categories";
 import { QFIcon } from "@/components/QuickFurnoIcons";
+// Phase 2 hardening: cities come from the admin-managed active-city source of
+// truth (same hook vendor registration uses), never a hardcoded list.
+import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 // Google area enhancement; manual fallback preserved. The Area / Locality input
 // upgrades to Google Places suggestions when a public key is present, and stays a
 // plain input (unchanged behaviour) whenever Google is missing or blocked.
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 // ---------------------------------------------------------------------------
@@ -345,6 +349,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<RFState>(initialState);
+  // Admin-managed active cities (single source of truth for city options AND the
+  // supported-city check after a Google place is picked). Never hardcoded here.
+  const { cities: activeCities, loading: citiesLoading, loaded: citiesLoaded } = useActiveCities();
   const [modalOptions, setModalOptions] = useState<EnquiryModalOptions>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -463,7 +470,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   // Fields validated inline (tick/cross + per-field message) per step. Tile/chip
   // steps (category, subcategory, timeline) keep the concise banner instead.
   const STEP_FIELDS: Record<number, string[]> = {
-    2: ["city", "pincode"],
+    2: ["city", "area", "pincode"],
     3: ["budgetMin", "budgetMax"],
     5: ["name", "phone", "whatsapp", "consent"],
   };
@@ -582,10 +589,18 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         return form.categoryId ? null : "Select a service category.";
       case 1:
         return form.subcategory ? null : "Select an interior service.";
-      case 2:
+      case 2: {
         if (!form.city) return "Please select your city.";
         if (form.pincode !== "" && form.pincode.length !== 6) return "Enter a valid 6-digit pincode.";
+        // Location completeness: require at least one location signal so future
+        // matching has something to work with — manual area OR browser-GPS coords
+        // (a Google selection provides one/both). Google is never required.
+        const hasArea = form.area.trim().length > 0;
+        const hasCoordinates =
+          form.lat != null && form.lng != null && Number.isFinite(form.lat) && Number.isFinite(form.lng);
+        if (!hasArea && !hasCoordinates) return "Enter your area/locality or use your current location.";
         return null;
+      }
       case 3: {
         if (form.budgetNotSure) return null;
         const hasMin = form.budgetMin.trim() !== "";
@@ -655,38 +670,73 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   }
 
   // ── Phase 2: Area / Locality — Google area enhancement (manual fallback) ────
-  // Manual typing keeps the exact old behaviour (free-text area). We also mark
-  // the source as "manual" and drop any stale structured Google identity so the
-  // saved area text never disagrees with a previously-picked place. Browser-GPS
-  // coordinates (if any) are kept, since typing an area doesn't invalidate them.
+  // Manual typing keeps the exact old behaviour (free-text area) and never
+  // leaves stale structured metadata that disagrees with the typed text.
+  //   CASE A (browser GPS captured): keep GPS lat/lng/accuracy/source/timestamp;
+  //           only refresh the area text (and clear any Google identity fields).
+  //   CASE B (previous Google place, or no GPS): clear ALL Google-derived data,
+  //           INCLUDING the now-stale locationCapturedAt, and mark source manual.
   function onAreaManualChange(value: string) {
     setForm((current) => {
-      const keepGpsCoords = current.locationSource === "browser_gps" && current.lat != null && current.lng != null;
-      return {
+      const keepGpsCoords =
+        current.locationSource === "browser_gps" &&
+        current.lat != null &&
+        current.lng != null &&
+        Number.isFinite(current.lat) &&
+        Number.isFinite(current.lng);
+
+      const base = {
         ...current,
         area: value,
         areaNormalized: value.trim().toLowerCase(),
+        // Google place identity never survives manual editing of the area text.
         googlePlaceId: "",
         formattedAddress: "",
         sublocality: "",
         neighborhood: "",
-        lat: keepGpsCoords ? current.lat : null,
-        lng: keepGpsCoords ? current.lng : null,
-        locationAccuracyMeters: keepGpsCoords ? current.locationAccuracyMeters : null,
-        locationSource: keepGpsCoords ? "browser_gps" : "manual",
+      };
+
+      if (keepGpsCoords) {
+        // CASE A — GPS coords/source/accuracy/timestamp remain valid.
+        return base;
+      }
+
+      // CASE B — drop every Google-derived signal, including the stale timestamp.
+      return {
+        ...base,
+        lat: null,
+        lng: null,
+        locationAccuracyMeters: null,
+        locationSource: "manual",
+        locationCapturedAt: "",
       };
     });
     markTouched("area");
   }
 
   // A Google prediction was picked: fill structured location, and update pincode
-  // / city only when they are safe (valid pincode; city that we actually serve).
+  // / city only when they are safe (valid pincode; city we actually serve).
+  //
+  // STRICT CITY CONSISTENCY (Part 4): if the client already chose a city and the
+  // picked place clearly belongs to a different city, we DO NOT overwrite ANY
+  // field (area/pincode/city/lat/lng/placeId/formattedAddress/areaNormalized) —
+  // we surface a message and let them pick again or type an area manually. This
+  // prevents ever saving city = X with coordinates from another city.
   function onAreaPlaceSelected(place: NormalizedGooglePlace) {
+    if (form.city && !isPlaceCompatibleWithSelectedCity(place, form.city)) {
+      setError(`Please select an area within ${form.city}.`);
+      return; // keep the form exactly as-is; manual typing remains available
+    }
+    setError("");
     setForm((current) => {
       const nextPincode =
         place.postalCode && /^\d{6}$/.test(place.postalCode) ? place.postalCode : current.pincode;
-      const nextCity =
-        place.city && (cities as readonly string[]).includes(place.city) ? place.city : current.city;
+      // Only accept a place city that is one of the admin-managed active cities
+      // (case-insensitive), and store it in the canonical casing from that list.
+      const matchedCity = place.city
+        ? activeCities.find((c) => c.toLowerCase() === place.city!.toLowerCase())
+        : undefined;
+      const nextCity = matchedCity ?? current.city;
       return {
         ...current,
         area: place.area ?? current.area,
@@ -1020,7 +1070,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             <h3 id="qf-rf-title">Where do you need the service?</h3>
             {(() => {
               const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
-              const areaUi = fieldUi("area", { valid: form.area.trim().length > 0, value: form.area, error: null, optional: true });
+              // Area is required UNLESS browser-GPS coordinates satisfy the
+              // location requirement. Google selection is never required; manual
+              // typing stays first-class.
+              const hasCoordinates =
+                form.lat != null && form.lng != null && Number.isFinite(form.lat) && Number.isFinite(form.lng);
+              const areaUi = fieldUi("area", {
+                valid: form.area.trim().length > 0 || hasCoordinates,
+                value: form.area,
+                error: "Enter your area/locality or use your current location.",
+              });
               const pincodeValid = form.pincode === "" || form.pincode.length === 6;
               const pincodeUi = fieldUi("pincode", {
                 valid: pincodeValid,
@@ -1039,15 +1098,27 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                         markTouched("city");
                       }}
                       onBlur={() => markTouched("city")}
+                      disabled={citiesLoading && activeCities.length === 0}
                     >
-                      <option value="">Select city</option>
-                      {cities.map((city) => (
+                      <option value="">
+                        {citiesLoading && !citiesLoaded ? "Loading cities…" : "Select city"}
+                      </option>
+                      {/* Preserve a pre-filled city (e.g. preferred-vendor flow) even
+                          if it isn't in the active list, so the value still shows. */}
+                      {form.city && !activeCities.includes(form.city) ? (
+                        <option value={form.city}>{form.city}</option>
+                      ) : null}
+                      {activeCities.map((city) => (
                         <option key={city} value={city}>
                           {city}
                         </option>
                       ))}
                     </select>
-                    {cityUi.showError ? <span className="qf-rf-field-err">{cityUi.error}</span> : null}
+                    {citiesLoaded && activeCities.length === 0 ? (
+                      <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
+                    ) : cityUi.showError ? (
+                      <span className="qf-rf-field-err">{cityUi.error}</span>
+                    ) : null}
                   </label>
                   <label className={areaUi.className}>
                     <span>Area / Locality</span>
@@ -1067,6 +1138,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       />
                       <ValidationIcon state={areaUi.iconState} />
                     </div>
+                    {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
                   </label>
                   <label className={pincodeUi.className}>
                     <span>Pincode (optional)</span>

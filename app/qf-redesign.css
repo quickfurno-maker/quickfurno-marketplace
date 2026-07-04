@@ -4003,11 +4003,77 @@ body::before {
 }
 
 /* Google area enhancement; manual fallback preserved.
-   Google Places renders its suggestions dropdown (.pac-container) on <body>;
-   keep it above the enquiry modal (backdrop z-index 140). Purely additive —
-   has no effect when Google isn't loaded. */
-.pac-container {
-  z-index: 100000 !important;
+   QuickFurno-owned suggestion dropdown for the Places NEW autocomplete. Rendered
+   inside the Area/Locality field wrapper (not on <body>), so it inherits the
+   modal's stacking context and needs no global z-index hack. Has no effect when
+   Google isn't loaded (the list simply never opens). */
+.qf-place-ac {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.qf-place-ac > input {
+  width: 100%;
+}
+
+.qf-place-suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60; /* above sibling fields within the modal */
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 14px 30px rgba(7, 17, 31, 0.18);
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.qf-place-suggest-item {
+  display: grid;
+  gap: 2px;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #07111f;
+}
+
+/* Visible active/hover row for keyboard + mouse navigation. */
+.qf-place-suggest-item.is-active,
+.qf-place-suggest-item:hover {
+  background: rgba(245, 164, 0, 0.14);
+}
+
+.qf-place-suggest-main {
+  font-size: 0.92rem;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qf-place-suggest-sub {
+  font-size: 0.78rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .qf-place-suggest {
+    max-height: 45vh;
+  }
+  .qf-place-suggest-item {
+    padding: 0.7rem 0.65rem;
+  }
 }
 
 @keyframes qfRfBackdropIn {

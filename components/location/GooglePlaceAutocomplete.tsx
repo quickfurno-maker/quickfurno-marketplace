@@ -4,26 +4,38 @@
 // QuickFurno — components/location/GooglePlaceAutocomplete.tsx
 // Google area enhancement; manual fallback preserved.
 //
-// A drop-in replacement for a plain <input> that ALSO offers Google Places
-// area/locality suggestions when (and only when) the Google Maps JS API can be
-// loaded with a valid public browser key. If Google is missing, blocked, or
-// fails for any reason, this renders exactly like a normal controlled input, so
-// the surrounding form keeps working and submitting with manually typed text.
+// A controlled <input> that ALSO offers Google area/locality suggestions using
+// the Places NEW programmatic Autocomplete Data API (AutocompleteSuggestion +
+// prediction.toPlace() + place.fetchFields()), rendered in a QuickFurno-owned
+// dropdown so the modal's look is unchanged. If Google is missing, blocked, or
+// fails for ANY reason, this behaves exactly like a plain input — manual typing
+// remains first-class and always submits.
 //
-// It renders ONLY the <input> (no wrapper) so it slots inside existing form
-// markup/styling (label + validation icon) without any visual redesign.
+// Behaviour:
+//   • onManualChange fires immediately on every keystroke (fallback path).
+//   • suggestions are debounced (~300ms) and only requested for >= 3 chars.
+//   • one AutocompleteSessionToken per typing-to-selection session (refreshed
+//     after each completed selection).
+//   • stale async responses are dropped (monotonic request sequence).
+//   • keyboard: ArrowUp/Down move, Enter selects, Escape closes; Enter never
+//     submits the enquiry form. Mouse select + outside-click-to-close supported.
 // ============================================================================
 import {
   InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
   useEffect,
   useRef,
+  useState,
 } from "react";
 import { loadGoogleMaps } from "@/lib/google-maps/loadGoogleMaps";
 import { normalizeGooglePlace } from "@/lib/google-maps/normalizePlace";
 import type {
-  GoogleAutocomplete,
-  GoogleMapsApi,
+  AutocompleteRequest,
+  NewPlace,
   NormalizedGooglePlace,
+  PlacePrediction,
+  PlacesLibrary,
 } from "@/lib/google-maps/types";
 
 type NativeInputProps = Omit<
@@ -44,6 +56,17 @@ export type GooglePlaceAutocompleteProps = NativeInputProps & {
   mode?: "locality" | "address";
 };
 
+type Suggestion = {
+  id: string;
+  primary: string;
+  secondary: string;
+  prediction: PlacePrediction;
+};
+
+const DEBOUNCE_MS = 300;
+const MIN_CHARS = 3;
+const MAX_SUGGESTIONS = 6;
+
 export default function GooglePlaceAutocomplete({
   value,
   placeholder,
@@ -53,10 +76,14 @@ export default function GooglePlaceAutocomplete({
   mode = "locality",
   ...inputProps
 }: GooglePlaceAutocompleteProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<GoogleAutocomplete | null>(null);
-  // Keep the freshest callbacks/props for the Google listener without
-  // re-initialising the widget on every render.
+  const placesRef = useRef<PlacesLibrary | null>(null);
+  const sessionTokenRef = useRef<unknown>(null);
+  const reqSeqRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Latest callbacks/props read by async handlers without re-subscribing.
   const onPlaceSelectedRef = useRef(onPlaceSelected);
   const cityRef = useRef(city);
   const modeRef = useRef(mode);
@@ -64,74 +91,232 @@ export default function GooglePlaceAutocomplete({
   cityRef.current = city;
   modeRef.current = mode;
 
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  // Best-effort load of the Places library. Any failure leaves manual input intact.
   useEffect(() => {
     let cancelled = false;
-    let mapsApi: GoogleMapsApi | null = null;
-
-    // Best-effort enhancement. Any failure leaves the plain input untouched.
     loadGoogleMaps()
-      .then((maps) => {
-        if (cancelled || !maps?.places?.Autocomplete || !inputRef.current) return;
-        mapsApi = maps;
-        try {
-          const autocomplete = new maps.places.Autocomplete(inputRef.current, {
-            // Bias to India; "(regions)" keeps predictions to localities /
-            // sublocalities / neighborhoods / pincodes, not random businesses.
-            componentRestrictions: { country: "in" },
-            types: modeRef.current === "address" ? ["geocode"] : ["(regions)"],
-            fields: ["place_id", "name", "formatted_address", "address_components", "geometry"],
-          });
-          autocompleteRef.current = autocomplete;
-
-          autocomplete.addListener("place_changed", () => {
-            let raw: ReturnType<GoogleAutocomplete["getPlace"]> | undefined;
-            try {
-              raw = autocomplete.getPlace();
-            } catch {
-              return;
-            }
-            // User pressed Enter without picking a prediction → no structured
-            // data. The manual value is already synced via onChange; do nothing.
-            if (!raw || (!raw.place_id && !raw.address_components && !raw.geometry)) return;
-            const normalized = normalizeGooglePlace(raw, cityRef.current, modeRef.current);
-            onPlaceSelectedRef.current(normalized);
-          });
-        } catch {
-          // Autocomplete construction failed (e.g. key lacks Places) — ignore.
-          autocompleteRef.current = null;
-        }
+      .then((places) => {
+        if (!cancelled) placesRef.current = places;
       })
       .catch(() => {
         /* never throws — manual input remains fully functional */
       });
-
     return () => {
       cancelled = true;
-      try {
-        if (autocompleteRef.current && mapsApi?.event) {
-          mapsApi.event.clearInstanceListeners(autocompleteRef.current);
-        }
-      } catch {
-        /* no-op */
-      }
-      autocompleteRef.current = null;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-    // Initialise once per mount; live values are read through the refs above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <input
-      {...inputProps}
-      ref={inputRef}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onManualChange(e.target.value)}
-      // Prevent an accidental form submit when picking a prediction with Enter.
-      onKeyDown={(e) => {
+  const ensureSessionToken = useCallback((): unknown => {
+    const places = placesRef.current;
+    if (!places) return null;
+    if (!sessionTokenRef.current) {
+      try {
+        sessionTokenRef.current = new places.AutocompleteSessionToken();
+      } catch {
+        sessionTokenRef.current = null;
+      }
+    }
+    return sessionTokenRef.current;
+  }, []);
+
+  const closeDropdown = useCallback(() => {
+    setOpen(false);
+    setActiveIndex(-1);
+  }, []);
+
+  const fetchSuggestions = useCallback(async (input: string) => {
+    const places = placesRef.current;
+    const query = input.trim();
+    if (!places || query.length < MIN_CHARS) {
+      setSuggestions([]);
+      closeDropdown();
+      return;
+    }
+
+    const seq = ++reqSeqRef.current;
+    const baseRequest: AutocompleteRequest = {
+      input: query,
+      sessionToken: ensureSessionToken() ?? undefined,
+      includedRegionCodes: ["in"], // India-only; no guessed city bounds
+      language: "en",
+      region: "IN",
+      includedPrimaryTypes: modeRef.current === "address" ? ["geocode"] : ["(regions)"],
+      // locationBias / locationRestriction are intentionally left unset — a clean
+      // extension point for FUTURE city-specific biasing (never guessed here).
+    };
+
+    const run = (request: AutocompleteRequest) =>
+      places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+
+    let response: Awaited<ReturnType<typeof run>> | null = null;
+    try {
+      response = await run(baseRequest);
+    } catch {
+      // Retry once without the primary-type filter (some keys reject the type).
+      try {
+        const { includedPrimaryTypes: _omit, ...rest } = baseRequest;
+        void _omit;
+        response = await run(rest);
+      } catch {
+        if (seq === reqSeqRef.current) {
+          setSuggestions([]);
+          closeDropdown();
+        }
+        return;
+      }
+    }
+
+    // Drop stale responses: only the newest request may update the UI.
+    if (seq !== reqSeqRef.current) return;
+
+    const items: Suggestion[] = (response?.suggestions ?? [])
+      .map((s) => s.placePrediction)
+      .filter((p): p is PlacePrediction => Boolean(p))
+      .slice(0, MAX_SUGGESTIONS)
+      .map((p, i) => ({
+        id: p.placeId ?? `sugg-${i}`,
+        primary: p.mainText?.text ?? p.text?.text ?? "",
+        secondary: p.secondaryText?.text ?? "",
+        prediction: p,
+      }))
+      .filter((s) => s.primary.length > 0);
+
+    setSuggestions(items);
+    setActiveIndex(items.length ? 0 : -1);
+    setOpen(items.length > 0);
+  }, [closeDropdown, ensureSessionToken]);
+
+  const handleManualChange = useCallback(
+    (raw: string) => {
+      onManualChange(raw); // immediate fallback — never gated on Google
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (!placesRef.current || raw.trim().length < MIN_CHARS) {
+        setSuggestions([]);
+        closeDropdown();
+        return;
+      }
+      debounceRef.current = setTimeout(() => void fetchSuggestions(raw), DEBOUNCE_MS);
+    },
+    [onManualChange, fetchSuggestions, closeDropdown],
+  );
+
+  const selectSuggestion = useCallback(async (suggestion: Suggestion) => {
+    closeDropdown();
+    setSuggestions([]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const places = placesRef.current;
+    if (!places) return;
+    try {
+      const place: NewPlace = suggestion.prediction.toPlace();
+      // fetchFields populates the Place instance in place; read it back after await.
+      await place.fetchFields({
+        fields: ["id", "displayName", "formattedAddress", "addressComponents", "location"],
+      });
+      const normalized = normalizeGooglePlace(place, cityRef.current, modeRef.current);
+      onPlaceSelectedRef.current(normalized);
+    } catch {
+      // fetchFields failed — the manually typed value stands; do nothing.
+    } finally {
+      // A session ends at selection: refresh the token for the next search.
+      sessionTokenRef.current = null;
+      ensureSessionToken();
+    }
+  }, [closeDropdown, ensureSessionToken]);
+
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLInputElement>) => {
+      inputProps.onKeyDown?.(e);
+      if (!open || suggestions.length === 0) {
+        // Still stop Enter from submitting the enquiry form from this field.
         if (e.key === "Enter") e.preventDefault();
-        inputProps.onKeyDown?.(e);
-      }}
-    />
+        return;
+      }
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setActiveIndex((i) => (i + 1) % suggestions.length);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+          break;
+        case "Enter":
+          e.preventDefault();
+          if (activeIndex >= 0 && activeIndex < suggestions.length) {
+            void selectSuggestion(suggestions[activeIndex]);
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          closeDropdown();
+          break;
+        default:
+          break;
+      }
+    },
+    [open, suggestions, activeIndex, selectSuggestion, closeDropdown, inputProps],
+  );
+
+  // Close on outside click (mousedown so it beats input blur/select).
+  useEffect(() => {
+    if (!open) return;
+    const onDocMouseDown = (ev: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(ev.target as Node)) {
+        closeDropdown();
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open, closeDropdown]);
+
+  const listboxId = "qf-place-suggest-list";
+  const showList = open && suggestions.length > 0;
+
+  return (
+    <div className="qf-place-ac" ref={containerRef}>
+      <input
+        {...inputProps}
+        ref={inputRef}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => handleManualChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        role="combobox"
+        aria-expanded={showList}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          showList && activeIndex >= 0 ? `qf-place-opt-${activeIndex}` : undefined
+        }
+        autoComplete={inputProps.autoComplete ?? "off"}
+      />
+      {showList ? (
+        <ul className="qf-place-suggest" role="listbox" id={listboxId}>
+          {suggestions.map((s, i) => (
+            <li
+              key={s.id}
+              id={`qf-place-opt-${i}`}
+              role="option"
+              aria-selected={i === activeIndex}
+              className={`qf-place-suggest-item${i === activeIndex ? " is-active" : ""}`}
+              // onMouseDown (not onClick) so selection fires before input blur.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                void selectSuggestion(s);
+              }}
+              onMouseEnter={() => setActiveIndex(i)}
+            >
+              <span className="qf-place-suggest-main">{s.primary}</span>
+              {s.secondary ? <span className="qf-place-suggest-sub">{s.secondary}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

@@ -1,11 +1,25 @@
 // ============================================================================
-// QuickFurno Lead Quality Engine - Phase 1 Hybrid Gate
-// Rule-based scoring only. No OTP, AI, WhatsApp sending, n8n decisions, or
-// vendor assignment happens here.
+// QuickFurno Lead Quality Engine V2 (backend-only)
+// Hard eligibility gates → commercial quality score → SEPARATE location confidence.
+// Rule-based scoring only. No OTP, AI, WhatsApp, n8n, or vendor assignment here.
+//
+// V2 rules:
+//   • Contact&Trust 20 / Location 20 / Requirement 30 / Intent 30 (max 100).
+//   • Email is NOT a scoring signal. Duplicate is a hard gate only (no
+//     not_duplicate reward, no fraud penalty).
+//   • Structured Google/GPS evidence feeds a SEPARATE location_confidence (0/4),
+//     never total_score. location_consent is not a quality signal.
+//   • Genuine client detail (+5) and explicit intent (+7) require a provably
+//     client-authored field. The current backend contract has none (message is a
+//     constructed metadata string), so both are awarded 0 in this pass.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
+import { evaluateBudgetFit, resolveBudgetCategory } from "@/lib/lead-quality/budgetFit";
 
 export type LeadScoreClass = "A+" | "A" | "B" | "C" | "D";
+
+// Persisted in score_breakdown for historical auditability across model changes.
+export const SCORE_MODEL_VERSION = "lead_quality_v2";
 
 export type LeadQualityRecommendedAction =
   | "auto_distribute"
@@ -20,7 +34,8 @@ export type LeadQualityRecommendedAction =
 export type LeadQualityInput = {
   name?: string | null;
   phone?: string | null;
-  email?: string | null;
+  // email is intentionally NOT part of the scoring input (V2). leadService passes
+  // its lead object via spread, so the extra field is simply ignored here.
   city?: string | null;
   area?: string | null;
   locality?: string | null;
@@ -53,6 +68,7 @@ export type LeadQualityInput = {
   location_consent?: boolean | null;
   is_duplicate?: boolean | null;
   lead_intent?: string | null;
+  assignment_intent?: string | null;
   serviceable_city?: boolean | null;
 };
 
@@ -63,6 +79,9 @@ export type LeadQualityScoreResult = {
   intent_score: number;
   fraud_penalty: number;
   total_score: number;
+  // SEPARATE from total_score: 0 (manual) or 4 (trusted Google/GPS). Feeds Phase 2
+  // distance-ranking confidence; never moves a lead across the quality threshold.
+  location_confidence: number;
   score_class: LeadScoreClass;
   hard_block_reason: string | null;
   recommended_action: LeadQualityRecommendedAction;
@@ -82,17 +101,17 @@ const FAKE_NAME_RE = /\b(test|demo|abc|xyz|random|dummy|sample|asdf|qwerty|unkno
 const SPAM_WORD_RE = /\b(lorem ipsum|asdf|qwerty|spam|fake lead|test lead|dummy|random text)\b/i;
 
 export function classifyLeadScore(totalScore: number): LeadScoreClass {
+  // V2 bands: A+ 85–100, A 70–84, B 55–69, C 40–54, D 0–39.
   if (totalScore >= 85) return "A+";
   if (totalScore >= 70) return "A";
-  if (totalScore >= 50) return "B";
-  if (totalScore >= 30) return "C";
+  if (totalScore >= 55) return "B";
+  if (totalScore >= 40) return "C";
   return "D";
 }
 
 export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreResult {
   const name = firstText(input.name);
   const phone = firstText(input.phone);
-  const email = firstText(input.email);
   const city = firstText(input.city);
   const area = firstText(input.area, input.locality);
   const service = firstText(input.service_required, input.service_category, input.serviceCategory, input.category);
@@ -100,18 +119,15 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
   const budget = firstText(input.budget, input.budget_range, input.budgetRange);
   const timeline = firstText(input.timeline);
   const message = firstText(input.message, input.requirement);
-  // Structured, TRUSTWORTHY location evidence (Phase 1) — replaces the retired
-  // pincode/free-text-address signal. Awarded ONLY for Google/GPS-backed data.
-  // IMPORTANT: `area_normalized` is deliberately excluded — a manual area entry
-  // sets it from the client's own typed text, which is NOT trustworthy evidence.
-  // Qualifying signals: a Google place id, valid coordinates, a Google formatted
-  // address, Google-derived sublocality/neighborhood, or a location_source that
-  // is google_place / browser_gps. NOT pincode, NOT arbitrary text.
+
+  // Trusted structured location evidence → separate location_confidence (0/4),
+  // NOT total_score. area_normalized excluded (can be manual text); location_consent
+  // excluded (permission state ≠ quality).
   const validLat = typeof input.latitude === "number" && Number.isFinite(input.latitude);
   const validLng = typeof input.longitude === "number" && Number.isFinite(input.longitude);
   const locationSource = String(input.location_source ?? "").trim().toLowerCase();
   const trustedLocationSource = locationSource === "google_place" || locationSource === "browser_gps";
-  const structuredLocationDetail = Boolean(
+  const structuredLocationEvidence = Boolean(
     firstText(input.google_place_id) ||
       (validLat && validLng) ||
       firstText(input.formatted_address) ||
@@ -119,79 +135,78 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
       firstText(input.neighborhood) ||
       trustedLocationSource,
   );
+  const locationConfidence = structuredLocationEvidence ? 4 : 0;
+
   const isDuplicate = Boolean(input.is_duplicate);
   const shareConsent = input.share_consent === true;
-  const locationConsent = input.location_consent === true;
   const validPhone = isValidIndianPhone(phone);
   const fakeName = looksFakeName(name);
   const genuineName = name.length >= 2 && !fakeName;
   const spamMessage = looksSpamMessage(message);
-  const activeCityKnown = input.serviceable_city === true;
-  const preferredVendorIntent = String(input.lead_intent ?? "").toLowerCase() === "preferred_vendor";
+  // Serviceability is an ELIGIBILITY gate: true (active), false (known inactive),
+  // null (lookup failure/unknown), undefined (not evaluated → no gate).
+  const cityServiceability = input.serviceable_city;
+  const activeCityKnown = cityServiceability === true;
+  const preferredOrSelected =
+    String(input.lead_intent ?? "").toLowerCase() === "preferred_vendor" ||
+    String(input.assignment_intent ?? "").toLowerCase() === "client_selected_vendor";
+  const hasSpecificCategory =
+    Boolean(subcategory) || resolveBudgetCategory({ service, category: input.category, subcategory }) !== null;
+  const budgetFit = evaluateBudgetFit(budget, { service, category: input.category, subcategory });
 
+  // Genuine client detail (+5) and explicit-intent (+7) require a provably client-
+  // authored field. The current backend contract exposes none (message is a system-
+  // constructed metadata string), so BOTH are awarded 0 in this backend-only pass.
+  const genuineClientDetail = false;
+  const explicitClientIntent = false;
+
+  // ── CONTACT & TRUST (max 20): no email, no not_duplicate ──────────────────
   const contactReasons: string[] = [];
   let contactScore = 0;
-  if (validPhone) addScore("valid_10_digit_indian_phone", 10, contactReasons, (value) => { contactScore += value; });
-  if (shareConsent) addScore("share_consent", 5, contactReasons, (value) => { contactScore += value; });
-  if (genuineName) addScore("genuine_name", 3, contactReasons, (value) => { contactScore += value; });
-  if (!isDuplicate) addScore("not_duplicate", 5, contactReasons, (value) => { contactScore += value; });
-  if (email) addScore("email_provided", 2, contactReasons, (value) => { contactScore += value; });
-  contactScore = Math.min(25, contactScore);
+  if (validPhone) addScore("valid_mobile_number", 10, contactReasons, (v) => { contactScore += v; });
+  if (genuineName) addScore("genuine_plausible_name", 5, contactReasons, (v) => { contactScore += v; });
+  if (shareConsent) addScore("share_consent", 5, contactReasons, (v) => { contactScore += v; });
+  contactScore = Math.min(20, contactScore);
 
+  // ── LOCATION USABILITY (max 20): active city 10 + area 10 ─────────────────
   const locationReasons: string[] = [];
   let locationScore = 0;
-  if (city) addScore("city_present", 5, locationReasons, (value) => { locationScore += value; });
-  if (activeCityKnown) addScore("serviceable_city", 5, locationReasons, (value) => { locationScore += value; });
-  if (area) addScore("area_or_locality_present", 5, locationReasons, (value) => { locationScore += value; });
-  if (structuredLocationDetail) addScore("structured_location_detail_present", 3, locationReasons, (value) => { locationScore += value; });
-  if (locationConsent) addScore("location_consent", 2, locationReasons, (value) => { locationScore += value; });
+  if (activeCityKnown) addScore("active_service_city", 10, locationReasons, (v) => { locationScore += v; });
+  if (area) addScore("area_or_locality_present", 10, locationReasons, (v) => { locationScore += v; });
   locationScore = Math.min(20, locationScore);
 
+  // ── REQUIREMENT COMPLETENESS (max 30) ─────────────────────────────────────
   const requirementReasons: string[] = [];
   let requirementScore = 0;
-  if (service) addScore("service_present", 5, requirementReasons, (value) => { requirementScore += value; });
-  if (subcategory) addScore("subcategory_present", 4, requirementReasons, (value) => { requirementScore += value; });
-  if (budget) addScore("budget_present", 4, requirementReasons, (value) => { requirementScore += value; });
-  if (timeline) addScore("timeline_present", 3, requirementReasons, (value) => { requirementScore += value; });
-  if (message) addScore("requirement_details_present", 4, requirementReasons, (value) => { requirementScore += value; });
-  requirementScore = Math.min(20, requirementScore);
+  if (service) addScore("service_selected", 6, requirementReasons, (v) => { requirementScore += v; });
+  if (hasSpecificCategory) addScore("specific_category_or_subcategory", 6, requirementReasons, (v) => { requirementScore += v; });
+  if (budgetFit.hasBudget) addScore("budget_selected", 5, requirementReasons, (v) => { requirementScore += v; });
+  if (timeline) addScore("timeline_selected", 4, requirementReasons, (v) => { requirementScore += v; });
+  if (firstText(input.property_type)) addScore("project_or_property_context", 4, requirementReasons, (v) => { requirementScore += v; });
+  if (genuineClientDetail) addScore("real_client_provided_detail", 5, requirementReasons, (v) => { requirementScore += v; });
+  requirementScore = Math.min(30, requirementScore);
 
+  // ── COMMERCIAL INTENT (max 30) ────────────────────────────────────────────
   const intentReasons: string[] = [];
   let intentScore = 0;
-  if (isUrgentTimeline(timeline, message)) addScore("urgent_within_7_days", 6, intentReasons, (value) => { intentScore += value; });
-  else if (isTimelineWithin30Days(timeline)) addScore("timeline_within_30_days", 4, intentReasons, (value) => { intentScore += value; });
-  if (hasRealisticBudget(budget)) addScore("realistic_budget", 4, intentReasons, (value) => { intentScore += value; });
-  if (suggestsHighIntent(message)) addScore("site_visit_start_work_or_quote_intent", 4, intentReasons, (value) => { intentScore += value; });
-  if (preferredVendorIntent) addScore("preferred_vendor_intent", 3, intentReasons, (value) => { intentScore += value; });
-  intentScore = Math.min(20, intentScore);
+  const timelineReadiness = timelineReadinessScore(timeline);
+  if (timelineReadiness.score > 0) addScore(timelineReadiness.reason, timelineReadiness.score, intentReasons, (v) => { intentScore += v; });
+  if (budgetFit.points > 0) addScore(`category_fit_budget_${budgetFit.tier}`, budgetFit.points, intentReasons, (v) => { intentScore += v; });
+  if (explicitClientIntent) addScore("explicit_quote_site_visit_or_start", 7, intentReasons, (v) => { intentScore += v; });
+  if (preferredOrSelected) addScore("preferred_or_client_selected_vendor", 5, intentReasons, (v) => { intentScore += v; });
+  intentScore = Math.min(30, intentScore);
 
-  const fraudReasons: string[] = [];
-  let fraudPenalty = 0;
-  if (isDuplicate) addScore("duplicate_lead", 15, fraudReasons, (value) => { fraudPenalty += value; });
-  if (fakeName) addScore("fake_or_test_name", 8, fraudReasons, (value) => { fraudPenalty += value; });
-  if (!validPhone) addScore("invalid_phone", 15, fraudReasons, (value) => { fraudPenalty += value; });
-  if (!city || !service) addScore("missing_city_or_service", 10, fraudReasons, (value) => { fraudPenalty += value; });
-  if (spamMessage) addScore("spam_or_junk_message", 8, fraudReasons, (value) => { fraudPenalty += value; });
-  fraudPenalty = Math.min(25, fraudPenalty);
+  // Duplicate/fake/spam/invalid-phone are HARD GATES, not point loss. fraud_penalty
+  // stays 0 for backward-compatible lead_scores storage.
+  const fraudPenalty = 0;
 
-  const totalScore = clamp(contactScore + locationScore + requirementScore + intentScore - fraudPenalty, 0, 100);
+  const totalScore = clamp(contactScore + locationScore + requirementScore + intentScore, 0, 100);
   const scoreClass = classifyLeadScore(totalScore);
   const hardBlockReason = getHardBlockReason({
-    shareConsent,
-    validPhone,
-    isDuplicate,
-    fakeName,
-    city,
-    service,
-    totalScore,
-    scoreClass,
+    shareConsent, validPhone, isDuplicate, fakeName, spamMessage, city, service, cityServiceability, scoreClass,
   });
   const recommendedAction = getRecommendedAction({
-    totalScore,
-    isDuplicate,
-    shareConsent,
-    validPhone,
-    fakeName,
+    scoreClass, isDuplicate, shareConsent, validPhone, fakeName, spamMessage, city, service, cityServiceability,
   });
 
   return {
@@ -201,22 +216,42 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
     intent_score: intentScore,
     fraud_penalty: fraudPenalty,
     total_score: totalScore,
+    location_confidence: locationConfidence,
     score_class: scoreClass,
     hard_block_reason: hardBlockReason,
     recommended_action: recommendedAction,
     score_breakdown: {
+      score_model_version: SCORE_MODEL_VERSION,
       contact: contactReasons,
       location: locationReasons,
       requirement: requirementReasons,
       intent: intentReasons,
-      fraud_penalty: fraudReasons,
-      signals: {
+      location_confidence: {
+        score: locationConfidence,
+        structured_google_gps_evidence: structuredLocationEvidence,
+      },
+      budget_fit: {
+        resolved_category: budgetFit.category,
+        configured_floor_inr: budgetFit.categoryMin,
+        parsed_budget_max_inr: budgetFit.maxRupees,
+        ratio: budgetFit.ratio,
+        tier: budgetFit.tier,
+        points: budgetFit.points,
+      },
+      hard_gates: {
         valid_phone: validPhone,
         share_consent: shareConsent,
         duplicate: isDuplicate,
         fake_name: fakeName,
         spam_message: spamMessage,
-        serviceable_city_known: activeCityKnown,
+        missing_city_or_service: !city || !service,
+        city_serviceability: cityServiceability === true ? "active" : cityServiceability === false ? "inactive" : cityServiceability === null ? "unknown" : "not_evaluated",
+      },
+      signals: {
+        genuine_client_detail_awarded: genuineClientDetail,
+        explicit_client_intent_awarded: explicitClientIntent,
+        active_service_city: activeCityKnown,
+        structured_location_evidence: structuredLocationEvidence,
       },
     },
   };
@@ -324,42 +359,59 @@ async function isServiceableCity(city?: string | null): Promise<boolean | null> 
   }
 }
 
+// Hard gates block auto-distribution regardless of numeric score. Fake and spam
+// keep DISTINCT reason codes (shared manual-review action).
 function getHardBlockReason(input: {
   shareConsent: boolean;
   validPhone: boolean;
   isDuplicate: boolean;
   fakeName: boolean;
+  spamMessage: boolean;
   city: string;
   service: string;
-  totalScore: number;
+  cityServiceability: boolean | null | undefined;
   scoreClass: LeadScoreClass;
 }): string | null {
+  if (input.isDuplicate) return "duplicate_lead";
   if (!input.shareConsent) return "missing_share_consent";
   if (!input.validPhone) return "invalid_phone";
-  if (input.isDuplicate) return "duplicate_lead";
   if (input.fakeName) return "fake_or_test_name";
+  if (input.spamMessage) return "spam_or_junk_message";
   if (!input.city) return "missing_city";
   if (!input.service) return "missing_service";
-  if (input.totalScore < 70 || input.scoreClass === "B" || input.scoreClass === "C" || input.scoreClass === "D") {
+  if (input.cityServiceability === false) return "city_not_serviceable";
+  if (input.cityServiceability === null) return "city_serviceability_unknown";
+  if (input.scoreClass !== "A" && input.scoreClass !== "A+") {
     return "score_below_auto_distribution_threshold";
   }
   return null;
 }
 
+// Deterministic precedence: duplicate → consent → phone → fake → spam → missing
+// city/service → inactive city → city-unknown → then A+/A auto, B clarify, C
+// nurture, D reject. (Fake/spam share the manual-review action; hard_block_reason
+// preserves the distinct reason so spam is never mislabelled as a name issue.)
 function getRecommendedAction(input: {
-  totalScore: number;
+  scoreClass: LeadScoreClass;
   isDuplicate: boolean;
   shareConsent: boolean;
   validPhone: boolean;
   fakeName: boolean;
+  spamMessage: boolean;
+  city: string;
+  service: string;
+  cityServiceability: boolean | null | undefined;
 }): LeadQualityRecommendedAction {
   if (input.isDuplicate) return "duplicate_no_bill";
   if (!input.shareConsent) return "consent_required_no_distribution";
   if (!input.validPhone) return "invalid_phone_no_distribution";
-  if (input.fakeName) return "manual_review_suspicious_name";
-  if (input.totalScore >= 70) return "auto_distribute";
-  if (input.totalScore >= 50) return "clarification_required";
-  if (input.totalScore >= 30) return "nurture";
+  if (input.fakeName || input.spamMessage) return "manual_review_suspicious_name";
+  if (!input.city || !input.service) return "clarification_required";
+  if (input.cityServiceability === false) return "nurture";
+  if (input.cityServiceability === null) return "reject_or_manual_review";
+  if (input.scoreClass === "A+" || input.scoreClass === "A") return "auto_distribute";
+  if (input.scoreClass === "B") return "clarification_required";
+  if (input.scoreClass === "C") return "nurture";
   return "reject_or_manual_review";
 }
 
@@ -399,13 +451,6 @@ function looksSpamMessage(value: string): boolean {
   return false;
 }
 
-function isUrgentTimeline(timeline: string, message: string): boolean {
-  const text = `${timeline} ${message}`.toLowerCase();
-  if (/\b(urgent|asap|immediate|today|tomorrow|this week|within 7|7 days|start now)\b/.test(text)) return true;
-  const days = extractDays(text);
-  return days !== null && days <= 7;
-}
-
 /** Lowercase, collapse whitespace, and fold every dash/hyphen variant to a space. */
 function normalizeTimelineText(value: string): string {
   return value
@@ -416,15 +461,34 @@ function normalizeTimelineText(value: string): string {
     .trim();
 }
 
-function isTimelineWithin30Days(timeline: string): boolean {
-  const text = normalizeTimelineText(timeline);
-  if (!text) return false;
-  // Current client label "Within One Month" (and "within 1 month"). Anchored on
-  // "within … month" so it never matches "One–Two/Two–Three/After Three Months".
-  if (/\bwithin (one|1) month\b/.test(text)) return true;
-  if (/\b(this month|within 30|30 days|2 weeks|3 weeks|4 weeks|15 days)\b/.test(text)) return true;
-  const days = extractDays(text);
-  return days !== null && days <= 30;
+/**
+ * Commercial-intent timeline readiness (max +10) from the STRUCTURED timeline only
+ * (no free-text provenance needed). Recognizes the exact UI labels robustly and
+ * never misclassifies "One–Two Months" as within one month (anchored on "within").
+ *   within 7 days +10 · within one month +7 · 1–2 months +5 · 2–3 months +3 · after 3 months +1
+ */
+function timelineReadinessScore(timeline: string): { score: number; reason: string } {
+  const t = normalizeTimelineText(timeline);
+  if (!t) return { score: 0, reason: "timeline_none" };
+  if (/\b(urgent|asap|immediate|immediately|today|tomorrow|this week|within 7|7 days|start now)\b/.test(t)) {
+    return { score: 10, reason: "timeline_within_7_days" };
+  }
+  if (/\bwithin 15 days\b|\b15 days\b|\bwithin (one|1) month\b|\bthis month\b|\bwithin 30\b|\b30 days\b|\b(2|3|4) weeks\b/.test(t)) {
+    return { score: 7, reason: "timeline_within_one_month" };
+  }
+  if (/\bone two months?\b|\b1 2 months?\b/.test(t)) return { score: 5, reason: "timeline_1_2_months" };
+  if (/\btwo three months?\b|\b2 3 months?\b/.test(t)) return { score: 3, reason: "timeline_2_3_months" };
+  if (/\bafter (three|3) months?\b/.test(t)) return { score: 1, reason: "timeline_after_3_months" };
+  const days = extractDays(t);
+  if (days !== null) {
+    if (days <= 7) return { score: 10, reason: "timeline_within_7_days" };
+    if (days <= 30) return { score: 7, reason: "timeline_within_one_month" };
+    if (days <= 60) return { score: 5, reason: "timeline_1_2_months" };
+    if (days <= 90) return { score: 3, reason: "timeline_2_3_months" };
+    return { score: 1, reason: "timeline_after_3_months" };
+  }
+  if (/\bexplor|just looking|browsing\b/.test(t)) return { score: 1, reason: "timeline_exploring" };
+  return { score: 1, reason: "timeline_unspecified_low" };
 }
 
 function extractDays(value: string): number | null {
@@ -432,16 +496,4 @@ function extractDays(value: string): number | null {
   if (!match) return null;
   const days = Number(match[1]);
   return Number.isFinite(days) ? days : null;
-}
-
-function hasRealisticBudget(value: string): boolean {
-  const text = value.toLowerCase().trim();
-  if (!text || /\b(not sure|unknown|na|n\/a|free)\b/.test(text)) return false;
-  const numbers = text.match(/\d[\d,]*/g)?.map((n) => Number(n.replace(/,/g, ""))).filter(Number.isFinite) ?? [];
-  if (numbers.length === 0) return true;
-  return Math.max(...numbers) >= 1000;
-}
-
-function suggestsHighIntent(value: string): boolean {
-  return /\b(site visit|visit|quotation|quote|estimate|start work|start|inspection|measurement|call back|callback|finalize)\b/i.test(value);
 }

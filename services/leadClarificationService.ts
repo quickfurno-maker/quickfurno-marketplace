@@ -257,7 +257,7 @@ export async function recalculateLeadAfterClarification(leadId: string): Promise
     const score = await scoreAndStoreLead(leadId, {
       name: lead.name,
       phone: lead.phone,
-      email: lead.email,
+      // email removed from the scoring input contract (Lead Quality V2).
       city: lead.city,
       area: lead.area ?? lead.locality,
       service_required: lead.service_required,

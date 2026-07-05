@@ -11,6 +11,7 @@
     "test:supabase:lead": "node scripts/test-supabase-lead-insert.mjs",
     "test:phase3a": "node scripts/phase3a-diagnostics-harness.ts",
     "test:phase3b": "node scripts/phase3b-recovery-harness.ts",
+    "test:phase4": "node scripts/phase4-credit-wallet-harness.ts",
     "grant:superadmin": "node scripts/grant-superadmin.mjs"
   },
   "dependencies": {

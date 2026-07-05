@@ -1,5 +1,15 @@
 // ============================================================================
 import { isLeadVendorCategoryCompatible } from "@/lib/vendors/categoryMatching";
+// Phase 4 canonical automatic eligibility lives in a ZERO-DEPENDENCY module so it
+// is importable standalone for harness testing; re-exported here so existing
+// callers keep importing it from vendorEligibility.
+export {
+  LEAD_CREDIT_COST,
+  normalizeAcceptingLeads,
+  evaluateVendorAutomaticLeadEligibility,
+  type VendorAutomaticLeadEligibility,
+  type VendorAutomaticLeadEligibilityReason,
+} from "./vendorAutomaticEligibility";
 // QuickFurno — Phase 13B: Shared Vendor Eligibility Helper
 //
 // ONE source of truth for "is this vendor eligible for a lead preview?". Used by
@@ -175,8 +185,11 @@ export function evaluateVendorLeadAssignmentEligibility(
 }
 
 /**
- * Contact access uses the same paid/trial/status/credit gate as automatic
- * assignment, without lead-specific city/category checks.
+ * @deprecated for AUTOMATIC lead assignment (Phase 4). This helper still classifies
+ * paid_status/package_status as commercial eligibility; the credit-wallet model no
+ * longer uses those for automatic matching. Use
+ * evaluateVendorAutomaticLeadEligibility() for automatic assignment eligibility.
+ * Retained for legacy preview/badge/history callers only.
  */
 export function evaluateVendorContactAccessEligibility(
   vendor: Record<string, unknown> | null | undefined,
@@ -184,6 +197,10 @@ export function evaluateVendorContactAccessEligibility(
 ): VendorContactAccessEligibility {
   return evaluateVendorLeadAssignmentEligibility(vendor, null, settings);
 }
+
+// Phase 4 canonical automatic eligibility (approved + active + accepting_leads +
+// credits >= cost; NO package/paid_status) is defined in the zero-dependency
+// module ./vendorAutomaticEligibility and re-exported at the top of this file.
 
 // ---------------------------------------------------------------------------
 // Phase 26A-2E: client-selected (vendor-profile) eligibility.

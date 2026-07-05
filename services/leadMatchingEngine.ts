@@ -9,7 +9,7 @@
 // Distance/area are RANKING signals only — never eligibility cutoffs. Legacy
 // exact-area membership is NOT a hard filter here (or in the RPC).
 // ============================================================================
-import { evaluateVendorContactAccessEligibility } from "../lib/vendors/vendorEligibility";
+import { evaluateVendorAutomaticLeadEligibility, normalizePackageStatus } from "../lib/vendors/vendorEligibility";
 import {
   getParentCategoryGroup,
   isLeadVendorCategoryCompatible,
@@ -86,6 +86,12 @@ export type VendorMatchEvaluation = {
 };
 
 const MAX_VENDOR_MATCHES = 3;
+// Phase 4 fill-until-3: pass a bounded RANKED candidate pool (ordering unchanged)
+// to the atomic RPC, which stops after MAX_VENDOR_MATCHES SUCCESSFUL assignments
+// even if a higher-ranked candidate loses its last credit concurrently. The RPC —
+// never this layer — enforces the max-3-successful cap atomically. Legacy RPCs that
+// only read the first 3 ids degrade safely to today's top-3 behavior.
+const MAX_CANDIDATE_POOL = 6;
 const VENDOR_PAGE_SIZE = 500;
 const MAX_VENDOR_SCAN = 5000;
 // Audit snapshots list per-vendor skip reasons up to this cap; reason counts
@@ -156,7 +162,9 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
     const { eligible, skipped, skippedReasonCounts } = evaluation.data;
 
-    const selectedVendorIds = eligible.slice(0, MAX_VENDOR_MATCHES).map((vendor) => vendor.id);
+    // Ranked candidate POOL (ordering unchanged). Recorded as selected_vendor_ids
+    // so diagnostics keep `assigned ⊆ selected`; the RPC caps SUCCESSFUL at 3.
+    const selectedVendorIds = eligible.slice(0, MAX_CANDIDATE_POOL).map((vendor) => vendor.id);
     // Audit-only: who was evaluated and why they were not selected. Eligible
     // vendors beyond the cap of 3 are recorded as max_vendor_cap_reached.
     const matchAudit = {
@@ -164,7 +172,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       matching_model_version: MATCHING_MODEL_VERSION,
       skipped,
       skipped_reason_counts: skippedReasonCounts,
-      max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_VENDOR_MATCHES).map((vendor) => vendor.id),
+      max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_CANDIDATE_POOL).map((vendor) => vendor.id),
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
@@ -341,12 +349,12 @@ export function rankVendorsForLead(
     const id = asText(vendor.id);
     if (!id) continue;
 
-    // Commercial eligibility ONLY (status/active/paid-or-trial/credits). City and
-    // category are gated below so we can distinguish Tier 0 vs Tier 1 fallback.
-    const commercial = evaluateVendorContactAccessEligibility(vendor, {
-      allow_trial_vendors_for_assignment: true,
-    });
-    const reasons = [...commercial.reasons];
+    // Phase 4 canonical commercial eligibility ONLY: approved + active +
+    // accepting_leads + remaining_credits >= LEAD_CREDIT_COST. Package/paid_status
+    // are NOT eligibility inputs anymore. City and category are gated below so we
+    // can still distinguish Tier 0 vs Tier 1 fallback. Must match the RPC gate.
+    const wallet = evaluateVendorAutomaticLeadEligibility(vendor);
+    const reasons: string[] = [...wallet.reasons];
 
     // City HARD gate — normalized text comparison (not exact-case).
     if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");
@@ -378,10 +386,10 @@ export function rankVendorsForLead(
       id,
       business_name: asText(vendor.business_name),
       // Informational only (NOT used for ranking); ranking uses the comparator below.
-      score: scoreVendor(vendor, lead, commercial.visibilityType),
-      credits: commercial.credits,
-      packageStatus: commercial.packageStatus,
-      visibilityType: commercial.visibilityType ?? "paid",
+      score: scoreVendor(vendor, lead, "credit_wallet"),
+      credits: wallet.credits,
+      packageStatus: normalizePackageStatus(vendor), // display/history only (deprecated for eligibility)
+      visibilityType: "credit_wallet",
       match_tier: tier,
       match_type: matchType,
       distance_km: distanceKm,

@@ -423,7 +423,10 @@ export function composeLeadDiagnostic(sources: LeadProcessingDiagnosticSources):
 
     // 8. A selected vendor is missing from a PARTIAL assignment set. Downgrade to
     //    medium when the matching snapshot documents an RPC skip reason for it.
-    if (assignmentCount > 0 && selectedVendorIds.length > 0) {
+    //    Phase 4: selected is now the ranked candidate POOL, so once the max-3 cap
+    //    is reached the un-assigned overflow candidates are EXPECTED (not an
+    //    anomaly) — only a run that filled FEWER than the cap can be short.
+    if (assignmentCount > 0 && assignmentCount < MAX_VENDORS_PER_LEAD && selectedVendorIds.length > 0) {
       const assignedSet = new Set(assignmentVendorIds);
       const missing = uniq(selectedVendorIds.filter((v) => !assignedSet.has(v)));
       if (missing.length > 0) {

@@ -25,6 +25,10 @@ lead. Packages only add credits; package status does not control matching.*
 | Wallet writers not wired | admin grant/adjust + package top-up routed through canonical primitive; refund + package-purchase boundaries added | `[implemented]` (TS) + `[migration-generated]` (00145) |
 | Preferred/manual RPCs missing `accepting_leads` | 00143 (preferred) + 00144 (manual) add `accepting_leads` | `[migration-generated]` |
 | Preferred/manual debits NOT ledger-correlated | 00143 + 00144 drop `deduct_vendor_credit`, do atomic debit + **mandatory** `lead_assignment_debit` ledger row; 00145 no longer duplicates `vendor_packages` on replay | `[migration-generated]` |
+| Manual RPC honored a DB setting of 4 | 00144 `v_max := least(get_setting_int(...,3), 3)` — hard cap 3 for selected-count guard + auto-fill | `[migration-generated]` |
+| Preferred RPC double trust gate | 00143 removes `verification_status` as eligibility (approved Approved+Pending vendors no longer blocked); trust = `status` only, verification is audit/display | `[migration-generated]` |
+| Legacy package route was a 2nd credit path | `updateVendorPackage` + package route grant **no** credits (metadata only); `creditsToAdd` dropped/ignored | `[implemented]` |
+| Package RPC didn't verify payment ownership | 00145 raises `PAYMENT_VENDOR_MISMATCH` / `PAYMENT_PACKAGE_MISMATCH` after locking the payment | `[migration-generated]` |
 | Pool = 6 | `MAX_ASSIGNMENT_CANDIDATE_POOL = 20` in matcher + delivery (agree) | `[implemented]` |
 | `qf_apply_vendor_credit_delta` hardening | lock-first, idempotency-after-lock, no-clamp, cumulative `total_credits` | `[migration-generated]` |
 

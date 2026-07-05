@@ -51,15 +51,13 @@ begin
   end if;
 
   -- ── Direct commercial gate (client-picked): NO package/paid/public_visibility. ──
+  -- Authoritative trust = vendors.status normalized to approved/active. Phase 4
+  -- REMOVES verification_status as an eligibility gate (it stays audit/display only)
+  -- so the automatic and preferred paths agree: many Approved vendors carry
+  -- verification_status='Pending', and that must NOT block a client-picked assignment.
   if lower(coalesce(v_vendor.status, '')) not in ('approved', 'active') then
     return jsonb_build_object('status', 'preferred_vendor_not_eligible', 'assigned', false,
       'reason', 'vendor_not_approved_or_active', 'vendor_id', p_vendor_id);
-  end if;
-
-  if lower(coalesce(v_vendor.verification_status, 'verified'))
-     in ('pending', 'rejected', 'unverified', 'not verified', 'failed', 'in review') then
-    return jsonb_build_object('status', 'preferred_vendor_not_eligible', 'assigned', false,
-      'reason', 'vendor_not_verified', 'vendor_id', p_vendor_id);
   end if;
 
   if coalesce(v_vendor.is_active, true) is not true then

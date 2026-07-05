@@ -30,6 +30,16 @@ declare
 begin
   select * into v_pay from public.payments where id = p_payment_id for update;
   if not found then raise exception 'PAYMENT_NOT_FOUND' using errcode = 'P0002'; end if;
+
+  -- PHASE 4: the payment must belong to THIS vendor and THIS package (a payment id
+  -- must never be reused to credit a different vendor or apply a different package).
+  if v_pay.vendor_id is distinct from p_vendor_id then
+    raise exception 'PAYMENT_VENDOR_MISMATCH' using errcode = 'P0001';
+  end if;
+  if v_pay.package_id is distinct from p_package_id then
+    raise exception 'PAYMENT_PACKAGE_MISMATCH' using errcode = 'P0001';
+  end if;
+
   if v_pay.payment_status <> 'Paid' then raise exception 'PAYMENT_NOT_PAID' using errcode = 'P0001'; end if;
 
   select * into v_pkg from public.packages where id = p_package_id;

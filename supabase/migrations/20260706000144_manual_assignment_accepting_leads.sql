@@ -36,7 +36,10 @@ declare
   v_after    int;
   v_assignment_id uuid;
 begin
-  v_max := public.get_setting_int('max_vendors_per_lead', 3);
+  -- PHASE 4 hard cap: MAX 3 vendors per lead, never exceeded, even if the DB
+  -- setting is misconfigured higher (live currently returns 4). Both the selected-
+  -- count guard and the auto-fill below use v_max, so 3 is the true ceiling.
+  v_max := least(public.get_setting_int('max_vendors_per_lead', 3), 3);
 
   select * into v_lead from public.leads where id = p_lead_id for update;
   if not found then

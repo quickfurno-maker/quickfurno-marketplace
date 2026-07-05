@@ -165,6 +165,20 @@ check("R9 [static] all three assignment RPCs use lead_assignment_debit", /'lead_
 // R10 — all three have MANDATORY ledger (insert present, no check_violation swallow).
 check("R10 [static] all three RPCs: mandatory ledger, no swallow", ledgerInsertRe.test(c142) && ledgerInsertRe.test(c143) && ledgerInsertRe.test(c144) && !swallowRe.test(c142) && !swallowRe.test(c143) && !swallowRe.test(c144));
 
+// ---- Final preflight corrections (F1–F6) -----------------------------------
+// F1 — manual assignment hard-caps at 3 even when the DB setting returns 4.
+check("F1 [static] manual RPC caps v_max via least(get_setting_int(...,3), 3)", /least\(public\.get_setting_int\('max_vendors_per_lead', 3\), 3\)/.test(c144));
+check("F1b [pure] configured 4 → least(4,3)=3 → never more than 3 assigned", simulateFillUntilSuccessful(Array.from({ length: 20 }, (_, i) => `c${i + 1}`), Math.min(4, 3), () => true).length === 3);
+// F2 — preferred assignment no longer gates on verification_status.
+check("F2 [static] preferred RPC does not block on verification_status", !/vendor_not_verified/.test(c143) && !/verification_status[\s\S]{0,80}in \('pending'/.test(c143));
+// F3 — legacy package metadata route does not grant credits.
+check("F3 [static] vendorAdminService package path grants no credits (no grantVendorCredits/creditsToAdd)", !/grantVendorCredits/.test(adminSrc) && !/creditsToAdd/.test(adminSrc));
+// F4/F5 — paid package function validates payment vendor + package ownership.
+check("F4 [static] package RPC validates payment vendor ownership", /PAYMENT_VENDOR_MISMATCH/.test(c145) && /v_pay\.vendor_id is distinct from p_vendor_id/.test(c145));
+check("F5 [static] package RPC validates payment package ownership", /PAYMENT_PACKAGE_MISMATCH/.test(c145) && /v_pay\.package_id is distinct from p_package_id/.test(c145));
+// F6 — package replay remains idempotent after the ownership checks.
+check("F6 [static] package RPC still idempotent (already_applied before vendor_packages insert)", /already_applied/.test(c145) && c145.indexOf("reference_type = 'package_purchase'") < c145.indexOf("insert into public.vendor_packages"));
+
 // ---- Alignment (report CASE 18) + refund append-only [pure] ----------------
 check("Align [static] matcher uses the canonical helper, not the package/paid helper", /evaluateVendorAutomaticLeadEligibility/.test(matcherSrc) && !/evaluateVendorContactAccessEligibility/.test(matcherSrc));
 check("Align [static] auto RPC gate removed package/paid, kept credits", !/v_has_active_package/.test(c142) && /remaining_credits, 0\) < v_credit_cost/.test(c142));

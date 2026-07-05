@@ -14,9 +14,12 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { evaluateVendorEligibility, type VendorEligibility } from "../lib/vendors/vendorEligibility";
-// Phase 4: all wallet increases/adjustments go through the canonical atomic
-// primitive (no direct remaining_credits/total_credits writes from here).
-import { applyVendorCreditDelta, grantVendorCredits } from "./vendorCreditWalletService";
+// Phase 4: manual admin credit changes go through the canonical atomic primitive
+// (no direct remaining_credits/total_credits writes from here). The legacy package
+// metadata path does NOT grant credits — paid package credits come from the
+// payment-confirmed wallet path (assign_package_to_vendor), manual grants from the
+// dedicated credits endpoint.
+import { applyVendorCreditDelta } from "./vendorCreditWalletService";
 
 const VENDOR_FIELDS =
   "id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, total_credits, remaining_credits, rating, completed_projects, is_active, public_visibility, paid_status, package_name, package_status, package_expires_at, created_at";
@@ -192,7 +195,6 @@ export async function updateVendorCredits(
 export interface UpdatePackageInput {
   packageName?: string | null;
   packageStatus: PackageStatus;
-  creditsToAdd?: number | null;
   packageExpiresAt?: string | null;
   updatedBy: string;
 }
@@ -208,7 +210,6 @@ export async function updateVendorPackage(
     return { ok: false, error: "Invalid package status.", code: "VALIDATION" };
   }
 
-  const creditsToAdd = Math.round(Number(input.creditsToAdd ?? 0));
   const expiresAt = normalizeExpiry(input.packageExpiresAt);
 
   try {
@@ -226,26 +227,15 @@ export async function updateVendorPackage(
       .eq("id", id);
     if (updateErr) return { ok: false, error: "Could not update the package.", code: "UPDATE_FAILED" };
 
-    // Optionally top up credits along with the package change — via the canonical
-    // wallet primitive (positive grant; no direct remaining_credits write here).
-    if (Number.isFinite(creditsToAdd) && creditsToAdd > 0) {
-      const grant = await grantVendorCredits({
-        vendorId: id,
-        amount: creditsToAdd,
-        changeType: "admin_credit_grant",
-        reason: `Package credit (${input.packageStatus}${input.packageName ? `: ${input.packageName}` : ""})`,
-        updatedBy: input.updatedBy,
-      });
-      if (!grant.ok) {
-        return { ok: false, error: "Could not add package credits.", code: "UPDATE_FAILED" };
-      }
-    }
+    // Phase 4: this legacy route updates DISPLAY/legacy package metadata ONLY. It
+    // must NEVER grant credits (that would be a second, uncontrolled credit path).
+    // Paid package credits come from the payment-confirmed wallet path
+    // (assign_package_to_vendor); manual admin grants use POST /credits.
 
     await recomputeVisibility(id);
     await bestEffortAudit("vendor.package_updated", id, {
       package_status: input.packageStatus,
       package_name: input.packageName ?? null,
-      creditsToAdd: creditsToAdd > 0 ? creditsToAdd : 0,
       updatedBy: input.updatedBy,
     });
 

@@ -1,8 +1,10 @@
 // ============================================================================
 // QuickFurno — Phase 13B: POST /api/admin/vendors/[id]/package
 // Superadmin-only. Assign / update the denormalized package fields used by the
-// Phase 13 preview eligibility. Optional credit top-up (logged).
-// NO WhatsApp, NO vendor notification, NO auto-deduction, NO n8n.
+// Phase 13 preview eligibility. DISPLAY/legacy metadata ONLY — Phase 4: this route
+// does NOT grant credits (any `creditsToAdd` in the body is ignored). Paid package
+// credits come from the payment-confirmed wallet path; manual grants use POST
+// /credits. NO WhatsApp, NO vendor notification, NO auto-deduction, NO n8n.
 // ============================================================================
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/app/actions";
@@ -36,10 +38,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
   }
 
+  // NOTE (Phase 4): `record.creditsToAdd` is intentionally ignored here — this route
+  // updates package metadata only and must not become a second credit-grant path.
   const result = await updateVendorPackage(params.id, {
     packageName: typeof record.packageName === "string" ? record.packageName : null,
     packageStatus: packageStatus as PackageStatus,
-    creditsToAdd: typeof record.creditsToAdd === "number" ? record.creditsToAdd : Number(record.creditsToAdd) || 0,
     packageExpiresAt: typeof record.packageExpiresAt === "string" ? record.packageExpiresAt : null,
     updatedBy: session.adminRole ?? "Superadmin",
   });

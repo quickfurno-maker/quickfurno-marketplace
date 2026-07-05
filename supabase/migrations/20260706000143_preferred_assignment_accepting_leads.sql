@@ -3,12 +3,14 @@
 -- Phase 4 (credit-wallet): align the CLIENT-SELECTED (preferred) assignment RPC
 -- with the availability rule. GENERATED FOR REVIEW — DO NOT AUTO-APPLY.
 --
--- ONLY change vs 20260702000037: add an `accepting_leads` gate (default true when
--- null). The preferred path already ignores package_status/paid_status/
--- public_visibility for a client-picked vendor. Signature, idempotency (already-
--- assigned replay), credit safety (deduct_vendor_credit/restore_vendor_credit),
--- and the response contract are PRESERVED. Historical assignment visibility is
--- unchanged.
+-- Changes vs 20260702000037: (1) add an `accepting_leads` gate (default true when
+-- null); (2) PHASE 4 credit-wallet debit — replace deduct_vendor_credit with an
+-- atomic conditional decrement + a MANDATORY assignment-correlated vendor_credit_logs
+-- row (change_type=lead_assignment_debit, reference_type=lead_assignment,
+-- reference_id=assignment id). A ledger failure rolls back the debit + assignment.
+-- The preferred path still ignores package_status/paid_status/public_visibility for
+-- a client-picked vendor. Signature, already-assigned replay (no 2nd debit / no 2nd
+-- ledger row), and the response contract are PRESERVED.
 -- ============================================================================
 create or replace function public.assign_lead_to_preferred_vendor(
   p_lead_id   uuid,
@@ -22,7 +24,6 @@ declare
   v_assignment_id uuid;
   v_before        int;
   v_after         int;
-  v_ok            boolean;
 begin
   select * into v_lead from public.leads where id = p_lead_id for update;
   if not found then
@@ -73,13 +74,19 @@ begin
   end if;
 
   v_before := coalesce(v_vendor.remaining_credits, 0);
-  if v_before <= 0 then
+  if v_before < 1 then
     return jsonb_build_object('status', 'preferred_vendor_no_credits', 'assigned', false,
       'vendor_id', p_vendor_id, 'credits_before', v_before);
   end if;
 
-  v_ok := public.deduct_vendor_credit(p_vendor_id);
-  if not v_ok then
+  -- PHASE 4 credit-wallet debit: atomic conditional decrement (NO deduct_vendor_credit,
+  -- NO package burn-down). The vendor row is already locked (FOR UPDATE above).
+  update public.vendors
+  set remaining_credits = remaining_credits - 1,
+      last_assigned_at = now()
+  where id = p_vendor_id and remaining_credits >= 1
+  returning remaining_credits into v_after;
+  if v_after is null then
     return jsonb_build_object('status', 'preferred_vendor_no_credits', 'assigned', false,
       'vendor_id', p_vendor_id, 'credits_before', v_before);
   end if;
@@ -89,14 +96,22 @@ begin
     values (p_lead_id, p_vendor_id, 'client_selected', true)
     returning id into v_assignment_id;
   exception when unique_violation then
-    perform public.restore_vendor_credit(p_vendor_id);
+    -- Race before the ledger row: restore the credit we just debited, no ledger written.
+    update public.vendors set remaining_credits = remaining_credits + 1 where id = p_vendor_id;
     return jsonb_build_object('status', 'already_assigned', 'assigned', true, 'vendor_id', p_vendor_id);
   end;
 
-  select remaining_credits into v_after from public.vendors where id = p_vendor_id;
+  -- MANDATORY ledger (no catch): a failure rolls back the debit + assignment.
+  insert into public.vendor_credit_logs (
+    vendor_id, change_type, credits_before, credits_delta, credits_after,
+    reason, updated_by, reference_type, reference_id
+  ) values (
+    p_vendor_id, 'lead_assignment_debit', v_before, -1, v_after,
+    'Preferred/client-selected lead assignment', 'phase4_credit_wallet_preferred',
+    'lead_assignment', v_assignment_id::text
+  );
 
-  update public.vendors set last_assigned_at = now() where id = p_vendor_id;
-  update public.leads   set status = 'Assigned' where id = p_lead_id;
+  update public.leads set status = 'Assigned' where id = p_lead_id;
 
   return jsonb_build_object(
     'status',         'assigned_to_preferred_vendor',
@@ -111,6 +126,3 @@ end; $$;
 grant execute on function public.assign_lead_to_preferred_vendor(uuid, uuid) to service_role;
 
 -- Reverse (review only): re-apply 20260702000037_fix_preferred_vendor_credit_direct_assignment.sql.
--- NOTE (documented gap): deduct_vendor_credit does NOT write a vendor_credit_logs
--- row, so preferred/manual debits are not yet ledger-correlated like the auto RPC.
--- That canonical-ledger alignment for preferred/manual is a follow-on migration.

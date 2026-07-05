@@ -24,6 +24,7 @@ lead. Packages only add credits; package status does not control matching.*
 | Ledger CHECK rejected `lead_assignment_debit` (swallowed) | 00141 aligns `change_type` CHECK to Phase 4 + legacy types; 00142 ledger insert made **mandatory** (no catch) | `[migration-generated]` |
 | Wallet writers not wired | admin grant/adjust + package top-up routed through canonical primitive; refund + package-purchase boundaries added | `[implemented]` (TS) + `[migration-generated]` (00145) |
 | Preferred/manual RPCs missing `accepting_leads` | 00143 (preferred) + 00144 (manual) add `accepting_leads` | `[migration-generated]` |
+| Preferred/manual debits NOT ledger-correlated | 00143 + 00144 drop `deduct_vendor_credit`, do atomic debit + **mandatory** `lead_assignment_debit` ledger row; 00145 no longer duplicates `vendor_packages` on replay | `[migration-generated]` |
 | Pool = 6 | `MAX_ASSIGNMENT_CANDIDATE_POOL = 20` in matcher + delivery (agree) | `[implemented]` |
 | `qf_apply_vendor_credit_delta` hardening | lock-first, idempotency-after-lock, no-clamp, cumulative `total_credits` | `[migration-generated]` |
 
@@ -44,8 +45,16 @@ wallet = `vendors.remaining_credits`; ledger = `vendor_credit_logs` (+`reference
 ## 6. Credit grant flow `[implemented]` + `[migration-generated]`
 Canonical primitive `qf_apply_vendor_credit_delta(vendor, delta, change_type, reason, reference_type, reference_id, updated_by, allow_negative)` (00141). TS boundary `services/vendorCreditWalletService.ts` (`applyVendorCreditDelta` / `grantVendorCredits` / `refundCreditForInvalidLead` / `grantCreditsForConfirmedPackagePurchase`). **Wired:** `vendorAdminService.updateVendorCredits` ("add" → `admin_credit_grant`, "set"/remove → `manual_adjustment`, optional idempotency `reference` from the credits API) and `updateVendorPackage` top-up → `admin_credit_grant`. No direct `remaining_credits`/`total_credits`/`vendor_credit_logs` writes remain in `vendorAdminService`.
 
-## 7. Assignment debit flow `[migration-generated]`
-Atomic inside 00142: conditional `remaining_credits - 1 WHERE remaining_credits >= 1`, one `lead_assignments` row, **MANDATORY** ledger row `change_type=lead_assignment_debit, reference_type=lead_assignment, reference_id=<assignment id>`. **No successful assignment debit without a successful ledger row** — a ledger failure rolls back the debit + assignment + lead status.
+## 7. Assignment debit flow `[migration-generated]` — ALL THREE paths ledger-correlated
+Every chargeable path now debits the credit wallet atomically and writes a
+**MANDATORY** assignment-correlated ledger row (`change_type=lead_assignment_debit`,
+`reference_type=lead_assignment`, `reference_id=<assignment id>`, `credits_delta=-1`).
+A ledger failure rolls back that debit + assignment. **No successful assignment
+debit without a successful ledger row** — for automatic (`00142`), preferred/client-
+selected (`00143`), and manual/admin (`00144`). `deduct_vendor_credit` /
+`restore_vendor_credit` are **no longer used** by any of the three RPCs (each does
+an atomic conditional `remaining_credits - 1 WHERE remaining_credits >= 1`, and a
+direct `+1` restore only for a pre-ledger `unique_violation` race).
 
 ## 8. Refund flow `[implemented]` (call site) + `[migration-generated]` (primitive)
 Append-only: `refundCreditForInvalidLead` grants `+1` via the primitive, `reference=(invalid_lead_refund, assignment id)`; the original `-1` is never deleted (idempotent — same reference refunds once).
@@ -69,11 +78,21 @@ Matcher passes a bounded ranked pool of **20** (ranking unchanged); 00142 iterat
 `docs/PHASE4_HISTORICAL_CREDIT_AUDIT.sql` — SELECT-only audit (27 charged assignments / 16 negative rows). **No backfill** (old ledger has no assignment reference → non-deterministic). Phase 4 guarantee is forward-only.
 
 ## 15. Test results (`npm run test:phase4`)
-**36 passed, 0 failed.** Eligibility CASES 1–8/16/17 `[pure]`; H1–H2 change-type constraint `[static]`; H3/H4 mandatory ledger / no-swallow `[static]`; H5/H6/H7 accepting_leads in auto/preferred/manual `[static]`; H8 preferred no package/paid `[static]`; H9/H10/H11 idempotent purchase/grant/refund `[static]`; H12 no-clamp `[static]`; H13/H13b/H14/H15 pool-20 + fill-until-3 + continue-to-later `[static]`+`[pure]`; H16/H17/H18 replay/delivery/whatsapp no-debit `[static]`; refund append-only `[pure]`. Regression: 3A **52/52**, 3B **58/58**. typecheck ✓, build ✓, `git diff --check` clean.
+**46 passed, 0 failed** (adds R1–R10: preferred/manual RPCs drop `deduct_vendor_credit`, insert `vendor_credit_logs` with `reference_type=lead_assignment`; all three RPCs use `lead_assignment_debit` with mandatory (non-swallowed) ledger; 00145 checks the package_purchase reference before inserting `vendor_packages`). Eligibility CASES 1–8/16/17 `[pure]`; H1–H2 change-type constraint `[static]`; H3/H4 mandatory ledger / no-swallow `[static]`; H5/H6/H7 accepting_leads in auto/preferred/manual `[static]`; H8 preferred no package/paid `[static]`; H9/H10/H11 idempotent purchase/grant/refund `[static]`; H12 no-clamp `[static]`; H13/H13b/H14/H15 pool-20 + fill-until-3 + continue-to-later `[static]`+`[pure]`; H16/H17/H18 replay/delivery/whatsapp no-debit `[static]`; refund append-only `[pure]`. Regression: 3A **52/52**, 3B **58/58**. typecheck ✓, build ✓, `git diff --check` clean.
 
 ## 16. Deferred / integration-required (honest)
-- `[integration-required]`: real transaction atomicity, concurrent matcher execution, RPC race behavior, DB-level uniqueness, and true rollback-on-ledger-failure — a pure/static harness does **not** prove these.
-- `[deferred]`: preferred/manual debits use `deduct_vendor_credit`, which writes **no** ledger row (documented in 00143) — canonical-ledger correlation for those paths is a follow-on migration. App-level package-purchase confirmation handler does not exist (order-intent only) — the TS boundary + DB `assign_package_to_vendor` (00145) are the go-forward; the future webhook call site is documented in `vendorCreditWalletService.ts`. Vendor/Admin dashboard UI intentionally untouched.
+- **Ledger correlation is COMPLETE** across all three assignment RPCs in the
+  generated migrations (auto/preferred/manual) — this is no longer deferred. The
+  package-purchase RPC (`00145`) is idempotent on `(package_purchase, payment id)`
+  and no longer risks a duplicate `vendor_packages` row on replay.
+- `[integration-required]` (NOT proven by a pure/static harness, NOT claimed): real
+  DB transaction atomicity, concurrent race testing, RPC-level uniqueness, true
+  rollback-on-ledger-failure, and production E2E. n8n sync remains documentation-only.
+- `[deferred]`: app-level package-purchase confirmation handler does not exist
+  (order-intent only) — the TS boundary `grantCreditsForConfirmedPackagePurchase`
+  + DB `assign_package_to_vendor` (`00145`) are the go-forward; the future webhook
+  call site is documented in `vendorCreditWalletService.ts`. Vendor/Admin dashboard
+  UI intentionally untouched.
 
 ---
 

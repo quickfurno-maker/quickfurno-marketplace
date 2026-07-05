@@ -10,9 +10,11 @@
 -- qf_apply_vendor_credit_delta with reference (package_purchase, payment id) so a
 -- repeated confirmation grants credits exactly once (`already_applied`).
 --
--- ONLY the credit-grant line changes. The vendor_packages insert / visibility
--- refresh are preserved (a legacy row-level idempotency concern, not credit-
--- affecting — documented in the report).
+-- Also fixes the row-duplication concern: an idempotency guard checks the prior
+-- (package_purchase, payment id) ledger reference BEFORE inserting vendor_packages,
+-- so a replayed payment confirmation neither double-grants credits NOR creates a
+-- duplicate vendor_packages row. The whole function is one transaction and the
+-- payment row is locked FOR UPDATE, so concurrent replays serialize safely.
 -- ============================================================================
 create or replace function public.assign_package_to_vendor(
   p_vendor_id  uuid,
@@ -32,6 +34,17 @@ begin
 
   select * into v_pkg from public.packages where id = p_package_id;
   if not found then raise exception 'PACKAGE_NOT_FOUND' using errcode = 'P0002'; end if;
+
+  -- IDEMPOTENCY: if this payment's package_purchase was already applied, return
+  -- WITHOUT inserting another vendor_packages row or granting credits again. The
+  -- payment row is locked (FOR UPDATE above), so concurrent same-payment calls
+  -- serialize here — the second observes the first's ledger row and short-circuits.
+  if exists (
+    select 1 from public.vendor_credit_logs
+    where reference_type = 'package_purchase' and reference_id = p_payment_id::text
+  ) then
+    return jsonb_build_object('status', 'already_applied', 'vendor_id', p_vendor_id, 'payment_id', p_payment_id, 'credits_added', 0);
+  end if;
 
   insert into public.vendor_packages
     (vendor_id, package_id, expiry_date, total_leads, remaining_leads, price_paid, payment_status, status)

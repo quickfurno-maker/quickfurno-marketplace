@@ -138,6 +138,33 @@ check("H17 [static] delivery service never mutates credits", !/remaining_credits
 // H18 — WhatsApp preview retry creates no debit.
 check("H18 [static] whatsapp preview log carries credit_deducted: false", /whatsapp_preview[\s\S]*?credit_deducted: false/.test(deliverySrc) || /credit_deducted: false[\s\S]*?whatsapp/.test(deliverySrc));
 
+// ---- Ledger-correlation corrections (R1–R10) [static] ----------------------
+const c145 = stripSql(readSource("../supabase/migrations/20260706000145_package_purchase_idempotent_grant.sql"));
+const ledgerInsertRe = /insert into public\.vendor_credit_logs/;
+const swallowRe = /when undefined_table or undefined_column or check_violation/;
+
+// R1/R4 — preferred + manual no longer use the old package-coupled debit helpers.
+check("R1 [static] preferred RPC does not call deduct_vendor_credit/restore_vendor_credit", !/deduct_vendor_credit|restore_vendor_credit/.test(c143));
+check("R4 [static] manual RPC does not call deduct_vendor_credit/restore_vendor_credit", !/deduct_vendor_credit|restore_vendor_credit/.test(c144));
+// R2/R5 — preferred + manual insert vendor_credit_logs.
+check("R2 [static] preferred RPC inserts vendor_credit_logs", ledgerInsertRe.test(c143));
+check("R5 [static] manual RPC inserts vendor_credit_logs", ledgerInsertRe.test(c144));
+// R3/R6 — reference_type = lead_assignment + change_type = lead_assignment_debit.
+check("R3 [static] preferred RPC uses reference_type lead_assignment (+ debit type)", /'lead_assignment'/.test(c143) && /'lead_assignment_debit'/.test(c143));
+check("R6 [static] manual RPC uses reference_type lead_assignment (+ debit type)", /'lead_assignment'/.test(c144) && /'lead_assignment_debit'/.test(c144));
+// R7 — 00145 checks the prior package_purchase reference BEFORE inserting vendor_packages.
+{
+  const refIdx = c145.indexOf("reference_type = 'package_purchase'");
+  const insIdx = c145.indexOf("insert into public.vendor_packages");
+  check("R7 [static] package RPC checks package_purchase reference before vendor_packages insert", refIdx >= 0 && insIdx >= 0 && refIdx < insIdx);
+}
+// R8 — repeated payment reference short-circuits (already_applied) → no duplicate row.
+check("R8 [static] package RPC returns already_applied on replay (no duplicate row/grant)", /already_applied/.test(c145));
+// R9 — all three assignment RPCs use lead_assignment_debit.
+check("R9 [static] all three assignment RPCs use lead_assignment_debit", /'lead_assignment_debit'/.test(c142) && /'lead_assignment_debit'/.test(c143) && /'lead_assignment_debit'/.test(c144));
+// R10 — all three have MANDATORY ledger (insert present, no check_violation swallow).
+check("R10 [static] all three RPCs: mandatory ledger, no swallow", ledgerInsertRe.test(c142) && ledgerInsertRe.test(c143) && ledgerInsertRe.test(c144) && !swallowRe.test(c142) && !swallowRe.test(c143) && !swallowRe.test(c144));
+
 // ---- Alignment (report CASE 18) + refund append-only [pure] ----------------
 check("Align [static] matcher uses the canonical helper, not the package/paid helper", /evaluateVendorAutomaticLeadEligibility/.test(matcherSrc) && !/evaluateVendorContactAccessEligibility/.test(matcherSrc));
 check("Align [static] auto RPC gate removed package/paid, kept credits", !/v_has_active_package/.test(c142) && /remaining_credits, 0\) < v_credit_cost/.test(c142));

@@ -3,12 +3,16 @@
 -- Phase 4 (credit-wallet): align the ADMIN/MANUAL + client-selected hybrid
 -- assignment RPC with the availability rule. GENERATED FOR REVIEW — DO NOT AUTO-APPLY.
 --
--- ONLY change vs 20260620000003: add `and coalesce(v.accepting_leads, true)` to BOTH
--- eligibility subqueries (client-selected validation AND auto-fill). Signature,
--- max-vendor behavior, idempotency (LEAD_ALREADY_ASSIGNED), credit safety
--- (deduct_vendor_credit / restore_vendor_credit), response contract, ranking, and
--- the legacy whatsapp_logs writes are PRESERVED. This RPC does not reference
--- package_status/paid_status (it uses public_visibility, which is unchanged).
+-- Changes vs 20260620000003: (1) add `and coalesce(v.accepting_leads, true)` to BOTH
+-- eligibility subqueries (client-selected validation AND auto-fill); (2) PHASE 4
+-- credit-wallet debit — replace deduct_vendor_credit with a per-vendor lock+recheck,
+-- atomic conditional decrement, and a MANDATORY assignment-correlated
+-- vendor_credit_logs row (change_type=lead_assignment_debit,
+-- reference_type=lead_assignment, reference_id=assignment id). A ledger failure rolls
+-- back that vendor's debit + assignment. Signature, max-vendor behavior, idempotency
+-- (LEAD_ALREADY_ASSIGNED), response contract, ranking, and the legacy whatsapp_logs
+-- writes are PRESERVED. This RPC does not reference package_status/paid_status (it
+-- uses public_visibility, which is unchanged).
 -- ============================================================================
 create or replace function public.assign_lead_to_vendors(
   p_lead_id             uuid,
@@ -27,8 +31,10 @@ declare
   v_slots    int;
   v_assigned uuid[] := '{}';
   v_skipped  uuid[] := '{}';
-  v_ok       boolean;
   v_type     text;
+  v_before   int;
+  v_after    int;
+  v_assignment_id uuid;
 begin
   v_max := public.get_setting_int('max_vendors_per_lead', 3);
 
@@ -94,10 +100,27 @@ begin
     );
   end if;
 
-  -- 3) assign + deduct (per-vendor, atomic within this function)
+  -- 3) assign + debit (per-vendor, atomic within this function)
   foreach v_vendor in array v_target loop
-    v_ok := public.deduct_vendor_credit(v_vendor);
-    if not v_ok then
+    -- Lock + transactional recheck of the money-safety gate. city/category/
+    -- public_visibility were already validated when building v_target above.
+    select remaining_credits into v_before
+    from public.vendors
+    where id = v_vendor
+      and status = 'Approved' and is_active and coalesce(accepting_leads, true)
+    for update;
+    if v_before is null or v_before < 1 then
+      v_skipped := v_skipped || v_vendor;
+      continue;
+    end if;
+
+    -- PHASE 4 credit-wallet debit: atomic conditional decrement (NO deduct_vendor_credit).
+    update public.vendors
+    set remaining_credits = remaining_credits - 1,
+        last_assigned_at = now()
+    where id = v_vendor and remaining_credits >= 1
+    returning remaining_credits into v_after;
+    if v_after is null then
       v_skipped := v_skipped || v_vendor;
       continue;
     end if;
@@ -106,14 +129,24 @@ begin
 
     begin
       insert into public.lead_assignments (lead_id, vendor_id, assignment_type, credit_deducted)
-      values (p_lead_id, v_vendor, v_type, true);
+      values (p_lead_id, v_vendor, v_type, true)
+      returning id into v_assignment_id;
     exception when unique_violation then
-      perform public.restore_vendor_credit(v_vendor);
+      -- Race before the ledger row: restore the credit; no ledger written.
+      update public.vendors set remaining_credits = remaining_credits + 1 where id = v_vendor;
       v_skipped := v_skipped || v_vendor;
       continue;
     end;
 
-    update public.vendors set last_assigned_at = now() where id = v_vendor;
+    -- MANDATORY ledger (no catch): a failure rolls back the debit + assignment.
+    insert into public.vendor_credit_logs (
+      vendor_id, change_type, credits_before, credits_delta, credits_after,
+      reason, updated_by, reference_type, reference_id
+    ) values (
+      v_vendor, 'lead_assignment_debit', v_before, -1, v_after,
+      case when v_vendor = any(v_selected) then 'Client-selected lead assignment' else 'Manual/admin lead assignment' end,
+      'phase4_credit_wallet_manual', 'lead_assignment', v_assignment_id::text
+    );
 
     insert into public.whatsapp_logs (recipient_type, recipient_id, phone, template_name, message)
     select 'vendor', v_vendor, ve.phone, 'new_lead_vendor',

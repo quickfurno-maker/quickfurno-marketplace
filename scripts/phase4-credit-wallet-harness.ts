@@ -179,6 +179,20 @@ check("F5 [static] package RPC validates payment package ownership", /PAYMENT_PA
 // F6 — package replay remains idempotent after the ownership checks.
 check("F6 [static] package RPC still idempotent (already_applied before vendor_packages insert)", /already_applied/.test(c145) && c145.indexOf("reference_type = 'package_purchase'") < c145.indexOf("insert into public.vendor_packages"));
 
+// ---- Manual-RPC eligibility simplification (V1–V6) [static] -----------------
+// V1 — public_visibility is no longer an assignment eligibility gate.
+check("V1 [static] manual RPC eligibility no longer references public_visibility", !/public_visibility/.test(c144));
+// V2 — the hard exact-area gate is removed (its `covers_full_city or …` filter is gone).
+check("V2 [static] manual RPC removed the hard exact-area gate (no covers_full_city)", !/covers_full_city/.test(c144));
+// V3 — area affinity is PRESERVED as a soft signal in ORDER BY.
+check("V3 [static] manual RPC keeps area affinity in ORDER BY", /case when v_lead\.area is not null and v_lead\.area = any\(v\.areas_covered\) then 0 else 1 end/.test(c144));
+// V4 — maximum remains hard-capped at 3.
+check("V4 [static] manual RPC still hard-caps at 3", /least\(public\.get_setting_int\('max_vendors_per_lead', 3\), 3\)/.test(c144));
+// V5 — no-credit remains blocked.
+check("V5 [static] manual RPC still requires remaining_credits > 0", /remaining_credits > 0/.test(c144));
+// V6 — accepting_leads still gates (both eligibility subqueries).
+check("V6 [static] manual RPC still gates on accepting_leads", (c144.match(/coalesce\(v\.accepting_leads, true\)/g) || []).length >= 2);
+
 // ---- Alignment (report CASE 18) + refund append-only [pure] ----------------
 check("Align [static] matcher uses the canonical helper, not the package/paid helper", /evaluateVendorAutomaticLeadEligibility/.test(matcherSrc) && !/evaluateVendorContactAccessEligibility/.test(matcherSrc));
 check("Align [static] auto RPC gate removed package/paid, kept credits", !/v_has_active_package/.test(c142) && /remaining_credits, 0\) < v_credit_cost/.test(c142));

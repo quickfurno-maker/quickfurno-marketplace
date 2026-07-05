@@ -11,8 +11,11 @@
 -- reference_type=lead_assignment, reference_id=assignment id). A ledger failure rolls
 -- back that vendor's debit + assignment. Signature, max-vendor behavior, idempotency
 -- (LEAD_ALREADY_ASSIGNED), response contract, ranking, and the legacy whatsapp_logs
--- writes are PRESERVED. This RPC does not reference package_status/paid_status (it
--- uses public_visibility, which is unchanged).
+-- writes are PRESERVED. (3) Operational eligibility simplified to the canonical set
+-- only — status Approved + is_active + accepting_leads + credits>0 + city + category.
+-- REMOVED public_visibility (public-listing control only, not an assignment gate) and
+-- the hard exact-area filter (area is a soft ranking signal in ORDER BY, never a
+-- gate). No package_status/paid_status/verification_status gate. Hard cap = 3.
 -- ============================================================================
 create or replace function public.assign_lead_to_vendors(
   p_lead_id             uuid,
@@ -58,19 +61,21 @@ begin
     raise exception 'DUPLICATE_LEAD' using errcode = 'P0001';
   end if;
 
-  -- 1) validate client-selected vendors (PHASE 4: + accepting_leads)
+  -- 1) validate client-selected vendors. PHASE 4 operational eligibility ONLY:
+  --    status Approved + is_active + accepting_leads + credits > 0 + city + category.
+  --    public_visibility is NOT an assignment gate (it controls public listing only).
+  --    Area is a soft/ranking signal (Phase 2), NEVER a hard eligibility filter.
   select coalesce(array_agg(distinct t.vid), '{}')
   into v_selected
   from unnest(p_selected_vendor_ids) as t(vid)
   where exists (
     select 1 from public.vendors v
     where v.id = t.vid
-      and v.status = 'Approved' and v.is_active and v.public_visibility
+      and v.status = 'Approved' and v.is_active
       and coalesce(v.accepting_leads, true)
       and v.remaining_credits > 0
       and v.city = v_lead.city
       and v_lead.service_required = any(v.service_categories)
-      and (v.covers_full_city or (v_lead.area is not null and v_lead.area = any(v.areas_covered)))
   );
 
   v_target := v_selected;
@@ -78,20 +83,22 @@ begin
     v_target := v_target[1:v_max];
   end if;
 
-  -- 2) auto-fill remaining slots (PHASE 4: + accepting_leads). Ranking unchanged.
+  -- 2) auto-fill remaining slots. Same PHASE 4 operational eligibility (no
+  --    public_visibility, no hard exact-area filter). Area affinity is PRESERVED as
+  --    a soft signal in ORDER BY only. Ranking otherwise unchanged.
   v_slots := v_max - coalesce(array_length(v_target, 1), 0);
   if v_slots > 0 then
     v_target := v_target || array(
       select v.id
       from public.vendors v
-      where v.status = 'Approved' and v.is_active and v.public_visibility
+      where v.status = 'Approved' and v.is_active
         and coalesce(v.accepting_leads, true)
         and v.remaining_credits > 0
         and v.city = v_lead.city
         and v_lead.service_required = any(v.service_categories)
-        and (v.covers_full_city or (v_lead.area is not null and v_lead.area = any(v.areas_covered)))
         and not (v.id = any(v_target))
       order by
+        -- area affinity: exact-area vendors rank first (soft signal, not a gate)
         (case when v_lead.area is not null and v_lead.area = any(v.areas_covered) then 0 else 1 end),
         (case when v_lead.service_required = any(v.service_categories) then 0 else 1 end),
         (select count(*) from public.lead_assignments la

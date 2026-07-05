@@ -91,6 +91,12 @@ const MAX_VENDOR_SCAN = 5000;
 // Audit snapshots list per-vendor skip reasons up to this cap; reason counts
 // always cover every evaluated vendor.
 const MAX_SKIPPED_AUDIT_ENTRIES = 40;
+// Phase 3A observability tag stamped into every matching_snapshot so read-only
+// diagnostics can tell current-system runs apart from legacy/untagged ones.
+// METADATA ONLY — it never affects ranking, filtering, tiers, distance, area
+// affinity, selection order, max-3, or the RPC call. Must mirror
+// EXPECTED_MATCHING_MODEL_VERSION in services/leadProcessingDiagnosticsCore.ts.
+const MATCHING_MODEL_VERSION = "distance_category_matching_phase2";
 
 export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result<AutoLeadMatchingResult>> {
   let runId: string | null = null;
@@ -154,6 +160,8 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     // Audit-only: who was evaluated and why they were not selected. Eligible
     // vendors beyond the cap of 3 are recorded as max_vendor_cap_reached.
     const matchAudit = {
+      // Phase 3A metadata (top-level in every snapshot via the spreads below).
+      matching_model_version: MATCHING_MODEL_VERSION,
       skipped,
       skipped_reason_counts: skippedReasonCounts,
       max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_VENDOR_MATCHES).map((vendor) => vendor.id),
@@ -379,7 +387,7 @@ async function createMatchingRun(lead: LeadForMatching): Promise<string | null> 
         run_status: "started",
         consent_confirmed: Boolean(lead.share_consent),
         max_vendors: MAX_VENDOR_MATCHES,
-        matching_snapshot: { lead: summarizeLead(lead) },
+        matching_snapshot: { matching_model_version: MATCHING_MODEL_VERSION, lead: summarizeLead(lead) },
       })
       .select("id")
       .single();

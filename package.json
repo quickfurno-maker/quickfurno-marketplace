@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:supabase:lead": "node scripts/test-supabase-lead-insert.mjs",
+    "test:phase3a": "node scripts/phase3a-diagnostics-harness.ts",
     "grant:superadmin": "node scripts/grant-superadmin.mjs"
   },
   "dependencies": {

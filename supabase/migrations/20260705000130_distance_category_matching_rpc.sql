@@ -274,7 +274,10 @@ begin
 
     -- Defensive final gates: commercial + NORMALIZED city + category compatibility.
     -- (No area gate: area/distance are ranking signals, decided by the JS matcher.)
-    if v_row.status <> 'Approved'
+    -- Status gate: normalized + fail-closed, mirroring the JS normalizeStatus
+    -- contract where BOTH 'approved' and 'active' count as approved. NULL/'' fail
+    -- closed (SQL <> against a literal would evaluate NULL as unknown = not blocked).
+    if lower(trim(coalesce(v_row.status, ''))) not in ('approved', 'active')
       or coalesce(v_row.is_active, false) is not true
       or coalesce(v_row.remaining_credits, 0) <= 0
       or not v_has_active_package

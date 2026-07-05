@@ -1128,7 +1128,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                         onPlaceSelected={onAreaPlaceSelected}
                         onBlur={() => markTouched("area")}
                         placeholder="e.g. Kharadi, Baner"
-                        autoComplete="address-level2"
+                        // Pincode is not a QuickFurno location input: disable the
+                        // browser's address/postal autofill so it can never inject a
+                        // PIN suggestion into the Area / Locality field.
+                        autoComplete="off"
                       />
                       <ValidationIcon state={areaUi.iconState} />
                     </div>

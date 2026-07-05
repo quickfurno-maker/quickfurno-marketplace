@@ -70,6 +70,29 @@ const DEBOUNCE_MS = 300;
 const MIN_CHARS = 3;
 const MAX_SUGGESTIONS = 6;
 
+// ---- Display-only Indian PIN sanitizer -------------------------------------
+// QuickFurno does NOT use pincode as a location input or a suggestion UX signal.
+// An Indian PIN is a standalone 6-digit number beginning 1–9 (e.g. 411014,
+// 560001, 400001). These helpers are PRESENTATION-ONLY: they clean the text we
+// render / would populate. They never touch a prediction's placeId, coordinates,
+// session token, city validation or the normalized payload.
+const INDIAN_PIN_RE = /\b[1-9]\d{5}\b/g;
+
+/** True only when the trimmed text is nothing but a standalone Indian PIN. */
+function isPinOnly(text: string): boolean {
+  return /^[1-9]\d{5}$/.test(text.trim());
+}
+
+/** Remove standalone Indian PIN tokens and tidy the leftover separators. */
+function stripStandalonePins(text: string): string {
+  return text
+    .replace(INDIAN_PIN_RE, " ")
+    .replace(/\s*,\s*,\s*/g, ", ") // collapse an emptied "A, <pin>, B" gap
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s,]+|[\s,]+$/g, "") // trim dangling separators a removed PIN leaves
+    .trim();
+}
+
 export default function GooglePlaceAutocomplete({
   value,
   placeholder,
@@ -195,10 +218,16 @@ export default function GooglePlaceAutocomplete({
       .slice(0, MAX_SUGGESTIONS)
       .map((p, i) => ({
         id: p.placeId ?? `sugg-${i}`,
-        primary: p.mainText?.text ?? p.text?.text ?? "",
-        secondary: p.secondaryText?.text ?? "",
+        // Display-only PIN sanitizing (helpers above): strip standalone PIN codes
+        // from the rendered text — "Kharadi, Pune 411014" shows as "Kharadi, Pune".
+        // The prediction object is untouched, so toPlace()/fetchFields still
+        // resolves the true place id + coordinates on selection.
+        primary: stripStandalonePins(p.mainText?.text ?? p.text?.text ?? ""),
+        secondary: stripStandalonePins(p.secondaryText?.text ?? ""),
         prediction: p,
       }))
+      // Drop a suggestion whose primary is only a PIN: it collapses to "" above,
+      // so a bare pincode is never shown or selectable as a location choice.
       .filter((s) => s.primary.length > 0);
 
     setSuggestions(items);
@@ -242,7 +271,14 @@ export default function GooglePlaceAutocomplete({
       // fetchFields was in flight, this detail result is stale — do NOT apply it.
       if (version !== interactionVersionRef.current) return;
       const normalized = normalizeGooglePlace(place, modeRef.current);
-      onPlaceSelectedRef.current(normalized);
+      // Defensive UI guard: a Google selection must never populate Area / Locality
+      // with a bare PIN code. normalizeGooglePlace already omits postal_code, so for
+      // real data this is a no-op (safePlace === normalized); if a PIN-only area
+      // ever slipped through we null it out here. City, coordinates, placeId,
+      // formattedAddress and areaNormalized are all passed through untouched.
+      const safePlace: NormalizedGooglePlace =
+        normalized.area && isPinOnly(normalized.area) ? { ...normalized, area: null } : normalized;
+      onPlaceSelectedRef.current(safePlace);
     } catch {
       // fetchFields failed — the manually typed value stands; do nothing.
     } finally {

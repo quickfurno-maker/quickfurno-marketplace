@@ -14,6 +14,9 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { evaluateVendorEligibility, type VendorEligibility } from "../lib/vendors/vendorEligibility";
+// Phase 4: all wallet increases/adjustments go through the canonical atomic
+// primitive (no direct remaining_credits/total_credits writes from here).
+import { applyVendorCreditDelta, grantVendorCredits } from "./vendorCreditWalletService";
 
 const VENDOR_FIELDS =
   "id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, total_credits, remaining_credits, rating, completed_projects, is_active, public_visibility, paid_status, package_name, package_status, package_expires_at, created_at";
@@ -131,6 +134,8 @@ export interface UpdateCreditsInput {
   amount: number;
   reason?: string | null;
   updatedBy: string;
+  /** Optional idempotency key (same reference applies the change at most once). */
+  reference?: string | null;
 }
 
 export async function updateVendorCredits(
@@ -149,29 +154,30 @@ export async function updateVendorCredits(
     if (!row) return { ok: false, error: "Vendor not found.", code: "NOT_FOUND" };
 
     const before = Math.max(0, Math.round(Number(row.remaining_credits ?? 0)));
-    const currentTotal = Math.max(0, Math.round(Number(row.total_credits ?? 0)));
+    // Deterministic delta. NEVER clamps: an "add" removal (negative amount) that
+    // would go below zero is rejected by the RPC (INSUFFICIENT_CREDITS), not zeroed.
+    const delta = input.mode === "set" ? Math.max(0, amount) - before : amount;
+    const changeType = input.mode === "add" && delta > 0 ? "admin_credit_grant" : "manual_adjustment";
+    const reference = typeof input.reference === "string" && input.reference.trim() ? input.reference.trim() : null;
 
-    const after = input.mode === "set" ? Math.max(0, amount) : Math.max(0, before + amount);
-    const delta = after - before;
-    const changeType = input.mode === "set" ? "manual_set" : delta >= 0 ? "manual_add" : "manual_remove";
+    if (delta !== 0) {
+      const applied = await applyVendorCreditDelta({
+        vendorId: id,
+        delta,
+        changeType,
+        reason: input.reason ?? null,
+        referenceType: reference ? changeType : null,
+        referenceId: reference,
+        updatedBy: input.updatedBy,
+        allowNegative: false,
+      });
+      if (!applied.ok) {
+        return { ok: false, error: "Could not update credits (insufficient balance or wallet error).", code: "UPDATE_FAILED" };
+      }
+    }
 
-    const db = adminClient();
-    const { error: updateErr } = await db
-      .from("vendors")
-      .update({ remaining_credits: after, total_credits: Math.max(currentTotal, after) })
-      .eq("id", id);
-    if (updateErr) return { ok: false, error: "Could not update credits.", code: "UPDATE_FAILED" };
-
-    await insertCreditLog(id, {
-      changeType,
-      before,
-      delta,
-      after,
-      reason: input.reason ?? null,
-      updatedBy: input.updatedBy,
-    });
     await recomputeVisibility(id);
-    await bestEffortAudit("vendor.credits_updated", id, { before, delta, after, mode: input.mode, updatedBy: input.updatedBy });
+    await bestEffortAudit("vendor.credits_updated", id, { before, delta, mode: input.mode, changeType, updatedBy: input.updatedBy });
 
     const fresh = (await getVendorRow(id)) ?? row;
     return { ok: true, data: { ...fresh, id, eligibility: evaluateVendorEligibility(fresh) } };
@@ -220,24 +226,18 @@ export async function updateVendorPackage(
       .eq("id", id);
     if (updateErr) return { ok: false, error: "Could not update the package.", code: "UPDATE_FAILED" };
 
-    // Optionally top up credits along with the package change.
+    // Optionally top up credits along with the package change — via the canonical
+    // wallet primitive (positive grant; no direct remaining_credits write here).
     if (Number.isFinite(creditsToAdd) && creditsToAdd > 0) {
-      const before = Math.max(0, Math.round(Number(row.remaining_credits ?? 0)));
-      const currentTotal = Math.max(0, Math.round(Number(row.total_credits ?? 0)));
-      const after = before + creditsToAdd;
-      const { error: creditErr } = await db
-        .from("vendors")
-        .update({ remaining_credits: after, total_credits: Math.max(currentTotal, after) })
-        .eq("id", id);
-      if (!creditErr) {
-        await insertCreditLog(id, {
-          changeType: "package_credit",
-          before,
-          delta: creditsToAdd,
-          after,
-          reason: `Package credit (${input.packageStatus}${input.packageName ? `: ${input.packageName}` : ""})`,
-          updatedBy: input.updatedBy,
-        });
+      const grant = await grantVendorCredits({
+        vendorId: id,
+        amount: creditsToAdd,
+        changeType: "admin_credit_grant",
+        reason: `Package credit (${input.packageStatus}${input.packageName ? `: ${input.packageName}` : ""})`,
+        updatedBy: input.updatedBy,
+      });
+      if (!grant.ok) {
+        return { ok: false, error: "Could not add package credits.", code: "UPDATE_FAILED" };
       }
     }
 
@@ -302,25 +302,6 @@ export async function getVendorCreditLog(vendorId: string): Promise<ServiceResul
     return { ok: true, data: rows };
   } catch {
     return { ok: true, data: [] };
-  }
-}
-
-async function insertCreditLog(
-  vendorId: string,
-  input: { changeType: string; before: number; delta: number; after: number; reason: string | null; updatedBy: string },
-) {
-  try {
-    await adminClient().from("vendor_credit_logs").insert({
-      vendor_id: vendorId,
-      change_type: input.changeType,
-      credits_before: input.before,
-      credits_delta: input.delta,
-      credits_after: input.after,
-      reason: input.reason,
-      updated_by: input.updatedBy,
-    });
-  } catch {
-    // Log table optional; the credit balance update already succeeded.
   }
 }
 

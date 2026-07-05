@@ -1,122 +1,90 @@
 # PHASE 4 — QuickFurno Simple Credit-Wallet Vendor System
 
-> **Status: implemented (TS keystone) + migrations generated for review. NOT
-> applied, NOT committed, NOT deployed.** SQL is review-only; DB integration &
-> production E2E are pending (see §15).
+> **Status: NOT production-ready until live DB integration passes.** TS logic is
+> implemented + verified; all SQL is **migration-generated for review (not
+> applied)**; concurrency/atomicity/rollback are **integration-required**. Nothing
+> committed, pushed, deployed, or migrated.
 
-**One-sentence rule achieved:** *An approved and active vendor who is accepting
-leads, has at least one credit, and matches the client's city and category can
-receive an enquiry. No credit = no enquiry. One successful assignment = one credit.
-Maximum three successful vendors per lead. Packages only add credits; package
-status does not control matching.*
+**Rule:** *An approved and active vendor who is accepting leads, has ≥1 credit, and
+matches the client's city and category can receive an enquiry. No credit = no
+enquiry. One successful assignment = one credit. Max three successful vendors per
+lead. Packages only add credits; package status does not control matching.*
+
+## Status legend
+`[implemented]` = code merged & verified (typecheck/build/pure/static harness).
+`[migration-generated]` = SQL written for review, **not applied**.
+`[integration-required]` = correctness needs a staging DB E2E (see §E2E).
+`[deferred]` = explicitly out of this pass, documented.
 
 ---
 
-## 1. Previous complexity discovered
-- The live auto-assignment RPC (`assign_lead_to_paid_vendors_phase26a`) gated on
-  `v_has_active_package` — an **OR** of `vendor_packages` active rows **or**
-  `package_status in (active,trial)` **or** `paid_status in (paid,trial,active,…)`.
-  So `package_status=active` alone classified a vendor as commercially eligible
-  even with `paid_status=Unpaid`.
-- The TS matcher used `evaluateVendorContactAccessEligibility` → `classifyVendorCommercialType` which treats `package_status=active` **or** `paid_status=paid` as "paid".
-- Credit balance is written **directly** (`.update({remaining_credits})`) from
-  `services/vendorAdminService.ts` (admin grant + package top-up) with **no
-  idempotency reference**; `vendor_credit_logs` had no `lead_id`/`reference`.
-- Three assignment RPCs exist: `assign_lead_to_paid_vendors_phase26a` (auto),
-  `assign_lead_to_preferred_vendor` (client-selected), `assign_lead_to_vendors`
-  (admin/manual). The preferred path already ignores package/paid (credits-only).
-- The auto RPC **preselected 3** candidates (`limit v_max`) — a candidate losing
-  its last credit concurrently left the lead under-filled.
-- `accepting_leads` did not exist anywhere.
+## 1. Preflight blockers fixed
+| Finding | Fix | Status |
+|---|---|---|
+| Ledger CHECK rejected `lead_assignment_debit` (swallowed) | 00141 aligns `change_type` CHECK to Phase 4 + legacy types; 00142 ledger insert made **mandatory** (no catch) | `[migration-generated]` |
+| Wallet writers not wired | admin grant/adjust + package top-up routed through canonical primitive; refund + package-purchase boundaries added | `[implemented]` (TS) + `[migration-generated]` (00145) |
+| Preferred/manual RPCs missing `accepting_leads` | 00143 (preferred) + 00144 (manual) add `accepting_leads` | `[migration-generated]` |
+| Pool = 6 | `MAX_ASSIGNMENT_CANDIDATE_POOL = 20` in matcher + delivery (agree) | `[implemented]` |
+| `qf_apply_vendor_credit_delta` hardening | lock-first, idempotency-after-lock, no-clamp, cumulative `total_credits` | `[migration-generated]` |
 
-## 2. Final canonical business rules
-`APPROVED + ACTIVE + ACCEPTING_LEADS + credits ≥ 1 + CITY match + CATEGORY match`.
-Package purchase only adds credits. `paid_status`/`package_status`/`package_expires_at`/`vendor_packages` **do not** control automatic assignment.
+## 2. Canonical business rule
+`APPROVED + ACTIVE + ACCEPTING_LEADS + remaining_credits ≥ 1 + CITY + CATEGORY`.
+`paid_status`/`package_status`/`package_expires_at`/`vendor_packages` are **history-only**.
 
 ## 3. Authoritative fields
-| Meaning | Field |
-|---|---|
-| Account approval | `vendors.status` (normalized: pending/approved/suspended/rejected) |
-| Temporary availability | `vendors.accepting_leads` (new, default true) |
-| Wallet balance | `vendors.remaining_credits` (canonical; no second column) |
-| Credit audit | `vendor_credit_logs` (+ new `reference_type`/`reference_id`) |
-| Package purchase | `vendor_packages` / package columns — **history only** |
+Approval = `vendors.status`; availability = `vendors.accepting_leads` (default true);
+wallet = `vendors.remaining_credits`; ledger = `vendor_credit_logs` (+`reference_type`/`reference_id`).
 
 ## 4. Deprecated matching dependencies (kept, not deleted)
-`paid_status`, `package_status`, `package_expires_at`, `vendor_packages` active rows, `public_visibility` — **removed from automatic eligibility in both layers**; retained for legacy preview/badge/history. `evaluateVendorContactAccessEligibility` is now `@deprecated for automatic assignment` and no longer called by the matcher.
+`paid_status`, `package_status`, `package_expires_at`, `vendor_packages` active rows, `public_visibility` — removed from **automatic** eligibility in both layers. `evaluateVendorContactAccessEligibility` is `@deprecated for assignment` and unused by the matcher.
 
-## 5. Eligibility flow
-`evaluateVendorAutomaticLeadEligibility(vendor)` (new, in the zero-dependency
-`lib/vendors/vendorAutomaticEligibility.ts`, re-exported from `vendorEligibility.ts`)
-→ `{ eligible, reasons, accountStatus, isActive, acceptingLeads, credits, creditCost }`
-with reasons `vendor_not_approved | vendor_suspended | vendor_inactive | not_accepting_leads | no_credits`. The matcher applies city + category **separately** (unchanged Phase 2 semantics). The RPC gate (migration 142) is byte-for-byte the same contract.
+## 5. Eligibility flow `[implemented]`
+`evaluateVendorAutomaticLeadEligibility` (zero-dep `lib/vendors/vendorAutomaticEligibility.ts`) → reasons `vendor_not_approved|vendor_suspended|vendor_inactive|not_accepting_leads|no_credits`. The RPC gate (00142) is the same contract in SQL.
 
-## 6. Credit grant flow
-Canonical primitive `qf_apply_vendor_credit_delta(vendor, delta, change_type, reason, reference_type, reference_id, updated_by)` (migration 141): locks vendor, **idempotent** on `(reference_type, reference_id)`, updates `remaining_credits` + writes one ledger row. Admin grants / package purchases / refunds should route through it (wiring is a follow-on — see §13).
+## 6. Credit grant flow `[implemented]` + `[migration-generated]`
+Canonical primitive `qf_apply_vendor_credit_delta(vendor, delta, change_type, reason, reference_type, reference_id, updated_by, allow_negative)` (00141). TS boundary `services/vendorCreditWalletService.ts` (`applyVendorCreditDelta` / `grantVendorCredits` / `refundCreditForInvalidLead` / `grantCreditsForConfirmedPackagePurchase`). **Wired:** `vendorAdminService.updateVendorCredits` ("add" → `admin_credit_grant`, "set"/remove → `manual_adjustment`, optional idempotency `reference` from the credits API) and `updateVendorPackage` top-up → `admin_credit_grant`. No direct `remaining_credits`/`total_credits`/`vendor_credit_logs` writes remain in `vendorAdminService`.
 
-## 7. Assignment debit flow
-The debit stays **atomic inside** the assignment RPC (migration 142): conditional
-`remaining_credits - 1 WHERE remaining_credits >= 1`, one `lead_assignments` row,
-one ledger row `change_type=lead_assignment_debit, delta=-1, reference_type=lead_assignment, reference_id=<assignment id>` (closes the Phase 3A accounting-correlation gap). No `vendor_packages` decrement anymore.
+## 7. Assignment debit flow `[migration-generated]`
+Atomic inside 00142: conditional `remaining_credits - 1 WHERE remaining_credits >= 1`, one `lead_assignments` row, **MANDATORY** ledger row `change_type=lead_assignment_debit, reference_type=lead_assignment, reference_id=<assignment id>`. **No successful assignment debit without a successful ledger row** — a ledger failure rolls back the debit + assignment + lead status.
 
-## 8. Refund flow
-Append-only: a refund is a **new** `+1` ledger row (`invalid_lead_refund`) via
-`qf_apply_vendor_credit_delta`; the original `-1` debit is **never** deleted
-(harness CASE 14).
+## 8. Refund flow `[implemented]` (call site) + `[migration-generated]` (primitive)
+Append-only: `refundCreditForInvalidLead` grants `+1` via the primitive, `reference=(invalid_lead_refund, assignment id)`; the original `-1` is never deleted (idempotent — same reference refunds once).
 
-## 9. Atomic transaction behavior
-Unchanged safety: lead `FOR UPDATE` lock, duplicate/idempotency short-circuits,
-vendor `FOR UPDATE` lock, **conditional** credit decrement (two concurrent leads
-cannot both spend the same last credit), `unique(lead_id, vendor_id)` with credit
-rollback on race, search_path hardened, least-privilege grants. **RPC signature
-unchanged.**
+## 9. Atomic transaction behavior `[migration-generated]` / `[integration-required]`
+Auto RPC: lead lock, duplicate/idempotency short-circuits, vendor lock, conditional debit, `unique(lead,vendor)` rollback, mandatory ledger, max-3. Wallet primitive: **vendor lock FIRST, idempotency after lock** (concurrent duplicates serialize → exactly one mutation), **no silent clamp** (raises `INSUFFICIENT_CREDITS` unless `allow_negative`). Real atomicity/race behavior is `[integration-required]`.
 
-## 10. Maximum-3 successful fill behavior
-The RPC now iterates the **whole** deduped ranked pool and `exit when assigned ≥ least(configured, 3)` — stop after **3 SUCCESSFUL**, not preselect-3. The JS matcher passes a bounded ranked pool (`MAX_CANDIDATE_POOL = 6`, ordering unchanged) so a candidate that lost its last credit is skipped and the next fills the slot (harness CASE 12). Ranking (tier → distance → area affinity → fairness → rating → id) is untouched; distance stays ranking-only; area stays soft.
+## 10. Max-3 successful fill `[implemented]` (pool) + `[migration-generated]` (loop)
+Matcher passes a bounded ranked pool of **20** (ranking unchanged); 00142 iterates the whole deduped pool in JS order, skips failed transactional rechecks, and `exit when assigned ≥ 3`. Pure model verified (H13b/H14/H15).
 
-## 11. Migration details (all additive, reversible, **generated for review — not applied**)
-- `20260706000140_vendor_accepting_leads.sql` — `add column if not exists accepting_leads boolean not null default true` + index. Reverse: drop column.
-- `20260706000141_vendor_credit_wallet_rpc.sql` — ledger `reference_type`/`reference_id` + **partial unique index** (`where reference_id is not null`, safe on all-NULL history — no duplicate audit needed) + `qf_apply_vendor_credit_delta` primitive.
-- `20260706000142_credit_wallet_assignment_rpc.sql` — create-or-replace the auto RPC with the credit-wallet gate + fill-until-3 + assignment-correlated ledger. Requires 140 & 141 first. Reverse: re-apply `20260705000130`.
+## 11. Migration order (all additive, reversible, **not applied**)
+`00140` accepting_leads → `00141` ledger ref + change_type constraint + wallet primitive → `00142` auto RPC (mandatory ledger, fill-until-3) → `00143` preferred RPC + accepting_leads → `00144` manual RPC + accepting_leads → `00145` package-purchase idempotent grant. 00141 is a hard prerequisite of 00142 (constraint + reference columns).
 
-## 12. Test results
-- **Phase 4 harness** (`npm run test:phase4`): **26 passed, 0 failed** — CASES 1–8, 12, 14, 16, 17 `[pure]`; CASES 9, 10, 11, 13, 15, 18 `[static]`. Verification levels labeled honestly; DB/E2E cases not claimed as proven.
-- **Regression**: Phase 3A **52/52**, Phase 3B **58/58** (matcher + diagnostics changes caused no regression).
-- **typecheck**: pass. **build**: pass. **git diff --check**: clean.
+## 12. total_credits semantics (decision)
+**A — cumulative credits ever granted.** The primitive increments `total_credits` on **positive** deltas only (`+ greatest(p_delta,0)`); debits/negative adjustments never reduce it. It is **not** an eligibility field (only `remaining_credits` is spendable).
 
-## 13. Compatibility risks & follow-on wiring (deferred, documented)
-- **Forward-compatible & safe pre-apply:** the TS matcher swap does not newly block any currently-assignable vendor (all had credits+active+approved); end-to-end behavior only changes once migration 142 is applied. Passing a 6-pool to the *current* RPC degrades to top-3 (it reads only the first 3). `accepting_leads` defaults true.
-- **Not yet wired (needs DB integration, intentionally out of this turn):** routing `vendorAdminService.updateVendorCredits` / `updateVendorPackage` and package-purchase confirmation / invalid-lead refunds through `qf_apply_vendor_credit_delta` for idempotency; the preferred-vendor RPC + `assign_lead_to_vendors` (manual) do not yet check `accepting_leads` (they already enforce credits). These are enumerated for Phase 4-cont.
-- **Vendor/Admin dashboards:** intentionally untouched (no clean minimal change without UI edits, which are out of scope). Admin can already read status/credits/ledger; `accepting_leads` surfacing is a follow-on.
-- **Phase 3A diagnostics:** one necessary refinement (`selected_vendor_not_reflected_in_assignment` skips at max-3, since selected is now the pool). New anomaly codes (`assignment_while_not_accepting_leads`, etc.) require per-vendor state loading — deferred; diagnostics stays read-only.
+## 13. Ledger reference design (decision)
+`reference_type` + `reference_id`, **GLOBAL** partial unique index `(reference_type, reference_id) where reference_id is not null` (vendor_id intentionally excluded — every canonical reference id is a globally-unique entity id). References: `lead_assignment`+assignment id · `package_purchase`+payment/order id · `admin_credit_grant`+grant key · `invalid_lead_refund`+assignment/approval id · `manual_adjustment`+adjustment key.
 
-## 14. Exact n8n synchronization requirements for next phase
-See `docs/N8N_VENDOR_CREDIT_SYNC_CONTRACT.md`. Events: `vendor.approved`,
-`vendor.accepting_leads_changed`, `credits.granted`, `credits.debited`,
-`credits.refunded`, `credits.exhausted`, `package.purchase_confirmed`, each with
-`vendor_id`, `credit_balance`, `delta`, `reference_type/id`, `reason`, `timestamp`,
-`idempotency_key`. **No events emitted, no workflow/webhook changed in Phase 4.**
+## 14. Historical data `[implemented]` (read-only)
+`docs/PHASE4_HISTORICAL_CREDIT_AUDIT.sql` — SELECT-only audit (27 charged assignments / 16 negative rows). **No backfill** (old ledger has no assignment reference → non-deterministic). Phase 4 guarantee is forward-only.
 
-## 15. Production E2E plan (pending; not run)
-On an **isolated staging Supabase** (never prod): (1) apply migrations 140→141→142
-in order; (2) seed vendors covering CASES 1–7,16,17 and assert live RPC eligibility
-matches the TS helper; (3) two concurrent leads on a 1-credit vendor → exactly one
-assignment, one `-1` ledger, no negative balance; (4) 4-candidate pool with a
-concurrent credit exhaustion → exactly 3 assignments (CASE 12); (5) repeat the same
-assignment + same purchase reference → no double assignment/debit (CASES 11, 13);
-(6) invalid-lead refund → original `-1` retained + new `+1` (CASE 14); (7) Phase 3B
-retry on a waiting lead → matched, idempotent, no duplicate delivery. Only after
-this passes should production migration be scheduled.
+## 15. Test results (`npm run test:phase4`)
+**36 passed, 0 failed.** Eligibility CASES 1–8/16/17 `[pure]`; H1–H2 change-type constraint `[static]`; H3/H4 mandatory ledger / no-swallow `[static]`; H5/H6/H7 accepting_leads in auto/preferred/manual `[static]`; H8 preferred no package/paid `[static]`; H9/H10/H11 idempotent purchase/grant/refund `[static]`; H12 no-clamp `[static]`; H13/H13b/H14/H15 pool-20 + fill-until-3 + continue-to-later `[static]`+`[pure]`; H16/H17/H18 replay/delivery/whatsapp no-debit `[static]`; refund append-only `[pure]`. Regression: 3A **52/52**, 3B **58/58**. typecheck ✓, build ✓, `git diff --check` clean.
+
+## 16. Deferred / integration-required (honest)
+- `[integration-required]`: real transaction atomicity, concurrent matcher execution, RPC race behavior, DB-level uniqueness, and true rollback-on-ledger-failure — a pure/static harness does **not** prove these.
+- `[deferred]`: preferred/manual debits use `deduct_vendor_credit`, which writes **no** ledger row (documented in 00143) — canonical-ledger correlation for those paths is a follow-on migration. App-level package-purchase confirmation handler does not exist (order-intent only) — the TS boundary + DB `assign_package_to_vendor` (00145) are the go-forward; the future webhook call site is documented in `vendorCreditWalletService.ts`. Vendor/Admin dashboard UI intentionally untouched.
 
 ---
 
-## Git safety answers
-- **UI files changed?** No — no `components/*`, `app/*` pages, CSS, or Tailwind.
-- **Existing API contract changed?** No — no route handler was modified.
-- **Database RPC signature changed?** No — `assign_lead_to_paid_vendors_phase26a(uuid, uuid[])` keeps its signature (body only, in a review-only migration). `qf_apply_vendor_credit_delta` is **new/additive**.
-- **Webhook contract changed?** No — n8n untouched; contract is documentation only.
+## Change surface
+**Modified:** `services/leadMatchingEngine.ts`, `services/leadDeliveryService.ts`, `services/vendorAdminService.ts`, `app/api/admin/vendors/[id]/credits/route.ts`, `scripts/phase4-credit-wallet-harness.ts`, migrations `20260706000141`, `20260706000142`.
+**New:** `services/vendorCreditWalletService.ts`, `docs/PHASE4_HISTORICAL_CREDIT_AUDIT.sql`, migrations `20260706000143`, `20260706000144`, `20260706000145`.
+**New corrective migrations:** 00143 (preferred RPC), 00144 (manual RPC), 00145 (package purchase); 00141/00142 revised.
+**RPC signatures:** `assign_lead_to_paid_vendors_phase26a(uuid,uuid[])` unchanged; `assign_lead_to_preferred_vendor(uuid,uuid)` unchanged; `assign_lead_to_vendors(uuid,uuid[],boolean,text)` unchanged; `assign_package_to_vendor(uuid,uuid,uuid)` unchanged. **New:** `qf_apply_vendor_credit_delta(uuid,int,text,text,text,text,text,boolean)`.
+**API changes:** admin credits route accepts an **optional** `reference` (backward-compatible; no breaking change).
+**UI changes:** none.
+**Webhook changes:** none (n8n untouched; contract remains documentation-only).
 
-### Files
-**Modified (5):** `lib/vendors/vendorEligibility.ts`, `services/leadMatchingEngine.ts`, `services/leadDeliveryService.ts`, `services/leadProcessingDiagnosticsCore.ts`, `package.json`.
-**New (6):** `lib/vendors/vendorAutomaticEligibility.ts`, `scripts/phase4-credit-wallet-harness.ts`, `docs/N8N_VENDOR_CREDIT_SYNC_CONTRACT.md`, and migrations `20260706000140`, `20260706000141`, `20260706000142`.
-**Migrations created (3):** all additive/reversible, **generated for review — not applied.**
+## E2E plan (integration-required, not run)
+On an isolated staging Supabase, apply 00140→00145 in order, then: (a) assert live RPC eligibility == TS helper across CASES 1–7/16/17; (b) force a ledger failure and confirm the debit + assignment roll back; (c) 20-candidate pool with concurrent credit exhaustion → exactly 3 assignments; (d) replay assignment + same purchase/grant/refund reference → one mutation each; (e) manual over-remove → `INSUFFICIENT_CREDITS` (no clamp); (f) Phase 3B retry idempotent. Only then schedule production migration.

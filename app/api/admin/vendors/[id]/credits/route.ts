@@ -29,11 +29,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: "amount must be a number." }, { status: 400 });
   }
   const reason = typeof record.reason === "string" ? record.reason : null;
+  // Optional idempotency key (backward-compatible): same reference grants once.
+  const reference = typeof record.reference === "string" ? record.reference : null;
 
   const result = await updateVendorCredits(params.id, {
     mode,
     amount,
     reason,
+    reference,
     updatedBy: session.adminRole ?? "Superadmin",
   });
   if (!result.ok) {

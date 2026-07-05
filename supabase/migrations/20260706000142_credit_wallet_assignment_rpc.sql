@@ -15,8 +15,10 @@
 --     loses its last credit concurrently is skipped and the next one fills the slot.
 --   • DEBIT: credit wallet only (LEAD_CREDIT_COST = 1). No vendor_packages
 --     decrement (packages are purchase-history only in the wallet model).
---   • LEDGER: writes reference_type='lead_assignment', reference_id=assignment id
---     (closes the Phase 3A accounting-correlation gap).
+--   • LEDGER: MANDATORY (no catch) debit row with change_type='lead_assignment_debit',
+--     reference_type='lead_assignment', reference_id=assignment id. A ledger failure
+--     rolls back the debit + assignment (closes the Phase 3A accounting gap AND the
+--     preflight "swallowed check_violation" gap).
 -- UNCHANGED SAFETY: lead FOR UPDATE lock, duplicate/idempotency short-circuits,
 --   vendor FOR UPDATE lock, conditional credit decrement, unique(lead,vendor)
 --   rollback, max-3 cap, ranking/order preserved (input order = JS ranking).
@@ -131,19 +133,19 @@ begin
       continue;
     end;
 
-    -- Ledger debit, correlated to the assignment (closes Phase 3A accounting gap).
-    begin
-      insert into public.vendor_credit_logs (
-        vendor_id, change_type, credits_before, credits_delta, credits_after,
-        reason, updated_by, reference_type, reference_id
-      ) values (
-        v_vendor, 'lead_assignment_debit', v_before, -v_credit_cost, v_after,
-        'Automatic lead assignment', 'phase4_credit_wallet_matching',
-        'lead_assignment', v_assignment_id::text
-      );
-    exception when undefined_table or undefined_column or check_violation then
-      null; -- ledger is best-effort; the credit balance + assignment already committed
-    end;
+    -- MANDATORY ledger debit, correlated to the assignment. NO catch: if this row
+    -- cannot be written the ENTIRE transaction (credit decrement + assignment + lead
+    -- status) rolls back. Canonical rule: NO SUCCESSFUL ASSIGNMENT DEBIT WITHOUT A
+    -- SUCCESSFUL LEDGER ROW. (Requires 20260706000141 applied first: reference
+    -- columns + the change_type constraint that allows 'lead_assignment_debit'.)
+    insert into public.vendor_credit_logs (
+      vendor_id, change_type, credits_before, credits_delta, credits_after,
+      reason, updated_by, reference_type, reference_id
+    ) values (
+      v_vendor, 'lead_assignment_debit', v_before, -v_credit_cost, v_after,
+      'Automatic lead assignment', 'phase4_credit_wallet_matching',
+      'lead_assignment', v_assignment_id::text
+    );
 
     v_assigned_ids := v_assigned_ids || v_vendor;
     v_assigned := v_assigned || jsonb_build_array(jsonb_build_object(

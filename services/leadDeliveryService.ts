@@ -43,8 +43,9 @@ type VendorPreviewRow = {
 
 // Phase 4: the matcher passes a bounded RANKED candidate POOL (not just 3) so the
 // RPC can fill until 3 SUCCESSFUL assignments. This is a sanity bound only — the
-// RPC remains the authority that caps SUCCESSFUL assignments at max-3.
-const MAX_ASSIGNMENT_CANDIDATE_POOL = 6;
+// RPC remains the authority that caps SUCCESSFUL assignments at max-3. Must agree
+// with MAX_ASSIGNMENT_CANDIDATE_POOL in services/leadMatchingEngine.ts.
+const MAX_ASSIGNMENT_CANDIDATE_POOL = 20;
 
 export async function assignLeadToMatchedVendors(leadId: string, vendorIds: string[]): Promise<Result<LeadAssignmentDeliveryResult>> {
   try {

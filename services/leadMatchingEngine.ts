@@ -87,11 +87,12 @@ export type VendorMatchEvaluation = {
 
 const MAX_VENDOR_MATCHES = 3;
 // Phase 4 fill-until-3: pass a bounded RANKED candidate pool (ordering unchanged)
-// to the atomic RPC, which stops after MAX_VENDOR_MATCHES SUCCESSFUL assignments
-// even if a higher-ranked candidate loses its last credit concurrently. The RPC —
-// never this layer — enforces the max-3-successful cap atomically. Legacy RPCs that
-// only read the first 3 ids degrade safely to today's top-3 behavior.
-const MAX_CANDIDATE_POOL = 6;
+// to the atomic RPC, which iterates candidates in JS order, skips any that fail a
+// transactional recheck, and stops after MAX_VENDOR_MATCHES SUCCESSFUL assignments
+// (never more) even if higher-ranked candidates lose their last credit concurrently.
+// The RPC — never this layer — enforces the max-3-successful cap atomically. Must
+// agree with MAX_ASSIGNMENT_CANDIDATE_POOL in services/leadDeliveryService.ts.
+const MAX_ASSIGNMENT_CANDIDATE_POOL = 20;
 const VENDOR_PAGE_SIZE = 500;
 const MAX_VENDOR_SCAN = 5000;
 // Audit snapshots list per-vendor skip reasons up to this cap; reason counts
@@ -164,7 +165,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
 
     // Ranked candidate POOL (ordering unchanged). Recorded as selected_vendor_ids
     // so diagnostics keep `assigned ⊆ selected`; the RPC caps SUCCESSFUL at 3.
-    const selectedVendorIds = eligible.slice(0, MAX_CANDIDATE_POOL).map((vendor) => vendor.id);
+    const selectedVendorIds = eligible.slice(0, MAX_ASSIGNMENT_CANDIDATE_POOL).map((vendor) => vendor.id);
     // Audit-only: who was evaluated and why they were not selected. Eligible
     // vendors beyond the cap of 3 are recorded as max_vendor_cap_reached.
     const matchAudit = {
@@ -172,7 +173,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       matching_model_version: MATCHING_MODEL_VERSION,
       skipped,
       skipped_reason_counts: skippedReasonCounts,
-      max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_CANDIDATE_POOL).map((vendor) => vendor.id),
+      max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_ASSIGNMENT_CANDIDATE_POOL).map((vendor) => vendor.id),
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);

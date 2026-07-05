@@ -1,8 +1,21 @@
 // ============================================================================
 // QuickFurno - services/leadMatchingEngine.ts
 // Consent-gated paid/trial vendor matching for dashboard delivery.
+//
+// Phase 2: category-tier + distance-aware ranking.
+//   Quality gate (external) → commercial eligibility → city hard gate →
+//   category tier (0 exact/best, 1 same-parent fallback) → distance ranking →
+//   soft area affinity → fill max 3 (tier 0 before tier 1) → atomic RPC.
+// Distance/area are RANKING signals only — never eligibility cutoffs. Legacy
+// exact-area membership is NOT a hard filter here (or in the RPC).
 // ============================================================================
-import { evaluateVendorLeadAssignmentEligibility } from "../lib/vendors/vendorEligibility";
+import { evaluateVendorContactAccessEligibility } from "../lib/vendors/vendorEligibility";
+import {
+  getParentCategoryGroup,
+  isLeadVendorCategoryCompatible,
+  vendorMatchesParentGroup,
+} from "../lib/vendors/categoryMatching";
+import { haversineKm, isValidCoordinate } from "../lib/geo/distance";
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
 import {
@@ -25,9 +38,13 @@ export type LeadForMatching = {
   budget?: string | null;
   timeline?: string | null;
   message?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   share_consent?: boolean | null;
   is_duplicate?: boolean | null;
 };
+
+export type CoordinateSource = "office_coordinates" | "legacy_coordinates" | "none";
 
 export type EligibleMatchedVendor = {
   id: string;
@@ -36,6 +53,15 @@ export type EligibleMatchedVendor = {
   packageStatus: string;
   visibilityType: string;
   business_name?: string | null;
+  // Phase 2 ranking + audit fields.
+  match_tier: 0 | 1;
+  match_type: string;
+  distance_km: number | null;
+  has_coordinates: boolean;
+  coordinate_source: CoordinateSource;
+  area_affinity: number;
+  rank_reason: string;
+  rank_position?: number;
 };
 
 export type AutoLeadMatchingResult = {
@@ -72,7 +98,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     const db = adminClient();
     const { data: lead, error: leadError } = await db
       .from("leads")
-      .select("id, name, phone, city, area, service_required, category, subcategory, budget, timeline, message, share_consent, is_duplicate")
+      .select("id, name, phone, city, area, service_required, category, subcategory, budget, timeline, message, latitude, longitude, share_consent, is_duplicate")
       .eq("id", leadId)
       .maybeSingle();
     if (leadError) throw leadError;
@@ -245,50 +271,101 @@ export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Res
       }
     }
 
-    const eligible: EligibleMatchedVendor[] = [];
-    const skipped: SkippedVendorAudit[] = [];
-    const skippedReasonCounts: Record<string, number> = {};
-
-    for (const vendor of rows) {
-      const id = asText(vendor.id);
-      if (!id) continue;
-
-      const eligibility = evaluateVendorLeadAssignmentEligibility(vendor, lead as Record<string, unknown>, {
-        allow_trial_vendors_for_assignment: true,
-      });
-      const reasons = [...eligibility.reasons];
-      if (eligibility.eligible && !serviceAreaMatches(vendor, lead)) reasons.push("service_area_mismatch");
-
-      if (reasons.length > 0) {
-        for (const reason of reasons) {
-          skippedReasonCounts[reason] = (skippedReasonCounts[reason] ?? 0) + 1;
-        }
-        if (skipped.length < MAX_SKIPPED_AUDIT_ENTRIES) {
-          skipped.push({ vendor_id: id, business_name: asText(vendor.business_name), reasons });
-        }
-        continue;
-      }
-
-      eligible.push({
-        id,
-        business_name: asText(vendor.business_name),
-        score: scoreVendor(vendor, lead, eligibility.visibilityType),
-        credits: eligibility.credits,
-        packageStatus: eligibility.packageStatus,
-        visibilityType: eligibility.visibilityType ?? "paid",
-      });
-    }
-
-    eligible.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      if (b.credits !== a.credits) return b.credits - a.credits;
-      return a.id.localeCompare(b.id);
-    });
-
-    return ok({ eligible, skipped, skippedReasonCounts });
+    return ok(rankVendorsForLead(lead, rows));
   } catch (e) {
     return fail(e);
   }
+}
+
+/**
+ * PURE ranking: given a lead and a set of vendor rows, classify commercial
+ * eligibility → city hard gate → category tier → distance/area, then rank per the
+ * approved order and fill (the caller applies max-3). No I/O — deterministic and
+ * unit-testable. Returns the SAME shape as evaluateVendorsForLead.
+ */
+export function rankVendorsForLead(
+  lead: LeadForMatching,
+  rows: Array<Record<string, unknown>>,
+): VendorMatchEvaluation {
+  const eligible: RankableCandidate[] = [];
+  const skipped: SkippedVendorAudit[] = [];
+  const skippedReasonCounts: Record<string, number> = {};
+
+  // Lead-level context computed once. Distance is only computable when the LEAD
+  // has coordinates; manual leads rank by tier + soft area affinity + fairness.
+  const leadHasCoords = isValidCoordinate(lead.latitude, lead.longitude);
+  const leadParentGroup = getParentCategoryGroup([lead.subcategory, lead.service_required, lead.category]);
+
+  for (const vendor of rows) {
+    const id = asText(vendor.id);
+    if (!id) continue;
+
+    // Commercial eligibility ONLY (status/active/paid-or-trial/credits). City and
+    // category are gated below so we can distinguish Tier 0 vs Tier 1 fallback.
+    const commercial = evaluateVendorContactAccessEligibility(vendor, {
+      allow_trial_vendors_for_assignment: true,
+    });
+    const reasons = [...commercial.reasons];
+
+    // City HARD gate — normalized text comparison (not exact-case).
+    if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");
+
+    // Category tier: 0 = exact/synonym/subcategory (best), 1 = same parent group
+    // fallback. Neither → not category compatible (hard reject).
+    const tierResult = classifyCategoryTier(lead, vendor, leadParentGroup);
+    if (tierResult === null) reasons.push("category_mismatch");
+
+    if (reasons.length > 0) {
+      for (const reason of reasons) {
+        skippedReasonCounts[reason] = (skippedReasonCounts[reason] ?? 0) + 1;
+      }
+      if (skipped.length < MAX_SKIPPED_AUDIT_ENTRIES) {
+        skipped.push({ vendor_id: id, business_name: asText(vendor.business_name), reasons });
+      }
+      continue;
+    }
+
+    const { tier, matchType } = tierResult!;
+    const coords = resolveVendorCoordinates(vendor);
+    const hasCoordinates = coords.source !== "none";
+    const distanceKm = leadHasCoords && hasCoordinates
+      ? haversineKm(lead.latitude, lead.longitude, coords.lat, coords.lng)
+      : null;
+    const areaAffinity = computeAreaAffinity(vendor, lead);
+
+    eligible.push({
+      id,
+      business_name: asText(vendor.business_name),
+      // Informational only (NOT used for ranking); ranking uses the comparator below.
+      score: scoreVendor(vendor, lead, commercial.visibilityType),
+      credits: commercial.credits,
+      packageStatus: commercial.packageStatus,
+      visibilityType: commercial.visibilityType ?? "paid",
+      match_tier: tier,
+      match_type: matchType,
+      distance_km: distanceKm,
+      has_coordinates: hasCoordinates,
+      coordinate_source: coords.source,
+      area_affinity: areaAffinity,
+      rank_reason: "",
+      __lastAssignedAt: asText(vendor.last_assigned_at),
+      __rating: Number.isFinite(Number(vendor.rating)) ? Number(vendor.rating) : 0,
+    });
+  }
+
+  // Rank: category tier first (0 before 1), then distance-aware ordering, then
+  // soft area affinity, fairness (last_assigned_at asc, nulls first), rating, id.
+  eligible.sort((a, b) => compareCandidates(a, b, leadHasCoords));
+
+  // Finalize audit: rank position + human reason; strip internal sort-only fields.
+  eligible.forEach((vendor, index) => {
+    vendor.rank_position = index + 1;
+    vendor.rank_reason = buildRankReason(vendor, leadHasCoords);
+    delete (vendor as Record<string, unknown>).__lastAssignedAt;
+    delete (vendor as Record<string, unknown>).__rating;
+  });
+
+  return { eligible, skipped, skippedReasonCounts };
 }
 
 export { assignLeadToMatchedVendors } from "./leadDeliveryService";
@@ -337,14 +414,86 @@ function summarizeLead(lead: LeadForMatching) {
   };
 }
 
-function serviceAreaMatches(vendor: Record<string, unknown>, lead: LeadForMatching) {
-  if (vendor.covers_full_city === true) return true;
+// City HARD gate — normalized comparison across the city/office_city aliases. A
+// vendor with no city cannot confirm a match, so it is rejected defensively.
+function cityMatches(vendor: Record<string, unknown>, lead: LeadForMatching): boolean {
+  const leadCity = normalize(lead.city);
+  const vendorCity = normalize(vendor.city) || normalize(vendor.office_city);
+  if (!leadCity) return true; // no lead city to gate on (never happens for real leads)
+  return Boolean(vendorCity) && vendorCity === leadCity;
+}
+
+// Category tier classification (reuses the shared canonical/parent-group contract):
+//   Tier 0 — exact / synonym / subcategory (isLeadVendorCategoryCompatible)
+//   Tier 1 — same parent category group fallback (getParentCategoryGroup)
+// Returns null when the vendor is NOT category-compatible at all.
+function classifyCategoryTier(
+  lead: LeadForMatching,
+  vendor: Record<string, unknown>,
+  leadParentGroup: string,
+): { tier: 0 | 1; matchType: string } | null {
+  const compat = isLeadVendorCategoryCompatible(lead as Record<string, unknown>, vendor);
+  if (compat.compatible) return { tier: 0, matchType: compat.matchType };
+  if (vendorMatchesParentGroup(vendor, leadParentGroup)) {
+    return { tier: 1, matchType: "parent_group_fallback" };
+  }
+  return null;
+}
+
+// Vendor coordinate priority: office_latitude/longitude → legacy latitude/longitude.
+function resolveVendorCoordinates(vendor: Record<string, unknown>): {
+  lat: number | null;
+  lng: number | null;
+  source: CoordinateSource;
+} {
+  const oLat = Number(vendor.office_latitude);
+  const oLng = Number(vendor.office_longitude);
+  if (isValidCoordinate(oLat, oLng)) return { lat: oLat, lng: oLng, source: "office_coordinates" };
+  const lLat = Number(vendor.latitude);
+  const lLng = Number(vendor.longitude);
+  if (isValidCoordinate(lLat, lLng)) return { lat: lLat, lng: lLng, source: "legacy_coordinates" };
+  return { lat: null, lng: null, source: "none" };
+}
+
+// SOFT area affinity (ranking only, never eligibility): exact listed-area match = 1,
+// covers_full_city = 0.5, otherwise 0. Legacy areas_covered is compatibility data.
+function computeAreaAffinity(vendor: Record<string, unknown>, lead: LeadForMatching): number {
   const leadArea = normalize(lead.area);
-  const areas = Array.isArray(vendor.areas_covered)
-    ? vendor.areas_covered.map(normalize).filter(Boolean)
-    : [];
-  if (!leadArea || areas.length === 0) return true;
-  return areas.includes(leadArea);
+  if (!leadArea) return 0;
+  const areas = Array.isArray(vendor.areas_covered) ? vendor.areas_covered.map(normalize).filter(Boolean) : [];
+  if (areas.includes(leadArea)) return 1;
+  if (vendor.covers_full_city === true) return 0.5;
+  return 0;
+}
+
+type RankableCandidate = EligibleMatchedVendor & { __lastAssignedAt: string | null; __rating: number };
+
+// Approved order: category_tier ASC, has_coordinates DESC, distance_km ASC,
+// area_affinity DESC, last_assigned_at ASC (nulls first), rating DESC, id ASC.
+// Coordinate/distance keys apply only when the LEAD has coordinates.
+function compareCandidates(a: RankableCandidate, b: RankableCandidate, leadHasCoords: boolean): number {
+  if (a.match_tier !== b.match_tier) return a.match_tier - b.match_tier;
+  if (leadHasCoords) {
+    if (a.has_coordinates !== b.has_coordinates) return a.has_coordinates ? -1 : 1;
+    const ad = a.distance_km ?? Number.POSITIVE_INFINITY;
+    const bd = b.distance_km ?? Number.POSITIVE_INFINITY;
+    if (ad !== bd) return ad - bd;
+  }
+  if (a.area_affinity !== b.area_affinity) return b.area_affinity - a.area_affinity;
+  const at = a.__lastAssignedAt ? Date.parse(a.__lastAssignedAt) : Number.NEGATIVE_INFINITY;
+  const bt = b.__lastAssignedAt ? Date.parse(b.__lastAssignedAt) : Number.NEGATIVE_INFINITY;
+  if (at !== bt) return at - bt; // never-assigned (nulls) first for fairness
+  if (a.__rating !== b.__rating) return b.__rating - a.__rating;
+  return a.id.localeCompare(b.id);
+}
+
+function buildRankReason(vendor: EligibleMatchedVendor, leadHasCoords: boolean): string {
+  const parts = [`tier${vendor.match_tier}:${vendor.match_type}`];
+  if (leadHasCoords && vendor.distance_km != null) parts.push(`${vendor.distance_km}km`);
+  else if (leadHasCoords && !vendor.has_coordinates) parts.push("no_vendor_coords");
+  else if (!leadHasCoords) parts.push("no_lead_coords");
+  if (vendor.area_affinity > 0) parts.push(`area_affinity:${vendor.area_affinity}`);
+  return parts.join(" | ");
 }
 
 function scoreVendor(vendor: Record<string, unknown>, lead: LeadForMatching, visibilityType?: string) {

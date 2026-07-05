@@ -8,9 +8,18 @@
 //
 // Quality V2 scoring and the Phase 2 matcher are REUSED verbatim by the services
 // (not re-implemented), so the harness validates the NEW Phase 3B surface: input
-// reconstruction, decision comparison, the retry gate/precondition, matcher-status
-// mapping, rescore↔retry separation, and the read/write boundary. Run with:
-//   node scripts/phase3b-recovery-harness.ts
+// reconstruction, decision comparison, the retry gate/precondition + fail-closed
+// consistency, matcher-status mapping, delivery-reuse rule, rescore↔retry
+// separation, and static read/write boundaries.
+//
+// HONEST SCOPE — what this pure harness PROVES: reconstruction, comparison,
+//   consistency contract, gate/precondition classification, status normalization,
+//   the delivery-suppression rule, separation, static write boundaries, and
+//   diagnostic fixture transitions.
+// What it DOES NOT prove (requires a controlled DB E2E, not this harness): real
+//   DB transaction atomicity, real concurrent matcher execution, real RPC race
+//   behavior, and real database-level delivery uniqueness. Those are NOT claimed.
+// Run with:  node scripts/phase3b-recovery-harness.ts
 // ============================================================================
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -31,7 +40,16 @@ const recovery = (await import(recoveryUrl)) as typeof import("../services/leadQ
 const diagUrl = new URL("../services/leadProcessingDiagnosticsCore.ts", import.meta.url).href;
 const diag = (await import(diagUrl)) as typeof import("../services/leadProcessingDiagnosticsCore");
 
-const { buildRescoreQualityInput, summarizeRescoreComparison, evaluateRetryQualityGate, classifyRetryPrecondition, mapMatcherStatusToRetryStatus } = recovery;
+const {
+  buildRescoreQualityInput,
+  summarizeRescoreComparison,
+  evaluateRetryQualityGate,
+  classifyRetryPrecondition,
+  mapMatcherStatusToRetryStatus,
+  qualityDecisionsConsistent,
+  rescoreReadbackConsistent,
+  deliverySuppressedForAssignmentStatus,
+} = recovery;
 const { composeLeadDiagnostic } = diag;
 
 // ---- assertion framework ---------------------------------------------------
@@ -178,38 +196,38 @@ console.log("QuickFurno Phase 3B — recovery harness\n");
 }
 
 // B8 — valid A lead, no assignments → proceed.
-check("B8 proceed (A, no assignments)", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 0 }) === "proceed");
+check("B8 proceed (A, no assignments)", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 0 }) === "proceed");
 
 // B9 — B lead → quality_gate_hold.
 {
   const gate = evaluateRetryQualityGate({ score: 66, class: "B", status: null, hard_block_reason: null, recommended_action: "clarification_required", score_model_version: null });
   check("B9 gate not passed for B", gate.passed === false);
-  check("B9 quality_gate_hold", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: gate.passed, assignmentCount: 0 }) === "quality_gate_hold");
+  check("B9 quality_gate_hold", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: gate.passed, assignmentCount: 0 }) === "quality_gate_hold");
 }
 
 // B10 — duplicate lead → duplicate_lead.
-check("B10 duplicate_lead", classifyRetryPrecondition({ leadExists: true, isDuplicate: true, gatePassed: true, assignmentCount: 0 }) === "duplicate_lead");
+check("B10 duplicate_lead", classifyRetryPrecondition({ leadExists: true, isDuplicate: true, qualityConsistent: true, gatePassed: true, assignmentCount: 0 }) === "duplicate_lead");
 
 // B11 — already-assigned lead → already_assigned (matcher NOT invoked).
-check("B11 already_assigned", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 2 }) === "already_assigned");
+check("B11 already_assigned", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 2 }) === "already_assigned");
 
 // B12 — waiting lead retry → proceed; matcher status maps through.
 {
-  check("B12 proceed for waiting lead (0 assignments)", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 0 }) === "proceed");
+  check("B12 proceed for waiting lead (0 assignments)", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 0 }) === "proceed");
   check("B12 map matched", mapMatcherStatusToRetryStatus("matched") === "matched");
   check("B12 map waiting", mapMatcherStatusToRetryStatus("waiting") === "waiting");
 }
 
 // B13 — repeated retry: first proceeds, second already_assigned.
 {
-  check("B13 first retry proceeds", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 0 }) === "proceed");
-  check("B13 second retry already_assigned", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 2 }) === "already_assigned");
+  check("B13 first retry proceeds", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 0 }) === "proceed");
+  check("B13 second retry already_assigned", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 2 }) === "already_assigned");
 }
 
 // B14 — concurrent retry model: both may observe 0 (Layer 1 TOCTOU); Layer 2 (RPC) protects.
 {
-  const a = classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 0 });
-  const b = classifyRetryPrecondition({ leadExists: true, isDuplicate: false, gatePassed: true, assignmentCount: 0 });
+  const a = classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 0 });
+  const b = classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 0 });
   check("B14 both attempts may proceed (Layer 1 is best-effort)", a === "proceed" && b === "proceed");
   const retrySrc = stripComments(readSource("../services/leadProcessingRecoveryService.ts"));
   check("B14 retry has no direct credit/package write (relies on RPC idempotency)", !/vendor_credit_logs|vendor_packages/.test(retrySrc) && !/\.(insert|update|delete|upsert|rpc)\s*\(/.test(retrySrc));
@@ -289,6 +307,70 @@ check("B11 already_assigned", classifyRetryPrecondition({ leadExists: true, isDu
   check("Boundary retry: no direct credit/package writes", !/vendor_credit_logs|vendor_packages/.test(retrySrc));
   check("Boundary core: pure (no write calls)", !writeCall.test(coreSrc));
 }
+
+// ============================================================================
+// Correction-pass coverage (C1–C10).
+// ============================================================================
+const dc = (score: number | null, cls: string | null, action: string | null, hard: string | null) => ({ score, class: cls, recommended_action: action, hard_block_reason: hard });
+
+// C1 — score/mirror consistent → retry gate may proceed.
+{
+  const consistent = qualityDecisionsConsistent(dc(76, "A", "auto_distribute", null), dc(76, "A", "auto_distribute", null));
+  check("C1 consistent decisions", consistent === true);
+  check("C1 proceed when consistent + gate passes", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: consistent, gatePassed: true, assignmentCount: 0 }) === "proceed");
+}
+
+// C2 — score/mirror mismatch → quality_state_inconsistent.
+{
+  const consistent = qualityDecisionsConsistent(dc(76, "A", "auto_distribute", null), dc(66, "B", "clarification_required", null));
+  check("C2 mismatch detected", consistent === false);
+  check("C2 quality_state_inconsistent", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: consistent, gatePassed: true, assignmentCount: 0 }) === "quality_state_inconsistent");
+}
+
+// C3 — score exists but mirror missing → inconsistent.
+{
+  const consistent = qualityDecisionsConsistent(dc(76, "A", "auto_distribute", null), dc(null, null, null, null));
+  check("C3 score-present / mirror-missing is inconsistent", consistent === false);
+  check("C3 quality_state_inconsistent", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: consistent, gatePassed: true, assignmentCount: 0 }) === "quality_state_inconsistent");
+}
+
+// C4 — mirror exists but score missing → inconsistent.
+{
+  const consistent = qualityDecisionsConsistent(dc(null, null, null, null), dc(76, "A", "auto_distribute", null));
+  check("C4 mirror-present / score-missing is inconsistent", consistent === false);
+  check("C4 quality_state_inconsistent", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: consistent, gatePassed: false, assignmentCount: 0 }) === "quality_state_inconsistent");
+}
+
+// C5 — rescore post-readback consistent → success (all three sides agree).
+{
+  const ok = rescoreReadbackConsistent(dc(76, "A", "auto_distribute", null), dc(76, "A", "auto_distribute", null), dc(76, "A", "auto_distribute", null));
+  check("C5 readback consistent → true", ok === true);
+}
+
+// C6 — rescore post-readback inconsistent → safe failure (mirror drifted).
+{
+  const ok = rescoreReadbackConsistent(dc(76, "A", "auto_distribute", null), dc(66, "B", "clarification_required", null), dc(76, "A", "auto_distribute", null));
+  check("C6 readback inconsistent → false (service returns QUALITY_STATE_INCONSISTENT)", ok === false);
+}
+
+// C7 — assignment RPC status "ok" → delivery side effects allowed.
+check("C7 delivery allowed for status ok", deliverySuppressedForAssignmentStatus("ok") === false);
+
+// C8 — assignment RPC status "already_assigned" → delivery side effects suppressed.
+check("C8 delivery suppressed for already_assigned", deliverySuppressedForAssignmentStatus("already_assigned") === true);
+
+// C9 — matcher's already_assigned guard suppresses delivery yet returns existing IDs.
+{
+  const src = readSource("../services/leadMatchingEngine.ts");
+  const guardIdx = src.indexOf('assignment.data.status === "already_assigned"');
+  const deliverIdx = src.indexOf("deliverLeadToVendorDashboard(");
+  check("C9 already_assigned guard exists", guardIdx >= 0);
+  check("C9 guard precedes delivery loop (delivery suppressed)", guardIdx >= 0 && deliverIdx >= 0 && guardIdx < deliverIdx);
+  check("C9 guard marks assignment_reused + returns existing assigned vendors", /assignment_reused:\s*true/.test(src) && /assignedVendors:\s*assigned/.test(src));
+}
+
+// C10 — sequential retry: assignmentCount > 0 → matcher not invoked.
+check("C10 already_assigned (no matcher) when assignments exist", classifyRetryPrecondition({ leadExists: true, isDuplicate: false, qualityConsistent: true, gatePassed: true, assignmentCount: 1 }) === "already_assigned");
 
 // ---- summary ---------------------------------------------------------------
 console.log(`\n${passed} passed, ${failed} failed`);

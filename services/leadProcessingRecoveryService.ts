@@ -25,6 +25,8 @@ import {
   classifyRetryPrecondition,
   evaluateRetryQualityGate,
   mapMatcherStatusToRetryStatus,
+  qualityDecisionsConsistent,
+  type QualityDecisionForCompare,
   type RecoveryErrorCode,
   type RecoveryQualityDecision,
   type RetryLeadMatchingResult,
@@ -47,10 +49,15 @@ export async function retryLeadMatchingAfterQualityPass(leadId: string): Promise
   try {
     const db = adminClient();
 
-    // Minimal reads: duplicate flag, deterministic latest quality decision, and the
-    // ACTUAL assignment count (head-only, no rows). No vendor/log scans.
+    // Minimal reads: duplicate flag + leads quality MIRROR, deterministic latest
+    // lead_scores decision, and the ACTUAL assignment count (head-only, no rows).
+    // No vendor/log scans.
     const [leadRes, scoreRes, assignRes] = await Promise.all([
-      db.from("leads").select("id, is_duplicate").eq("id", id).maybeSingle(),
+      db
+        .from("leads")
+        .select("id, is_duplicate, lead_quality_score, lead_quality_class, lead_quality_hard_block_reason, lead_quality_recommended_action")
+        .eq("id", id)
+        .maybeSingle(),
       db
         .from("lead_scores")
         .select("total_score, score_class, hard_block_reason, recommended_action, created_at, id")
@@ -63,10 +70,19 @@ export async function retryLeadMatchingAfterQualityPass(leadId: string): Promise
 
     if (leadRes.error && !isMissingRelationError(leadRes.error)) throw leadRes.error;
 
-    const leadRow = leadRes.data as { id?: string | null; is_duplicate?: boolean | null } | null;
+    const leadRow = leadRes.data as {
+      id?: string | null;
+      is_duplicate?: boolean | null;
+      lead_quality_score?: number | null;
+      lead_quality_class?: string | null;
+      lead_quality_hard_block_reason?: string | null;
+      lead_quality_recommended_action?: string | null;
+    } | null;
     const leadExists = Boolean(leadRow?.id);
     const isDuplicate = leadRow?.is_duplicate === true;
 
+    // Deterministic latest score is the AUTHORITATIVE quality decision (also used by
+    // Phase 3A). Never trust lead.status as quality truth.
     const latest = firstScoreRow(scoreRes);
     const decision: RecoveryQualityDecision = {
       score: numOrNull(latest?.total_score),
@@ -77,9 +93,26 @@ export async function retryLeadMatchingAfterQualityPass(leadId: string): Promise
       score_model_version: null,
     };
     const gate = evaluateRetryQualityGate(decision);
+
+    // Correction 1 — fail-closed quality-state consistency: the latest score
+    // decision must match the leads mirror before we ever reach the gate/matcher.
+    const scoreSide: QualityDecisionForCompare = {
+      score: decision.score,
+      class: decision.class,
+      recommended_action: decision.recommended_action,
+      hard_block_reason: decision.hard_block_reason,
+    };
+    const mirrorSide: QualityDecisionForCompare = {
+      score: numOrNull(leadRow?.lead_quality_score),
+      class: strOrNull(leadRow?.lead_quality_class),
+      recommended_action: strOrNull(leadRow?.lead_quality_recommended_action),
+      hard_block_reason: strOrNull(leadRow?.lead_quality_hard_block_reason),
+    };
+    const qualityConsistent = qualityDecisionsConsistent(scoreSide, mirrorSide);
+
     const assignmentCount = assignRes.count ?? 0;
 
-    const pre = classifyRetryPrecondition({ leadExists, isDuplicate, gatePassed: gate.passed, assignmentCount });
+    const pre = classifyRetryPrecondition({ leadExists, isDuplicate, qualityConsistent, gatePassed: gate.passed, assignmentCount });
 
     if (pre === "lead_not_found") return failure("LEAD_NOT_FOUND", "Lead not found.");
 

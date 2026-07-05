@@ -199,6 +199,39 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     }
 
     const assigned = assignment.data.assigned.slice(0, MAX_VENDOR_MATCHES);
+
+    // Concurrent-retry safety (Phase 3B correction): the RPC returns
+    // status = "already_assigned" when this lead's assignments already exist (its
+    // idempotent short-circuit / a race with another retry). Those assignments —
+    // and their delivery/preview logs — were already created by the original run,
+    // so DO NOT recreate delivery side effects (dashboard / whatsapp_preview /
+    // client preview). Record a truthful terminal run and return the EXISTING
+    // assigned vendors. Ranking, selection, max-3, the RPC, and credits are unchanged.
+    if (assignment.data.status === "already_assigned") {
+      await updateMatchingRun(runId, {
+        run_status: "matched",
+        eligible_vendor_count: eligible.length,
+        selected_vendor_ids: selectedVendorIds,
+        assigned_vendor_ids: assigned.map((vendor) => vendor.vendor_id),
+        failure_reason: null,
+        matching_snapshot: {
+          lead: summarizeLead(leadRow),
+          selected: selectedVendorIds,
+          eligible,
+          ...matchAudit,
+          assignment: assignment.data,
+          assignment_reused: true,
+        },
+      });
+      return ok({
+        leadId,
+        status: "matched",
+        eligibleVendorCount: eligible.length,
+        selectedVendorIds,
+        assignedVendors: assigned,
+      });
+    }
+
     if (assigned.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
       await updateMatchingRun(runId, {

@@ -24,18 +24,26 @@ export type RecoveryErrorCode =
   | "VALIDATION"
   | "LEAD_NOT_FOUND"
   | "QUALITY_RESCORE_FAILED"
+  | "QUALITY_STATE_INCONSISTENT"
   | "MATCHING_FAILED";
 
 export type RetryStatus =
   | "already_assigned"
   | "quality_gate_hold"
+  | "quality_state_inconsistent"
   | "duplicate_lead"
   | "lead_not_found"
   | "matched"
   | "waiting"
   | "failed";
 
-export type RetryPrecondition = "lead_not_found" | "duplicate_lead" | "quality_gate_hold" | "already_assigned" | "proceed";
+export type RetryPrecondition =
+  | "lead_not_found"
+  | "duplicate_lead"
+  | "quality_state_inconsistent"
+  | "quality_gate_hold"
+  | "already_assigned"
+  | "proceed";
 
 /** Loose stored-lead shape read by the recovery services (mirrors public.leads). */
 export interface RecoveryLeadRow {
@@ -213,21 +221,70 @@ export function evaluateRetryQualityGate(decision: RecoveryQualityDecision): Ret
 
 /**
  * The explicit retry decision, in the required order:
- *   missing → duplicate → quality gate → already-assigned → proceed.
+ *   missing → duplicate → quality-state consistency → quality gate →
+ *   already-assigned → proceed.
+ * The consistency check (fail-closed) is BEFORE the gate: a lead whose latest
+ * lead_scores decision disagrees with its leads mirror is held, not matched.
  * `already_assigned` is decided from ACTUAL lead_assignments count (Layer 1);
  * the DB RPC provides Layer 2 idempotency under races.
  */
 export function classifyRetryPrecondition(input: {
   leadExists: boolean;
   isDuplicate: boolean;
+  qualityConsistent: boolean;
   gatePassed: boolean;
   assignmentCount: number;
 }): RetryPrecondition {
   if (!input.leadExists) return "lead_not_found";
   if (input.isDuplicate) return "duplicate_lead";
+  if (!input.qualityConsistent) return "quality_state_inconsistent";
   if (!input.gatePassed) return "quality_gate_hold";
   if (input.assignmentCount > 0) return "already_assigned";
   return "proceed";
+}
+
+// ---------------------------------------------------------------------------
+// Correction pass — quality-state consistency (fail-closed) + delivery reuse.
+// ---------------------------------------------------------------------------
+export interface QualityDecisionForCompare {
+  score: number | null;
+  class: string | null;
+  recommended_action: string | null;
+  hard_block_reason: string | null;
+}
+
+/**
+ * Consistency contract (fail-closed): score EXACT numeric equality; class and
+ * recommended_action case-insensitive; hard_block_reason null/empty-normalized.
+ * A present-vs-missing side (e.g. a score row but an empty mirror) compares
+ * UNEQUAL → inconsistent. Both-absent compares equal (a never-scored lead is not
+ * a mismatch; the retry quality gate then holds it).
+ */
+export function qualityDecisionsConsistent(a: QualityDecisionForCompare, b: QualityDecisionForCompare): boolean {
+  return (
+    (a.score ?? null) === (b.score ?? null) &&
+    ciEq(strOrNull(a.class), strOrNull(b.class)) &&
+    ciEq(strOrNull(a.recommended_action), strOrNull(b.recommended_action)) &&
+    strOrNull(a.hard_block_reason) === strOrNull(b.hard_block_reason)
+  );
+}
+
+/** Post-rescore read-back: latest score, leads mirror, and the returned current must all agree. */
+export function rescoreReadbackConsistent(
+  scoreSide: QualityDecisionForCompare,
+  mirrorSide: QualityDecisionForCompare,
+  currentSide: QualityDecisionForCompare,
+): boolean {
+  return qualityDecisionsConsistent(scoreSide, mirrorSide) && qualityDecisionsConsistent(scoreSide, currentSide);
+}
+
+/**
+ * RPC idempotent-status contract: `already_assigned` means the assignments (and
+ * their delivery/preview logs) already exist, so the matcher must NOT recreate
+ * delivery side effects. Mirrors the narrow guard in services/leadMatchingEngine.ts.
+ */
+export function deliverySuppressedForAssignmentStatus(status: string): boolean {
+  return status === "already_assigned";
 }
 
 /** Normalize the matcher's AutoLeadMatchingResult.status → a terminal retry status. */

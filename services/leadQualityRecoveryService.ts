@@ -20,7 +20,9 @@ import { SCORE_MODEL_VERSION, getLeadQualityDecision, scoreAndStoreLead } from "
 import {
   buildRescoreQualityInput,
   readPreviousDecision,
+  rescoreReadbackConsistent,
   summarizeRescoreComparison,
+  type QualityDecisionForCompare,
   type RecoveryErrorCode,
   type RecoveryLeadRow,
   type RescoreResult,
@@ -79,6 +81,64 @@ export async function rescoreLeadQualityOnly(leadId: string): Promise<Result<Res
 
     const { decision_changed, change_summary } = summarizeRescoreComparison(previous, current);
 
+    // Correction 2 — minimal deterministic READ-BACK. scoreAndStoreLead writes the
+    // lead_scores row and the leads mirror as two separate awaited operations, so a
+    // partial failure could leave them disagreeing. Re-read both and require that
+    // the latest score, the mirror, and the returned current decision all agree.
+    // Fail closed on mismatch (no matcher, no auto-repair, no score-row deletion).
+    const [rbScoreRes, rbLeadRes] = await Promise.all([
+      db
+        .from("lead_scores")
+        .select("total_score, score_class, hard_block_reason, recommended_action, created_at, id")
+        .eq("lead_id", id)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1),
+      db
+        .from("leads")
+        .select("lead_quality_score, lead_quality_class, lead_quality_hard_block_reason, lead_quality_recommended_action")
+        .eq("id", id)
+        .maybeSingle(),
+    ]);
+    const rbScoreRow = (rbScoreRes.data ?? [])[0] as
+      | { total_score?: number | null; score_class?: string | null; hard_block_reason?: string | null; recommended_action?: string | null }
+      | undefined;
+    const rbLeadRow = rbLeadRes.data as
+      | { lead_quality_score?: number | null; lead_quality_class?: string | null; lead_quality_hard_block_reason?: string | null; lead_quality_recommended_action?: string | null }
+      | null;
+
+    const scoreSide: QualityDecisionForCompare = {
+      score: numOrNull(rbScoreRow?.total_score),
+      class: strOrNull(rbScoreRow?.score_class),
+      recommended_action: strOrNull(rbScoreRow?.recommended_action),
+      hard_block_reason: strOrNull(rbScoreRow?.hard_block_reason),
+    };
+    const mirrorSide: QualityDecisionForCompare = {
+      score: numOrNull(rbLeadRow?.lead_quality_score),
+      class: strOrNull(rbLeadRow?.lead_quality_class),
+      recommended_action: strOrNull(rbLeadRow?.lead_quality_recommended_action),
+      hard_block_reason: strOrNull(rbLeadRow?.lead_quality_hard_block_reason),
+    };
+    const currentSide: QualityDecisionForCompare = {
+      score: current.score,
+      class: current.class,
+      recommended_action: current.recommended_action,
+      hard_block_reason: current.hard_block_reason,
+    };
+    const consistent = rescoreReadbackConsistent(scoreSide, mirrorSide, currentSide);
+
+    // Log only lead_id, operation, consistency result, timestamp (no PII).
+    console.info("[lead rescore] consistency read-back", {
+      lead_id: id,
+      operation: "rescore_quality_only",
+      consistent,
+      at: new Date().toISOString(),
+    });
+
+    if (!consistent) {
+      return failure("QUALITY_STATE_INCONSISTENT", "Quality state is inconsistent after rescore; recovery is blocked until reconciled.");
+    }
+
     // Structured, PII-free audit (lead_id + score transition only).
     console.info("[lead rescore] quality-only rescore", {
       lead_id: id,
@@ -99,6 +159,17 @@ export async function rescoreLeadQualityOnly(leadId: string): Promise<Result<Res
 
 function failure(code: RecoveryErrorCode, error: string): RecoveryFailure {
   return { ok: false, code, error };
+}
+
+function numOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+function strOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  return t.length > 0 ? t : null;
 }
 
 function readModelVersion(res: { data: Array<{ score_breakdown?: unknown }> | null; error: unknown }): string | null {

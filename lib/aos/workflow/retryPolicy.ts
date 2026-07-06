@@ -12,6 +12,17 @@ export const DEFAULT_WORKFLOW_RETRY_POLICY: RetryPolicyConfig = {
   maxDelaySeconds: 60 * 60,
 };
 
+export function createRetryPolicyConfig(maxAttempts: number): RetryPolicyConfig {
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new Error("RETRY_MAX_ATTEMPTS_INVALID");
+  }
+
+  return {
+    ...DEFAULT_WORKFLOW_RETRY_POLICY,
+    maxAttempts,
+  };
+}
+
 export function calculateRetryDecision(
   attemptCount: number,
   retryable: boolean,
@@ -52,4 +63,3 @@ export function calculateRetryDecision(
     reason: `retry_in_${delaySeconds}_seconds`,
   };
 }
-

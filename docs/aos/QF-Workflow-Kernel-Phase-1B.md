@@ -6,6 +6,7 @@ Migrations created:
 
 - `supabase/migrations/20260706000147_workflow_kernel_atomic_step.sql`
 - `supabase/migrations/20260706000148_workflow_kernel_safety_hardening.sql`
+- `supabase/migrations/20260706000149_workflow_kernel_retry_consistency.sql`
 
 The migrations were created for review and were not automatically applied to production.
 
@@ -70,7 +71,9 @@ State/version races raise `WORKFLOW_STATE_CONFLICT`. Event ownership mismatches 
 
 Task and outbox idempotency keys are checked before insert. Existing same-scope task/outbox rows are skipped; materially different definitions raise `WORKFLOW_TASK_IDEMPOTENCY_CONFLICT` or `OUTBOX_IDEMPOTENCY_CONFLICT`.
 
-Task idempotency comparison now includes `workflow_instance_id`, `task_type`, `payload_json`, `priority`, `max_attempts`, and explicit `due_at`. Omitted `due_at` uses the function timestamp for insertion and does not create a false mismatch against an existing defaulted task.
+Task idempotency comparison now includes `workflow_instance_id`, `task_type`, `payload_json`, `priority`, `max_attempts`, and normalized `due_at`.
+
+For tasks created inside `qf_apply_workflow_step(...)`, explicit `due_at` is normalized to its `timestamptz` value. Omitted `due_at` is normalized to the triggering `domain_events.created_at`, which is durable and stable across equivalent retries of the same event. This means an explicit future schedule and an omitted immediate schedule cannot silently share the same task idempotency key.
 
 ## Domain Event Ownership
 
@@ -79,11 +82,12 @@ Task idempotency comparison now includes `workflow_instance_id`, `task_type`, `p
 `qf_acquire_domain_event(event_id, worker_id, stale_lock_after)` uses a conditional update:
 
 - `pending -> processing` returns `acquired`.
-- due `retry_scheduled -> processing` returns `acquired`.
+- due `retry_scheduled -> processing` returns `acquired` only while `attempt_count < max_attempts`.
 - stale `processing -> processing` with a new owner returns `acquired`.
 - active `processing` returns `already_processing` without mutation.
 - `processed` returns `already_processed`.
 - future `retry_scheduled` returns `retry_not_due`.
+- exhausted `retry_scheduled` returns `retry_exhausted` and is not reacquired.
 - `failed` / `dead_letter` raises `DOMAIN_EVENT_NOT_PROCESSABLE`.
 
 The Kernel treats `already_processing`, `already_processed`, and `retry_not_due` as non-mutating outcomes. A duplicate caller does not fail, dead-letter, unlock, or apply a step for another worker's event.
@@ -100,6 +104,10 @@ Terminal paths:
 - retry exhaustion -> `dead_letter`
 
 Retryable handler failures use `calculateRetryDecision(...)` and call `qf_schedule_domain_event_retry(...)`, which requires `processing + locked_by = workerId`. Terminal failures call `qf_dead_letter_domain_event(...)`, also owner-aware.
+
+The retry policy uses the durable event row's `max_attempts`, not only the default policy. The standard deterministic backoff schedule and maximum delay are preserved, but `maxAttempts = domain_events.max_attempts`.
+
+SQL retry scheduling requires `p_attempt_count = current attempt_count + 1` and `p_attempt_count < max_attempts`. This keeps `attempt_count` monotonic and prevents exhausted events from staying `retry_scheduled`. When `p_attempt_count >= max_attempts`, the Kernel uses the owner-aware dead-letter flow instead.
 
 ## Stale Event Recovery
 
@@ -175,6 +183,19 @@ If no row is updated, the service raises `OUTBOX_OWNERSHIP_CONFLICT`.
 
 The mock command type is `test.noop`.
 
+## Worker Identity
+
+Workflow services use `normalizeWorkerId(...)` before ownership-sensitive calls. The canonical worker ID is a trimmed, non-empty string.
+
+The same canonical value is used for:
+
+- domain event acquisition
+- event ownership comparison
+- atomic transition RPC calls
+- event retry/dead-letter transitions
+- task mutation ownership filters
+- outbox mutation ownership filters
+
 ## Retry Policy
 
 Default policy:
@@ -187,6 +208,13 @@ Default policy:
 - attempt 5: dead-letter
 
 The policy is deterministic and has no random jitter or infinite loop.
+
+For domain events, the `max attempts` value comes from `domain_events.max_attempts`. For example:
+
+- `max_attempts = 1`: first retryable failure dead-letters.
+- `max_attempts = 2`: first failure schedules retry, second dead-letters.
+- `max_attempts = 5`: default behavior.
+- `max_attempts = 10`: retries can continue past the default fifth attempt using the capped delay schedule.
 
 ## Failure Sanitization
 

@@ -11,6 +11,7 @@ export type WorkflowKernelStatus =
   | "already_processed"
   | "already_processing"
   | "retry_not_due"
+  | "retry_exhausted"
   | "failed"
   | "dead_letter"
   | "skipped";

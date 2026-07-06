@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/supabase";
+import { normalizeWorkerId } from "./workerIdentity";
 import type { JsonRecord, WorkflowTaskRecord } from "./workflowPersistenceTypes";
 import type { RetryDecision, WorkflowTaskRequest } from "./workflowTypes";
 
@@ -26,9 +27,10 @@ export async function enqueueWorkflowTask(
 }
 
 export async function claimOneDueWorkflowTask(workerId: string): Promise<WorkflowTaskRecord | null> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .rpc("qf_claim_due_workflow_task", {
-      p_worker_id: workerId,
+      p_worker_id: canonicalWorkerId,
     })
     .maybeSingle();
 
@@ -37,6 +39,7 @@ export async function claimOneDueWorkflowTask(workerId: string): Promise<Workflo
 }
 
 export async function markWorkflowTaskCompleted(taskId: string, workerId: string, result: JsonRecord = {}): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
@@ -49,7 +52,7 @@ export async function markWorkflowTaskCompleted(taskId: string, workerId: string
     })
     .eq("id", taskId)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -62,6 +65,7 @@ export async function scheduleWorkflowTaskRetry(
   decision: RetryDecision,
   errorMessage: string,
 ): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const nextAttemptCount = Math.min(decision.attemptNumber, task.max_attempts);
   const terminal = decision.shouldDeadLetter || !decision.shouldRetry;
   const { data, error } = await adminClient()
@@ -77,7 +81,7 @@ export async function scheduleWorkflowTaskRetry(
     })
     .eq("id", task.id)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -85,6 +89,7 @@ export async function scheduleWorkflowTaskRetry(
 }
 
 export async function markWorkflowTaskFailed(taskId: string, workerId: string, errorMessage: string): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
@@ -96,7 +101,7 @@ export async function markWorkflowTaskFailed(taskId: string, workerId: string, e
     })
     .eq("id", taskId)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -104,6 +109,7 @@ export async function markWorkflowTaskFailed(taskId: string, workerId: string, e
 }
 
 export async function markWorkflowTaskDeadLetter(taskId: string, workerId: string, errorMessage: string): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
@@ -115,7 +121,7 @@ export async function markWorkflowTaskDeadLetter(taskId: string, workerId: strin
     })
     .eq("id", taskId)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;

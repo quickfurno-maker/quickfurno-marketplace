@@ -1,7 +1,8 @@
 import { acquireDomainEvent, markDomainEventDeadLetter, scheduleDomainEventRetry } from "./domainEventService";
 import { recordWorkflowFailure, safeErrorMessage, classifyRetryableFailure, sanitizeWorkflowMetadata } from "./failureService";
 import { beginIdempotentOperation, failIdempotentOperation } from "./idempotencyService";
-import { calculateRetryDecision } from "./retryPolicy";
+import { calculateRetryDecision, createRetryPolicyConfig } from "./retryPolicy";
+import { normalizeWorkerId } from "./workerIdentity";
 import { getOrCreateWorkflowInstance } from "./workflowRepository";
 import type { WorkflowRegistry } from "./workflowRegistry";
 import { normalizeWorkflowStatus } from "./workflowState";
@@ -25,10 +26,11 @@ export async function processDomainEventById(
   let ownsEvent = false;
   let idempotencyStarted = false;
   let stepCommitted = false;
+  const workerId = normalizeWorkerId(options.workerId);
   const idempotencyKey = `workflow_kernel:event:${eventId}`;
 
   try {
-    const event = await acquireDomainEvent(eventId, options.workerId);
+    const event = await acquireDomainEvent(eventId, workerId);
     if (event.acquisition_status === "already_processed") {
       return { status: "already_processed", eventId };
     }
@@ -38,9 +40,12 @@ export async function processDomainEventById(
     if (event.acquisition_status === "retry_not_due") {
       return { status: "retry_not_due", eventId, workflowInstance: null };
     }
+    if (event.acquisition_status === "retry_exhausted") {
+      return { status: "retry_exhausted", eventId, workflowInstance: null };
+    }
 
     acquiredEvent = event;
-    ownsEvent = event.locked_by === options.workerId && event.processing_status === "processing";
+    ownsEvent = event.locked_by === workerId && event.processing_status === "processing";
 
     const workflowType = resolveWorkflowType(event);
     const definition = registry.resolve(workflowType);
@@ -99,7 +104,7 @@ export async function processDomainEventById(
       targetStatus,
       domainEventId: event.id,
       eventType: event.event_type,
-      workerId: options.workerId,
+      workerId,
       reason: handlerResult.reason ?? null,
       metadata: handlerResult.metadata ?? {},
       createdBy: options.createdBy ?? "workflow_kernel",
@@ -129,7 +134,8 @@ export async function processDomainEventById(
   } catch (error) {
     const message = safeErrorMessage(error);
     const retryable = classifyRetryableFailure(error);
-    const retryDecision = calculateRetryDecision(acquiredEvent?.attempt_count ?? 0, retryable);
+    const retryConfig = createRetryPolicyConfig(acquiredEvent?.max_attempts ?? 1);
+    const retryDecision = calculateRetryDecision(acquiredEvent?.attempt_count ?? 0, retryable, new Date(), retryConfig);
 
     if (workflowId) {
       await recordWorkflowFailure({
@@ -139,7 +145,7 @@ export async function processDomainEventById(
         retryable,
         status: retryDecision.shouldRetry ? "retry_scheduled" : "dead_letter",
         attemptNumber: retryDecision.attemptNumber,
-        metadata: sanitizeWorkflowMetadata({ eventId, workerId: options.workerId, retry_reason: retryDecision.reason }),
+        metadata: sanitizeWorkflowMetadata({ eventId, workerId, retry_reason: retryDecision.reason }),
       });
     }
 
@@ -157,9 +163,9 @@ export async function processDomainEventById(
     if (ownsEvent && acquiredEvent && !stepCommitted && acquiredEvent.processing_status !== "processed") {
       try {
         if (retryDecision.shouldRetry && retryDecision.nextRetryAt) {
-          await scheduleDomainEventRetry(eventId, options.workerId, retryDecision.attemptNumber, retryDecision.nextRetryAt);
+          await scheduleDomainEventRetry(eventId, workerId, retryDecision.attemptNumber, retryDecision.nextRetryAt);
         } else {
-          await markDomainEventDeadLetter(eventId, options.workerId, retryDecision.attemptNumber);
+          await markDomainEventDeadLetter(eventId, workerId, retryDecision.attemptNumber);
         }
       } catch {
         // Preserve the original safe failure result.

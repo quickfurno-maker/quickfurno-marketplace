@@ -32,6 +32,7 @@ execFileSync(
     "lib/aos/workflow/workflowRegistry.ts",
     "lib/aos/workflow/workflowValidation.ts",
     "lib/aos/workflow/failureRedaction.ts",
+    "lib/aos/workflow/workerIdentity.ts",
     "lib/aos/workflow/qfKernelTestWorkflow.ts",
   ],
   { stdio: "pipe" },
@@ -43,14 +44,17 @@ const retry = requireFromBuild("./lib/aos/workflow/retryPolicy.js");
 const registryMod = requireFromBuild("./lib/aos/workflow/workflowRegistry.js");
 const validation = requireFromBuild("./lib/aos/workflow/workflowValidation.js");
 const redaction = requireFromBuild("./lib/aos/workflow/failureRedaction.js");
+const workerIdentity = requireFromBuild("./lib/aos/workflow/workerIdentity.js");
 const mock = requireFromBuild("./lib/aos/workflow/qfKernelTestWorkflow.js");
 
 const checks = [];
 const migration148 = readFileSync("supabase/migrations/20260706000148_workflow_kernel_safety_hardening.sql", "utf8");
+const migration149 = readFileSync("supabase/migrations/20260706000149_workflow_kernel_retry_consistency.sql", "utf8");
 const kernelSource = readFileSync("lib/aos/workflow/workflowKernel.ts", "utf8");
 const taskServiceSource = readFileSync("lib/aos/workflow/workflowTaskService.ts", "utf8");
 const outboxServiceSource = readFileSync("lib/aos/workflow/outboxService.ts", "utf8");
 const repositorySource = readFileSync("lib/aos/workflow/workflowRepository.ts", "utf8");
+const transitionServiceSource = readFileSync("lib/aos/workflow/workflowTransitionService.ts", "utf8");
 
 function check(name, fn) {
   try {
@@ -98,6 +102,28 @@ check("event retry exhaustion dead-letters", () => {
   assert(result.reason === "max_attempts_exhausted", "expected max attempts exhaustion reason");
 });
 
+check("event maxAttempts=1 dead-letters on first failure", () => {
+  const result = retry.calculateRetryDecision(0, true, new Date("2026-07-06T00:00:00.000Z"), retry.createRetryPolicyConfig(1));
+  assert(result.shouldDeadLetter === true && result.attemptNumber === 1, "maxAttempts=1 should dead-letter at attempt 1");
+});
+
+check("event maxAttempts=2 retries once then exhausts", () => {
+  const first = retry.calculateRetryDecision(0, true, new Date("2026-07-06T00:00:00.000Z"), retry.createRetryPolicyConfig(2));
+  const second = retry.calculateRetryDecision(1, true, new Date("2026-07-06T00:00:00.000Z"), retry.createRetryPolicyConfig(2));
+  assert(first.shouldRetry === true && first.attemptNumber === 1, "maxAttempts=2 first failure should retry");
+  assert(second.shouldDeadLetter === true && second.attemptNumber === 2, "maxAttempts=2 second failure should dead-letter");
+});
+
+check("event maxAttempts=5 preserves default behavior", () => {
+  const result = retry.calculateRetryDecision(3, true, new Date("2026-07-06T00:00:00.000Z"), retry.createRetryPolicyConfig(5));
+  assert(result.shouldRetry === true && result.nextRetryAt === "2026-07-06T01:00:00.000Z", "maxAttempts=5 attempt 4 should retry at one hour");
+});
+
+check("event maxAttempts=10 allows retries beyond default", () => {
+  const result = retry.calculateRetryDecision(4, true, new Date("2026-07-06T00:00:00.000Z"), retry.createRetryPolicyConfig(10));
+  assert(result.shouldRetry === true && result.attemptNumber === 5, "maxAttempts=10 should not dead-letter at attempt 5");
+});
+
 check("sensitive error keys are redacted", () => {
   const sanitized = redaction.sanitizeWorkflowMetadata({
     authorization: "Bearer abc123",
@@ -128,6 +154,30 @@ check("duplicate workflow registration rejected", () => {
     rejected = String(error.message).includes("WORKFLOW_DEFINITION_ALREADY_REGISTERED");
   }
   assert(rejected, "duplicate registration must throw");
+});
+
+check("canonical worker ID trim", () => {
+  assert(workerIdentity.normalizeWorkerId(" worker-1 ") === "worker-1", "worker ID should trim");
+});
+
+check("blank worker ID rejected", () => {
+  let rejected = false;
+  try {
+    workerIdentity.normalizeWorkerId("");
+  } catch (error) {
+    rejected = String(error.message).includes("WORKER_ID_REQUIRED");
+  }
+  assert(rejected, "blank worker ID should reject");
+});
+
+check("whitespace-only worker ID rejected", () => {
+  let rejected = false;
+  try {
+    workerIdentity.normalizeWorkerId("   ");
+  } catch (error) {
+    rejected = String(error.message).includes("WORKER_ID_REQUIRED");
+  }
+  assert(rejected, "whitespace worker ID should reject");
 });
 
 check("unknown workflow type handled safely", () => {
@@ -215,9 +265,9 @@ check("workflow get-or-create race handles expected unique conflict", () => {
 });
 
 check("task idempotency scope includes execution definition", () => {
-  assert(migration148.includes("v_existing_task.priority is distinct from v_task_priority"), "priority must be compared");
-  assert(migration148.includes("v_existing_task.max_attempts is distinct from v_task_max_attempts"), "max attempts must be compared");
-  assert(migration148.includes("v_existing_task.due_at is distinct from v_task_due_at"), "due_at must be compared when explicit");
+  assert(migration149.includes("v_existing_task.priority is distinct from v_task_priority"), "priority must be compared");
+  assert(migration149.includes("v_existing_task.max_attempts is distinct from v_task_max_attempts"), "max attempts must be compared");
+  assert(migration149.includes("v_existing_task.due_at is distinct from v_task_due_at"), "due_at must always be compared");
 });
 
 check("successful step completes idempotency inside atomic RPC", () => {
@@ -236,6 +286,43 @@ check("runtime harness does not claim concurrency pass from smoke", () => {
 check("no provider execution added", () => {
   const combined = `${kernelSource}\n${readFileSync("lib/aos/workflow/outboxService.ts", "utf8")}`;
   assert(!/fetch\(|axios|whatsapp\.send|n8n|meta\.|twilio|sendgrid/i.test(combined), "kernel/outbox service must not execute providers");
+});
+
+check("no retry policy/database max-attempt mismatch", () => {
+  assert(kernelSource.includes("createRetryPolicyConfig(acquiredEvent?.max_attempts"), "kernel must use durable event max_attempts");
+  assert(migration149.includes("p_attempt_count >= v_event.max_attempts"), "SQL must reject exhausted retry scheduling");
+  assert(migration149.includes("de.attempt_count < de.max_attempts"), "SQL acquisition must not reacquire exhausted retry rows");
+});
+
+check("attempt_count cannot decrease structurally", () => {
+  assert(migration149.includes("p_attempt_count <> v_event.attempt_count + 1"), "SQL must require exact next attempt sequence");
+  assert(!migration149.includes("least(p_attempt_count, max_attempts),\n      next_retry_at = p_next_retry_at"), "retry scheduling must not clamp exhausted attempts into retry_scheduled");
+});
+
+check("canonical worker ID used in ownership call sites", () => {
+  assert(kernelSource.includes("const workerId = normalizeWorkerId(options.workerId)"), "kernel must normalize worker ID once");
+  assert(taskServiceSource.includes("canonicalWorkerId"), "task service must use canonical worker ID");
+  assert(outboxServiceSource.includes("canonicalWorkerId"), "outbox service must use canonical worker ID");
+  assert(transitionServiceSource.includes("canonicalWorkerId"), "transition service must use canonical worker ID");
+});
+
+check("task due_at deterministic normalization", () => {
+  assert(migration149.includes("v_task_due_at := coalesce(nullif(v_task->>'due_at', '')::timestamptz, v_event.created_at)"), "omitted due_at must normalize to event created_at");
+});
+
+check("task due_at material mismatch conflict", () => {
+  assert(!migration149.includes("v_task_due_at_explicit"), "due_at conflict must not be asymmetric");
+  assert(migration149.includes("or v_existing_task.due_at is distinct from v_task_due_at"), "due_at mismatch must conflict");
+});
+
+check("same explicit task due_at duplicates are accepted structurally", () => {
+  assert(migration149.includes("continue;"), "same-scope idempotent task duplicates should continue");
+  assert(migration149.includes("v_task_due_at := coalesce"), "explicit due_at should be normalized before compare");
+});
+
+check("omitted immediate task due_at is stable across equivalent attempts", () => {
+  const occurrences = (migration149.match(/v_event\.created_at/g) ?? []).length;
+  assert(occurrences >= 1, "event created_at should be the stable omitted due_at source");
 });
 
 for (const item of checks) {

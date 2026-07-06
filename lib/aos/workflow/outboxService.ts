@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/supabase";
+import { normalizeWorkerId } from "./workerIdentity";
 import type { OutboxEventRecord } from "./workflowPersistenceTypes";
 import type { OutboxCommandRequest, RetryDecision } from "./workflowTypes";
 
@@ -32,9 +33,10 @@ export async function getOutboxCommand(id: string): Promise<OutboxEventRecord | 
 }
 
 export async function claimOneDueOutboxCommand(workerId: string): Promise<OutboxEventRecord | null> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .rpc("qf_claim_due_outbox_event", {
-      p_worker_id: workerId,
+      p_worker_id: canonicalWorkerId,
     })
     .maybeSingle();
 
@@ -43,6 +45,7 @@ export async function claimOneDueOutboxCommand(workerId: string): Promise<Outbox
 }
 
 export async function markOutboxSent(id: string, workerId: string): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
@@ -52,7 +55,7 @@ export async function markOutboxSent(id: string, workerId: string): Promise<void
     })
     .eq("id", id)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -60,6 +63,7 @@ export async function markOutboxSent(id: string, workerId: string): Promise<void
 }
 
 export async function markOutboxCompleted(id: string, workerId: string): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
@@ -71,7 +75,7 @@ export async function markOutboxCompleted(id: string, workerId: string): Promise
     })
     .eq("id", id)
     .eq("status", "sent")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -84,6 +88,7 @@ export async function scheduleOutboxRetry(
   decision: RetryDecision,
   errorMessage: string,
 ): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const terminal = decision.shouldDeadLetter || !decision.shouldRetry;
   const { data, error } = await adminClient()
     .from("outbox_events")
@@ -98,7 +103,7 @@ export async function scheduleOutboxRetry(
     })
     .eq("id", event.id)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -106,6 +111,7 @@ export async function scheduleOutboxRetry(
 }
 
 export async function markOutboxFailed(id: string, workerId: string, errorMessage: string): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
@@ -117,7 +123,7 @@ export async function markOutboxFailed(id: string, workerId: string, errorMessag
     })
     .eq("id", id)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -125,6 +131,7 @@ export async function markOutboxFailed(id: string, workerId: string, errorMessag
 }
 
 export async function markOutboxDeadLetter(id: string, workerId: string, errorMessage: string): Promise<void> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
@@ -136,7 +143,7 @@ export async function markOutboxDeadLetter(id: string, workerId: string, errorMe
     })
     .eq("id", id)
     .eq("status", "processing")
-    .eq("locked_by", workerId)
+    .eq("locked_by", canonicalWorkerId)
     .select("id")
     .maybeSingle();
   if (error) throw error;

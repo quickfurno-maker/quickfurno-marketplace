@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/supabase";
+import { normalizeWorkerId } from "./workerIdentity";
 import { normalizeWorkflowStatus, validateWorkflowTransition } from "./workflowState";
 import type { WorkflowInstanceRecord } from "./workflowPersistenceTypes";
 import type { WorkflowDefinition, WorkflowTransitionRequest } from "./workflowTypes";
@@ -39,6 +40,7 @@ export async function applyWorkflowTransition(
 ): Promise<WorkflowTransitionApplyResult> {
   const validationFailure = validateHandlerTransition(definition, workflow, request);
   if (validationFailure) return validationFailure;
+  const canonicalWorkerId = normalizeWorkerId(request.workerId);
 
   const { data, error } = await adminClient()
     .rpc("qf_apply_workflow_step", {
@@ -49,7 +51,7 @@ export async function applyWorkflowTransition(
       p_target_status: request.targetStatus,
       p_domain_event_id: request.domainEventId,
       p_event_type: request.eventType,
-      p_worker_id: request.workerId,
+      p_worker_id: canonicalWorkerId,
       p_reason: request.reason ?? null,
       p_transition_metadata: request.metadata ?? {},
       p_created_by: request.createdBy ?? "workflow_kernel",

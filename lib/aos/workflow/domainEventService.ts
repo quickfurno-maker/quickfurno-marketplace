@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/supabase";
+import { normalizeWorkerId } from "./workerIdentity";
 import type { DomainEventRecord, JsonRecord } from "./workflowPersistenceTypes";
 
 export interface CreateDomainEventInput {
@@ -15,7 +16,7 @@ export interface CreateDomainEventInput {
 }
 
 export interface AcquiredDomainEvent extends DomainEventRecord {
-  acquisition_status: "acquired" | "already_processed" | "already_processing" | "retry_not_due";
+  acquisition_status: "acquired" | "already_processed" | "already_processing" | "retry_not_due" | "retry_exhausted";
 }
 
 export async function createDomainEvent(input: CreateDomainEventInput): Promise<DomainEventRecord> {
@@ -55,10 +56,11 @@ export async function getDomainEventById(id: string): Promise<DomainEventRecord 
 }
 
 export async function acquireDomainEvent(eventId: string, workerId: string): Promise<AcquiredDomainEvent> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .rpc("qf_acquire_domain_event", {
       p_event_id: eventId,
-      p_worker_id: workerId,
+      p_worker_id: canonicalWorkerId,
       p_stale_lock_after: "15 minutes",
     })
     .maybeSingle();
@@ -73,10 +75,11 @@ export async function scheduleDomainEventRetry(
   attemptCount: number,
   nextRetryAt: string,
 ): Promise<DomainEventRecord> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .rpc("qf_schedule_domain_event_retry", {
       p_event_id: eventId,
-      p_worker_id: workerId,
+      p_worker_id: canonicalWorkerId,
       p_attempt_count: attemptCount,
       p_next_retry_at: nextRetryAt,
     })
@@ -91,10 +94,11 @@ export async function markDomainEventDeadLetter(
   workerId: string,
   attemptCount: number,
 ): Promise<DomainEventRecord> {
+  const canonicalWorkerId = normalizeWorkerId(workerId);
   const { data, error } = await adminClient()
     .rpc("qf_dead_letter_domain_event", {
       p_event_id: eventId,
-      p_worker_id: workerId,
+      p_worker_id: canonicalWorkerId,
       p_attempt_count: attemptCount,
     })
     .maybeSingle();

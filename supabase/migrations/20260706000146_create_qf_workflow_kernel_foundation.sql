@@ -278,7 +278,7 @@ create index if not exists idx_idempotency_records_updated_at
 -- ----------------------------------------------------------------------------
 create table if not exists public.workflow_transition_history (
   id uuid primary key default gen_random_uuid(),
-  workflow_instance_id uuid not null references public.workflow_instances(id) on delete cascade,
+  workflow_instance_id uuid not null references public.workflow_instances(id) on delete restrict,
   from_state text,
   to_state text not null,
   event_type text,
@@ -289,7 +289,7 @@ create table if not exists public.workflow_transition_history (
 );
 
 comment on table public.workflow_transition_history is
-  'Permanent internal audit trail of workflow state transitions.';
+  'Permanent internal audit trail of workflow state transitions. ON DELETE RESTRICT prevents workflow deletion from silently deleting audit history.';
 
 create index if not exists idx_workflow_transition_history_instance_created_at
   on public.workflow_transition_history(workflow_instance_id, created_at);
@@ -308,10 +308,18 @@ as $$
 declare
   v_task public.workflow_tasks%rowtype;
 begin
+  if p_worker_id is null or length(trim(p_worker_id)) = 0 then
+    raise exception 'WORKER_ID_REQUIRED' using errcode = 'P0001';
+  end if;
+
+  if p_stale_lock_after is null or p_stale_lock_after <= interval '0 seconds' then
+    raise exception 'INVALID_STALE_LOCK_INTERVAL' using errcode = 'P0001';
+  end if;
+
   update public.workflow_tasks
   set status = 'processing',
       locked_at = now(),
-      locked_by = p_worker_id,
+      locked_by = trim(p_worker_id),
       started_at = coalesce(started_at, now()),
       updated_at = now()
   where id = (
@@ -350,10 +358,18 @@ as $$
 declare
   v_event public.outbox_events%rowtype;
 begin
+  if p_worker_id is null or length(trim(p_worker_id)) = 0 then
+    raise exception 'WORKER_ID_REQUIRED' using errcode = 'P0001';
+  end if;
+
+  if p_stale_lock_after is null or p_stale_lock_after <= interval '0 seconds' then
+    raise exception 'INVALID_STALE_LOCK_INTERVAL' using errcode = 'P0001';
+  end if;
+
   update public.outbox_events
   set status = 'processing',
       locked_at = now(),
-      locked_by = p_worker_id,
+      locked_by = trim(p_worker_id),
       updated_at = now()
   where id = (
     select oe.id
@@ -401,6 +417,12 @@ returns table (
 language plpgsql
 set search_path = pg_catalog, public, pg_temp
 as $$
+declare
+  v_key text;
+  v_operation_type text;
+  v_entity_type text;
+  v_entity_id text;
+  v_record public.idempotency_records%rowtype;
 begin
   if p_idempotency_key is null or length(trim(p_idempotency_key)) = 0 then
     raise exception 'IDEMPOTENCY_KEY_REQUIRED' using errcode = 'P0001';
@@ -410,59 +432,79 @@ begin
     raise exception 'OPERATION_TYPE_REQUIRED' using errcode = 'P0001';
   end if;
 
-  return query
-  with inserted as (
-    insert into public.idempotency_records as ir (
-      idempotency_key,
-      operation_type,
-      entity_type,
-      entity_id,
-      status
-    )
-    values (
-      trim(p_idempotency_key),
-      trim(p_operation_type),
-      nullif(trim(coalesce(p_entity_type, '')), ''),
-      nullif(trim(coalesce(p_entity_id, '')), ''),
-      'started'
-    )
-    on conflict (idempotency_key) do nothing
-    returning
-      ir.id,
-      ir.idempotency_key,
-      ir.operation_type,
-      ir.entity_type,
-      ir.entity_id,
-      ir.status,
-      ir.result_json,
-      ir.created_at,
-      ir.completed_at,
-      ir.updated_at,
-      true as was_created
+  v_key := trim(p_idempotency_key);
+  v_operation_type := trim(p_operation_type);
+  v_entity_type := nullif(trim(coalesce(p_entity_type, '')), '');
+  v_entity_id := nullif(trim(coalesce(p_entity_id, '')), '');
+
+  insert into public.idempotency_records (
+    idempotency_key,
+    operation_type,
+    entity_type,
+    entity_id,
+    status
   )
-  select * from inserted
-  union all
-  select
-    existing.id,
-    existing.idempotency_key,
-    existing.operation_type,
-    existing.entity_type,
-    existing.entity_id,
-    existing.status,
-    existing.result_json,
-    existing.created_at,
-    existing.completed_at,
-    existing.updated_at,
-    false as was_created
+  values (
+    v_key,
+    v_operation_type,
+    v_entity_type,
+    v_entity_id,
+    'started'
+  )
+  on conflict (idempotency_key) do nothing
+  returning * into v_record;
+
+  if v_record.id is not null then
+    return query
+    select
+      v_record.id,
+      v_record.idempotency_key,
+      v_record.operation_type,
+      v_record.entity_type,
+      v_record.entity_id,
+      v_record.status,
+      v_record.result_json,
+      v_record.created_at,
+      v_record.completed_at,
+      v_record.updated_at,
+      true;
+    return;
+  end if;
+
+  select existing.*
+  into v_record
   from public.idempotency_records existing
-  where existing.idempotency_key = trim(p_idempotency_key)
-    and not exists (select 1 from inserted)
-  limit 1;
+  where existing.idempotency_key = v_key;
+
+  if v_record.id is null then
+    raise exception 'IDEMPOTENCY_RECORD_NOT_FOUND_AFTER_CONFLICT' using errcode = 'P0001';
+  end if;
+
+  if v_record.operation_type is distinct from v_operation_type
+    or v_record.entity_type is distinct from v_entity_type
+    or v_record.entity_id is distinct from v_entity_id
+  then
+    raise exception 'IDEMPOTENCY_KEY_SCOPE_MISMATCH' using errcode = 'P0001';
+  end if;
+
+  return query
+  select
+    v_record.id,
+    v_record.idempotency_key,
+    v_record.operation_type,
+    v_record.entity_type,
+    v_record.entity_id,
+    v_record.status,
+    v_record.result_json,
+    v_record.created_at,
+    v_record.completed_at,
+    v_record.updated_at,
+    false;
 end;
 $$;
 
 comment on function public.qf_begin_idempotent_operation(text, text, text, text) is
-  'Concurrency-safe insert-first idempotency guard. One caller inserts; duplicates receive the existing record with was_created=false. Service-role only.';
+  'Concurrency-safe insert-first idempotency guard. One caller inserts; same-scope duplicates receive the existing record with was_created=false; scope mismatches raise IDEMPOTENCY_KEY_SCOPE_MISMATCH. Service-role only.';
 
 -- ----------------------------------------------------------------------------
 -- RLS / PRIVILEGES

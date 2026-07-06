@@ -18,7 +18,7 @@ The migration was created for review and was not automatically applied to produc
 | `outbox_events` | Durable external command outbox for a future integration executor. |
 | `workflow_failures` | Safe operational failure summaries. |
 | `idempotency_records` | Concurrency-safe duplicate execution guard records. |
-| `workflow_transition_history` | Permanent workflow state transition audit trail. |
+| `workflow_transition_history` | Permanent workflow state transition audit trail. Its workflow FK uses `ON DELETE RESTRICT` so deleting a workflow instance cannot silently delete transition history. |
 
 ## Relationship Diagram
 
@@ -118,13 +118,21 @@ Dead-letter representation is explicit status, not deletion. Phase 1B should kee
 
 `idempotency_records.idempotency_key` is globally unique.
 
-The function `qf_begin_idempotent_operation(...)` uses an insert-first pattern:
+The function `qf_begin_idempotent_operation(...)` uses an insert-first PL/pgSQL pattern:
 
 1. Try `insert ... on conflict do nothing`.
-2. If the insert succeeds, return `was_created = true`.
-3. If another caller already won, return the existing row with `was_created = false`.
+2. If the insert succeeds, return that new row with `was_created = true`.
+3. If another caller already won, run a separate read of the existing row and return it with `was_created = false`.
+4. If the existing row has a different operation scope, raise `IDEMPOTENCY_KEY_SCOPE_MISMATCH`.
 
-This avoids a check-then-insert race. Future callers should only perform the guarded business operation when `was_created = true`, or should inspect the existing row status/result when `was_created = false`.
+This avoids a check-then-insert race and does not rely on PostgreSQL system columns to infer insert status. The unique constraint on `idempotency_key` remains the final concurrency guard.
+
+Duplicate caller guarantee:
+
+- Same `idempotency_key`, same `operation_type`, same normalized `entity_type`, and same normalized `entity_id` returns the existing record with `was_created = false`.
+- Same `idempotency_key` with different scope raises `IDEMPOTENCY_KEY_SCOPE_MISMATCH`; the key is not silently reused for a different business operation.
+
+Future callers should only perform the guarded business operation when `was_created = true`, or should inspect the existing row status/result when `was_created = false`.
 
 Additional object-specific idempotency protection:
 
@@ -138,12 +146,18 @@ Workflow tasks are claimed through `qf_claim_due_workflow_task(worker_id, stale_
 
 The function performs a single atomic `update ... where id = (select ... for update skip locked limit 1) returning *`.
 
-Eligible task rows:
+The function validates:
 
-- `status = 'pending'`, or
-- `status = 'retry_scheduled' and next_retry_at <= now()`,
-- `due_at <= now()`,
-- no active lock, where an old pending/retry lock is older than `stale_lock_after`.
+- `worker_id` must be non-null and not blank, otherwise `WORKER_ID_REQUIRED` is raised.
+- `stale_lock_after` must be greater than `interval '0 seconds'`, otherwise `INVALID_STALE_LOCK_INTERVAL` is raised.
+
+Eligible task rows are exactly:
+
+- `due_at <= now()`, and
+- either `status = 'pending'`, or `status = 'retry_scheduled' and next_retry_at <= now()`, and
+- no active lock on that pending/retry row, where an old pending/retry lock is older than `stale_lock_after`.
+
+The claim function does not make `processing` rows claimable. Stale `processing` recovery is deferred to a separate future recovery service.
 
 Claim update:
 
@@ -157,7 +171,15 @@ Task priority convention:
 
 Higher numeric `priority` values are claimed first, then earliest `due_at`, then oldest `created_at`.
 
-Outbox events are claimed through `qf_claim_due_outbox_event(worker_id, stale_lock_after)` using the same `FOR UPDATE SKIP LOCKED` pattern. Because the requested Phase 1A outbox schema does not include `due_at`, pending outbox commands are ordered by oldest `created_at`; retry-scheduled commands are eligible when `next_retry_at <= now()`.
+Outbox events are claimed through `qf_claim_due_outbox_event(worker_id, stale_lock_after)` using the same `FOR UPDATE SKIP LOCKED` pattern and the same `worker_id` / positive `stale_lock_after` validation.
+
+Eligible outbox rows are exactly:
+
+- `status = 'pending'`, or
+- `status = 'retry_scheduled' and next_retry_at <= now()`, and
+- no active lock on that pending/retry row, where an old pending/retry lock is older than `stale_lock_after`.
+
+Because the requested Phase 1A outbox schema does not include `due_at`, pending outbox commands are ordered by oldest `created_at`. The outbox claim function does not make `processing` rows claimable.
 
 ## Stale Lock Recovery Design
 
@@ -172,7 +194,9 @@ The schema supports future crash recovery with:
 - `next_retry_at`
 - partial indexes on `locked_at` where status is `processing`
 
-Future Phase 1B recovery policy should find `processing` tasks or outbox events where `locked_at` is older than a configured threshold. The recovery job can then either requeue to `retry_scheduled` with a future `next_retry_at`, mark `failed`, or move to `dead_letter` based on `attempt_count`, `max_attempts`, and retryability.
+Current claim RPCs apply stale-lock checks only within the pending/retry eligibility set. They do not reclaim `processing` rows.
+
+Future Phase 1B recovery policy should use a separate recovery service to find `processing` tasks or outbox events where `locked_at` is older than a configured threshold. The recovery service can then either requeue to `retry_scheduled` with a future `next_retry_at`, mark `failed`, or move to `dead_letter` based on `attempt_count`, `max_attempts`, and retryability.
 
 ## Retry Fields
 
@@ -197,6 +221,12 @@ The functions are service-role-only and are not granted to `anon` or `authentica
 The functions are not `SECURITY DEFINER`; they run as the caller. In the QuickFurno app, future server-side callers should use `adminClient()`/service role only. This avoids creating browser-callable definer functions that bypass RLS.
 
 Operational payload columns are documented as safe-summary storage. They must not store API keys, authorization headers, service-role keys, provider access tokens, secret-bearing request bodies, or uncontrolled stack traces.
+
+## Validation Scope
+
+`npm run test:phase1a` performs static SQL and source validation only. It checks the migration text, security posture, idempotency RPC structure, claim RPC guardrails, and persistence type exports.
+
+Static validation does not prove real concurrent PostgreSQL execution. Runtime concurrency tests against a safe local or staging database should be added before Phase 1B workers rely on these RPCs.
 
 ## Applying Later
 
@@ -226,4 +256,3 @@ Phase 1A does not implement:
 - AI agents
 - polling workers
 - deployment
-

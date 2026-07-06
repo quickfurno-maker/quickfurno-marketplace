@@ -1,6 +1,6 @@
 export type JsonRecord = Record<string, unknown>;
 
-export type WorkflowInstanceStatus =
+export type WorkflowStatus =
   | "active"
   | "paused"
   | "completed"
@@ -16,14 +16,14 @@ export type WorkflowTaskStatus =
   | "dead_letter"
   | "cancelled";
 
-export type DomainEventProcessingStatus =
+export type DomainEventStatus =
   | "pending"
   | "processing"
   | "processed"
   | "failed"
   | "dead_letter";
 
-export type OutboxEventStatus =
+export type OutboxStatus =
   | "pending"
   | "processing"
   | "sent"
@@ -39,7 +39,7 @@ export type WorkflowFailureStatus =
   | "resolved"
   | "dead_letter";
 
-export type IdempotencyRecordStatus = "started" | "completed" | "failed";
+export type IdempotencyStatus = "started" | "completed" | "failed";
 
 export interface WorkflowInstanceRecord {
   id: string;
@@ -47,7 +47,7 @@ export interface WorkflowInstanceRecord {
   entity_type: string;
   entity_id: string;
   current_state: string;
-  status: WorkflowInstanceStatus;
+  status: WorkflowStatus;
   version: number;
   context_json: JsonRecord;
   started_at: string;
@@ -90,7 +90,7 @@ export interface DomainEventRecord {
   correlation_id: string | null;
   causation_id: string | null;
   idempotency_key: string | null;
-  processing_status: DomainEventProcessingStatus;
+  processing_status: DomainEventStatus;
   processed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -103,7 +103,7 @@ export interface OutboxEventRecord {
   entity_id: string | null;
   payload_json: JsonRecord;
   idempotency_key: string;
-  status: OutboxEventStatus;
+  status: OutboxStatus;
   attempt_count: number;
   max_attempts: number;
   next_retry_at: string | null;
@@ -136,7 +136,7 @@ export interface IdempotencyRecord {
   operation_type: string;
   entity_type: string | null;
   entity_id: string | null;
-  status: IdempotencyRecordStatus;
+  status: IdempotencyStatus;
   result_json: JsonRecord;
   created_at: string;
   completed_at: string | null;
@@ -154,4 +154,3 @@ export interface WorkflowTransitionRecord {
   created_by: string | null;
   created_at: string;
 }
-

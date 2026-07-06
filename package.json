@@ -12,6 +12,7 @@
     "test:phase3a": "node scripts/phase3a-diagnostics-harness.ts",
     "test:phase3b": "node scripts/phase3b-recovery-harness.ts",
     "test:phase4": "node scripts/phase4-credit-wallet-harness.ts",
+    "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "grant:superadmin": "node scripts/grant-superadmin.mjs"
   },
   "dependencies": {

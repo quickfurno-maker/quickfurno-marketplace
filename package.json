@@ -15,6 +15,7 @@
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",
+    "test:phase2a": "node scripts/phase2a-lead-lifecycle-harness.mjs",
     "grant:superadmin": "node scripts/grant-superadmin.mjs"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
-import { acquireDomainEvent, markDomainEventDeadLetter, markDomainEventFailed } from "./domainEventService";
+import { acquireDomainEvent, markDomainEventDeadLetter, scheduleDomainEventRetry } from "./domainEventService";
 import { recordWorkflowFailure, safeErrorMessage, classifyRetryableFailure, sanitizeWorkflowMetadata } from "./failureService";
-import { beginIdempotentOperation, completeIdempotentOperation, failIdempotentOperation } from "./idempotencyService";
+import { beginIdempotentOperation, failIdempotentOperation } from "./idempotencyService";
+import { calculateRetryDecision } from "./retryPolicy";
 import { getOrCreateWorkflowInstance } from "./workflowRepository";
 import type { WorkflowRegistry } from "./workflowRegistry";
 import { normalizeWorkflowStatus } from "./workflowState";
@@ -20,6 +21,10 @@ export async function processDomainEventById(
   options: WorkflowKernelOptions,
 ): Promise<WorkflowKernelResult> {
   let workflowId: string | null = null;
+  let acquiredEvent: DomainEventRecord | null = null;
+  let ownsEvent = false;
+  let idempotencyStarted = false;
+  let stepCommitted = false;
   const idempotencyKey = `workflow_kernel:event:${eventId}`;
 
   try {
@@ -27,6 +32,15 @@ export async function processDomainEventById(
     if (event.acquisition_status === "already_processed") {
       return { status: "already_processed", eventId };
     }
+    if (event.acquisition_status === "already_processing") {
+      return { status: "already_processing", eventId, workflowInstance: null };
+    }
+    if (event.acquisition_status === "retry_not_due") {
+      return { status: "retry_not_due", eventId, workflowInstance: null };
+    }
+
+    acquiredEvent = event;
+    ownsEvent = event.locked_by === options.workerId && event.processing_status === "processing";
 
     const workflowType = resolveWorkflowType(event);
     const definition = registry.resolve(workflowType);
@@ -40,6 +54,7 @@ export async function processDomainEventById(
       "domain_event",
       eventId,
     );
+    idempotencyStarted = true;
 
     if (!idempotency.was_created && idempotency.status === "completed") {
       return {
@@ -84,24 +99,25 @@ export async function processDomainEventById(
       targetStatus,
       domainEventId: event.id,
       eventType: event.event_type,
+      workerId: options.workerId,
       reason: handlerResult.reason ?? null,
       metadata: handlerResult.metadata ?? {},
       createdBy: options.createdBy ?? "workflow_kernel",
       tasks: handlerResult.tasks ?? [],
       outboxCommands: handlerResult.outboxCommands ?? [],
+      idempotencyKey,
+      idempotencyResult: {
+        status: "processed",
+        workflow_instance_id: workflow.id,
+        workflow_type: workflow.workflow_type,
+        next_state: handlerResult.nextState,
+      },
     });
 
     if (!transition.ok) {
       throw new Error(transition.code);
     }
-
-    await completeIdempotentOperation(idempotencyKey, {
-      status: "processed",
-      workflow_instance_id: transition.workflow.id,
-      workflow_type: transition.workflow.workflow_type,
-      state: transition.workflow.current_state,
-      version: transition.workflow.version,
-    });
+    stepCommitted = true;
 
     return {
       status: "processed",
@@ -113,6 +129,7 @@ export async function processDomainEventById(
   } catch (error) {
     const message = safeErrorMessage(error);
     const retryable = classifyRetryableFailure(error);
+    const retryDecision = calculateRetryDecision(acquiredEvent?.attempt_count ?? 0, retryable);
 
     if (workflowId) {
       await recordWorkflowFailure({
@@ -120,29 +137,37 @@ export async function processDomainEventById(
         errorCode: codeFromError(error),
         message,
         retryable,
-        status: retryable ? "open" : "dead_letter",
-        metadata: sanitizeWorkflowMetadata({ eventId }),
+        status: retryDecision.shouldRetry ? "retry_scheduled" : "dead_letter",
+        attemptNumber: retryDecision.attemptNumber,
+        metadata: sanitizeWorkflowMetadata({ eventId, workerId: options.workerId, retry_reason: retryDecision.reason }),
       });
     }
 
-    try {
-      await failIdempotentOperation(idempotencyKey, {
-        status: "failed",
-        error: message,
-      });
-    } catch {
-      // The idempotency row may not exist if acquisition or definition resolution failed.
+    if (idempotencyStarted && !stepCommitted) {
+      try {
+        await failIdempotentOperation(idempotencyKey, {
+          status: "failed",
+          error: message,
+        });
+      } catch {
+        // Preserve the original safe failure result.
+      }
     }
 
-    try {
-      if (retryable) await markDomainEventFailed(eventId, message);
-      else await markDomainEventDeadLetter(eventId, message);
-    } catch {
-      // Preserve the original safe failure result.
+    if (ownsEvent && acquiredEvent && !stepCommitted && acquiredEvent.processing_status !== "processed") {
+      try {
+        if (retryDecision.shouldRetry && retryDecision.nextRetryAt) {
+          await scheduleDomainEventRetry(eventId, options.workerId, retryDecision.attemptNumber, retryDecision.nextRetryAt);
+        } else {
+          await markDomainEventDeadLetter(eventId, options.workerId, retryDecision.attemptNumber);
+        }
+      } catch {
+        // Preserve the original safe failure result.
+      }
     }
 
     return {
-      status: retryable ? "failed" : "dead_letter",
+      status: retryDecision.shouldRetry ? "failed" : "dead_letter",
       eventId,
       workflowInstance: null,
       failure: {
@@ -160,10 +185,11 @@ export function resolveWorkflowType(event: DomainEventRecord): string {
   return typeof fromPayload === "string" && fromPayload.trim() ? fromPayload.trim() : event.event_type;
 }
 
-function codeFromError(error: unknown): "WORKFLOW_DEFINITION_NOT_FOUND" | "WORKFLOW_HANDLER_FAILED" | "WORKFLOW_STATE_CONFLICT" | "INVALID_TRANSITION" | "IDEMPOTENCY_CONFLICT" | "PERSISTENCE_ERROR" | "UNKNOWN" {
+function codeFromError(error: unknown): "WORKFLOW_DEFINITION_NOT_FOUND" | "WORKFLOW_HANDLER_FAILED" | "WORKFLOW_STATE_CONFLICT" | "INVALID_TRANSITION" | "IDEMPOTENCY_CONFLICT" | "DOMAIN_EVENT_OWNERSHIP_CONFLICT" | "PERSISTENCE_ERROR" | "UNKNOWN" {
   const message = safeErrorMessage(error);
   if (message.includes("WORKFLOW_DEFINITION_NOT_FOUND")) return "WORKFLOW_DEFINITION_NOT_FOUND";
   if (message.includes("WORKFLOW_STATE_CONFLICT")) return "WORKFLOW_STATE_CONFLICT";
+  if (message.includes("DOMAIN_EVENT_OWNERSHIP_CONFLICT")) return "DOMAIN_EVENT_OWNERSHIP_CONFLICT";
   if (message.includes("INVALID_TRANSITION")) return "INVALID_TRANSITION";
   if (message.includes("IDEMPOTENCY")) return "IDEMPOTENCY_CONFLICT";
   if (message.includes("PGRST") || message.includes("PostgREST") || message.includes("SQL")) return "PERSISTENCE_ERROR";

@@ -8,7 +8,7 @@ export function sanitizeWorkflowMetadata(value: unknown): JsonRecord {
 
 export function safeErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "Unknown workflow error");
-  return message.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[REDACTED]").slice(0, 500);
+  return sanitizeSecretString(message).slice(0, 500);
 }
 
 export function classifyRetryableFailure(error: unknown): boolean {
@@ -27,8 +27,16 @@ function sanitizeValue(value: unknown): unknown {
     return out;
   }
   if (typeof value === "string") {
-    return value.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+    return sanitizeSecretString(value);
   }
   return value;
 }
 
+function sanitizeSecretString(value: string): string {
+  return value
+    .replace(/(Authorization\s*:\s*Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[REDACTED]")
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[REDACTED]")
+    .replace(/\b(password|api_key|apikey|access_token|refresh_token|service_role|secret)\s*[:=]\s*([^&\s,;]+)/gi, "$1=[REDACTED]")
+    .replace(/\b(postgres(?:ql)?|mysql|mariadb|mongodb):\/\/([^:\s/@]+):([^@\s]+)@/gi, "$1://$2:[REDACTED]@")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED_JWT]");
+}

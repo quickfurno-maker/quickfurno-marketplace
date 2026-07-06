@@ -11,10 +11,11 @@ export interface CreateDomainEventInput {
   correlationId?: string | null;
   causationId?: string | null;
   idempotencyKey?: string | null;
+  maxAttempts?: number;
 }
 
 export interface AcquiredDomainEvent extends DomainEventRecord {
-  acquisition_status: "acquired" | "already_processed";
+  acquisition_status: "acquired" | "already_processed" | "already_processing" | "retry_not_due";
 }
 
 export async function createDomainEvent(input: CreateDomainEventInput): Promise<DomainEventRecord> {
@@ -29,6 +30,7 @@ export async function createDomainEvent(input: CreateDomainEventInput): Promise<
     causation_id: input.causationId ?? null,
     idempotency_key: input.idempotencyKey ?? null,
     processing_status: "pending",
+    max_attempts: input.maxAttempts ?? 5,
   };
 
   const { data, error } = await adminClient()
@@ -57,6 +59,7 @@ export async function acquireDomainEvent(eventId: string, workerId: string): Pro
     .rpc("qf_acquire_domain_event", {
       p_event_id: eventId,
       p_worker_id: workerId,
+      p_stale_lock_after: "15 minutes",
     })
     .maybeSingle();
 
@@ -64,30 +67,38 @@ export async function acquireDomainEvent(eventId: string, workerId: string): Pro
   return data as AcquiredDomainEvent;
 }
 
-export async function markDomainEventFailed(eventId: string, message: string): Promise<void> {
-  const { error } = await adminClient()
-    .from("domain_events")
-    .update({
-      processing_status: "failed",
-      updated_at: new Date().toISOString(),
-      locked_at: null,
-      locked_by: null,
+export async function scheduleDomainEventRetry(
+  eventId: string,
+  workerId: string,
+  attemptCount: number,
+  nextRetryAt: string,
+): Promise<DomainEventRecord> {
+  const { data, error } = await adminClient()
+    .rpc("qf_schedule_domain_event_retry", {
+      p_event_id: eventId,
+      p_worker_id: workerId,
+      p_attempt_count: attemptCount,
+      p_next_retry_at: nextRetryAt,
     })
-    .eq("id", eventId)
-    .neq("processing_status", "processed");
-  if (error) throw error;
+    .maybeSingle();
+
+  if (error || !data) throw error ?? new Error("DOMAIN_EVENT_RETRY_SCHEDULE_FAILED");
+  return data as DomainEventRecord;
 }
 
-export async function markDomainEventDeadLetter(eventId: string, message: string): Promise<void> {
-  const { error } = await adminClient()
-    .from("domain_events")
-    .update({
-      processing_status: "dead_letter",
-      updated_at: new Date().toISOString(),
-      locked_at: null,
-      locked_by: null,
+export async function markDomainEventDeadLetter(
+  eventId: string,
+  workerId: string,
+  attemptCount: number,
+): Promise<DomainEventRecord> {
+  const { data, error } = await adminClient()
+    .rpc("qf_dead_letter_domain_event", {
+      p_event_id: eventId,
+      p_worker_id: workerId,
+      p_attempt_count: attemptCount,
     })
-    .eq("id", eventId)
-    .neq("processing_status", "processed");
-  if (error) throw error;
+    .maybeSingle();
+
+  if (error || !data) throw error ?? new Error("DOMAIN_EVENT_DEAD_LETTER_FAILED");
+  return data as DomainEventRecord;
 }

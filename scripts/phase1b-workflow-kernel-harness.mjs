@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
@@ -46,6 +46,11 @@ const redaction = requireFromBuild("./lib/aos/workflow/failureRedaction.js");
 const mock = requireFromBuild("./lib/aos/workflow/qfKernelTestWorkflow.js");
 
 const checks = [];
+const migration148 = readFileSync("supabase/migrations/20260706000148_workflow_kernel_safety_hardening.sql", "utf8");
+const kernelSource = readFileSync("lib/aos/workflow/workflowKernel.ts", "utf8");
+const taskServiceSource = readFileSync("lib/aos/workflow/workflowTaskService.ts", "utf8");
+const outboxServiceSource = readFileSync("lib/aos/workflow/outboxService.ts", "utf8");
+const repositorySource = readFileSync("lib/aos/workflow/workflowRepository.ts", "utf8");
 
 function check(name, fn) {
   try {
@@ -83,6 +88,16 @@ check("max attempts produce dead-letter decision", () => {
   assert(result.shouldDeadLetter === true, "fifth attempt should dead-letter");
 });
 
+check("retry policy event scheduling is deterministic", () => {
+  const result = retry.calculateRetryDecision(1, true, new Date("2026-07-06T00:00:00.000Z"));
+  assert(result.nextRetryAt === "2026-07-06T00:05:00.000Z", `unexpected second retry time ${result.nextRetryAt}`);
+});
+
+check("event retry exhaustion dead-letters", () => {
+  const result = retry.calculateRetryDecision(4, true, new Date("2026-07-06T00:00:00.000Z"));
+  assert(result.reason === "max_attempts_exhausted", "expected max attempts exhaustion reason");
+});
+
 check("sensitive error keys are redacted", () => {
   const sanitized = redaction.sanitizeWorkflowMetadata({
     authorization: "Bearer abc123",
@@ -91,6 +106,16 @@ check("sensitive error keys are redacted", () => {
   assert(sanitized.authorization === "[REDACTED]", "authorization should redact");
   assert(sanitized.nested.access_token === "[REDACTED]", "access_token should redact");
   assert(sanitized.nested.safe === "ok", "safe value should remain");
+});
+
+check("sensitive error strings are redacted", () => {
+  const message = redaction.safeErrorMessage(
+    "Authorization: Bearer abc.def.ghi password=swordfish api_key=key123 postgres://user:pass@localhost/db eyJhbGci.eyJzdWIi.signature",
+  );
+  assert(!message.includes("swordfish"), "password value should redact");
+  assert(!message.includes("key123"), "api_key value should redact");
+  assert(!message.includes("user:pass@"), "database URL password should redact");
+  assert(message.includes("[REDACTED]") || message.includes("[REDACTED_JWT]"), "message should contain redaction markers");
 });
 
 check("duplicate workflow registration rejected", () => {
@@ -149,6 +174,9 @@ check("outbox test command remains persistence-only", () => {
       updated_at: "2026-07-06T00:00:00.000Z",
       locked_at: null,
       locked_by: null,
+      attempt_count: 0,
+      max_attempts: 5,
+      next_retry_at: null,
     },
     definition: testDefinition,
     now: "2026-07-06T00:00:00.000Z",
@@ -159,6 +187,55 @@ check("outbox test command remains persistence-only", () => {
 check("kernel test workflow does not reference real lead/vendor services", () => {
   const serialized = JSON.stringify(testDefinition);
   assert(!/leadService|leadMatching|vendor|credit|whatsapp|n8n/i.test(serialized), "mock workflow references real services");
+});
+
+check("already-processing acquisition is non-mutating/skipped", () => {
+  assert(migration148.includes("'already_processing'::text"), "migration must return already_processing");
+  assert(kernelSource.includes('event.acquisition_status === "already_processing"'), "kernel must branch on already_processing");
+  assert(!kernelSource.includes("DOMAIN_EVENT_ALREADY_PROCESSING"), "kernel must not rely on active-processing exceptions");
+});
+
+check("domain event retry lifecycle exists", () => {
+  assert(migration148.includes("retry_scheduled"), "retry_scheduled status must exist");
+  assert(migration148.includes("attempt_count"), "domain event attempt_count must exist");
+  assert(migration148.includes("next_retry_at"), "domain event next_retry_at must exist");
+  assert(kernelSource.includes("scheduleDomainEventRetry"), "kernel must schedule owned retryable failures");
+});
+
+check("worker ownership conflict handling is present", () => {
+  assert(migration148.includes("DOMAIN_EVENT_OWNERSHIP_CONFLICT"), "event ownership conflict must exist");
+  assert(taskServiceSource.includes("WORKFLOW_TASK_OWNERSHIP_CONFLICT"), "task ownership conflict must exist");
+  assert(outboxServiceSource.includes("OUTBOX_OWNERSHIP_CONFLICT"), "outbox ownership conflict must exist");
+});
+
+check("workflow get-or-create race handles expected unique conflict", () => {
+  assert(repositorySource.includes("isActiveWorkflowUniqueConflict"), "race helper must exist");
+  assert(repositorySource.includes("uq_workflow_instances_active_entity"), "partial unique constraint must be targeted");
+  assert(repositorySource.includes("findActiveWorkflowInstance(input.workflowType"), "loser must refetch active winner");
+});
+
+check("task idempotency scope includes execution definition", () => {
+  assert(migration148.includes("v_existing_task.priority is distinct from v_task_priority"), "priority must be compared");
+  assert(migration148.includes("v_existing_task.max_attempts is distinct from v_task_max_attempts"), "max attempts must be compared");
+  assert(migration148.includes("v_existing_task.due_at is distinct from v_task_due_at"), "due_at must be compared when explicit");
+});
+
+check("successful step completes idempotency inside atomic RPC", () => {
+  assert(migration148.includes("p_idempotency_key"), "RPC must accept idempotency key");
+  assert(migration148.includes("update public.idempotency_records"), "RPC must update idempotency record");
+  assert(!kernelSource.includes("completeIdempotentOperation"), "kernel should not complete idempotency after the atomic step");
+});
+
+check("runtime harness does not claim concurrency pass from smoke", () => {
+  const runtimeHarness = readFileSync("scripts/phase1b-workflow-runtime-db-harness.mjs", "utf8");
+  assert(runtimeHarness.includes("DB CONNECTION SMOKE: PASSED"), "smoke status should be explicit");
+  assert(runtimeHarness.includes("RUNTIME DB CONCURRENCY TESTS: NOT RUN"), "smoke-only path must be not-run");
+  assert(!runtimeHarness.includes("PASSED - safe database smoke"), "old misleading pass message must be gone");
+});
+
+check("no provider execution added", () => {
+  const combined = `${kernelSource}\n${readFileSync("lib/aos/workflow/outboxService.ts", "utf8")}`;
+  assert(!/fetch\(|axios|whatsapp\.send|n8n|meta\.|twilio|sendgrid/i.test(combined), "kernel/outbox service must not execute providers");
 });
 
 for (const item of checks) {
@@ -175,4 +252,3 @@ if (failures.length > 0) {
 }
 
 console.log(`\nAll ${checks.length} Phase 1B workflow kernel harness checks passed.`);
-

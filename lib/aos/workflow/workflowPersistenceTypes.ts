@@ -19,6 +19,7 @@ export type WorkflowTaskStatus =
 export type DomainEventStatus =
   | "pending"
   | "processing"
+  | "retry_scheduled"
   | "processed"
   | "failed"
   | "dead_letter";
@@ -96,6 +97,9 @@ export interface DomainEventRecord {
   updated_at: string;
   locked_at: string | null;
   locked_by: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  next_retry_at: string | null;
 }
 
 export interface OutboxEventRecord {

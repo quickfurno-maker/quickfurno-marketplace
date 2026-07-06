@@ -42,20 +42,25 @@ export async function claimOneDueOutboxCommand(workerId: string): Promise<Outbox
   return (data as OutboxEventRecord | null) ?? null;
 }
 
-export async function markOutboxSent(id: string): Promise<void> {
-  const { error } = await adminClient()
+export async function markOutboxSent(id: string, workerId: string): Promise<void> {
+  const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
       status: "sent",
       sent_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("OUTBOX_OWNERSHIP_CONFLICT");
 }
 
-export async function markOutboxCompleted(id: string): Promise<void> {
-  const { error } = await adminClient()
+export async function markOutboxCompleted(id: string, workerId: string): Promise<void> {
+  const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
       status: "completed",
@@ -64,17 +69,23 @@ export async function markOutboxCompleted(id: string): Promise<void> {
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "sent")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("OUTBOX_OWNERSHIP_CONFLICT");
 }
 
 export async function scheduleOutboxRetry(
   event: OutboxEventRecord,
+  workerId: string,
   decision: RetryDecision,
   errorMessage: string,
 ): Promise<void> {
   const terminal = decision.shouldDeadLetter || !decision.shouldRetry;
-  const { error } = await adminClient()
+  const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
       status: terminal ? "dead_letter" : "retry_scheduled",
@@ -85,12 +96,17 @@ export async function scheduleOutboxRetry(
       last_error: errorMessage.slice(0, 500),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", event.id);
+    .eq("id", event.id)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("OUTBOX_OWNERSHIP_CONFLICT");
 }
 
-export async function markOutboxFailed(id: string, errorMessage: string): Promise<void> {
-  const { error } = await adminClient()
+export async function markOutboxFailed(id: string, workerId: string, errorMessage: string): Promise<void> {
+  const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
       status: "failed",
@@ -99,12 +115,17 @@ export async function markOutboxFailed(id: string, errorMessage: string): Promis
       last_error: errorMessage.slice(0, 500),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("OUTBOX_OWNERSHIP_CONFLICT");
 }
 
-export async function markOutboxDeadLetter(id: string, errorMessage: string): Promise<void> {
-  const { error } = await adminClient()
+export async function markOutboxDeadLetter(id: string, workerId: string, errorMessage: string): Promise<void> {
+  const { data, error } = await adminClient()
     .from("outbox_events")
     .update({
       status: "dead_letter",
@@ -113,6 +134,11 @@ export async function markOutboxDeadLetter(id: string, errorMessage: string): Pr
       last_error: errorMessage.slice(0, 500),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("OUTBOX_OWNERSHIP_CONFLICT");
 }

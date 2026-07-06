@@ -36,8 +36,8 @@ export async function claimOneDueWorkflowTask(workerId: string): Promise<Workflo
   return (data as WorkflowTaskRecord | null) ?? null;
 }
 
-export async function markWorkflowTaskCompleted(taskId: string, result: JsonRecord = {}): Promise<void> {
-  const { error } = await adminClient()
+export async function markWorkflowTaskCompleted(taskId: string, workerId: string, result: JsonRecord = {}): Promise<void> {
+  const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
       status: "completed",
@@ -47,18 +47,24 @@ export async function markWorkflowTaskCompleted(taskId: string, result: JsonReco
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", taskId);
+    .eq("id", taskId)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("WORKFLOW_TASK_OWNERSHIP_CONFLICT");
 }
 
 export async function scheduleWorkflowTaskRetry(
   task: WorkflowTaskRecord,
+  workerId: string,
   decision: RetryDecision,
   errorMessage: string,
 ): Promise<void> {
   const nextAttemptCount = Math.min(decision.attemptNumber, task.max_attempts);
   const terminal = decision.shouldDeadLetter || !decision.shouldRetry;
-  const { error } = await adminClient()
+  const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
       status: terminal ? "dead_letter" : "retry_scheduled",
@@ -69,12 +75,17 @@ export async function scheduleWorkflowTaskRetry(
       last_error: errorMessage.slice(0, 500),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", task.id);
+    .eq("id", task.id)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("WORKFLOW_TASK_OWNERSHIP_CONFLICT");
 }
 
-export async function markWorkflowTaskFailed(taskId: string, errorMessage: string): Promise<void> {
-  const { error } = await adminClient()
+export async function markWorkflowTaskFailed(taskId: string, workerId: string, errorMessage: string): Promise<void> {
+  const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
       status: "failed",
@@ -83,12 +94,17 @@ export async function markWorkflowTaskFailed(taskId: string, errorMessage: strin
       last_error: errorMessage.slice(0, 500),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", taskId);
+    .eq("id", taskId)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("WORKFLOW_TASK_OWNERSHIP_CONFLICT");
 }
 
-export async function markWorkflowTaskDeadLetter(taskId: string, errorMessage: string): Promise<void> {
-  const { error } = await adminClient()
+export async function markWorkflowTaskDeadLetter(taskId: string, workerId: string, errorMessage: string): Promise<void> {
+  const { data, error } = await adminClient()
     .from("workflow_tasks")
     .update({
       status: "dead_letter",
@@ -97,8 +113,13 @@ export async function markWorkflowTaskDeadLetter(taskId: string, errorMessage: s
       last_error: errorMessage.slice(0, 500),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", taskId);
+    .eq("id", taskId)
+    .eq("status", "processing")
+    .eq("locked_by", workerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("WORKFLOW_TASK_OWNERSHIP_CONFLICT");
 }
 
 export async function inspectStaleProcessingTasks(olderThanIso: string, limit = 25): Promise<WorkflowTaskRecord[]> {
@@ -113,4 +134,3 @@ export async function inspectStaleProcessingTasks(olderThanIso: string, limit = 
   if (error) throw error;
   return (data ?? []) as WorkflowTaskRecord[];
 }
-

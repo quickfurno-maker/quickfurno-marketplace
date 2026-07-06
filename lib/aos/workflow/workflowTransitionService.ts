@@ -49,6 +49,7 @@ export async function applyWorkflowTransition(
       p_target_status: request.targetStatus,
       p_domain_event_id: request.domainEventId,
       p_event_type: request.eventType,
+      p_worker_id: request.workerId,
       p_reason: request.reason ?? null,
       p_transition_metadata: request.metadata ?? {},
       p_created_by: request.createdBy ?? "workflow_kernel",
@@ -67,20 +68,22 @@ export async function applyWorkflowTransition(
         entity_type: command.entityType ?? null,
         entity_id: command.entityId ?? null,
       })),
+      p_idempotency_key: request.idempotencyKey ?? null,
+      p_idempotency_result: request.idempotencyResult ?? {},
     })
     .maybeSingle();
 
   if (error || !data) {
     const message = error?.message ?? "Workflow transition failed.";
-    const stateConflict = /WORKFLOW_STATE_CONFLICT|DOMAIN_EVENT_PROCESSING_STATE_CONFLICT/i.test(message);
+    const stateConflict = /WORKFLOW_STATE_CONFLICT/i.test(message);
+    const ownershipConflict = /DOMAIN_EVENT_OWNERSHIP_CONFLICT/i.test(message);
     return {
       ok: false,
-      code: stateConflict ? "WORKFLOW_STATE_CONFLICT" : "PERSISTENCE_ERROR",
+      code: stateConflict ? "WORKFLOW_STATE_CONFLICT" : ownershipConflict ? "DOMAIN_EVENT_OWNERSHIP_CONFLICT" : "PERSISTENCE_ERROR",
       message,
-      retryable: stateConflict,
+      retryable: stateConflict || ownershipConflict,
     };
   }
 
   return { ok: true, workflow: data as WorkflowInstanceRecord };
 }
-

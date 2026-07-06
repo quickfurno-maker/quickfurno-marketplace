@@ -9,6 +9,8 @@ import type {
 export type WorkflowKernelStatus =
   | "processed"
   | "already_processed"
+  | "already_processing"
+  | "retry_not_due"
   | "failed"
   | "dead_letter"
   | "skipped";
@@ -16,6 +18,7 @@ export type WorkflowKernelStatus =
 export type WorkflowKernelFailureCode =
   | "DOMAIN_EVENT_NOT_FOUND"
   | "DOMAIN_EVENT_NOT_PROCESSABLE"
+  | "DOMAIN_EVENT_OWNERSHIP_CONFLICT"
   | "WORKFLOW_DEFINITION_NOT_FOUND"
   | "WORKFLOW_HANDLER_FAILED"
   | "WORKFLOW_STATE_CONFLICT"
@@ -77,11 +80,14 @@ export interface WorkflowTransitionRequest {
   targetStatus: WorkflowStatus;
   domainEventId: string;
   eventType: string;
+  workerId: string;
   reason?: string | null;
   metadata?: JsonRecord;
   createdBy?: string | null;
   tasks?: WorkflowTaskRequest[];
   outboxCommands?: OutboxCommandRequest[];
+  idempotencyKey?: string | null;
+  idempotencyResult?: JsonRecord;
 }
 
 export interface WorkflowKernelFailure {
@@ -112,4 +118,3 @@ export interface WorkflowKernelOptions {
   workerId: string;
   createdBy?: string;
 }
-

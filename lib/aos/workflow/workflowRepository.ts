@@ -64,6 +64,20 @@ export async function getWorkflowInstanceById(id: string): Promise<WorkflowInsta
 export async function getOrCreateWorkflowInstance(input: CreateWorkflowInstanceInput): Promise<WorkflowInstanceRecord> {
   const existing = await findActiveWorkflowInstance(input.workflowType, input.entityType, input.entityId);
   if (existing) return existing;
-  return createWorkflowInstance(input);
+
+  try {
+    return await createWorkflowInstance(input);
+  } catch (error) {
+    if (!isActiveWorkflowUniqueConflict(error)) throw error;
+
+    const winner = await findActiveWorkflowInstance(input.workflowType, input.entityType, input.entityId);
+    if (!winner) throw error;
+    return winner;
+  }
 }
 
+export function isActiveWorkflowUniqueConflict(error: unknown): boolean {
+  const maybeError = error as { code?: string; message?: string; details?: string; constraint?: string };
+  const text = `${maybeError.message ?? ""} ${maybeError.details ?? ""} ${maybeError.constraint ?? ""}`;
+  return maybeError.code === "23505" && text.includes("uq_workflow_instances_active_entity");
+}

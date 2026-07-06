@@ -51,8 +51,8 @@ writeFileSync(sqlPath, sql, "utf8");
 
 try {
   execFileSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", sqlPath], { stdio: "inherit", shell: true });
-  console.log("RUNTIME DB CONCURRENCY TESTS: PASSED - safe database smoke connection only; full SQL concurrency scenarios are reserved for an applied local/staging DB.");
+  console.log("DB CONNECTION SMOKE: PASSED");
+  console.log("RUNTIME DB CONCURRENCY TESTS: NOT RUN - full ownership and concurrency scenarios require an applied safe test database harness.");
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
-

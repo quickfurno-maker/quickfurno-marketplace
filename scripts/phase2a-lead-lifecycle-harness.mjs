@@ -4,15 +4,15 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 /**
- * Phase 2A — QuickFurno Lead Lifecycle harness.
+ * Phase 2A — QuickFurno Lead Lifecycle harness (corrected).
  *
- * This is a SOURCE/STATIC test harness. It compiles the pure lifecycle modules
- * plus the generic kernel validators to a throwaway build, then exercises the
- * deterministic handler and cross-checks every produced transition against the
- * kernel's own `validateWorkflowTransition` and `validateHandlerResult`.
+ * SOURCE/STATIC harness. It compiles the pure lifecycle modules plus the generic
+ * kernel validators to a throwaway build, then exercises the deterministic
+ * handler and cross-checks every produced transition against the kernel's own
+ * `validateWorkflowTransition` and `validateHandlerResult`.
  *
  * It does NOT connect to any database and does NOT claim real database
- * integration. Runtime DB integration is intentionally deferred to a later phase.
+ * integration; runtime DB integration is intentionally deferred to a later phase.
  */
 
 const outDir = resolve(".phase2a-test-build");
@@ -69,6 +69,7 @@ const kernelTest = requireFromBuild("./lib/aos/workflow/qfKernelTestWorkflow.js"
 
 const states = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleStates.js`);
 const events = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleEvents.js`);
+const types = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleTypes.js`);
 const validation = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleValidation.js`);
 const taskIntents = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleTaskIntents.js`);
 const handlerMod = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleHandler.js`);
@@ -77,6 +78,8 @@ const registrationMod = requireFromBuild(`./${LIFECYCLE_DIR}/leadLifecycleRegist
 
 const S = states.LeadLifecycleState;
 const E = events.LeadLifecycleEventType;
+const O = types.ManualReviewOutcome;
+const T = taskIntents.LeadLifecycleTaskIntent;
 const definition = definitionMod.createLeadLifecycleWorkflowDefinition();
 
 const checks = [];
@@ -91,18 +94,25 @@ function check(name, fn) {
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
+function expectThrows(fn) {
+  try {
+    fn();
+    return false;
+  } catch {
+    return true;
+  }
+}
 
+const LEAD_ID = "lead_1";
 let seq = 0;
-function makeContext(currentState, eventType, payload = {}) {
+function makeContext(currentState, eventType, payload = {}, overrides = {}) {
   seq += 1;
-  const workflowId = `wf_${seq}`;
-  const eventId = `evt_${seq}`;
   return {
     workflow: {
-      id: workflowId,
+      id: `wf_${seq}`,
       workflow_type: states.LEAD_LIFECYCLE_WORKFLOW_TYPE,
-      entity_type: "lead",
-      entity_id: "lead_1",
+      entity_type: overrides.wfEntityType ?? "lead",
+      entity_id: overrides.wfEntityId ?? LEAD_ID,
       current_state: currentState,
       status: state.normalizeWorkflowStatus(states.leadLifecycleStatusForState(currentState)),
       version: 1,
@@ -114,10 +124,10 @@ function makeContext(currentState, eventType, payload = {}) {
       created_at: "2026-07-06T00:00:00.000Z",
     },
     event: {
-      id: eventId,
+      id: `evt_${seq}`,
       event_type: eventType,
-      entity_type: "lead",
-      entity_id: "lead_1",
+      entity_type: overrides.eventEntityType ?? "lead",
+      entity_id: overrides.eventEntityId ?? LEAD_ID,
       payload_version: 1,
       payload_json: payload,
       trace_id: null,
@@ -139,8 +149,8 @@ function makeContext(currentState, eventType, payload = {}) {
 }
 
 /** Run the handler and assert the produced step is a kernel-valid transition. */
-function runValidStep(currentState, eventType, payload) {
-  const context = makeContext(currentState, eventType, payload);
+function runValidStep(currentState, eventType, payload, overrides) {
+  const context = makeContext(currentState, eventType, payload, overrides);
   const result = handlerMod.leadLifecycleHandler(context);
 
   const handlerValidation = kernelValidation.validateHandlerResult(result);
@@ -159,222 +169,339 @@ function runValidStep(currentState, eventType, payload) {
   return result;
 }
 
-function expectThrows(fn) {
-  let threw = false;
-  try {
-    fn();
-  } catch {
-    threw = true;
-  }
-  return threw;
-}
+// ==================================================================
+// CORRECTION 1 — Canonical lead identity
+// ==================================================================
+check("C1a. canonical lead identity accepted; canonical id used in task + metadata", () => {
+  const result = runValidStep(S.RECEIVED, E.LIFECYCLE_STARTED, {});
+  assert(result.metadata.lead_id === LEAD_ID, "metadata must carry canonical lead id");
+  assert(result.tasks[0].payload.lead_id === LEAD_ID, "task payload must carry canonical lead id");
+});
 
-// ------------------------------------------------------------------
-// 1. Lifecycle start
-// ------------------------------------------------------------------
+check("C1b. missing payload.lead_id accepted via entity identity", () => {
+  const id = validation.resolveCanonicalLeadIdentity(
+    { entity_type: "lead", entity_id: LEAD_ID },
+    { entity_type: "lead", entity_id: LEAD_ID, payload_json: {} },
+  );
+  assert(id.ok === true && id.value.leadId === LEAD_ID, "entity identity should resolve without payload lead_id");
+});
+
+check("C1c. matching payload.lead_id (== entity_id) accepted", () => {
+  const result = runValidStep(S.RECEIVED, E.LIFECYCLE_STARTED, { lead_id: LEAD_ID });
+  assert(result.metadata.lead_id === LEAD_ID, "matching payload lead_id should be accepted");
+});
+
+check("C1d. mismatched payload.lead_id rejected (LEAD_IDENTITY_MISMATCH)", () => {
+  const id = validation.resolveCanonicalLeadIdentity(
+    { entity_type: "lead", entity_id: "LEAD-A" },
+    { entity_type: "lead", entity_id: "LEAD-A", payload_json: { lead_id: "LEAD-B" } },
+  );
+  assert(id.ok === false && id.message === "LEAD_IDENTITY_MISMATCH", "payload lead mismatch must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.RECEIVED, E.LIFECYCLE_STARTED, { lead_id: "LEAD-B" }))), "handler must throw on mismatch");
+});
+
+check("C1e. event/workflow entity mismatch rejected", () => {
+  const id = validation.resolveCanonicalLeadIdentity(
+    { entity_type: "lead", entity_id: "LEAD-A" },
+    { entity_type: "lead", entity_id: "LEAD-B", payload_json: {} },
+  );
+  assert(id.ok === false && id.message === "WORKFLOW_EVENT_ENTITY_MISMATCH", "workflow/event entity mismatch must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.RECEIVED, E.LIFECYCLE_STARTED, {}, { wfEntityId: "LEAD-A", eventEntityId: "LEAD-B" }))), "handler must throw on entity mismatch");
+});
+
+check("C1f. non-lead entity_type rejected", () => {
+  const id = validation.resolveCanonicalLeadIdentity(
+    { entity_type: "lead", entity_id: LEAD_ID },
+    { entity_type: "vendor", entity_id: LEAD_ID, payload_json: {} },
+  );
+  assert(id.ok === false && id.message === "LEAD_ENTITY_TYPE_REQUIRED", "non-lead event entity_type must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.RECEIVED, E.LIFECYCLE_STARTED, {}, { eventEntityType: "vendor" }))), "handler must throw on non-lead entity");
+});
+
+check("C1g. empty entity id rejected", () => {
+  const id = validation.resolveCanonicalLeadIdentity(
+    { entity_type: "lead", entity_id: "" },
+    { entity_type: "lead", entity_id: "", payload_json: {} },
+  );
+  assert(id.ok === false && id.message === "LEAD_ENTITY_ID_REQUIRED", "empty entity id must reject");
+});
+
+check("C1h. workflow entity_type mismatch rejected", () => {
+  const id = validation.resolveCanonicalLeadIdentity(
+    { entity_type: "unknown", entity_id: LEAD_ID },
+    { entity_type: "lead", entity_id: LEAD_ID, payload_json: {} },
+  );
+  assert(id.ok === false && id.message === "WORKFLOW_ENTITY_TYPE_MISMATCH", "workflow entity_type mismatch must reject");
+});
+
+// ==================================================================
+// Lifecycle start + quality routing (retained)
+// ==================================================================
 check("1. lifecycle start enters QUALITY_SCORING_PENDING", () => {
-  const result = runValidStep(S.RECEIVED, E.LIFECYCLE_STARTED, { lead_id: "L1" });
+  const result = runValidStep(S.RECEIVED, E.LIFECYCLE_STARTED, {});
   assert(result.nextState === S.QUALITY_SCORING_PENDING, `got ${result.nextState}`);
-  assert(result.workflowStatus === "active", "start should stay active");
-  assert(result.tasks?.[0]?.taskType === taskIntents.LeadLifecycleTaskIntent.QUALITY_SCORE, "should open quality score task");
+  assert(result.tasks[0].taskType === T.QUALITY_SCORE, "should open quality score task");
 });
 
-// ------------------------------------------------------------------
-// 2-7. Quality routing (initial)
-// ------------------------------------------------------------------
 check("2. A+ routes to READY_FOR_MATCHING", () => {
-  const result = runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "A+" });
-  assert(result.nextState === S.READY_FOR_MATCHING, `got ${result.nextState}`);
+  assert(runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "A+" }).nextState === S.READY_FOR_MATCHING);
 });
-
 check("3. A routes to READY_FOR_MATCHING", () => {
-  const result = runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "A" });
-  assert(result.nextState === S.READY_FOR_MATCHING, `got ${result.nextState}`);
+  assert(runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "A" }).nextState === S.READY_FOR_MATCHING);
 });
-
-check("4. B routes to CLARIFICATION_PENDING", () => {
+check("4. B routes to CLARIFICATION_PENDING_1", () => {
   const result = runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "B" });
-  assert(result.nextState === S.CLARIFICATION_PENDING, `got ${result.nextState}`);
-  assert(result.tasks?.[0]?.taskType === taskIntents.LeadLifecycleTaskIntent.CLARIFICATION_PREPARE, "should open clarification prepare task");
+  assert(result.nextState === S.CLARIFICATION_PENDING_1, `got ${result.nextState}`);
+  assert(result.tasks[0].taskType === T.CLARIFICATION_PREPARE, "should open clarification prepare task");
 });
-
 check("5. C routes to NURTURE_PENDING", () => {
-  const result = runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "C" });
-  assert(result.nextState === S.NURTURE_PENDING, `got ${result.nextState}`);
+  assert(runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "C" }).nextState === S.NURTURE_PENDING);
 });
-
 check("6. D routes to REJECTED", () => {
   const result = runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "D" });
-  assert(result.nextState === S.REJECTED, `got ${result.nextState}`);
-  assert(result.workflowStatus === "cancelled", "rejected should be cancelled status");
+  assert(result.nextState === S.REJECTED && result.workflowStatus === "cancelled", `got ${result.nextState}`);
 });
-
 check("7. D + manual_review_required routes to MANUAL_REVIEW_PENDING", () => {
-  const result = runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, {
-    tier: "D",
-    manual_review_required: true,
-  });
+  assert(runValidStep(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "D", manual_review_required: true }).nextState === S.MANUAL_REVIEW_PENDING);
+});
+
+// ==================================================================
+// CORRECTION 2 — Durable bounded clarification rounds
+// ==================================================================
+check("8. clarification (round 1) completed -> RESCORE_PENDING_1", () => {
+  const result = runValidStep(S.CLARIFICATION_PENDING_1, E.CLARIFICATION_COMPLETED, {});
+  assert(result.nextState === S.RESCORE_PENDING_1, `got ${result.nextState}`);
+  assert(result.tasks[0].taskType === T.QUALITY_RESCORE, "should open rescore task");
+});
+check("9. rescore A -> READY_FOR_MATCHING", () => {
+  assert(runValidStep(S.RESCORE_PENDING_1, E.QUALITY_RESULTED, { tier: "A" }).nextState === S.READY_FOR_MATCHING);
+});
+check("10. rescore B (round 1) without authorization -> MANUAL_REVIEW_PENDING", () => {
+  const result = runValidStep(S.RESCORE_PENDING_1, E.QUALITY_RESULTED, { tier: "B" });
   assert(result.nextState === S.MANUAL_REVIEW_PENDING, `got ${result.nextState}`);
 });
-
-// ------------------------------------------------------------------
-// 8-11. Clarification + rescore + loop safety
-// ------------------------------------------------------------------
-check("8. clarification completed routes to RESCORE_PENDING", () => {
-  const result = runValidStep(S.CLARIFICATION_PENDING, E.CLARIFICATION_COMPLETED, { lead_id: "L1" });
-  assert(result.nextState === S.RESCORE_PENDING, `got ${result.nextState}`);
-  assert(result.tasks?.[0]?.taskType === taskIntents.LeadLifecycleTaskIntent.QUALITY_RESCORE, "should open rescore task");
+check("11. rescore B (round 1) with authorization -> CLARIFICATION_PENDING_2", () => {
+  const result = runValidStep(S.RESCORE_PENDING_1, E.QUALITY_RESULTED, { tier: "B", clarification_allowed: true });
+  assert(result.nextState === S.CLARIFICATION_PENDING_2, `got ${result.nextState}`);
 });
-
-check("9. rescore A routes to READY_FOR_MATCHING", () => {
-  const result = runValidStep(S.RESCORE_PENDING, E.QUALITY_RESULTED, { tier: "A" });
-  assert(result.nextState === S.READY_FOR_MATCHING, `got ${result.nextState}`);
+check("C2a. clarification (round 2) completed -> RESCORE_PENDING_2", () => {
+  assert(runValidStep(S.CLARIFICATION_PENDING_2, E.CLARIFICATION_COMPLETED, {}).nextState === S.RESCORE_PENDING_2);
 });
-
-check("10. rescore B without permission does NOT re-enter clarification (loop safe)", () => {
-  const result = runValidStep(S.RESCORE_PENDING, E.QUALITY_RESULTED, { tier: "B" });
-  assert(result.nextState !== S.CLARIFICATION_PENDING, "must not loop back into clarification");
+check("C2b. rescore B (round 2) with authorization -> MANUAL_REVIEW_PENDING (cap)", () => {
+  const result = runValidStep(S.RESCORE_PENDING_2, E.QUALITY_RESULTED, { tier: "B", clarification_allowed: true });
   assert(result.nextState === S.MANUAL_REVIEW_PENDING, `got ${result.nextState}`);
-  assert(result.metadata?.quality?.loop_safety_applied === true, "loop safety flag should be recorded");
+  assert(result.metadata.quality.loop_safety_applied === true, "cap fallback must flag loop safety");
+});
+check("C2c. repeated B cannot bypass cap by RESETTING payload clarification_cycle", () => {
+  // Full path; every rescore resets clarification_cycle to 0, yet the cap holds
+  // because the round is derived from durable state, not the payload.
+  const walk = [
+    [S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "B", clarification_cycle: 0 }, S.CLARIFICATION_PENDING_1],
+    [S.CLARIFICATION_PENDING_1, E.CLARIFICATION_COMPLETED, {}, S.RESCORE_PENDING_1],
+    [S.RESCORE_PENDING_1, E.QUALITY_RESULTED, { tier: "B", clarification_allowed: true, clarification_cycle: 0 }, S.CLARIFICATION_PENDING_2],
+    [S.CLARIFICATION_PENDING_2, E.CLARIFICATION_COMPLETED, {}, S.RESCORE_PENDING_2],
+    [S.RESCORE_PENDING_2, E.QUALITY_RESULTED, { tier: "B", clarification_allowed: true, clarification_cycle: 0 }, S.MANUAL_REVIEW_PENDING],
+  ];
+  for (const [from, evt, payload, expected] of walk) {
+    assert(runValidStep(from, evt, payload).nextState === expected, `expected ${expected} from ${from}`);
+  }
+});
+check("C2d. structural cap: RESCORE_PENDING_2 has no clarification edge; no round-3 state", () => {
+  const edges = states.LEAD_LIFECYCLE_TRANSITIONS[S.RESCORE_PENDING_2];
+  assert(!edges.includes(S.CLARIFICATION_PENDING_1) && !edges.includes(S.CLARIFICATION_PENDING_2), "no clarification re-entry from final rescore round");
+  assert(states.CLARIFICATION_STATE_BY_ROUND[states.MAX_CLARIFICATION_CYCLES + 1] === undefined, "there must be no clarification round beyond the cap");
+  assert(states.MAX_CLARIFICATION_CYCLES === 2, "cap constant retained at 2");
+});
+check("C2e. even the kernel blocks a round-3 attempt from RESCORE_PENDING_2", () => {
+  const v = state.validateWorkflowTransition(definition, S.RESCORE_PENDING_2, S.CLARIFICATION_PENDING_2, "active");
+  assert(v.ok === false && v.code === "INVALID_TRANSITION", "kernel must reject re-clarification from final rescore round");
 });
 
-check("11. rescore B with explicit clarification_allowed routes to CLARIFICATION_PENDING", () => {
-  const result = runValidStep(S.RESCORE_PENDING, E.QUALITY_RESULTED, {
-    tier: "B",
-    clarification_allowed: true,
-    clarification_cycle: 1,
-  });
-  assert(result.nextState === S.CLARIFICATION_PENDING, `got ${result.nextState}`);
-});
-
-check("11b. rescore B with clarification_allowed but cap exhausted routes to MANUAL_REVIEW_PENDING", () => {
-  const result = runValidStep(S.RESCORE_PENDING, E.QUALITY_RESULTED, {
-    tier: "B",
-    clarification_allowed: true,
-    clarification_cycle: handlerMod.MAX_CLARIFICATION_CYCLES,
-  });
-  assert(result.nextState === S.MANUAL_REVIEW_PENDING, `got ${result.nextState}`);
-});
-
-// ------------------------------------------------------------------
-// 12-13. Matching lifecycle
-// ------------------------------------------------------------------
+// ==================================================================
+// Matching lifecycle + CORRECTION 4 vendor count contract
+// ==================================================================
 check("12. matching requested: READY_FOR_MATCHING -> MATCHING_PENDING", () => {
-  const result = runValidStep(S.READY_FOR_MATCHING, E.MATCHING_REQUESTED, { lead_id: "L1" });
-  assert(result.nextState === S.MATCHING_PENDING, `got ${result.nextState}`);
-  assert(result.tasks?.[0]?.taskType === taskIntents.LeadLifecycleTaskIntent.MATCHING_PREPARE, "should open matching prepare task");
+  const result = runValidStep(S.READY_FOR_MATCHING, E.MATCHING_REQUESTED, {});
+  assert(result.nextState === S.MATCHING_PENDING && result.tasks[0].taskType === T.MATCHING_PREPARE);
+});
+check("13. matching completed (count 3) -> MATCH_RECOMMENDATION_READY", () => {
+  const result = runValidStep(S.MATCHING_PENDING, E.MATCHING_COMPLETED, { recommended_vendor_count: 3 });
+  assert(result.nextState === S.MATCH_RECOMMENDATION_READY && result.metadata.recommended_vendor_count === 3);
+});
+check("C4a. matching count 0 accepted", () => {
+  assert(validation.validateMatchingResult({ recommended_vendor_count: 0 }).ok === true);
+});
+check("C4b. matching count 1..3 accepted", () => {
+  for (const n of [1, 2, 3]) assert(validation.validateMatchingResult({ recommended_vendor_count: n }).ok === true, `count ${n}`);
+});
+check("C4c. matching count 4 rejected", () => {
+  const r = validation.validateMatchingResult({ recommended_vendor_count: 4 });
+  assert(r.ok === false && r.message === "RECOMMENDED_VENDOR_COUNT_INVALID", "count > 3 must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MATCHING_PENDING, E.MATCHING_COMPLETED, { recommended_vendor_count: 4 }))), "handler must throw on count 4");
+});
+check("C4d. matching count missing/fraction/string/negative rejected", () => {
+  assert(validation.validateMatchingResult({}).ok === false, "missing count must reject");
+  assert(validation.validateMatchingResult({ recommended_vendor_count: 1.5 }).ok === false, "fraction must reject");
+  assert(validation.validateMatchingResult({ recommended_vendor_count: "3" }).ok === false, "string must reject");
+  assert(validation.validateMatchingResult({ recommended_vendor_count: -1 }).ok === false, "negative must reject");
+});
+check("C4e. matching vendor_ids must agree with count", () => {
+  assert(validation.validateMatchingResult({ recommended_vendor_count: 2, recommended_vendor_ids: ["v1", "v2"] }).ok === true, "matching ids accepted");
+  assert(validation.validateMatchingResult({ recommended_vendor_count: 2, recommended_vendor_ids: ["v1"] }).ok === false, "id/count mismatch must reject");
 });
 
-check("13. matching completed: MATCHING_PENDING -> MATCH_RECOMMENDATION_READY", () => {
-  const result = runValidStep(S.MATCHING_PENDING, E.MATCHING_COMPLETED, { lead_id: "L1" });
-  assert(result.nextState === S.MATCH_RECOMMENDATION_READY, `got ${result.nextState}`);
-});
-
-// ------------------------------------------------------------------
-// 14-16. Distribution approval lifecycle + future auto authorization
-// ------------------------------------------------------------------
+// ==================================================================
+// Distribution approval lifecycle + future auto authorization
+// ==================================================================
 check("14. approval required: MATCH_RECOMMENDATION_READY -> DISTRIBUTION_APPROVAL_PENDING", () => {
-  const result = runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, {});
-  assert(result.nextState === S.DISTRIBUTION_APPROVAL_PENDING, `got ${result.nextState}`);
+  assert(runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, {}).nextState === S.DISTRIBUTION_APPROVAL_PENDING);
 });
-
 check("15. explicit approval: DISTRIBUTION_APPROVAL_PENDING -> DISTRIBUTION_PENDING", () => {
-  const result = runValidStep(S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {});
-  assert(result.nextState === S.DISTRIBUTION_PENDING, `got ${result.nextState}`);
+  assert(runValidStep(S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {}).nextState === S.DISTRIBUTION_PENDING);
 });
-
-check("16. auto-authorized exists but does not activate real distribution", () => {
+check("16. auto-authorized exists but activates no real distribution", () => {
   const result = runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_AUTO_AUTHORIZED, {});
-  assert(result.nextState === S.DISTRIBUTION_PENDING, `got ${result.nextState}`);
-  assert(result.metadata?.auto_authorized === true, "should flag auto authorization");
-  // No external side effects: only a persistence-only prepare task intent, no outbox commands.
-  assert(!result.outboxCommands || result.outboxCommands.length === 0, "auto-authorize must not emit outbox/provider commands");
-  assert(result.tasks?.[0]?.taskType === taskIntents.LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE, "should only open a prepare intent");
+  assert(result.nextState === S.DISTRIBUTION_PENDING && result.metadata.auto_authorized === true);
+  assert(!result.outboxCommands || result.outboxCommands.length === 0, "no outbox/provider commands");
+  assert(result.tasks[0].taskType === T.DISTRIBUTION_PREPARE, "only a prepare intent");
 });
 
-// ------------------------------------------------------------------
-// 17. Distribution completion + closure
-// ------------------------------------------------------------------
-check("17. distribution completed: DISTRIBUTION_PENDING -> DISTRIBUTED", () => {
-  const result = runValidStep(S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, {});
-  assert(result.nextState === S.DISTRIBUTED, `got ${result.nextState}`);
+// ==================================================================
+// Distribution completion + CORRECTION 4 distribution count contract
+// ==================================================================
+check("17. distribution completed (count 3) -> DISTRIBUTED", () => {
+  const result = runValidStep(S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 3 });
+  assert(result.nextState === S.DISTRIBUTED && result.metadata.distributed_vendor_count === 3);
 });
-
 check("17b. distributed can close: DISTRIBUTED -> CLOSED", () => {
   const result = runValidStep(S.DISTRIBUTED, E.CLOSED, {});
-  assert(result.nextState === S.CLOSED, `got ${result.nextState}`);
-  assert(result.workflowStatus === "completed", "closed should complete workflow");
+  assert(result.nextState === S.CLOSED && result.workflowStatus === "completed");
+});
+check("C4f. distribution count 1..3 accepted", () => {
+  for (const n of [1, 2, 3]) assert(validation.validateDistributionResult({ distributed_vendor_count: n }).ok === true, `count ${n}`);
+});
+check("C4g. distribution count 0 rejected", () => {
+  const r = validation.validateDistributionResult({ distributed_vendor_count: 0 });
+  assert(r.ok === false && r.message === "DISTRIBUTED_VENDOR_COUNT_INVALID", "0 distributed must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 0 }))), "handler must throw on 0");
+});
+check("C4h. distribution count 4 rejected", () => {
+  assert(validation.validateDistributionResult({ distributed_vendor_count: 4 }).ok === false, "count > 3 must reject");
+});
+check("C4i. distribution non-integer/string rejected", () => {
+  assert(validation.validateDistributionResult({ distributed_vendor_count: 2.5 }).ok === false, "fraction must reject");
+  assert(validation.validateDistributionResult({ distributed_vendor_count: "2" }).ok === false, "string must reject");
+});
+check("C4j. MAX_VENDORS_PER_LEAD constant is 3", () => {
+  assert(types.MAX_VENDORS_PER_LEAD === 3, "shared max vendor constant must be 3");
 });
 
-// ------------------------------------------------------------------
-// 18-21. Validation + invalid combinations + terminal safety
-// ------------------------------------------------------------------
+// ==================================================================
+// CORRECTION 3 — Manual review resolution contract
+// ==================================================================
+check("C3a. manual review -> matching (APPROVE_FOR_MATCHING)", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_FOR_MATCHING }).nextState === S.READY_FOR_MATCHING);
+});
+check("C3b. manual review -> clarification (ALLOW_CLARIFICATION)", () => {
+  const result = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.ALLOW_CLARIFICATION });
+  assert(result.nextState === S.CLARIFICATION_PENDING_1, `got ${result.nextState}`);
+});
+check("C3c. manual review -> nurture (SEND_TO_NURTURE)", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.SEND_TO_NURTURE }).nextState === S.NURTURE_PENDING);
+});
+check("C3d. manual review -> reject (REJECT)", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.REJECT }).nextState === S.REJECTED);
+});
+check("C3e. manual review -> close (CLOSE)", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.CLOSE }).nextState === S.CLOSED);
+});
+check("C3f. APPROVE_DISTRIBUTION requires explicit authorization metadata", () => {
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_DISTRIBUTION }))), "must reject without authorization");
+  const result = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_DISTRIBUTION, distribution_authorized: true });
+  assert(result.nextState === S.DISTRIBUTION_PENDING && result.metadata.distribution_authorized === true, "authorized approval -> distribution pending");
+});
+check("C3g. invalid manual review outcome rejected", () => {
+  assert(validation.validateManualReviewResolution({ outcome: "FOO" }).ok === false, "unknown outcome must reject");
+  assert(validation.validateManualReviewResolution({}).ok === false, "missing outcome must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: "FOO" }))), "handler must throw on invalid outcome");
+});
+check("C3h. MANUAL_REVIEW_PENDING edges exactly match resolution outcomes (no FAILED edge)", () => {
+  const edges = new Set(states.LEAD_LIFECYCLE_TRANSITIONS[S.MANUAL_REVIEW_PENDING]);
+  const expected = new Set([S.READY_FOR_MATCHING, S.CLARIFICATION_PENDING_1, S.NURTURE_PENDING, S.DISTRIBUTION_PENDING, S.REJECTED, S.CLOSED]);
+  assert(edges.size === expected.size, `edge count mismatch: ${[...edges].join(",")}`);
+  for (const e of expected) assert(edges.has(e), `missing edge ${e}`);
+  assert(!edges.has(S.FAILED), "unsafe FAILED edge must be removed from manual review");
+});
+
+// ==================================================================
+// Nurture requalification
+// ==================================================================
+check("C5a. nurture requalification: NURTURE_PENDING -> QUALITY_SCORING_PENDING", () => {
+  const result = runValidStep(S.NURTURE_PENDING, E.NURTURE_REQUALIFICATION_REQUESTED, {});
+  assert(result.nextState === S.QUALITY_SCORING_PENDING, `got ${result.nextState}`);
+  assert(result.tasks[0].taskType === T.QUALITY_SCORE, "requalification should re-open the quality score task intent");
+  assert(result.metadata.requalification === true, "should flag requalification");
+});
+
+// ==================================================================
+// Validation + invalid combinations + terminal safety (retained)
+// ==================================================================
 check("18. invalid quality tier rejected by validation and handler", () => {
   const invalid = validation.validateQualityResult({ tier: "Z" });
-  assert(invalid.ok === false && invalid.message === "QUALITY_TIER_INVALID", "validation must reject unknown tier");
-  const threw = expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "Z" })));
-  assert(threw, "handler must throw on invalid tier");
+  assert(invalid.ok === false && invalid.message === "QUALITY_TIER_INVALID");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "Z" }))));
 });
-
 check("18b. arbitrary score strings are not accepted", () => {
-  assert(validation.validateQualityResult({ tier: "92" }).ok === false, "numeric-string score must reject");
-  assert(validation.validateQualityResult({ tier: "great" }).ok === false, "freeform tier must reject");
-  assert(validation.validateQualityResult({}).ok === false, "missing tier must reject");
+  assert(validation.validateQualityResult({ tier: "92" }).ok === false);
+  assert(validation.validateQualityResult({ tier: "great" }).ok === false);
+  assert(validation.validateQualityResult({}).ok === false);
 });
-
-check("18c. clarification_cycle must be a non-negative integer", () => {
-  assert(validation.validateQualityResult({ tier: "B", clarification_cycle: -1 }).ok === false, "negative cycle must reject");
-  assert(validation.validateQualityResult({ tier: "B", clarification_cycle: 1.5 }).ok === false, "fractional cycle must reject");
-  assert(validation.validateQualityResult({ tier: "B", clarification_cycle: 0 }).ok === true, "zero cycle must accept");
+check("18c. clarification_cycle must be a non-negative integer (payload hygiene)", () => {
+  assert(validation.validateQualityResult({ tier: "B", clarification_cycle: -1 }).ok === false);
+  assert(validation.validateQualityResult({ tier: "B", clarification_cycle: 1.5 }).ok === false);
+  assert(validation.validateQualityResult({ tier: "B", clarification_cycle: 0 }).ok === true);
 });
-
 check("19. invalid event/state combination rejected", () => {
-  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.READY_FOR_MATCHING, E.QUALITY_RESULTED, { tier: "A" }))), "quality result is invalid in READY_FOR_MATCHING");
-  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.RECEIVED, E.MATCHING_REQUESTED, {}))), "matching request is invalid in RECEIVED");
-  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVED, {}))), "approval is invalid without approval-pending");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.READY_FOR_MATCHING, E.QUALITY_RESULTED, { tier: "A" }))));
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.RECEIVED, E.MATCHING_REQUESTED, {}))));
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVED, {}))));
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.QUALITY_SCORING_PENDING, E.NURTURE_REQUALIFICATION_REQUESTED, {}))));
 });
-
 check("20. terminal REJECTED workflow cannot continue into matching", () => {
-  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.REJECTED, E.MATCHING_REQUESTED, {}))), "handler must refuse to leave REJECTED");
-  const validationResult = state.validateWorkflowTransition(definition, S.REJECTED, S.MATCHING_PENDING, "cancelled");
-  assert(validationResult.ok === false && validationResult.code === "TERMINAL_WORKFLOW", "kernel must block terminal REJECTED transitions");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.REJECTED, E.MATCHING_REQUESTED, {}))));
+  const v = state.validateWorkflowTransition(definition, S.REJECTED, S.MATCHING_PENDING, "cancelled");
+  assert(v.ok === false && v.code === "TERMINAL_WORKFLOW");
 });
-
 check("21. CLOSED is terminal", () => {
-  assert(states.LEAD_LIFECYCLE_TERMINAL_STATES.includes(S.CLOSED), "CLOSED must be terminal");
-  assert(state.isTerminalState(definition, S.CLOSED), "definition must mark CLOSED terminal");
-  const validationResult = state.validateWorkflowTransition(definition, S.CLOSED, S.READY_FOR_MATCHING, "completed");
-  assert(validationResult.ok === false, "no transition allowed out of CLOSED");
-  assert(!states.LEAD_LIFECYCLE_TRANSITIONS[S.CLOSED], "terminal states have no outgoing edges");
+  assert(states.LEAD_LIFECYCLE_TERMINAL_STATES.includes(S.CLOSED));
+  assert(state.isTerminalState(definition, S.CLOSED));
+  assert(state.validateWorkflowTransition(definition, S.CLOSED, S.READY_FOR_MATCHING, "completed").ok === false);
+  assert(!states.LEAD_LIFECYCLE_TRANSITIONS[S.CLOSED]);
 });
-
-check("21b. FAILED and REJECTED are terminal with no outgoing edges", () => {
+check("21b. terminal states have no outgoing edges", () => {
   for (const terminal of states.LEAD_LIFECYCLE_TERMINAL_STATES) {
     assert(!states.LEAD_LIFECYCLE_TRANSITIONS[terminal], `${terminal} must have no outgoing transitions`);
   }
-  assert(states.leadLifecycleStatusForState(S.FAILED) === "failed", "FAILED maps to failed status");
+  assert(states.leadLifecycleStatusForState(S.FAILED) === "failed");
 });
 
-// ------------------------------------------------------------------
-// 22. Deterministic idempotency keys
-// ------------------------------------------------------------------
+// ==================================================================
+// Deterministic idempotency keys (retained)
+// ==================================================================
 check("22. task intents use deterministic idempotency keys", () => {
-  const key1 = taskIntents.buildLeadLifecycleTaskIdempotencyKey("wf_x", "evt_y", taskIntents.LeadLifecycleTaskIntent.QUALITY_SCORE);
-  const key2 = taskIntents.buildLeadLifecycleTaskIdempotencyKey("wf_x", "evt_y", taskIntents.LeadLifecycleTaskIntent.QUALITY_SCORE);
-  assert(key1 === key2, "same identity must yield same key");
-  assert(key1 === "qf_lead_lifecycle:task:wf_x:evt_y:lead.quality.score", `unexpected key: ${key1}`);
-
-  // The handler produces reproducible keys from durable identity only.
-  const ctx = makeContext(S.RECEIVED, E.LIFECYCLE_STARTED, { lead_id: "L1" });
+  const key1 = taskIntents.buildLeadLifecycleTaskIdempotencyKey("wf_x", "evt_y", T.QUALITY_SCORE);
+  const key2 = taskIntents.buildLeadLifecycleTaskIdempotencyKey("wf_x", "evt_y", T.QUALITY_SCORE);
+  assert(key1 === key2 && key1 === "qf_lead_lifecycle:task:wf_x:evt_y:lead.quality.score", `unexpected key: ${key1}`);
+  const ctx = makeContext(S.RECEIVED, E.LIFECYCLE_STARTED, {});
   const first = handlerMod.leadLifecycleHandler(ctx);
   const second = handlerMod.leadLifecycleHandler(ctx);
   assert(first.tasks[0].idempotencyKey === second.tasks[0].idempotencyKey, "replay must reproduce identical key");
   assert(!/\d{13}|Math\.random|[0-9a-f]{8}-[0-9a-f]{4}/.test(first.tasks[0].idempotencyKey), "key must not embed timestamps/random/uuid");
 });
 
-// ------------------------------------------------------------------
-// 23-29. No forbidden imports / no provider execution
-// ------------------------------------------------------------------
+// ==================================================================
+// No forbidden imports / no provider execution (retained)
+// ==================================================================
 const lifecycleSources = lifecycleFiles.map((file) => readFileSync(`${LIFECYCLE_DIR}/${file}`, "utf8"));
 const combinedSource = lifecycleSources.join("\n");
 
@@ -389,56 +516,46 @@ function collectModuleSpecifiers(source) {
 }
 
 const allSpecifiers = lifecycleSources.flatMap(collectModuleSpecifiers);
-const FORBIDDEN_IMPORT = /services\/|leadService|leadQualityService|leadClarificationService|leadMatchingEngine|leadDeliveryService|n8n|whatsapp|twilio|sendgrid|axios|node-fetch|@supabase|stripe|razorpay|credit/i;
+const FORBIDDEN_IMPORT = /services\/|leadService|leadQualityService|leadClarificationService|leadMatchingEngine|leadDeliveryService|n8n|whatsapp|twilio|sendgrid|axios|node-fetch|@supabase|stripe|razorpay|credit|wallet|ledger/i;
 
 check("23-25. no real lead/matching/delivery service imports", () => {
-  const offenders = allSpecifiers.filter((spec) => /services\/|leadService|leadMatchingEngine|leadDeliveryService|leadClarificationService|leadQualityService/i.test(spec));
+  const offenders = allSpecifiers.filter((s) => /services\/|leadService|leadMatchingEngine|leadDeliveryService|leadClarificationService|leadQualityService/i.test(s));
   assert(offenders.length === 0, `forbidden service imports: ${offenders.join(", ")}`);
 });
-
 check("26. no credit mutation imports", () => {
-  const offenders = allSpecifiers.filter((spec) => /credit|wallet|ledger/i.test(spec));
-  assert(offenders.length === 0, `forbidden credit imports: ${offenders.join(", ")}`);
+  assert(allSpecifiers.filter((s) => /credit|wallet|ledger/i.test(s)).length === 0);
 });
-
 check("27-28. no WhatsApp or n8n imports", () => {
-  const offenders = allSpecifiers.filter((spec) => /whatsapp|n8n|meta|twilio/i.test(spec));
-  assert(offenders.length === 0, `forbidden channel imports: ${offenders.join(", ")}`);
+  assert(allSpecifiers.filter((s) => /whatsapp|n8n|meta|twilio/i.test(s)).length === 0);
 });
-
 check("28b. every lifecycle import specifier is workflow-internal", () => {
-  const offenders = allSpecifiers.filter((spec) => FORBIDDEN_IMPORT.test(spec));
+  const offenders = allSpecifiers.filter((s) => FORBIDDEN_IMPORT.test(s));
   assert(offenders.length === 0, `forbidden imports: ${offenders.join(", ")}`);
 });
-
-check("29. no provider execution primitives in source", () => {
-  assert(!/\bfetch\s*\(/.test(combinedSource), "no fetch() calls allowed");
-  assert(!/\baxios\b/.test(combinedSource), "no axios usage allowed");
-  assert(!/createClient\s*\(/.test(combinedSource), "no supabase client instantiation allowed");
-  assert(!/\.send\s*\(/.test(combinedSource), "no channel .send() calls allowed");
-  assert(!/Math\.random/.test(combinedSource), "no randomness allowed in a deterministic lifecycle");
+check("29. no provider execution primitives / assignment / credit mutation in source", () => {
+  assert(!/\bfetch\s*\(/.test(combinedSource), "no fetch() calls");
+  assert(!/\baxios\b/.test(combinedSource), "no axios");
+  assert(!/createClient\s*\(/.test(combinedSource), "no supabase client");
+  assert(!/\.send\s*\(/.test(combinedSource), "no channel .send()");
+  assert(!/Math\.random/.test(combinedSource), "no randomness in a deterministic lifecycle");
+  assert(!/assign_leads_to_vendors|insert\s+into|\.rpc\s*\(/i.test(combinedSource), "no assignment RPC / DB writes");
 });
 
-// ------------------------------------------------------------------
-// 30. Isolation from qf_kernel_test
-// ------------------------------------------------------------------
+// ==================================================================
+// Isolation + structural integrity (retained)
+// ==================================================================
 check("30. qf_kernel_test remains isolated from the lead lifecycle", () => {
-  assert(states.LEAD_LIFECYCLE_WORKFLOW_TYPE === "qf_lead_lifecycle", "stable workflow type");
-  assert(states.LEAD_LIFECYCLE_WORKFLOW_TYPE !== kernelTest.QF_KERNEL_TEST_WORKFLOW_TYPE, "must differ from kernel test type");
+  assert(states.LEAD_LIFECYCLE_WORKFLOW_TYPE === "qf_lead_lifecycle");
+  assert(states.LEAD_LIFECYCLE_WORKFLOW_TYPE !== kernelTest.QF_KERNEL_TEST_WORKFLOW_TYPE);
   assert(!/qf_kernel_test/.test(combinedSource), "lifecycle source must not reference the test workflow");
-
   const registry = registryMod.createWorkflowRegistry();
   registry.register(kernelTest.createQfKernelTestWorkflowDefinition());
   registrationMod.registerLeadLifecycleWorkflow(registry);
-  const types = registry.listWorkflowTypes();
-  assert(types.includes("qf_kernel_test") && types.includes("qf_lead_lifecycle"), "both workflows coexist");
-  assert(registry.resolve("qf_kernel_test").initialState === "CREATED", "kernel test unchanged");
-  assert(registry.resolve("qf_lead_lifecycle").initialState === S.RECEIVED, "lifecycle initial state intact");
+  const list = registry.listWorkflowTypes();
+  assert(list.includes("qf_kernel_test") && list.includes("qf_lead_lifecycle"));
+  assert(registry.resolve("qf_kernel_test").initialState === "CREATED");
+  assert(registry.resolve("qf_lead_lifecycle").initialState === S.RECEIVED);
 });
-
-// ------------------------------------------------------------------
-// Structural integrity checks
-// ------------------------------------------------------------------
 check("31. definition serializes without real service references", () => {
   const serialized = JSON.stringify({
     workflowType: definition.workflowType,
@@ -446,57 +563,49 @@ check("31. definition serializes without real service references", () => {
     terminalStates: definition.terminalStates,
     transitions: definition.transitions,
   });
-  assert(!/leadService|leadMatching|vendor|credit|whatsapp|n8n/i.test(serialized), "definition must not reference real services");
+  assert(!/leadService|leadMatching|vendor|credit|whatsapp|n8n/i.test(serialized));
 });
-
 check("32. transition graph only targets known states", () => {
   const known = new Set(Object.values(S));
   for (const [from, targets] of Object.entries(states.LEAD_LIFECYCLE_TRANSITIONS)) {
     assert(known.has(from), `unknown source state ${from}`);
-    for (const target of targets) {
-      assert(known.has(target), `unknown target state ${target} from ${from}`);
-    }
+    for (const target of targets) assert(known.has(target), `unknown target ${target} from ${from}`);
   }
 });
-
 check("33. registration rejects duplicate lead lifecycle", () => {
   const registry = registryMod.createWorkflowRegistry();
   registrationMod.registerLeadLifecycleWorkflow(registry);
-  assert(expectThrows(() => registrationMod.registerLeadLifecycleWorkflow(registry)), "duplicate registration must throw");
+  assert(expectThrows(() => registrationMod.registerLeadLifecycleWorkflow(registry)));
 });
-
-check("34. full happy-path walk is kernel-valid end to end", () => {
+check("34. full happy path still kernel-valid end to end", () => {
   const steps = [
     [S.RECEIVED, E.LIFECYCLE_STARTED, {}, S.QUALITY_SCORING_PENDING],
     [S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "A+" }, S.READY_FOR_MATCHING],
     [S.READY_FOR_MATCHING, E.MATCHING_REQUESTED, {}, S.MATCHING_PENDING],
-    [S.MATCHING_PENDING, E.MATCHING_COMPLETED, {}, S.MATCH_RECOMMENDATION_READY],
+    [S.MATCHING_PENDING, E.MATCHING_COMPLETED, { recommended_vendor_count: 3 }, S.MATCH_RECOMMENDATION_READY],
     [S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, {}, S.DISTRIBUTION_APPROVAL_PENDING],
     [S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {}, S.DISTRIBUTION_PENDING],
-    [S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, {}, S.DISTRIBUTED],
+    [S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 3 }, S.DISTRIBUTED],
     [S.DISTRIBUTED, E.CLOSED, {}, S.CLOSED],
   ];
   for (const [from, evt, payload, expected] of steps) {
-    const result = runValidStep(from, evt, payload);
-    assert(result.nextState === expected, `expected ${expected} got ${result.nextState}`);
+    assert(runValidStep(from, evt, payload).nextState === expected, `expected ${expected} from ${from}`);
   }
 });
-
-check("35. clarification loop path is kernel-valid end to end", () => {
+check("35. full clarification path still kernel-valid end to end", () => {
   const steps = [
-    [S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "B" }, S.CLARIFICATION_PENDING],
-    [S.CLARIFICATION_PENDING, E.CLARIFICATION_COMPLETED, {}, S.RESCORE_PENDING],
-    [S.RESCORE_PENDING, E.QUALITY_RESULTED, { tier: "A" }, S.READY_FOR_MATCHING],
+    [S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "B" }, S.CLARIFICATION_PENDING_1],
+    [S.CLARIFICATION_PENDING_1, E.CLARIFICATION_COMPLETED, {}, S.RESCORE_PENDING_1],
+    [S.RESCORE_PENDING_1, E.QUALITY_RESULTED, { tier: "A" }, S.READY_FOR_MATCHING],
   ];
   for (const [from, evt, payload, expected] of steps) {
-    const result = runValidStep(from, evt, payload);
-    assert(result.nextState === expected, `expected ${expected} got ${result.nextState}`);
+    assert(runValidStep(from, evt, payload).nextState === expected, `expected ${expected} from ${from}`);
   }
 });
 
-// ------------------------------------------------------------------
+// ==================================================================
 // Report
-// ------------------------------------------------------------------
+// ==================================================================
 for (const item of checks) {
   console.log(`${item.ok ? "PASS" : "FAIL"} ${item.name}`);
   if (!item.ok) console.error(item.error);

@@ -12,15 +12,30 @@ import type { WorkflowStatus } from "../../workflow/workflowPersistenceTypes";
 
 export const LEAD_LIFECYCLE_WORKFLOW_TYPE = "qf_lead_lifecycle";
 
+/** Canonical entity type this workflow operates on. */
+export const LEAD_ENTITY_TYPE = "lead";
+
+/**
+ * Loop-safety cap: the maximum number of clarification rounds the automated
+ * (rescore-driven) path may enter. This is NOT a scoring threshold. It is
+ * enforced *structurally* by bounded per-round states below, so a caller cannot
+ * reset an event counter to loop indefinitely.
+ */
+export const MAX_CLARIFICATION_CYCLES = 2;
+
 export const LeadLifecycleState = {
   /** Lead has been received by the lifecycle; no scoring has happened yet. */
   RECEIVED: "RECEIVED",
   /** Waiting for an authoritative quality result (score is computed elsewhere). */
   QUALITY_SCORING_PENDING: "QUALITY_SCORING_PENDING",
-  /** B-tier route: waiting for the client to answer clarification questions. */
-  CLARIFICATION_PENDING: "CLARIFICATION_PENDING",
-  /** Clarification answered; waiting for an authoritative rescore result. */
-  RESCORE_PENDING: "RESCORE_PENDING",
+  /** B-tier route, round 1: waiting for the client to answer clarification questions. */
+  CLARIFICATION_PENDING_1: "CLARIFICATION_PENDING_1",
+  /** Round 1 clarification answered; waiting for an authoritative rescore result. */
+  RESCORE_PENDING_1: "RESCORE_PENDING_1",
+  /** B-tier route, round 2 (final round): waiting for clarification answers. */
+  CLARIFICATION_PENDING_2: "CLARIFICATION_PENDING_2",
+  /** Round 2 clarification answered; waiting for an authoritative rescore result. */
+  RESCORE_PENDING_2: "RESCORE_PENDING_2",
   /** A+/A route: lead is ready to enter matching. */
   READY_FOR_MATCHING: "READY_FOR_MATCHING",
   /** Matching has been requested; waiting for a match result (no ranking here). */
@@ -52,6 +67,39 @@ export const LEAD_LIFECYCLE_INITIAL_STATE: LeadLifecycleStateValue =
   LeadLifecycleState.RECEIVED;
 
 /**
+ * Bounded clarification round wiring. The round number is derived from the
+ * durable workflow state, never from a caller-supplied event field, so the cap
+ * cannot be bypassed by resetting a payload counter.
+ *
+ * The number of clarification/rescore round states is sized to
+ * MAX_CLARIFICATION_CYCLES (rounds 1..MAX).
+ */
+export const CLARIFICATION_STATE_BY_ROUND: Record<number, LeadLifecycleStateValue> = {
+  1: LeadLifecycleState.CLARIFICATION_PENDING_1,
+  2: LeadLifecycleState.CLARIFICATION_PENDING_2,
+};
+
+export const RESCORE_STATE_BY_CLARIFICATION: Record<string, LeadLifecycleStateValue> = {
+  [LeadLifecycleState.CLARIFICATION_PENDING_1]: LeadLifecycleState.RESCORE_PENDING_1,
+  [LeadLifecycleState.CLARIFICATION_PENDING_2]: LeadLifecycleState.RESCORE_PENDING_2,
+};
+
+export const CLARIFICATION_ROUND_BY_RESCORE: Record<string, number> = {
+  [LeadLifecycleState.RESCORE_PENDING_1]: 1,
+  [LeadLifecycleState.RESCORE_PENDING_2]: 2,
+};
+
+export const CLARIFICATION_PENDING_STATES: LeadLifecycleStateValue[] = [
+  LeadLifecycleState.CLARIFICATION_PENDING_1,
+  LeadLifecycleState.CLARIFICATION_PENDING_2,
+];
+
+export const RESCORE_PENDING_STATES: LeadLifecycleStateValue[] = [
+  LeadLifecycleState.RESCORE_PENDING_1,
+  LeadLifecycleState.RESCORE_PENDING_2,
+];
+
+/**
  * Terminal states. A workflow that reaches one of these cannot transition
  * further; the kernel's transition validator enforces this alongside the
  * terminal workflow status.
@@ -67,27 +115,46 @@ export const LEAD_LIFECYCLE_TERMINAL_STATES: LeadLifecycleStateValue[] = [
  * here, otherwise the kernel's `validateWorkflowTransition` will reject the
  * step with INVALID_TRANSITION. Keys with no outgoing edges (terminal states)
  * are intentionally omitted.
+ *
+ * Note the structural clarification cap: RESCORE_PENDING_2 has NO edge to any
+ * clarification state, so a third clarification round is impossible by
+ * construction — even if the handler had a bug, the kernel would reject it.
  */
 export const LEAD_LIFECYCLE_TRANSITIONS: Record<string, LeadLifecycleStateValue[]> = {
   [LeadLifecycleState.RECEIVED]: [LeadLifecycleState.QUALITY_SCORING_PENDING],
   [LeadLifecycleState.QUALITY_SCORING_PENDING]: [
     LeadLifecycleState.READY_FOR_MATCHING,
-    LeadLifecycleState.CLARIFICATION_PENDING,
+    LeadLifecycleState.CLARIFICATION_PENDING_1,
     LeadLifecycleState.NURTURE_PENDING,
     LeadLifecycleState.MANUAL_REVIEW_PENDING,
     LeadLifecycleState.REJECTED,
     LeadLifecycleState.FAILED,
   ],
-  [LeadLifecycleState.CLARIFICATION_PENDING]: [
-    LeadLifecycleState.RESCORE_PENDING,
+  [LeadLifecycleState.CLARIFICATION_PENDING_1]: [
+    LeadLifecycleState.RESCORE_PENDING_1,
     LeadLifecycleState.MANUAL_REVIEW_PENDING,
     LeadLifecycleState.REJECTED,
     LeadLifecycleState.CLOSED,
     LeadLifecycleState.FAILED,
   ],
-  [LeadLifecycleState.RESCORE_PENDING]: [
+  [LeadLifecycleState.RESCORE_PENDING_1]: [
     LeadLifecycleState.READY_FOR_MATCHING,
-    LeadLifecycleState.CLARIFICATION_PENDING,
+    LeadLifecycleState.CLARIFICATION_PENDING_2,
+    LeadLifecycleState.NURTURE_PENDING,
+    LeadLifecycleState.MANUAL_REVIEW_PENDING,
+    LeadLifecycleState.REJECTED,
+    LeadLifecycleState.FAILED,
+  ],
+  [LeadLifecycleState.CLARIFICATION_PENDING_2]: [
+    LeadLifecycleState.RESCORE_PENDING_2,
+    LeadLifecycleState.MANUAL_REVIEW_PENDING,
+    LeadLifecycleState.REJECTED,
+    LeadLifecycleState.CLOSED,
+    LeadLifecycleState.FAILED,
+  ],
+  [LeadLifecycleState.RESCORE_PENDING_2]: [
+    // No clarification edge here: the clarification cap is structural.
+    LeadLifecycleState.READY_FOR_MATCHING,
     LeadLifecycleState.NURTURE_PENDING,
     LeadLifecycleState.MANUAL_REVIEW_PENDING,
     LeadLifecycleState.REJECTED,
@@ -122,18 +189,20 @@ export const LEAD_LIFECYCLE_TRANSITIONS: Record<string, LeadLifecycleStateValue[
   ],
   [LeadLifecycleState.DISTRIBUTED]: [LeadLifecycleState.CLOSED],
   [LeadLifecycleState.NURTURE_PENDING]: [
+    // Requalification re-enters scoring under an explicit authoritative event.
+    LeadLifecycleState.QUALITY_SCORING_PENDING,
     LeadLifecycleState.CLOSED,
     LeadLifecycleState.REJECTED,
     LeadLifecycleState.MANUAL_REVIEW_PENDING,
   ],
   [LeadLifecycleState.MANUAL_REVIEW_PENDING]: [
+    // Exactly the destinations reachable via lead.manual_review.resolved outcomes.
     LeadLifecycleState.READY_FOR_MATCHING,
-    LeadLifecycleState.CLARIFICATION_PENDING,
+    LeadLifecycleState.CLARIFICATION_PENDING_1,
     LeadLifecycleState.NURTURE_PENDING,
     LeadLifecycleState.DISTRIBUTION_PENDING,
     LeadLifecycleState.REJECTED,
     LeadLifecycleState.CLOSED,
-    LeadLifecycleState.FAILED,
   ],
 };
 

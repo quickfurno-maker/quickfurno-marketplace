@@ -24,6 +24,8 @@ export const LeadLifecycleEventType = {
   DISTRIBUTION_AUTO_AUTHORIZED: "lead.distribution.auto_authorized",
   DISTRIBUTION_COMPLETED: "lead.distribution.completed",
   MANUAL_REVIEW_REQUIRED: "lead.manual_review.required",
+  MANUAL_REVIEW_RESOLVED: "lead.manual_review.resolved",
+  NURTURE_REQUALIFICATION_REQUESTED: "lead.nurture.requalification_requested",
   REJECTED: "lead.rejected",
   CLOSED: "lead.closed",
 
@@ -50,6 +52,8 @@ export const LEAD_LIFECYCLE_DRIVER_EVENTS: LeadLifecycleEventTypeValue[] = [
   LeadLifecycleEventType.DISTRIBUTION_AUTO_AUTHORIZED,
   LeadLifecycleEventType.DISTRIBUTION_COMPLETED,
   LeadLifecycleEventType.MANUAL_REVIEW_REQUIRED,
+  LeadLifecycleEventType.MANUAL_REVIEW_RESOLVED,
+  LeadLifecycleEventType.NURTURE_REQUALIFICATION_REQUESTED,
   LeadLifecycleEventType.REJECTED,
   LeadLifecycleEventType.CLOSED,
 ];

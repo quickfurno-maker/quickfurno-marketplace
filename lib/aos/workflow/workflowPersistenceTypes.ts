@@ -94,6 +94,8 @@ export interface DomainEventRecord {
   processed_at: string | null;
   created_at: string;
   updated_at: string;
+  locked_at: string | null;
+  locked_by: string | null;
 }
 
 export interface OutboxEventRecord {

@@ -9,7 +9,7 @@
 // SAFETY:
 //   - Superadmin only (reuses the project admin session guard).
 //   - Returns booleans/labels only. NEVER exposes the n8n webhook URL,
-//     QF_N8N_SECRET, or the service-role key.
+//     new_n8n_secret, or the service-role key.
 //   - The service-role write happens server-side via the runtime utility.
 //   - Toggling this switch performs NO WhatsApp send, NO vendor notification,
 //     NO credit deduction, NO auto assignment, and NO n8n database writes.

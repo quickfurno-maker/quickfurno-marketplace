@@ -148,8 +148,13 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/aos/whatsapp-status" -Method P
 ## 6. Security Rules
 
 - Incoming callbacks must send the `x-qf-n8n-secret` header.
-- The expected secret is `QF_N8N_WEBHOOK_SECRET`, configured later in production
-  hosting secrets.
+- QuickFurno reads the expected secret from the server environment:
+  `new_n8n_secret=<private secret>`.
+- n8n must send the same private value using an HTTP Request Header Auth
+  credential:
+  - **Name:** `x-qf-n8n-secret`
+  - **Value:** same private secret value stored in QuickFurno server
+    `new_n8n_secret`
 - Do not add the secret to `.env` or `.env.local` in this phase.
 - If the secret is missing in production, callbacks return safe `401`.
 - If the secret is missing outside production, the route enters documented safe
@@ -190,9 +195,9 @@ change in a reviewed production activation phase.
 
 1. Create `QF-n8n-Event-Router` with event-type branching.
 2. Import individual workflow shells with disabled triggers.
-3. Configure n8n credentials outside the repository.
+3. Configure the n8n HTTP Request Header Auth credential outside the repository.
 4. Point n8n callbacks to the three AOS endpoints.
-5. Add `x-qf-n8n-secret` to every callback request.
+5. Use the Header Auth credential so every callback sends `x-qf-n8n-secret`.
 6. Test in development mock mode with fake payloads only.
 7. Add staging webhook URLs after approval.
 8. Enable production one workflow at a time behind feature flags.
@@ -200,7 +205,10 @@ change in a reviewed production activation phase.
 ## 10. Production Checklist
 
 - Confirm `.env` and `.env.local` do not contain n8n or WhatsApp secrets.
-- Configure `QF_N8N_WEBHOOK_SECRET` in production hosting secrets.
+- Configure `new_n8n_secret=<private secret>` in the QuickFurno production
+  server environment.
+- Configure the matching n8n HTTP Request Header Auth credential:
+  **Name:** `x-qf-n8n-secret`; **Value:** same private secret value.
 - Review all endpoint responses for masked phones and no stack traces.
 - Add Supabase workflow log tables with RLS and non-public grants.
 - Add audited retry and dead-letter behavior.

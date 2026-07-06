@@ -5,7 +5,7 @@
 //
 // Superadmin control surface for the AOS -> n8n master router runtime switch.
 // Talks ONLY to /api/admin/aos-runtime-settings. It never sees the n8n webhook
-// URL or QF_N8N_SECRET — the API returns booleans and labels only.
+// URL or new_n8n_secret — the API returns booleans and labels only.
 //
 // Preview-only by design: this never sends WhatsApp, notifies vendors, deducts
 // credits, auto-assigns leads, or writes to the DB from n8n.

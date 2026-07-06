@@ -24,7 +24,7 @@ Everything below stays **disabled** in this phase, regardless of the switch:
 - ❌ No auto-assignment of vendors
 - ❌ No real WhatsApp credentials
 - ❌ No Supabase write nodes in n8n
-- ❌ No secrets exposed in the UI (no webhook URL, no `QF_N8N_SECRET`)
+- ❌ No secrets exposed in the UI (no webhook URL, no `new_n8n_secret`)
 - ✅ Public website UI unchanged
 - ✅ Lead form submission + Supabase lead creation unchanged
 - ✅ Default runtime switch is **OFF**
@@ -223,7 +223,7 @@ Keep the n8n preview router safe (preview-only; no WhatsApp/Supabase write nodes
    # add to the server env (NOT committed; e.g. PM2 ecosystem env or shell export)
    N8N_ENABLED=true
    N8N_OUTBOUND_WEBHOOK_ENABLED=true
-   # N8N_WEBHOOK_URL + QF_N8N_WEBHOOK_SECRET already configured server-side
+   # N8N_WEBHOOK_URL + new_n8n_secret already configured server-side
    pm2 restart quickfurno --update-env
    ```
 
@@ -232,7 +232,7 @@ Keep the n8n preview router safe (preview-only; no WhatsApp/Supabase write nodes
    ```bash
    curl -s -X POST https://<your-domain>/api/aos/events \
      -H "content-type: application/json" \
-     -H "x-qf-n8n-secret: <QF_N8N_WEBHOOK_SECRET>" \
+     -H "x-qf-n8n-secret: <new_n8n_secret>" \
      -d '{"event":"lead.created","lead_id":"qf_test_vps_1","source":"phase12-vps"}' | jq
    ```
 
@@ -278,7 +278,7 @@ Any one of these returns the system to safe mock mode:
 - ✅ Either lock OFF → mock/preview mode, `n8nWebhookCalled=false`.
 - ✅ No WhatsApp sending. No vendor notification. No credit deduction.
 - ✅ No auto-assignment. No Supabase writes from n8n.
-- ✅ No secrets in the UI/API responses (webhook URL and `QF_N8N_SECRET` never returned).
+- ✅ No secrets in the UI/API responses (webhook URL and `new_n8n_secret` never returned).
 - ✅ Lead form + Supabase lead creation untouched; public website UI unchanged.
 - ✅ `production_locked` mode is rejected by the API and shown as coming soon.
 ```

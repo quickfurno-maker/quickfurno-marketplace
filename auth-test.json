@@ -1,0 +1,5 @@
+﻿{
+  "event": "credits.debited",
+  "vendor_id": "test-vendor",
+  "reference_id": "auth-status-test-003"
+}

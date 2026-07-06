@@ -126,12 +126,15 @@ AUTO_ASSIGNMENT_ENABLED = false
 ## 6. Future production activation steps
 
 1. Review and approve each child workflow individually.
-2. Configure `QF_N8N_WEBHOOK_SECRET` in production hosting secrets only (never
-   in `.env` / `.env.local` / the repo).
-3. Require and validate the `x-qf-n8n-secret` header on every callback.
-4. Apply any Supabase workflow-log migrations with RLS review.
-5. Enable one workflow at a time behind its feature flag.
-6. Register approved WhatsApp templates before enabling any send path.
-7. Keep auto-assignment and credit deduction behind the human approval queue.
-8. Add audit logging (masked), retries, and dead-letter handling.
-9. Export and back up n8n workflows after activation.
+2. Configure `new_n8n_secret=<private secret>` in the QuickFurno production
+   server environment only (never in `.env` / `.env.local` / the repo).
+3. In n8n, create an HTTP Request Header Auth credential:
+   **Name:** `x-qf-n8n-secret`; **Value:** the same private secret value stored
+   in QuickFurno server `new_n8n_secret`.
+4. Require and validate the `x-qf-n8n-secret` header on every callback.
+5. Apply any Supabase workflow-log migrations with RLS review.
+6. Enable one workflow at a time behind its feature flag.
+7. Register approved WhatsApp templates before enabling any send path.
+8. Keep auto-assignment and credit deduction behind the human approval queue.
+9. Add audit logging (masked), retries, and dead-letter handling.
+10. Export and back up n8n workflows after activation.

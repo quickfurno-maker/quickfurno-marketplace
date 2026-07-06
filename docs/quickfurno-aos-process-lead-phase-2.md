@@ -122,15 +122,14 @@ A `lead` object **or** a `lead_id` is required; otherwise the endpoint returns `
 ## Security
 
 - Header: `x-qf-n8n-secret`.
-- Server env: **`QF_N8N_SECRET`** (falls back to the Phase 1
-  `QF_N8N_WEBHOOK_SECRET` if that is the only one set).
+- QuickFurno server env: **`new_n8n_secret=<private secret>`**.
 - If the secret env is **missing**:
   - **Production** (`NODE_ENV=production`) → request rejected with `401`.
   - **Development** → allowed as a safe mock/preview only (the response
     `security.mode` is `development_mock`; it is explicitly not a trusted call).
 - The secret is never logged. Phone numbers are masked everywhere.
 
-> Set `QF_N8N_SECRET` in the production hosting secrets (Hostinger/PM2 env),
+> Set `new_n8n_secret` in the production hosting secrets (Hostinger/PM2 env),
 > **not** in `.env` or `.env.local`. This phase does not touch those files.
 
 ---
@@ -141,9 +140,12 @@ In the `QF-n8n-New-Lead-Intake` workflow, add an **HTTP Request** node:
 
 - **Method:** `POST`
 - **URL (production):** `https://quickfurno.in/api/aos/process-lead`
+- **Authentication:** HTTP Request Header Auth credential
+  - **Name:** `x-qf-n8n-secret`
+  - **Value:** same private secret value stored in QuickFurno server
+    `new_n8n_secret`
 - **Headers:**
   - `Content-Type: application/json`
-  - `x-qf-n8n-secret: <value of QF_N8N_SECRET>`
 - **Body (JSON):** the `lead.created` payload shown above.
 
 n8n should branch on the response: e.g. route `spamRisk === "high"` to a review
@@ -157,13 +159,14 @@ flag is `false`, no real action is taken until later phases enable them.
 From the project root, with the dev server running (`npm run dev`):
 
 ```powershell
-$headers = @{ "x-qf-n8n-secret" = $env:QF_N8N_SECRET; "Content-Type" = "application/json" }
+$headers = @{ "x-qf-n8n-secret" = "<same private test secret>"; "Content-Type" = "application/json" }
 $body = Get-Content -Raw -Path .\test-aos-process-lead.json
 Invoke-RestMethod -Method Post -Uri "http://localhost:3000/api/aos/process-lead" -Headers $headers -Body $body | ConvertTo-Json -Depth 6
 ```
 
-In development with no `QF_N8N_SECRET` set, the header may be omitted and the
-endpoint responds in `development_mock` mode.
+Use the same private test secret configured in the local QuickFurno server
+environment. In development with no `new_n8n_secret` set, the header may be
+omitted and the endpoint responds in `development_mock` mode.
 
 **Production URL placeholder:** `https://quickfurno.in/api/aos/process-lead`
 

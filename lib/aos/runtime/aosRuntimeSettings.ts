@@ -18,7 +18,7 @@
 //     import this from a client component — it must never reach the browser.
 //   - Never throws on read: a missing table/row/error resolves to a safe OFF
 //     default so lead submission is never blocked.
-//   - Stores NO secrets. Exposes NO webhook URL or QF_N8N_SECRET.
+//   - Stores NO secrets. Exposes NO webhook URL or new_n8n_secret.
 //   - This module performs NO WhatsApp send, NO vendor notification, NO credit
 //     deduction, NO auto assignment, and NO n8n-driven database writes.
 // ============================================================================

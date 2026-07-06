@@ -5,8 +5,7 @@
 // deterministic, side-effect-free preview in lib/aos/workflows/processLeadWorkflow.
 //
 // Security:
-//   - Requires header `x-qf-n8n-secret` matching env `QF_N8N_SECRET`
-//     (falls back to the Phase 1 `QF_N8N_WEBHOOK_SECRET` for compatibility).
+//   - Requires header `x-qf-n8n-secret` matching env `new_n8n_secret`.
 //   - Missing secret → rejected in production, allowed as a safe mock in dev.
 //   - The secret value is never logged. Client phone numbers are masked.
 //
@@ -28,8 +27,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const N8N_SECRET_HEADER = "x-qf-n8n-secret";
-const PRIMARY_SECRET_ENV_KEY = "QF_N8N_SECRET";
-const FALLBACK_SECRET_ENV_KEY = "QF_N8N_WEBHOOK_SECRET";
+const SECRET_ENV_KEY = "new_n8n_secret";
 
 type SecretCheck =
   | { ok: true; mode: "validated" | "development_mock"; message: string }
@@ -49,9 +47,7 @@ function timingSafeEqual(provided: string, expected: string): boolean {
  */
 function checkN8nSecret(request: Request): SecretCheck {
   const expected =
-    process.env[PRIMARY_SECRET_ENV_KEY]?.trim() ||
-    process.env[FALLBACK_SECRET_ENV_KEY]?.trim() ||
-    "";
+    process.env[SECRET_ENV_KEY]?.trim() || "";
   const isProduction = process.env.NODE_ENV === "production";
 
   if (!expected) {
@@ -66,7 +62,7 @@ function checkN8nSecret(request: Request): SecretCheck {
       ok: true,
       mode: "development_mock",
       message:
-        "Development mock: QF_N8N_SECRET is not set, so this preview is not a trusted call.",
+        "Development mock: new_n8n_secret is not set, so this preview is not a trusted call.",
     };
   }
 

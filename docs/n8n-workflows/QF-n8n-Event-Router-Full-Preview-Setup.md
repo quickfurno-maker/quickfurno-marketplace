@@ -266,8 +266,14 @@ Per `QuickFurno_n8n_AOS_Workflow_Structure.docx`, the live Event Router must
 needs no header. Before activation, add — as separate, reviewed steps:
 
 - An **IF / Filter** node right after the webhook that checks the
-  `x-qf-n8n-secret` header against an **n8n environment variable**
-  (`QF_N8N_SECRET`), never a hardcoded value. Reject when it does not match.
+  `x-qf-n8n-secret` header. QuickFurno stores the expected value in the server
+  environment as `new_n8n_secret=<private secret>`. n8n must send that same
+  value through an **HTTP Request Header Auth** credential:
+  - **Name:** `x-qf-n8n-secret`
+  - **Value:** same private secret value stored in QuickFurno server
+    `new_n8n_secret`
+  Never hardcode the value or reference an n8n env expression. Reject when it
+  does not match.
 - Replace each preview Set node with an **HTTP Request** node calling the real
   QuickFurno endpoint (`/api/aos/process-lead`, `/api/aos/vendor-response`, etc.)
   only after that path is reviewed and its feature flag is enabled.
@@ -289,7 +295,7 @@ CREDIT_DEDUCTION_ENABLED=false
 AUTO_ASSIGNMENT_ENABLED=false
 ```
 
-- Never put `QF_N8N_WEBHOOK_SECRET`, a WhatsApp token, or the Supabase
+- Never put `new_n8n_secret`, a WhatsApp token, or the Supabase
   service-role key in `.env.local` or the repo. Production secrets belong only in
   hosting secret storage, added during the reviewed production phase.
 - This preview workflow does not read any of these — they stay off until the real

@@ -13,7 +13,7 @@ import { getWorkflowForN8nEvent } from "@/lib/aos/events/n8nWorkflowMap";
 import { maskPhoneNumber } from "./whatsappTool";
 
 const N8N_SECRET_HEADER = "x-qf-n8n-secret";
-const N8N_SECRET_ENV_KEY = "QF_N8N_WEBHOOK_SECRET";
+const N8N_SECRET_ENV_KEY = "new_n8n_secret";
 const N8N_WEBHOOK_URL_ENV_KEY = "N8N_WEBHOOK_URL";
 const N8N_WEBHOOK_TIMEOUT_MS = 8_000;
 
@@ -40,7 +40,7 @@ export function createN8nToolPlaceholder() {
 }
 
 export function validateN8nSecret(request: Request): N8nSecretValidationResult {
-  // TODO(qf-n8n-production): set QF_N8N_WEBHOOK_SECRET in production hosting secrets.
+  // TODO(qf-n8n-production): set new_n8n_secret in production hosting secrets.
   // Do not store this value in .env or .env.local in this phase.
   const expectedSecret = process.env[N8N_SECRET_ENV_KEY]?.trim();
   const isProduction = process.env.NODE_ENV === "production";

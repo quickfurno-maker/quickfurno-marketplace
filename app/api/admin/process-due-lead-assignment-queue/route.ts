@@ -9,7 +9,7 @@
 // This is a SERVER-ONLY endpoint — there is no admin session here, so it is
 // gated by a shared secret so it can later be triggered by n8n / a VPS cron.
 //   - Requires header `x-qf-cron-secret` matching env `QF_CRON_SECRET`
-//     (falls back to `QF_N8N_SECRET` for compatibility).
+//     (falls back to `new_n8n_secret` for compatibility).
 //   - Missing secret → rejected in production, allowed as a safe mock in dev.
 //   - The secret value is never logged.
 //
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 const CRON_SECRET_HEADER = "x-qf-cron-secret";
 const PRIMARY_SECRET_ENV_KEY = "QF_CRON_SECRET";
-const FALLBACK_SECRET_ENV_KEY = "QF_N8N_SECRET";
+const FALLBACK_SECRET_ENV_KEY = "new_n8n_secret";
 const MAX_LIMIT = 100;
 
 type SecretCheck =

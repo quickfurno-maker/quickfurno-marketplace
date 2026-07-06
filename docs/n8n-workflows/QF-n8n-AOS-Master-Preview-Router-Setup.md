@@ -82,9 +82,16 @@ The HTTP node header uses a **placeholder**: `x-qf-n8n-secret: dev-test-secret`.
 
 - This is a throwaway dev value, **not** a real secret.
 - Before any production use, replace it with a strong **server-only** secret,
-  stored as an **n8n environment variable** (e.g. `QF_N8N_SECRET`) and referenced
-  as `={{ $env.QF_N8N_SECRET }}` — never hardcoded, never in `.env.local`, never
-  in the repo. Your `/api/aos/process-lead` route must validate this header.
+  stored in the QuickFurno server environment:
+  `new_n8n_secret=<private secret>`.
+- In n8n, store the same private value in an **HTTP Request Header Auth**
+  credential:
+  - **Name:** `x-qf-n8n-secret`
+  - **Value:** same private secret value stored in QuickFurno server
+    `new_n8n_secret`
+- Do not hardcode the secret, reference an n8n env expression, put it in
+  `.env.local`, or commit it to the repo. Your `/api/aos/process-lead` route
+  must validate this header.
 
 ---
 

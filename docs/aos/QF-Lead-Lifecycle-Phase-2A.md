@@ -4,6 +4,11 @@
 > lead identity, durable clarification loop protection, manual-review resolution
 > contract, the maximum 3-vendor contract guard, and an optional nurture
 > requalification path.
+>
+> Includes the **final manual-review safety hardening** (2026-07-07): removed the
+> generic `APPROVE_DISTRIBUTION` manual-review distribution bypass and made an
+> auditable `reviewed_by` reviewer identity mandatory on every manual-review
+> resolution.
 
 ## 1. Purpose
 
@@ -143,27 +148,48 @@ Phase 2A does not compute a score. It consumes an authoritative
 | `C` | `NURTURE_PENDING` |
 | `D` | `REJECTED`, unless `manual_review_required = true` → `MANUAL_REVIEW_PENDING` |
 
-## 8. Manual Review Resolution Contract (Correction 3)
+## 8. Manual Review Resolution Contract (Correction 3 + final safety hardening)
 
-`lead.manual_review.resolved` carries a strict typed `outcome`. Unknown outcomes
-are rejected (`MANUAL_REVIEW_OUTCOME_INVALID`).
+`lead.manual_review.resolved` carries a strict typed `outcome` **and** a required
+auditable reviewer identity. Unknown outcomes are rejected
+(`MANUAL_REVIEW_OUTCOME_INVALID`).
 
 | Outcome | Destination |
 | --- | --- |
 | `APPROVE_FOR_MATCHING` | `READY_FOR_MATCHING` |
-| `ALLOW_CLARIFICATION` | `CLARIFICATION_PENDING_1` (human-gated; §6) |
+| `ALLOW_CLARIFICATION` | `CLARIFICATION_PENDING_1` (explicit human override; §6) |
 | `SEND_TO_NURTURE` | `NURTURE_PENDING` |
-| `APPROVE_DISTRIBUTION` | `DISTRIBUTION_PENDING` — **requires** `distribution_authorized: true` |
 | `REJECT` | `REJECTED` |
 | `CLOSE` | `CLOSED` |
 
-`APPROVE_DISTRIBUTION` does not blindly bypass distribution safety: it requires
-explicit authoritative review metadata (`distribution_authorized = true`), else
-`MANUAL_REVIEW_DISTRIBUTION_AUTHORIZATION_REQUIRED`. It remains state-machine-only
-— no vendors are assigned and no credits are deducted. `MANUAL_REVIEW_PENDING`'s
-outgoing transition edges were trimmed to exactly these six destinations (the
-previously-modeled `→ FAILED` edge, unreachable via any resolution outcome, was
-removed).
+**Generic manual review cannot approve distribution.** There is no
+`APPROVE_DISTRIBUTION` outcome and no `MANUAL_REVIEW_PENDING → DISTRIBUTION_PENDING`
+edge. `MANUAL_REVIEW_PENDING` can be reached from contexts that never completed
+matching (e.g. a D-tier quality result with the manual-review flag), so a generic
+manual-review distribution approval could bypass `READY_FOR_MATCHING`,
+`MATCHING_PENDING`, `MATCH_RECOMMENDATION_READY`, and
+`DISTRIBUTION_APPROVAL_PENDING`. Distribution therefore **only** ever proceeds
+through the dedicated controlled distribution states:
+`MATCH_RECOMMENDATION_READY → DISTRIBUTION_APPROVAL_PENDING → DISTRIBUTION_PENDING`.
+Any future distribution-specific human review must be modeled as an explicit
+context-specific state/event, never as a generic manual-review escape hatch.
+
+**Required reviewer identity.** Every resolution is a human-gated decision, so
+`reviewed_by` must be present, a string, trimmed, and non-empty — otherwise
+`MANUAL_REVIEW_REVIEWER_REQUIRED`. This applies to all five outcomes. The
+normalized (trimmed) reviewer identity is included in the transition metadata as
+`reviewed_by`. This is contract validation only — no authentication service is
+called and no admin user is looked up.
+
+**`ALLOW_CLARIFICATION` is an explicit human override only.** It requires
+`reviewed_by`, re-enters the bounded clarification sequence at round 1, and must
+never be generated automatically by a Phase 2B adapter. Automated clarification
+remains bounded to two rounds by the durable round states (§6); a repeated manual
+override is an auditable human decision, not automated retry behavior.
+
+`MANUAL_REVIEW_PENDING`'s outgoing transition edges are exactly these five
+destinations (the previously-modeled `→ DISTRIBUTION_PENDING` and `→ FAILED` edges
+were removed).
 
 ## 9. Nurture Requalification Decision
 
@@ -294,12 +320,11 @@ stateDiagram-v2
   NURTURE_PENDING --> QUALITY_SCORING_PENDING: nurture.requalification_requested
   NURTURE_PENDING --> CLOSED: lead.closed
 
-  MANUAL_REVIEW_PENDING --> READY_FOR_MATCHING: resolved (APPROVE_FOR_MATCHING)
-  MANUAL_REVIEW_PENDING --> CLARIFICATION_PENDING_1: resolved (ALLOW_CLARIFICATION)
-  MANUAL_REVIEW_PENDING --> NURTURE_PENDING: resolved (SEND_TO_NURTURE)
-  MANUAL_REVIEW_PENDING --> DISTRIBUTION_PENDING: resolved (APPROVE_DISTRIBUTION + authorized)
-  MANUAL_REVIEW_PENDING --> REJECTED: resolved (REJECT)
-  MANUAL_REVIEW_PENDING --> CLOSED: resolved (CLOSE)
+  MANUAL_REVIEW_PENDING --> READY_FOR_MATCHING: resolved (APPROVE_FOR_MATCHING, reviewer)
+  MANUAL_REVIEW_PENDING --> CLARIFICATION_PENDING_1: resolved (ALLOW_CLARIFICATION, reviewer)
+  MANUAL_REVIEW_PENDING --> NURTURE_PENDING: resolved (SEND_TO_NURTURE, reviewer)
+  MANUAL_REVIEW_PENDING --> REJECTED: resolved (REJECT, reviewer)
+  MANUAL_REVIEW_PENDING --> CLOSED: resolved (CLOSE, reviewer)
 
   REJECTED --> [*]
   CLOSED --> [*]
@@ -309,7 +334,7 @@ stateDiagram-v2
 ## Test Coverage
 
 `npm run test:phase2a` runs `scripts/phase2a-lead-lifecycle-harness.mjs`, a
-**source/static** harness (69 checks) that compiles the pure lifecycle modules plus
+**source/static** harness (74 checks) that compiles the pure lifecycle modules plus
 the kernel validators and exercises the deterministic handler, cross-checking every
 produced transition against the kernel's own `validateWorkflowTransition` and
 `validateHandlerResult`. It is not a database integration test; runtime DB

@@ -399,38 +399,69 @@ check("C4j. MAX_VENDORS_PER_LEAD constant is 3", () => {
 // ==================================================================
 // CORRECTION 3 — Manual review resolution contract
 // ==================================================================
-check("C3a. manual review -> matching (APPROVE_FOR_MATCHING)", () => {
-  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_FOR_MATCHING }).nextState === S.READY_FOR_MATCHING);
+const REVIEWER = "admin_42";
+check("C3a. manual review -> matching (APPROVE_FOR_MATCHING) with reviewer", () => {
+  const r = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_FOR_MATCHING, reviewed_by: REVIEWER });
+  assert(r.nextState === S.READY_FOR_MATCHING, `got ${r.nextState}`);
+  assert(r.metadata.reviewed_by === REVIEWER, "reviewer must be in metadata");
 });
-check("C3b. manual review -> clarification (ALLOW_CLARIFICATION)", () => {
-  const result = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.ALLOW_CLARIFICATION });
-  assert(result.nextState === S.CLARIFICATION_PENDING_1, `got ${result.nextState}`);
+check("C3b. manual review -> clarification (ALLOW_CLARIFICATION) with reviewer", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.ALLOW_CLARIFICATION, reviewed_by: REVIEWER }).nextState === S.CLARIFICATION_PENDING_1);
 });
-check("C3c. manual review -> nurture (SEND_TO_NURTURE)", () => {
-  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.SEND_TO_NURTURE }).nextState === S.NURTURE_PENDING);
+check("C3c. manual review -> nurture (SEND_TO_NURTURE) with reviewer", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.SEND_TO_NURTURE, reviewed_by: REVIEWER }).nextState === S.NURTURE_PENDING);
 });
-check("C3d. manual review -> reject (REJECT)", () => {
-  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.REJECT }).nextState === S.REJECTED);
+check("C3d. manual review -> reject (REJECT) with reviewer", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.REJECT, reviewed_by: REVIEWER }).nextState === S.REJECTED);
 });
-check("C3e. manual review -> close (CLOSE)", () => {
-  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.CLOSE }).nextState === S.CLOSED);
+check("C3e. manual review -> close (CLOSE) with reviewer", () => {
+  assert(runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.CLOSE, reviewed_by: REVIEWER }).nextState === S.CLOSED);
 });
-check("C3f. APPROVE_DISTRIBUTION requires explicit authorization metadata", () => {
-  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_DISTRIBUTION }))), "must reject without authorization");
-  const result = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_DISTRIBUTION, distribution_authorized: true });
-  assert(result.nextState === S.DISTRIBUTION_PENDING && result.metadata.distribution_authorized === true, "authorized approval -> distribution pending");
+check("C3f. APPROVE_DISTRIBUTION removed; generic manual review cannot reach DISTRIBUTION_PENDING", () => {
+  assert(O.APPROVE_DISTRIBUTION === undefined, "APPROVE_DISTRIBUTION outcome must not exist");
+  assert(validation.validateManualReviewResolution({ outcome: "APPROVE_DISTRIBUTION", reviewed_by: REVIEWER }).ok === false, "APPROVE_DISTRIBUTION must be an invalid outcome");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: "APPROVE_DISTRIBUTION", reviewed_by: REVIEWER }))), "handler must reject APPROVE_DISTRIBUTION");
+  assert(!states.LEAD_LIFECYCLE_TRANSITIONS[S.MANUAL_REVIEW_PENDING].includes(S.DISTRIBUTION_PENDING), "no direct manual-review distribution edge");
+  const v = state.validateWorkflowTransition(definition, S.MANUAL_REVIEW_PENDING, S.DISTRIBUTION_PENDING, "active");
+  assert(v.ok === false && v.code === "INVALID_TRANSITION", "kernel must reject manual review -> distribution");
 });
-check("C3g. invalid manual review outcome rejected", () => {
-  assert(validation.validateManualReviewResolution({ outcome: "FOO" }).ok === false, "unknown outcome must reject");
-  assert(validation.validateManualReviewResolution({}).ok === false, "missing outcome must reject");
-  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: "FOO" }))), "handler must throw on invalid outcome");
+check("C3g. invalid / missing manual review outcome rejected", () => {
+  assert(validation.validateManualReviewResolution({ outcome: "FOO", reviewed_by: REVIEWER }).ok === false, "unknown outcome must reject");
+  assert(validation.validateManualReviewResolution({ reviewed_by: REVIEWER }).ok === false, "missing outcome must reject");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: "FOO", reviewed_by: REVIEWER }))), "handler must throw on invalid outcome");
 });
-check("C3h. MANUAL_REVIEW_PENDING edges exactly match resolution outcomes (no FAILED edge)", () => {
+check("C3h. missing reviewed_by rejects (MANUAL_REVIEW_REVIEWER_REQUIRED)", () => {
+  const r = validation.validateManualReviewResolution({ outcome: O.APPROVE_FOR_MATCHING });
+  assert(r.ok === false && r.message === "MANUAL_REVIEW_REVIEWER_REQUIRED", "missing reviewer must reject with clear error");
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.APPROVE_FOR_MATCHING }))), "handler must throw without reviewer");
+});
+check("C3i. blank / non-string reviewed_by rejects", () => {
+  assert(validation.validateManualReviewResolution({ outcome: O.REJECT, reviewed_by: "   " }).ok === false, "whitespace reviewer must reject");
+  assert(validation.validateManualReviewResolution({ outcome: O.REJECT, reviewed_by: "" }).ok === false, "empty reviewer must reject");
+  assert(validation.validateManualReviewResolution({ outcome: O.REJECT, reviewed_by: 7 }).ok === false, "non-string reviewer must reject");
+});
+check("C3j. reviewed_by is trimmed and stored in result metadata", () => {
+  const r = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.CLOSE, reviewed_by: "  admin_7  " });
+  assert(r.metadata.reviewed_by === "admin_7", `reviewer should be trimmed, got ${r.metadata.reviewed_by}`);
+});
+check("C3k. ALLOW_CLARIFICATION requires reviewer (human override only)", () => {
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.ALLOW_CLARIFICATION }))), "ALLOW_CLARIFICATION without reviewer must reject");
+  const r = runValidStep(S.MANUAL_REVIEW_PENDING, E.MANUAL_REVIEW_RESOLVED, { outcome: O.ALLOW_CLARIFICATION, reviewed_by: REVIEWER });
+  assert(r.nextState === S.CLARIFICATION_PENDING_1 && r.metadata.reviewed_by === REVIEWER, "ALLOW_CLARIFICATION with reviewer must succeed");
+});
+check("C3l. MANUAL_REVIEW_PENDING edges exactly match final outcome destinations", () => {
   const edges = new Set(states.LEAD_LIFECYCLE_TRANSITIONS[S.MANUAL_REVIEW_PENDING]);
-  const expected = new Set([S.READY_FOR_MATCHING, S.CLARIFICATION_PENDING_1, S.NURTURE_PENDING, S.DISTRIBUTION_PENDING, S.REJECTED, S.CLOSED]);
+  const expected = new Set([S.READY_FOR_MATCHING, S.CLARIFICATION_PENDING_1, S.NURTURE_PENDING, S.REJECTED, S.CLOSED]);
   assert(edges.size === expected.size, `edge count mismatch: ${[...edges].join(",")}`);
   for (const e of expected) assert(edges.has(e), `missing edge ${e}`);
-  assert(!edges.has(S.FAILED), "unsafe FAILED edge must be removed from manual review");
+  assert(!edges.has(S.DISTRIBUTION_PENDING), "no distribution escape from generic manual review");
+  assert(!edges.has(S.FAILED), "no FAILED escape from manual review");
+});
+check("C3m. manual review outcome enum is exactly the five safe outcomes", () => {
+  const outcomes = new Set(Object.values(O));
+  const expected = new Set(["APPROVE_FOR_MATCHING", "ALLOW_CLARIFICATION", "SEND_TO_NURTURE", "REJECT", "CLOSE"]);
+  assert(outcomes.size === expected.size, `outcome count mismatch: ${[...outcomes].join(",")}`);
+  for (const e of expected) assert(outcomes.has(e), `missing outcome ${e}`);
 });
 
 // ==================================================================

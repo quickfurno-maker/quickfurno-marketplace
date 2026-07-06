@@ -65,14 +65,15 @@ export interface DistributionResult {
 
 /**
  * Explicit, human-gated manual review resolution outcomes. Unknown outcomes are
- * rejected. APPROVE_DISTRIBUTION additionally requires authoritative review
- * metadata (see validation) and remains state-machine-only.
+ * rejected. There is intentionally NO generic distribution outcome: distribution
+ * only ever proceeds through the dedicated controlled distribution states
+ * (MATCH_RECOMMENDATION_READY → DISTRIBUTION_APPROVAL_PENDING → DISTRIBUTION_PENDING),
+ * never via a generic manual-review escape hatch.
  */
 export const ManualReviewOutcome = {
   APPROVE_FOR_MATCHING: "APPROVE_FOR_MATCHING",
   ALLOW_CLARIFICATION: "ALLOW_CLARIFICATION",
   SEND_TO_NURTURE: "SEND_TO_NURTURE",
-  APPROVE_DISTRIBUTION: "APPROVE_DISTRIBUTION",
   REJECT: "REJECT",
   CLOSE: "CLOSE",
 } as const;
@@ -82,10 +83,8 @@ export type ManualReviewOutcomeValue =
 
 export interface ManualReviewResolution {
   outcome: ManualReviewOutcomeValue;
-  /** True only when an authoritative reviewer explicitly authorized distribution. */
-  distributionAuthorized: boolean;
-  /** Optional non-empty reviewer identity echoed into metadata. */
-  reviewedBy: string | null;
+  /** Required auditable reviewer identity (trimmed, non-empty). */
+  reviewedBy: string;
 }
 
 /** Canonical lead identity derived from validated workflow/event entity identity. */

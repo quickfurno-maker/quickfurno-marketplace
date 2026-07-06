@@ -212,7 +212,11 @@ export function validateDistributionResult(payload: JsonRecord): ValidationResul
 
 const MANUAL_REVIEW_OUTCOMES = new Set<string>(Object.values(ManualReviewOutcome));
 
-/** Validate a lead.manual_review.resolved payload with a strict outcome enum. */
+/**
+ * Validate a lead.manual_review.resolved payload with a strict outcome enum and a
+ * required auditable reviewer identity. Every manual review resolution is a
+ * human-gated decision, so `reviewed_by` must be a non-empty, trimmed string.
+ */
 export function validateManualReviewResolution(payload: JsonRecord): ValidationResult<ManualReviewResolution> {
   if (!isPlainObject(payload)) {
     return { ok: false, message: "MANUAL_REVIEW_RESOLUTION_PAYLOAD_REQUIRED" };
@@ -223,14 +227,10 @@ export function validateManualReviewResolution(payload: JsonRecord): ValidationR
   }
   const outcome = outcomeRaw as ManualReviewOutcomeValue;
 
-  const distributionAuthorized = payload.distribution_authorized === true;
-  if (outcome === ManualReviewOutcome.APPROVE_DISTRIBUTION && !distributionAuthorized) {
-    // Do not let a manual-review approval blindly bypass distribution safety:
-    // it requires explicit authoritative review metadata.
-    return { ok: false, message: "MANUAL_REVIEW_DISTRIBUTION_AUTHORIZATION_REQUIRED" };
+  if (!isNonEmptyString(payload.reviewed_by)) {
+    return { ok: false, message: "MANUAL_REVIEW_REVIEWER_REQUIRED" };
   }
+  const reviewedBy = payload.reviewed_by.trim();
 
-  const reviewedBy = isNonEmptyString(payload.reviewed_by) ? payload.reviewed_by.trim() : null;
-
-  return { ok: true, value: { outcome, distributionAuthorized, reviewedBy } };
+  return { ok: true, value: { outcome, reviewedBy } };
 }

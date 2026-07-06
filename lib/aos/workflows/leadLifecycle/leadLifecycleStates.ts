@@ -197,10 +197,11 @@ export const LEAD_LIFECYCLE_TRANSITIONS: Record<string, LeadLifecycleStateValue[
   ],
   [LeadLifecycleState.MANUAL_REVIEW_PENDING]: [
     // Exactly the destinations reachable via lead.manual_review.resolved outcomes.
+    // No DISTRIBUTION_PENDING edge: distribution never proceeds via generic manual
+    // review — only through the dedicated controlled distribution states.
     LeadLifecycleState.READY_FOR_MATCHING,
     LeadLifecycleState.CLARIFICATION_PENDING_1,
     LeadLifecycleState.NURTURE_PENDING,
-    LeadLifecycleState.DISTRIBUTION_PENDING,
     LeadLifecycleState.REJECTED,
     LeadLifecycleState.CLOSED,
   ],

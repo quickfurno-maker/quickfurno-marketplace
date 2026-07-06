@@ -67,15 +67,20 @@ const STATE_TASK_INTENT: Partial<Record<LeadLifecycleStateValue, LeadLifecycleTa
   [LeadLifecycleState.MANUAL_REVIEW_PENDING]: LeadLifecycleTaskIntent.MANUAL_REVIEW_PREPARE,
 };
 
-/** Manual review resolution outcome → destination lifecycle state. */
+/**
+ * Manual review resolution outcome → destination lifecycle state.
+ *
+ * There is intentionally NO distribution destination here. Distribution only ever
+ * proceeds through the dedicated controlled distribution states; generic manual
+ * review can never bypass matching/approval to reach DISTRIBUTION_PENDING.
+ */
 const MANUAL_REVIEW_OUTCOME_STATE: Record<ManualReviewOutcomeValue, LeadLifecycleStateValue> = {
   [ManualReviewOutcome.APPROVE_FOR_MATCHING]: LeadLifecycleState.READY_FOR_MATCHING,
-  // Human-gated: routes into the bounded clarification sequence at round 1. Each
-  // grant requires an explicit manual-review resolution, so this is never an
-  // automated loop.
+  // Human-gated override: routes into the bounded clarification sequence at round
+  // 1. Each grant requires an explicit, auditable manual-review resolution, so
+  // this is never automated retry behavior.
   [ManualReviewOutcome.ALLOW_CLARIFICATION]: LeadLifecycleState.CLARIFICATION_PENDING_1,
   [ManualReviewOutcome.SEND_TO_NURTURE]: LeadLifecycleState.NURTURE_PENDING,
-  [ManualReviewOutcome.APPROVE_DISTRIBUTION]: LeadLifecycleState.DISTRIBUTION_PENDING,
   [ManualReviewOutcome.REJECT]: LeadLifecycleState.REJECTED,
   [ManualReviewOutcome.CLOSE]: LeadLifecycleState.CLOSED,
 };
@@ -397,10 +402,9 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
         context,
         leadId,
         nextState,
-        `Manual review resolved: ${resolution.value.outcome}.`,
+        `Manual review resolved: ${resolution.value.outcome} by ${resolution.value.reviewedBy}.`,
         {
           manual_review_outcome: resolution.value.outcome,
-          distribution_authorized: resolution.value.distributionAuthorized,
           reviewed_by: resolution.value.reviewedBy,
         },
       );

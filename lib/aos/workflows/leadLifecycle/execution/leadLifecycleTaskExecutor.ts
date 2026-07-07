@@ -11,11 +11,29 @@ import {
   assertNoManualReviewResolution,
   mapQualityResultToLifecycleEvent,
 } from "../events/leadLifecycleResultMapper";
+import { resolveLeadDistributionRecommendation } from "../distribution/leadDistributionRecommendationResolver";
+import { resolveLeadDistributionRoute } from "../distribution/leadDistributionRouteGuard";
+import { validateDistributionApprovalRequired } from "../distribution/leadDistributionValidation";
+import type {
+  LeadDistributionRecommendationEventPort,
+  LeadDistributionRoutingPort,
+} from "../distribution/leadDistributionTypes";
 import type { LeadLifecycleTaskExecutionResult } from "./leadLifecycleTaskExecutionTypes";
+
+/**
+ * Phase 3A distribution ports required ONLY by the prepare_approval task. They
+ * are optional so existing Phase 2B call sites/tests remain unaffected; the
+ * prepare_approval case fails loudly if they are missing.
+ */
+export interface LeadLifecycleDistributionPorts {
+  recommendationEventPort: LeadDistributionRecommendationEventPort;
+  routingPort: LeadDistributionRoutingPort;
+}
 
 export interface LeadLifecycleTaskExecutorDeps {
   ports: LeadLifecycleServicePorts;
   resultEventPublisher: LeadLifecycleEventPublisher;
+  distribution?: LeadLifecycleDistributionPorts;
 }
 
 const ENABLED_TASKS = new Set<string>([
@@ -23,6 +41,7 @@ const ENABLED_TASKS = new Set<string>([
   LeadLifecycleTaskIntent.CLARIFICATION_PREPARE,
   LeadLifecycleTaskIntent.QUALITY_RESCORE,
   LeadLifecycleTaskIntent.MATCHING_PREPARE,
+  LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE_APPROVAL,
   LeadLifecycleTaskIntent.DISTRIBUTION_AWAIT_APPROVAL,
   LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE,
   LeadLifecycleTaskIntent.NURTURE_PREPARE,
@@ -115,6 +134,104 @@ export async function executeLeadLifecycleTask(
         recommended_vendor_count: recommendedVendorIds.length,
         recommended_vendor_ids: recommendedVendorIds,
         assignment_executed: false,
+        delivery_executed: false,
+      });
+    }
+
+    case LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE_APPROVAL: {
+      const distribution = deps.distribution;
+      if (!distribution) throw new Error("DISTRIBUTION_PORTS_REQUIRED");
+      if (!context.triggeredByEvent) throw new Error("RECOMMENDATION_EVENT_ID_REQUIRED");
+
+      // Resolve the immutable recommendation snapshot from the triggering
+      // lead.matching.completed event (no matching rerun, no re-ranking).
+      const resolved = await resolveLeadDistributionRecommendation(
+        {
+          recommendationEventId: context.triggeredByEvent,
+          expectedWorkflowInstanceId: context.workflowInstanceId,
+          expectedLeadId: context.leadId,
+        },
+        distribution.recommendationEventPort,
+      );
+      if (!resolved.ok) throw new Error(resolved.message);
+      const snapshot = resolved.value;
+
+      // Verify the standard route. Special routes are safely deferred with no
+      // published event and no side effect.
+      const route = await resolveLeadDistributionRoute(context.leadId, distribution.routingPort);
+      if (!route.isStandardRoute) {
+        return {
+          status: "deferred_special_route",
+          task_type: taskType,
+          lead_id: context.leadId,
+          workflow_instance_id: context.workflowInstanceId,
+          result: {
+            workflow_type: LEAD_LIFECYCLE_WORKFLOW_TYPE,
+            lead_id: context.leadId,
+            workflow_instance_id: context.workflowInstanceId,
+            deferred_reason: "special_route_owned_by_existing_services",
+            route_classification: route.classification,
+            approval_event_published: false,
+            manual_review_event_published: false,
+            assignment_executed: false,
+            credit_mutation_executed: false,
+            delivery_executed: false,
+          },
+        };
+      }
+
+      // Zero recommendations → manual review (never approval_required).
+      if (snapshot.recommendedVendorCount === 0) {
+        const event = await deps.resultEventPublisher.publish({
+          workflowTaskId: task.id,
+          leadId: context.leadId,
+          eventType: LeadLifecycleEventType.MANUAL_REVIEW_REQUIRED,
+          payload: {
+            reason: "no_distribution_recommendations",
+            recommendation_event_id: snapshot.recommendationEventId,
+          },
+          correlationId: context.workflowInstanceId,
+          causationId: context.triggeredByEvent,
+        });
+        return completed(taskType, context, {
+          published_event_id: event.id,
+          published_event_type: event.event_type,
+          recommendation_event_id: snapshot.recommendationEventId,
+          recommended_vendor_count: 0,
+          manual_review_reason: "no_distribution_recommendations",
+          approval_required_published: false,
+          assignment_executed: false,
+          credit_mutation_executed: false,
+          delivery_executed: false,
+        });
+      }
+
+      // 1..3 recommendations → approval_required with the bound snapshot.
+      const approvalPayload = {
+        recommendation_event_id: snapshot.recommendationEventId,
+        recommended_vendor_count: snapshot.recommendedVendorCount,
+        recommended_vendor_ids: [...snapshot.recommendedVendorIds],
+      };
+      // Belt-and-suspenders: never emit an invalid approval_required event.
+      const validated = validateDistributionApprovalRequired(approvalPayload);
+      if (!validated.ok) throw new Error(validated.message);
+
+      const event = await deps.resultEventPublisher.publish({
+        workflowTaskId: task.id,
+        leadId: context.leadId,
+        eventType: LeadLifecycleEventType.DISTRIBUTION_APPROVAL_REQUIRED,
+        payload: approvalPayload,
+        correlationId: context.workflowInstanceId,
+        causationId: context.triggeredByEvent,
+      });
+      return completed(taskType, context, {
+        published_event_id: event.id,
+        published_event_type: event.event_type,
+        recommendation_event_id: snapshot.recommendationEventId,
+        recommended_vendor_count: snapshot.recommendedVendorCount,
+        recommended_vendor_ids: [...snapshot.recommendedVendorIds],
+        assignment_executed: false,
+        credit_mutation_executed: false,
         delivery_executed: false,
       });
     }

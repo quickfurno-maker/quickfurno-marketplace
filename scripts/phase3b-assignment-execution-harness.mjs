@@ -42,6 +42,9 @@ const files = [
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentTypes.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentValidation.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentResultMapper.ts",
+  "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentAdapter.ts",
+  "lib/errors.ts",
+  "services/leadDeliveryService.ts",
   "services/leadQualityService.ts",
 ];
 
@@ -83,6 +86,7 @@ const validationMod = requireFromBuild(`${D}/distribution/leadDistributionValida
 const resolverMod = requireFromBuild(`${D}/distribution/leadDistributionApprovedSnapshotResolver.js`);
 const assignValidationMod = requireFromBuild(`${D}/distribution/leadDistributionAssignmentValidation.js`);
 const mapperMod = requireFromBuild(`${D}/distribution/leadDistributionAssignmentResultMapper.js`);
+const adapterMod = requireFromBuild(`${D}/distribution/leadDistributionAssignmentAdapter.js`);
 const assignTypesMod = requireFromBuild(`${D}/distribution/leadDistributionAssignmentTypes.js`);
 
 const checks = [];
@@ -228,7 +232,7 @@ function makeExecutorDeps(opts = {}) {
       distribution: {
         recommendationEventPort: { async getDomainEventById(id) { calls.eventLookups.push(id); return eventMap.get(id) ?? null; } },
         routingPort: { async readLeadRouting(leadId) { calls.routingReads.push(leadId); return opts.routing ?? STANDARD_ROUTING; } },
-        assignmentExecution: {
+        assignmentExecution: opts.assignmentExecution ?? {
           async assignApprovedVendors(input) {
             calls.assignInputs.push(input);
             if (opts.assignmentThrow) throw new Error(opts.assignmentThrow);
@@ -238,6 +242,29 @@ function makeExecutorDeps(opts = {}) {
       },
     },
   };
+}
+
+// --- Real adapter DI helpers (boundary fn + truth port injected) --------------
+function makeBoundary(opts = {}) {
+  return async (leadId, vendorIds) => {
+    if (opts.throwCode) return { ok: false, code: opts.throwCode, error: "boundary failed" };
+    const assigned = opts.assigned ?? [{ vendor_id: "vA", assignment_id: "a1" }];
+    return { ok: true, data: { status: opts.status ?? "ok", lead_id: opts.leadId ?? leadId, assigned, skipped: [], assigned_count: assigned.length } };
+  };
+}
+function makeTruthPort(opts = {}) {
+  return {
+    async readAssignmentsForLead(leadId) {
+      if (opts.throw) throw new Error(opts.throw);
+      return opts.rows ?? [{ id: "a1", vendorId: "vA" }, { id: "a3", vendorId: "vC" }];
+    },
+  };
+}
+function makeAdapter(opts = {}) {
+  return new adapterMod.SupabaseLeadDistributionAssignmentPort({
+    boundary: makeBoundary(opts.boundary ?? {}),
+    truthPort: makeTruthPort(opts.truth ?? {}),
+  });
 }
 
 class InMemoryDomainEventRepository {
@@ -525,6 +552,98 @@ check("58b. no client PII in completed payload", async () => {
 });
 
 // ==========================================================================
+// AUTHORITATIVE ASSIGNMENT TRUTH (post-assignment lead_assignments read-back)
+// ==========================================================================
+check("TR1. lifecycle truth comes from lead_assignments read-back, not lossy boundary response", async () => {
+  const adapter = makeAdapter({ boundary: { status: "ok", assigned: [{ vendor_id: "vA", assignment_id: "a1" }] }, truth: { rows: [{ id: "a1", vendorId: "vA" }, { id: "a3", vendorId: "vC" }] } });
+  const r = await adapter.assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC });
+  assert(r.assigned.map((a) => a.vendorId).join(",") === "vA,vC" && r.assigned.map((a) => a.assignmentId).join(",") === "a1,a3", "adapter must use truth read-back");
+  const m = mapperMod.mapAssignmentResultToOutcome(r, snap(ABC));
+  assert(m.value.kind === "completed" && m.value.distributedVendorIds.join(",") === "vA,vC" && m.value.skippedVendorIds.join() === "vB", "mapper wrong from truth");
+});
+check("TR2. empty boundary response, truth [A] -> distributed [A]", async () => {
+  const adapter = makeAdapter({ boundary: { status: "ok", assigned: [] }, truth: { rows: [{ id: "a1", vendorId: "vA" }] } });
+  const r = await adapter.assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC });
+  const m = mapperMod.mapAssignmentResultToOutcome(r, snap(ABC));
+  assert(m.value.distributedVendorIds.join() === "vA" && m.value.skippedVendorIds.join(",") === "vB,vC", "truth [A] must distribute [A]");
+});
+check("TR3. already_assigned recovery: truth DB order [C,A] -> distributed [A,C]; status preserved", async () => {
+  const adapter = makeAdapter({ boundary: { status: "already_assigned", assigned: [] }, truth: { rows: [{ id: "a3", vendorId: "vC" }, { id: "a1", vendorId: "vA" }] } });
+  const r = await adapter.assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC });
+  assert(r.status === "already_assigned", "boundary status must be preserved for diagnostics");
+  const m = mapperMod.mapAssignmentResultToOutcome(r, snap(ABC));
+  assert(m.value.distributedVendorIds.join(",") === "vA,vC", "already_assigned canonical wrong");
+});
+check("TR4. truth-read failure throws (no fallback to boundary response)", async () => {
+  const adapter = makeAdapter({ boundary: { status: "ok", assigned: [{ vendor_id: "vA", assignment_id: "a1" }] }, truth: { throw: "POSTGREST_TEMPORARY_FAILURE" } });
+  await expectRejects(() => adapter.assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC }), /POSTGREST_TEMPORARY_FAILURE/);
+});
+check("TR4b. truth-read failure via executor publishes no lifecycle event", async () => {
+  const adapter = makeAdapter({ boundary: { status: "ok", assigned: [] }, truth: { throw: "POSTGREST_TEMPORARY_FAILURE" } });
+  const { deps, calls } = makeExecutorDeps({ assignmentExecution: adapter });
+  await expectRejects(() => executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps), /POSTGREST_TEMPORARY_FAILURE/);
+  assert(calls.published.length === 0, "no event may be published on truth-read failure");
+});
+check("TR5. boundary ok:false fails loudly (ASSIGNMENT_EXECUTION_FAILED)", async () => {
+  await expectRejects(() => makeAdapter({ boundary: { throwCode: "MIGRATION_NOT_APPLIED" } }).assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC }), /ASSIGNMENT_EXECUTION_FAILED:MIGRATION_NOT_APPLIED/);
+});
+check("TR6. blank/unknown boundary status rejected", async () => {
+  await expectRejects(() => makeAdapter({ boundary: { status: "unknown", assigned: [] } }).assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC }), /ASSIGNMENT_BOUNDARY_STATUS_INVALID/);
+  await expectRejects(() => makeAdapter({ boundary: { status: "   ", assigned: [] } }).assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC }), /ASSIGNMENT_BOUNDARY_STATUS_INVALID/);
+});
+check("TR7. boundary lead mismatch rejected", async () => {
+  await expectRejects(() => makeAdapter({ boundary: { status: "ok", leadId: "lead_OTHER", assigned: [] } }).assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC }), /ASSIGNMENT_BOUNDARY_LEAD_MISMATCH/);
+});
+check("TR8. truth row missing/blank assignment id fails loudly", () => {
+  assert(assignValidationMod.validateAssignmentTruthRows([{ id: null, vendorId: "vA" }]).message === "ASSIGNMENT_TRUTH_ASSIGNMENT_ID_INVALID", "missing id");
+  assert(assignValidationMod.validateAssignmentTruthRows([{ id: "  ", vendorId: "vA" }]).message === "ASSIGNMENT_TRUTH_ASSIGNMENT_ID_INVALID", "blank id");
+});
+check("TR9. truth row missing/blank vendor id fails loudly", () => {
+  assert(assignValidationMod.validateAssignmentTruthRows([{ id: "a1", vendorId: null }]).message === "ASSIGNMENT_TRUTH_VENDOR_ID_INVALID", "missing vendor");
+  assert(assignValidationMod.validateAssignmentTruthRows([{ id: "a1", vendorId: " " }]).message === "ASSIGNMENT_TRUTH_VENDOR_ID_INVALID", "blank vendor");
+});
+check("TR10. duplicate truth vendor id fails loudly", () => {
+  assert(assignValidationMod.validateAssignmentTruthRows([{ id: "a1", vendorId: "vA" }, { id: "a2", vendorId: "vA" }]).message === "ASSIGNMENT_TRUTH_VENDOR_IDS_NOT_UNIQUE", "dup vendor");
+});
+check("TR11. malformed truth does not silently shrink the set (adapter throws)", async () => {
+  const adapter = makeAdapter({ boundary: { status: "ok", assigned: [] }, truth: { rows: [{ id: "a1", vendorId: "vA" }, { id: null, vendorId: "vC" }] } });
+  await expectRejects(() => adapter.assignApprovedVendors({ leadId: LEAD_ID, approvedVendorIds: ABC }), /ASSIGNMENT_TRUTH_ASSIGNMENT_ID_INVALID/);
+});
+check("TR12. >3 truth rows -> structural rejection via mapper", () => {
+  const r = { status: "already_assigned", leadId: LEAD_ID, assigned: [["vA", "a1"], ["vB", "a2"], ["vC", "a3"], ["vD", "a4"]].map(([v, a]) => ({ vendorId: v, assignmentId: a })) };
+  const m = mapperMod.mapAssignmentResultToOutcome(r, snap(ABC));
+  assert(!m.ok && m.message === "ASSIGNMENT_RESULT_COUNT_INVALID", "structural count reject");
+});
+check("TR13. zero truth rows -> approved_vendors_no_longer_assignable manual review", async () => {
+  const adapter = makeAdapter({ boundary: { status: "no_eligible_vendors", assigned: [] }, truth: { rows: [] } });
+  const { deps, calls } = makeExecutorDeps({ assignmentExecution: adapter });
+  await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps);
+  assert(calls.published[0].eventType === E.MANUAL_REVIEW_REQUIRED && calls.published[0].payload.reason === REASON.ZERO_ASSIGNABLE, "zero truth must be manual review");
+});
+check("TR14. truth contains an unapproved vendor -> outside-scope manual review", async () => {
+  const adapter = makeAdapter({ boundary: { status: "ok", assigned: [] }, truth: { rows: [{ id: "a1", vendorId: "vA" }, { id: "a9", vendorId: "vZ" }] } });
+  const { deps, calls } = makeExecutorDeps({ assignmentExecution: adapter });
+  await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps);
+  assert(calls.published[0].payload.reason === REASON.OUTSIDE_SCOPE, "outside scope must come from truth");
+});
+check("TR15/TR16. adapter retry: lossy attempt1 + already_assigned attempt2 -> one identical durable event", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
+  const taskId = "task_truth_retry";
+  const a1 = makeAdapter({ boundary: { status: "ok", assigned: [{ vendor_id: "vA", assignment_id: "a1" }] }, truth: { rows: [{ id: "a1", vendorId: "vA" }, { id: "a3", vendorId: "vC" }] } });
+  await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE, { __taskId: taskId }), makeExecutorDeps({ publisher, assignmentExecution: a1 }).deps);
+  const a2 = makeAdapter({ boundary: { status: "already_assigned", assigned: [] }, truth: { rows: [{ id: "a3", vendorId: "vC" }, { id: "a1", vendorId: "vA" }] } });
+  const r2 = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE, { __taskId: taskId }), makeExecutorDeps({ publisher, assignmentExecution: a2 }).deps);
+  assert(repo.byKey.size === 1, `expected exactly one durable event, got ${repo.byKey.size}`);
+  assert(r2.result.distributed_vendor_ids.join(",") === "vA,vC" && r2.result.skipped_vendor_ids.join() === "vB", "retry canonical mismatch");
+});
+check("TR17. real adapter defaults are production impls (boundary + Supabase truth port)", () => {
+  const src = readFileSync("lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentAdapter.ts", "utf8");
+  assert(/assignLeadToMatchedVendors/.test(src) && /SupabaseLeadDistributionAssignmentTruthPort/.test(src), "adapter defaults must be production impls");
+  assert(/lead_assignments/.test(src) && /select\(\s*["']id, vendor_id["']\s*\)/.test(src), "truth port must read id, vendor_id from lead_assignments");
+});
+
+// ==========================================================================
 // SIDE-EFFECT SAFETY (static scans + workspace guards)
 // ==========================================================================
 const phase3bFiles = [
@@ -551,7 +670,7 @@ check("68. no outbox provider command", () => assert(!/outboxCommands|outbox_eve
 check("69. no production worker loop", () => assert(!/setInterval|while\s*\(\s*true\s*\)|claimOneDueWorkflowTask\s*\(/.test(scanCombined), "worker loop/claim startup found"));
 check("69b. assignment adapter wraps only assignLeadToMatchedVendors (approved boundary)", () => {
   const adapter = readFileSync("lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentAdapter.ts", "utf8");
-  assert(/assignLeadToMatchedVendors\s*\(/.test(adapter), "adapter must call the approved assignment boundary");
+  assert(/assignLeadToMatchedVendors\b/.test(adapter), "adapter must default to the approved assignment boundary");
   assert(!/\.rpc\s*\(|deliverLeadToVendorDashboard|createVendorLeadWhatsappPreview|createClientAssignedVendorsPreview/.test(adapter), "adapter must not call RPC/delivery directly");
 });
 check("70. no PM2 modification", () => assert(!gitPorcelain().some((f) => /pm2|ecosystem/i.test(f)), "PM2 file changed"));

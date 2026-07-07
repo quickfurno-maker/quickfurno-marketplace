@@ -2,7 +2,11 @@ import {
   MAX_DISTRIBUTION_VENDORS,
   type DistributionValidationResult,
 } from "./leadDistributionTypes";
-import type { LeadAssignmentExecutionResult } from "./leadDistributionAssignmentTypes";
+import type {
+  AssignedVendorRecord,
+  AssignmentTruthRow,
+  LeadAssignmentExecutionResult,
+} from "./leadDistributionAssignmentTypes";
 
 /**
  * QuickFurno Distribution Control — assignment result structural validation (3B).
@@ -63,4 +67,39 @@ export function validateAssignmentExecutionResult(
     ok: true,
     value: { status: typeof raw.status === "string" ? raw.status : "unknown", assignedVendorIds },
   };
+}
+
+/**
+ * Strictly validate the authoritative `lead_assignments` truth rows read back
+ * after the assignment boundary commits. NEVER silently discards a malformed row
+ * — a malformed row fails loudly (it must not shrink the assignment set). Returns
+ * `{ vendorId, assignmentId }[]` (assignmentId is the row id). Row/DB order is not
+ * lifecycle-authoritative; the canonical mapper reorders by approved order.
+ */
+export function validateAssignmentTruthRows(
+  rows: AssignmentTruthRow[],
+): DistributionValidationResult<AssignedVendorRecord[]> {
+  if (!Array.isArray(rows)) {
+    return { ok: false, message: "ASSIGNMENT_TRUTH_ROWS_MUST_BE_ARRAY" };
+  }
+  const assigned: AssignedVendorRecord[] = [];
+  const seenVendors = new Set<string>();
+  for (const row of rows) {
+    if (!row || typeof row !== "object") {
+      return { ok: false, message: "ASSIGNMENT_TRUTH_ROW_INVALID" };
+    }
+    if (!isNonEmptyString(row.id)) {
+      return { ok: false, message: "ASSIGNMENT_TRUTH_ASSIGNMENT_ID_INVALID" };
+    }
+    if (!isNonEmptyString(row.vendorId)) {
+      return { ok: false, message: "ASSIGNMENT_TRUTH_VENDOR_ID_INVALID" };
+    }
+    const vendorId = row.vendorId.trim();
+    if (seenVendors.has(vendorId)) {
+      return { ok: false, message: "ASSIGNMENT_TRUTH_VENDOR_IDS_NOT_UNIQUE" };
+    }
+    seenVendors.add(vendorId);
+    assigned.push({ vendorId, assignmentId: row.id.trim() });
+  }
+  return { ok: true, value: assigned };
 }

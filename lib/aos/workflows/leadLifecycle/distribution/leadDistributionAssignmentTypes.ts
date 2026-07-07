@@ -41,6 +41,27 @@ export interface LeadDistributionAssignmentPort {
 }
 
 /**
+ * A raw `public.lead_assignments` truth row read back AFTER the credit-affecting
+ * boundary commits. `id` is the assignment id, `vendorId` the vendor. Fields are
+ * loosely typed so a strict validator (not the DB adapter) fails loudly on any
+ * malformed row rather than silently discarding it.
+ */
+export interface AssignmentTruthRow {
+  id: string | null;
+  vendorId: string | null;
+}
+
+/**
+ * Read-only authoritative assignment-truth port. Reads the committed
+ * `lead_assignments` rows for a lead — the lifecycle assignment truth — after the
+ * assignment boundary returns. No mutation. DB row order is NOT lifecycle
+ * authoritative (the canonical mapper reorders by approved order).
+ */
+export interface LeadDistributionAssignmentTruthPort {
+  readAssignmentsForLead(leadId: string): Promise<AssignmentTruthRow[]>;
+}
+
+/**
  * Canonical, deterministic assignment outcome derived from the authoritative
  * result + the immutable approved snapshot. `completed` distributes 1..3 approved
  * vendors; `manual_review` is a safe deterministic escape (zero assignable,

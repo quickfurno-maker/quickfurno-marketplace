@@ -32,6 +32,10 @@ import {
   type LeadQualityResult,
   type ManualReviewOutcomeValue,
 } from "./leadLifecycleTypes";
+import {
+  validateDistributionApprovalRequired,
+  validateDistributionApproved,
+} from "./distribution/leadDistributionValidation";
 
 /**
  * QuickFurno Lead Lifecycle — deterministic handler (Phase 2A, corrected).
@@ -61,6 +65,10 @@ const STATE_TASK_INTENT: Partial<Record<LeadLifecycleStateValue, LeadLifecycleTa
   [LeadLifecycleState.RESCORE_PENDING_1]: LeadLifecycleTaskIntent.QUALITY_RESCORE,
   [LeadLifecycleState.RESCORE_PENDING_2]: LeadLifecycleTaskIntent.QUALITY_RESCORE,
   [LeadLifecycleState.MATCHING_PENDING]: LeadLifecycleTaskIntent.MATCHING_PREPARE,
+  // Phase 3A: entering MATCH_RECOMMENDATION_READY opens the approval-preparation
+  // task, which resolves the immutable recommendation snapshot bound to the
+  // triggering lead.matching.completed event.
+  [LeadLifecycleState.MATCH_RECOMMENDATION_READY]: LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE_APPROVAL,
   [LeadLifecycleState.DISTRIBUTION_APPROVAL_PENDING]: LeadLifecycleTaskIntent.DISTRIBUTION_AWAIT_APPROVAL,
   [LeadLifecycleState.DISTRIBUTION_PENDING]: LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE,
   [LeadLifecycleState.NURTURE_PENDING]: LeadLifecycleTaskIntent.NURTURE_PREPARE,
@@ -330,23 +338,41 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
 
     case LeadLifecycleEventType.DISTRIBUTION_APPROVAL_REQUIRED: {
       assertSourceState(state, LeadLifecycleState.MATCH_RECOMMENDATION_READY, eventType);
+      // Phase 3A: reject empty/unvalidated approval-required events.
+      const approvalRequired = validateDistributionApprovalRequired(payload);
+      if (!approvalRequired.ok) {
+        throw new LeadLifecycleTransitionError(approvalRequired.message);
+      }
       return buildResult(
         context,
         leadId,
         LeadLifecycleState.DISTRIBUTION_APPROVAL_PENDING,
         "Distribution requires explicit approval (controlled rollout).",
-        {},
+        {
+          recommendation_event_id: approvalRequired.value.recommendationEventId,
+          recommended_vendor_count: approvalRequired.value.recommendedVendorCount,
+        },
       );
     }
 
     case LeadLifecycleEventType.DISTRIBUTION_APPROVED: {
       assertSourceState(state, LeadLifecycleState.DISTRIBUTION_APPROVAL_PENDING, eventType);
+      // Phase 3A: enforce the approved-subset + recommendation-order contract
+      // before authorizing distribution.
+      const approved = validateDistributionApproved(payload);
+      if (!approved.ok) {
+        throw new LeadLifecycleTransitionError(approved.message);
+      }
       return buildResult(
         context,
         leadId,
         LeadLifecycleState.DISTRIBUTION_PENDING,
         "Distribution explicitly approved; ready to prepare distribution.",
-        {},
+        {
+          recommendation_event_id: approved.value.recommendationEventId,
+          approved_vendor_count: approved.value.approvedVendorCount,
+          approved_by: approved.value.approvedBy,
+        },
       );
     }
 

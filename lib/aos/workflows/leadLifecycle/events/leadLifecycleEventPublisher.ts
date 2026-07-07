@@ -93,7 +93,7 @@ function assertLifecycleIdentity(
   }
 }
 
-class SupabaseLeadLifecycleDomainEventRepository implements LeadLifecycleDomainEventRepository {
+export class SupabaseLeadLifecycleDomainEventRepository implements LeadLifecycleDomainEventRepository {
   async insert(input: {
     eventType: LeadLifecycleEventTypeValue;
     entityType: string;

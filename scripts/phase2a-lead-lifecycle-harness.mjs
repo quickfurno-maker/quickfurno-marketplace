@@ -353,11 +353,30 @@ check("C4e. matching vendor_ids must agree with count", () => {
 // ==================================================================
 // Distribution approval lifecycle + future auto authorization
 // ==================================================================
+// Phase 3A strengthened the approval contract: approval_required / approved
+// events now carry a validated recommendation snapshot (empty payloads reject).
+const APPROVAL_REQUIRED_PAYLOAD = {
+  recommendation_event_id: "evt_match_1",
+  recommended_vendor_count: 3,
+  recommended_vendor_ids: ["v1", "v2", "v3"],
+};
+const APPROVED_PAYLOAD = {
+  ...APPROVAL_REQUIRED_PAYLOAD,
+  approved_vendor_count: 2,
+  approved_vendor_ids: ["v1", "v2"],
+  approved_by: "admin_1",
+};
 check("14. approval required: MATCH_RECOMMENDATION_READY -> DISTRIBUTION_APPROVAL_PENDING", () => {
-  assert(runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, {}).nextState === S.DISTRIBUTION_APPROVAL_PENDING);
+  assert(runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, APPROVAL_REQUIRED_PAYLOAD).nextState === S.DISTRIBUTION_APPROVAL_PENDING);
+});
+check("14b. empty approval_required payload is now rejected (Phase 3A contract)", () => {
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, {}))), "empty approval_required must reject");
 });
 check("15. explicit approval: DISTRIBUTION_APPROVAL_PENDING -> DISTRIBUTION_PENDING", () => {
-  assert(runValidStep(S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {}).nextState === S.DISTRIBUTION_PENDING);
+  assert(runValidStep(S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, APPROVED_PAYLOAD).nextState === S.DISTRIBUTION_PENDING);
+});
+check("15b. empty approved payload is now rejected (Phase 3A contract)", () => {
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {}))), "empty approved must reject");
 });
 check("16. auto-authorized exists but activates no real distribution", () => {
   const result = runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_AUTO_AUTHORIZED, {});
@@ -614,8 +633,8 @@ check("34. full happy path still kernel-valid end to end", () => {
     [S.QUALITY_SCORING_PENDING, E.QUALITY_RESULTED, { tier: "A+" }, S.READY_FOR_MATCHING],
     [S.READY_FOR_MATCHING, E.MATCHING_REQUESTED, {}, S.MATCHING_PENDING],
     [S.MATCHING_PENDING, E.MATCHING_COMPLETED, { recommended_vendor_count: 3 }, S.MATCH_RECOMMENDATION_READY],
-    [S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, {}, S.DISTRIBUTION_APPROVAL_PENDING],
-    [S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {}, S.DISTRIBUTION_PENDING],
+    [S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, APPROVAL_REQUIRED_PAYLOAD, S.DISTRIBUTION_APPROVAL_PENDING],
+    [S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, APPROVED_PAYLOAD, S.DISTRIBUTION_PENDING],
     [S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 3 }, S.DISTRIBUTED],
     [S.DISTRIBUTED, E.CLOSED, {}, S.CLOSED],
   ];

@@ -15,6 +15,11 @@ export const LeadLifecycleTaskIntent = {
   CLARIFICATION_PREPARE: "lead.clarification.prepare",
   QUALITY_RESCORE: "lead.quality.rescore",
   MATCHING_PREPARE: "lead.matching.prepare",
+  // Phase 3A: dedicated approval-preparation task opened on entering
+  // MATCH_RECOMMENDATION_READY. It resolves the immutable recommendation
+  // snapshot and publishes AT MOST ONE result event (approval_required OR
+  // manual_review.required). It never assigns vendors.
+  DISTRIBUTION_PREPARE_APPROVAL: "lead.distribution.prepare_approval",
   DISTRIBUTION_AWAIT_APPROVAL: "lead.distribution.await_approval",
   DISTRIBUTION_PREPARE: "lead.distribution.prepare",
   NURTURE_PREPARE: "lead.nurture.prepare",

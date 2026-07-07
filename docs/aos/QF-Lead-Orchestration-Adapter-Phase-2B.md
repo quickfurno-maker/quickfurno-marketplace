@@ -139,7 +139,11 @@ Every Phase 2B lifecycle event is persisted to `domain_events` with:
 
 Result event idempotency keys are deterministic:
 
-`qf_lead_lifecycle:task_result:{workflow_task_id}:{event_type}`
+`qf_lead_lifecycle:task_result:{workflow_task_id}`
+
+The key is tied to workflow task identity only. Event type is deliberately not
+part of the unique key because one workflow task may publish at most one durable
+result event.
 
 The publisher inserts the event. On an expected unique conflict, it refetches the existing event by idempotency key and verifies:
 
@@ -149,6 +153,25 @@ The publisher inserts the event. On an expected unique conflict, it refetches th
 - payload scope
 
 If the existing event differs, it throws `DOMAIN_EVENT_IDEMPOTENCY_CONFLICT`. Unrelated database errors are rethrown.
+
+## Executor Retry Model
+
+Task result event identity is tied to workflow task identity. A retry of the
+same task cannot change the lifecycle result that was already published by that
+task.
+
+If the authoritative result changes after a task result event has already been
+published, that change must be represented by a new explicit workflow task/event
+cycle. It must not be represented by silently producing a second result event
+from the original task.
+
+Replay behavior:
+
+- same task id + same event type + same entity + same payload -> reuse existing event
+- same task id + same event type + different payload -> `DOMAIN_EVENT_IDEMPOTENCY_CONFLICT`
+- same task id + different event type -> `DOMAIN_EVENT_IDEMPOTENCY_CONFLICT`
+- same task id + different lead identity -> `DOMAIN_EVENT_IDEMPOTENCY_CONFLICT`
+- different task ids -> independent result events are allowed
 
 ## Task Execution Contract
 
@@ -166,7 +189,10 @@ It returns a structured execution result. The coordinator persists completion th
 
 `lead.distribution.prepare`, `lead.nurture.prepare`, and `lead.manual_review.prepare` return `deferred_not_enabled`.
 
-A future generic worker must treat this as a completed internal marker for Phase 2B, not as successful assignment, nurture delivery, or manual review resolution. Later phases must introduce explicit side-effect executors with their own approval and safety contracts.
+`deferred_not_enabled` task completion is an internal Phase 2B marker only. It
+must not be interpreted as assignment completed, nurture communication
+delivered, or manual review resolved. Phase 3 must introduce explicit execution
+semantics for real distribution work.
 
 ## Manual Review Safety
 

@@ -46,7 +46,6 @@ export class DurableLeadLifecycleEventPublisher implements LeadLifecycleEventPub
 
     const idempotencyKey = buildLeadLifecycleResultEventIdempotencyKey(
       input.workflowTaskId,
-      input.eventType,
     );
 
     try {
@@ -72,11 +71,10 @@ export class DurableLeadLifecycleEventPublisher implements LeadLifecycleEventPub
 
 export function buildLeadLifecycleResultEventIdempotencyKey(
   workflowTaskId: string,
-  eventType: LeadLifecycleEventTypeValue,
 ): string {
   const taskId = workflowTaskId.trim();
   if (!taskId) throw new Error("WORKFLOW_TASK_ID_REQUIRED");
-  return `${LEAD_LIFECYCLE_WORKFLOW_TYPE}:task_result:${taskId}:${eventType}`;
+  return `${LEAD_LIFECYCLE_WORKFLOW_TYPE}:task_result:${taskId}`;
 }
 
 function assertLifecycleIdentity(

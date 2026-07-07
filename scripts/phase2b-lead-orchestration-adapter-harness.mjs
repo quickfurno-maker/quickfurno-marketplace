@@ -205,7 +205,7 @@ function makeDeps(overrides = {}) {
         traceId: input.traceId ?? null,
         correlationId: input.correlationId ?? null,
         causationId: input.causationId ?? null,
-        idempotencyKey: publisherMod.buildLeadLifecycleResultEventIdempotencyKey(input.workflowTaskId, input.eventType),
+        idempotencyKey: publisherMod.buildLeadLifecycleResultEventIdempotencyKey(input.workflowTaskId),
       });
     },
   };
@@ -430,23 +430,25 @@ check("26. payload.workflow_type is qf_lead_lifecycle", async () => {
   assert(event.payload_json.workflow_type === states.LEAD_LIFECYCLE_WORKFLOW_TYPE, "workflow type missing");
 });
 
-check("27. deterministic result event idempotency key", () => {
-  const key1 = publisherMod.buildLeadLifecycleResultEventIdempotencyKey("task_x", E.QUALITY_RESULTED);
-  const key2 = publisherMod.buildLeadLifecycleResultEventIdempotencyKey("task_x", E.QUALITY_RESULTED);
+check("27. task-only deterministic result event idempotency key", () => {
+  const key1 = publisherMod.buildLeadLifecycleResultEventIdempotencyKey(" task_x ");
+  const key2 = publisherMod.buildLeadLifecycleResultEventIdempotencyKey("task_x");
   assert(key1 === key2, "key not deterministic");
-  assert(key1 === "qf_lead_lifecycle:task_result:task_x:lead.quality.resulted", `unexpected key ${key1}`);
+  assert(key1 === "qf_lead_lifecycle:task_result:task_x", `unexpected key ${key1}`);
+  assert(!key1.includes(E.QUALITY_RESULTED), "key must not include event type");
   assert(!/\d{13}|random|uuid/i.test(key1), "key includes random/timestamp marker");
 });
 
-check("28. duplicate result publication returns/reuses existing event safely", async () => {
+check("28. same task same event same payload reuses existing event safely", async () => {
   const repo = new InMemoryDomainEventRepository();
   const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
   const first = await publisher.publish({ workflowTaskId: "task_dup", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } });
   const second = await publisher.publish({ workflowTaskId: "task_dup", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } });
   assert(first.id === second.id, "duplicate should reuse existing event");
+  assert(repo.byKey.size === 1, "duplicate replay must leave one durable event");
 });
 
-check("29. same key with conflicting scope rejects", async () => {
+check("29. same task same event different payload conflicts", async () => {
   const repo = new InMemoryDomainEventRepository();
   const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
   await publisher.publish({ workflowTaskId: "task_conflict", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } });
@@ -454,9 +456,62 @@ check("29. same key with conflicting scope rejects", async () => {
     () => publisher.publish({ workflowTaskId: "task_conflict", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 1 } }),
     /DOMAIN_EVENT_IDEMPOTENCY_CONFLICT/,
   );
+  assert(repo.byKey.size === 1, "payload conflict must not insert a second event");
 });
 
-check("30. unrelated persistence errors are not swallowed", async () => {
+check("30. same task different event type conflicts", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
+  await publisher.publish({ workflowTaskId: "task_event_conflict", leadId: LEAD_ID, eventType: E.QUALITY_RESULTED, payload: { quality: { tier: "A+" } } });
+  await expectRejects(
+    () => publisher.publish({ workflowTaskId: "task_event_conflict", leadId: LEAD_ID, eventType: E.MANUAL_REVIEW_REQUIRED, payload: { manual_review: { reason: "changed_on_retry" } } }),
+    /DOMAIN_EVENT_IDEMPOTENCY_CONFLICT/,
+  );
+  assert(repo.byKey.size === 1, "event-type conflict must not insert a second event");
+});
+
+check("31. same task different lead identity conflicts", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
+  await publisher.publish({ workflowTaskId: "task_lead_conflict", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } });
+  await expectRejects(
+    () => publisher.publish({ workflowTaskId: "task_lead_conflict", leadId: "lead_456", eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } }),
+    /DOMAIN_EVENT_IDEMPOTENCY_CONFLICT/,
+  );
+  assert(repo.byKey.size === 1, "lead conflict must not insert a second event");
+});
+
+check("32. different task IDs produce independent events", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
+  const first = await publisher.publish({ workflowTaskId: "task_independent_1", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } });
+  const second = await publisher.publish({ workflowTaskId: "task_independent_2", leadId: LEAD_ID, eventType: E.MATCHING_COMPLETED, payload: { recommended_vendor_count: 0 } });
+  assert(first.id !== second.id, "different tasks should create independent events");
+  assert(repo.byKey.size === 2, "different tasks should leave two durable events");
+});
+
+check("33. cross-event retry conflict leaves exactly one durable event", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
+  await publisher.publish({
+    workflowTaskId: "task_quality_1",
+    leadId: LEAD_ID,
+    eventType: E.QUALITY_RESULTED,
+    payload: { quality: { tier: "A+", source: "first_attempt" } },
+  });
+  await expectRejects(
+    () => publisher.publish({
+      workflowTaskId: "task_quality_1",
+      leadId: LEAD_ID,
+      eventType: E.MANUAL_REVIEW_REQUIRED,
+      payload: { manual_review: { reason: "retry_changed_mapping" } },
+    }),
+    /DOMAIN_EVENT_IDEMPOTENCY_CONFLICT/,
+  );
+  assert(repo.byKey.size === 1, "cross-event retry must leave exactly one durable event");
+});
+
+check("34. unrelated persistence errors are not swallowed", async () => {
   const repo = new InMemoryDomainEventRepository();
   repo.failUnrelated = true;
   const publisher = new publisherMod.DurableLeadLifecycleEventPublisher(repo);
@@ -466,79 +521,79 @@ check("30. unrelated persistence errors are not swallowed", async () => {
   );
 });
 
-check("31. executor never generates lead.manual_review.resolved", async () => {
+check("35. executor never generates lead.manual_review.resolved", async () => {
   const { deps, calls } = makeDeps({ qualityResult: quality({ recommended_action: "manual_review_suspicious_name", hard_block_reason: "fake_or_test_name" }) });
   await executorMod.executeLeadLifecycleTask(makeTask(T.QUALITY_SCORE), deps);
   assert(calls.published[0].eventType !== E.MANUAL_REVIEW_RESOLVED, "manual review resolved generated");
 });
 
-check("32. deferred distribution task performs no assignment", async () => {
+check("36. deferred distribution task performs no assignment", async () => {
   const { deps } = makeDeps();
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps);
   assert(result.status === "deferred_not_enabled" && result.result.assignment_executed === false, "distribution not deferred safely");
 });
 
-check("33. deferred nurture task performs no provider send", async () => {
+check("37. deferred nurture task performs no provider send", async () => {
   const { deps } = makeDeps();
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.NURTURE_PREPARE), deps);
   assert(result.result.whatsapp_sent === false && result.result.n8n_called === false, "provider send enabled");
 });
 
-check("34. deferred manual review task fabricates no human decision", async () => {
+check("38. deferred manual review task fabricates no human decision", async () => {
   const { deps } = makeDeps();
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.MANUAL_REVIEW_PREPARE), deps);
   assert(result.result.manual_review_decision_fabricated === false, "manual review decision fabricated");
 });
 
-check("35. no WhatsApp", () => {
+check("39. no WhatsApp", () => {
   assert(!/\bwhatsappTool|whatsapp-dispatch|sendWhatsApp|\.send\s*\(/i.test(phase2bCombined), "WhatsApp send primitive found");
 });
-check("36. no n8n", () => {
+check("40. no n8n", () => {
   assert(!/\bn8nTool|n8nSync|webhook|fetch\s*\(/i.test(phase2bCombined), "n8n/webhook primitive found");
 });
-check("37. no outbox provider command", () => {
+check("41. no outbox provider command", () => {
   assert(!/outboxCommands|outbox_events|command_type/i.test(phase2bCombined), "outbox provider command found");
 });
-check("38. no production worker loop", () => {
+check("42. no production worker loop", () => {
   assert(!/setInterval|while\s*\(\s*true\s*\)|claimOneDueWorkflowTask\s*\(/.test(phase2bCombined), "worker loop or claim startup found");
 });
-check("39. no PM2 change", () => {
+check("43. no PM2 change", () => {
   const changed = gitDiffNames();
   assert(!changed.some((file) => /pm2|ecosystem/i.test(file)), "PM2 file changed");
 });
-check("40. no live leadService modification", () => {
+check("44. no live leadService modification", () => {
   const changed = gitDiffNames(["--", "services/leadService.ts"]);
   assert(changed.length === 0, "leadService.ts modified");
 });
-check("41. Phase 2A lifecycle test script remains available", () => {
+check("45. Phase 2A lifecycle test script remains available", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
   assert(Boolean(packageJson.scripts["test:phase2a"]), "test:phase2a missing");
 });
-check("42. qf_kernel_test remains isolated", () => {
+check("46. qf_kernel_test remains isolated", () => {
   assert(!/qf_kernel_test/.test(phase2bCombined), "Phase 2B source references qf_kernel_test");
 });
 
-check("43. clarification completion bridge builds only completion event", () => {
+check("47. clarification completion bridge builds only completion event", () => {
   const draft = bridge.buildClarificationCompletedEvent({ leadId: LEAD_ID, requestId: "clar_1" });
   assert(draft.eventType === E.CLARIFICATION_COMPLETED, "wrong event");
   assert(draft.payload.workflow_type === states.LEAD_LIFECYCLE_WORKFLOW_TYPE, "workflow type missing");
   assert(!("reviewed_by" in draft.payload), "reviewer fabricated");
 });
 
-check("44. invalid task status is rejected", async () => {
+check("48. invalid task status is rejected", async () => {
   const { deps } = makeDeps();
   const task = makeTask(T.QUALITY_SCORE);
   task.status = "pending";
   await expectRejects(() => executorMod.executeLeadLifecycleTask(task, deps), /WORKFLOW_TASK_STATUS_INVALID/);
 });
 
-check("45. workflow payload identity mismatch is rejected", async () => {
+check("49. workflow payload identity mismatch is rejected", async () => {
   const { deps } = makeDeps();
   const task = makeTask(T.QUALITY_SCORE, { workflow_instance_id: "wrong_wf" });
   await expectRejects(() => executorMod.executeLeadLifecycleTask(task, deps), /WORKFLOW_TASK_WORKFLOW_INSTANCE_ID_MISMATCH/);
 });
 
-check("46. protected business services remain unmodified", () => {
+check("50. protected business services remain unmodified", () => {
   const changed = gitDiffNames(["--",
     "services/leadService.ts",
     "services/leadQualityService.ts",
@@ -549,21 +604,21 @@ check("46. protected business services remain unmodified", () => {
   assert(changed.length === 0, `protected services modified: ${changed.join(", ")}`);
 });
 
-check("47. no database migration created", () => {
+check("51. no database migration created", () => {
   const changed = gitDiffNames(["--", "supabase/migrations"]);
   assert(changed.length === 0, `migration changed: ${changed.join(", ")}`);
 });
 
-check("48. no UI files modified", () => {
+check("52. no UI files modified", () => {
   const changed = gitDiffNames(["--", "app", "components", "public"]);
   assert(changed.length === 0, `UI files changed: ${changed.join(", ")}`);
 });
 
-check("49. docs file exists", () => {
+check("53. docs file exists", () => {
   assert(existsSync("docs/aos/QF-Lead-Orchestration-Adapter-Phase-2B.md"), "Phase 2B doc missing");
 });
 
-check("50. package script test:phase2b exists", () => {
+check("54. package script test:phase2b exists", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
   assert(packageJson.scripts["test:phase2b"] === "node scripts/phase2b-lead-orchestration-adapter-harness.mjs", "script missing");
 });

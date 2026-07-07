@@ -3,6 +3,7 @@ import { LEAD_ENTITY_TYPE, LeadLifecycleState, LEAD_LIFECYCLE_WORKFLOW_TYPE } fr
 import {
   MAX_DISTRIBUTION_VENDORS,
   type ApproveLeadDistributionInput,
+  type LeadDistributionApprovalBindingPort,
   type LeadDistributionRecommendationEventPort,
   type LeadDistributionRecommendationSnapshot,
   type LeadDistributionRoutingPort,
@@ -10,6 +11,7 @@ import {
 } from "./leadDistributionTypes";
 import { resolveLeadDistributionRecommendation } from "./leadDistributionRecommendationResolver";
 import { resolveLeadDistributionRoute } from "./leadDistributionRouteGuard";
+import { readCurrentDistributionApprovalBinding } from "./leadDistributionApprovalBinding";
 import { isApprovedSubsetPreservingOrder, normalizeVendorIdList } from "./leadDistributionValidation";
 import type { LeadDistributionApprovalPublisher } from "./leadDistributionApprovalPublisher";
 
@@ -34,6 +36,7 @@ export interface LeadDistributionApprovalServiceDeps {
   recommendationEventPort: LeadDistributionRecommendationEventPort;
   routingPort: LeadDistributionRoutingPort;
   workflowStatePort: LeadDistributionWorkflowStatePort;
+  bindingPort: LeadDistributionApprovalBindingPort;
   approvalPublisher: LeadDistributionApprovalPublisher;
 }
 
@@ -111,7 +114,18 @@ export async function approveLeadDistribution(
     throw new LeadDistributionApprovalError("DISTRIBUTION_WORKFLOW_STATE_NOT_APPROVAL_PENDING");
   }
 
-  // 7. Publish the durable approved event under the dedicated human-approval key.
+  // 7. Authoritative binding: the supplied recommendation must be the EXACT
+  // snapshot that caused the current transition into DISTRIBUTION_APPROVAL_PENDING.
+  // A stale historical recommendation for the same lead/workflow is rejected.
+  const binding = await readCurrentDistributionApprovalBinding(workflowInstanceId, deps.bindingPort);
+  if (!binding.ok) {
+    throw new LeadDistributionApprovalError(binding.message);
+  }
+  if (binding.value.recommendationEventId !== recommendationEventId) {
+    throw new LeadDistributionApprovalError("DISTRIBUTION_APPROVAL_RECOMMENDATION_BINDING_MISMATCH");
+  }
+
+  // 8. Publish the durable approved event under the dedicated human-approval key.
   const event = await deps.approvalPublisher.publish({
     workflowInstanceId,
     leadId,

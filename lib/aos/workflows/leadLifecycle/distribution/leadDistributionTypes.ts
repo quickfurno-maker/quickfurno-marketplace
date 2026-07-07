@@ -2,6 +2,7 @@ import type {
   DomainEventRecord,
   JsonRecord,
   WorkflowInstanceRecord,
+  WorkflowTransitionRecord,
 } from "../../../workflow/workflowPersistenceTypes";
 import type { LeadLifecycleEventTypeValue } from "../leadLifecycleEvents";
 
@@ -47,33 +48,41 @@ export interface LeadDistributionRecommendationExpectation {
 }
 
 /**
- * The authoritative lead routing fields that distinguish the three assignment
- * models. These are the ONLY real `public.leads` columns Phase 3A reads to
- * classify a route — no guessed field names.
+ * The authoritative lead routing fields that distinguish the assignment models.
+ * These are the ONLY real `public.leads` columns Phase 3A reads to classify a
+ * route — no guessed field names. All exist today:
  *
- *   - lead_intent            (general_auto_match | preferred_vendor)
- *   - target_vendor_id       (a specific vendor the client picked from a CTA)
- *   - preferred_vendor_id    (preferred-vendor routing target)
- *   - requirement_group_id   (per-parent-category requirement / client-selected group)
+ *   - lead_intent            (general_auto_match | preferred_vendor)      [mig 035]
+ *   - target_vendor_id       (a specific vendor the client picked from a CTA) [mig 035]
+ *   - preferred_vendor_id    (preferred-vendor routing target)            [mig 035]
+ *   - requirement_group_id   (per-parent-category requirement group)      [mig 032]
+ *   - selected_vendor_id     (a client-selected vendor)                   [mig 032]
+ *   - assignment_intent      (e.g. "client_selected_vendor")             [mig 032]
  */
 export interface LeadRoutingSnapshot {
   leadIntent: string | null;
   targetVendorId: string | null;
   preferredVendorId: string | null;
   requirementGroupId: string | null;
+  selectedVendorId: string | null;
+  assignmentIntent: string | null;
 }
 
 /**
- * Route classifications derived strictly from real routing fields.
- *
- * `client-selected` vendor priority is a sub-flow *inside* a requirement group
- * (it is keyed by the same `requirement_group_id` lead column plus group-level
- * selection state), so it is covered by REQUIREMENT_GROUP here rather than a
- * separate lead-level field that does not exist.
+ * The exact `leads.assignment_intent` value written by the client-selected flow
+ * (services/clientRequirementGroupService.ts). No fuzzy matching.
+ */
+export const CLIENT_SELECTED_ASSIGNMENT_INTENT = "client_selected_vendor";
+
+/**
+ * Route classifications derived strictly from real routing fields. The
+ * client-selected route is now isolated as a first-class classification so a
+ * client-selected lead can never fall through to the standard route.
  */
 export const LeadDistributionRoute = {
   STANDARD: "standard_route",
   PREFERRED_VENDOR: "preferred_vendor_route",
+  CLIENT_SELECTED: "client_selected_route",
   REQUIREMENT_GROUP: "requirement_group_route",
 } as const;
 
@@ -104,6 +113,27 @@ export interface LeadDistributionRoutingPort {
 /** Read-only access to authoritative workflow state (for the approval gate). */
 export interface LeadDistributionWorkflowStatePort {
   getWorkflowInstanceById(id: string): Promise<WorkflowInstanceRecord | null>;
+}
+
+/**
+ * The recommendation snapshot currently awaiting approval, derived from the most
+ * recent authoritative `→ DISTRIBUTION_APPROVAL_PENDING` transition. This is the
+ * authorization/integrity gate: only the exact currently-pending recommendation
+ * may be approved (a stale historical recommendation cannot).
+ */
+export interface LeadDistributionApprovalBinding {
+  recommendationEventId: string;
+}
+
+/**
+ * Read-only access to workflow_transition_history for the current approval
+ * binding. Returns the newest transition whose to_state is
+ * DISTRIBUTION_APPROVAL_PENDING, or null when none exists.
+ */
+export interface LeadDistributionApprovalBindingPort {
+  readCurrentApprovalBindingTransition(
+    workflowInstanceId: string,
+  ): Promise<WorkflowTransitionRecord | null>;
 }
 
 /**

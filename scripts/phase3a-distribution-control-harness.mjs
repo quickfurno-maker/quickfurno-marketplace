@@ -39,6 +39,7 @@ const files = [
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionRecommendationResolver.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionRouteGuard.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalPublisher.ts",
+  "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalBinding.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalService.ts",
   "services/leadQualityService.ts",
 ];
@@ -91,6 +92,7 @@ const resolverMod = requireFromBuild(`${D}/distribution/leadDistributionRecommen
 const routeGuardMod = requireFromBuild(`${D}/distribution/leadDistributionRouteGuard.js`);
 const approvalPubMod = requireFromBuild(`${D}/distribution/leadDistributionApprovalPublisher.js`);
 const approvalSvcMod = requireFromBuild(`${D}/distribution/leadDistributionApprovalService.js`);
+const bindingMod = requireFromBuild(`${D}/distribution/leadDistributionApprovalBinding.js`);
 const typesMod = requireFromBuild(`${D}/distribution/leadDistributionTypes.js`);
 
 const checks = [];
@@ -118,7 +120,17 @@ const WF_TYPE = states.LEAD_LIFECYCLE_WORKFLOW_TYPE;
 const LEAD_ID = "lead_std_1";
 const WORKFLOW_ID = "wf_std_1";
 const MATCH_EVENT_ID = "evt_match_std_1";
-const STANDARD_ROUTING = { leadIntent: "general_auto_match", targetVendorId: null, preferredVendorId: null, requirementGroupId: null };
+function routing(o = {}) {
+  return {
+    leadIntent: o.leadIntent ?? null,
+    targetVendorId: o.targetVendorId ?? null,
+    preferredVendorId: o.preferredVendorId ?? null,
+    requirementGroupId: o.requirementGroupId ?? null,
+    selectedVendorId: o.selectedVendorId ?? null,
+    assignmentIntent: o.assignmentIntent ?? null,
+  };
+}
+const STANDARD_ROUTING = routing({ leadIntent: "general_auto_match" });
 
 let counter = 0;
 const allPublished = [];
@@ -263,15 +275,35 @@ function makeWorkflow(opts = {}) {
   };
 }
 
+function makeTransition(metadata_json) {
+  return {
+    id: "tr_1",
+    workflow_instance_id: WORKFLOW_ID,
+    from_state: S.MATCH_RECOMMENDATION_READY,
+    to_state: S.DISTRIBUTION_APPROVAL_PENDING,
+    event_type: E.DISTRIBUTION_APPROVAL_REQUIRED,
+    reason: null,
+    metadata_json,
+    created_by: "workflow_kernel",
+    created_at: "2026-07-07T00:00:00.000Z",
+  };
+}
+
 function makeApprovalDeps(opts = {}) {
   const repo = opts.repo ?? new InMemoryDomainEventRepository();
   const eventMap = new Map();
-  const recEvent = opts.recEvent ?? makeMatchingEvent({ ids: ["vA", "vB", "vC"] });
-  eventMap.set(recEvent.id, recEvent);
+  for (const e of (opts.recEvents ?? [opts.recEvent ?? makeMatchingEvent({ ids: ["vA", "vB", "vC"] })])) eventMap.set(e.id, e);
+  const recEvent = opts.recEvent ?? [...eventMap.values()][0];
+  // Approval binding: the recommendation snapshot currently awaiting approval.
+  const bindingRecId = opts.bindingRecId !== undefined ? opts.bindingRecId : recEvent.id;
+  const bindingTransition = opts.bindingNull
+    ? null
+    : makeTransition(opts.bindingMetadata !== undefined ? opts.bindingMetadata : { recommendation_event_id: bindingRecId, lead_id: LEAD_ID });
   const deps = {
     recommendationEventPort: { async getDomainEventById(id) { return eventMap.get(id) ?? null; } },
     routingPort: { async readLeadRouting() { return opts.routing ?? STANDARD_ROUTING; } },
     workflowStatePort: { async getWorkflowInstanceById() { return opts.workflow === null ? null : (opts.workflow ?? makeWorkflow()); } },
+    bindingPort: { async readCurrentApprovalBindingTransition() { return bindingTransition; } },
     approvalPublisher: opts.approvalPublisher ?? new approvalPubMod.DurableLeadDistributionApprovalPublisher(repo),
   };
   return { deps, repo, recEvent };
@@ -397,37 +429,89 @@ check("15. no matching rerun during preparation", async () => {
   await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
   assert(calls.matching === 0 && calls.quality === 0 && calls.latestQuality === 0, "must not rerun matching/scoring");
 });
+const cls = (o) => routeGuardMod.classifyLeadDistributionRoute(routing(o));
+
 check("16. standard route accepted (publishes approval_required)", async () => {
   const { deps, calls } = makeExecutorDeps({ routing: STANDARD_ROUTING });
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
   assert(result.status === "completed" && calls.published[0].eventType === E.DISTRIBUTION_APPROVAL_REQUIRED, "standard route not accepted");
 });
-check("17. preferred-vendor route deferred", async () => {
-  const { deps, calls } = makeExecutorDeps({ routing: { leadIntent: "preferred_vendor", targetVendorId: null, preferredVendorId: "vP", requirementGroupId: null } });
-  const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
-  assert(result.status === "deferred_special_route" && result.result.route_classification === "preferred_vendor_route", `got ${result.status}`);
-  assert(calls.published.length === 0, "deferred route must publish nothing");
+check("16b. classifier: plain standard lead -> standard_route", () => {
+  const d = cls({ leadIntent: "general_auto_match" });
+  assert(d.classification === "standard_route" && d.isStandardRoute === true, "standard misclassified");
 });
-check("18. client-selected specific-vendor route deferred", async () => {
-  const { deps, calls } = makeExecutorDeps({ routing: { leadIntent: null, targetVendorId: "vTarget", preferredVendorId: null, requirementGroupId: null } });
+check("16c. classifier: no routing fields at all -> standard_route", () => {
+  assert(cls({}).classification === "standard_route", "empty routing must be standard");
+});
+check("17. classifier: requirement_group_id -> requirement_group_route", () => {
+  const d = cls({ requirementGroupId: "grp_1" });
+  assert(d.classification === "requirement_group_route" && d.isStandardRoute === false, "req group misclassified");
+});
+check("17b. classifier: selected_vendor_id (no req group) -> client_selected_route", () => {
+  const d = cls({ selectedVendorId: "vSel" });
+  assert(d.classification === "client_selected_route" && d.isStandardRoute === false, `got ${d.classification}`);
+});
+check("17c. classifier: assignment_intent=client_selected_vendor -> client_selected_route", () => {
+  const d = cls({ assignmentIntent: "client_selected_vendor" });
+  assert(d.classification === "client_selected_route" && d.isStandardRoute === false, `got ${d.classification}`);
+});
+check("17d. classifier precedence: selected_vendor + preferred fields -> client_selected_route", () => {
+  const d = cls({ selectedVendorId: "vSel", preferredVendorId: "vP", targetVendorId: "vT", leadIntent: "preferred_vendor" });
+  assert(d.classification === "client_selected_route", `client-selected must win over preferred, got ${d.classification}`);
+});
+check("17e. classifier precedence: requirement_group wins over client_selected", () => {
+  const d = cls({ requirementGroupId: "grp_1", selectedVendorId: "vSel", assignmentIntent: "client_selected_vendor" });
+  assert(d.classification === "requirement_group_route", `req group must win, got ${d.classification}`);
+});
+check("17f. arbitrary assignment_intent (not client_selected_vendor) is not client-selected", () => {
+  // No broad fuzzy matching: only the exact value routes to client_selected.
+  const d = cls({ assignmentIntent: "auto_match", leadIntent: "general_auto_match" });
+  assert(d.classification === "standard_route", `unexpected ${d.classification}`);
+});
+check("18. classifier: lead_intent=preferred_vendor -> preferred_vendor_route", () => {
+  assert(cls({ leadIntent: "preferred_vendor" }).classification === "preferred_vendor_route", "preferred intent misclassified");
+});
+check("18b. classifier: target_vendor_id -> preferred_vendor_route", () => {
+  assert(cls({ targetVendorId: "vT" }).classification === "preferred_vendor_route", "target vendor misclassified");
+});
+check("18c. classifier: preferred_vendor_id -> preferred_vendor_route", () => {
+  assert(cls({ preferredVendorId: "vP" }).classification === "preferred_vendor_route", "preferred vendor id misclassified");
+});
+check("19. executor: preferred-vendor route deferred (no event)", async () => {
+  const { deps, calls } = makeExecutorDeps({ routing: routing({ leadIntent: "preferred_vendor", preferredVendorId: "vP" }) });
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
   assert(result.status === "deferred_special_route" && result.result.route_classification === "preferred_vendor_route", `got ${result.result.route_classification}`);
   assert(calls.published.length === 0, "deferred route must publish nothing");
 });
-check("19. requirement-group route deferred", async () => {
-  const { deps, calls } = makeExecutorDeps({ routing: { leadIntent: null, targetVendorId: null, preferredVendorId: null, requirementGroupId: "grp_1" } });
+check("19b. executor: requirement-group route deferred (no event)", async () => {
+  const { deps, calls } = makeExecutorDeps({ routing: routing({ requirementGroupId: "grp_1" }) });
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
   assert(result.status === "deferred_special_route" && result.result.route_classification === "requirement_group_route", `got ${result.result.route_classification}`);
   assert(calls.published.length === 0, "deferred route must publish nothing");
 });
+check("19c. executor: client-selected (selected_vendor_id) prepare -> deferred_special_route", async () => {
+  const { deps } = makeExecutorDeps({ routing: routing({ selectedVendorId: "vSel" }) });
+  const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
+  assert(result.status === "deferred_special_route" && result.result.route_classification === "client_selected_route", `got ${result.result.route_classification}`);
+});
+check("19d. executor: client-selected prepare publishes no event", async () => {
+  const { deps, calls } = makeExecutorDeps({ routing: routing({ assignmentIntent: "client_selected_vendor" }) });
+  await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
+  assert(calls.published.length === 0, "client-selected route must publish nothing");
+});
+check("19e. executor: client-selected prepare performs no assignment", async () => {
+  const { deps } = makeExecutorDeps({ routing: routing({ selectedVendorId: "vSel" }) });
+  const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
+  assert(result.result.assignment_executed === false && result.result.credit_mutation_executed === false && result.result.delivery_executed === false, "client-selected route claims a side effect");
+});
 check("20. deferred special route performs no assignment/side effect", async () => {
-  const { deps } = makeExecutorDeps({ routing: { leadIntent: "preferred_vendor", targetVendorId: null, preferredVendorId: null, requirementGroupId: null } });
+  const { deps } = makeExecutorDeps({ routing: routing({ leadIntent: "preferred_vendor" }) });
   const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE_APPROVAL), deps);
   assert(result.result.assignment_executed === false && result.result.credit_mutation_executed === false && result.result.delivery_executed === false, "deferred route claims a side effect");
 });
-check("20b. route guard classifier is pure over a snapshot", () => {
-  assert(routeGuardMod.classifyLeadDistributionRoute(STANDARD_ROUTING).isStandardRoute === true, "standard misclassified");
-  assert(routeGuardMod.classifyLeadDistributionRoute({ leadIntent: null, targetVendorId: null, preferredVendorId: null, requirementGroupId: "g" }).classification === "requirement_group_route", "req group misclassified");
+check("20b. Supabase routing adapter reads selected_vendor_id and assignment_intent", () => {
+  const src = readFileSync("lib/aos/workflows/leadLifecycle/distribution/leadDistributionAdapters.ts", "utf8");
+  assert(/selected_vendor_id/.test(src) && /assignment_intent/.test(src), "adapter must read the new routing columns");
 });
 
 // ==========================================================================
@@ -546,6 +630,62 @@ check("38b. first valid approval wins for a recommendation snapshot", async () =
 });
 
 // ==========================================================================
+// APPROVAL BINDING (current-pending-snapshot authorization gate)
+// ==========================================================================
+check("B1. workflow pending for R1 + approve R1 -> accepted", async () => {
+  const { deps } = makeApprovalDeps({ bindingRecId: MATCH_EVENT_ID });
+  const r = await approvalSvcMod.approveLeadDistribution(approveInput({ recommendationEventId: MATCH_EVENT_ID, approvedVendorIds: ["vA"] }), deps);
+  assert(r.event.event_type === E.DISTRIBUTION_APPROVED, "bound approval must succeed");
+});
+check("B2. workflow pending for R2 + approve stale R1 -> binding mismatch", async () => {
+  const { deps } = makeApprovalDeps({ bindingRecId: "evt_R2" });
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput({ recommendationEventId: MATCH_EVENT_ID }), deps), /DISTRIBUTION_APPROVAL_RECOMMENDATION_BINDING_MISMATCH/);
+});
+check("B3. no transition binding -> rejected", async () => {
+  const { deps } = makeApprovalDeps({ bindingNull: true });
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput(), deps), /DISTRIBUTION_APPROVAL_BINDING_NOT_FOUND/);
+});
+check("B4. binding metadata missing recommendation_event_id -> rejected", async () => {
+  const { deps } = makeApprovalDeps({ bindingMetadata: { lead_id: LEAD_ID } });
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput(), deps), /DISTRIBUTION_APPROVAL_BINDING_INVALID/);
+});
+check("B5. blank recommendation_event_id in binding -> rejected", async () => {
+  const { deps } = makeApprovalDeps({ bindingMetadata: { recommendation_event_id: "   " } });
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput(), deps), /DISTRIBUTION_APPROVAL_BINDING_INVALID/);
+});
+check("B6. bound valid approval replay still reuses event", async () => {
+  const { deps, repo } = makeApprovalDeps();
+  const first = await approvalSvcMod.approveLeadDistribution(approveInput({ approvedVendorIds: ["vA", "vB"] }), deps);
+  const second = await approvalSvcMod.approveLeadDistribution(approveInput({ approvedVendorIds: ["vA", "vB"] }), deps);
+  assert(first.event.id === second.event.id && repo.byKey.size === 1, "bound replay must reuse one event");
+});
+check("B7. bound approval changed approved vendors still conflict", async () => {
+  const { deps, repo } = makeApprovalDeps();
+  await approvalSvcMod.approveLeadDistribution(approveInput({ approvedVendorIds: ["vA", "vB"] }), deps);
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput({ approvedVendorIds: ["vA", "vC"] }), deps), /DISTRIBUTION_APPROVAL_IDEMPOTENCY_CONFLICT/);
+  assert(repo.byKey.size === 1, "conflict must not insert second event");
+});
+check("B8. bound approval unrelated persistence errors still rethrow", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  repo.failUnrelated = true;
+  const { deps } = makeApprovalDeps({ repo, approvalPublisher: new approvalPubMod.DurableLeadDistributionApprovalPublisher(repo) });
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput(), deps), /POSTGREST_UNRELATED_FAILURE/);
+});
+check("B9. concurrency: pending R2, caller attempts R1 -> no approval event inserted", async () => {
+  const repo = new InMemoryDomainEventRepository();
+  const { deps } = makeApprovalDeps({ repo, bindingRecId: "evt_R2", approvalPublisher: new approvalPubMod.DurableLeadDistributionApprovalPublisher(repo) });
+  await expectRejects(() => approvalSvcMod.approveLeadDistribution(approveInput({ recommendationEventId: MATCH_EVENT_ID }), deps), /DISTRIBUTION_APPROVAL_RECOMMENDATION_BINDING_MISMATCH/);
+  assert(repo.byKey.size === 0, "stale-recommendation approval must insert no event");
+});
+check("B10. pure binding resolver fails safely + trims", () => {
+  assert(bindingMod.resolveDistributionApprovalBinding(null).message === "DISTRIBUTION_APPROVAL_BINDING_NOT_FOUND", "null must be not found");
+  assert(bindingMod.resolveDistributionApprovalBinding(makeTransition({})).message === "DISTRIBUTION_APPROVAL_BINDING_INVALID", "missing meta must be invalid");
+  assert(!bindingMod.resolveDistributionApprovalBinding(makeTransition({ recommendation_event_id: "  " })).ok, "blank must be invalid");
+  const ok = bindingMod.resolveDistributionApprovalBinding(makeTransition({ recommendation_event_id: " evt_x " }));
+  assert(ok.ok && ok.value.recommendationEventId === "evt_x", "valid binding must trim + resolve");
+});
+
+// ==========================================================================
 // EVENT CONTRACT
 // ==========================================================================
 check("39. approval_required payload validated (empty rejected)", () => {
@@ -592,6 +732,7 @@ const distributionFiles = [
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionRecommendationResolver.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionRouteGuard.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalPublisher.ts",
+  "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalBinding.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalService.ts",
   "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAdapters.ts",
 ];

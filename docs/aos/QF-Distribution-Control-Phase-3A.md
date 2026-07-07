@@ -19,8 +19,41 @@ A separate, explicit human approval command then records a durable
 ## 2. Standard-route-only scope
 
 Phase 3A applies **only** to the STANDARD marketplace route (a general auto-match lead,
-`lead_intent = general_auto_match` with no preferred/target vendor and no requirement group).
-The controlled approval path never touches the other two assignment models.
+`lead_intent = general_auto_match` with no preferred/target vendor, no selected vendor, and no
+requirement group). The controlled approval path never touches the other assignment models.
+
+### 2.1 Route-guard columns (all real `public.leads` columns)
+
+The guard reads exactly six columns — no guessed names:
+
+| Column | Migration | Meaning |
+|---|---|---|
+| `lead_intent` | 035 | `general_auto_match` \| `preferred_vendor` |
+| `target_vendor_id` | 035 | specific vendor picked from a CTA (preferred) |
+| `preferred_vendor_id` | 035 | preferred-vendor routing target |
+| `requirement_group_id` | 032 | per-parent-category requirement group |
+| `selected_vendor_id` | 032 | a client-selected vendor |
+| `assignment_intent` | 032 | e.g. `client_selected_vendor` |
+
+> Correction (2026-07-07): an earlier report incorrectly claimed `selected_vendor_id` and
+> `assignment_intent` do not exist. They **do** exist — added by
+> `supabase/migrations/20260701000032_phase26a2d_client_requirement_groups.sql` (lines 81, 83).
+> The guard now reads them so a client-selected lead can never fall through to `standard_route`.
+
+### 2.2 Route classification precedence (deterministic, most-specific first)
+
+1. `requirement_group_id` non-empty → **`requirement_group_route`**
+2. `assignment_intent = client_selected_vendor` **or** `selected_vendor_id` non-empty → **`client_selected_route`**
+3. `lead_intent = preferred_vendor` **or** `target_vendor_id` **or** `preferred_vendor_id` non-empty → **`preferred_vendor_route`**
+4. otherwise → **`standard_route`**
+
+`client_selected_route` is now a first-class classification (Correction 1) rather than being
+folded into the requirement-group route. `assignment_intent` matching is **exact**
+(`client_selected_vendor`, the literal value written by `clientRequirementGroupService.ts`) — no
+fuzzy matching. Client-selected precedence beats preferred-vendor: a lead with both a
+`selected_vendor_id` and preferred fields classifies as `client_selected_route`. Every
+non-standard classification returns `isStandardRoute = false`, publishes no approval event,
+performs no assignment, and calls none of the existing special-route services.
 
 ## 3. Why the preferred-vendor route stays separate
 
@@ -30,15 +63,17 @@ window, and delayed remaining-slot fill inside `services/preferredVendorLeadServ
 `services/delayedLeadFillService.ts`. Phase 3A must not re-implement or merge that behavior,
 so the standard-route guard classifies it as `preferred_vendor_route` and **defers** it.
 
-## 4. Why the requirement-group route stays separate
+## 4. Why the requirement-group and client-selected routes stay separate
 
-The requirement-group / client-selected route already enforces per-parent-category groups,
-a 3-vendor-per-group cap, client-selection priority, a 1-hour selection window, and auto-fill
-inside `services/clientRequirementGroupService.ts` (RPC `assign_vendor_to_requirement_group`).
-"Client-selected vendor priority" is a sub-flow **inside** a requirement group, keyed by the
-same `requirement_group_id` lead column plus group-level selection state — there is no separate
-lead-level `selected_vendor_id`. Phase 3A classifies any lead with `requirement_group_id` as
-`requirement_group_route` and **defers** it.
+The requirement-group / client-selected route already enforces per-parent-category groups, a
+3-vendor-per-group cap, client-selection priority, a 1-hour selection window, and auto-fill
+inside `services/clientRequirementGroupService.ts` (RPCs `assign_vendor_to_requirement_group`,
+`assign_client_selected_vendor_to_group`). That service writes `leads.selected_vendor_id` and
+`leads.assignment_intent = client_selected_vendor` when a client explicitly picks a vendor.
+Phase 3A classifies a lead with `requirement_group_id` as `requirement_group_route`, and a lead
+with `selected_vendor_id` / `assignment_intent = client_selected_vendor` (without a requirement
+group) as `client_selected_route`, and **defers** both — it never assigns, and never calls these
+services.
 
 ## 5. Matching recommendation snapshot contract
 
@@ -130,12 +165,44 @@ For recommendation `[A, B, C]`:
 | `[B,A]`, `[C,B]` | rejected (`DISTRIBUTION_APPROVED_ORDER_NOT_PRESERVED`) |
 | `[A,D]` | rejected (`DISTRIBUTION_APPROVED_VENDOR_NOT_RECOMMENDED`) |
 
-## 12. Approval identity
+## 12. Approval identity + current-pending-snapshot binding
 
 Approval requires that the recommendation snapshot belongs to the **same lead** and **same
 workflow**, that the route is standard (special routes are rejected with
 `DISTRIBUTION_SPECIAL_ROUTE_NOT_ALLOWED`), and that authoritative workflow state is loaded and
 equals `DISTRIBUTION_APPROVAL_PENDING`.
+
+**Same lead + same workflow is not sufficient (Correction 2).** A workflow may carry multiple
+historical matching events (R1 recommends `[A,B,C]`, later R2 recommends `[D,E,F]`). The approval
+service must bind to **the exact recommendation snapshot that caused the current transition into
+`DISTRIBUTION_APPROVAL_PENDING`**, not merely a valid historical one.
+
+- **Authoritative binding source:** `workflow_transition_history`. When the handler transitions
+  `MATCH_RECOMMENDATION_READY → DISTRIBUTION_APPROVAL_PENDING`, it stamps
+  `metadata_json.recommendation_event_id`. The kernel persists this durably (audit trail).
+- **Binding read:** a narrow read-only port loads the **newest** `→ DISTRIBUTION_APPROVAL_PENDING`
+  transition for the workflow (`order by created_at desc, id desc, limit 1`) and extracts
+  `recommendation_event_id`. It fails safely: no transition →
+  `DISTRIBUTION_APPROVAL_BINDING_NOT_FOUND`; missing/blank metadata →
+  `DISTRIBUTION_APPROVAL_BINDING_INVALID`.
+- **Gate:** if `binding.recommendationEventId !== input.recommendationEventId` →
+  **`DISTRIBUTION_APPROVAL_RECOMMENDATION_BINDING_MISMATCH`** and **no** approved event is inserted.
+
+So if the workflow is currently pending approval for **R2**, a command approving **R1** (a stale
+historical recommendation) is rejected, even though R1 is a valid matching event for the same lead
+and workflow.
+
+### Approval service order
+
+1. validate command input
+2. resolve recommendation snapshot (bound to lead + workflow)
+3. approved-subset + recommendation-order check
+4. special-route guard (standard only)
+5. load authoritative workflow instance
+6. require `current_state = DISTRIBUTION_APPROVAL_PENDING`
+7. load current approval binding from `workflow_transition_history`; require
+   `binding.recommendationEventId === input.recommendationEventId`
+8. only then publish `lead.distribution.approved`
 
 ## 13. Approval idempotency
 
@@ -150,6 +217,12 @@ qf_lead_lifecycle:distribution_approval:{workflow_instance_id}:{recommendation_e
 - Same key, different approved vendors / different lead / different recommendation snapshot →
   **`DISTRIBUTION_APPROVAL_IDEMPOTENCY_CONFLICT`**.
 - Unrelated persistence errors are **rethrown**, never swallowed.
+
+**The idempotency key is not authorization.** The transition-history binding (§12) is the
+authorization/integrity gate that establishes *which* recommendation is currently awaiting
+approval; the idempotency key only deduplicates approvals of the already-authorized bound
+snapshot. Do not rely on the key alone to prove a recommendation is currently pending. First
+valid (bound) approval wins for that snapshot.
 
 ## 14. Workflow state requirement
 
@@ -203,7 +276,8 @@ lib/aos/workflows/leadLifecycle/distribution/
   leadDistributionTypes.ts                     # pure contracts + port interfaces
   leadDistributionValidation.ts                # pure snapshot/payload validation
   leadDistributionRecommendationResolver.ts    # load + normalize matching event → snapshot
-  leadDistributionRouteGuard.ts                # standard vs preferred vs requirement-group
+  leadDistributionRouteGuard.ts                # standard vs preferred vs client-selected vs req-group
+  leadDistributionApprovalBinding.ts           # current-pending-snapshot binding (transition history)
   leadDistributionApprovalPublisher.ts         # durable approved event (dedicated key)
   leadDistributionApprovalService.ts           # human approval command (backend)
   leadDistributionAdapters.ts                  # Supabase-backed default ports (not run in 3A)

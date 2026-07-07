@@ -12,8 +12,15 @@ import {
   mapQualityResultToLifecycleEvent,
 } from "../events/leadLifecycleResultMapper";
 import { resolveLeadDistributionRecommendation } from "../distribution/leadDistributionRecommendationResolver";
+import { resolveLeadDistributionApprovedSnapshot } from "../distribution/leadDistributionApprovedSnapshotResolver";
 import { resolveLeadDistributionRoute } from "../distribution/leadDistributionRouteGuard";
-import { validateDistributionApprovalRequired } from "../distribution/leadDistributionValidation";
+import {
+  validateDistributionApprovalRequired,
+  validateDistributionCompleted,
+} from "../distribution/leadDistributionValidation";
+import { mapAssignmentResultToOutcome } from "../distribution/leadDistributionAssignmentResultMapper";
+import { DistributionAssignmentManualReviewReason } from "../distribution/leadDistributionAssignmentTypes";
+import type { LeadDistributionAssignmentPort } from "../distribution/leadDistributionAssignmentTypes";
 import type {
   LeadDistributionRecommendationEventPort,
   LeadDistributionRoutingPort,
@@ -21,13 +28,17 @@ import type {
 import type { LeadLifecycleTaskExecutionResult } from "./leadLifecycleTaskExecutionTypes";
 
 /**
- * Phase 3A distribution ports required ONLY by the prepare_approval task. They
- * are optional so existing Phase 2B call sites/tests remain unaffected; the
- * prepare_approval case fails loudly if they are missing.
+ * Distribution ports for the prepare_approval (Phase 3A) and prepare (Phase 3B)
+ * tasks. Optional so existing Phase 2B call sites/tests are unaffected; each task
+ * fails loudly if a port it needs is missing. `recommendationEventPort` is a
+ * generic "get durable domain event by id" port reused to load both the matching
+ * event (3A) and the approved event (3B).
  */
 export interface LeadLifecycleDistributionPorts {
   recommendationEventPort: LeadDistributionRecommendationEventPort;
   routingPort: LeadDistributionRoutingPort;
+  /** Phase 3B: the standard-route credit-safe assignment boundary. */
+  assignmentExecution?: LeadDistributionAssignmentPort;
 }
 
 export interface LeadLifecycleTaskExecutorDeps {
@@ -242,7 +253,137 @@ export async function executeLeadLifecycleTask(
         marker: "awaiting_explicit_distribution_approval",
       });
 
-    case LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE:
+    case LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE: {
+      const distribution = deps.distribution;
+      if (!distribution?.assignmentExecution) throw new Error("DISTRIBUTION_ASSIGNMENT_PORTS_REQUIRED");
+      if (!context.triggeredByEvent) throw new Error("APPROVAL_EVENT_ID_REQUIRED");
+
+      // Resolve the exact approved snapshot from the triggering
+      // lead.distribution.approved event (no matching rerun, no re-ranking).
+      const resolved = await resolveLeadDistributionApprovedSnapshot(
+        {
+          approvalEventId: context.triggeredByEvent,
+          expectedWorkflowInstanceId: context.workflowInstanceId,
+          expectedLeadId: context.leadId,
+        },
+        distribution.recommendationEventPort,
+      );
+      if (!resolved.ok) throw new Error(resolved.message);
+      const snapshot = resolved.value;
+
+      // Standard route only. A route change after approval → deterministic manual review.
+      const route = await resolveLeadDistributionRoute(context.leadId, distribution.routingPort);
+      if (!route.isStandardRoute) {
+        const event = await deps.resultEventPublisher.publish({
+          workflowTaskId: task.id,
+          leadId: context.leadId,
+          eventType: LeadLifecycleEventType.MANUAL_REVIEW_REQUIRED,
+          payload: {
+            reason: DistributionAssignmentManualReviewReason.ROUTE_CHANGED,
+            approval_event_id: snapshot.approvalEventId,
+            recommendation_event_id: snapshot.recommendationEventId,
+            route_classification: route.classification,
+            approved_vendor_count: snapshot.approvedVendorCount,
+            approved_vendor_ids: [...snapshot.approvedVendorIds],
+          },
+          correlationId: context.workflowInstanceId,
+          causationId: context.triggeredByEvent,
+        });
+        return completed(taskType, context, {
+          published_event_id: event.id,
+          published_event_type: event.event_type,
+          manual_review_reason: DistributionAssignmentManualReviewReason.ROUTE_CHANGED,
+          route_classification: route.classification,
+          assignment_executed: false,
+          aos_credit_math_executed: false,
+          delivery_log_written: false,
+          whatsapp_sent: false,
+          n8n_called: false,
+        });
+      }
+
+      // Execute ONLY the approved subset through the existing credit-safe boundary.
+      const raw = await distribution.assignmentExecution.assignApprovedVendors({
+        leadId: snapshot.leadId,
+        approvedVendorIds: [...snapshot.approvedVendorIds],
+      });
+      const outcome = mapAssignmentResultToOutcome(raw, {
+        leadId: snapshot.leadId,
+        approvedVendorIds: snapshot.approvedVendorIds,
+      });
+      // Structural corruption of the authoritative result → fail loudly (retry/dead-letter).
+      if (!outcome.ok) throw new Error(outcome.message);
+
+      if (outcome.value.kind === "manual_review") {
+        const event = await deps.resultEventPublisher.publish({
+          workflowTaskId: task.id,
+          leadId: context.leadId,
+          eventType: LeadLifecycleEventType.MANUAL_REVIEW_REQUIRED,
+          payload: {
+            reason: outcome.value.reason,
+            approval_event_id: snapshot.approvalEventId,
+            recommendation_event_id: snapshot.recommendationEventId,
+            approved_vendor_count: snapshot.approvedVendorCount,
+            approved_vendor_ids: [...snapshot.approvedVendorIds],
+          },
+          correlationId: context.workflowInstanceId,
+          causationId: context.triggeredByEvent,
+        });
+        return completed(taskType, context, {
+          published_event_id: event.id,
+          published_event_type: event.event_type,
+          manual_review_reason: outcome.value.reason,
+          distributed_vendor_count: 0,
+          assignment_executed: true,
+          aos_credit_math_executed: false,
+          delivery_log_written: false,
+          whatsapp_sent: false,
+          n8n_called: false,
+        });
+      }
+
+      // 1..3 assigned → durable distribution.completed with the canonical partition.
+      // The payload contains ONLY vendor ids/counts + durable event ids — no volatile
+      // retry facts — so it is byte-identical across a fresh assignment and an
+      // already_assigned replay, preserving one-task→one-result idempotency.
+      const completedPayload = {
+        approval_event_id: snapshot.approvalEventId,
+        recommendation_event_id: snapshot.recommendationEventId,
+        approved_vendor_count: snapshot.approvedVendorCount,
+        approved_vendor_ids: [...snapshot.approvedVendorIds],
+        distributed_vendor_count: outcome.value.distributedVendorIds.length,
+        distributed_vendor_ids: outcome.value.distributedVendorIds,
+        skipped_vendor_ids: outcome.value.skippedVendorIds,
+      };
+      const validatedCompleted = validateDistributionCompleted(completedPayload);
+      if (!validatedCompleted.ok) throw new Error(validatedCompleted.message);
+
+      const event = await deps.resultEventPublisher.publish({
+        workflowTaskId: task.id,
+        leadId: context.leadId,
+        eventType: LeadLifecycleEventType.DISTRIBUTION_COMPLETED,
+        payload: completedPayload,
+        correlationId: context.workflowInstanceId,
+        causationId: context.triggeredByEvent,
+      });
+      return completed(taskType, context, {
+        published_event_id: event.id,
+        published_event_type: event.event_type,
+        approval_event_id: snapshot.approvalEventId,
+        distributed_vendor_count: outcome.value.distributedVendorIds.length,
+        distributed_vendor_ids: outcome.value.distributedVendorIds,
+        skipped_vendor_ids: outcome.value.skippedVendorIds,
+        assignment_executed: true,
+        // Credits are handled inside the boundary RPC; the AOS layer does no credit math.
+        aos_credit_math_executed: false,
+        // Authoritative dashboard delivery = the lead_assignments row itself. No legacy
+        // delivery-log / preview insert is coupled to this retryable task.
+        delivery_log_written: false,
+        whatsapp_sent: false,
+        n8n_called: false,
+      });
+    }
+
     case LeadLifecycleTaskIntent.NURTURE_PREPARE:
     case LeadLifecycleTaskIntent.MANUAL_REVIEW_PREPARE:
       return {

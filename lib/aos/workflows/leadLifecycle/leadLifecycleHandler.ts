@@ -22,7 +22,6 @@ import {
 } from "./leadLifecycleTaskIntents";
 import {
   resolveCanonicalLeadIdentity,
-  validateDistributionResult,
   validateManualReviewResolution,
   validateMatchingResult,
   validateQualityResult,
@@ -35,6 +34,7 @@ import {
 import {
   validateDistributionApprovalRequired,
   validateDistributionApproved,
+  validateDistributionCompleted,
 } from "./distribution/leadDistributionValidation";
 
 /**
@@ -391,8 +391,9 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
 
     case LeadLifecycleEventType.DISTRIBUTION_COMPLETED: {
       assertSourceState(state, LeadLifecycleState.DISTRIBUTION_PENDING, eventType);
-      // Correction 4: distributed count must be within [1, MAX_VENDORS_PER_LEAD].
-      const distribution = validateDistributionResult(payload);
+      // Phase 3B: strict partition contract — distributed + skipped must exactly
+      // partition the approved set (order-preserving, disjoint), with 1..3 distributed.
+      const distribution = validateDistributionCompleted(payload);
       if (!distribution.ok) {
         throw new LeadLifecycleTransitionError(distribution.message);
       }
@@ -401,7 +402,10 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
         leadId,
         LeadLifecycleState.DISTRIBUTED,
         "Distribution completed; lead delivered to matched vendors.",
-        { distributed_vendor_count: distribution.value.distributedVendorCount },
+        {
+          approval_event_id: distribution.value.approvalEventId,
+          distributed_vendor_count: distribution.value.distributedVendorCount,
+        },
       );
     }
 

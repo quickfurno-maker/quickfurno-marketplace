@@ -366,6 +366,17 @@ const APPROVED_PAYLOAD = {
   approved_vendor_ids: ["v1", "v2"],
   approved_by: "admin_1",
 };
+// Phase 3B strengthened distribution.completed: distributed + skipped must exactly
+// partition the approved set (order-preserving, disjoint).
+const DISTRIBUTION_COMPLETED_PAYLOAD = {
+  approval_event_id: "evt_appr_1",
+  recommendation_event_id: "evt_match_1",
+  approved_vendor_count: 3,
+  approved_vendor_ids: ["v1", "v2", "v3"],
+  distributed_vendor_count: 3,
+  distributed_vendor_ids: ["v1", "v2", "v3"],
+  skipped_vendor_ids: [],
+};
 check("14. approval required: MATCH_RECOMMENDATION_READY -> DISTRIBUTION_APPROVAL_PENDING", () => {
   assert(runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, APPROVAL_REQUIRED_PAYLOAD).nextState === S.DISTRIBUTION_APPROVAL_PENDING);
 });
@@ -389,8 +400,11 @@ check("16. auto-authorized exists but activates no real distribution", () => {
 // Distribution completion + CORRECTION 4 distribution count contract
 // ==================================================================
 check("17. distribution completed (count 3) -> DISTRIBUTED", () => {
-  const result = runValidStep(S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 3 });
+  const result = runValidStep(S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, DISTRIBUTION_COMPLETED_PAYLOAD);
   assert(result.nextState === S.DISTRIBUTED && result.metadata.distributed_vendor_count === 3);
+});
+check("17c. empty distribution.completed payload now rejected (Phase 3B contract)", () => {
+  assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 3 }))), "partial completed payload must reject");
 });
 check("17b. distributed can close: DISTRIBUTED -> CLOSED", () => {
   const result = runValidStep(S.DISTRIBUTED, E.CLOSED, {});
@@ -635,7 +649,7 @@ check("34. full happy path still kernel-valid end to end", () => {
     [S.MATCHING_PENDING, E.MATCHING_COMPLETED, { recommended_vendor_count: 3 }, S.MATCH_RECOMMENDATION_READY],
     [S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_APPROVAL_REQUIRED, APPROVAL_REQUIRED_PAYLOAD, S.DISTRIBUTION_APPROVAL_PENDING],
     [S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, APPROVED_PAYLOAD, S.DISTRIBUTION_PENDING],
-    [S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, { distributed_vendor_count: 3 }, S.DISTRIBUTED],
+    [S.DISTRIBUTION_PENDING, E.DISTRIBUTION_COMPLETED, DISTRIBUTION_COMPLETED_PAYLOAD, S.DISTRIBUTED],
     [S.DISTRIBUTED, E.CLOSED, {}, S.CLOSED],
   ];
   for (const [from, evt, payload, expected] of steps) {

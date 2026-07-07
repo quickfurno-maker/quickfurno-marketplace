@@ -6,6 +6,8 @@ import {
   type DistributionApprovalRequiredContract,
   type DistributionApprovedContract,
   type DistributionValidationResult,
+  type LeadDistributionApprovedExpectation,
+  type LeadDistributionApprovedSnapshot,
   type LeadDistributionRecommendationExpectation,
   type LeadDistributionRecommendationSnapshot,
 } from "./leadDistributionTypes";
@@ -260,6 +262,161 @@ export function validateDistributionApproved(
       approvedVendorIds: approved.value,
       approvedBy: payload.approved_by.trim(),
       approvalReason,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3B — approved-event snapshot resolution + distribution.completed contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate a loaded `lead.distribution.approved` domain event and normalize it
+ * into an immutable snapshot bound to the expected lead + workflow. Reuses the
+ * approved-payload contract (subset + recommendation-order rules). NEVER reruns
+ * matching or reranks.
+ */
+export function validateApprovedEventSnapshot(
+  event: DomainEventRecord,
+  expectation: LeadDistributionApprovedExpectation,
+): DistributionValidationResult<LeadDistributionApprovedSnapshot> {
+  if (event.id !== expectation.approvalEventId) {
+    return { ok: false, message: "APPROVED_EVENT_ID_MISMATCH" };
+  }
+  if (event.event_type !== LeadLifecycleEventType.DISTRIBUTION_APPROVED) {
+    return { ok: false, message: "APPROVED_EVENT_TYPE_INVALID" };
+  }
+  if (event.entity_type !== LEAD_ENTITY_TYPE) {
+    return { ok: false, message: "APPROVED_EVENT_ENTITY_TYPE_INVALID" };
+  }
+  if (!isNonEmptyString(expectation.expectedLeadId)) {
+    return { ok: false, message: "APPROVED_EXPECTED_LEAD_REQUIRED" };
+  }
+  if (event.entity_id !== expectation.expectedLeadId) {
+    return { ok: false, message: "APPROVED_EVENT_LEAD_MISMATCH" };
+  }
+  if (!isNonEmptyString(expectation.expectedWorkflowInstanceId)) {
+    return { ok: false, message: "APPROVED_EXPECTED_WORKFLOW_REQUIRED" };
+  }
+  if (event.correlation_id !== expectation.expectedWorkflowInstanceId) {
+    return { ok: false, message: "APPROVED_EVENT_WORKFLOW_MISMATCH" };
+  }
+
+  const payload = isPlainObject(event.payload_json) ? event.payload_json : null;
+  if (!payload) {
+    return { ok: false, message: "APPROVED_EVENT_PAYLOAD_REQUIRED" };
+  }
+  if (payload.workflow_type !== LEAD_LIFECYCLE_WORKFLOW_TYPE) {
+    return { ok: false, message: "APPROVED_EVENT_WORKFLOW_TYPE_INVALID" };
+  }
+  if (payload.lead_id !== expectation.expectedLeadId) {
+    return { ok: false, message: "APPROVED_EVENT_LEAD_MISMATCH" };
+  }
+
+  const approved = validateDistributionApproved(payload);
+  if (!approved.ok) return approved;
+
+  const snapshot: LeadDistributionApprovedSnapshot = Object.freeze({
+    approvalEventId: expectation.approvalEventId,
+    recommendationEventId: approved.value.recommendationEventId,
+    leadId: expectation.expectedLeadId,
+    workflowInstanceId: expectation.expectedWorkflowInstanceId,
+    recommendedVendorIds: Object.freeze([...approved.value.recommendedVendorIds]),
+    recommendedVendorCount: approved.value.recommendedVendorCount,
+    approvedVendorIds: Object.freeze([...approved.value.approvedVendorIds]),
+    approvedVendorCount: approved.value.approvedVendorCount,
+    approvedBy: approved.value.approvedBy,
+  });
+  return { ok: true, value: snapshot };
+}
+
+export interface DistributionCompletedContract {
+  approvalEventId: string;
+  recommendationEventId: string;
+  approvedVendorCount: number;
+  approvedVendorIds: string[];
+  distributedVendorCount: number;
+  distributedVendorIds: string[];
+  skippedVendorIds: string[];
+}
+
+/**
+ * Strict `lead.distribution.completed` payload validation. Enforces that
+ * distributed + skipped **exactly partition** the approved set, both preserving
+ * approved order, disjoint, with distributed a non-empty approved subset.
+ */
+export function validateDistributionCompleted(
+  payload: JsonRecord,
+): DistributionValidationResult<DistributionCompletedContract> {
+  if (!isPlainObject(payload)) {
+    return { ok: false, message: "DISTRIBUTION_COMPLETED_PAYLOAD_REQUIRED" };
+  }
+  if (!isNonEmptyString(payload.approval_event_id)) {
+    return { ok: false, message: "DISTRIBUTION_APPROVAL_EVENT_ID_REQUIRED" };
+  }
+  if (!isNonEmptyString(payload.recommendation_event_id)) {
+    return { ok: false, message: "DISTRIBUTION_RECOMMENDATION_EVENT_ID_REQUIRED" };
+  }
+
+  if (!isIntegerInRange(payload.approved_vendor_count, 1, MAX_DISTRIBUTION_VENDORS)) {
+    return { ok: false, message: "DISTRIBUTION_APPROVED_COUNT_INVALID" };
+  }
+  const approvedCount = payload.approved_vendor_count;
+  const approved = normalizeVendorIdList(payload.approved_vendor_ids, "DISTRIBUTION_APPROVED_IDS_REQUIRED");
+  if (!approved.ok) return approved;
+  if (approved.value.length !== approvedCount) {
+    return { ok: false, message: "DISTRIBUTION_APPROVED_IDS_COUNT_MISMATCH" };
+  }
+
+  if (!isIntegerInRange(payload.distributed_vendor_count, 1, MAX_DISTRIBUTION_VENDORS)) {
+    return { ok: false, message: "DISTRIBUTION_DISTRIBUTED_COUNT_INVALID" };
+  }
+  const distributedCount = payload.distributed_vendor_count;
+  const distributed = normalizeVendorIdList(payload.distributed_vendor_ids, "DISTRIBUTION_DISTRIBUTED_IDS_REQUIRED");
+  if (!distributed.ok) return distributed;
+  if (distributed.value.length !== distributedCount) {
+    return { ok: false, message: "DISTRIBUTION_DISTRIBUTED_IDS_COUNT_MISMATCH" };
+  }
+
+  // skipped is required (present) but may be an empty array (full distribution).
+  if (payload.skipped_vendor_ids === undefined || payload.skipped_vendor_ids === null) {
+    return { ok: false, message: "DISTRIBUTION_SKIPPED_IDS_REQUIRED" };
+  }
+  const skipped = normalizeVendorIdList(payload.skipped_vendor_ids, "DISTRIBUTION_SKIPPED_IDS_REQUIRED");
+  if (!skipped.ok) return skipped;
+
+  // distributed ⊆ approved, preserving approved order.
+  const distSubset = isApprovedSubsetPreservingOrder(approved.value, distributed.value);
+  if (!distSubset.ok) {
+    return { ok: false, message: distSubset.message === "DISTRIBUTION_APPROVED_ORDER_NOT_PRESERVED" ? "DISTRIBUTION_DISTRIBUTED_ORDER_NOT_PRESERVED" : "DISTRIBUTION_DISTRIBUTED_NOT_APPROVED_SUBSET" };
+  }
+  // skipped ⊆ approved, preserving approved order.
+  const skipSubset = isApprovedSubsetPreservingOrder(approved.value, skipped.value);
+  if (!skipSubset.ok) {
+    return { ok: false, message: skipSubset.message === "DISTRIBUTION_APPROVED_ORDER_NOT_PRESERVED" ? "DISTRIBUTION_SKIPPED_ORDER_NOT_PRESERVED" : "DISTRIBUTION_SKIPPED_NOT_APPROVED_SUBSET" };
+  }
+
+  // distributed and skipped must be disjoint and exactly partition approved.
+  const distSet = new Set(distributed.value);
+  for (const id of skipped.value) {
+    if (distSet.has(id)) {
+      return { ok: false, message: "DISTRIBUTION_DISTRIBUTED_SKIPPED_NOT_DISJOINT" };
+    }
+  }
+  if (distributed.value.length + skipped.value.length !== approved.value.length) {
+    return { ok: false, message: "DISTRIBUTION_PARTITION_INCOMPLETE" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      approvalEventId: payload.approval_event_id.trim(),
+      recommendationEventId: payload.recommendation_event_id.trim(),
+      approvedVendorCount: approvedCount,
+      approvedVendorIds: approved.value,
+      distributedVendorCount: distributedCount,
+      distributedVendorIds: distributed.value,
+      skippedVendorIds: skipped.value,
     },
   };
 }

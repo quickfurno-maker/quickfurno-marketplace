@@ -48,6 +48,30 @@ export interface LeadDistributionRecommendationExpectation {
 }
 
 /**
+ * Immutable, normalized snapshot of the authoritative `lead.distribution.approved`
+ * event that authorized this distribution (Phase 3B). The approved vendor subset
+ * is the ONLY set that may be executed against the assignment boundary.
+ */
+export interface LeadDistributionApprovedSnapshot {
+  readonly approvalEventId: string;
+  readonly recommendationEventId: string;
+  readonly leadId: string;
+  readonly workflowInstanceId: string;
+  readonly recommendedVendorIds: readonly string[];
+  readonly recommendedVendorCount: number;
+  readonly approvedVendorIds: readonly string[];
+  readonly approvedVendorCount: number;
+  readonly approvedBy: string;
+}
+
+/** Identity an approved snapshot must be bound to (same lead, same workflow). */
+export interface LeadDistributionApprovedExpectation {
+  approvalEventId: string;
+  expectedWorkflowInstanceId: string;
+  expectedLeadId: string;
+}
+
+/**
  * The authoritative lead routing fields that distinguish the assignment models.
  * These are the ONLY real `public.leads` columns Phase 3A reads to classify a
  * route — no guessed field names. All exist today:

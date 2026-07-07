@@ -527,10 +527,11 @@ check("35. executor never generates lead.manual_review.resolved", async () => {
   assert(calls.published[0].eventType !== E.MANUAL_REVIEW_RESOLVED, "manual review resolved generated");
 });
 
-check("36. deferred distribution task performs no assignment", async () => {
+check("36. distribution prepare performs no assignment without explicit assignment ports", async () => {
+  // Phase 3B enabled lead.distribution.prepare, but it must never assign without
+  // an explicitly injected assignment execution port — it fails loudly instead.
   const { deps } = makeDeps();
-  const result = await executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps);
-  assert(result.status === "deferred_not_enabled" && result.result.assignment_executed === false, "distribution not deferred safely");
+  await expectRejects(() => executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps), /DISTRIBUTION_ASSIGNMENT_PORTS_REQUIRED/);
 });
 
 check("37. deferred nurture task performs no provider send", async () => {

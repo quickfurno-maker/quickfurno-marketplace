@@ -15,6 +15,8 @@ import type {
   LeadDistributionWorkflowStatePort,
   LeadRoutingSnapshot,
 } from "./leadDistributionTypes";
+import type { LeadDistributionAssignmentPort } from "./leadDistributionAssignmentTypes";
+import { SupabaseLeadDistributionAssignmentPort } from "./leadDistributionAssignmentAdapter";
 import {
   DurableLeadDistributionApprovalPublisher,
 } from "./leadDistributionApprovalPublisher";
@@ -100,16 +102,22 @@ export class SupabaseLeadDistributionWorkflowStatePort
   }
 }
 
-/** Ports the prepare_approval executor task needs (recommendation + routing). */
+/**
+ * Ports the distribution executor tasks need: prepare_approval (3A) uses
+ * recommendation + routing; prepare (3B) additionally uses the assignment
+ * execution boundary.
+ */
 export interface LeadDistributionExecutorPorts {
   recommendationEventPort: LeadDistributionRecommendationEventPort;
   routingPort: LeadDistributionRoutingPort;
+  assignmentExecution: LeadDistributionAssignmentPort;
 }
 
 export function createLeadDistributionExecutorPorts(): LeadDistributionExecutorPorts {
   return {
     recommendationEventPort: new SupabaseLeadDistributionRecommendationEventPort(),
     routingPort: new SupabaseLeadDistributionRoutingPort(),
+    assignmentExecution: new SupabaseLeadDistributionAssignmentPort(),
   };
 }
 

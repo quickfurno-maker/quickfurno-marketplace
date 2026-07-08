@@ -1,18 +1,32 @@
 // ============================================================================
-// QuickFurno — services/communicationAdminService.ts
+// QuickFurno — services/communicationAdminService.ts   (server-only)
 //
-// Admin read-model services for the future Admin WhatsApp Automation Center.
+// Admin read-model services for the future Admin → WhatsApp Automation Center.
 // Leverages adminClient to query communication tables, returning Result<T>.
+//
+// READ-ONLY BY CONSTRUCTION. Nothing here enables an automation, dispatches a
+// message, or mutates the ledger. The Automation Center will render these
+// projections; turning an automation on is a separate, authorized write, and it
+// never bypasses Phase 4 authorization at dispatch time.
+//
+// The projections deliberately cover every state the Center must show:
+// automation readiness, operational enablement, provider health, template
+// readiness, queued, retry scheduled, failed, dead letter, and webhook
+// processing state.
 // ============================================================================
 
 import { adminClient } from "../lib/supabase";
-import { appError, fail, ok, type Result } from "../lib/errors";
+import { fail, ok, type Result } from "../lib/errors";
 import { getActiveWhatsAppProvider } from "./communicationService";
-import type {
-  CommunicationAutomationCatalog,
-  CommunicationMessage,
-  CommunicationTemplate,
-  CommunicationWebhookReceipt,
+import {
+  COMMUNICATION_AUTOMATION_READINESS_STATES,
+  isAutomationDispatchable,
+  type CommunicationAutomationCatalog,
+  type CommunicationAutomationReadiness,
+  type CommunicationMessage,
+  type CommunicationTemplate,
+  type CommunicationWebhookProcessingStatus,
+  type CommunicationWebhookReceipt,
 } from "../lib/communication/types";
 import type { WhatsAppProviderHealth } from "../lib/communication/providers/whatsappProvider";
 
@@ -20,6 +34,7 @@ export interface CommunicationOverview {
   totalMessages: number;
   statusBreakdown: Record<string, number>;
   queuedCount: number;
+  dispatchingCount: number;
   acceptedCount: number;
   sentCount: number;
   deliveredCount: number;
@@ -27,6 +42,7 @@ export interface CommunicationOverview {
   failedCount: number;
   retryScheduledCount: number;
   deadLetterCount: number;
+  cancelledCount: number;
 }
 
 export interface AutomationActivitySummary {
@@ -34,6 +50,58 @@ export interface AutomationActivitySummary {
   totalTriggered: number;
   lastTriggeredAt: string | null;
   statusBreakdown: Record<string, number>;
+}
+
+/**
+ * Readiness (how far it is BUILT) reported separately from operational
+ * enablement (whether an operator TURNED IT ON). Phase 5B ships every
+ * automation as `wiring_pending` + disabled, so the Center can never present an
+ * unwired workflow as live.
+ */
+export interface AutomationReadinessSummary {
+  totalAutomations: number;
+  readinessBreakdown: Record<CommunicationAutomationReadiness, number>;
+  operationallyEnabledCount: number;
+  /** Both `active` AND enabled. Still subject to Phase 4 authorization. */
+  dispatchableCount: number;
+  automations: CommunicationAutomationCatalog[];
+}
+
+export interface WebhookProcessingSummary {
+  totalReceipts: number;
+  processingBreakdown: Record<CommunicationWebhookProcessingStatus, number>;
+  invalidSignatureCount: number;
+  duplicateRedeliveryCount: number;
+  lastReceivedAt: string | null;
+}
+
+const MESSAGE_STATUS_KEYS = [
+  "queued",
+  "dispatching",
+  "accepted",
+  "sent",
+  "delivered",
+  "read",
+  "failed",
+  "retry_scheduled",
+  "dead_letter",
+  "cancelled",
+] as const;
+
+const WEBHOOK_PROCESSING_KEYS: readonly CommunicationWebhookProcessingStatus[] = [
+  "received",
+  "verified",
+  "processed",
+  "duplicate",
+  "rejected",
+  "failed",
+];
+
+function emptyCounts<K extends string>(keys: readonly K[]): Record<K, number> {
+  return keys.reduce((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {} as Record<K, number>);
 }
 
 /**
@@ -48,30 +116,18 @@ export async function getCommunicationOverview(): Promise<Result<CommunicationOv
     if (error) throw error;
 
     const messages = data || [];
-    const breakdown: Record<string, number> = {
-      queued: 0,
-      dispatching: 0,
-      accepted: 0,
-      sent: 0,
-      delivered: 0,
-      read: 0,
-      failed: 0,
-      retry_scheduled: 0,
-      dead_letter: 0,
-      cancelled: 0,
-    };
+    const breakdown = emptyCounts(MESSAGE_STATUS_KEYS);
 
     messages.forEach((msg) => {
-      const status = msg.status || "queued";
-      if (status in breakdown) {
-        breakdown[status]++;
-      }
+      const status = (msg.status || "queued") as (typeof MESSAGE_STATUS_KEYS)[number];
+      if (status in breakdown) breakdown[status]++;
     });
 
-    const overview: CommunicationOverview = {
+    return ok({
       totalMessages: messages.length,
       statusBreakdown: breakdown,
       queuedCount: breakdown.queued,
+      dispatchingCount: breakdown.dispatching,
       acceptedCount: breakdown.accepted,
       sentCount: breakdown.sent,
       deliveredCount: breakdown.delivered,
@@ -79,9 +135,8 @@ export async function getCommunicationOverview(): Promise<Result<CommunicationOv
       failedCount: breakdown.failed,
       retryScheduledCount: breakdown.retry_scheduled,
       deadLetterCount: breakdown.dead_letter,
-    };
-
-    return ok(overview);
+      cancelledCount: breakdown.cancelled,
+    });
   } catch (e) {
     return fail(e);
   }
@@ -105,6 +160,44 @@ export async function listCommunicationAutomations(): Promise<Result<Communicati
 }
 
 /**
+ * Automation readiness vs operational enablement, kept strictly distinct so the
+ * Automation Center never renders "foundation exists" as "workflow is live".
+ */
+export async function getAutomationReadinessSummary(): Promise<Result<AutomationReadinessSummary>> {
+  try {
+    const { data, error } = await adminClient()
+      .from("communication_automation_catalog")
+      .select("*")
+      .order("automation_key", { ascending: true });
+
+    if (error) throw error;
+
+    const automations = (data || []) as CommunicationAutomationCatalog[];
+    const readinessBreakdown = emptyCounts(COMMUNICATION_AUTOMATION_READINESS_STATES);
+
+    let operationallyEnabledCount = 0;
+    let dispatchableCount = 0;
+
+    automations.forEach((automation) => {
+      const readiness = automation.readiness_status;
+      if (readiness in readinessBreakdown) readinessBreakdown[readiness]++;
+      if (automation.is_operationally_enabled) operationallyEnabledCount++;
+      if (isAutomationDispatchable(automation)) dispatchableCount++;
+    });
+
+    return ok({
+      totalAutomations: automations.length,
+      readinessBreakdown,
+      operationallyEnabledCount,
+      dispatchableCount,
+      automations,
+    });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
  * Retrieves recent messages dispatched or queued in the ledger.
  */
 export async function listRecentCommunicationMessages(limit = 50): Promise<Result<CommunicationMessage[]>> {
@@ -113,6 +206,40 @@ export async function listRecentCommunicationMessages(limit = 50): Promise<Resul
       .from("communication_messages")
       .select("*")
       .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return ok((data || []) as CommunicationMessage[]);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Messages waiting to be picked up (immediate or scheduled). */
+export async function listQueuedCommunicationMessages(limit = 50): Promise<Result<CommunicationMessage[]>> {
+  try {
+    const { data, error } = await adminClient()
+      .from("communication_messages")
+      .select("*")
+      .eq("status", "queued")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return ok((data || []) as CommunicationMessage[]);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Messages with a backoff retry pending. */
+export async function listRetryScheduledMessages(limit = 50): Promise<Result<CommunicationMessage[]>> {
+  try {
+    const { data, error } = await adminClient()
+      .from("communication_messages")
+      .select("*")
+      .eq("status", "retry_scheduled")
+      .order("next_retry_at", { ascending: true })
       .limit(limit);
 
     if (error) throw error;
@@ -179,6 +306,50 @@ export async function listWebhookReceipts(limit = 50): Promise<Result<Communicat
 }
 
 /**
+ * Webhook processing health: how many payloads were verified, processed,
+ * rejected, or arrived as redeliveries of an already-recorded receipt.
+ */
+export async function getWebhookProcessingSummary(): Promise<Result<WebhookProcessingSummary>> {
+  try {
+    const { data, error } = await adminClient()
+      .from("communication_webhook_receipts")
+      .select("*");
+
+    if (error) throw error;
+
+    const receipts = (data || []) as CommunicationWebhookReceipt[];
+    const processingBreakdown = emptyCounts(WEBHOOK_PROCESSING_KEYS);
+
+    let invalidSignatureCount = 0;
+    let duplicateRedeliveryCount = 0;
+    let lastReceivedAt: string | null = null;
+
+    receipts.forEach((receipt) => {
+      const status = receipt.processing_status;
+      if (status in processingBreakdown) processingBreakdown[status]++;
+      if (!receipt.signature_valid) invalidSignatureCount++;
+      duplicateRedeliveryCount += receipt.duplicate_count ?? 0;
+      if (
+        receipt.received_at &&
+        (!lastReceivedAt || new Date(receipt.received_at) > new Date(lastReceivedAt))
+      ) {
+        lastReceivedAt = receipt.received_at;
+      }
+    });
+
+    return ok({
+      totalReceipts: receipts.length,
+      processingBreakdown,
+      invalidSignatureCount,
+      duplicateRedeliveryCount,
+      lastReceivedAt,
+    });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
  * Retrieves a summary of registered templates and their readiness counts.
  */
 export async function getTemplateReadinessSummary(): Promise<Result<{
@@ -196,23 +367,19 @@ export async function getTemplateReadinessSummary(): Promise<Result<{
     if (error) throw error;
 
     const templates = (data || []) as CommunicationTemplate[];
-    const breakdown: Record<string, number> = {
-      draft: 0,
-      mock_ready: 0,
-      provider_mapping_required: 0,
-      provider_ready: 0,
-      disabled: 0,
-    };
+    const breakdown = emptyCounts([
+      "draft",
+      "mock_ready",
+      "provider_mapping_required",
+      "provider_ready",
+      "disabled",
+    ] as const);
 
     let activeCount = 0;
     templates.forEach((tpl) => {
       const status = tpl.readiness_status || "draft";
-      if (status in breakdown) {
-        breakdown[status]++;
-      }
-      if (tpl.is_active) {
-        activeCount++;
-      }
+      if (status in breakdown) breakdown[status]++;
+      if (tpl.is_active) activeCount++;
     });
 
     return ok({
@@ -268,7 +435,7 @@ export async function getAutomationActivitySummary(): Promise<Result<AutomationA
       };
     });
 
-    messages.forEach((msg) => {
+    (messages || []).forEach((msg) => {
       const key = msg.message_type;
       if (activityMap[key]) {
         activityMap[key].totalTriggered++;

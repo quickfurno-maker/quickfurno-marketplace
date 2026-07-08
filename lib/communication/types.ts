@@ -30,17 +30,71 @@ export type CommunicationMessageStatus =
 
 export type CommunicationPriority = "critical" | "high" | "normal" | "low";
 
+export type CommunicationNormalizedEventType = "accepted" | "sent" | "delivered" | "read" | "failed";
+
+export type CommunicationWebhookProcessingStatus =
+  | "received"
+  | "verified"
+  | "processed"
+  | "duplicate"
+  | "rejected"
+  | "failed";
+
+export type CommunicationTemplateReadiness =
+  | "draft"
+  | "mock_ready"
+  | "provider_mapping_required"
+  | "provider_ready"
+  | "disabled";
+
+/**
+ * Automation READINESS — how far an automation definition has progressed from
+ * "the row exists" to "this is a live, wired workflow". Readiness is a build
+ * state, deliberately separate from `is_operationally_enabled` (see below).
+ *
+ *   foundation_ready           — definition exists; no template mapped yet.
+ *   wiring_pending             — template mapped; no code path triggers it yet.
+ *   mock_ready                 — exercisable end-to-end against the mock provider.
+ *   provider_mapping_required  — real provider template not yet registered.
+ *   provider_ready             — real provider template registered and approved.
+ *   active                     — genuinely wired and intended for live use.
+ *
+ * Phase 5B seeds every automation at `wiring_pending`: the core exists, but no
+ * business or authentication workflow calls it yet.
+ */
+export type CommunicationAutomationReadiness =
+  | "foundation_ready"
+  | "wiring_pending"
+  | "mock_ready"
+  | "provider_mapping_required"
+  | "provider_ready"
+  | "active";
+
+export const COMMUNICATION_AUTOMATION_READINESS_STATES: readonly CommunicationAutomationReadiness[] =
+  Object.freeze([
+    "foundation_ready",
+    "wiring_pending",
+    "mock_ready",
+    "provider_mapping_required",
+    "provider_ready",
+    "active",
+  ]);
+
 /**
  * An authorized communication intent, carrying everything required to build,
  * authorize, and schedule a communication message.
+ *
+ * NOTE (Phase 5B review fix #1): an intent carries NO plaintext destination.
+ * The durable `recipient_type` + `recipient_id` pair is resolved to a
+ * destination server-side, at dispatch time, by a CommunicationRecipientResolver
+ * — which is what makes scheduled sends and retries restart-safe.
  */
 export interface CommunicationIntent {
   readonly type: string; // e.g. 'vendor_new_lead', 'client_login_otp'
   readonly lane: CommunicationLane;
   readonly channel: CommunicationChannel;
   readonly recipient_type: CommunicationRecipientType;
-  readonly recipient_id: string | null; // client_account.id / vendor.id / user_id
-  readonly destination: string; // plaintext phone number to be hashed/masked during dispatch
+  readonly recipient_id: string | null; // client_account.id / vendor.id / profile.id
   readonly template_key: string;
   readonly variables: Record<string, string>;
   readonly entity_type: string | null; // e.g. 'lead', 'payment'
@@ -66,7 +120,7 @@ export interface CommunicationTemplate {
   readonly version: string;
   readonly provider_template_name: string | null;
   readonly provider_template_id: string | null;
-  readonly readiness_status: "draft" | "mock_ready" | "provider_mapping_required" | "provider_ready" | "disabled";
+  readonly readiness_status: CommunicationTemplateReadiness;
   readonly is_active: boolean;
   readonly created_at: string;
   readonly updated_at: string;
@@ -74,6 +128,9 @@ export interface CommunicationTemplate {
 
 /**
  * Message record representing a row in `communication_messages`.
+ *
+ * `destination_hash` / `destination_masked` are the ONLY destination artefacts
+ * persisted. There is no plaintext destination column, by design.
  */
 export interface CommunicationMessage {
   readonly id: string;
@@ -113,13 +170,14 @@ export interface CommunicationMessage {
 
 /**
  * Delivery event trace representing a row in `communication_delivery_events`.
+ * Append-only: the table grants service_role SELECT + INSERT only.
  */
 export interface CommunicationDeliveryEvent {
   readonly id: string;
   readonly communication_message_id: string;
   readonly provider: string;
   readonly provider_event_id: string | null;
-  readonly normalized_event_type: "accepted" | "sent" | "delivered" | "read" | "failed";
+  readonly normalized_event_type: CommunicationNormalizedEventType;
   readonly provider_message_id: string;
   readonly occurred_at: string;
   readonly sanitized_metadata: Record<string, unknown>;
@@ -128,6 +186,11 @@ export interface CommunicationDeliveryEvent {
 
 /**
  * Webhook receipt log representing a row in `communication_webhook_receipts`.
+ *
+ * Unique on (provider, provider_event_id) and on payload_hash. A redelivery
+ * therefore never inserts a second row — it increments `duplicate_count` on the
+ * row that already exists, which keeps admin monitoring informative without
+ * fighting the constraints.
  */
 export interface CommunicationWebhookReceipt {
   readonly id: string;
@@ -135,8 +198,10 @@ export interface CommunicationWebhookReceipt {
   readonly provider_event_id: string | null;
   readonly payload_hash: string;
   readonly signature_valid: boolean;
-  readonly normalized_event_type: "accepted" | "sent" | "delivered" | "read" | "failed" | null;
-  readonly processing_status: "received" | "verified" | "processed" | "duplicate" | "rejected" | "failed";
+  readonly normalized_event_type: CommunicationNormalizedEventType | null;
+  readonly processing_status: CommunicationWebhookProcessingStatus;
+  readonly duplicate_count: number;
+  readonly last_duplicate_at: string | null;
   readonly received_at: string;
   readonly processed_at: string | null;
   readonly failure_reason_sanitized: string | null;
@@ -144,7 +209,17 @@ export interface CommunicationWebhookReceipt {
 }
 
 /**
- * Logical automation catalog representing a row in `communication_automation_catalog`.
+ * Logical automation catalog representing a row in
+ * `communication_automation_catalog`.
+ *
+ * `readiness_status` describes how far the automation has been BUILT.
+ * `is_operationally_enabled` describes whether an operator has TURNED IT ON.
+ * They are independent, and the database additionally forbids enabling anything
+ * whose readiness is not `active`.
+ *
+ * Operational enablement is necessary but NEVER sufficient: every dispatch still
+ * passes through Phase 4 authorization. Enabling an automation here does not,
+ * and must not, bypass a policy decision.
  */
 export interface CommunicationAutomationCatalog {
   readonly automation_key: string;
@@ -152,7 +227,7 @@ export interface CommunicationAutomationCatalog {
   readonly description: string | null;
   readonly lane: CommunicationLane;
   readonly channel: CommunicationChannel;
-  readonly operational_status: "enabled" | "disabled";
+  readonly readiness_status: CommunicationAutomationReadiness;
   readonly provider_required: string;
   readonly template_key: string | null;
   readonly is_operationally_enabled: boolean;
@@ -161,4 +236,14 @@ export interface CommunicationAutomationCatalog {
   readonly last_failure_at: string | null;
   readonly created_at: string;
   readonly updated_at: string;
+}
+
+/**
+ * An automation may only be dispatched when it is both fully built and switched
+ * on. Callers must STILL obtain a Phase 4 policy authorization afterwards.
+ */
+export function isAutomationDispatchable(
+  automation: Pick<CommunicationAutomationCatalog, "readiness_status" | "is_operationally_enabled">
+): boolean {
+  return automation.readiness_status === "active" && automation.is_operationally_enabled === true;
 }

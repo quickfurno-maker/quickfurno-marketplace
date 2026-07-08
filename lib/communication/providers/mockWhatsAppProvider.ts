@@ -1,27 +1,128 @@
 // ============================================================================
 // QuickFurno — lib/communication/providers/mockWhatsAppProvider.ts
 //
-// Mock WhatsApp Provider implementation for tests and dev sandbox.
-// Bounded strictly to mock execution: zero network calls, zero SMS/WhatsApp sends.
-// Supports deterministic success, retryable failure, and permanent failure.
+// Mock WhatsApp Provider implementation for tests and the dev sandbox.
+// Bounded strictly to mock execution: zero network calls, zero WhatsApp sends.
+//
+// DETERMINISM CONTRACT (Phase 5B review fixes #5 and #6)
+//   • Message ids come from a per-instance monotonic counter plus a stable hash
+//     of the send input — never Math.random(), never Date.now().
+//   • normalizeWebhook() and deriveWebhookEventId() are PURE functions of the
+//     payload. Same payload in, same events out, forever.
+//   • verifyWebhookSignature() applies one exact rule — an HMAC-SHA256 of the
+//     raw body under the shared secret. There is no permissive prefix check.
+//
+// THIS ADAPTER IS TEST/DEV ONLY. It must never be registered as the active
+// provider in production; a real adapter implements the same interface.
 // ============================================================================
 
+import crypto from "crypto";
 import type {
+  WhatsAppNormalizedEventType,
   WhatsAppProvider,
   WhatsAppProviderHealth,
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
 } from "./whatsappProvider";
-import { sanitizeAuthSecurityMetadata } from "../../identity/authSecurityEvent";
+import {
+  isForbiddenSecurityMetadataKey,
+  sanitizeAuthSecurityMetadata,
+} from "../../identity/authSecurityEvent";
+
+/** The one provider identity this adapter ever reports. */
+export const MOCK_PROVIDER_KEY = "mock";
+
+/**
+ * Reserved E.164 destinations that steer the simulation. Real numbers are never
+ * used, and the triggers are valid E.164 so they survive phone normalization.
+ */
+export const MOCK_DESTINATIONS = {
+  /** Simulates a transient provider failure (retryable). */
+  RETRYABLE_FAILURE: "+15550000001",
+  /** Simulates a permanent provider rejection (not retryable). */
+  PERMANENT_FAILURE: "+15550000002",
+} as const;
+
+const ALLOWED_WEBHOOK_STATUSES: readonly WhatsAppNormalizedEventType[] = Object.freeze([
+  "accepted",
+  "sent",
+  "delivered",
+  "read",
+  "failed",
+]);
+
+function isNormalizedEventType(value: unknown): value is WhatsAppNormalizedEventType {
+  return typeof value === "string" && (ALLOWED_WEBHOOK_STATUSES as readonly string[]).includes(value);
+}
+
+/** Stable, order-independent hash of an arbitrary JSON-ish value. */
+function stableHash(value: unknown): string {
+  return crypto.createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, nested]) => `${JSON.stringify(key)}:${stableStringify(nested)}`);
+  return `{${entries.join(",")}}`;
+}
+
+/** Reads the first present key, coercing only strings/numbers. */
+function readField(payload: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim() !== "") return value;
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+/**
+ * The exact signature the mock accepts: `sha256=<hmac-sha256(secret, rawBody)>`.
+ * Exported so harnesses can build a valid signature instead of a magic string.
+ */
+export function computeMockWebhookSignature(rawBody: string, secret: string): string {
+  return `sha256=${crypto.createHmac("sha256", secret).update(rawBody).digest("hex")}`;
+}
+
+/** Constant-time comparison that tolerates unequal lengths. */
+function secureEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/** What the mock retained about a send. Never holds a plaintext secret. */
+export interface MockSendRecord {
+  readonly lane: "authentication" | "business";
+  readonly to: string;
+  readonly templateKey: string;
+  /** Variable NAMES only — enough to assert templating, no values leaked. */
+  readonly variableKeys: readonly string[];
+  /** Business-lane variables with secret-looking keys redacted. Empty for auth. */
+  readonly variables: Record<string, string>;
+}
 
 export class MockWhatsAppProvider implements WhatsAppProvider {
-  private lastSentPayloads: Array<{ to: string; templateKey: string; variables: Record<string, string> }> = [];
+  readonly providerKey = MOCK_PROVIDER_KEY;
 
-  getLastSentPayloads() {
+  private sendSequence = 0;
+  private lastSentPayloads: MockSendRecord[] = [];
+
+  getLastSentPayloads(): readonly MockSendRecord[] {
     return this.lastSentPayloads;
   }
 
-  clearLastSentPayloads() {
+  clearLastSentPayloads(): void {
+    this.lastSentPayloads = [];
+  }
+
+  /** Resets the deterministic id counter. Tests call this for a clean slate. */
+  reset(): void {
+    this.sendSequence = 0;
     this.lastSentPayloads = [];
   }
 
@@ -30,22 +131,18 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     templateKey: string,
     variables: Record<string, string>
   ): Promise<WhatsAppSendResult> {
-    // SECURITY: sanitize variables so no plaintext OTP is stored in debug logs or properties
-    const sanitizedVars: Record<string, string> = {};
-    for (const [key, value] of Object.entries(variables)) {
-      if (
-        /(otp|pass|code|secret|token|key|auth|header)/i.test(key) &&
-        !/hash/i.test(key)
-      ) {
-        sanitizedVars[key] = "[REDACTED_OTP]";
-      } else {
-        sanitizedVars[key] = value;
-      }
-    }
+    // SECURITY: the authentication lane carries the plaintext OTP to the
+    // provider call and nowhere else. The mock retains variable NAMES only, so
+    // a test double can never become an OTP sink.
+    this.lastSentPayloads.push({
+      lane: "authentication",
+      to,
+      templateKey,
+      variableKeys: Object.keys(variables),
+      variables: {},
+    });
 
-    this.lastSentPayloads.push({ to, templateKey, variables: sanitizedVars });
-
-    return this.simulateSend(to);
+    return this.simulateSend(to, templateKey, variables);
   }
 
   async sendTemplateMessage(
@@ -53,31 +150,33 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     templateKey: string,
     variables: Record<string, string>
   ): Promise<WhatsAppSendResult> {
-    // SECURITY: sanitize variables
+    // Reuses the Phase 5A sanitization vocabulary rather than a weaker local
+    // regex, so "forbidden key" means exactly one thing across the codebase.
     const sanitizedVars: Record<string, string> = {};
     for (const [key, value] of Object.entries(variables)) {
-      if (
-        /(otp|pass|code|secret|token|key|auth|header)/i.test(key) &&
-        !/hash/i.test(key)
-      ) {
-        sanitizedVars[key] = "[REDACTED]";
-      } else {
-        sanitizedVars[key] = value;
-      }
+      sanitizedVars[key] = isForbiddenSecurityMetadataKey(key) ? "[REDACTED]" : value;
     }
 
-    this.lastSentPayloads.push({ to, templateKey, variables: sanitizedVars });
+    this.lastSentPayloads.push({
+      lane: "business",
+      to,
+      templateKey,
+      variableKeys: Object.keys(variables),
+      variables: sanitizedVars,
+    });
 
-    return this.simulateSend(to);
+    return this.simulateSend(to, templateKey, variables);
   }
 
-  private simulateSend(to: string): WhatsAppSendResult {
-    const cleanTo = to.trim();
-
-    if (cleanTo.includes("fail-retry")) {
+  private simulateSend(
+    to: string,
+    templateKey: string,
+    variables: Record<string, string>
+  ): WhatsAppSendResult {
+    if (to === MOCK_DESTINATIONS.RETRYABLE_FAILURE) {
       return {
         accepted: false,
-        provider: "mock",
+        provider: this.providerKey,
         providerMessageId: null,
         normalizedStatus: "failed",
         errorCode: "RATE_LIMIT_EXCEEDED",
@@ -86,10 +185,10 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
       };
     }
 
-    if (cleanTo.includes("fail-permanent")) {
+    if (to === MOCK_DESTINATIONS.PERMANENT_FAILURE) {
       return {
         accepted: false,
-        provider: "mock",
+        provider: this.providerKey,
         providerMessageId: null,
         normalizedStatus: "failed",
         errorCode: "INVALID_DESTINATION_NUMBER",
@@ -98,14 +197,15 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
       };
     }
 
-    // Success simulation
-    const randomSuffix = Math.random().toString(36).substring(2, 10);
-    const mockId = `mock-msg-${Date.now()}-${randomSuffix}`;
+    // Deterministic id: monotonic counter + stable hash of the send input.
+    this.sendSequence += 1;
+    const sequence = String(this.sendSequence).padStart(6, "0");
+    const inputDigest = stableHash({ to, templateKey, variables }).slice(0, 12);
 
     return {
       accepted: true,
-      provider: "mock",
-      providerMessageId: mockId,
+      provider: this.providerKey,
+      providerMessageId: `mock-msg-${sequence}-${inputDigest}`,
       normalizedStatus: "accepted",
       errorCode: null,
       errorMessage: null,
@@ -113,31 +213,37 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     };
   }
 
-  verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
-    if (!signature || !secret) return false;
-    // Mock signature verification check
-    return signature === "mock-valid-signature" || signature.startsWith("sha256=");
+  verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
+    if (typeof rawBody !== "string" || !signature || !secret) return false;
+    return secureEquals(signature, computeMockWebhookSignature(rawBody, secret));
+  }
+
+  deriveWebhookEventId(payload: Record<string, unknown>): string {
+    const explicit = readField(payload, "event_id", "eventId");
+    if (explicit) return explicit;
+    // Deterministic fallback — never random. Identical payloads collapse onto
+    // the same receipt, which is exactly the de-duplication behaviour we want.
+    return `mock-evt-${stableHash(payload).slice(0, 24)}`;
   }
 
   normalizeWebhook(payload: Record<string, unknown>): WhatsAppWebhookEvent[] {
-    const eventId = String(payload.event_id || payload.eventId || `mock-evt-${Math.random()}`);
-    const messageId = String(payload.message_id || payload.messageId || "");
-    const status = String(payload.status || "delivered");
-    const occurredAt = String(payload.timestamp || new Date().toISOString());
+    const providerMessageId = readField(payload, "message_id", "messageId");
+    const occurredAt = readField(payload, "timestamp", "occurred_at", "occurredAt");
+    const status = readField(payload, "status");
 
-    const allowedStatuses = ["accepted", "sent", "delivered", "read", "failed"] as const;
-    const normalizedEventType = allowedStatuses.includes(status as any)
-      ? (status as any)
-      : "delivered";
+    // Required identifiers absent, or a lifecycle state we do not understand:
+    // drop the event. It must never be coerced onto "delivered".
+    if (!providerMessageId || !occurredAt) return [];
+    if (!isNormalizedEventType(status)) return [];
 
     const rawMeta = (payload.metadata as Record<string, unknown>) || {};
     const sanitizedMetadata = sanitizeAuthSecurityMetadata(rawMeta);
 
     return [
       {
-        providerEventId: eventId,
-        providerMessageId: messageId,
-        normalizedEventType,
+        providerEventId: this.deriveWebhookEventId(payload),
+        providerMessageId,
+        normalizedEventType: status,
         occurredAt,
         sanitizedMetadata,
       },
@@ -146,13 +252,15 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
 
   async healthCheck(): Promise<WhatsAppProviderHealth> {
     return {
-      provider: "mock",
+      provider: this.providerKey,
       configured: true,
       reachable: true,
       status: "healthy",
+      // A health probe is inherently a point-in-time observation; this is the
+      // one clock read the mock keeps.
       checkedAt: new Date().toISOString(),
       latencyMs: 12,
-      detailsSanitized: { info: "Mock provider online" },
+      detailsSanitized: { info: "Mock provider online", mode: "test-dev-only" },
     };
   }
 }

@@ -16,6 +16,7 @@ import {
   type PolicyEvaluatedFactsSummary,
   type PolicyValidationResult,
 } from "./policyTypes";
+import { LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_VERSION } from "./policyConfig";
 
 /**
  * QuickFurno Automation Policy Engine — fail-closed validation (Phase 4A).
@@ -220,8 +221,14 @@ export function validateLeadDistributionAuthorizationConfig(
 ): PolicyValidationResult<LeadDistributionAuthorizationPolicyConfig> {
   if (!isRecord(raw)) return fail("CONFIG_NOT_OBJECT");
 
+  // Bind the config to EXACTLY this evaluator's policy version. Any unsupported
+  // version (e.g. "..._v2", "..._v99", "v2", "unknown"), as well as blank,
+  // missing, null, undefined, or non-string versions, fails closed — an
+  // unrecognized policy revision must never be evaluated under v1 gates.
   const policyVersion = raw.policyVersion;
-  if (!isNonEmptyString(policyVersion)) return fail("CONFIG_POLICY_VERSION_INVALID");
+  if (policyVersion !== LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_VERSION) {
+    return fail("CONFIG_POLICY_VERSION_INVALID");
+  }
 
   const mode = raw.mode;
   if (!KNOWN_POLICY_MODES.includes(mode as AutomationPolicyModeValue)) {

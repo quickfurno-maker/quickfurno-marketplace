@@ -515,6 +515,74 @@ check("87. Phase 4A doc exists", () =>
 check("88. test:phase4a wired to this harness", () =>
   assert(pkg.scripts["test:phase4a"] === "node scripts/phase4a-policy-engine-harness.mjs", "test:phase4a not wired"));
 
+// ==========================================================================
+// POLICY VERSION BINDING (correction)
+// ==========================================================================
+const V2 = "lead_distribution_authorization_v2";
+const V99 = "lead_distribution_authorization_v99";
+
+check("89. exact v1 accepted", () => {
+  const r = validateConfig(config({ policyVersion: VERSION }));
+  assert(r.ok && r.value.policyVersion === "lead_distribution_authorization_v1", "exact v1 must be accepted");
+});
+check("90. missing version rejected", () =>
+  assert(!validateConfig(without(config(), "policyVersion")).ok, "missing version must reject"));
+check("91. blank version rejected", () =>
+  assert(!validateConfig(config({ policyVersion: "" })).ok, "blank version must reject"));
+check("92. null version rejected", () =>
+  assert(!validateConfig(config({ policyVersion: null })).ok, "null version must reject"));
+check("93. non-string version rejected", () => {
+  assert(!validateConfig(config({ policyVersion: 123 })).ok, "numeric version must reject");
+  assert(!validateConfig(config({ policyVersion: undefined })).ok, "undefined version must reject");
+});
+check("94. v2 (lead_distribution_authorization_v2) rejected", () =>
+  assert(!validateConfig(config({ policyVersion: V2 })).ok, "v2 must reject"));
+check("95. v99 rejected", () =>
+  assert(!validateConfig(config({ policyVersion: V99 })).ok, "v99 must reject"));
+check("96. unknown / bare 'v2' rejected", () => {
+  assert(!validateConfig(config({ policyVersion: "unknown" })).ok, "unknown must reject");
+  assert(!validateConfig(config({ policyVersion: "v2" })).ok, "bare v2 must reject");
+});
+check("97. unsupported guarded-auto config fails closed", () => {
+  const r = evaluate(facts(), config({ policyVersion: V2, mode: MODE.GUARDED_AUTO_AUTHORIZE, enabled: true }));
+  assert(r.decision === DECISION.REQUIRE_HUMAN_APPROVAL, `expected human approval, got ${r.decision}`);
+  assert(r.failedGates.length === 1 && r.failedGates[0] === GATE.POLICY_CONFIG_VALID, `unexpected failedGates ${r.failedGates}`);
+});
+check("98. unsupported guarded-auto config never auto-authorizes", () => {
+  const cfg = config({ policyVersion: V2, mode: MODE.GUARDED_AUTO_AUTHORIZE, enabled: true });
+  const direct = evaluate(facts(), cfg);
+  const safe = evaluateSafely(facts(), cfg);
+  const viaRegistry = P.resolvePolicyEvaluator(KEY.LEAD_DISTRIBUTION_AUTHORIZATION)(facts(), cfg);
+  assert(direct.decision !== DECISION.AUTO_AUTHORIZE, "direct must not auto-authorize");
+  assert(safe.decision !== DECISION.AUTO_AUTHORIZE, "safe must not auto-authorize");
+  assert(viaRegistry.decision !== DECISION.AUTO_AUTHORIZE, "registry must not auto-authorize");
+});
+check("99. fail-closed reason is policy_config_invalid_fail_closed", () => {
+  const r = evaluate(facts(), config({ policyVersion: V2, mode: MODE.GUARDED_AUTO_AUTHORIZE, enabled: true }));
+  assert(r.reasonCode === REASON.POLICY_CONFIG_INVALID_FAIL_CLOSED, `got ${r.reasonCode}`);
+});
+check("100. v1 and v2 fingerprints differ, and v2 still fails closed", () => {
+  const fpV1 = fingerprint(config({ policyVersion: VERSION }));
+  const fpV2 = fingerprint(config({ policyVersion: V2 }));
+  assert(fpV1 !== fpV2, "v1 and v2 fingerprints must differ");
+  const r = evaluate(facts(), config({ policyVersion: V2, mode: MODE.GUARDED_AUTO_AUTHORIZE, enabled: true }));
+  assert(r.decision === DECISION.REQUIRE_HUMAN_APPROVAL && r.reasonCode === REASON.POLICY_CONFIG_INVALID_FAIL_CLOSED, "v2 must fail closed despite distinct fingerprint");
+});
+check("101. v1 result reports evaluator v1", () => {
+  const r = evaluate(facts(), config({ policyVersion: VERSION }));
+  assert(r.policyVersion === "lead_distribution_authorization_v1", `got ${r.policyVersion}`);
+});
+check("102. invalid v2 fail-closed result still reports evaluator v1 (no echo)", () => {
+  const r = evaluate(facts(), config({ policyVersion: V2, mode: MODE.GUARDED_AUTO_AUTHORIZE, enabled: true }));
+  assert(r.policyVersion === "lead_distribution_authorization_v1", `must report evaluator v1, got ${r.policyVersion}`);
+  assert(r.policyVersion !== V2, "must not echo unsupported config version into the result");
+});
+check("103. same v1 facts + config remain deterministic", () => {
+  const a = evaluate(facts(), config());
+  const b = evaluate(facts(), config());
+  assert(JSON.stringify(a) === JSON.stringify(b), "v1 evaluation must stay deterministic");
+});
+
 function gitPorcelain(paths = []) {
   const output = execFileSync("git", ["status", "--porcelain", "--", ...paths], { encoding: "utf8" });
   return output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);

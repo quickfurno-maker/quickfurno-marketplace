@@ -107,6 +107,13 @@ maximumRecommendationCount        (integer 1..3)
 These are **automation authorization gates only**. They do **not** change any
 quality classification threshold.
 
+`policyVersion` is **bound exactly** to this evaluator's supported version,
+`lead_distribution_authorization_v1` (the `LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_VERSION`
+constant). Any other value — `lead_distribution_authorization_v2`,
+`lead_distribution_authorization_v99`, `v2`, `unknown`, blank, missing, `null`,
+`undefined`, or any non-string — fails config validation. An unrecognized policy
+revision is never evaluated under v1 gates.
+
 ## 7. Safe defaults
 
 `SAFE_DEFAULT_LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_CONFIG` is the most
@@ -131,8 +138,12 @@ hard block / `auto_distribute` / 1..3 recommendations.
 
 Unknown or malformed configuration must **never** expand automation authority.
 Any unknown mode, out-of-range score, empty/invalid allowed-class list, invalid
-vendor bounds (`max > 3`, `min > max`, `min < 0`), or missing required action
-produces a validation failure. On config validation failure the decision is
+vendor bounds (`max > 3`, `min > max`, `min < 0`), missing required action, or an
+**unsupported `policyVersion`** (anything other than
+`lead_distribution_authorization_v1`) produces a validation failure. In
+particular, an unsupported version with `guarded_auto_authorize` + `enabled=true`
+and every quality/recommendation gate passing can **never** return
+`auto_authorize` — config validation runs first and fails closed. On config validation failure the decision is
 `require_human_approval` with reason `policy_config_invalid_fail_closed`. A more
 permissive value is never silently substituted. The safe wrapper
 `evaluateDistributionAuthorizationPolicySafely(...)` additionally guarantees that
@@ -191,6 +202,15 @@ An explicit constant, never the package version or a timestamp:
 ```
 LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_VERSION = "lead_distribution_authorization_v1"
 ```
+
+**Version binding:** `validateLeadDistributionAuthorizationConfig` requires
+`config.policyVersion` to equal this constant exactly, or it fails closed to
+`require_human_approval` / `policy_config_invalid_fail_closed`. The **decision
+result** always reports the evaluator's implementation version
+(`lead_distribution_authorization_v1`); it never echoes an unsupported config
+version. The config fingerprint still includes `config.policyVersion`, so a v1
+config and a v2 config yield **different** fingerprints even though the v2 config
+fails closed.
 
 ## 13. Config fingerprint
 

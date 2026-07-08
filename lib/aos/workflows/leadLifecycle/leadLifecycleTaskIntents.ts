@@ -15,11 +15,21 @@ export const LeadLifecycleTaskIntent = {
   CLARIFICATION_PREPARE: "lead.clarification.prepare",
   QUALITY_RESCORE: "lead.quality.rescore",
   MATCHING_PREPARE: "lead.matching.prepare",
-  // Phase 3A: dedicated approval-preparation task opened on entering
-  // MATCH_RECOMMENDATION_READY. It resolves the immutable recommendation
+  // Phase 3A: dedicated approval-preparation task. Historically opened on
+  // entering MATCH_RECOMMENDATION_READY; superseded by DISTRIBUTION_POLICY_EVALUATE
+  // in Phase 4B-2. The executor path is retained for backward compatibility with
+  // historical durable tasks/tests. It resolves the immutable recommendation
   // snapshot and publishes AT MOST ONE result event (approval_required OR
   // manual_review.required). It never assigns vendors.
   DISTRIBUTION_PREPARE_APPROVAL: "lead.distribution.prepare_approval",
+  // Phase 4B-2: the policy-evaluation task now opened on entering
+  // MATCH_RECOMMENDATION_READY. It resolves the immutable recommendation snapshot,
+  // the current route, the latest authoritative quality result, and the durable
+  // policy config snapshot; evaluates the Phase 4A deterministic policy; and
+  // publishes AT MOST ONE result event (approval_required, auto_authorized, or
+  // manual_review.required) — or defers a special route with no event. It never
+  // assigns vendors, deducts credits, reruns matching, or reranks.
+  DISTRIBUTION_POLICY_EVALUATE: "lead.distribution.policy_evaluate",
   DISTRIBUTION_AWAIT_APPROVAL: "lead.distribution.await_approval",
   DISTRIBUTION_PREPARE: "lead.distribution.prepare",
   NURTURE_PREPARE: "lead.nurture.prepare",

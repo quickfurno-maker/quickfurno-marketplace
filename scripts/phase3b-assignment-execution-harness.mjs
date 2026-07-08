@@ -347,13 +347,15 @@ check("11. executor uses task triggered_by_event as approved source", async () =
   assert(calls.eventLookups[0] === "evt_specific", "did not resolve the triggering approval event");
   assert(calls.published[0].payload.approval_event_id === "evt_specific", "bound wrong approval event");
 });
-check("12. missing triggering approval event rejected (not found)", async () => {
+check("12. missing triggering authorization event rejected (not found)", async () => {
+  // Phase 4B-2: the prepare task resolves the neutral authorization snapshot, so a
+  // missing triggering event now surfaces AUTHORIZATION_EVENT_NOT_FOUND.
   const { deps } = makeExecutorDeps({ events: [] });
-  await expectRejects(() => executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps), /APPROVED_EVENT_NOT_FOUND/);
+  await expectRejects(() => executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE), deps), /AUTHORIZATION_EVENT_NOT_FOUND/);
 });
 check("12b. empty triggered_by_event rejected", async () => {
   const { deps } = makeExecutorDeps();
-  await expectRejects(() => executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE, { triggered_by_event: "" }), deps), /APPROVAL_EVENT_ID_REQUIRED/);
+  await expectRejects(() => executorMod.executeLeadLifecycleTask(makeTask(T.DISTRIBUTION_PREPARE, { triggered_by_event: "" }), deps), /AUTHORIZATION_EVENT_ID_REQUIRED/);
 });
 check("13. assignment port receives approved IDs only", async () => {
   const { deps, calls } = makeExecutorDeps({ approvedEvent: { recommended: ABC, approved: ["vA", "vC"] }, events: [makeApprovedEvent({ recommended: ABC, approved: ["vA", "vC"] })], assignmentResult: rawResult({ assigned: assignedRecords([["vA", "a1"], ["vC", "a3"]]) }) });

@@ -2,6 +2,12 @@ import type { JsonRecord } from "../../../workflow/workflowPersistenceTypes";
 import {
   AutomationPolicyKey,
   DistributionAuthorizationDecision,
+  KNOWN_RECOMMENDED_ACTIONS,
+  KNOWN_ROUTE_CLASSIFICATIONS,
+  KNOWN_SCORE_CLASSES,
+  type LeadDistributionRouteValue,
+  type LeadQualityRecommendedAction,
+  type LeadScoreClass,
 } from "../../../policy/policyTypes";
 import { LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_VERSION } from "../../../policy/policyConfig";
 import { PolicyDecisionReason } from "../../../policy/policyDecisionReasons";
@@ -9,7 +15,14 @@ import {
   AutomationPolicyConfigSource,
   type AutomationPolicyConfigSourceValue,
 } from "../../../policy/runtime/policyConfigStoreTypes";
-import type { DistributionValidationResult } from "./leadDistributionTypes";
+import {
+  MAX_DISTRIBUTION_VENDORS,
+  type DistributionValidationResult,
+} from "./leadDistributionTypes";
+import {
+  LEAD_LIFECYCLE_WORKFLOW_TYPE,
+  isKnownLeadLifecycleState,
+} from "../leadLifecycleStates";
 
 export interface PolicyDecisionAuditContract {
   readonly policy_key: string;
@@ -38,6 +51,20 @@ const POLICY_AUDIT_KEYS = Object.freeze([
 ]);
 
 const POLICY_FACTS_SUMMARY_KEYS = new Set([
+  "policyKey",
+  "workflowType",
+  "workflowInstanceId",
+  "leadId",
+  "currentLifecycleState",
+  "routeClassification",
+  "scoreClass",
+  "totalScore",
+  "hardBlockReasonPresent",
+  "recommendedAction",
+  "recommendationEventId",
+  "recommendedVendorCount",
+]);
+const REQUIRED_POLICY_FACTS_SUMMARY_KEYS = Object.freeze([
   "policyKey",
   "workflowType",
   "workflowInstanceId",
@@ -186,6 +213,11 @@ function validatePolicyFactsSummary(
   if (!isPlainObject(raw)) {
     return { ok: false, message: "POLICY_AUDIT_FACTS_SUMMARY_REQUIRED" };
   }
+  for (const key of REQUIRED_POLICY_FACTS_SUMMARY_KEYS) {
+    if (!(key in raw)) {
+      return { ok: false, message: "POLICY_AUDIT_FACTS_SUMMARY_FIELD_REQUIRED" };
+    }
+  }
   for (const [key, value] of Object.entries(raw)) {
     if (!POLICY_FACTS_SUMMARY_KEYS.has(key)) {
       return { ok: false, message: "POLICY_AUDIT_FACTS_SUMMARY_UNKNOWN_FIELD" };
@@ -194,7 +226,71 @@ function validatePolicyFactsSummary(
       return { ok: false, message: "POLICY_AUDIT_PII_FIELD_REJECTED" };
     }
   }
-  return { ok: true, value: { ...raw } };
+  if (raw.policyKey !== AutomationPolicyKey.LEAD_DISTRIBUTION_AUTHORIZATION) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_POLICY_KEY_INVALID" };
+  }
+  if (raw.workflowType !== LEAD_LIFECYCLE_WORKFLOW_TYPE) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_WORKFLOW_TYPE_INVALID" };
+  }
+  if (!isNonEmptyString(raw.workflowInstanceId)) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_WORKFLOW_INSTANCE_ID_INVALID" };
+  }
+  if (!isNonEmptyString(raw.leadId)) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_LEAD_ID_INVALID" };
+  }
+  if (
+    !isNonEmptyString(raw.currentLifecycleState) ||
+    !isKnownLeadLifecycleState(raw.currentLifecycleState)
+  ) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_LIFECYCLE_STATE_INVALID" };
+  }
+  if (
+    !KNOWN_ROUTE_CLASSIFICATIONS.includes(
+      raw.routeClassification as LeadDistributionRouteValue,
+    )
+  ) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_ROUTE_CLASSIFICATION_INVALID" };
+  }
+  if (!KNOWN_SCORE_CLASSES.includes(raw.scoreClass as LeadScoreClass)) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_SCORE_CLASS_INVALID" };
+  }
+  if (!isIntegerInRange(raw.totalScore, 0, 100)) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_TOTAL_SCORE_INVALID" };
+  }
+  if (typeof raw.hardBlockReasonPresent !== "boolean") {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_HARD_BLOCK_PRESENT_INVALID" };
+  }
+  if (
+    !KNOWN_RECOMMENDED_ACTIONS.includes(
+      raw.recommendedAction as LeadQualityRecommendedAction,
+    )
+  ) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_RECOMMENDED_ACTION_INVALID" };
+  }
+  if (!isNonEmptyString(raw.recommendationEventId)) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_RECOMMENDATION_EVENT_ID_INVALID" };
+  }
+  if (!isIntegerInRange(raw.recommendedVendorCount, 0, MAX_DISTRIBUTION_VENDORS)) {
+    return { ok: false, message: "POLICY_AUDIT_FACTS_RECOMMENDATION_COUNT_INVALID" };
+  }
+
+  return {
+    ok: true,
+    value: Object.freeze({
+      policyKey: AutomationPolicyKey.LEAD_DISTRIBUTION_AUTHORIZATION,
+      workflowType: LEAD_LIFECYCLE_WORKFLOW_TYPE,
+      workflowInstanceId: raw.workflowInstanceId.trim(),
+      leadId: raw.leadId.trim(),
+      currentLifecycleState: raw.currentLifecycleState.trim(),
+      routeClassification: raw.routeClassification,
+      scoreClass: raw.scoreClass,
+      totalScore: raw.totalScore,
+      hardBlockReasonPresent: raw.hardBlockReasonPresent,
+      recommendedAction: raw.recommendedAction,
+      recommendationEventId: raw.recommendationEventId.trim(),
+      recommendedVendorCount: raw.recommendedVendorCount,
+    }),
+  };
 }
 
 function validateGateList(
@@ -226,4 +322,14 @@ function isPlainObject(value: unknown): value is JsonRecord {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isIntegerInRange(value: unknown, min: number, max: number): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= min &&
+    value <= max
+  );
 }

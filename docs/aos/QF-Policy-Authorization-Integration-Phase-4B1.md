@@ -34,6 +34,8 @@ The config is the Phase 4A safe default:
 
 The seed fingerprint is `1ecca567b6564e9188d4aab7cb7557614c87f2131c947b42929475b4e592901c`, computed from `computePolicyConfigFingerprint(SAFE_DEFAULT_LEAD_DISTRIBUTION_AUTHORIZATION_POLICY_CONFIG)`.
 
+The immutable safe-default config row is inserted if missing. The active pointer is created only when no pointer exists: its conflict path is `ON CONFLICT (policy_key) DO NOTHING`. Replaying the migration must never replace an operator-selected active config or silently reset the pointer back to the safe default.
+
 ## Runtime Config Adapter
 
 Runtime modules live under `lib/aos/policy/runtime/`.
@@ -66,6 +68,23 @@ The safe-default fallback has `configId: null` and `source: safe_default_no_acti
 - `policy_failed_gates`
 
 The validator uses a strict allowlist and rejects timestamp, worker, attempt, hostname, random, and PII-looking fields.
+
+`policy_facts_summary` must exactly match the Phase 4A evaluated facts summary shape:
+
+- `policyKey`
+- `workflowType`
+- `workflowInstanceId`
+- `leadId`
+- `currentLifecycleState`
+- `routeClassification`
+- `scoreClass`
+- `totalScore`
+- `hardBlockReasonPresent`
+- `recommendedAction`
+- `recommendationEventId`
+- `recommendedVendorCount`
+
+The facts summary validator requires all fields, rejects unknown fields, validates known lifecycle state, route classification, score class, recommended action, integer score bounds `0..100`, boolean hard-block presence, and recommendation count bounds `0..3`. It returns a normalized frozen summary.
 
 ## Auto-Authorized Event Contract
 
@@ -105,4 +124,4 @@ Run:
 
 `npm run test:phase4b1`
 
-The Phase 4B-1 harness performs 82 checks covering migration shape, storage integrity, config loading, safe fallback, audit contract validation, auto-authorized payload rules, unified resolver behavior, and non-goal/security guards.
+The Phase 4B-1 harness performs 107 checks covering migration shape, non-overwriting active-pointer seeding, storage integrity, config loading, safe fallback, strict facts-summary validation, audit contract validation, auto-authorized payload rules, unified resolver behavior, and non-goal/security guards.

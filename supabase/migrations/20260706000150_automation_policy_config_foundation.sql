@@ -143,10 +143,7 @@ select
   id,
   'phase4b1_safe_default_seed'
 from selected_config
-on conflict (policy_key) do update
-  set config_id = excluded.config_id,
-      activated_by = excluded.activated_by,
-      activated_at = now();
+on conflict (policy_key) do nothing;
 
 -- ----------------------------------------------------------------------------
 -- RLS / privileges

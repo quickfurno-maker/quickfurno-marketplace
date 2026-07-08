@@ -605,9 +605,11 @@ check("50. protected business services remain unmodified", () => {
   assert(changed.length === 0, `protected services modified: ${changed.join(", ")}`);
 });
 
-check("51. no database migration created", () => {
-  const changed = gitDiffNames(["--", "supabase/migrations"]);
-  assert(changed.length === 0, `migration changed: ${changed.join(", ")}`);
+check("51. no unexpected database migration created", () => {
+  const unexpected = gitDiffNames(["--", "supabase/migrations"]).filter(
+    (line) => !line.includes("20260706000150_automation_policy_config_foundation.sql"),
+  );
+  assert(unexpected.length === 0, `unexpected migration changed: ${unexpected.join(", ")}`);
 });
 
 check("52. no UI files modified", () => {

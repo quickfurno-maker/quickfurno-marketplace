@@ -159,6 +159,9 @@ function validFactsSummary() {
     recommendedVendorCount: 2,
   };
 }
+function validAuditWithFacts(factsSummary) {
+  return validAudit({ policy_facts_summary: factsSummary });
+}
 function validAudit(overrides = {}) {
   return {
     policy_key: KEY,
@@ -250,6 +253,10 @@ function without(obj, key) {
 function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
 }
+function activePointerSeedSql() {
+  const match = migration.match(/insert into\s+public\.automation_policy_active_configs[\s\S]*?;/i);
+  return match?.[0] ?? "";
+}
 function gitPorcelain(paths = []) {
   const output = execFileSync("git", ["status", "--porcelain", "--", ...paths], { encoding: "utf8" });
   return output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -270,6 +277,9 @@ check("8. safe default config seeded", () => assert(/lead_distribution_authoriza
 check("9. safe default mode human_approval_only", () => assert(/"mode":\s*"human_approval_only"/.test(migration), "safe mode missing"));
 check("10. safe default enabled=false", () => assert(/"enabled":\s*false/.test(migration), "safe enabled=false missing"));
 check("11. safe default fingerprint equals Phase 4A computed fingerprint", () => assert(migration.includes(FINGERPRINT) && FINGERPRINT === "1ecca567b6564e9188d4aab7cb7557614c87f2131c947b42929475b4e592901c", `fingerprint mismatch ${FINGERPRINT}`));
+check("11a. seed SQL does not update an existing active pointer", () => assert(!/set\s+config_id\s*=|activated_at\s*=\s*now\(\)|excluded\.config_id/i.test(activePointerSeedSql()), "active pointer seed contains update assignment"));
+check("11b. active pointer conflict path is DO NOTHING", () => assert(/on conflict\s*\(\s*policy_key\s*\)\s*do nothing/i.test(activePointerSeedSql()), "active pointer conflict path is not DO NOTHING"));
+check("11c. no DO UPDATE exists for the active-pointer seed", () => assert(!/on conflict\s*\(\s*policy_key\s*\)\s*do update/i.test(activePointerSeedSql()), "active pointer seed still uses DO UPDATE"));
 
 // CONFIG ADAPTER
 check("12. valid active config loads", async () => {
@@ -316,6 +326,29 @@ check("29. facts summary required", () => assert(!auditMod.validatePolicyDecisio
 check("30. passed gates array required", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAudit({ policy_passed_gates: "facts_valid" })).ok, "bad passed gates accepted"));
 check("31. failed gates array required", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAudit({ policy_failed_gates: "none" })).ok, "bad failed gates accepted"));
 check("32. PII-looking fields rejected by strict allowlist", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAudit({ policy_facts_summary: { ...validFactsSummary(), client_phone: "999" } })).ok, "PII field accepted"));
+check("32a. empty facts summary rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({})).ok, "empty facts summary accepted"));
+check("32b. missing required facts-summary field rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts(without(validFactsSummary(), "workflowType"))).ok, "missing required summary field accepted"));
+check("32c. unknown facts-summary field rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), unexpectedField: "x" })).ok, "unknown summary field accepted"));
+check("32d. wrong facts-summary policy key rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), policyKey: "wrong_policy" })).ok, "wrong summary policy key accepted"));
+check("32e. blank workflowInstanceId rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), workflowInstanceId: "  " })).ok, "blank workflow id accepted"));
+check("32f. blank leadId rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), leadId: "  " })).ok, "blank lead id accepted"));
+check("32g. invalid lifecycle state rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), currentLifecycleState: "NOT_A_STATE" })).ok, "invalid lifecycle state accepted"));
+check("32h. invalid route classification rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), routeClassification: "mystery_route" })).ok, "invalid route accepted"));
+check("32i. invalid score class rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), scoreClass: "Z" })).ok, "invalid score class accepted"));
+check("32j. totalScore string rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), totalScore: "95" })).ok, "string score accepted"));
+check("32k. totalScore below 0 rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), totalScore: -1 })).ok, "negative score accepted"));
+check("32l. totalScore above 100 rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), totalScore: 101 })).ok, "score >100 accepted"));
+check("32m. non-integer totalScore rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), totalScore: 95.5 })).ok, "fractional score accepted"));
+check("32n. non-boolean hardBlockReasonPresent rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), hardBlockReasonPresent: "false" })).ok, "non-boolean hard-block flag accepted"));
+check("32o. unknown recommendedAction rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), recommendedAction: "ship_now" })).ok, "unknown action accepted"));
+check("32p. blank recommendationEventId rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), recommendationEventId: " " })).ok, "blank recommendation event accepted"));
+check("32q. recommendation count below 0 rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), recommendedVendorCount: -1 })).ok, "negative recommendation count accepted"));
+check("32r. recommendation count above 3 rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), recommendedVendorCount: 4 })).ok, "recommendation count >3 accepted"));
+check("32s. non-integer recommendation count rejected", () => assert(!auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts({ ...validFactsSummary(), recommendedVendorCount: 1.5 })).ok, "fractional recommendation count accepted"));
+check("32t. valid complete facts summary passes and is frozen", () => {
+  const result = auditMod.validatePolicyDecisionAuditContract(validAuditWithFacts(validFactsSummary()));
+  assert(result.ok && Object.isFrozen(result.value.policy_facts_summary), "valid normalized facts summary rejected or not frozen");
+});
 
 // AUTO AUTHORIZED CONTRACT
 check("33. valid auto-authorized payload accepted", () => assert(autoMod.validateDistributionAutoAuthorized(validAutoPayload()).ok, "valid auto payload rejected"));
@@ -338,6 +371,7 @@ check("49. unsupported policy version rejected", () => assert(!autoMod.validateD
 check("50. failed gates non-empty rejected", () => assert(!autoMod.validateDistributionAutoAuthorized(validAutoPayload({ policy_failed_gates: ["policy_enabled"] })).ok, "failed gate accepted"));
 check("51. safe-default config source rejected for auto authorization", () => assert(!autoMod.validateDistributionAutoAuthorized(validAutoPayload({ policy_config_source: SOURCE.SAFE_DEFAULT_NO_ACTIVE_CONFIG })).ok, "safe default source accepted"));
 check("52. missing config id rejected", () => assert(!autoMod.validateDistributionAutoAuthorized(validAutoPayload({ policy_config_id: null })).ok, "null config id accepted"));
+check("52a. auto-authorized payload with malformed facts summary rejected", () => assert(!autoMod.validateDistributionAutoAuthorized(validAutoPayload({ policy_facts_summary: {} })).ok, "auto payload malformed facts summary accepted"));
 
 // UNIFIED AUTHORIZATION SNAPSHOT
 check("53. human approved event maps to human authorization source", async () => {
@@ -414,6 +448,11 @@ check("67. malformed auto authorization rejected", async () => {
   const event = domainEvent({ payload: validAutoPayload({ authorized_vendor_ids: ["vB", "vA"] }) });
   const result = await authResolver.resolveLeadDistributionAuthorizationSnapshot({ authorizationEventId: event.id, expectedWorkflowInstanceId: "wf_std_1", expectedLeadId: "lead_std_1" }, resolverPort(event));
   assert(!result.ok, "malformed auto accepted");
+});
+check("67a. unified auto resolver rejects malformed policy facts summary", async () => {
+  const event = domainEvent({ payload: validAutoPayload({ policy_facts_summary: {} }) });
+  const result = await authResolver.resolveLeadDistributionAuthorizationSnapshot({ authorizationEventId: event.id, expectedWorkflowInstanceId: "wf_std_1", expectedLeadId: "lead_std_1" }, resolverPort(event));
+  assert(!result.ok, "malformed policy facts summary accepted by resolver");
 });
 check("68. no matching function called", async () => {
   const calls = {};

@@ -64,9 +64,56 @@ export interface LeadDistributionApprovedSnapshot {
   readonly approvedBy: string;
 }
 
+export const LeadDistributionAuthorizationSource = {
+  HUMAN_APPROVAL: "human_approval",
+  POLICY_AUTO_AUTHORIZATION: "policy_auto_authorization",
+} as const;
+
+export type LeadDistributionAuthorizationSourceValue =
+  (typeof LeadDistributionAuthorizationSource)[keyof typeof LeadDistributionAuthorizationSource];
+
+export interface LeadDistributionPolicyAuditSnapshot {
+  readonly policy_key: string;
+  readonly policy_version: string;
+  readonly policy_fingerprint: string;
+  readonly policy_decision: string;
+  readonly policy_reason_code: string;
+  readonly policy_config_id: string | null;
+  readonly policy_config_source: string;
+  readonly policy_facts_summary: JsonRecord;
+  readonly policy_passed_gates: readonly string[];
+  readonly policy_failed_gates: readonly string[];
+}
+
+/**
+ * Neutral authorization snapshot for both human-approved and future
+ * policy-auto-authorized distribution. Phase 4B-1 defines this contract only;
+ * the Phase 3B executor still consumes LeadDistributionApprovedSnapshot.
+ */
+export interface LeadDistributionAuthorizationSnapshot {
+  readonly authorizationEventId: string;
+  readonly authorizationSource: LeadDistributionAuthorizationSourceValue;
+  readonly recommendationEventId: string;
+  readonly leadId: string;
+  readonly workflowInstanceId: string;
+  readonly recommendedVendorIds: readonly string[];
+  readonly recommendedVendorCount: number;
+  readonly authorizedVendorIds: readonly string[];
+  readonly authorizedVendorCount: number;
+  readonly humanApprovedBy: string | null;
+  readonly policyAudit: LeadDistributionPolicyAuditSnapshot | null;
+}
+
 /** Identity an approved snapshot must be bound to (same lead, same workflow). */
 export interface LeadDistributionApprovedExpectation {
   approvalEventId: string;
+  expectedWorkflowInstanceId: string;
+  expectedLeadId: string;
+}
+
+/** Identity an authorization snapshot must be bound to (same lead, same workflow). */
+export interface LeadDistributionAuthorizationExpectation {
+  authorizationEventId: string;
   expectedWorkflowInstanceId: string;
   expectedLeadId: string;
 }
@@ -210,6 +257,17 @@ export interface DistributionApprovedContract {
   approvedVendorIds: string[];
   approvedBy: string;
   approvalReason: string | null;
+}
+
+/** Validated future auto-authorized event payload contract. */
+export interface DistributionAutoAuthorizedContract {
+  recommendationEventId: string;
+  recommendedVendorCount: number;
+  recommendedVendorIds: string[];
+  authorizedVendorCount: number;
+  authorizedVendorIds: string[];
+  authorizationSource: "policy_auto_authorization";
+  policyAudit: LeadDistributionPolicyAuditSnapshot;
 }
 
 /** A published distribution approval payload (no PII), for reuse across modules. */

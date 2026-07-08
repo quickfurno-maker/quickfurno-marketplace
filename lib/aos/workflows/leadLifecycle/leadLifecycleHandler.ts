@@ -36,6 +36,7 @@ import {
   validateDistributionApproved,
   validateDistributionCompleted,
 } from "./distribution/leadDistributionValidation";
+import { validateDistributionAutoAuthorized } from "./distribution/leadDistributionAutoAuthorizationValidation";
 
 /**
  * QuickFurno Lead Lifecycle — deterministic handler (Phase 2A, corrected).
@@ -380,12 +381,20 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
       // Future capability: state-machine only. This does NOT activate automatic
       // distribution, assign vendors, or deduct credits.
       assertSourceState(state, LeadLifecycleState.MATCH_RECOMMENDATION_READY, eventType);
+      const autoAuthorized = validateDistributionAutoAuthorized(payload);
+      if (!autoAuthorized.ok) {
+        throw new LeadLifecycleTransitionError(autoAuthorized.message);
+      }
       return buildResult(
         context,
         leadId,
         LeadLifecycleState.DISTRIBUTION_PENDING,
         "Distribution auto-authorized (future capability; no execution in Phase 2A).",
-        { auto_authorized: true },
+        {
+          auto_authorized: true,
+          recommendation_event_id: autoAuthorized.value.recommendationEventId,
+          authorized_vendor_count: autoAuthorized.value.authorizedVendorCount,
+        },
       );
     }
 

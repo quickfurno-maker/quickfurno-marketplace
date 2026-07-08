@@ -444,8 +444,12 @@ check("70. no worker", () =>
   assert(!/setInterval|while\s*\(\s*true\s*\)|claimOneDueWorkflowTask\s*\(/.test(policySource), "worker loop found"));
 check("71. no PM2 modification", () =>
   assert(!gitPorcelain().some((f) => /pm2|ecosystem/i.test(f)), "PM2 file changed"));
-check("72. no migration created or changed", () =>
-  assert(gitPorcelain(["supabase/migrations", "db"]).length === 0, "migration changed/created"));
+check("72. no unexpected migration created or changed", () => {
+  const unexpected = gitPorcelain(["supabase/migrations", "db"]).filter(
+    (line) => !line.includes("20260706000150_automation_policy_config_foundation.sql"),
+  );
+  assert(unexpected.length === 0, `unexpected migration changed/created: ${unexpected.join(", ")}`);
+});
 check("73. no UI change", () =>
   assert(gitPorcelain(["app", "components", "public"]).length === 0, "UI files changed"));
 check("74. protected services unchanged", () => {

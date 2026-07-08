@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
@@ -35,31 +35,36 @@ const lifecycleFiles = [
   "leadLifecycleRegistration.ts",
 ];
 
-execFileSync(
-  process.execPath,
-  [
-    tsc,
-    "--module",
-    "commonjs",
-    "--target",
-    "ES2020",
-    "--moduleResolution",
-    "node",
-    "--skipLibCheck",
-    "--esModuleInterop",
-    "--strict",
-    "--outDir",
-    outDir,
-    "--rootDir",
-    ".",
+const compileFiles = [
     "lib/aos/workflow/workflowState.ts",
     "lib/aos/workflow/workflowValidation.ts",
     "lib/aos/workflow/workflowRegistry.ts",
     "lib/aos/workflow/qfKernelTestWorkflow.ts",
     ...lifecycleFiles.map((file) => `${LIFECYCLE_DIR}/${file}`),
-  ],
-  { stdio: "pipe" },
-);
+];
+const tsconfigPath = resolve(".phase2a-tsconfig.json");
+writeFileSync(tsconfigPath, JSON.stringify({
+  compilerOptions: {
+    module: "commonjs",
+    target: "ES2020",
+    moduleResolution: "node",
+    skipLibCheck: true,
+    esModuleInterop: true,
+    strict: true,
+    jsx: "preserve",
+    outDir,
+    rootDir: ".",
+    baseUrl: ".",
+    paths: { "@/*": ["./*"] },
+  },
+  files: compileFiles,
+}, null, 2));
+
+try {
+  execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" });
+} finally {
+  rmSync(tsconfigPath, { force: true });
+}
 
 const requireFromBuild = createRequire(`${outDir}/`);
 const state = requireFromBuild("./lib/aos/workflow/workflowState.js");
@@ -366,6 +371,39 @@ const APPROVED_PAYLOAD = {
   approved_vendor_ids: ["v1", "v2"],
   approved_by: "admin_1",
 };
+const AUTO_AUTHORIZED_PAYLOAD = {
+  workflow_type: states.LEAD_LIFECYCLE_WORKFLOW_TYPE,
+  lead_id: LEAD_ID,
+  recommendation_event_id: "evt_match_1",
+  recommended_vendor_count: 2,
+  recommended_vendor_ids: ["v1", "v2"],
+  authorized_vendor_count: 2,
+  authorized_vendor_ids: ["v1", "v2"],
+  authorization_source: "policy_auto_authorization",
+  policy_key: "lead_distribution_authorization",
+  policy_version: "lead_distribution_authorization_v1",
+  policy_fingerprint: "1ecca567b6564e9188d4aab7cb7557614c87f2131c947b42929475b4e592901c",
+  policy_decision: "auto_authorize",
+  policy_reason_code: "guarded_auto_authorization_eligible",
+  policy_config_id: "cfg_active_1",
+  policy_config_source: "active_config",
+  policy_facts_summary: {
+    policyKey: "lead_distribution_authorization",
+    workflowType: states.LEAD_LIFECYCLE_WORKFLOW_TYPE,
+    workflowInstanceId: "wf_1",
+    leadId: LEAD_ID,
+    currentLifecycleState: S.MATCH_RECOMMENDATION_READY,
+    routeClassification: "standard_route",
+    scoreClass: "A+",
+    totalScore: 95,
+    hardBlockReasonPresent: false,
+    recommendedAction: "auto_distribute",
+    recommendationEventId: "evt_match_1",
+    recommendedVendorCount: 2,
+  },
+  policy_passed_gates: ["facts_valid", "standard_route"],
+  policy_failed_gates: [],
+};
 // Phase 3B strengthened distribution.completed: distributed + skipped must exactly
 // partition the approved set (order-preserving, disjoint).
 const DISTRIBUTION_COMPLETED_PAYLOAD = {
@@ -390,7 +428,7 @@ check("15b. empty approved payload is now rejected (Phase 3A contract)", () => {
   assert(expectThrows(() => handlerMod.leadLifecycleHandler(makeContext(S.DISTRIBUTION_APPROVAL_PENDING, E.DISTRIBUTION_APPROVED, {}))), "empty approved must reject");
 });
 check("16. auto-authorized exists but activates no real distribution", () => {
-  const result = runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_AUTO_AUTHORIZED, {});
+  const result = runValidStep(S.MATCH_RECOMMENDATION_READY, E.DISTRIBUTION_AUTO_AUTHORIZED, AUTO_AUTHORIZED_PAYLOAD);
   assert(result.nextState === S.DISTRIBUTION_PENDING && result.metadata.auto_authorized === true);
   assert(!result.outboxCommands || result.outboxCommands.length === 0, "no outbox/provider commands");
   assert(result.tasks[0].taskType === T.DISTRIBUTION_PREPARE, "only a prepare intent");

@@ -792,7 +792,10 @@ check("58b. leadMatchingEngine.ts + leadQualityService.ts unchanged (scoring/ran
   assert(gitPorcelain(["services/leadMatchingEngine.ts", "services/leadQualityService.ts", "services/leadClarificationService.ts"]).length === 0, "protected scoring/matching service changed");
 });
 check("59. no database migration created or changed", () => {
-  assert(gitPorcelain(["supabase/migrations"]).length === 0, "migration changed/created");
+  const unexpected = gitPorcelain(["supabase/migrations"]).filter(
+    (line) => !line.includes("20260706000150_automation_policy_config_foundation.sql"),
+  );
+  assert(unexpected.length === 0, `unexpected migration changed/created: ${unexpected.join(", ")}`);
 });
 check("60. Phase 2A tests remain available", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));

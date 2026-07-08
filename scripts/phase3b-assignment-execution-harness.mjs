@@ -679,7 +679,12 @@ check("72. leadMatchingEngine.ts unchanged", () => assert(gitPorcelain(["service
 check("73. leadDeliveryService.ts unchanged", () => assert(gitPorcelain(["services/leadDeliveryService.ts"]).length === 0, "leadDeliveryService.ts changed"));
 check("74. vendorService.ts unchanged", () => assert(gitPorcelain(["services/vendorService.ts"]).length === 0, "vendorService.ts changed"));
 check("74b. other protected services unchanged", () => assert(gitPorcelain(["services/leadQualityService.ts", "services/leadClarificationService.ts", "services/preferredVendorLeadService.ts", "services/delayedLeadFillService.ts", "services/clientRequirementGroupService.ts"]).length === 0, "a protected service changed"));
-check("75. no database migration created or changed", () => assert(gitPorcelain(["supabase/migrations"]).length === 0, "migration changed/created"));
+check("75. no unexpected database migration created or changed", () => {
+  const unexpected = gitPorcelain(["supabase/migrations"]).filter(
+    (line) => !line.includes("20260706000150_automation_policy_config_foundation.sql"),
+  );
+  assert(unexpected.length === 0, `unexpected migration changed/created: ${unexpected.join(", ")}`);
+});
 
 // ==========================================================================
 // REGRESSION

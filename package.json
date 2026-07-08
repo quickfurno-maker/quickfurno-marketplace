@@ -18,6 +18,7 @@
     "test:phase4b1": "node scripts/phase4b1-policy-inputs-contract-harness.mjs",
     "test:phase4b2": "node scripts/phase4b2-policy-lifecycle-integration-harness.mjs",
     "test:phase5a": "node scripts/phase5a-identity-security-harness.mjs",
+    "test:phase5b": "node scripts/phase5b-communication-core-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",

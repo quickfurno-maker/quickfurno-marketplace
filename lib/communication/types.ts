@@ -80,14 +80,68 @@ export const COMMUNICATION_AUTOMATION_READINESS_STATES: readonly CommunicationAu
     "active",
   ]);
 
+// ----------------------------------------------------------------------------
+// Destination source — a discriminated contract
+// ----------------------------------------------------------------------------
+/**
+ * How a message learns the number to dial.
+ *
+ * `recipient_reference` is the default and the ONLY source permitted for
+ * business communications, for scheduled sends, and for retries: the destination
+ * is recovered from the durable `recipient_type` + `recipient_id` pair by a
+ * CommunicationRecipientResolver, at dispatch time, which is what makes those
+ * paths restart-safe.
+ *
+ * `ephemeral_auth_destination` exists for exactly one problem: a first-time
+ * client requesting a login OTP has no `client_accounts` row yet, so there is
+ * nothing to resolve. The caller supplies the number in request memory only. It
+ * is tightly fenced — authentication lane only, immediate send only, never
+ * schedulable, never re-dispatchable from stored state — and the plaintext never
+ * touches the database: only `destination_hash` and `destination_masked` are
+ * persisted, exactly as for a resolved recipient.
+ */
+export type CommunicationDestinationSourceKind =
+  | "recipient_reference"
+  | "ephemeral_auth_destination";
+
+export interface RecipientReferenceDestinationSource {
+  readonly kind: "recipient_reference";
+}
+
+export interface EphemeralAuthDestinationSource {
+  readonly kind: "ephemeral_auth_destination";
+  /** Plaintext, request-memory only. Normalized to E.164, hashed, then dropped. */
+  readonly destination: string;
+}
+
+export type CommunicationDestinationSource =
+  | RecipientReferenceDestinationSource
+  | EphemeralAuthDestinationSource;
+
+export const RECIPIENT_REFERENCE_DESTINATION: RecipientReferenceDestinationSource =
+  Object.freeze({ kind: "recipient_reference" });
+
+/** Builds the fenced first-time-OTP destination source. */
+export function ephemeralAuthDestination(destination: string): EphemeralAuthDestinationSource {
+  return { kind: "ephemeral_auth_destination", destination };
+}
+
+export function isEphemeralAuthDestination(
+  source: CommunicationDestinationSource
+): source is EphemeralAuthDestinationSource {
+  return source.kind === "ephemeral_auth_destination";
+}
+
 /**
  * An authorized communication intent, carrying everything required to build,
  * authorize, and schedule a communication message.
  *
- * NOTE (Phase 5B review fix #1): an intent carries NO plaintext destination.
- * The durable `recipient_type` + `recipient_id` pair is resolved to a
+ * NOTE (Phase 5B review fix #1): an intent carries NO plaintext destination
+ * field. The durable `recipient_type` + `recipient_id` pair is resolved to a
  * destination server-side, at dispatch time, by a CommunicationRecipientResolver
- * — which is what makes scheduled sends and retries restart-safe.
+ * — which is what makes scheduled sends and retries restart-safe. The single,
+ * tightly fenced exception is `destination_source: ephemeral_auth_destination`
+ * (see {@link CommunicationDestinationSource}).
  */
 export interface CommunicationIntent {
   readonly type: string; // e.g. 'vendor_new_lead', 'client_login_otp'
@@ -95,6 +149,8 @@ export interface CommunicationIntent {
   readonly channel: CommunicationChannel;
   readonly recipient_type: CommunicationRecipientType;
   readonly recipient_id: string | null; // client_account.id / vendor.id / profile.id
+  /** Defaults to `recipient_reference` when omitted. */
+  readonly destination_source?: CommunicationDestinationSource;
   readonly template_key: string;
   readonly variables: Record<string, string>;
   readonly entity_type: string | null; // e.g. 'lead', 'payment'
@@ -139,6 +195,9 @@ export interface CommunicationMessage {
   readonly channel: CommunicationChannel;
   readonly recipient_type: CommunicationRecipientType;
   readonly recipient_id: string | null;
+  /** Which contract produced the destination. Audited: an OTP sent to a
+   *  caller-supplied number is a security-relevant event. */
+  readonly destination_source: CommunicationDestinationSourceKind;
   readonly destination_hash: string;
   readonly destination_masked: string;
   readonly template_key: string | null;

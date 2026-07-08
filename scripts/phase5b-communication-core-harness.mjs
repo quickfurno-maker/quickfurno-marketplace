@@ -34,6 +34,7 @@ const files = [
   "lib/communication/dbErrors.ts",
   "lib/communication/recipientResolver.ts",
   "lib/communication/providers/whatsappProvider.ts",
+  "lib/communication/providers/providerError.ts",
   "lib/communication/providers/mockWhatsAppProvider.ts",
   "services/communicationRecipientResolver.ts",
   "services/communicationService.ts",
@@ -103,6 +104,7 @@ const UNIQUE_INDEXES = {
 const TABLE_DEFAULTS = {
   communication_messages: () => ({
     status: "queued", attempt_count: 0, max_attempts: 5, next_retry_at: null,
+    destination_source: "recipient_reference",
     provider_message_id: null, failure_code: null, failure_reason_sanitized: null,
     scheduled_at: null, accepted_at: null, sent_at: null, delivered_at: null,
     read_at: null, failed_at: null, variables: {}, metadata: {},
@@ -154,15 +156,33 @@ function onNextSelect(table, fire) {
   selectRaceHooks.push({ table, fire });
 }
 
+/**
+ * One-shot hooks that fire BEFORE an update's filters are applied — used to let a
+ * competing worker mutate the row between our read and our compare-and-set.
+ * Async, so the competitor can run a whole dispatch.
+ */
+let updateRaceHooks = [];
+function onNextUpdate(table, fire) {
+  updateRaceHooks.push({ table, fire });
+}
+
 /** One-shot fault injection so hard database failures can be exercised. */
 let insertFaults = [];
 function failNextInsert(table, error) {
   insertFaults.push({ table, error });
 }
 
+/** `match(updatePayload)` narrows the fault to one specific update in a flow. */
+let updateFaults = [];
+function failNextUpdate(table, error, match) {
+  updateFaults.push({ table, error, match });
+}
+
 function resetDb() {
   selectRaceHooks = [];
+  updateRaceHooks = [];
   insertFaults = [];
+  updateFaults = [];
   db.communication_templates = [
     { template_key: "client_login_otp", channel: "whatsapp", category: "authentication", description: "OTP for client", version: "1.0", readiness_status: "mock_ready", is_active: true, provider_template_name: null },
     { template_key: "vendor_whatsapp_verify", channel: "whatsapp", category: "authentication", description: "OTP for vendor verify", version: "1.0", readiness_status: "mock_ready", is_active: true, provider_template_name: null },
@@ -263,6 +283,22 @@ class MockQueryBuilder {
     }
 
     if (this.action === "update") {
+      // A competing worker gets to move the row BEFORE our filters run — this is
+      // exactly the window a compare-and-set has to close.
+      const hookIndex = updateRaceHooks.findIndex((h) => h.table === this.table);
+      if (hookIndex !== -1) {
+        const [hook] = updateRaceHooks.splice(hookIndex, 1);
+        await hook.fire();
+      }
+
+      const faultIndex = updateFaults.findIndex(
+        (f) => f.table === this.table && (!f.match || f.match(this.actionData))
+      );
+      if (faultIndex !== -1) {
+        const [fault] = updateFaults.splice(faultIndex, 1);
+        return { data: null, error: fault.error };
+      }
+
       for (const f of this.filters) list = list.filter(f);
       for (const item of list) Object.assign(item, this.actionData);
       return { data: list, error: null };
@@ -295,14 +331,19 @@ supabaseMod.adminClient = () => ({ from: (table) => new MockQueryBuilder(table) 
 const CommServiceMod = requireFromBuild("./services/communicationService.js");
 const AdminServiceMod = requireFromBuild("./services/communicationAdminService.js");
 const MockProviderMod = requireFromBuild("./lib/communication/providers/mockWhatsAppProvider.js");
+const ProviderErrorMod = requireFromBuild("./lib/communication/providers/providerError.js");
 const PhoneMod = requireFromBuild("./lib/communication/phone.js");
 const ResolverMod = requireFromBuild("./lib/communication/recipientResolver.js");
 const SupabaseResolverMod = requireFromBuild("./services/communicationRecipientResolver.js");
 const TypesMod = requireFromBuild("./lib/communication/types.js");
 
-const { MOCK_DESTINATIONS, MockWhatsAppProvider, computeMockWebhookSignature } = MockProviderMod;
+const {
+  MOCK_DESTINATIONS, MockWhatsAppProvider, computeMockWebhookSignature,
+  MOCK_LEAKY_EXCEPTION_MESSAGE,
+} = MockProviderMod;
 const { StaticCommunicationRecipientResolver } = ResolverMod;
 const { CommunicationService, hashDestination } = CommServiceMod;
+const { ephemeralAuthDestination } = TypesMod;
 
 const checks = [];
 function check(name, fn) { checks.push({ name, fn }); }
@@ -1229,6 +1270,450 @@ check("FIX12-d. the mock database enforces real unique constraints", async () =>
   const d = await supabaseMod.adminClient().from("communication_webhook_receipts")
     .insert({ provider: "mock", provider_event_id: "e1", payload_hash: "h1", signature_valid: true, processing_status: "verified" }).select("*").single();
   assert(d.error === null, "partial indexes are partitioned by signature_valid");
+});
+
+// ============================================================================
+// HARDENING 1 — ATOMIC DISPATCH CLAIM
+// ============================================================================
+function seedDispatchableMessage(id = "msg-claim") {
+  db.communication_messages = [{
+    id, provider: "mock", status: "queued", lane: "business", channel: "whatsapp",
+    recipient_type: "vendor", recipient_id: "vend-123", destination_source: "recipient_reference",
+    attempt_count: 0, max_attempts: 5, next_retry_at: null, scheduled_at: null,
+    idempotency_key: `idem-${id}`, destination_hash: hashDestination(VENDOR_DEST),
+    destination_masked: "+91******3211", template_key: "vendor_new_lead",
+    variables: { name: "Keshav Studio" }, metadata: {}, created_at: new Date().toISOString(),
+  }];
+  return db.communication_messages[0];
+}
+
+check("H1-a. two workers racing the same message produce exactly one provider invocation", async () => {
+  resetDb();
+  seedDispatchableMessage("msg-claim");
+
+  const providerA = new MockWhatsAppProvider();
+  const providerB = new MockWhatsAppProvider();
+  const workerA = new CommunicationService(providerA, resolverFor());
+  const workerB = new CommunicationService(providerB, resolverFor());
+
+  // Both workers read the row as `queued`. Worker B wins the compare-and-set and
+  // completes its whole dispatch in the window before worker A's UPDATE filters.
+  onNextUpdate("communication_messages", async () => {
+    await workerB.dispatchPersistedMessage("msg-claim");
+  });
+
+  const a = await workerA.dispatchPersistedMessage("msg-claim");
+
+  const invocations = providerA.getLastSentPayloads().length + providerB.getLastSentPayloads().length;
+  assert(invocations === 1, `exactly one provider invocation required, got ${invocations}`);
+  assert(providerA.getLastSentPayloads().length === 0, "the losing worker must not call the provider");
+  assert(providerB.getLastSentPayloads().length === 1, "the winning worker sends exactly once");
+
+  assert(a.ok === false, "the losing worker returns a safe failure, not a duplicate send");
+  assert(a.code === "MESSAGE_ALREADY_CLAIMED", `expected MESSAGE_ALREADY_CLAIMED, got ${a.code}`);
+
+  assert(db.communication_messages.length === 1, "no duplicate ledger row");
+  assert(db.communication_messages[0].status === "accepted", "the winner's outcome stands");
+  assert(db.communication_messages[0].attempt_count === 1, "exactly one attempt consumed");
+});
+
+check("H1-b. a stale read cannot claim a message another worker already moved", async () => {
+  resetDb();
+  const row = seedDispatchableMessage("msg-stale");
+  const staleRead = { ...row };          // caller believes it is still `queued`
+  row.status = "dispatching";            // the database says otherwise
+
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor());
+  const res = await s.dispatchMessage(staleRead, { providerTemplateName: "vendor_new_lead" });
+
+  assert(res.ok === false && res.code === "MESSAGE_ALREADY_CLAIMED", `expected MESSAGE_ALREADY_CLAIMED, got ${res.code}`);
+  assert(provider.getLastSentPayloads().length === 0, "provider must not be called");
+  assert(db.communication_messages[0].status === "dispatching", "the other worker's claim is untouched");
+});
+
+check("H1-c. an already-dispatching message can never be re-claimed", async () => {
+  resetDb();
+  const row = seedDispatchableMessage("msg-inflight");
+  row.status = "dispatching";
+
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor());
+  const res = await s.dispatchMessage({ ...row }, { providerTemplateName: "vendor_new_lead" });
+
+  assert(res.ok === false && res.code === "MESSAGE_ALREADY_CLAIMED", `expected MESSAGE_ALREADY_CLAIMED, got ${res.code}`);
+  assert(provider.getLastSentPayloads().length === 0, "provider must not be called");
+});
+
+check("H1-d. a failed pre-flight cannot clobber a row another worker has claimed", async () => {
+  resetDb();
+  seedDispatchableMessage("msg-clobber");
+
+  const providerA = new MockWhatsAppProvider();
+  const providerB = new MockWhatsAppProvider();
+  // Worker A's resolver is empty, so its destination pre-flight fails and it tries
+  // to mark the message `failed` — while worker B has already claimed it.
+  const workerA = new CommunicationService(providerA, new StaticCommunicationRecipientResolver());
+  const workerB = new CommunicationService(providerB, resolverFor());
+
+  onNextUpdate("communication_messages", async () => {
+    await workerB.dispatchPersistedMessage("msg-clobber");
+  });
+
+  const a = await workerA.dispatchPersistedMessage("msg-clobber");
+
+  assert(a.ok === false, "worker A fails closed");
+  assert(db.communication_messages[0].status === "accepted", "worker B's successful dispatch is not overwritten by A's failure");
+  assert(db.communication_messages[0].failure_code === null, "no failure recorded over a successful send");
+  assert(providerB.getLastSentPayloads().length === 1, "exactly one send");
+});
+
+check("H1-e. the claim is a compare-and-set on id AND expected status", () => {
+  assert(!/updateMessageState/.test(SERVICE_SOURCE), "the non-atomic updateMessageState helper must be gone");
+  const claim = SERVICE_SOURCE.match(/claimMessageForDispatch[\s\S]*?\.select\("\*"\);/);
+  assert(claim, "claimMessageForDispatch must exist");
+  assert(/\.eq\("id", message\.id\)/.test(claim[0]), "claim must constrain the message id");
+  assert(/\.eq\("status", message\.status\)/.test(claim[0]), "claim must constrain the expected current status");
+  assert(/claimed\.length !== 1/.test(SERVICE_SOURCE), "claim must verify exactly one row was claimed");
+});
+
+// ============================================================================
+// HARDENING 2 — PROVIDER EXCEPTION RECOVERY
+// ============================================================================
+const NEVER_PERSIST = ["sk_live", "Bearer", "Authorization", "AKIA", "raw_payload", "otp", "123456", "9876543210"];
+
+function assertNoStrandedDispatching() {
+  for (const m of db.communication_messages) {
+    assert(m.status !== "dispatching", `message ${m.id} was stranded in dispatching`);
+  }
+}
+
+check("H2-a. authentication provider exception ends as failed", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor({ "client:ca-123": MOCK_DESTINATIONS.THROW_TRANSIENT }));
+  const res = await s.send(authIntent());
+
+  assert(res.ok === true, `the throw must be normalized, not propagated: ${res.ok ? "" : res.error}`);
+  assert(res.data.status === "failed", `expected failed, got ${res.data.status}`);
+  assert(res.data.status !== "retry_scheduled" && res.data.status !== "dead_letter", "auth never retries or dead-letters");
+  assert(res.data.failure_code === "MOCK_TRANSIENT_TRANSPORT", `expected the adapter's code, got ${res.data.failure_code}`);
+  assert(res.data.attempt_count === 1, "the attempt was consumed");
+  assertNoStrandedDispatching();
+});
+
+check("H2-b. business transient provider exception schedules a retry", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), resolverFor({ "vendor:vend-123": MOCK_DESTINATIONS.THROW_TRANSIENT }));
+  const res = await s.send(businessIntent());
+
+  assert(res.ok === true, "throw normalized");
+  assert(res.data.status === "retry_scheduled", `expected retry_scheduled, got ${res.data.status}`);
+  assert(res.data.next_retry_at !== null, "backoff scheduled");
+  assert(res.data.failure_code === "MOCK_TRANSIENT_TRANSPORT", `got ${res.data.failure_code}`);
+  assertNoStrandedDispatching();
+});
+
+check("H2-c. a raw transport-code exception (ECONNRESET) is treated as transient", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), resolverFor({ "vendor:vend-123": MOCK_DESTINATIONS.THROW_TRANSPORT }));
+  const res = await s.send(businessIntent());
+
+  assert(res.ok === true, "throw normalized");
+  assert(res.data.status === "retry_scheduled", `expected retry_scheduled, got ${res.data.status}`);
+  assert(res.data.failure_code === "ECONNRESET", `expected ECONNRESET, got ${res.data.failure_code}`);
+  assertNoStrandedDispatching();
+});
+
+check("H2-d. business exhausted transient exception ends as dead_letter", async () => {
+  resetDb();
+  db.communication_messages = [{
+    id: "msg-throw-exhaust", provider: "mock", status: "retry_scheduled", lane: "business", channel: "whatsapp",
+    recipient_type: "vendor", recipient_id: "vend-throw", destination_source: "recipient_reference",
+    attempt_count: 4, max_attempts: 5, scheduled_at: null,
+    next_retry_at: new Date(Date.now() - 1000).toISOString(),
+    idempotency_key: "idem-throw-exhaust", destination_hash: hashDestination(MOCK_DESTINATIONS.THROW_TRANSIENT),
+    destination_masked: "+15******0003", template_key: "vendor_new_lead",
+    variables: {}, metadata: {}, created_at: new Date().toISOString(),
+  }];
+  const resolver = resolverFor();
+  resolver.set("vendor", "vend-throw", MOCK_DESTINATIONS.THROW_TRANSIENT);
+
+  const s = new CommunicationService(new MockWhatsAppProvider(), resolver);
+  const res = await s.dispatchPersistedMessage("msg-throw-exhaust");
+
+  assert(res.ok === true, "throw normalized");
+  assert(res.data.status === "dead_letter", `expected dead_letter, got ${res.data.status}`);
+  assert(res.data.attempt_count === 5, "final attempt consumed");
+  assert(res.data.next_retry_at === null, "no further retry");
+  assertNoStrandedDispatching();
+});
+
+check("H2-e. an explicitly permanent provider exception ends as failed", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), resolverFor({ "vendor:vend-123": MOCK_DESTINATIONS.THROW_PERMANENT }));
+  const res = await s.send(businessIntent());
+
+  assert(res.ok === true, "throw normalized");
+  assert(res.data.status === "failed", `expected failed, got ${res.data.status}`);
+  assert(res.data.next_retry_at === null, "permanent errors never retry");
+  assert(res.data.failure_code === "MOCK_PERMANENT_REJECTION", `got ${res.data.failure_code}`);
+  assertNoStrandedDispatching();
+});
+
+check("H2-f. an unclassified exception never leaks secrets and is never retried", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), resolverFor({ "vendor:vend-123": MOCK_DESTINATIONS.THROW_LEAKY }));
+  const res = await s.send(businessIntent());
+
+  assert(res.ok === true, "throw normalized");
+  assert(res.data.status === "failed", `an unprovable delivery must never be retried; got ${res.data.status}`);
+  assert(res.data.failure_code === "PROVIDER_EXCEPTION", `got ${res.data.failure_code}`);
+
+  const persisted = JSON.stringify(db.communication_messages[0]);
+  for (const secret of NEVER_PERSIST) {
+    assert(!persisted.includes(secret), `"${secret}" must never reach the ledger`);
+  }
+  assert(!persisted.includes(MOCK_LEAKY_EXCEPTION_MESSAGE), "the raw exception text must never be persisted");
+  assert(/Exception text withheld/.test(res.data.failure_reason_sanitized), "the reason states the text was withheld");
+  assertNoStrandedDispatching();
+});
+
+check("H2-g. no exception path ever strands a message in dispatching", async () => {
+  for (const destination of [
+    MOCK_DESTINATIONS.THROW_TRANSIENT, MOCK_DESTINATIONS.THROW_PERMANENT,
+    MOCK_DESTINATIONS.THROW_TRANSPORT, MOCK_DESTINATIONS.THROW_LEAKY,
+  ]) {
+    resetDb();
+    const s = new CommunicationService(new MockWhatsAppProvider(), resolverFor({ "vendor:vend-123": destination }));
+    await s.send(businessIntent());
+    assert(db.communication_messages.length === 1, "row written");
+    assertNoStrandedDispatching();
+  }
+});
+
+check("H2-h. exception classification is deterministic and conservative", () => {
+  const { classifyProviderException, ProviderDispatchError, transientProviderError, permanentProviderError } = ProviderErrorMod;
+
+  assert(classifyProviderException(transientProviderError("X_CODE", "m")).retryable === true, "explicit transient");
+  assert(classifyProviderException(permanentProviderError("Y_CODE", "m")).retryable === false, "explicit permanent");
+  assert(classifyProviderException(transientProviderError("X_CODE", "m")).code === "X_CODE", "adapter code preserved");
+
+  const econn = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+  assert(classifyProviderException(econn).retryable === true, "known transport code is transient");
+  assert(classifyProviderException(econn).code === "ECONNRESET", "transport code preserved");
+
+  const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+  assert(classifyProviderException(abort).retryable === true, "AbortError is transient");
+
+  // Anything we cannot prove failed in transit must NOT be retried.
+  assert(classifyProviderException(new TypeError("x is not a function")).retryable === false, "adapter bug never retried");
+  assert(classifyProviderException(new TypeError("x")).code === "PROVIDER_EXCEPTION", "unclassified code");
+  assert(classifyProviderException("just a string").retryable === false, "non-Error throw handled");
+  assert(classifyProviderException(null).code === "PROVIDER_EXCEPTION", "null throw handled");
+
+  // A hostile code that is not identifier-shaped must not be persisted verbatim.
+  const hostile = Object.assign(new Error("x"), { code: "Bearer sk_live_abc; DROP TABLE" });
+  assert(classifyProviderException(hostile).code === "PROVIDER_EXCEPTION", "non-identifier code rejected");
+  const hostileTyped = new ProviderDispatchError("Bearer sk_live_abc", "m", false);
+  assert(classifyProviderException(hostileTyped).code === "PROVIDER_EXCEPTION", "non-identifier adapter code rejected");
+});
+
+check("H2-i. describeProviderException emits only allowlisted identifiers", () => {
+  const { describeProviderException } = ProviderErrorMod;
+  const leaky = new Error(MOCK_LEAKY_EXCEPTION_MESSAGE);
+  const described = describeProviderException(leaky, "PROVIDER_EXCEPTION");
+  for (const secret of NEVER_PERSIST) {
+    assert(!described.includes(secret), `"${secret}" must not appear in the description`);
+  }
+  assert(described === "Provider adapter threw Error (PROVIDER_EXCEPTION). Exception text withheld: it may embed provider secrets.",
+    `unexpected description: ${described}`);
+});
+
+check("H2-j. a failed outcome write releases the claim instead of stranding it", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor());
+
+  // The provider accepts, then the ledger write for `accepted` blows up.
+  failNextUpdate("communication_messages", { code: "08006", message: "connection failure" }, (u) => u.status === "accepted");
+
+  const res = await s.send(businessIntent());
+
+  assert(res.ok === false, "the recording failure surfaces");
+  assert(provider.getLastSentPayloads().length === 1, "the message really was sent");
+  const row = db.communication_messages[0];
+  assert(row.status === "failed", `claim must be released as failed, got ${row.status}`);
+  assert(row.failure_code === "DISPATCH_RECORDING_FAILED", `got ${row.failure_code}`);
+  assertNoStrandedDispatching();
+});
+
+// ============================================================================
+// HARDENING 3 — FIRST-TIME CLIENT OTP BOOTSTRAP (EPHEMERAL AUTH DESTINATION)
+// ============================================================================
+check("H3-a. first-time client auth OTP succeeds with no client_accounts row", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  // An EMPTY resolver: there is no client_accounts row to resolve, by construction.
+  const s = new CommunicationService(provider, new StaticCommunicationRecipientResolver());
+
+  const res = await s.send(authIntent({
+    recipient_id: null,
+    destination_source: ephemeralAuthDestination("+91 98765 43210"),
+  }));
+
+  assert(res.ok === true, `first-time OTP must send: ${res.ok ? "" : res.code}`);
+  assert(res.data.status === "accepted", `expected accepted, got ${res.data.status}`);
+  assert(res.data.destination_source === "ephemeral_auth_destination", "source recorded for audit");
+  assert(provider.getLastSentPayloads()[0].to === "+919876543210", "normalized E.164 reached the provider");
+  assert(provider.getLastSentPayloads()[0].lane === "authentication", "auth lane used");
+});
+
+check("H3-b. the ephemeral plaintext destination is absent from the persisted message", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), new StaticCommunicationRecipientResolver());
+  await s.send(authIntent({
+    recipient_id: null,
+    variables: { otp: "123456" },
+    destination_source: ephemeralAuthDestination("+919876543210"),
+  }));
+
+  const persisted = db.communication_messages[0];
+  assert(persisted.destination_hash === hashDestination("+919876543210"), "hash persisted");
+  assert(persisted.destination_masked === "+91******3210", `mask persisted, got ${persisted.destination_masked}`);
+  assert(!("destination" in persisted), "no plaintext destination column");
+
+  const serialized = JSON.stringify(persisted);
+  assert(!serialized.includes("919876543210"), "no plaintext destination anywhere in the row");
+  assert(!serialized.includes("+91 98765 43210"), "no formatted plaintext either");
+  assert(!serialized.includes("123456"), "no OTP value");
+  assert(Object.keys(persisted.variables).length === 0, "auth lane persists no variables");
+});
+
+check("H3-c. a business intent with an ephemeral destination is rejected", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor());
+
+  const res = await s.send(businessIntent({ destination_source: ephemeralAuthDestination(VENDOR_DEST) }));
+
+  assert(res.ok === false, "business must never use an arbitrary direct destination");
+  assert(res.code === "EPHEMERAL_DESTINATION_AUTH_LANE_ONLY", `got ${res.code}`);
+  assert(db.communication_messages.length === 0, "no row created");
+  assert(provider.getLastSentPayloads().length === 0, "provider never called");
+});
+
+check("H3-d. a scheduled auth intent with an ephemeral destination is rejected", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), new StaticCommunicationRecipientResolver());
+
+  for (const scheduled_at of [
+    new Date(Date.now() + 60_000).toISOString(),
+    new Date(Date.now() - 60_000).toISOString(),   // even a past timestamp is refused
+  ]) {
+    const res = await s.send(authIntent({
+      recipient_id: null, scheduled_at,
+      destination_source: ephemeralAuthDestination("+919876543210"),
+    }));
+    assert(res.ok === false, "an ephemeral destination is never schedulable");
+    assert(res.code === "EPHEMERAL_DESTINATION_NOT_SCHEDULABLE", `got ${res.code}`);
+  }
+  assert(db.communication_messages.length === 0, "no row created");
+});
+
+check("H3-e. an ephemeral message can never be re-dispatched from stored state", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor());
+
+  // The authentication lane guard fires first.
+  db.communication_messages = [{
+    id: "msg-eph-auth", provider: "mock", status: "queued", lane: "authentication",
+    recipient_type: "client", recipient_id: null, destination_source: "ephemeral_auth_destination",
+    attempt_count: 0, max_attempts: 1, destination_hash: hashDestination(CLIENT_DEST),
+    variables: {}, template_key: "client_login_otp", created_at: new Date().toISOString(),
+  }];
+  const auth = await s.dispatchPersistedMessage("msg-eph-auth");
+  assert(auth.ok === false && auth.code === "AUTH_LANE_NOT_REDISPATCHABLE", `got ${auth.code}`);
+
+  // Defence in depth: even if a row somehow escaped the DB check constraint and
+  // claimed a business lane, the destination source alone blocks re-dispatch.
+  db.communication_messages = [{
+    id: "msg-eph-biz", provider: "mock", status: "retry_scheduled", lane: "business",
+    recipient_type: "client", recipient_id: null, destination_source: "ephemeral_auth_destination",
+    attempt_count: 1, max_attempts: 5, next_retry_at: new Date(Date.now() - 1000).toISOString(),
+    destination_hash: hashDestination(CLIENT_DEST), variables: {}, template_key: "vendor_new_lead",
+    created_at: new Date().toISOString(),
+  }];
+  const biz = await s.dispatchPersistedMessage("msg-eph-biz");
+  assert(biz.ok === false && biz.code === "EPHEMERAL_DESTINATION_NOT_REDISPATCHABLE", `got ${biz.code}`);
+  assert(provider.getLastSentPayloads().length === 0, "provider never called");
+});
+
+check("H3-f. equivalent formatted international numbers produce the same stored hash", async () => {
+  resetDb();
+  const s = new CommunicationService(new MockWhatsAppProvider(), new StaticCommunicationRecipientResolver());
+  const formats = ["+919876543210", "+91 98765 43210", "+91-98765-43210", "0091 98765 43210", "+91 (98765) 43210"];
+
+  for (const [i, destination] of formats.entries()) {
+    const res = await s.send(authIntent({
+      recipient_id: null, idempotency_key: `idem-eph-${i}`,
+      destination_source: ephemeralAuthDestination(destination),
+    }));
+    assert(res.ok === true, `${destination} must send: ${res.ok ? "" : res.code}`);
+  }
+
+  const hashes = new Set(db.communication_messages.map((m) => m.destination_hash));
+  const masks = new Set(db.communication_messages.map((m) => m.destination_masked));
+  assert(db.communication_messages.length === formats.length, "one row per send");
+  assert(hashes.size === 1, `all equivalent formats must store one hash, got ${hashes.size}`);
+  assert(masks.size === 1, "all equivalent formats must store one mask");
+  assert([...hashes][0] === hashDestination("+919876543210"), "hash is of the canonical E.164 value");
+});
+
+check("H3-g. an invalid ephemeral destination is rejected before any row is written", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, new StaticCommunicationRecipientResolver());
+
+  for (const [destination, code] of [
+    ["9876543210", "PHONE_MISSING_COUNTRY_CODE"],
+    ["", "PHONE_EMPTY"],
+    ["+91abc", "PHONE_INVALID_CHARACTERS"],
+    ["+0919876543210", "PHONE_INVALID_COUNTRY_CODE"],
+  ]) {
+    const res = await s.send(authIntent({
+      recipient_id: null, idempotency_key: `idem-bad-${destination}`,
+      destination_source: ephemeralAuthDestination(destination),
+    }));
+    assert(res.ok === false, `"${destination}" must be rejected`);
+    assert(res.code === code, `"${destination}": expected ${code}, got ${res.code}`);
+  }
+  assert(db.communication_messages.length === 0, "no rows created");
+  assert(provider.getLastSentPayloads().length === 0, "provider never called");
+});
+
+check("H3-h. resolved-recipient delivery is unchanged by the ephemeral path", async () => {
+  resetDb();
+  const provider = new MockWhatsAppProvider();
+  const s = new CommunicationService(provider, resolverFor());
+  const res = await s.send(businessIntent());
+
+  assert(res.ok === true, "the default path still resolves");
+  assert(res.data.destination_source === "recipient_reference", "default source recorded");
+  assert(provider.getLastSentPayloads()[0].to === VENDOR_DEST, "resolver still drives business delivery");
+});
+
+check("H3-i. migration fences the ephemeral source in the schema", () => {
+  assert(normalizedSql.includes("destination_source text not null default 'recipient_reference'"),
+    "destination_source column defaults to the resolver path");
+  assert(normalizedSql.includes("check (destination_source in ('recipient_reference', 'ephemeral_auth_destination'))"),
+    "destination_source vocabulary constrained");
+  assert(normalizedSql.includes("check (destination_source = 'recipient_reference' or lane = 'authentication')"),
+    "ephemeral is fenced to the authentication lane at the database level");
+  assert(normalizedSql.includes("check (destination_source = 'recipient_reference' or scheduled_at is null)"),
+    "ephemeral can never be scheduled at the database level");
+  assert(!/\bdestination text\b/.test(normalizedSql), "still no plaintext destination column");
 });
 
 // ============================================================================

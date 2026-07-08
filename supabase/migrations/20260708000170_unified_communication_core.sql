@@ -68,8 +68,14 @@ create table if not exists public.communication_messages (
   channel                   text not null check (channel = 'whatsapp'),
   recipient_type            text not null check (recipient_type in ('client', 'vendor', 'admin', 'integration', 'system')),
   recipient_id              uuid,
+  -- How the destination was obtained. 'ephemeral_auth_destination' means the
+  -- caller supplied the number in request memory (first-time client login OTP,
+  -- before any client_accounts row exists). Audited: an OTP sent to an
+  -- unresolved, caller-supplied number is a security-relevant event.
+  destination_source        text not null default 'recipient_reference'
+                              check (destination_source in ('recipient_reference', 'ephemeral_auth_destination')),
   -- sha256 of the canonical E.164 destination. The plaintext number is resolved
-  -- server-side at dispatch time and is never stored.
+  -- server-side at dispatch time and is never stored — for BOTH sources.
   destination_hash          text not null,
   destination_masked        text not null,
   template_key              text references public.communication_templates(template_key),
@@ -98,7 +104,15 @@ create table if not exists public.communication_messages (
   delivered_at              timestamptz,
   read_at                   timestamptz,
   failed_at                 timestamptz,
-  updated_at                timestamptz not null default now()
+  updated_at                timestamptz not null default now(),
+  -- An ephemeral destination is fenced to the authentication lane. Business
+  -- communications must always resolve from the durable recipient reference.
+  constraint chk_comm_message_ephemeral_is_authentication
+    check (destination_source = 'recipient_reference' or lane = 'authentication'),
+  -- ...and can never be scheduled: its plaintext lives only in request memory,
+  -- so there would be nothing left to dispatch from later.
+  constraint chk_comm_message_ephemeral_never_scheduled
+    check (destination_source = 'recipient_reference' or scheduled_at is null)
 );
 
 create index if not exists idx_communication_messages_lookup

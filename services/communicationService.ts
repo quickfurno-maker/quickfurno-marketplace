@@ -36,6 +36,7 @@ import type { CommunicationRecipientResolver } from "../lib/communication/recipi
 import {
   getActiveRecipientResolver,
 } from "./communicationRecipientResolver";
+import { RECIPIENT_REFERENCE_DESTINATION } from "../lib/communication/types";
 import type {
   CommunicationIntent,
   CommunicationMessage,
@@ -50,6 +51,7 @@ import type {
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
 } from "../lib/communication/providers/whatsappProvider";
+import { normalizeProviderException } from "../lib/communication/providers/providerError";
 import { MockWhatsAppProvider } from "../lib/communication/providers/mockWhatsAppProvider";
 
 // The canonical destination helpers live in lib/communication/phone.ts; these
@@ -97,6 +99,14 @@ const COMMUNICATION_ERROR_MESSAGES = {
   MESSAGE_NOT_FOUND: "No communication message matches this reference.",
   MESSAGE_NOT_DISPATCHABLE: "The communication message is not in a dispatchable state.",
   MESSAGE_NOT_DUE: "The communication message is not due for dispatch yet.",
+  MESSAGE_ALREADY_CLAIMED:
+    "Another worker already claimed this message for dispatch; no communication was sent.",
+  EPHEMERAL_DESTINATION_AUTH_LANE_ONLY:
+    "An ephemeral destination may only be used by the authentication lane.",
+  EPHEMERAL_DESTINATION_NOT_SCHEDULABLE:
+    "An ephemeral destination is request-memory only and can never be scheduled.",
+  EPHEMERAL_DESTINATION_NOT_REDISPATCHABLE:
+    "An ephemeral destination is request-memory only and can never be re-dispatched from stored state.",
   DESTINATION_HASH_MISMATCH: "The supplied destination does not match the recorded destination hash.",
   RECIPIENT_DESTINATION_CHANGED:
     "The recipient destination changed after this message was queued; the message was not re-routed.",
@@ -237,12 +247,29 @@ export class CommunicationService {
 
   /**
    * Dispatches an authorized CommunicationIntent. The intent carries no
-   * plaintext destination — the recipient reference is resolved server-side.
+   * plaintext destination field — the recipient reference is resolved
+   * server-side, unless the caller supplied a fenced ephemeral authentication
+   * destination (first-time client OTP, before any client_accounts row exists).
    */
   async send(intent: CommunicationIntent): Promise<Result<CommunicationMessage>> {
     try {
       if (!intent.idempotency_key || !intent.template_key) {
         throw appError("VALIDATION");
+      }
+
+      const destinationSource = intent.destination_source ?? RECIPIENT_REFERENCE_DESTINATION;
+
+      // Fence the ephemeral path before anything else touches the database.
+      if (destinationSource.kind === "ephemeral_auth_destination") {
+        if (intent.lane !== "authentication") {
+          // Business communications must always go through the resolver.
+          return fail(commError("EPHEMERAL_DESTINATION_AUTH_LANE_ONLY"));
+        }
+        if (intent.scheduled_at) {
+          // The plaintext lives in request memory only; there is nothing to
+          // dispatch from later, so scheduling is refused outright.
+          return fail(commError("EPHEMERAL_DESTINATION_NOT_SCHEDULABLE"));
+        }
       }
 
       const isScheduled = Boolean(intent.scheduled_at && new Date(intent.scheduled_at) > new Date());
@@ -267,14 +294,21 @@ export class CommunicationService {
         return fail(commError("TEMPLATE_NOT_READY"));
       }
 
-      // Resolve the destination BEFORE writing the ledger row: an unresolvable
+      // Establish the destination BEFORE writing the ledger row: an unresolvable
       // recipient must not leave a queued message that can never be delivered.
-      const resolved = await this.recipientResolver.resolveDestination(
-        intent.recipient_type,
-        intent.recipient_id
-      );
-      if (!resolved.ok) return resolved;
-      const destination = resolved.data;
+      let destination: string;
+      if (destinationSource.kind === "ephemeral_auth_destination") {
+        const normalized = normalizePhoneE164(destinationSource.destination);
+        if (!normalized.ok) return fail(phoneNormalizationError(normalized.code));
+        destination = normalized.e164;
+      } else {
+        const resolved = await this.recipientResolver.resolveDestination(
+          intent.recipient_type,
+          intent.recipient_id
+        );
+        if (!resolved.ok) return resolved;
+        destination = resolved.data;
+      }
 
       const sanitizedMetadata = sanitizeAuthSecurityMetadata(intent.metadata);
       // The authentication lane persists NO variables at all: `variables` carries
@@ -288,6 +322,9 @@ export class CommunicationService {
         channel: intent.channel,
         recipient_type: intent.recipient_type,
         recipient_id: intent.recipient_id,
+        destination_source: destinationSource.kind,
+        // Only the hash and the mask are ever written. `destination` itself dies
+        // with this request — for BOTH sources, identically.
         destination_hash: hashPhoneE164(destination),
         destination_masked: maskPhoneE164(destination),
         template_key: intent.template_key,
@@ -360,6 +397,11 @@ export class CommunicationService {
       if (message.lane === "authentication") {
         return fail(commError("AUTH_LANE_NOT_REDISPATCHABLE"));
       }
+      // Defence in depth: the schema already constrains ephemeral rows to the
+      // authentication lane, so this is unreachable — and stays unreachable.
+      if (message.destination_source === "ephemeral_auth_destination") {
+        return fail(commError("EPHEMERAL_DESTINATION_NOT_REDISPATCHABLE"));
+      }
       if (message.status !== "queued" && message.status !== "retry_scheduled") {
         return fail(commError("MESSAGE_NOT_DISPATCHABLE"));
       }
@@ -384,8 +426,11 @@ export class CommunicationService {
 
   /**
    * Executes one delivery attempt. Public so workers and tests can drive it.
-   * Resolves the destination itself unless the caller already did so in the same
-   * request (in which case the value is checked against the recorded hash).
+   *
+   * The message is CLAIMED with a compare-and-set before the provider is ever
+   * touched, so two workers racing on the same row produce exactly one provider
+   * invocation. Whatever the provider then does — return, reject, or throw — the
+   * message always leaves `dispatching`.
    */
   async dispatchMessage(
     message: CommunicationMessage,
@@ -407,32 +452,90 @@ export class CommunicationService {
       }
       const destination = destinationResult.data;
 
-      const transitioned = await this.updateMessageState(message.id, message.status, "dispatching");
-      if (!transitioned) return fail(commError("INVALID_STATE_TRANSITION"));
+      // Atomic claim. A loser here has sent nothing and must send nothing.
+      const claim = await this.claimMessageForDispatch(message);
+      if (!claim.ok) return claim;
+      const claimed = claim.data;
 
-      const currentAttempt = message.attempt_count + 1;
-      const providerTemplate = options.providerTemplateName || message.template_key || "";
+      const currentAttempt = claimed.attempt_count + 1;
+      const providerTemplate = options.providerTemplateName || claimed.template_key || "";
 
-      let result: WhatsAppSendResult;
+      try {
+        const result = await this.invokeProvider(claimed, destination, providerTemplate, options);
+        return result.accepted
+          ? await this.recordDispatchSuccess(claimed, currentAttempt, result)
+          : await this.recordDispatchFailure(claimed, currentAttempt, result);
+      } catch (recordingError) {
+        // We hold the claim and the outcome write failed. Surrender the claim as
+        // `failed` rather than abandon the row in `dispatching`.
+        await this.releaseClaimAsFailed(claimed);
+        throw recordingError;
+      }
+    } catch (e) {
+      return fail(e);
+    }
+  }
+
+  /**
+   * Compare-and-set dispatch claim: the UPDATE is constrained by both the message
+   * id AND the status the caller believes it read. Exactly one concurrent worker
+   * can match, so exactly one calls the provider — the database, not a read-then-
+   * write in application code, is what serializes them.
+   */
+  private async claimMessageForDispatch(
+    message: CommunicationMessage
+  ): Promise<Result<CommunicationMessage>> {
+    if (message.status === "dispatching") {
+      // Same-state is "valid" for webhooks but must never re-claim a dispatch.
+      return fail(commError("MESSAGE_ALREADY_CLAIMED"));
+    }
+    if (!isValidTransition(message.status, "dispatching")) {
+      return fail(commError("INVALID_STATE_TRANSITION"));
+    }
+
+    const { data, error } = await adminClient()
+      .from("communication_messages")
+      .update({ status: "dispatching", updated_at: new Date().toISOString() })
+      .eq("id", message.id)
+      .eq("status", message.status)
+      .select("*");
+
+    if (error) throw error;
+
+    const claimed = (data ?? []) as CommunicationMessage[];
+    // Zero rows claimed: another worker moved the row between our read and our
+    // write. Return a safe result — do NOT call the provider.
+    if (claimed.length !== 1) return fail(commError("MESSAGE_ALREADY_CLAIMED"));
+    return ok(claimed[0]);
+  }
+
+  /**
+   * The single place the provider is invoked. A throwing adapter is folded into
+   * the provider-neutral failure result so the ordinary lane rules apply, and no
+   * provider-specific exception type leaks into this service.
+   */
+  private async invokeProvider(
+    message: CommunicationMessage,
+    destination: string,
+    providerTemplate: string,
+    options: DispatchOptions
+  ): Promise<WhatsAppSendResult> {
+    try {
       if (message.lane === "authentication") {
         // Sensitive variables travel to the provider call and nowhere else.
-        result = await this.provider.sendAuthenticationMessage(
+        return await this.provider.sendAuthenticationMessage(
           destination,
           providerTemplate,
           options.rawVariables as Record<string, string>
         );
-      } else {
-        // On a retry there are no in-memory variables — the persisted (already
-        // sanitized) ones are the record of what this message is supposed to say.
-        const variables = this.sanitizeVariables(options.rawVariables ?? message.variables ?? {});
-        result = await this.provider.sendTemplateMessage(destination, providerTemplate, variables);
       }
-
-      return result.accepted
-        ? await this.recordDispatchSuccess(message, currentAttempt, result)
-        : await this.recordDispatchFailure(message, currentAttempt, result);
-    } catch (e) {
-      return fail(e);
+      // On a retry there are no in-memory variables — the persisted (already
+      // sanitized) ones are the record of what this message is supposed to say.
+      const variables = this.sanitizeVariables(options.rawVariables ?? message.variables ?? {});
+      return await this.provider.sendTemplateMessage(destination, providerTemplate, variables);
+    } catch (providerException) {
+      // Never rethrow: an escaping exception would strand the claim.
+      return normalizeProviderException(providerException, this.provider.providerKey);
     }
   }
 
@@ -447,6 +550,12 @@ export class CommunicationService {
         return fail(commError("DESTINATION_HASH_MISMATCH"));
       }
       return ok(normalized.e164);
+    }
+
+    // Without a request-memory destination an ephemeral message is unrecoverable
+    // by construction. Never fall through to the resolver for one.
+    if (message.destination_source === "ephemeral_auth_destination") {
+      return fail(commError("EPHEMERAL_DESTINATION_NOT_REDISPATCHABLE"));
     }
 
     const resolved = await this.recipientResolver.resolveDestination(
@@ -533,7 +642,11 @@ export class CommunicationService {
     return this.applyMessageUpdate(message.id, updates);
   }
 
-  /** Terminal failure that never reached the provider (e.g. unresolvable recipient). */
+  /**
+   * Terminal failure that never reached the provider (e.g. unresolvable
+   * recipient). Compare-and-set on the status we read, so a worker whose
+   * pre-flight failed can never clobber a row another worker already claimed.
+   */
   private async markMessageFailed(
     message: CommunicationMessage,
     failureCode: string,
@@ -551,7 +664,34 @@ export class CommunicationService {
         failure_reason_sanitized: sanitizeFailureReason(failureReason),
         updated_at: nowIso,
       })
-      .eq("id", message.id);
+      .eq("id", message.id)
+      .eq("status", message.status);
+  }
+
+  /**
+   * Last-resort release of a held claim when the outcome write itself failed.
+   * Best-effort and constrained to `dispatching`, so it can only ever free a row
+   * this worker is still holding. Swallows its own errors — the original error is
+   * the one worth surfacing.
+   */
+  private async releaseClaimAsFailed(claimed: CommunicationMessage): Promise<void> {
+    const nowIso = new Date().toISOString();
+    try {
+      await adminClient()
+        .from("communication_messages")
+        .update({
+          status: "failed",
+          next_retry_at: null,
+          failed_at: nowIso,
+          failure_code: "DISPATCH_RECORDING_FAILED",
+          failure_reason_sanitized: "The dispatch outcome could not be recorded.",
+          updated_at: nowIso,
+        })
+        .eq("id", claimed.id)
+        .eq("status", "dispatching");
+    } catch {
+      /* best effort — never mask the original failure */
+    }
   }
 
   private async applyMessageUpdate(
@@ -868,19 +1008,6 @@ export class CommunicationService {
   // --------------------------------------------------------------------------
   // Persistence helpers
   // --------------------------------------------------------------------------
-
-  private async updateMessageState(
-    messageId: string,
-    currentStatus: CommunicationMessageStatus,
-    targetStatus: CommunicationMessageStatus
-  ): Promise<boolean> {
-    if (!isValidTransition(currentStatus, targetStatus)) return false;
-    const { error } = await adminClient()
-      .from("communication_messages")
-      .update({ status: targetStatus, updated_at: new Date().toISOString() })
-      .eq("id", messageId);
-    return !error;
-  }
 
   private async getMessageById(id: string): Promise<CommunicationMessage | null> {
     const { data, error } = await adminClient()

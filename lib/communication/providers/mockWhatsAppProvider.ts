@@ -24,6 +24,7 @@ import type {
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
 } from "./whatsappProvider";
+import { permanentProviderError, transientProviderError } from "./providerError";
 import {
   isForbiddenSecurityMetadataKey,
   sanitizeAuthSecurityMetadata,
@@ -37,11 +38,26 @@ export const MOCK_PROVIDER_KEY = "mock";
  * used, and the triggers are valid E.164 so they survive phone normalization.
  */
 export const MOCK_DESTINATIONS = {
-  /** Simulates a transient provider failure (retryable). */
+  /** Returns a retryable failure RESULT (adapter does not throw). */
   RETRYABLE_FAILURE: "+15550000001",
-  /** Simulates a permanent provider rejection (not retryable). */
+  /** Returns a permanent failure RESULT (adapter does not throw). */
   PERMANENT_FAILURE: "+15550000002",
+  /** THROWS a transient ProviderDispatchError. */
+  THROW_TRANSIENT: "+15550000003",
+  /** THROWS a permanent ProviderDispatchError. */
+  THROW_PERMANENT: "+15550000004",
+  /** THROWS a raw Error carrying a Node transport `code` (ECONNRESET). */
+  THROW_TRANSPORT: "+15550000005",
+  /** THROWS an unclassified Error whose message is stuffed with secrets. */
+  THROW_LEAKY: "+15550000006",
 } as const;
+
+/**
+ * The secret-bearing exception text used by THROW_LEAKY. Exported so the harness
+ * can assert that not one character of it ever reaches the ledger.
+ */
+export const MOCK_LEAKY_EXCEPTION_MESSAGE =
+  'POST /v1/messages failed. Authorization: Bearer sk_live_9f3ac2b81de44c07a5e6 — api_key=AKIA7QF2MOCKKEY0001, raw_payload={"otp":"123456","to":"+919876543210"}';
 
 const ALLOWED_WEBHOOK_STATUSES: readonly WhatsAppNormalizedEventType[] = Object.freeze([
   "accepted",
@@ -173,6 +189,30 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     templateKey: string,
     variables: Record<string, string>
   ): WhatsAppSendResult {
+    // --- adapters that THROW ---------------------------------------------
+    // CommunicationService must normalize each of these into a safe delivery
+    // failure and never strand the message in `dispatching`.
+    if (to === MOCK_DESTINATIONS.THROW_TRANSIENT) {
+      throw transientProviderError("MOCK_TRANSIENT_TRANSPORT", "Simulated mock provider socket hang up");
+    }
+
+    if (to === MOCK_DESTINATIONS.THROW_PERMANENT) {
+      throw permanentProviderError("MOCK_PERMANENT_REJECTION", "Simulated mock provider permanent rejection");
+    }
+
+    if (to === MOCK_DESTINATIONS.THROW_TRANSPORT) {
+      const transport = new Error("socket hang up") as Error & { code: string };
+      transport.code = "ECONNRESET";
+      throw transport;
+    }
+
+    if (to === MOCK_DESTINATIONS.THROW_LEAKY) {
+      // An unclassified adapter bug whose message is full of things that must
+      // never be persisted. The service must withhold this text entirely.
+      throw new Error(MOCK_LEAKY_EXCEPTION_MESSAGE);
+    }
+
+    // --- adapters that RETURN a failure result ----------------------------
     if (to === MOCK_DESTINATIONS.RETRYABLE_FAILURE) {
       return {
         accepted: false,

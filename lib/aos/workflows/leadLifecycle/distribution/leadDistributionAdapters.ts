@@ -3,6 +3,12 @@ import { getDomainEventById } from "../../../workflow/domainEventService";
 import { getWorkflowInstanceById } from "../../../workflow/workflowRepository";
 import { LeadLifecycleState } from "../leadLifecycleStates";
 import { SupabaseLeadLifecycleDomainEventRepository } from "../events/leadLifecycleEventPublisher";
+import { loadAutomationPolicyConfigSnapshot } from "../../../policy/runtime/policyConfigStoreAdapter";
+import type { LoadedAutomationPolicyConfigSnapshot } from "../../../policy/runtime/policyConfigStoreTypes";
+import type {
+  LeadLifecyclePolicyConfigPort,
+  LeadLifecycleResultEventReaderPort,
+} from "./leadDistributionPolicyEvaluationExecutor";
 import type {
   DomainEventRecord,
   WorkflowInstanceRecord,
@@ -103,14 +109,43 @@ export class SupabaseLeadDistributionWorkflowStatePort
 }
 
 /**
- * Ports the distribution executor tasks need: prepare_approval (3A) uses
- * recommendation + routing; prepare (3B) additionally uses the assignment
- * execution boundary.
+ * Phase 4B-2: durable policy config snapshot loader port for the policy-evaluation
+ * task. Delegates to the Phase 4B-1 runtime loader (safe default when no active
+ * pointer; throws on DB / integrity failure — fail closed).
+ */
+export class SupabaseLeadLifecyclePolicyConfigPort implements LeadLifecyclePolicyConfigPort {
+  async loadSnapshot(policyKey: string): Promise<LoadedAutomationPolicyConfigSnapshot> {
+    return loadAutomationPolicyConfigSnapshot(policyKey);
+  }
+}
+
+/**
+ * Phase 4B-2: retry-stable result-event pre-read port. Reads a durable domain
+ * event by its idempotency key so a re-run of the policy task reuses an already
+ * published result instead of re-evaluating.
+ */
+export class SupabaseLeadLifecycleResultEventReaderPort
+  implements LeadLifecycleResultEventReaderPort
+{
+  private readonly repository = new SupabaseLeadLifecycleDomainEventRepository();
+  async findResultEventByIdempotencyKey(
+    idempotencyKey: string,
+  ): Promise<DomainEventRecord | null> {
+    return this.repository.findByIdempotencyKey(idempotencyKey);
+  }
+}
+
+/**
+ * Ports the distribution executor tasks need: policy_evaluate (4B-2) uses
+ * recommendation + routing + policy config + result-event pre-read; prepare (3B/4B-2)
+ * additionally uses the assignment execution boundary.
  */
 export interface LeadDistributionExecutorPorts {
   recommendationEventPort: LeadDistributionRecommendationEventPort;
   routingPort: LeadDistributionRoutingPort;
   assignmentExecution: LeadDistributionAssignmentPort;
+  policyConfig: LeadLifecyclePolicyConfigPort;
+  resultEventReader: LeadLifecycleResultEventReaderPort;
 }
 
 export function createLeadDistributionExecutorPorts(): LeadDistributionExecutorPorts {
@@ -118,6 +153,8 @@ export function createLeadDistributionExecutorPorts(): LeadDistributionExecutorP
     recommendationEventPort: new SupabaseLeadDistributionRecommendationEventPort(),
     routingPort: new SupabaseLeadDistributionRoutingPort(),
     assignmentExecution: new SupabaseLeadDistributionAssignmentPort(),
+    policyConfig: new SupabaseLeadLifecyclePolicyConfigPort(),
+    resultEventReader: new SupabaseLeadLifecycleResultEventReaderPort(),
   };
 }
 

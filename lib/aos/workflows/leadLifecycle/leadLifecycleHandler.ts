@@ -34,7 +34,7 @@ import {
 import {
   validateDistributionApprovalRequired,
   validateDistributionApproved,
-  validateDistributionCompleted,
+  validateDistributionCompletedAuthorization,
 } from "./distribution/leadDistributionValidation";
 import { validateDistributionAutoAuthorized } from "./distribution/leadDistributionAutoAuthorizationValidation";
 
@@ -66,10 +66,13 @@ const STATE_TASK_INTENT: Partial<Record<LeadLifecycleStateValue, LeadLifecycleTa
   [LeadLifecycleState.RESCORE_PENDING_1]: LeadLifecycleTaskIntent.QUALITY_RESCORE,
   [LeadLifecycleState.RESCORE_PENDING_2]: LeadLifecycleTaskIntent.QUALITY_RESCORE,
   [LeadLifecycleState.MATCHING_PENDING]: LeadLifecycleTaskIntent.MATCHING_PREPARE,
-  // Phase 3A: entering MATCH_RECOMMENDATION_READY opens the approval-preparation
+  // Phase 4B-2: entering MATCH_RECOMMENDATION_READY opens the policy-evaluation
   // task, which resolves the immutable recommendation snapshot bound to the
-  // triggering lead.matching.completed event.
-  [LeadLifecycleState.MATCH_RECOMMENDATION_READY]: LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE_APPROVAL,
+  // triggering lead.matching.completed event, evaluates the deterministic policy,
+  // and maps the decision to at most one lifecycle outcome event. The historical
+  // DISTRIBUTION_PREPARE_APPROVAL executor path remains supported for
+  // backward-compatibility, but NEW transitions create only DISTRIBUTION_POLICY_EVALUATE.
+  [LeadLifecycleState.MATCH_RECOMMENDATION_READY]: LeadLifecycleTaskIntent.DISTRIBUTION_POLICY_EVALUATE,
   [LeadLifecycleState.DISTRIBUTION_APPROVAL_PENDING]: LeadLifecycleTaskIntent.DISTRIBUTION_AWAIT_APPROVAL,
   [LeadLifecycleState.DISTRIBUTION_PENDING]: LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE,
   [LeadLifecycleState.NURTURE_PENDING]: LeadLifecycleTaskIntent.NURTURE_PREPARE,
@@ -400,9 +403,11 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
 
     case LeadLifecycleEventType.DISTRIBUTION_COMPLETED: {
       assertSourceState(state, LeadLifecycleState.DISTRIBUTION_PENDING, eventType);
-      // Phase 3B: strict partition contract — distributed + skipped must exactly
-      // partition the approved set (order-preserving, disjoint), with 1..3 distributed.
-      const distribution = validateDistributionCompleted(payload);
+      // Phase 4B-2: accept the neutral completed authorization contract AND
+      // historical legacy human completed payloads. Same strict partition rules:
+      // distributed + skipped must exactly partition the authorized set
+      // (order-preserving, disjoint), with 1..3 distributed.
+      const distribution = validateDistributionCompletedAuthorization(payload);
       if (!distribution.ok) {
         throw new LeadLifecycleTransitionError(distribution.message);
       }
@@ -412,7 +417,8 @@ export function leadLifecycleHandler(context: WorkflowHandlerContext): WorkflowH
         LeadLifecycleState.DISTRIBUTED,
         "Distribution completed; lead delivered to matched vendors.",
         {
-          approval_event_id: distribution.value.approvalEventId,
+          authorization_event_id: distribution.value.authorizationEventId,
+          authorization_source: distribution.value.authorizationSource,
           distributed_vendor_count: distribution.value.distributedVendorCount,
         },
       );

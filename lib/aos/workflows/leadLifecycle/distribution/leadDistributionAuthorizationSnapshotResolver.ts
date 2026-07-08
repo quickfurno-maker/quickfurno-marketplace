@@ -4,12 +4,14 @@ import type {
   LeadDistributionAuthorizationExpectation,
   LeadDistributionAuthorizationSnapshot,
   LeadDistributionRecommendationEventPort,
+  LeadDistributionRecommendationSnapshot,
 } from "./leadDistributionTypes";
 import {
   LeadDistributionAuthorizationSource,
 } from "./leadDistributionTypes";
 import { validateApprovedEventSnapshot } from "./leadDistributionValidation";
 import { validateAutoAuthorizedEventSnapshot } from "./leadDistributionAutoAuthorizationValidation";
+import { resolveLeadDistributionRecommendation } from "./leadDistributionRecommendationResolver";
 
 /**
  * Neutral authorization resolver (Phase 4B-1 contract only).
@@ -62,12 +64,69 @@ export async function resolveLeadDistributionAuthorizationSnapshot(
   }
 
   if (event.event_type === LeadLifecycleEventType.DISTRIBUTION_AUTO_AUTHORIZED) {
-    return validateAutoAuthorizedEventSnapshot(event, {
+    const auto = validateAutoAuthorizedEventSnapshot(event, {
       authorizationEventId: eventId,
       expectedWorkflowInstanceId: expectation.expectedWorkflowInstanceId,
       expectedLeadId: expectation.expectedLeadId,
     });
+    if (!auto.ok) return auto;
+
+    // Correction 2 — cross-bind the auto-authorization to the ORIGINAL immutable
+    // lead.matching.completed event. An internally-consistent but forged / corrupted
+    // / manually-inserted auto event must not authorize a different vendor list than
+    // the authoritative matching snapshot. This never reruns matching, reranks,
+    // appends, truncates, or replaces vendors — it only reads and compares.
+    const recommendation = await resolveLeadDistributionRecommendation(
+      {
+        recommendationEventId: auto.value.recommendationEventId,
+        expectedWorkflowInstanceId: expectation.expectedWorkflowInstanceId,
+        expectedLeadId: expectation.expectedLeadId,
+      },
+      port,
+    );
+    if (!recommendation.ok) return recommendation;
+
+    const bound = assertAutoAuthorizationMatchesRecommendation(auto.value, recommendation.value);
+    if (!bound.ok) return bound;
+    return auto;
   }
 
   return { ok: false, message: "AUTHORIZATION_EVENT_TYPE_INVALID" };
+}
+
+/**
+ * Verify the auto-authorization snapshot exactly matches the authoritative
+ * recommendation snapshot: same lead, workflow, recommendation event id,
+ * recommended vendor count, and recommended vendor ids in the exact same order.
+ * The authorized ids (already proven equal to the auto event's recommended ids)
+ * are also cross-checked against the authoritative matching ids.
+ */
+function assertAutoAuthorizationMatchesRecommendation(
+  auto: LeadDistributionAuthorizationSnapshot,
+  recommendation: LeadDistributionRecommendationSnapshot,
+): DistributionValidationResult<true> {
+  if (recommendation.leadId !== auto.leadId) {
+    return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+  }
+  if (recommendation.workflowInstanceId !== auto.workflowInstanceId) {
+    return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+  }
+  if (recommendation.recommendationEventId !== auto.recommendationEventId) {
+    return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+  }
+  if (recommendation.recommendedVendorCount !== auto.recommendedVendorCount) {
+    return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+  }
+  if (recommendation.recommendedVendorIds.length !== auto.recommendedVendorIds.length) {
+    return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+  }
+  for (let index = 0; index < recommendation.recommendedVendorIds.length; index += 1) {
+    if (recommendation.recommendedVendorIds[index] !== auto.recommendedVendorIds[index]) {
+      return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+    }
+    if (recommendation.recommendedVendorIds[index] !== auto.authorizedVendorIds[index]) {
+      return { ok: false, message: "AUTO_AUTH_RECOMMENDATION_SNAPSHOT_MISMATCH" };
+    }
+  }
+  return { ok: true, value: true };
 }

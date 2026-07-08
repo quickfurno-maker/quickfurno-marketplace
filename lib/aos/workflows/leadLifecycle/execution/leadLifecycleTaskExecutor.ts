@@ -1,4 +1,4 @@
-import type { WorkflowTaskRecord } from "../../../workflow/workflowPersistenceTypes";
+import type { JsonRecord, WorkflowTaskRecord } from "../../../workflow/workflowPersistenceTypes";
 import type { LeadLifecycleServicePorts } from "../adapters/leadLifecycleServicePorts";
 import { LeadLifecycleEventType } from "../leadLifecycleEvents";
 import { LEAD_LIFECYCLE_WORKFLOW_TYPE } from "../leadLifecycleStates";
@@ -12,19 +12,27 @@ import {
   mapQualityResultToLifecycleEvent,
 } from "../events/leadLifecycleResultMapper";
 import { resolveLeadDistributionRecommendation } from "../distribution/leadDistributionRecommendationResolver";
-import { resolveLeadDistributionApprovedSnapshot } from "../distribution/leadDistributionApprovedSnapshotResolver";
+import { resolveLeadDistributionAuthorizationSnapshot } from "../distribution/leadDistributionAuthorizationSnapshotResolver";
 import { resolveLeadDistributionRoute } from "../distribution/leadDistributionRouteGuard";
 import {
   validateDistributionApprovalRequired,
+  validateDistributionAuthorizationCompleted,
   validateDistributionCompleted,
 } from "../distribution/leadDistributionValidation";
 import { mapAssignmentResultToOutcome } from "../distribution/leadDistributionAssignmentResultMapper";
 import { DistributionAssignmentManualReviewReason } from "../distribution/leadDistributionAssignmentTypes";
 import type { LeadDistributionAssignmentPort } from "../distribution/leadDistributionAssignmentTypes";
-import type {
-  LeadDistributionRecommendationEventPort,
-  LeadDistributionRoutingPort,
+import {
+  LeadDistributionAuthorizationSource,
+  type LeadDistributionAuthorizationSnapshot,
+  type LeadDistributionRecommendationEventPort,
+  type LeadDistributionRoutingPort,
 } from "../distribution/leadDistributionTypes";
+import {
+  executeLeadDistributionPolicyEvaluationTask,
+  type LeadLifecyclePolicyConfigPort,
+  type LeadLifecycleResultEventReaderPort,
+} from "../distribution/leadDistributionPolicyEvaluationExecutor";
 import type { LeadLifecycleTaskExecutionResult } from "./leadLifecycleTaskExecutionTypes";
 
 /**
@@ -39,6 +47,10 @@ export interface LeadLifecycleDistributionPorts {
   routingPort: LeadDistributionRoutingPort;
   /** Phase 3B: the standard-route credit-safe assignment boundary. */
   assignmentExecution?: LeadDistributionAssignmentPort;
+  /** Phase 4B-2: durable policy config snapshot loader for the policy task. */
+  policyConfig?: LeadLifecyclePolicyConfigPort;
+  /** Phase 4B-2: optional retry-stable result-event pre-read for the policy task. */
+  resultEventReader?: LeadLifecycleResultEventReaderPort;
 }
 
 export interface LeadLifecycleTaskExecutorDeps {
@@ -52,6 +64,7 @@ const ENABLED_TASKS = new Set<string>([
   LeadLifecycleTaskIntent.CLARIFICATION_PREPARE,
   LeadLifecycleTaskIntent.QUALITY_RESCORE,
   LeadLifecycleTaskIntent.MATCHING_PREPARE,
+  LeadLifecycleTaskIntent.DISTRIBUTION_POLICY_EVALUATE,
   LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE_APPROVAL,
   LeadLifecycleTaskIntent.DISTRIBUTION_AWAIT_APPROVAL,
   LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE,
@@ -147,6 +160,35 @@ export async function executeLeadLifecycleTask(
         assignment_executed: false,
         delivery_executed: false,
       });
+    }
+
+    case LeadLifecycleTaskIntent.DISTRIBUTION_POLICY_EVALUATE: {
+      const distribution = deps.distribution;
+      if (!distribution) throw new Error("DISTRIBUTION_PORTS_REQUIRED");
+      if (!distribution.policyConfig) throw new Error("DISTRIBUTION_POLICY_CONFIG_PORT_REQUIRED");
+      // Correction 1 — the result-event reader is MANDATORY for the policy task.
+      // Fail loudly BEFORE any authoritative read or the policy module runs.
+      if (!distribution.resultEventReader) {
+        throw new Error("DISTRIBUTION_POLICY_RESULT_EVENT_READER_REQUIRED");
+      }
+      if (!context.triggeredByEvent) throw new Error("RECOMMENDATION_EVENT_ID_REQUIRED");
+
+      return executeLeadDistributionPolicyEvaluationTask(
+        {
+          taskId: task.id,
+          leadId: context.leadId,
+          workflowInstanceId: context.workflowInstanceId,
+          triggeredByEvent: context.triggeredByEvent,
+        },
+        {
+          latestQualityPort: deps.ports.latestQuality,
+          recommendationEventPort: distribution.recommendationEventPort,
+          routingPort: distribution.routingPort,
+          policyConfigPort: distribution.policyConfig,
+          resultEventPublisher: deps.resultEventPublisher,
+          resultEventReader: distribution.resultEventReader,
+        },
+      );
     }
 
     case LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE_APPROVAL: {
@@ -256,13 +298,16 @@ export async function executeLeadLifecycleTask(
     case LeadLifecycleTaskIntent.DISTRIBUTION_PREPARE: {
       const distribution = deps.distribution;
       if (!distribution?.assignmentExecution) throw new Error("DISTRIBUTION_ASSIGNMENT_PORTS_REQUIRED");
-      if (!context.triggeredByEvent) throw new Error("APPROVAL_EVENT_ID_REQUIRED");
+      if (!context.triggeredByEvent) throw new Error("AUTHORIZATION_EVENT_ID_REQUIRED");
 
-      // Resolve the exact approved snapshot from the triggering
-      // lead.distribution.approved event (no matching rerun, no re-ranking).
-      const resolved = await resolveLeadDistributionApprovedSnapshot(
+      // Phase 4B-2: resolve the neutral authorization snapshot from the triggering
+      // event — lead.distribution.approved (human) OR lead.distribution.auto_authorized
+      // (policy). No matching rerun, no re-ranking. The assignment boundary executes
+      // ONLY snapshot.authorizedVendorIds (approved subset for human approval; the exact
+      // recommendation set for policy auto-authorization).
+      const resolved = await resolveLeadDistributionAuthorizationSnapshot(
         {
-          approvalEventId: context.triggeredByEvent,
+          authorizationEventId: context.triggeredByEvent,
           expectedWorkflowInstanceId: context.workflowInstanceId,
           expectedLeadId: context.leadId,
         },
@@ -270,22 +315,20 @@ export async function executeLeadLifecycleTask(
       );
       if (!resolved.ok) throw new Error(resolved.message);
       const snapshot = resolved.value;
+      const isHuman = snapshot.authorizationSource === LeadDistributionAuthorizationSource.HUMAN_APPROVAL;
 
-      // Standard route only. A route change after approval → deterministic manual review.
+      // Standard route only. A route change after authorization → deterministic manual review.
       const route = await resolveLeadDistributionRoute(context.leadId, distribution.routingPort);
       if (!route.isStandardRoute) {
         const event = await deps.resultEventPublisher.publish({
           workflowTaskId: task.id,
           leadId: context.leadId,
           eventType: LeadLifecycleEventType.MANUAL_REVIEW_REQUIRED,
-          payload: {
-            reason: DistributionAssignmentManualReviewReason.ROUTE_CHANGED,
-            approval_event_id: snapshot.approvalEventId,
-            recommendation_event_id: snapshot.recommendationEventId,
-            route_classification: route.classification,
-            approved_vendor_count: snapshot.approvedVendorCount,
-            approved_vendor_ids: [...snapshot.approvedVendorIds],
-          },
+          payload: buildAuthorizationManualReviewPayload(
+            snapshot,
+            DistributionAssignmentManualReviewReason.ROUTE_CHANGED,
+            route.classification,
+          ),
           correlationId: context.workflowInstanceId,
           causationId: context.triggeredByEvent,
         });
@@ -294,6 +337,7 @@ export async function executeLeadLifecycleTask(
           published_event_type: event.event_type,
           manual_review_reason: DistributionAssignmentManualReviewReason.ROUTE_CHANGED,
           route_classification: route.classification,
+          authorization_source: snapshot.authorizationSource,
           assignment_executed: false,
           aos_credit_math_executed: false,
           delivery_log_written: false,
@@ -302,14 +346,16 @@ export async function executeLeadLifecycleTask(
         });
       }
 
-      // Execute ONLY the approved subset through the existing credit-safe boundary.
+      // Execute ONLY the authorized vendor ids through the existing credit-safe boundary.
+      // The port param name stays `approvedVendorIds` for Phase 3B compatibility; it carries
+      // the neutral authorized set.
       const raw = await distribution.assignmentExecution.assignApprovedVendors({
         leadId: snapshot.leadId,
-        approvedVendorIds: [...snapshot.approvedVendorIds],
+        approvedVendorIds: [...snapshot.authorizedVendorIds],
       });
       const outcome = mapAssignmentResultToOutcome(raw, {
         leadId: snapshot.leadId,
-        approvedVendorIds: snapshot.approvedVendorIds,
+        approvedVendorIds: snapshot.authorizedVendorIds,
       });
       // Structural corruption of the authoritative result → fail loudly (retry/dead-letter).
       if (!outcome.ok) throw new Error(outcome.message);
@@ -319,13 +365,7 @@ export async function executeLeadLifecycleTask(
           workflowTaskId: task.id,
           leadId: context.leadId,
           eventType: LeadLifecycleEventType.MANUAL_REVIEW_REQUIRED,
-          payload: {
-            reason: outcome.value.reason,
-            approval_event_id: snapshot.approvalEventId,
-            recommendation_event_id: snapshot.recommendationEventId,
-            approved_vendor_count: snapshot.approvedVendorCount,
-            approved_vendor_ids: [...snapshot.approvedVendorIds],
-          },
+          payload: buildAuthorizationManualReviewPayload(snapshot, outcome.value.reason, null),
           correlationId: context.workflowInstanceId,
           causationId: context.triggeredByEvent,
         });
@@ -333,6 +373,7 @@ export async function executeLeadLifecycleTask(
           published_event_id: event.id,
           published_event_type: event.event_type,
           manual_review_reason: outcome.value.reason,
+          authorization_source: snapshot.authorizationSource,
           distributed_vendor_count: 0,
           assignment_executed: true,
           aos_credit_math_executed: false,
@@ -345,17 +386,13 @@ export async function executeLeadLifecycleTask(
       // 1..3 assigned → durable distribution.completed with the canonical partition.
       // The payload contains ONLY vendor ids/counts + durable event ids — no volatile
       // retry facts — so it is byte-identical across a fresh assignment and an
-      // already_assigned replay, preserving one-task→one-result idempotency.
-      const completedPayload = {
-        approval_event_id: snapshot.approvalEventId,
-        recommendation_event_id: snapshot.recommendationEventId,
-        approved_vendor_count: snapshot.approvedVendorCount,
-        approved_vendor_ids: [...snapshot.approvedVendorIds],
-        distributed_vendor_count: outcome.value.distributedVendorIds.length,
-        distributed_vendor_ids: outcome.value.distributedVendorIds,
-        skipped_vendor_ids: outcome.value.skippedVendorIds,
-      };
-      const validatedCompleted = validateDistributionCompleted(completedPayload);
+      // already_assigned replay, preserving one-task→one-result idempotency. Human
+      // approvals keep the legacy completed shape (backward compatibility); policy
+      // auto-authorizations use the neutral authorization shape.
+      const completedPayload = buildAuthorizationCompletedPayload(snapshot, outcome.value);
+      const validatedCompleted = isHuman
+        ? validateDistributionCompleted(completedPayload)
+        : validateDistributionAuthorizationCompleted(completedPayload);
       if (!validatedCompleted.ok) throw new Error(validatedCompleted.message);
 
       const event = await deps.resultEventPublisher.publish({
@@ -369,7 +406,12 @@ export async function executeLeadLifecycleTask(
       return completed(taskType, context, {
         published_event_id: event.id,
         published_event_type: event.event_type,
-        approval_event_id: snapshot.approvalEventId,
+        ...(isHuman
+          ? { approval_event_id: snapshot.authorizationEventId }
+          : {
+              authorization_event_id: snapshot.authorizationEventId,
+              authorization_source: snapshot.authorizationSource,
+            }),
         distributed_vendor_count: outcome.value.distributedVendorIds.length,
         distributed_vendor_ids: outcome.value.distributedVendorIds,
         skipped_vendor_ids: outcome.value.skippedVendorIds,
@@ -408,6 +450,72 @@ export async function executeLeadLifecycleTask(
       throw new Error(`LEAD_LIFECYCLE_TASK_UNHANDLED:${String(exhaustive)}`);
     }
   }
+}
+
+/**
+ * Build the DISTRIBUTION_COMPLETED payload for the neutral authorization snapshot.
+ * Human approvals keep the legacy shape (approval_event_id / approved_*) so
+ * historical Phase 3B behavior is byte-identical; policy auto-authorizations use
+ * the neutral shape (authorization_event_id / authorization_source / authorized_*).
+ */
+function buildAuthorizationCompletedPayload(
+  snapshot: LeadDistributionAuthorizationSnapshot,
+  outcome: { distributedVendorIds: string[]; skippedVendorIds: string[] },
+): JsonRecord {
+  const distributed_vendor_count = outcome.distributedVendorIds.length;
+  if (snapshot.authorizationSource === LeadDistributionAuthorizationSource.HUMAN_APPROVAL) {
+    return {
+      approval_event_id: snapshot.authorizationEventId,
+      recommendation_event_id: snapshot.recommendationEventId,
+      approved_vendor_count: snapshot.authorizedVendorCount,
+      approved_vendor_ids: [...snapshot.authorizedVendorIds],
+      distributed_vendor_count,
+      distributed_vendor_ids: outcome.distributedVendorIds,
+      skipped_vendor_ids: outcome.skippedVendorIds,
+    };
+  }
+  return {
+    authorization_event_id: snapshot.authorizationEventId,
+    authorization_source: snapshot.authorizationSource,
+    recommendation_event_id: snapshot.recommendationEventId,
+    authorized_vendor_count: snapshot.authorizedVendorCount,
+    authorized_vendor_ids: [...snapshot.authorizedVendorIds],
+    distributed_vendor_count,
+    distributed_vendor_ids: outcome.distributedVendorIds,
+    skipped_vendor_ids: outcome.skippedVendorIds,
+  };
+}
+
+/**
+ * Build a manual-review payload for the neutral authorization snapshot. Human
+ * approvals keep the legacy identity fields; policy auto-authorizations use the
+ * neutral identity fields. `routeClassification` is included only for a
+ * route-changed-after-authorization review.
+ */
+function buildAuthorizationManualReviewPayload(
+  snapshot: LeadDistributionAuthorizationSnapshot,
+  reason: string,
+  routeClassification: string | null,
+): JsonRecord {
+  const payload: JsonRecord =
+    snapshot.authorizationSource === LeadDistributionAuthorizationSource.HUMAN_APPROVAL
+      ? {
+          reason,
+          approval_event_id: snapshot.authorizationEventId,
+          recommendation_event_id: snapshot.recommendationEventId,
+          approved_vendor_count: snapshot.authorizedVendorCount,
+          approved_vendor_ids: [...snapshot.authorizedVendorIds],
+        }
+      : {
+          reason,
+          authorization_event_id: snapshot.authorizationEventId,
+          authorization_source: snapshot.authorizationSource,
+          recommendation_event_id: snapshot.recommendationEventId,
+          authorized_vendor_count: snapshot.authorizedVendorCount,
+          authorized_vendor_ids: [...snapshot.authorizedVendorIds],
+        };
+  if (routeClassification) payload.route_classification = routeClassification;
+  return payload;
 }
 
 function completed(

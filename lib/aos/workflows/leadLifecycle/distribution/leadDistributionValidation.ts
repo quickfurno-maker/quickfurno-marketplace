@@ -2,12 +2,14 @@ import type { DomainEventRecord, JsonRecord } from "../../../workflow/workflowPe
 import { LeadLifecycleEventType } from "../leadLifecycleEvents";
 import { LEAD_ENTITY_TYPE, LEAD_LIFECYCLE_WORKFLOW_TYPE } from "../leadLifecycleStates";
 import {
+  LeadDistributionAuthorizationSource,
   MAX_DISTRIBUTION_VENDORS,
   type DistributionApprovalRequiredContract,
   type DistributionApprovedContract,
   type DistributionValidationResult,
   type LeadDistributionApprovedExpectation,
   type LeadDistributionApprovedSnapshot,
+  type LeadDistributionAuthorizationSourceValue,
   type LeadDistributionRecommendationExpectation,
   type LeadDistributionRecommendationSnapshot,
 } from "./leadDistributionTypes";
@@ -417,6 +419,150 @@ export function validateDistributionCompleted(
       distributedVendorCount: distributedCount,
       distributedVendorIds: distributed.value,
       skippedVendorIds: skipped.value,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4B-2 — neutral distribution.completed authorization contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Neutral completed contract for both human-approved and policy-auto-authorized
+ * distribution. `authorizedVendorIds` is the set that was authorized for
+ * assignment (approved subset for human approval; exact recommendation set for
+ * policy auto-authorization). The partition rules are IDENTICAL to the legacy
+ * contract: distributed + skipped exactly partition the authorized set, both
+ * preserving authorized order, disjoint, with 1..3 distributed.
+ */
+export interface DistributionAuthorizationCompletedContract {
+  authorizationEventId: string;
+  authorizationSource: LeadDistributionAuthorizationSourceValue;
+  recommendationEventId: string;
+  authorizedVendorCount: number;
+  authorizedVendorIds: string[];
+  distributedVendorCount: number;
+  distributedVendorIds: string[];
+  skippedVendorIds: string[];
+}
+
+/** Strict validation of the NEUTRAL completed authorization payload. */
+export function validateDistributionAuthorizationCompleted(
+  payload: JsonRecord,
+): DistributionValidationResult<DistributionAuthorizationCompletedContract> {
+  if (!isPlainObject(payload)) {
+    return { ok: false, message: "DISTRIBUTION_COMPLETED_PAYLOAD_REQUIRED" };
+  }
+  if (!isNonEmptyString(payload.authorization_event_id)) {
+    return { ok: false, message: "DISTRIBUTION_AUTHORIZATION_EVENT_ID_REQUIRED" };
+  }
+  if (
+    payload.authorization_source !== LeadDistributionAuthorizationSource.HUMAN_APPROVAL &&
+    payload.authorization_source !== LeadDistributionAuthorizationSource.POLICY_AUTO_AUTHORIZATION
+  ) {
+    return { ok: false, message: "DISTRIBUTION_AUTHORIZATION_SOURCE_INVALID" };
+  }
+  if (!isNonEmptyString(payload.recommendation_event_id)) {
+    return { ok: false, message: "DISTRIBUTION_RECOMMENDATION_EVENT_ID_REQUIRED" };
+  }
+
+  if (!isIntegerInRange(payload.authorized_vendor_count, 1, MAX_DISTRIBUTION_VENDORS)) {
+    return { ok: false, message: "DISTRIBUTION_AUTHORIZED_COUNT_INVALID" };
+  }
+  const authorizedCount = payload.authorized_vendor_count;
+  const authorized = normalizeVendorIdList(payload.authorized_vendor_ids, "DISTRIBUTION_AUTHORIZED_IDS_REQUIRED");
+  if (!authorized.ok) return authorized;
+  if (authorized.value.length !== authorizedCount) {
+    return { ok: false, message: "DISTRIBUTION_AUTHORIZED_IDS_COUNT_MISMATCH" };
+  }
+
+  if (!isIntegerInRange(payload.distributed_vendor_count, 1, MAX_DISTRIBUTION_VENDORS)) {
+    return { ok: false, message: "DISTRIBUTION_DISTRIBUTED_COUNT_INVALID" };
+  }
+  const distributedCount = payload.distributed_vendor_count;
+  const distributed = normalizeVendorIdList(payload.distributed_vendor_ids, "DISTRIBUTION_DISTRIBUTED_IDS_REQUIRED");
+  if (!distributed.ok) return distributed;
+  if (distributed.value.length !== distributedCount) {
+    return { ok: false, message: "DISTRIBUTION_DISTRIBUTED_IDS_COUNT_MISMATCH" };
+  }
+
+  if (payload.skipped_vendor_ids === undefined || payload.skipped_vendor_ids === null) {
+    return { ok: false, message: "DISTRIBUTION_SKIPPED_IDS_REQUIRED" };
+  }
+  const skipped = normalizeVendorIdList(payload.skipped_vendor_ids, "DISTRIBUTION_SKIPPED_IDS_REQUIRED");
+  if (!skipped.ok) return skipped;
+
+  const distSubset = isApprovedSubsetPreservingOrder(authorized.value, distributed.value);
+  if (!distSubset.ok) {
+    return { ok: false, message: distSubset.message === "DISTRIBUTION_APPROVED_ORDER_NOT_PRESERVED" ? "DISTRIBUTION_DISTRIBUTED_ORDER_NOT_PRESERVED" : "DISTRIBUTION_DISTRIBUTED_NOT_AUTHORIZED_SUBSET" };
+  }
+  const skipSubset = isApprovedSubsetPreservingOrder(authorized.value, skipped.value);
+  if (!skipSubset.ok) {
+    return { ok: false, message: skipSubset.message === "DISTRIBUTION_APPROVED_ORDER_NOT_PRESERVED" ? "DISTRIBUTION_SKIPPED_ORDER_NOT_PRESERVED" : "DISTRIBUTION_SKIPPED_NOT_AUTHORIZED_SUBSET" };
+  }
+
+  const distSet = new Set(distributed.value);
+  for (const id of skipped.value) {
+    if (distSet.has(id)) {
+      return { ok: false, message: "DISTRIBUTION_DISTRIBUTED_SKIPPED_NOT_DISJOINT" };
+    }
+  }
+  if (distributed.value.length + skipped.value.length !== authorized.value.length) {
+    return { ok: false, message: "DISTRIBUTION_PARTITION_INCOMPLETE" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      authorizationEventId: payload.authorization_event_id.trim(),
+      authorizationSource: payload.authorization_source,
+      recommendationEventId: payload.recommendation_event_id.trim(),
+      authorizedVendorCount: authorizedCount,
+      authorizedVendorIds: authorized.value,
+      distributedVendorCount: distributedCount,
+      distributedVendorIds: distributed.value,
+      skippedVendorIds: skipped.value,
+    },
+  };
+}
+
+/**
+ * Accepts BOTH the neutral completed authorization payload AND the legacy human
+ * completed payload (approval_event_id / approved_*), normalizing legacy into the
+ * neutral contract with authorizationSource = human_approval. Used by the handler
+ * so historical human completion events remain valid.
+ */
+export function validateDistributionCompletedAuthorization(
+  payload: JsonRecord,
+): DistributionValidationResult<DistributionAuthorizationCompletedContract> {
+  if (!isPlainObject(payload)) {
+    return { ok: false, message: "DISTRIBUTION_COMPLETED_PAYLOAD_REQUIRED" };
+  }
+  const isNeutral =
+    "authorization_event_id" in payload ||
+    "authorization_source" in payload ||
+    "authorized_vendor_ids" in payload ||
+    "authorized_vendor_count" in payload;
+
+  if (isNeutral) {
+    return validateDistributionAuthorizationCompleted(payload);
+  }
+
+  // Legacy human completed payload → normalize (behavior identical to the legacy
+  // validator; only the field names change to the neutral contract).
+  const legacy = validateDistributionCompleted(payload);
+  if (!legacy.ok) return legacy;
+  return {
+    ok: true,
+    value: {
+      authorizationEventId: legacy.value.approvalEventId,
+      authorizationSource: LeadDistributionAuthorizationSource.HUMAN_APPROVAL,
+      recommendationEventId: legacy.value.recommendationEventId,
+      authorizedVendorCount: legacy.value.approvedVendorCount,
+      authorizedVendorIds: legacy.value.approvedVendorIds,
+      distributedVendorCount: legacy.value.distributedVendorCount,
+      distributedVendorIds: legacy.value.distributedVendorIds,
+      skippedVendorIds: legacy.value.skippedVendorIds,
     },
   };
 }

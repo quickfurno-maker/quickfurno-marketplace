@@ -238,10 +238,32 @@ function resolverPort(event, calls = {}) {
   calls.matching = 0;
   calls.assignment = 0;
   calls.credit = 0;
+  // Phase 4B-2 Correction 2: the neutral resolver cross-binds a policy
+  // auto-authorization to the ORIGINAL lead.matching.completed event referenced by
+  // recommendation_event_id. Serve a matching event derived from the auth event's
+  // own recommendation snapshot so a well-formed auto event still resolves. (The
+  // human-approval path does not cross-bind and is unaffected.)
+  const payload = event && event.payload_json ? event.payload_json : {};
+  const matchingEvent = event && payload.recommendation_event_id
+    ? domainEvent({
+        id: payload.recommendation_event_id,
+        eventType: E.MATCHING_COMPLETED,
+        entityId: event.entity_id,
+        correlationId: event.correlation_id,
+        payload: {
+          workflow_type: WF_TYPE,
+          lead_id: payload.lead_id,
+          recommended_vendor_count: payload.recommended_vendor_count,
+          recommended_vendor_ids: payload.recommended_vendor_ids,
+        },
+      })
+    : null;
   return {
     async getDomainEventById(id) {
       calls.eventLookups.push(id);
-      return event && event.id === id ? event : null;
+      if (event && event.id === id) return event;
+      if (matchingEvent && matchingEvent.id === id) return matchingEvent;
+      return null;
     },
   };
 }
@@ -510,8 +532,8 @@ check("79. protected services unchanged", () => {
   ];
   assert(gitPorcelain(protectedPaths).length === 0, "protected service changed");
 });
-check("80. lifecycle task mapping unchanged", () => assert(/\[LeadLifecycleState\.MATCH_RECOMMENDATION_READY\]: LeadLifecycleTaskIntent\.DISTRIBUTION_PREPARE_APPROVAL/.test(handlerSource), "MATCH_RECOMMENDATION_READY mapping changed"));
-check("81. Phase 3B executor unchanged", () => assert(gitPorcelain(["lib/aos/workflows/leadLifecycle/execution/leadLifecycleTaskExecutor.ts"]).length === 0 && /resolveLeadDistributionApprovedSnapshot/.test(executorSource) && !/resolveLeadDistributionAuthorizationSnapshot/.test(executorSource), "executor changed or neutral resolver wired too early"));
+check("80. lifecycle task mapping updated to policy evaluation (Phase 4B-2)", () => assert(/\[LeadLifecycleState\.MATCH_RECOMMENDATION_READY\]: LeadLifecycleTaskIntent\.DISTRIBUTION_POLICY_EVALUATE/.test(handlerSource), "MATCH_RECOMMENDATION_READY must map to DISTRIBUTION_POLICY_EVALUATE"));
+check("81. Phase 4B-2 neutral authorization resolver wired in executor", () => assert(/resolveLeadDistributionAuthorizationSnapshot/.test(executorSource) && /DISTRIBUTION_POLICY_EVALUATE/.test(executorSource), "executor must wire the neutral authorization resolver and the policy evaluate task"));
 check("82. no production migration applied", () => assert(!/supabase\s+(db\s+push|migration\s+up|link)|--linked|--project-ref/i.test(newSource + migration) && pkg.scripts["test:phase4b1"] === "node scripts/phase4b1-policy-inputs-contract-harness.mjs", "production apply command or package wiring missing"));
 
 const results = [];

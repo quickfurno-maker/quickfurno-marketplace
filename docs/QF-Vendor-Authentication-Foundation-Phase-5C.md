@@ -93,14 +93,17 @@ All are internal. Callers receive a generic `UNAUTHORIZED`.
 | `resolveCurrentVendorAccess()` | ” | Validates the session, then resolves |
 | `requireVendorAccess()` | ” | The one guard for protected vendor routes |
 | `requireVendorScope(requestedVendorId)` | ” | Validates an untrusted id, returns the canonical context |
-| `linkVendorAuthUser(adminAuth, input)` | ” | Idempotent, admin-authorized provisioning |
+| `linkVendorAuthUser(input)` | ” | Idempotent, admin-authorized provisioning |
 | `vendorPasswordLogin(input)` | `services/vendorAuthService.ts` | Supabase Auth password login |
 | `recordAuthSecurityEvent(input)` | `services/authSecurityEventService.ts` | The only `auth_security_events` writer |
 
-`linkVendorAuthUser` requires an `AdminVendorLinkAuthorization`, obtainable only
-from `authorizeAdminForVendorLinking()` (checks `profiles.role = 'admin'` on the
-current session). A browser-supplied `vendorId` therefore cannot reach the write
-path unaccompanied.
+`linkVendorAuthUser` accepts **no authorization argument**. A plain TypeScript
+object is forgeable by any caller, so a value like `{ adminUserId: "…" }` would be
+an authorization *claim*, never a *proof*. Authority is derived internally by the
+private `requireAdminSession()` — Supabase-validated session, then
+`profiles.role = 'admin'` — and only then does the private
+`performVendorAuthUserLink()` touch the service-role client. `input.vendorId` names
+the operation's **target** and confers no authority whatsoever.
 
 ---
 
@@ -115,10 +118,31 @@ identifier + password
   → resolveVendorAccess(user.id)
       ├─ active mapping  → stamp last_login_at / last_login_method='password'
       │                    record vendor.login_success
-      └─ anything else   → serverClient().auth.signOut()   (same auth context)
+      └─ anything else   → signOut({ scope: "local" })   (same auth context)
+                           inspect the returned { error }; retry once
                            record sanitized vendor.login_failed
                            return the generic failure
 ```
+
+### Session invalidation
+
+`scope: "local"` is explicit and deliberate. The **default scope is global**, which
+would revoke every refresh token the user holds — signing them out of every other
+device because one login attempt hit a vendor with no active mapping. Only the
+current session is torn down.
+
+The `{ error }` Supabase returns is **inspected**, with one bounded retry. We never
+report an invalidation we did not observe: the audit row carries
+`session_invalidated: boolean`, `session_invalidation_failure`
+(`sign_out_rejected` | `sign_out_threw` | `null`) and `session_invalidation_attempts`.
+
+When invalidation cannot be confirmed we do **not** escalate to a global sign-out
+(that would punish the user's other devices for our failure) and we do **not**
+invent a second cookie. The cookie may survive, but every protected surface still
+fails closed — `requireVendorAccess()` resolves no active mapping for that
+principal. The one thing Phase 5C must not do is claim success it did not observe.
+The raw `AuthError` is discarded (its message can embed a token or a request URL);
+only the closed, identifier-shaped vocabulary above reaches the ledger.
 
 **Never**: `adminClient().auth.signInWithPassword()` — signing a user in with the
 service-role key bypasses the request's auth context and leaves no browser
@@ -185,10 +209,15 @@ Additive, idempotent, non-destructive. **Not applied.**
 1. `create table if not exists public.vendor_dashboard_users` — the table exists in
    the linked database but was never captured in a local migration file (the known
    CLI history drift). No-op where it exists; authoritative for fresh environments.
-2. `user_id → auth.users(id) ON DELETE SET NULL`, added inside a `DO` block guarded
-   by a `pg_constraint` lookup. Deleting an authentication account must never
-   delete the vendor business. The existing `vendor_id` FK (`ON DELETE CASCADE`) is
-   untouched.
+2. `user_id → auth.users(id) ON DELETE SET NULL`. Existence of *a* foreign key is not
+   the contract — the **delete action** is. The `DO` block reads
+   `pg_constraint.confdeltype` for the single-column `user_id` FK and branches:
+   absent → add it; `'n'` (SET NULL) → idempotent no-op; **anything else**
+   (`CASCADE`, `RESTRICT`, `NO ACTION`, `SET DEFAULT`) → `RAISE`, refusing to accept
+   silently-wrong semantics. It never removes a constraint it did not create — that
+   is a destructive act belonging to a human. Deleting an authentication account must
+   never delete the vendor business. The existing `vendor_id` FK (`ON DELETE CASCADE`)
+   is untouched.
 3. `create unique index if not exists uq_vendor_dashboard_users_user_id ... where user_id is not null`
    — one auth principal can never resolve to two vendor businesses. Partial, so
    many unclaimed (`user_id IS NULL`) rows may coexist.
@@ -225,23 +254,34 @@ Written values: `role='owner'`, `status='active'`, `phone_verified=false`,
 
 ---
 
-## 9. RLS policy summary
+## 9. RLS + privilege summary
 
 RLS was already enabled with **zero policies** (effective deny-all) while broad
 grants remained. This replaces that with an explicit model.
 
-| Role | Grants | Policies |
+**A `GRANT` only adds privileges — it removes nothing.** The linked database carries
+historical privileges on this table, including `DELETE`, `TRUNCATE`, `REFERENCES` and
+`TRIGGER`. Every role is therefore `REVOKE ALL`-ed to zero *first*, then granted
+exactly what it needs. The revoke must precede the grant, and the harness applies the
+migration's real `GRANT`/`REVOKE` statements in order against a simulated
+over-privileged starting state to prove the end state is exactly:
+
+| Role | Privileges after migration | Policies |
 | --- | --- | --- |
-| `anon` | *revoked, none* | none |
-| `authenticated` | `SELECT` only | `self read`: `auth.uid() IS NOT NULL AND auth.uid() = user_id`<br>`admin read`: `public.is_admin()` |
+| `anon` | *none* | none |
+| `authenticated` | `SELECT` | `self read`: `auth.uid() IS NOT NULL AND auth.uid() = user_id`<br>`admin read`: `public.is_admin()` |
 | `service_role` | `SELECT, INSERT, UPDATE` | (bypasses RLS) |
+
+No role retains `DELETE`, `TRUNCATE`, `REFERENCES`, or `TRIGGER`. Removing a vendor
+business still cascades through the `vendor_id` FK: PostgreSQL's referential-action
+triggers run with the table owner's privileges and bypass both the grant check and
+RLS, so no `DELETE` grant is required for that.
 
 No `INSERT` / `UPDATE` / `DELETE` grant or policy exists for `authenticated`, so a
 vendor can never modify `vendor_id`, `user_id`, `role`, `status`, `phone_verified`,
 or `whatsapp_otp_enabled` from the browser. Login metadata is written server-side
-through `service_role`. No `DELETE` grant for `service_role` either — access is
-revoked by setting `status`, and the `vendor_id` FK already cascades when a vendor
-business is removed. No broad `using (true)` policy exists.
+through `service_role`. Access is revoked by setting `status`, never by deleting a
+row. No broad `using (true)` policy exists.
 
 ---
 
@@ -278,3 +318,14 @@ transport at all.
 * **The identifier hash is unsalted SHA-256**, matching the existing Phase 5A/5B
   `destination_hash` convention. It is brute-forceable for a known phone-number
   space; it exists for audit correlation, not secrecy.
+* **Unconfirmed session invalidation leaves the cookie standing.** When
+  `signOut({scope:"local"})` fails twice, we record `session_invalidated: false` and
+  return the generic denial. We do not escalate to a global sign-out and do not
+  clear cookies out-of-band. Protected surfaces still fail closed through
+  `VendorAccessContext`, but the raw Supabase session remains until it expires. An
+  operator should alert on `session_invalidation_failure` in `auth_security_events`.
+* **The FK and privilege checks are modelled, not executed.** There is no in-process
+  PostgreSQL, so the harness applies the migration's real `GRANT`/`REVOKE` statements
+  to a simulated privilege state, and models the `DO` block's branch after reading its
+  accepted `confdeltype` code out of the SQL. Both are coupled to the migration text;
+  neither is a live `psql` run. Behaviour against the real catalog is verified on apply.

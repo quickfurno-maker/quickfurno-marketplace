@@ -108,7 +108,21 @@ alter table public.vendor_dashboard_users
 -- Adding the constraint validates existing rows: if an orphaned non-null user_id
 -- exists, this migration FAILS rather than silently discarding the link. That is
 -- the intended behaviour.
+--
+-- Existence of *a* foreign key is not the contract — the DELETE ACTION is. A
+-- pre-existing FK with ON DELETE CASCADE would destroy vendor access mappings
+-- when an auth account is removed; RESTRICT/NO ACTION would make auth deletion
+-- impossible. So we inspect pg_constraint.confdeltype and branch on it:
+--   'n' = SET NULL  → the required contract, do nothing
+--   absent          → add the correct constraint
+--   anything else   → RAISE, and never silently accept the wrong semantics
+--
+-- We deliberately do NOT remove an unknown constraint automatically: discarding a
+-- constraint we did not create is a destructive act that belongs to a human.
 do $$
+declare
+  v_conname     text;
+  v_confdeltype "char";
 begin
   if to_regclass('public.vendor_dashboard_users') is null then
     return;
@@ -117,20 +131,35 @@ begin
     return;
   end if;
 
-  if not exists (
-    select 1
-    from pg_constraint c
-    join pg_attribute a
-      on a.attrelid = c.conrelid
-     and a.attnum = any (c.conkey)
-    where c.conrelid = 'public.vendor_dashboard_users'::regclass
-      and c.contype  = 'f'
-      and c.confrelid = 'auth.users'::regclass
-      and a.attname = 'user_id'
-  ) then
+  -- Single-column foreign key on user_id referencing auth.users.
+  select c.conname, c.confdeltype
+    into v_conname, v_confdeltype
+  from pg_constraint c
+  join pg_attribute a
+    on a.attrelid = c.conrelid
+   and a.attnum = any (c.conkey)
+  where c.conrelid  = 'public.vendor_dashboard_users'::regclass
+    and c.contype   = 'f'
+    and c.confrelid = 'auth.users'::regclass
+    and a.attname   = 'user_id'
+    and array_length(c.conkey, 1) = 1
+  limit 1;
+
+  if v_conname is null then
     alter table public.vendor_dashboard_users
       add constraint vendor_dashboard_users_user_id_fkey
       foreign key (user_id) references auth.users(id) on delete set null;
+
+  elsif v_confdeltype = 'n' then
+    -- Correct ON DELETE SET NULL constraint already present. Idempotent no-op.
+    null;
+
+  else
+    raise exception
+      'vendor_dashboard_users.user_id foreign key "%" has delete action "%", but Phase 5C requires ON DELETE SET NULL',
+      v_conname, v_confdeltype
+      using errcode = 'invalid_table_definition',
+            hint = 'Review the existing constraint and remove it manually. This migration will not remove a constraint it did not create.';
   end if;
 end
 $$;
@@ -195,6 +224,11 @@ on conflict do nothing;
 -- The table already had RLS enabled with ZERO policies (effective deny-all for
 -- the PostgREST roles) while broad grants remained. This replaces that with an
 -- explicit model.
+--
+-- CRITICAL: a GRANT only ADDS privileges. The linked database carries historical
+-- privileges on this table (including DELETE, TRUNCATE, REFERENCES and TRIGGER)
+-- that a GRANT can never remove. Every role below is therefore REVOKED to zero
+-- first, then granted exactly what it needs. The revoke must precede the grant.
 alter table public.vendor_dashboard_users enable row level security;
 
 -- anon: no access at all. Vendors authenticate before anything here is readable.
@@ -208,8 +242,14 @@ revoke all on public.vendor_dashboard_users from authenticated;
 grant select on public.vendor_dashboard_users to authenticated;
 
 -- service_role: the server layer resolves access, links principals, and stamps
--- login metadata. No DELETE grant — access is revoked by setting status, and the
--- vendor_id FK already cascades when a vendor business is removed.
+-- login metadata. Exactly SELECT + INSERT + UPDATE remain after the revoke —
+-- no DELETE, no TRUNCATE, no REFERENCES, no TRIGGER.
+--
+-- Access is revoked by setting `status`, never by deleting a row. Removing a
+-- vendor business still cascades through the vendor_id FK: PostgreSQL's
+-- referential-action triggers run with the table owner's privileges and bypass
+-- both the grant check and RLS, so no DELETE grant is required for that.
+revoke all on public.vendor_dashboard_users from service_role;
 grant select, insert, update on public.vendor_dashboard_users to service_role;
 
 -- Self-read. auth.uid() is the Supabase-validated principal; a NULL user_id row
@@ -232,8 +272,10 @@ create policy "vendor_dashboard_users admin read" on public.vendor_dashboard_use
 --   • no credential column, no token column, no session column
 --   • no anon policy or grant
 --   • no authenticated INSERT / UPDATE / DELETE grant or policy
+--   • no DELETE / TRUNCATE / REFERENCES / TRIGGER privilege for ANY role
 --   • no policy that exposes another vendor's mapping row
 --   • no SECURITY DEFINER helper (no policy here requires one)
+--   • no automatic removal of a foreign key this migration did not create
 --   • no UPDATE of public.vendors (existing vendors.user_id links are preserved
 --     exactly as they are, and remain the source the backfill reads from)
 --   • no change to any Phase 5A or Phase 5B table, index, grant, or seed row

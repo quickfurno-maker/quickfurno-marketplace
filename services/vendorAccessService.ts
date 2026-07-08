@@ -236,35 +236,38 @@ export async function recordVendorLoginMetadata(
 // ----------------------------------------------------------------------------
 
 /**
- * Proof that an admin authorized a linking operation. Only obtainable from
- * `authorizeAdminForVendorLinking()`, which checks the CURRENT session — so a
- * browser-supplied vendorId can never reach `linkVendorAuthUser` unaccompanied.
+ * Establishes admin authority from the CURRENT request-scoped session, using the
+ * repository's existing convention (profiles.role = 'admin').
+ *
+ * PRIVATE BY DESIGN. There is no exported "authorization proof" type: a plain
+ * TypeScript object is forgeable by any caller, so a value like
+ * `{ adminUserId: "…" }` would be an authorization *claim*, never a *proof*.
+ * Authority is derived here, internally, from the Supabase-validated session and
+ * nothing else — never from a function argument, request body, query parameter,
+ * hidden input, or URL segment.
  */
-export interface AdminVendorLinkAuthorization {
-  readonly adminUserId: string;
-}
-
-/** Mirrors the repository's existing admin convention (profiles.role = 'admin'). */
-export async function authorizeAdminForVendorLinking(): Promise<Result<AdminVendorLinkAuthorization>> {
+async function requireAdminSession(): Promise<Result<string>> {
   try {
     const sb = await serverClient();
     const { data, error } = await sb.auth.getUser();
     if (error || !data?.user?.id) return fail(appError("UNAUTHORIZED"));
 
-    const { data: profile } = await sb
+    const { data: profile, error: profileError } = await sb
       .from("profiles")
       .select("role")
       .eq("id", data.user.id)
       .maybeSingle();
 
+    if (profileError) return fail(appError("UNAUTHORIZED"));
     if ((profile as { role?: string } | null)?.role !== "admin") return fail(appError("UNAUTHORIZED"));
-    return ok({ adminUserId: data.user.id });
-  } catch (e) {
-    return fail(e);
+    return ok(data.user.id);
+  } catch {
+    return fail(appError("UNAUTHORIZED"));
   }
 }
 
 export interface LinkVendorAuthUserInput {
+  /** The admin operation's TARGET. Never the source of authority to perform it. */
   readonly vendorId: string;
   readonly authUserId: string;
   readonly email?: string | null;
@@ -275,7 +278,13 @@ export interface LinkVendorAuthUserInput {
 /**
  * Idempotently link a Supabase auth principal to a vendor business.
  *
+ * Authorization is established INTERNALLY from the current authenticated session
+ * (`requireAdminSession()`); the function accepts no authorization argument, so
+ * there is nothing for a caller to forge. `input.vendorId` names the target of
+ * the operation and confers no authority.
+ *
  * Guarantees:
+ *   • only an authenticated admin session may execute it;
  *   • never reassigns an auth principal to a different vendor (fails closed);
  *   • never overwrites an existing, differently-owned mapping;
  *   • never touches vendors.user_id;
@@ -284,11 +293,21 @@ export interface LinkVendorAuthUserInput {
  *   • never changes paid or business-verification state.
  */
 export async function linkVendorAuthUser(
-  authorization: AdminVendorLinkAuthorization,
+  input: LinkVendorAuthUserInput
+): Promise<Result<VendorAccessContext>> {
+  const admin = await requireAdminSession();
+  if (!admin.ok) return admin;
+  return performVendorAuthUserLink(input);
+}
+
+/**
+ * The service-role write. Private: reachable only after `requireAdminSession()`
+ * has proven admin authority from the current session.
+ */
+async function performVendorAuthUserLink(
   input: LinkVendorAuthUserInput
 ): Promise<Result<VendorAccessContext>> {
   try {
-    if (!authorization?.adminUserId) return fail(appError("UNAUTHORIZED"));
     if (!input.vendorId || !input.authUserId || !input.role) throw appError("VALIDATION");
 
     let phone: string | null = null;

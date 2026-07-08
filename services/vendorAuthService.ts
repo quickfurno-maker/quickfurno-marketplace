@@ -20,7 +20,8 @@
 //   4. on success: stamp last_login_at/last_login_method server-side and record
 //      vendor.login_success;
 //   5. on ANY failure — including "authenticated but no active vendor mapping" —
-//      sign the session out through the SAME auth context, record a sanitized
+//      invalidate ONLY this session (`signOut({ scope: "local" })`) through the
+//      SAME auth context, inspect the returned error, record a sanitized
 //      vendor.login_failed, and return one indistinguishable generic error.
 //
 // The caller must be a Server Action or Route Handler: `signInWithPassword`
@@ -77,6 +78,31 @@ export const VendorLoginFailureClassification = {
 export type VendorLoginFailureClassificationValue =
   (typeof VendorLoginFailureClassification)[keyof typeof VendorLoginFailureClassification];
 
+/**
+ * Why a local session invalidation could not be confirmed. A SANITIZED vocabulary:
+ * the raw Supabase `AuthError` is never persisted — its message can carry a token,
+ * a request URL, or a provider payload.
+ */
+export const SessionInvalidationFailure = {
+  /** Supabase returned an error from signOut(). */
+  SIGN_OUT_REJECTED: "sign_out_rejected",
+  /** signOut() threw (transport, aborted request, adapter bug). */
+  SIGN_OUT_THREW: "sign_out_threw",
+} as const;
+
+export type SessionInvalidationFailureValue =
+  (typeof SessionInvalidationFailure)[keyof typeof SessionInvalidationFailure];
+
+export interface SessionInvalidationOutcome {
+  /** True ONLY when Supabase confirmed the local session was cleared. */
+  readonly invalidated: boolean;
+  readonly failure: SessionInvalidationFailureValue | null;
+  readonly attempts: number;
+}
+
+/** Bounded retry: one transient failure should not leave a session standing. */
+const SESSION_INVALIDATION_MAX_ATTEMPTS = 2;
+
 /** Maps an access-denial reason onto its audit classification. */
 const DENIAL_CLASSIFICATION: Record<string, VendorLoginFailureClassificationValue> = {
   [VendorAccessDenialReason.NOT_AUTHENTICATED]: VendorLoginFailureClassification.NOT_AUTHENTICATED,
@@ -111,10 +137,24 @@ async function auditLoginFailure(params: {
   identifier: VendorLoginIdentifier | null;
   actorUserId: string | null;
   correlationId: string | null;
+  sessionInvalidation?: SessionInvalidationOutcome | null;
 }): Promise<void> {
   // Only the HASH of a canonical identifier is ever persisted; an identifier we
   // could not canonicalize contributes nothing at all.
   const destinationHash = params.identifier ? hashVendorLoginIdentifier(params.identifier) : null;
+
+  const metadata: Record<string, unknown> = {
+    login_method: VendorLoginMethod.PASSWORD,
+    login_identifier_kind: params.identifier?.kind ?? null,
+    failure_classification: params.classification,
+  };
+
+  if (params.sessionInvalidation) {
+    // Sanitized enums only. The raw AuthError never reaches the ledger.
+    metadata.session_invalidated = params.sessionInvalidation.invalidated;
+    metadata.session_invalidation_failure = params.sessionInvalidation.failure;
+    metadata.session_invalidation_attempts = params.sessionInvalidation.attempts;
+  }
 
   await recordAuthSecurityEvent({
     eventType: AuthSecurityEventType.VENDOR_LOGIN_FAILED,
@@ -123,21 +163,41 @@ async function auditLoginFailure(params: {
     actorUserId: params.actorUserId,
     correlationId: params.correlationId,
     destinationHash,
-    metadata: {
-      login_method: VendorLoginMethod.PASSWORD,
-      login_identifier_kind: params.identifier?.kind ?? null,
-      failure_classification: params.classification,
-    },
+    metadata,
   });
 }
 
-/** Invalidate a session we just created but must not hand out. */
-async function invalidateSession(sb: SupabaseClient): Promise<void> {
-  try {
-    await sb.auth.signOut();
-  } catch {
-    /* best effort — the caller still receives a denial */
+/**
+ * Invalidate the session we just established but must not hand out.
+ *
+ * `scope: "local"` is explicit and deliberate. The default scope is GLOBAL, which
+ * would revoke every refresh token this user holds — signing them out of every
+ * other device because one login attempt hit a vendor that has no active mapping.
+ * Only the current session may be torn down here.
+ *
+ * The `{ error }` Supabase returns is INSPECTED. We never report success we did
+ * not observe; on failure the raw AuthError is discarded (its message can embed a
+ * token or a request URL) and only a sanitized classification survives.
+ */
+async function invalidateLocalSession(sb: SupabaseClient): Promise<SessionInvalidationOutcome> {
+  let failure: SessionInvalidationFailureValue | null = null;
+
+  for (let attempt = 1; attempt <= SESSION_INVALIDATION_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const { error } = await sb.auth.signOut({ scope: "local" });
+      if (!error) return { invalidated: true, failure: null, attempts: attempt };
+      failure = SessionInvalidationFailure.SIGN_OUT_REJECTED;
+    } catch {
+      failure = SessionInvalidationFailure.SIGN_OUT_THREW;
+    }
   }
+
+  // Unconfirmed. We do NOT escalate to a global sign-out (that would punish the
+  // user's other devices for our failure), and we do NOT invent a second cookie.
+  // The cookie may survive, but every protected surface still fails closed:
+  // requireVendorAccess() resolves no active mapping for this principal. What we
+  // must not do is claim the session was invalidated when it was not.
+  return { invalidated: false, failure, attempts: SESSION_INVALIDATION_MAX_ATTEMPTS };
 }
 
 /**
@@ -198,15 +258,18 @@ export async function vendorPasswordLogin(
 
     if (!access.ok) {
       // Authentic Supabase user, but not a vendor we grant dashboard access to.
-      // Tear down the session we just established, through the same auth context.
-      await invalidateSession(sb);
+      // Tear down ONLY this session, through the same auth context, and record
+      // whether Supabase actually confirmed it.
+      const sessionInvalidation = await invalidateLocalSession(sb);
       await auditLoginFailure({
         classification:
           DENIAL_CLASSIFICATION[access.reason] ?? VendorLoginFailureClassification.LOOKUP_FAILED,
         identifier,
         actorUserId: authUserId,
         correlationId,
+        sessionInvalidation,
       });
+      // Public response is identical whether or not invalidation was confirmed.
       return genericLoginFailure();
     }
 

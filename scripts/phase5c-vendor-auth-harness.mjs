@@ -144,13 +144,19 @@ const PASSWORD_A = "correct-horse-battery-staple";
 
 const db = {};
 let signOutCalls = 0;
+/** Every options object passed to signOut(), in order. */
+let signOutOptions = [];
 let signInCalls = [];
 let currentSessionUserId = null;
+/** When set, signOut() returns this as `{ error }` (or throws it if `.throws`). */
+let signOutFailure = null;
 
 function resetDb() {
   signOutCalls = 0;
+  signOutOptions = [];
   signInCalls = [];
   currentSessionUserId = null;
+  signOutFailure = null;
 
   // auth.users (Supabase Auth authority)
   db.auth_users = [
@@ -300,8 +306,22 @@ function fakeAuthClient() {
         if (!currentSessionUserId) return { data: { user: null }, error: { message: "no session" } };
         return { data: { user: { id: currentSessionUserId } }, error: null };
       },
-      async signOut() {
+      async signOut(options) {
         signOutCalls += 1;
+        signOutOptions.push(options);
+
+        // `remaining` (when present) makes the failure transient: it fails that
+        // many times, then succeeds. Absent → fails on every attempt.
+        const shouldFail =
+          signOutFailure && (signOutFailure.remaining === undefined || signOutFailure.remaining > 0);
+
+        if (shouldFail) {
+          if (signOutFailure.remaining !== undefined) signOutFailure.remaining -= 1;
+          if (signOutFailure.throws) throw signOutFailure.error;
+          // Supabase kept the session: the caller must NOT report success.
+          return { error: signOutFailure.error };
+        }
+
         currentSessionUserId = null;
         return { error: null };
       },
@@ -373,6 +393,63 @@ function rlsWrite(role, cmd) {
   const applicable = RLS.policies.filter((p) => p.cmd === cmd && p.role === role);
   if (applicable.length === 0) return { denied: "no_policy" };
   return { denied: null };
+}
+
+// ----------------------------------------------------------------------------
+// Table-privilege engine — applies the migration's REAL grant/revoke statements,
+// in order, to a starting privilege state. This is what proves the migration
+// REMOVES historical privileges; a grep for "no GRANT DELETE" could not.
+// ----------------------------------------------------------------------------
+const ALL_TABLE_PRIVILEGES = ["select", "insert", "update", "delete", "truncate", "references", "trigger"];
+
+const PRIVILEGE_STATEMENT = /\b(grant|revoke)\s+([a-z, ]+?)\s+on\s+public\.vendor_dashboard_users\s+(?:to|from)\s+([a-z_]+)\s*;/gi;
+
+function applyPrivilegeStatements(sql, initialState) {
+  const state = {};
+  for (const [role, privileges] of Object.entries(initialState)) state[role] = new Set(privileges);
+
+  const applied = [];
+  for (const match of sql.matchAll(PRIVILEGE_STATEMENT)) {
+    const verb = match[1].toLowerCase();
+    const privilegeText = match[2].toLowerCase().trim();
+    const role = match[3].toLowerCase();
+
+    const privileges =
+      privilegeText === "all" || privilegeText === "all privileges"
+        ? [...ALL_TABLE_PRIVILEGES]
+        : privilegeText.split(",").map((p) => p.trim()).filter(Boolean);
+
+    if (!state[role]) state[role] = new Set();
+    for (const privilege of privileges) {
+      if (verb === "grant") state[role].add(privilege);
+      else state[role].delete(privilege);
+    }
+    applied.push({ verb, privileges, role });
+  }
+  return { state, applied };
+}
+
+/** The privilege set the linked database is documented to carry TODAY. */
+const HISTORICAL_BROAD_PRIVILEGES = () => ({
+  anon: [...ALL_TABLE_PRIVILEGES],
+  authenticated: [...ALL_TABLE_PRIVILEGES],
+  service_role: [...ALL_TABLE_PRIVILEGES],
+});
+
+// ----------------------------------------------------------------------------
+// Foreign-key reconciliation model — mirrors the migration's DO block branch.
+// The accepted delete-action code is READ OUT OF THE SQL, so the model cannot
+// drift from the migration without the assertions below catching it.
+// ----------------------------------------------------------------------------
+const FK_DELETE_ACTIONS = { a: "no action", r: "restrict", c: "cascade", n: "set null", d: "set default" };
+
+const FK_ACCEPTED_DELETE_CODE = (strippedSql.match(/v_confdeltype\s*=\s*'([a-z])'/) ?? [])[1] ?? null;
+
+/** `existing` mirrors a pg_constraint row: { conname, confdeltype } or null. */
+function reconcileUserIdForeignKey(existing) {
+  if (!existing) return { action: "add", onDelete: "set null" };
+  if (existing.confdeltype === FK_ACCEPTED_DELETE_CODE) return { action: "noop" };
+  return { action: "raise", conname: existing.conname, confdeltype: existing.confdeltype };
 }
 
 /** JS translation of the migration's backfill predicate, for behavioural testing. */
@@ -765,6 +842,123 @@ check("21. authenticated user with no vendor mapping is signed out and denied", 
 });
 
 // ============================================================================
+// FIX 3 — RELIABLE, LOCAL-SCOPED SESSION INVALIDATION
+// ============================================================================
+check("FIX3-a. no vendor mapping → a LOCAL signOut is invoked and confirmed", async () => {
+  resetDb();
+  const res = await AuthService.vendorPasswordLogin({ identifier: "orphan@example.com", password: "pw-orphan" });
+
+  assert(res.ok === false, "denied");
+  assert(signOutCalls === 1, `exactly one signOut, got ${signOutCalls}`);
+  assert(signOutOptions[0] && signOutOptions[0].scope === "local",
+    `scope must be "local", got ${JSON.stringify(signOutOptions[0])}`);
+  assert(currentSessionUserId === null, "the session is gone");
+
+  const e = lastEvent();
+  assert(e.metadata.session_invalidated === true, "confirmed invalidation recorded");
+  assert(e.metadata.session_invalidation_failure === null, "no failure recorded");
+  assert(e.metadata.session_invalidation_attempts === 1, "one attempt");
+});
+
+check("FIX3-b. suspended membership → a LOCAL signOut is invoked", async () => {
+  for (const status of ["suspended", "revoked", "invited"]) {
+    resetDb();
+    db.vendor_dashboard_users[0].status = status;
+    const res = await AuthService.vendorPasswordLogin({ identifier: EMAIL_A, password: PASSWORD_A });
+    assert(res.ok === false, `${status} denied`);
+    assert(signOutCalls === 1, `${status}: signOut invoked`);
+    assert(signOutOptions[0].scope === "local", `${status}: local scope`);
+    assert(lastEvent().metadata.session_invalidated === true, `${status}: invalidation confirmed`);
+  }
+
+  // A malformed mapping and a missing vendor also tear the session down.
+  resetDb();
+  db.vendor_dashboard_users[0].vendor_id = null;
+  await AuthService.vendorPasswordLogin({ identifier: EMAIL_A, password: PASSWORD_A });
+  assert(signOutCalls === 1 && lastEvent().metadata.failure_classification === "malformed_mapping", "malformed mapping");
+
+  resetDb();
+  db.vendors = db.vendors.filter((v) => v.id !== VENDOR_A);
+  await AuthService.vendorPasswordLogin({ identifier: EMAIL_A, password: PASSWORD_A });
+  assert(signOutCalls === 1 && lastEvent().metadata.failure_classification === "vendor_not_found", "missing vendor");
+});
+
+check("FIX3-c. signOut is never global", () => {
+  assert(/signOut\(\{ scope: "local" \}\)/.test(AUTH_SERVICE_SRC), "must pass an explicit local scope");
+  // A bare signOut() defaults to GLOBAL, revoking every device's refresh token.
+  assert(!/signOut\(\s*\)/.test(AUTH_SERVICE_SRC), "no default-scope signOut anywhere");
+  assert(!/scope:\s*["']global["']/.test(AUTH_SERVICE_SRC), "never global");
+  assert(!/scope:\s*["']others["']/.test(AUTH_SERVICE_SRC), "never others");
+});
+
+check("FIX3-d. a returned signOut error is detected and never reported as success", async () => {
+  resetDb();
+  signOutFailure = {
+    error: { name: "AuthApiError", status: 500, message: "refresh_token=eyJhbGciOi.SECRET.TOKEN rejected at https://proj.supabase.co/auth/v1/logout" },
+  };
+
+  const res = await AuthService.vendorPasswordLogin({ identifier: "orphan@example.com", password: "pw-orphan" });
+
+  assert(res.ok === false && res.code === "VENDOR_LOGIN_FAILED", "the public denial stays generic");
+  assert(res.error === "Invalid login credentials.", "and the public message is unchanged");
+  assert(signOutCalls === 2, `bounded retry expected, got ${signOutCalls} attempts`);
+  assert(signOutOptions.every((o) => o && o.scope === "local"), "the retry stays local, never escalating to global");
+  assert(currentSessionUserId === AUTH_USER_ORPHAN, "Supabase kept the session — we must not pretend otherwise");
+
+  const e = lastEvent();
+  assert(e.metadata.session_invalidated === false, "must NOT claim an invalidation that did not happen");
+  assert(e.metadata.session_invalidation_failure === "sign_out_rejected", `got ${e.metadata.session_invalidation_failure}`);
+  assert(e.metadata.session_invalidation_attempts === 2, "attempt count recorded");
+  assert(e.metadata.failure_classification === "no_vendor_mapping", "the access denial is still classified");
+});
+
+check("FIX3-e. a thrown signOut is detected and classified separately", async () => {
+  resetDb();
+  signOutFailure = { throws: true, error: new Error("socket hang up; access_token=eyJhbGciOiJ.LEAKED") };
+
+  const res = await AuthService.vendorPasswordLogin({ identifier: "orphan@example.com", password: "pw-orphan" });
+
+  assert(res.ok === false && res.code === "VENDOR_LOGIN_FAILED", "generic denial");
+  assert(signOutCalls === 2, "retried once");
+  const e = lastEvent();
+  assert(e.metadata.session_invalidated === false, "no false success");
+  assert(e.metadata.session_invalidation_failure === "sign_out_threw", `got ${e.metadata.session_invalidation_failure}`);
+});
+
+check("FIX3-f. a transient signOut failure is recovered by the bounded retry", async () => {
+  resetDb();
+  // Fails once, then succeeds — exactly what the bounded retry exists for.
+  signOutFailure = { error: { name: "AuthApiError", message: "transient" }, remaining: 1 };
+
+  const res = await AuthService.vendorPasswordLogin({ identifier: "orphan@example.com", password: "pw-orphan" });
+
+  assert(res.ok === false, "still denied — there is no vendor mapping");
+  assert(signOutCalls === 2, `first attempt fails, second succeeds: got ${signOutCalls}`);
+  assert(currentSessionUserId === null, "the session really was cleared");
+  assert(lastEvent().metadata.session_invalidated === true, "the retry confirmed invalidation");
+  assert(lastEvent().metadata.session_invalidation_attempts === 2, "two attempts recorded");
+});
+
+check("FIX3-g. no raw Auth error text or token reaches audit metadata", async () => {
+  resetDb();
+  signOutFailure = {
+    error: { name: "AuthApiError", status: 500, message: "refresh_token=eyJhbGciOi.SECRET.TOKEN rejected at https://proj.supabase.co/auth/v1/logout" },
+  };
+  await AuthService.vendorPasswordLogin({ identifier: "orphan@example.com", password: "pw-orphan" });
+
+  const serialized = JSON.stringify(events());
+  for (const leak of ["eyJhbGciOi", "SECRET", "TOKEN", "refresh_token", "access_token", "AuthApiError", "supabase.co", "rejected at", "logout"]) {
+    assert(!serialized.includes(leak), `"${leak}" must never reach the audit log`);
+  }
+  assert(serialized.includes("sign_out_rejected"), "only the sanitized classification survives");
+
+  // The sanitized vocabulary is a closed set — no free text.
+  const allowed = Object.values(AuthService.SessionInvalidationFailure);
+  assert(allowed.includes(lastEvent().metadata.session_invalidation_failure), "failure value comes from the closed vocabulary");
+  assert(allowed.length === 2 && allowed.every((v) => /^[a-z_]+$/.test(v)), "closed, identifier-shaped vocabulary");
+});
+
+// ============================================================================
 // 22–28. RLS MODEL
 // ============================================================================
 check("22. RLS allows an authenticated user to read only their own mapping row", () => {
@@ -815,6 +1009,7 @@ check("24-28. an authenticated vendor cannot modify vendor_id, user_id, role, st
 check("22b. the migration declares exactly the RLS model this harness simulates", () => {
   assert(normalizedSql.includes("alter table public.vendor_dashboard_users enable row level security;"), "RLS enabled");
   assert(normalizedSql.includes("revoke all on public.vendor_dashboard_users from authenticated;"), "authenticated revoked first");
+  assert(normalizedSql.includes("revoke all on public.vendor_dashboard_users from service_role;"), "service_role revoked first");
   assert(normalizedSql.includes("grant select, insert, update on public.vendor_dashboard_users to service_role;"), "service_role grants");
   assert(/create policy "vendor_dashboard_users self read" on public\.vendor_dashboard_users for select to authenticated using \(auth\.uid\(\) is not null and auth\.uid\(\) = user_id\)/.test(normalizedSql),
     "self-read policy must be exactly auth.uid() IS NOT NULL AND auth.uid() = user_id");
@@ -867,28 +1062,57 @@ check("30. a duplicate non-null user_id mapping is rejected by the partial uniqu
     "migration declares the partial unique index");
 });
 
-check("30b. linkVendorAuthUser is idempotent and never reassigns identity ownership", async () => {
+// ============================================================================
+// FIX 2 — NO FORGEABLE ADMIN AUTHORIZATION PROOF
+// ============================================================================
+check("FIX2-a. no public write function accepts a forgeable authorization object", () => {
+  assert(!/AdminVendorLinkAuthorization/.test(ACCESS_SERVICE_SRC), "the forgeable proof type must be gone from the source");
+  assert(AccessService.AdminVendorLinkAuthorization === undefined, "nothing exported at runtime");
+  assert(typeof AccessService.authorizeAdminForVendorLinking === "undefined", "no exported authorization factory");
+  assert(AccessService.linkVendorAuthUser.length === 1,
+    `linkVendorAuthUser must take exactly one argument, got ${AccessService.linkVendorAuthUser.length}`);
+
+  // Authority is derived internally, from the session, by a PRIVATE helper.
+  assert(/async function requireAdminSession/.test(ACCESS_SERVICE_SRC), "authority derived internally");
+  assert(!/export\s+(async\s+)?function\s+requireAdminSession/.test(ACCESS_SERVICE_SRC), "the helper must stay private");
+  assert(!/export\s+async\s+function\s+performVendorAuthUserLink/.test(ACCESS_SERVICE_SRC), "the raw write must stay private");
+  assert(/requireAdminSession\(\)/.test(ACCESS_SERVICE_SRC), "linkVendorAuthUser calls it");
+});
+
+check("FIX2-b. a direct link call with no authenticated session is denied", async () => {
   resetDb();
-  const auth = { adminUserId: AUTH_USER_ADMIN };
+  signIn(null);
+  const res = await AccessService.linkVendorAuthUser({ vendorId: VENDOR_A, authUserId: AUTH_USER_ORPHAN, role: "owner" });
+  assert(res.ok === false && res.code === "UNAUTHORIZED", `expected UNAUTHORIZED, got ${res.code}`);
+  assert(db.vendor_dashboard_users.length === 2, "no write occurred");
+});
 
-  // Idempotent re-link of an existing, matching mapping.
-  const same = await AccessService.linkVendorAuthUser(auth, { vendorId: VENDOR_A, authUserId: AUTH_USER_A, role: "owner" });
-  assert(same.ok === true && same.data.vendorDashboardUserId === "vdu-a", "existing mapping returned unchanged");
-  assert(db.vendor_dashboard_users.length === 2, "no row created");
+check("FIX2-c. an authenticated NON-admin session is denied", async () => {
+  resetDb();
+  signIn(AUTH_USER_A); // profiles.role = 'vendor'
+  const res = await AccessService.linkVendorAuthUser({ vendorId: VENDOR_B, authUserId: AUTH_USER_ORPHAN, role: "owner" });
+  assert(res.ok === false && res.code === "UNAUTHORIZED", `expected UNAUTHORIZED, got ${res.code}`);
+  assert(db.vendor_dashboard_users.length === 2, "no write occurred");
 
-  // Cross-vendor reassignment must fail closed.
-  const cross = await AccessService.linkVendorAuthUser(auth, { vendorId: VENDOR_B, authUserId: AUTH_USER_A, role: "owner" });
-  assert(cross.ok === false && cross.code === "CROSS_VENDOR_LINK_CONFLICT", `got ${cross.code}`);
-  assert(db.vendor_dashboard_users.find((r) => r.id === "vdu-a").vendor_id === VENDOR_A, "ownership untouched");
+  // An authenticated user with no profiles row at all is also denied.
+  resetDb();
+  db.profiles = [];
+  signIn(AUTH_USER_ADMIN);
+  const noProfile = await AccessService.linkVendorAuthUser({ vendorId: VENDOR_A, authUserId: AUTH_USER_A, role: "owner" });
+  assert(noProfile.ok === false && noProfile.code === "UNAUTHORIZED", "missing profile fails closed");
+});
 
-  // Fresh link: never marks verification, never touches vendors.
+check("FIX2-d. an authenticated admin session succeeds and infers nothing", async () => {
   resetDb();
   db.vendor_dashboard_users = [];
+  signIn(AUTH_USER_ADMIN);
   const vendorsBefore = JSON.stringify(db.vendors);
-  const fresh = await AccessService.linkVendorAuthUser(auth, {
+
+  const fresh = await AccessService.linkVendorAuthUser({
     vendorId: VENDOR_A, authUserId: AUTH_USER_A, phone: "+91 98765 43210", email: " Owner-A@Example.com ", role: "owner",
   });
-  assert(fresh.ok === true, `fresh link: ${fresh.ok ? "" : fresh.code}`);
+  assert(fresh.ok === true, `admin link must succeed: ${fresh.ok ? "" : fresh.code}`);
+
   const row = db.vendor_dashboard_users[0];
   assert(row.phone === "+919876543210", "phone canonicalized to E.164");
   assert(row.email === EMAIL_A, "email canonicalized");
@@ -896,16 +1120,147 @@ check("30b. linkVendorAuthUser is idempotent and never reassigns identity owners
   assert(row.status === "active" && row.role === "owner", "membership defaults");
   assert(JSON.stringify(db.vendors) === vendorsBefore, "vendors table untouched");
 
-  // Ambiguous local phone rejected here too.
+  // Ambiguous local phone still rejected, even for an admin.
   resetDb();
   db.vendor_dashboard_users = [];
-  const bad = await AccessService.linkVendorAuthUser(auth, { vendorId: VENDOR_A, authUserId: AUTH_USER_A, phone: "9876543210", role: "owner" });
+  signIn(AUTH_USER_ADMIN);
+  const bad = await AccessService.linkVendorAuthUser({ vendorId: VENDOR_A, authUserId: AUTH_USER_A, phone: "9876543210", role: "owner" });
   assert(bad.ok === false && bad.code === "VENDOR_LINK_INVALID_PHONE", `got ${bad.code}`);
   assert(db.vendor_dashboard_users.length === 0, "no row on invalid phone");
+});
 
-  // Unauthorized callers never reach the write.
-  const unauth = await AccessService.linkVendorAuthUser({ adminUserId: "" }, { vendorId: VENDOR_A, authUserId: AUTH_USER_A, role: "owner" });
-  assert(unauth.ok === false && unauth.code === "UNAUTHORIZED", "admin authorization required");
+check("FIX2-e. a forged object carrying an admin user id cannot authorize linking", async () => {
+  resetDb();
+  signIn(null); // NO authenticated session — every call below must be refused.
+
+  const forgeries = [
+    { vendorId: VENDOR_A, authUserId: AUTH_USER_ORPHAN, role: "owner", adminUserId: AUTH_USER_ADMIN },
+    { vendorId: VENDOR_A, authUserId: AUTH_USER_ORPHAN, role: "owner", authorization: { adminUserId: AUTH_USER_ADMIN } },
+    { vendorId: VENDOR_A, authUserId: AUTH_USER_ORPHAN, role: "owner", isAdmin: true, role_override: "admin" },
+  ];
+  for (const forged of forgeries) {
+    const res = await AccessService.linkVendorAuthUser(forged);
+    assert(res.ok === false && res.code === "UNAUTHORIZED", `forgery accepted: ${JSON.stringify(forged)} → ${res.code}`);
+  }
+
+  // The OLD two-argument call shape cannot slip an authorization proof through:
+  // the first argument is now the input, and authority still comes from the session.
+  const legacy = await AccessService.linkVendorAuthUser(
+    { adminUserId: AUTH_USER_ADMIN },
+    { vendorId: VENDOR_A, authUserId: AUTH_USER_ORPHAN, role: "owner" }
+  );
+  assert(legacy.ok === false && legacy.code === "UNAUTHORIZED", "legacy two-argument call must not authorize");
+
+  assert(db.vendor_dashboard_users.length === 2, "no forgery produced a write");
+});
+
+check("FIX2-f. cross-vendor reassignment denied and idempotency preserved under the new API", async () => {
+  resetDb();
+  signIn(AUTH_USER_ADMIN);
+
+  // Idempotent re-link of an existing, matching mapping.
+  const same = await AccessService.linkVendorAuthUser({ vendorId: VENDOR_A, authUserId: AUTH_USER_A, role: "owner" });
+  assert(same.ok === true && same.data.vendorDashboardUserId === "vdu-a", "existing mapping returned unchanged");
+  assert(db.vendor_dashboard_users.length === 2, "no row created");
+
+  // Cross-vendor reassignment must fail closed, even for an admin.
+  const cross = await AccessService.linkVendorAuthUser({ vendorId: VENDOR_B, authUserId: AUTH_USER_A, role: "owner" });
+  assert(cross.ok === false && cross.code === "CROSS_VENDOR_LINK_CONFLICT", `got ${cross.code}`);
+  assert(db.vendor_dashboard_users.find((r) => r.id === "vdu-a").vendor_id === VENDOR_A, "ownership untouched");
+});
+
+// ============================================================================
+// FIX 1 — SERVICE_ROLE PRIVILEGES ARE ACTUALLY REDUCED
+// ============================================================================
+check("FIX1-a. the migration REVOKES pre-existing broad privileges, not merely grants", () => {
+  // Start from the linked database's documented state: every role over-privileged
+  // with DELETE / TRUNCATE / REFERENCES / TRIGGER.
+  const { state, applied } = applyPrivilegeStatements(strippedSql, HISTORICAL_BROAD_PRIVILEGES());
+  const privileges = (role) => [...state[role]].sort().join(",");
+
+  assert(privileges("anon") === "", `anon must end with zero privileges, got "${privileges("anon")}"`);
+  assert(privileges("authenticated") === "select", `authenticated must end with SELECT only, got "${privileges("authenticated")}"`);
+  assert(privileges("service_role") === "insert,select,update",
+    `service_role must end with exactly SELECT+INSERT+UPDATE, got "${privileges("service_role")}"`);
+
+  for (const banned of ["delete", "truncate", "references", "trigger"]) {
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      assert(!state[role].has(banned), `${role} must not retain ${banned.toUpperCase()} after the migration`);
+    }
+  }
+
+  // A GRANT can never remove a privilege, so the REVOKE must exist and come first.
+  const serviceRoleStatements = applied.filter((s) => s.role === "service_role");
+  assert(serviceRoleStatements.length >= 2, "service_role needs both a revoke and a grant");
+  assert(serviceRoleStatements[0].verb === "revoke", "service_role must be REVOKEd before being GRANTed");
+  assert(serviceRoleStatements[0].privileges.length === ALL_TABLE_PRIVILEGES.length,
+    "the service_role revoke must be REVOKE ALL, not a partial revoke");
+  assert(serviceRoleStatements[1].verb === "grant", "…then granted");
+});
+
+check("FIX1-b. the privilege model really would catch a grant-only migration", () => {
+  // Anti-vacuity: prove the engine fails on the pre-fix migration text.
+  const grantOnly = "grant select, insert, update on public.vendor_dashboard_users to service_role;";
+  const { state } = applyPrivilegeStatements(grantOnly, HISTORICAL_BROAD_PRIVILEGES());
+  assert(state.service_role.has("delete"), "a GRANT alone cannot remove DELETE — the model must show that");
+  assert(state.service_role.has("truncate"), "…nor TRUNCATE");
+  assert(state.service_role.has("references") && state.service_role.has("trigger"), "…nor REFERENCES/TRIGGER");
+
+  // And that a partial revoke would not be enough either.
+  const partial = "revoke delete on public.vendor_dashboard_users from service_role; " + grantOnly;
+  const partialState = applyPrivilegeStatements(partial, HISTORICAL_BROAD_PRIVILEGES()).state;
+  assert(partialState.service_role.has("truncate"), "a partial revoke leaves TRUNCATE behind");
+});
+
+check("FIX1-c. no role anywhere is granted a destructive privilege", () => {
+  for (const match of strippedSql.matchAll(PRIVILEGE_STATEMENT)) {
+    if (match[1].toLowerCase() !== "grant") continue;
+    const granted = match[2].toLowerCase();
+    for (const banned of ["all", "delete", "truncate", "references", "trigger"]) {
+      assert(!granted.includes(banned), `migration grants "${banned}" to ${match[3]}`);
+    }
+  }
+  assert(normalizedSql.includes("revoke all on public.vendor_dashboard_users from service_role;"), "explicit service_role revoke");
+});
+
+// ============================================================================
+// FIX 4 — THE FK DELETE ACTION IS VERIFIED, NOT JUST FK EXISTENCE
+// ============================================================================
+check("FIX4-a. the migration inspects confdeltype and accepts only SET NULL", () => {
+  assert(FK_ACCEPTED_DELETE_CODE !== null, "the DO block must compare confdeltype against a delete-action code");
+  assert(FK_ACCEPTED_DELETE_CODE === "n",
+    `only SET NULL ('n') may be accepted as already-correct, migration accepts '${FK_ACCEPTED_DELETE_CODE}' (${FK_DELETE_ACTIONS[FK_ACCEPTED_DELETE_CODE]})`);
+  assert(/confdeltype/.test(strippedSql), "confdeltype must be selected");
+  assert(/raise\s+exception/i.test(strippedSql), "a conflicting FK must raise");
+  assert(/array_length\(c\.conkey, 1\) = 1/.test(strippedSql), "must match a single-column FK on user_id");
+  // Never auto-drop a constraint we did not create.
+  assert(!/drop\s+constraint/i.test(strippedSql), "the migration must never drop an existing constraint");
+});
+
+check("FIX4-b. no FK present → the correct SET NULL FK is added", () => {
+  const decision = reconcileUserIdForeignKey(null);
+  assert(decision.action === "add", `expected add, got ${decision.action}`);
+  assert(decision.onDelete === "set null", "must be added with ON DELETE SET NULL");
+  assert(/add constraint vendor_dashboard_users_user_id_fkey[\s\S]{0,120}on delete set null/.test(normalizedSql),
+    "the add branch must declare ON DELETE SET NULL");
+});
+
+check("FIX4-c. a correct SET NULL FK → idempotent no-op", () => {
+  const decision = reconcileUserIdForeignKey({ conname: "vendor_dashboard_users_user_id_fkey", confdeltype: "n" });
+  assert(decision.action === "noop", `expected noop, got ${decision.action}`);
+});
+
+check("FIX4-d. a conflicting CASCADE / RESTRICT / NO ACTION / SET DEFAULT FK → refuse, never silently accept", () => {
+  for (const code of ["c", "r", "a", "d"]) {
+    const decision = reconcileUserIdForeignKey({ conname: "legacy_fk", confdeltype: code });
+    assert(decision.action === "raise",
+      `a ${FK_DELETE_ACTIONS[code]} FK must be refused, got ${decision.action}`);
+    assert(decision.confdeltype === code, "the offending action is reported");
+  }
+  // Specifically: the old "does any FK exist?" logic would have accepted CASCADE.
+  const cascade = reconcileUserIdForeignKey({ conname: "legacy_fk", confdeltype: "c" });
+  assert(cascade.action !== "noop", "ON DELETE CASCADE must never be treated as already-correct");
+  assert(cascade.action !== "add", "and must not be silently duplicated");
 });
 
 // ============================================================================
@@ -1099,9 +1454,14 @@ check("40b. migration is additive, idempotent, and non-destructive", () => {
   assert(/create unique index if not exists/.test(normalizedSql), "index create is guarded");
   assert(/add column if not exists/.test(normalizedSql), "column adds are guarded");
   assert(/drop policy if exists/.test(normalizedSql), "policy replacement is guarded");
-  // Only the FK add is unguarded by IF NOT EXISTS — it is wrapped in a DO block.
-  assert(/do \$\$/.test(normalizedSql) && /if not exists \( select 1 from pg_constraint/.test(normalizedSql),
-    "the FK add must be idempotent via pg_constraint lookup");
+  // Only the FK add is unguarded by IF NOT EXISTS — it is wrapped in a DO block
+  // that reads pg_constraint and branches on the existing delete action.
+  assert(/do \$\$/.test(normalizedSql), "the FK add is wrapped in a DO block");
+  assert(/select c\.conname, c\.confdeltype into/.test(normalizedSql),
+    "the FK add must be idempotent via a pg_constraint conname/confdeltype lookup");
+  assert(/if v_conname is null then/.test(normalizedSql), "absent FK → add");
+  assert(/elsif v_confdeltype = 'n' then/.test(normalizedSql), "correct FK → no-op");
+  assert(/else raise exception/.test(normalizedSql), "conflicting FK → refuse");
   // No production apply command in executable SQL or service code. (The migration
   // header comment names these commands precisely to forbid them.)
   assert(!/supabase\s+(db\s+push|migration\s+up|migration\s+repair|link)/i.test(strippedSql + ALL_NEW_SERVICE_SRC),

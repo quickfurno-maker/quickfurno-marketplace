@@ -158,6 +158,8 @@ const EXPECTED_EVENTS = [
   // Phase 5D additions (client WhatsApp OTP login failure auditing).
   "client.otp_request_failed", "client.otp_verify_failed",
   "client.login_success",
+  // Phase 5E additions (vendor WhatsApp verification / password reset failures).
+  "vendor.whatsapp_verification_failed", "vendor.password_reset_failed",
   "auth.rate_limit_triggered", "auth.challenge_expired",
 ];
 check("16. every documented auth security event type accepted", () => {

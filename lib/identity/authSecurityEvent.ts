@@ -20,8 +20,13 @@ export const AuthSecurityEventType = {
   VENDOR_LOGIN_FAILED: "vendor.login_failed",
   VENDOR_WHATSAPP_VERIFICATION_REQUESTED: "vendor.whatsapp_verification_requested",
   VENDOR_WHATSAPP_VERIFIED: "vendor.whatsapp_verified",
+  // Phase 5E — the two failure counterparts the existing vocabulary lacked. Both
+  // carry ONLY a sanitized classification, a destination hash, and a challenge id;
+  // never an OTP, OTP hash, pepper, password, grant token, or raw Auth error.
+  VENDOR_WHATSAPP_VERIFICATION_FAILED: "vendor.whatsapp_verification_failed",
   VENDOR_PASSWORD_RESET_REQUESTED: "vendor.password_reset_requested",
   VENDOR_PASSWORD_RESET_OTP_FAILED: "vendor.password_reset_otp_failed",
+  VENDOR_PASSWORD_RESET_FAILED: "vendor.password_reset_failed",
   VENDOR_PASSWORD_RESET_COMPLETED: "vendor.password_reset_completed",
   CLIENT_OTP_REQUESTED: "client.otp_requested",
   // Phase 5D — safe failure auditing for the client WhatsApp OTP login flow.

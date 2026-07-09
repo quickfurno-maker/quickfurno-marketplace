@@ -21,6 +21,7 @@
     "test:phase5b": "node scripts/phase5b-communication-core-harness.mjs",
     "test:phase5c": "node scripts/phase5c-vendor-auth-harness.mjs",
     "test:phase5d": "node scripts/phase5d-client-whatsapp-otp-harness.mjs",
+    "test:phase5e": "node scripts/phase5e-vendor-whatsapp-reset-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",

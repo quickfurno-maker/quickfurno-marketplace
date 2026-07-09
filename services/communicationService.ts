@@ -36,8 +36,9 @@ import type { CommunicationRecipientResolver } from "../lib/communication/recipi
 import {
   getActiveRecipientResolver,
 } from "./communicationRecipientResolver";
-import { RECIPIENT_REFERENCE_DESTINATION } from "../lib/communication/types";
+import { ACTIVE_DISPATCH_CHANNEL, RECIPIENT_REFERENCE_DESTINATION } from "../lib/communication/types";
 import type {
+  CommunicationChannel,
   CommunicationIntent,
   CommunicationMessage,
   CommunicationMessageStatus,
@@ -46,6 +47,11 @@ import type {
   CommunicationWebhookProcessingStatus,
   CommunicationWebhookReceipt,
 } from "../lib/communication/types";
+import {
+  CHANNEL_DISPATCH_ERROR,
+  isChannelDispatchable,
+  isTemplateChannelConsistent,
+} from "../lib/communication/channelDispatchGuard";
 import type {
   WhatsAppProvider,
   WhatsAppSendResult,
@@ -87,6 +93,10 @@ const FAILURE_REASON_MAX_LENGTH = 500;
 // Service error vocabulary
 // ----------------------------------------------------------------------------
 const COMMUNICATION_ERROR_MESSAGES = {
+  UNSUPPORTED_DISPATCH_CHANNEL:
+    "This communication channel is not dispatchable by the active provider; the message was not sent on another channel.",
+  TEMPLATE_CHANNEL_MISMATCH:
+    "The communication template channel does not match the requested channel.",
   TEMPLATE_NOT_FOUND_OR_INACTIVE: "The communication template does not exist or is inactive.",
   TEMPLATE_LANE_MISMATCH: "The communication template belongs to a different lane.",
   TEMPLATE_NOT_READY: "The communication template is not ready to be sent.",
@@ -241,6 +251,29 @@ export class CommunicationService {
     this.recipientResolver = recipientResolver;
   }
 
+  /**
+   * The channel this service dispatches on — its provider's channel. A
+   * WhatsAppProvider declares `channel: "whatsapp"` (Phase 5F-A); a provider that
+   * predates the field is, by type, the WhatsApp adapter, so it defaults to the
+   * active WhatsApp dispatch channel. This never yields sms/rcs, so an sms/rcs
+   * message/intent is always refused by the channel guards.
+   */
+  private dispatchChannel(): CommunicationChannel {
+    return (this.provider as { channel?: CommunicationChannel }).channel ?? ACTIVE_DISPATCH_CHANNEL;
+  }
+
+  /**
+   * Whether a persisted message's channel is FOREIGN to the active provider — an
+   * EXPLICIT sms/rcs channel this WhatsApp service must never dispatch. A row with
+   * no channel is treated as the provider's own channel: `communication_messages.
+   * channel` is NOT NULL in the database, so this only covers non-DB callers, and
+   * an sms/rcs message always carries an explicit channel and is therefore always
+   * caught. This only classifies — it never coerces or reroutes a channel.
+   */
+  private isForeignChannel(channel: CommunicationChannel | null | undefined): boolean {
+    return channel != null && !isChannelDispatchable(channel, this.dispatchChannel());
+  }
+
   // --------------------------------------------------------------------------
   // Enqueue + immediate send
   // --------------------------------------------------------------------------
@@ -255,6 +288,15 @@ export class CommunicationService {
     try {
       if (!intent.idempotency_key || !intent.template_key) {
         throw appError("VALIDATION");
+      }
+
+      // Phase 5F-A runtime channel safety (INITIAL SEND GUARD). CommunicationService
+      // dispatches ONLY on its provider's channel (whatsapp). An sms/rcs intent fails
+      // closed HERE — before any communication_messages insert and before any
+      // provider call — and is never silently rewritten to whatsapp and never
+      // fallen back to another channel.
+      if (!isChannelDispatchable(intent.channel, this.dispatchChannel())) {
+        return fail(commError("UNSUPPORTED_DISPATCH_CHANNEL"));
       }
 
       const destinationSource = intent.destination_source ?? RECIPIENT_REFERENCE_DESTINATION;
@@ -292,6 +334,13 @@ export class CommunicationService {
       }
       if (template.readiness_status === "draft" || template.readiness_status === "disabled") {
         return fail(commError("TEMPLATE_NOT_READY"));
+      }
+      // TEMPLATE CHANNEL CONSISTENCY. The template must be for the SAME channel as
+      // the intent. A mismatch (e.g. a whatsapp intent pointed at an sms template,
+      // or the reverse) fails closed before any provider call — the template is
+      // never rewritten onto another channel.
+      if (!isTemplateChannelConsistent(template.channel, intent.channel)) {
+        return fail(commError("TEMPLATE_CHANNEL_MISMATCH"));
       }
 
       // Establish the destination BEFORE writing the ledger row: an unresolvable
@@ -437,6 +486,16 @@ export class CommunicationService {
     options: DispatchOptions = {}
   ): Promise<Result<CommunicationMessage>> {
     try {
+      // PERSISTED-MESSAGE DISPATCH GUARD (defence in depth at the FINAL dispatch
+      // boundary). A persisted row whose channel is not the active provider's
+      // channel — a queued or retry sms/rcs message — must never be dispatched by
+      // the WhatsApp service. Fail closed BEFORE the claim so zero provider calls
+      // occur, and never mutate or reroute the channel. This holds even when a row
+      // reaches dispatch via a scheduled send or a retry, not only at enqueue time.
+      if (this.isForeignChannel(message.channel)) {
+        return fail(commError("UNSUPPORTED_DISPATCH_CHANNEL"));
+      }
+
       if (message.lane === "authentication" && !options.rawVariables) {
         return fail(commError("AUTH_LANE_NOT_REDISPATCHABLE"));
       }
@@ -520,6 +579,22 @@ export class CommunicationService {
     providerTemplate: string,
     options: DispatchOptions
   ): Promise<WhatsAppSendResult> {
+    // PROVIDER/MESSAGE CHANNEL IDENTITY CHECK immediately before the provider call
+    // (defence in depth with the dispatch-boundary guard). If a message whose
+    // channel is not this provider's channel ever reaches here, refuse with ZERO
+    // provider invocation and fold it into a non-retryable failure result — never
+    // rewrite or reroute the channel.
+    if (this.isForeignChannel(message.channel)) {
+      return {
+        accepted: false,
+        provider: this.provider.providerKey,
+        providerMessageId: null,
+        normalizedStatus: "failed",
+        errorCode: CHANNEL_DISPATCH_ERROR.UNSUPPORTED_DISPATCH_CHANNEL,
+        errorMessage: "The message channel does not match the active provider channel.",
+        retryable: false,
+      };
+    }
     try {
       if (message.lane === "authentication") {
         // Sensitive variables travel to the provider call and nowhere else.
@@ -860,6 +935,15 @@ export class CommunicationService {
   ): Promise<{ application: EventApplication; deliveryEventRecorded: boolean }> {
     const message = await this.getMessageByProviderMessageId(event.providerMessageId);
     if (!message) return { application: "unmatched", deliveryEventRecorded: false };
+
+    // WEBHOOK CHANNEL FENCE. The lookup above is already scoped to this provider's
+    // key, but this is the explicit channel-level guarantee: a WhatsApp webhook can
+    // never advance (or fail) a message whose channel is not the active provider's
+    // channel — an sms/rcs message is never touched by WhatsApp webhook processing.
+    // Treat any such match as unmatched; do not mutate or reroute it.
+    if (this.isForeignChannel(message.channel)) {
+      return { application: "unmatched", deliveryEventRecorded: false };
+    }
 
     let application: EventApplication;
 

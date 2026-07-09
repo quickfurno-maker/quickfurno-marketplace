@@ -124,6 +124,8 @@ export interface MockSendRecord {
 
 export class MockWhatsAppProvider implements WhatsAppProvider {
   readonly providerKey = MOCK_PROVIDER_KEY;
+  /** This adapter serves the WhatsApp channel only. */
+  readonly channel = "whatsapp" as const;
 
   private sendSequence = 0;
   private lastSentPayloads: MockSendRecord[] = [];

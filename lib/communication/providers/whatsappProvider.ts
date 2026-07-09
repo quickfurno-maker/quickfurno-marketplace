@@ -52,6 +52,14 @@ export interface WhatsAppProvider {
   readonly providerKey: string;
 
   /**
+   * The transport channel this adapter serves — always `"whatsapp"`. Made
+   * explicit (Phase 5F-A) so CommunicationService can assert a message's channel
+   * matches the active provider's channel before dispatch, and never sends an
+   * sms/rcs message over the WhatsApp adapter.
+   */
+  readonly channel: "whatsapp";
+
+  /**
    * Dispatches sensitive authentication OTP messages.
    * OTP values are treated as highly confidential and are not logged or stored.
    */

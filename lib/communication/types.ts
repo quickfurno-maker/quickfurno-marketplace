@@ -5,7 +5,35 @@
 // Uses snake_case to align 1:1 with Supabase database columns.
 // ============================================================================
 
-export type CommunicationChannel = "whatsapp";
+/**
+ * The GENERIC communication channel vocabulary (Phase 5F-A). The platform
+ * FOUNDATION supports WhatsApp, SMS, and (future) RCS. Widening this type is a
+ * foundation change only: in Phase 5F-A CommunicationService still dispatches
+ * WhatsApp exactly as before, and no SMS/RCS send path is wired. A channel is a
+ * TRANSPORT decision, never an authentication or business-authorization decision.
+ *
+ * NOTE: the authentication CHALLENGE delivery channel is a SEPARATE, narrower
+ * Phase 5E security vocabulary (whatsapp / sms only — never RCS); see
+ * `lib/identity/vendorAuthAutomation.ts#VendorAuthDeliveryChannel`.
+ */
+export type CommunicationChannel = "whatsapp" | "sms" | "rcs";
+
+export const COMMUNICATION_CHANNELS: readonly CommunicationChannel[] = Object.freeze([
+  "whatsapp",
+  "sms",
+  "rcs",
+]);
+
+export function isCommunicationChannel(value: unknown): value is CommunicationChannel {
+  return typeof value === "string" && (COMMUNICATION_CHANNELS as readonly string[]).includes(value);
+}
+
+/**
+ * The ONLY channel CommunicationService actually dispatches on in Phase 5F-A. SMS
+ * and RCS are foundation vocabulary; their send paths are not wired until a later
+ * controlled phase.
+ */
+export const ACTIVE_DISPATCH_CHANNEL: CommunicationChannel = "whatsapp";
 
 export type CommunicationLane = "authentication" | "business";
 

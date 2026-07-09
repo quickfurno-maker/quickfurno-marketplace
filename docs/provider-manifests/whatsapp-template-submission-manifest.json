@@ -1,0 +1,179 @@
+{
+  "manifest_version": "1.0",
+  "phase": "5F-A",
+  "channel": "whatsapp",
+  "provider_key": "meta_whatsapp_cloud",
+  "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED WhatsApp Cloud API mappings. This is NOT an API submission and grants NO approval. Every entry starts approval_status='draft' with provider_template_id=null. Real submission/mapping happens in Phase 5F-B under a controlled rollout.",
+  "warnings": [
+    "No template here is submitted or approved.",
+    "No secrets, tokens, or real OTP examples are stored.",
+    "body_spec placeholders use {{n}} positional variables; actual approved copy is defined at submission time.",
+    "provider_template_id remains null until Meta assigns one after approval."
+  ],
+  "groups": {
+    "authentication": [
+      {
+        "internal_template_key": "client_login_otp",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "authentication",
+        "body_spec": "Your QuickFurno login code is {{1}}. It expires shortly. Do not share it.",
+        "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "vendor_whatsapp_verify",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "authentication",
+        "body_spec": "Your QuickFurno verification code is {{1}}. It expires shortly. Do not share it.",
+        "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "vendor_password_reset",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "authentication",
+        "body_spec": "Your QuickFurno password reset code is {{1}}. It expires shortly. Do not share it.",
+        "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      }
+    ],
+    "transactional_business": [
+      {
+        "internal_template_key": "lead_received",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
+        "variables_schema": { "1": { "type": "text", "description": "client name" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "vendor_new_lead",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "New QuickFurno lead in {{1}} for {{2}}. Open your dashboard to view details.",
+        "variables_schema": { "1": { "type": "text", "description": "city" }, "2": { "type": "text", "description": "category" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "clarification_request",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+        "variables_schema": { "1": { "type": "text", "description": "client name" }, "2": { "type": "text", "description": "clarification prompt" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "clarification_reminder",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
+        "variables_schema": { "1": { "type": "text", "description": "clarification prompt" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "lead_assignment_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
+        "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "client_nurture_followup",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Hi {{1}}, still planning your project? QuickFurno can reconnect you with professionals.",
+        "variables_schema": { "1": { "type": "text", "description": "client name" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "dormant_requirement_reactivation",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Hi {{1}}, your QuickFurno requirement is still open. Reply to reactivate matching.",
+        "variables_schema": { "1": { "type": "text", "description": "client name" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "low_credit_warning",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno: your credit balance is low ({{1}}). Recharge to keep receiving leads.",
+        "variables_schema": { "1": { "type": "text", "description": "remaining credits" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "recharge_reminder",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno reminder: recharge your credits to continue receiving matched leads.",
+        "variables_schema": {},
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "admin_assignment_failure_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno admin alert: lead assignment failed for {{1}}.",
+        "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "admin_automation_failure_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno admin alert: automation {{1}} failed.",
+        "variables_schema": { "1": { "type": "text", "description": "automation key" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "admin_policy_block_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno admin alert: a policy blocked lead {{1}}.",
+        "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      },
+      {
+        "internal_template_key": "admin_provider_outage_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno admin alert: communication provider {{1}} appears to be down.",
+        "variables_schema": { "1": { "type": "text", "description": "provider key" } },
+        "approval_status": "draft",
+        "provider_template_id": null
+      }
+    ]
+  }
+}

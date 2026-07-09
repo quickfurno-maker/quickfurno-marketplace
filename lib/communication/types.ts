@@ -54,7 +54,12 @@ export type CommunicationMessageStatus =
   | "failed"
   | "retry_scheduled"
   | "dead_letter"
-  | "cancelled";
+  | "cancelled"
+  // Phase 5F-B: provider acceptance could not be proven or disproven (timeout /
+  // abort / ambiguous network / ambiguous 5xx / 2xx without a usable message id).
+  // Never retried, never dead-lettered by elapsed time; a later verified webhook
+  // reconciles it forward to sent/delivered/read/failed.
+  | "outcome_unknown";
 
 export type CommunicationPriority = "critical" | "high" | "normal" | "low";
 

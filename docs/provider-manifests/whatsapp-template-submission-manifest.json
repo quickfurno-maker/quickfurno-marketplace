@@ -1,15 +1,22 @@
 {
-  "manifest_version": "1.0",
-  "phase": "5F-A",
+  "manifest_version": "1.1",
+  "phase": "5F-B",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
-  "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED WhatsApp Cloud API mappings. This is NOT an API submission and grants NO approval. Every entry starts approval_status='draft' with provider_template_id=null. Real submission/mapping happens in Phase 5F-B under a controlled rollout.",
+  "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED WhatsApp Cloud API mappings. This is NOT an API submission and grants NO approval. Every entry stays approval_status='draft' with provider_template_name=null and provider_template_id=null. Phase 5F-B adds binding_contract READINESS ONLY where the source keys are proven from repository call sites; it submits no template and creates no mapping row.",
   "warnings": [
     "No template here is submitted or approved.",
     "No secrets, tokens, or real OTP examples are stored.",
     "body_spec placeholders use {{n}} positional variables; actual approved copy is defined at submission time.",
-    "provider_template_id remains null until Meta assigns one after approval."
+    "provider_template_id remains null until Meta assigns one after approval.",
+    "binding_contract.binding_readiness='resolved' only where source_key is proven in repository code; 'unresolved' entries are NOT guessed."
   ],
+  "binding_contract_notes": {
+    "binding_version": 1,
+    "proven_source_keys": ["otp"],
+    "proof": "The only CommunicationIntent variable built by live callers is { otp } (services/supabaseSendSmsHookService.ts, services/vendorVerificationService.ts, services/vendorPasswordResetService.ts). Business-template source keys are not wired to any live caller, so their bindings remain unresolved.",
+    "component_semantics": "component + 1-based position <- source_key (parameter_type). Positions are deterministic; order is NEVER inferred from object key order."
+  },
   "groups": {
     "authentication": [
       {
@@ -19,6 +26,11 @@
         "category": "authentication",
         "body_spec": "Your QuickFurno login code is {{1}}. It expires shortly. Do not share it.",
         "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "binding_contract": {
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "bindings": [{ "component": "body", "position": 1, "source_key": "otp", "parameter_type": "text" }]
+        },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -29,6 +41,11 @@
         "category": "authentication",
         "body_spec": "Your QuickFurno verification code is {{1}}. It expires shortly. Do not share it.",
         "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "binding_contract": {
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "bindings": [{ "component": "body", "position": 1, "source_key": "otp", "parameter_type": "text" }]
+        },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -39,6 +56,11 @@
         "category": "authentication",
         "body_spec": "Your QuickFurno password reset code is {{1}}. It expires shortly. Do not share it.",
         "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "binding_contract": {
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "bindings": [{ "component": "body", "position": 1, "source_key": "otp", "parameter_type": "text" }]
+        },
         "approval_status": "draft",
         "provider_template_id": null
       }
@@ -51,6 +73,7 @@
         "category": "utility",
         "body_spec": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
         "variables_schema": { "1": { "type": "text", "description": "client name" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -61,6 +84,7 @@
         "category": "utility",
         "body_spec": "New QuickFurno lead in {{1}} for {{2}}. Open your dashboard to view details.",
         "variables_schema": { "1": { "type": "text", "description": "city" }, "2": { "type": "text", "description": "category" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -71,6 +95,7 @@
         "category": "utility",
         "body_spec": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
         "variables_schema": { "1": { "type": "text", "description": "client name" }, "2": { "type": "text", "description": "clarification prompt" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -81,6 +106,7 @@
         "category": "utility",
         "body_spec": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
         "variables_schema": { "1": { "type": "text", "description": "clarification prompt" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -91,6 +117,7 @@
         "category": "utility",
         "body_spec": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
         "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -101,6 +128,7 @@
         "category": "utility",
         "body_spec": "Hi {{1}}, still planning your project? QuickFurno can reconnect you with professionals.",
         "variables_schema": { "1": { "type": "text", "description": "client name" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -111,6 +139,7 @@
         "category": "utility",
         "body_spec": "Hi {{1}}, your QuickFurno requirement is still open. Reply to reactivate matching.",
         "variables_schema": { "1": { "type": "text", "description": "client name" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -121,6 +150,7 @@
         "category": "utility",
         "body_spec": "QuickFurno: your credit balance is low ({{1}}). Recharge to keep receiving leads.",
         "variables_schema": { "1": { "type": "text", "description": "remaining credits" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -131,6 +161,7 @@
         "category": "utility",
         "body_spec": "QuickFurno reminder: recharge your credits to continue receiving matched leads.",
         "variables_schema": {},
+        "binding_contract": { "binding_readiness": "unresolved", "note": "no variables; binding deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -141,6 +172,7 @@
         "category": "utility",
         "body_spec": "QuickFurno admin alert: lead assignment failed for {{1}}.",
         "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -151,6 +183,7 @@
         "category": "utility",
         "body_spec": "QuickFurno admin alert: automation {{1}} failed.",
         "variables_schema": { "1": { "type": "text", "description": "automation key" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -161,6 +194,7 @@
         "category": "utility",
         "body_spec": "QuickFurno admin alert: a policy blocked lead {{1}}.",
         "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       },
@@ -171,6 +205,7 @@
         "category": "utility",
         "body_spec": "QuickFurno admin alert: communication provider {{1}} appears to be down.",
         "variables_schema": { "1": { "type": "text", "description": "provider key" } },
+        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
         "approval_status": "draft",
         "provider_template_id": null
       }

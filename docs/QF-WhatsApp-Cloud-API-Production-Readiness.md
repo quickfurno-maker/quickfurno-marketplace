@@ -41,22 +41,44 @@ All of the above are **non-secret operational identifiers**. None is a credentia
 
 ## Server-only config contract (documented — DELIBERATELY NOT SET)
 
-These are **runtime, server-only** environment variables. Phase 5F-A does not set
-them, and they must never be committed or written to any table:
+These are **runtime, server-only** environment variables. Neither Phase 5F-A nor
+5F-B sets them, and they must never be committed or written to any table:
 
 ```
+WHATSAPP_PROVIDER_MODE         # "mock" (default) | "meta_cloud"
 WHATSAPP_ACCESS_TOKEN          # System User token (secret)
 WHATSAPP_PHONE_NUMBER_ID       # non-secret send-target id
 WHATSAPP_WABA_ID               # non-secret WABA id
 WHATSAPP_APP_SECRET            # app secret for webhook signature (secret)
 WHATSAPP_WEBHOOK_VERIFY_TOKEN  # GET-verification token (secret)
-WHATSAPP_GRAPH_API_VERSION     # e.g. a pinned Graph API version string
+WHATSAPP_GRAPH_API_VERSION     # pinned Graph API version, e.g. v19.0 (must be explicit)
+WHATSAPP_HTTP_TIMEOUT_MS       # bounded, positive ms; enforced by AbortController
 ```
 
 Only `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, and
-`WHATSAPP_WEBHOOK_VERIFY_TOKEN` are secrets; the others are non-secret ids. The
-database `communication_provider_accounts` stores **only** the non-secret
-references — there is no token/secret column anywhere.
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN` are secrets; the others are non-secret ids/config.
+The database `communication_provider_accounts` stores **only** the non-secret
+references — there is no token/secret column anywhere. The config contract
+(`lib/communication/providers/metaCloudWhatsAppConfig.ts`) reports only missing/invalid
+variable **names** on failure and **never** falls back from `meta_cloud` to `mock`.
+`WHATSAPP_GRAPH_API_VERSION` must be explicitly configured (never hardcoded), and
+`WHATSAPP_HTTP_TIMEOUT_MS` is validated finite/positive/bounded.
+
+## Phase 5F-B — what is now built (still DISABLED by default)
+
+Phase 5F-B adds the real Meta adapter and its gates **without activating sending**.
+Migration `20260709000200_whatsapp_cloud_api_runtime_control.sql` (NOT applied) adds
+`communication_provider_runtime_policies` (seeded one row, fully **disabled**) and
+`communication_provider_canary_destinations` (destination **hashes** only, none
+seeded). A real Meta send requires, in order: an **authorized** CommunicationIntent
+→ operational **runtime policy** (`outbound_enabled` + `activation_status` in
+`canary`/`active`) → **provider-account readiness** (all status fields production-ready
+and references matching config) → an **approved active provider-template mapping**
+(no legacy `provider_template_name` fallback for Meta) → **strict variable binding**
+→ CommunicationService ledger → the abortable Meta adapter. A provider being
+technically configured **never** authorizes a communication; Phase 4 authorization
+still applies. Activation is performed later via the activation runbook
+(`QF-WhatsApp-Cloud-API-Activation-Runbook.md`).
 
 ## Webhook readiness
 

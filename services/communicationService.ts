@@ -57,6 +57,7 @@ import type {
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
 } from "../lib/communication/providers/whatsappProvider";
+import { effectiveOutcomeCertainty } from "../lib/communication/providers/whatsappProvider";
 import { normalizeProviderException } from "../lib/communication/providers/providerError";
 import { MockWhatsAppProvider } from "../lib/communication/providers/mockWhatsAppProvider";
 
@@ -95,6 +96,8 @@ const FAILURE_REASON_MAX_LENGTH = 500;
 const COMMUNICATION_ERROR_MESSAGES = {
   UNSUPPORTED_DISPATCH_CHANNEL:
     "This communication channel is not dispatchable by the active provider; the message was not sent on another channel.",
+  UNSUPPORTED_DISPATCH_PROVIDER:
+    "This message is owned by a different provider and was not dispatched by the active provider.",
   TEMPLATE_CHANNEL_MISMATCH:
     "The communication template channel does not match the requested channel.",
   TEMPLATE_NOT_FOUND_OR_INACTIVE: "The communication template does not exist or is inactive.",
@@ -145,7 +148,7 @@ function commError(code: CommunicationErrorCode): AppError {
  */
 const ALLOWED_TRANSITIONS: Record<CommunicationMessageStatus, CommunicationMessageStatus[]> = {
   queued: ["dispatching", "failed", "cancelled"],
-  dispatching: ["accepted", "sent", "failed", "retry_scheduled", "dead_letter"],
+  dispatching: ["accepted", "sent", "failed", "retry_scheduled", "dead_letter", "outcome_unknown"],
   accepted: ["sent", "delivered", "read", "failed"],
   sent: ["delivered", "read", "failed"],
   delivered: ["read"],
@@ -154,6 +157,9 @@ const ALLOWED_TRANSITIONS: Record<CommunicationMessageStatus, CommunicationMessa
   retry_scheduled: ["dispatching", "failed", "dead_letter", "cancelled"],
   dead_letter: [],
   cancelled: [],
+  // A parked unknown outcome only moves FORWARD, and only via a later verified
+  // provider webhook — never to retry_scheduled / dispatching / dead_letter.
+  outcome_unknown: ["sent", "delivered", "read", "failed"],
 };
 
 /**
@@ -272,6 +278,23 @@ export class CommunicationService {
    */
   private isForeignChannel(channel: CommunicationChannel | null | undefined): boolean {
     return channel != null && !isChannelDispatchable(channel, this.dispatchChannel());
+  }
+
+  /**
+   * Whether a persisted message's provider is FOREIGN to the active provider (Phase
+   * 5F-B provider identity fence). A message may only be dispatched by the provider
+   * that owns it — exact, case-sensitive equality of the persisted `message.provider`
+   * and the active `provider.providerKey`. An explicit mismatch is refused; the
+   * channel/provider is never rewritten and queued messages are never migrated
+   * between providers. A row without a provider (non-DB callers only; the column is
+   * NOT NULL) is treated as the active provider's own.
+   */
+  private isForeignProvider(messageProvider: string | null | undefined): boolean {
+    return (
+      typeof messageProvider === "string" &&
+      messageProvider.length > 0 &&
+      messageProvider !== this.provider.providerKey
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -495,6 +518,12 @@ export class CommunicationService {
       if (this.isForeignChannel(message.channel)) {
         return fail(commError("UNSUPPORTED_DISPATCH_CHANNEL"));
       }
+      // PROVIDER IDENTITY FENCE (final dispatch boundary). A persisted message may
+      // only be dispatched by the provider that owns it. Fail closed BEFORE the
+      // claim so zero provider calls occur; never reroute or migrate the message.
+      if (this.isForeignProvider(message.provider)) {
+        return fail(commError("UNSUPPORTED_DISPATCH_PROVIDER"));
+      }
 
       if (message.lane === "authentication" && !options.rawVariables) {
         return fail(commError("AUTH_LANE_NOT_REDISPATCHABLE"));
@@ -521,7 +550,16 @@ export class CommunicationService {
 
       try {
         const result = await this.invokeProvider(claimed, destination, providerTemplate, options);
-        return result.accepted
+        // CANONICAL FAIL-CLOSED DECISION ORDER (independent of adapter correctness):
+        //   1) derive the EFFECTIVE certainty (missing/invalid/contradictory →
+        //      unknown_outcome; never inferred from result.accepted);
+        //   2) ONLY a valid `accepted` certainty (which requires accepted === true)
+        //      enters success handling;
+        //   3) everything else — unknown_outcome (any accepted/retryable), or a
+        //      contradictory result — goes to the failure path, where unknown_outcome
+        //      is parked in outcome_unknown and a valid definitive_failure follows the
+        //      existing lane retry rules.
+        return effectiveOutcomeCertainty(result) === "accepted"
           ? await this.recordDispatchSuccess(claimed, currentAttempt, result)
           : await this.recordDispatchFailure(claimed, currentAttempt, result);
       } catch (recordingError) {
@@ -593,6 +631,22 @@ export class CommunicationService {
         errorCode: CHANNEL_DISPATCH_ERROR.UNSUPPORTED_DISPATCH_CHANNEL,
         errorMessage: "The message channel does not match the active provider channel.",
         retryable: false,
+        outcomeCertainty: "definitive_failure",
+      };
+    }
+    // PROVIDER IDENTITY FENCE immediately before the provider call (defence in depth
+    // with the dispatch-boundary fence). A message owned by a different provider is
+    // refused here with ZERO provider invocation — never rerouted.
+    if (this.isForeignProvider(message.provider)) {
+      return {
+        accepted: false,
+        provider: this.provider.providerKey,
+        providerMessageId: null,
+        normalizedStatus: "failed",
+        errorCode: "UNSUPPORTED_DISPATCH_PROVIDER",
+        errorMessage: "The message provider does not match the active provider.",
+        retryable: false,
+        outcomeCertainty: "definitive_failure",
       };
     }
     try {
@@ -680,6 +734,25 @@ export class CommunicationService {
     result: WhatsAppSendResult
   ): Promise<Result<CommunicationMessage>> {
     const nowIso = new Date().toISOString();
+
+    // UNKNOWN OUTCOME (Phase 5F-B): the provider may actually have accepted the
+    // request (a timeout / abort / ambiguous network / ambiguous 5xx / 2xx without a
+    // usable id, a contradictory result, or a missing/invalid certainty). We can
+    // neither prove nor disprove delivery, so we PARK the message in
+    // `outcome_unknown`: NO retry, NO dead_letter, NO `failed_at` stamp, and
+    // `next_retry_at = null`. A later verified webhook reconciles it forward. This
+    // DOMINATES the retryable flag: an unknown outcome is never collapsed into
+    // `failed`, and `retryable=true` never turns it into a retry.
+    if (effectiveOutcomeCertainty(result) === "unknown_outcome") {
+      return this.applyMessageUpdate(message.id, {
+        status: "outcome_unknown" as CommunicationMessageStatus,
+        attempt_count: attemptCount,
+        failure_code: result.errorCode,
+        failure_reason_sanitized: sanitizeFailureReason(result.errorMessage),
+        next_retry_at: null,
+        updated_at: nowIso,
+      });
+    }
 
     // Authentication is a single-shot lane: it never schedules a retry and it
     // never dead-letters. Its first delivery failure is simply `failed`.

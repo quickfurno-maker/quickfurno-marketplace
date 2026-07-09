@@ -423,6 +423,7 @@ function makeNamedProvider(providerKey) {
         accepted: true, provider: this.providerKey,
         providerMessageId: `${providerKey}-msg-${this.sentCount}`,
         normalizedStatus: "accepted", errorCode: null, errorMessage: null, retryable: false,
+        outcomeCertainty: "accepted",
       };
     },
     verifyWebhookSignature(rawBody, signature, secret) {
@@ -1414,14 +1415,16 @@ check("H2-b. business transient provider exception schedules a retry", async () 
   assertNoStrandedDispatching();
 });
 
-check("H2-c. a raw transport-code exception (ECONNRESET) is treated as transient", async () => {
+check("H2-c. a raw AMBIGUOUS transport-code exception (ECONNRESET) is parked as outcome_unknown", async () => {
   resetDb();
   const s = new CommunicationService(new MockWhatsAppProvider(), resolverFor({ "vendor:vend-123": MOCK_DESTINATIONS.THROW_TRANSPORT }));
   const res = await s.send(businessIntent());
 
   assert(res.ok === true, "throw normalized");
-  assert(res.data.status === "retry_scheduled", `expected retry_scheduled, got ${res.data.status}`);
+  // The provider may have accepted the request before the socket reset — ambiguous.
+  assert(res.data.status === "outcome_unknown", `expected outcome_unknown, got ${res.data.status}`);
   assert(res.data.failure_code === "ECONNRESET", `expected ECONNRESET, got ${res.data.failure_code}`);
+  assert(res.data.next_retry_at === null, "an ambiguous exception is never retried");
   assertNoStrandedDispatching();
 });
 
@@ -1467,7 +1470,9 @@ check("H2-f. an unclassified exception never leaks secrets and is never retried"
   const res = await s.send(businessIntent());
 
   assert(res.ok === true, "throw normalized");
-  assert(res.data.status === "failed", `an unprovable delivery must never be retried; got ${res.data.status}`);
+  // An unclassified exception is UNPROVABLE — parked as outcome_unknown, never retried.
+  assert(res.data.status === "outcome_unknown", `an unprovable delivery must never be retried or failed; got ${res.data.status}`);
+  assert(res.data.next_retry_at === null, "unclassified exception is never retried");
   assert(res.data.failure_code === "PROVIDER_EXCEPTION", `got ${res.data.failure_code}`);
 
   const persisted = JSON.stringify(db.communication_messages[0]);
@@ -1492,31 +1497,45 @@ check("H2-g. no exception path ever strands a message in dispatching", async () 
   }
 });
 
-check("H2-h. exception classification is deterministic and conservative", () => {
-  const { classifyProviderException, ProviderDispatchError, transientProviderError, permanentProviderError } = ProviderErrorMod;
+check("H2-h. exception classification is by PROVABLE certainty (ambiguous → unknown, never retried)", () => {
+  const { classifyProviderException, ProviderDispatchError, definitiveRetryableProviderError, definitivePermanentProviderError, unknownOutcomeProviderError } = ProviderErrorMod;
 
-  assert(classifyProviderException(transientProviderError("X_CODE", "m")).retryable === true, "explicit transient");
-  assert(classifyProviderException(permanentProviderError("Y_CODE", "m")).retryable === false, "explicit permanent");
-  assert(classifyProviderException(transientProviderError("X_CODE", "m")).code === "X_CODE", "adapter code preserved");
+  // Explicit typed errors carry their own validated certainty.
+  const dr = classifyProviderException(definitiveRetryableProviderError("X_CODE", "m"));
+  assert(dr.retryable === true && dr.outcomeCertainty === "definitive_failure" && dr.code === "X_CODE", "explicit definitive-retryable");
+  assert(classifyProviderException(definitivePermanentProviderError("Y_CODE", "m")).retryable === false, "explicit definitive-permanent");
+  const uk = unknownOutcomeProviderError("Z_CODE", "m");
+  assert(uk.retryable === false && uk.outcomeCertainty === "unknown_outcome", "unknown_outcome typed error forces retryable=false");
 
+  // AMBIGUOUS transport code → unknown_outcome, never retried merely for a familiar code.
   const econn = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
-  assert(classifyProviderException(econn).retryable === true, "known transport code is transient");
-  assert(classifyProviderException(econn).code === "ECONNRESET", "transport code preserved");
+  const ec = classifyProviderException(econn);
+  assert(ec.retryable === false && ec.outcomeCertainty === "unknown_outcome" && ec.code === "ECONNRESET", "ambiguous transport code is unknown, not retried");
 
-  const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
-  assert(classifyProviderException(abort).retryable === true, "AbortError is transient");
+  // PROVEN pre-connect failure → definitive_failure, safely retryable.
+  const dns = classifyProviderException(Object.assign(new Error("dns"), { code: "ENOTFOUND" }));
+  assert(dns.retryable === true && dns.outcomeCertainty === "definitive_failure", "proven pre-connect is definitive + retryable");
 
-  // Anything we cannot prove failed in transit must NOT be retried.
-  assert(classifyProviderException(new TypeError("x is not a function")).retryable === false, "adapter bug never retried");
+  // Abort/timeout → unknown_outcome, never retried.
+  const abort = classifyProviderException(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  assert(abort.retryable === false && abort.outcomeCertainty === "unknown_outcome", "AbortError is unknown, not retried");
+
+  // Unclassified → unknown_outcome, never definitive, never retried.
+  const bug = classifyProviderException(new TypeError("x is not a function"));
+  assert(bug.retryable === false && bug.outcomeCertainty === "unknown_outcome", "adapter bug → unknown, never retried");
   assert(classifyProviderException(new TypeError("x")).code === "PROVIDER_EXCEPTION", "unclassified code");
   assert(classifyProviderException("just a string").retryable === false, "non-Error throw handled");
   assert(classifyProviderException(null).code === "PROVIDER_EXCEPTION", "null throw handled");
 
-  // A hostile code that is not identifier-shaped must not be persisted verbatim.
+  // Hostile / non-identifier codes are never persisted verbatim.
   const hostile = Object.assign(new Error("x"), { code: "Bearer sk_live_abc; DROP TABLE" });
   assert(classifyProviderException(hostile).code === "PROVIDER_EXCEPTION", "non-identifier code rejected");
-  const hostileTyped = new ProviderDispatchError("Bearer sk_live_abc", "m", false);
+  const hostileTyped = new ProviderDispatchError("Bearer sk_live_abc", "m", "definitive_failure", false);
   assert(classifyProviderException(hostileTyped).code === "PROVIDER_EXCEPTION", "non-identifier adapter code rejected");
+
+  // A thrown failure can never be `accepted`: the constructor fails closed to unknown_outcome.
+  const bad = new ProviderDispatchError("A_CODE", "m", "accepted", true);
+  assert(bad.outcomeCertainty === "unknown_outcome" && bad.retryable === false, "accepted certainty on a thrown failure → unknown_outcome + retryable false");
 });
 
 check("H2-i. describeProviderException emits only allowlisted identifiers", () => {

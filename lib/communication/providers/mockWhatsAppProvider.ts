@@ -24,7 +24,7 @@ import type {
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
 } from "./whatsappProvider";
-import { permanentProviderError, transientProviderError } from "./providerError";
+import { definitivePermanentProviderError, definitiveRetryableProviderError } from "./providerError";
 import {
   isForbiddenSecurityMetadataKey,
   sanitizeAuthSecurityMetadata,
@@ -42,11 +42,11 @@ export const MOCK_DESTINATIONS = {
   RETRYABLE_FAILURE: "+15550000001",
   /** Returns a permanent failure RESULT (adapter does not throw). */
   PERMANENT_FAILURE: "+15550000002",
-  /** THROWS a transient ProviderDispatchError. */
+  /** THROWS a typed DEFINITIVE, safely-retryable ProviderDispatchError. */
   THROW_TRANSIENT: "+15550000003",
-  /** THROWS a permanent ProviderDispatchError. */
+  /** THROWS a typed DEFINITIVE, permanent ProviderDispatchError. */
   THROW_PERMANENT: "+15550000004",
-  /** THROWS a raw Error carrying a Node transport `code` (ECONNRESET). */
+  /** THROWS a raw Error carrying an AMBIGUOUS transport `code` (ECONNRESET). */
   THROW_TRANSPORT: "+15550000005",
   /** THROWS an unclassified Error whose message is stuffed with secrets. */
   THROW_LEAKY: "+15550000006",
@@ -126,6 +126,8 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
   readonly providerKey = MOCK_PROVIDER_KEY;
   /** This adapter serves the WhatsApp channel only. */
   readonly channel = "whatsapp" as const;
+  /** The mock sends by internal template key — no approved provider mapping needed. */
+  readonly templateResolutionMode = "internal_template" as const;
 
   private sendSequence = 0;
   private lastSentPayloads: MockSendRecord[] = [];
@@ -195,11 +197,12 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     // CommunicationService must normalize each of these into a safe delivery
     // failure and never strand the message in `dispatching`.
     if (to === MOCK_DESTINATIONS.THROW_TRANSIENT) {
-      throw transientProviderError("MOCK_TRANSIENT_TRANSPORT", "Simulated mock provider socket hang up");
+      // A typed error the adapter has PROVEN is a definitive, safely-retryable failure.
+      throw definitiveRetryableProviderError("MOCK_TRANSIENT_TRANSPORT", "Simulated adapter-proven definitive, safely-retryable failure");
     }
 
     if (to === MOCK_DESTINATIONS.THROW_PERMANENT) {
-      throw permanentProviderError("MOCK_PERMANENT_REJECTION", "Simulated mock provider permanent rejection");
+      throw definitivePermanentProviderError("MOCK_PERMANENT_REJECTION", "Simulated mock provider permanent rejection");
     }
 
     if (to === MOCK_DESTINATIONS.THROW_TRANSPORT) {
@@ -223,7 +226,10 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
         normalizedStatus: "failed",
         errorCode: "RATE_LIMIT_EXCEEDED",
         errorMessage: "Simulated mock provider rate limit exceeded",
+        // A rate-limit is a DEFINITE (provably-not-delivered) rejection that is safe
+        // to retry — definitive_failure keeps the existing retry lane behavior.
         retryable: true,
+        outcomeCertainty: "definitive_failure",
       };
     }
 
@@ -236,6 +242,7 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
         errorCode: "INVALID_DESTINATION_NUMBER",
         errorMessage: "Simulated mock provider invalid recipient destination",
         retryable: false,
+        outcomeCertainty: "definitive_failure",
       };
     }
 
@@ -252,6 +259,7 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
       errorCode: null,
       errorMessage: null,
       retryable: false,
+      outcomeCertainty: "accepted",
     };
   }
 

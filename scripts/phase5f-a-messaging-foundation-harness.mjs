@@ -1134,6 +1134,7 @@ srcMutation("MUT: remove the provider/message channel identity check",
   '        errorCode: CHANNEL_DISPATCH_ERROR.UNSUPPORTED_DISPATCH_CHANNEL,\n' +
   '        errorMessage: "The message channel does not match the active provider channel.",\n' +
   '        retryable: false,\n' +
+  '        outcomeCertainty: "definitive_failure",\n' +
   '      };\n' +
   '    }',
   "",

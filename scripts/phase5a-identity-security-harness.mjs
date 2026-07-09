@@ -154,7 +154,10 @@ check("15. client account status vocabulary is active/suspended/disabled", () =>
 const EXPECTED_EVENTS = [
   "vendor.login_success", "vendor.login_failed", "vendor.whatsapp_verification_requested",
   "vendor.whatsapp_verified", "vendor.password_reset_requested", "vendor.password_reset_otp_failed",
-  "vendor.password_reset_completed", "client.otp_requested", "client.login_success",
+  "vendor.password_reset_completed", "client.otp_requested",
+  // Phase 5D additions (client WhatsApp OTP login failure auditing).
+  "client.otp_request_failed", "client.otp_verify_failed",
+  "client.login_success",
   "auth.rate_limit_triggered", "auth.challenge_expired",
 ];
 check("16. every documented auth security event type accepted", () => {

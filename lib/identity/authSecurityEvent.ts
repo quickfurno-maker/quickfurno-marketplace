@@ -24,6 +24,11 @@ export const AuthSecurityEventType = {
   VENDOR_PASSWORD_RESET_OTP_FAILED: "vendor.password_reset_otp_failed",
   VENDOR_PASSWORD_RESET_COMPLETED: "vendor.password_reset_completed",
   CLIENT_OTP_REQUESTED: "client.otp_requested",
+  // Phase 5D — safe failure auditing for the client WhatsApp OTP login flow.
+  // Both carry ONLY sanitized classifications + a destination hash; never an OTP,
+  // token, raw phone, raw Auth error, hook body, signature, or session token.
+  CLIENT_OTP_REQUEST_FAILED: "client.otp_request_failed",
+  CLIENT_OTP_VERIFY_FAILED: "client.otp_verify_failed",
   CLIENT_LOGIN_SUCCESS: "client.login_success",
   AUTH_RATE_LIMIT_TRIGGERED: "auth.rate_limit_triggered",
   AUTH_CHALLENGE_EXPIRED: "auth.challenge_expired",

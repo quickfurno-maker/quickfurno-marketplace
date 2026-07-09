@@ -260,10 +260,14 @@ create table if not exists public.authentication_transport_policies (
   -- A fallback provider only makes sense with a fallback channel.
   constraint chk_auth_transport_fallback_consistency
     check (fallback_channel is not null or (fallback_provider_key is null and automatic_fallback_enabled = false and user_requested_fallback_enabled = false)),
-  -- vendor_whatsapp_verify NEVER has a fallback: possession of the WhatsApp number
-  -- cannot be proven by an SMS. This is a schema-level guarantee.
-  constraint chk_auth_transport_whatsapp_verify_no_fallback
-    check (auth_flow <> 'vendor_whatsapp_verify' or fallback_channel is null)
+  -- vendor_whatsapp_verify is WhatsApp-ONLY as a transport: its PRIMARY channel must
+  -- be whatsapp (an sms/rcs primary is structurally impossible — that flow proves
+  -- possession of the WhatsApp number) AND it declares NO fallback (SMS possession is
+  -- a different claim). One schema-level constraint proves both; it subsumes the
+  -- earlier no-fallback check, so that condition is not duplicated elsewhere.
+  constraint chk_auth_transport_whatsapp_verify_whatsapp_only
+    check (auth_flow <> 'vendor_whatsapp_verify'
+           or (primary_channel = 'whatsapp' and fallback_channel is null))
 );
 
 -- Safe seed: primary whatsapp on the current mock adapter; every fallback and

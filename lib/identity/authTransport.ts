@@ -139,6 +139,8 @@ export interface AuthDeliveryAttempt {
 // Fallback eligibility — fail closed
 // ----------------------------------------------------------------------------
 export const FallbackIneligibleReason = {
+  /** The evaluated authFlow does not match the policy's own authFlow. Fail closed. */
+  POLICY_FLOW_MISMATCH: "policy_flow_mismatch",
   NOT_DEFINITIVE_FAILURE: "not_definitive_failure",
   POLICY_DISABLED: "policy_disabled",
   AUTOMATIC_FALLBACK_DISABLED: "automatic_fallback_disabled",
@@ -156,15 +158,17 @@ export type FallbackEligibility =
 /**
  * THE fail-closed automatic-fallback gate.
  *
- * An automatic fallback is eligible ONLY when ALL of the following hold:
- *   1. the flow is NOT the WhatsApp-possession flow (vendor_whatsapp_verify never
+ * An automatic fallback is eligible ONLY when ALL of the following hold, IN ORDER:
+ *   1. the evaluated `authFlow` matches the policy's own `authFlow` — a policy for a
+ *      DIFFERENT flow can never make this flow eligible (fail closed);
+ *   2. the flow is NOT the WhatsApp-possession flow (vendor_whatsapp_verify never
  *      falls back — SMS possession ≠ WhatsApp possession);
- *   2. the outcome certainty is EXACTLY `definitive_failure` — never
+ *   3. the outcome certainty is EXACTLY `definitive_failure` — never
  *      `unknown_outcome` (timeout / delayed webhook / user-hasn't-typed) and never
  *      merely `!result.ok`;
- *   3. the policy is operationally enabled;
- *   4. automatic fallback is enabled on the policy;
- *   5. a fallback channel + provider are declared.
+ *   4. the policy is operationally enabled;
+ *   5. automatic fallback is enabled on the policy;
+ *   6. a fallback channel + provider are declared.
  *
  * `hardFailureOnly` is a belt-and-braces flag: even if it were somehow false, this
  * function still requires a definitive failure. Anything short of all conditions
@@ -176,6 +180,11 @@ export function evaluateAutomaticFallback(
   outcome: AuthTransportOutcome,
   policy: AuthTransportPolicy
 ): FallbackEligibility {
+  // (1) A policy governs exactly one auth flow. If the evaluated flow is not this
+  // policy's flow, fail closed — a wrong-flow policy must never yield eligibility.
+  if (authFlow !== policy.authFlow) {
+    return { eligible: false, reason: FallbackIneligibleReason.POLICY_FLOW_MISMATCH };
+  }
   if (authFlow === WHATSAPP_POSSESSION_FLOW || policy.authFlow === WHATSAPP_POSSESSION_FLOW) {
     return { eligible: false, reason: FallbackIneligibleReason.WHATSAPP_POSSESSION_FLOW };
   }
@@ -209,12 +218,49 @@ export function isAutomaticFallbackEligible(
 }
 
 /**
- * Build the declared transport plan from a policy. The plan carries a fallback
- * STEP only when the policy declares one AND the flow permits it (the
- * WhatsApp-possession flow never gets a fallback step). Declaring a plan is not the
- * same as being eligible to execute it — eligibility is re-checked per outcome.
+ * Why a policy is too semantically invalid to build a transport plan from. These
+ * are STRUCTURAL contradictions of the possession-flow invariant, not runtime
+ * failures — `buildAuthTransportPlan` refuses rather than silently repair them.
  */
-export function buildAuthTransportPlan(policy: AuthTransportPolicy): AuthTransportPlan {
+export const InvalidTransportPolicyReason = {
+  /** vendor_whatsapp_verify with a primary channel other than whatsapp. */
+  WHATSAPP_VERIFY_PRIMARY_NOT_WHATSAPP: "whatsapp_verify_primary_not_whatsapp",
+  /** vendor_whatsapp_verify that declares any fallback channel/provider. */
+  WHATSAPP_VERIFY_HAS_FALLBACK: "whatsapp_verify_has_fallback",
+} as const;
+
+export type InvalidTransportPolicyReasonValue =
+  (typeof InvalidTransportPolicyReason)[keyof typeof InvalidTransportPolicyReason];
+
+/** Fail-closed result of building a transport plan. */
+export type AuthTransportPlanResult =
+  | { readonly ok: true; readonly plan: AuthTransportPlan }
+  | { readonly ok: false; readonly reason: InvalidTransportPolicyReasonValue };
+
+/**
+ * Build the declared transport plan from a policy — FAIL CLOSED.
+ *
+ * A semantically invalid possession-flow policy yields `{ ok: false, reason }` and
+ * NO plan. The WhatsApp-possession flow (vendor_whatsapp_verify) must be WhatsApp-
+ * only: its primary channel must be whatsapp (an sms/rcs primary is refused, never
+ * rewritten to whatsapp), and it may declare no fallback (an sms/rcs "possession"
+ * is a different claim). This never silently repairs an invalid policy and never
+ * emits an executable-looking plan that contradicts the invariant.
+ *
+ * For a valid policy the plan carries a fallback STEP only when the policy declares
+ * one AND the flow permits it. Declaring a plan is not the same as being eligible to
+ * execute it — eligibility is re-checked per outcome by `evaluateAutomaticFallback`.
+ */
+export function buildAuthTransportPlan(policy: AuthTransportPolicy): AuthTransportPlanResult {
+  if (policy.authFlow === WHATSAPP_POSSESSION_FLOW) {
+    if (policy.primaryChannel !== AuthTransportChannel.WHATSAPP) {
+      return { ok: false, reason: InvalidTransportPolicyReason.WHATSAPP_VERIFY_PRIMARY_NOT_WHATSAPP };
+    }
+    if (policy.fallbackChannel !== null || policy.fallbackProviderKey !== null) {
+      return { ok: false, reason: InvalidTransportPolicyReason.WHATSAPP_VERIFY_HAS_FALLBACK };
+    }
+  }
+
   const primary: AuthTransportPlanStep = {
     channel: policy.primaryChannel,
     providerKey: policy.primaryProviderKey,
@@ -225,10 +271,13 @@ export function buildAuthTransportPlan(policy: AuthTransportPolicy): AuthTranspo
     policy.fallbackChannel !== null &&
     policy.fallbackProviderKey !== null;
   return {
-    authFlow: policy.authFlow,
-    primary,
-    fallback: canDeclareFallback
-      ? { channel: policy.fallbackChannel as AuthTransportChannelValue, providerKey: policy.fallbackProviderKey as string, attemptNumber: 2 }
-      : null,
+    ok: true,
+    plan: {
+      authFlow: policy.authFlow,
+      primary,
+      fallback: canDeclareFallback
+        ? { channel: policy.fallbackChannel as AuthTransportChannelValue, providerKey: policy.fallbackProviderKey as string, attemptNumber: 2 }
+        : null,
+    },
   };
 }

@@ -362,13 +362,18 @@ check("18-19. client-login and vendor-reset declare an SMS fallback vocabulary b
   }
 });
 
-check("20. vendor_whatsapp_verify has NO SMS fallback (possession claim differs) — seed AND schema", () => {
+check("20. vendor_whatsapp_verify is WhatsApp-ONLY (primary whatsapp, no fallback) — seed AND schema", () => {
   const row = SQL.transportSeed.byFlow.vendor_whatsapp_verify;
+  // (3) seed remains WhatsApp-primary / no-fallback.
   assert(row.primary_channel === "whatsapp", "primary whatsapp");
   assert(row.fallback_channel === "null", `vendor_whatsapp_verify must have NO fallback channel, got ${row.fallback_channel}`);
-  // A DB CHECK guarantees it regardless of any future seed edit.
-  assert(/chk_auth_transport_whatsapp_verify_no_fallback[\s\S]*?auth_flow <> 'vendor_whatsapp_verify' or fallback_channel is null/.test(SQL.stripped5fa), "schema CHECK forbids a vendor_whatsapp_verify fallback");
-  // The contract encodes the same rule.
+  // (1,2) A single DB CHECK forces BOTH primary=whatsapp AND fallback IS NULL for this
+  // flow, regardless of any future seed edit — an sms/rcs-primary row is impossible.
+  assert(/chk_auth_transport_whatsapp_verify_whatsapp_only/.test(SQL.stripped5fa), "the whatsapp-only CHECK exists");
+  assert(/chk_auth_transport_whatsapp_verify_whatsapp_only[\s\S]*?auth_flow <> 'vendor_whatsapp_verify'[\s\S]*?primary_channel = 'whatsapp' and fallback_channel is null/.test(SQL.stripped5fa), "schema CHECK forces primary=whatsapp AND no fallback for vendor_whatsapp_verify");
+  // The superseded no-fallback-only constraint is gone (folded into whatsapp_only, no duplication).
+  assert(!/chk_auth_transport_whatsapp_verify_no_fallback/.test(SQL.stripped5fa), "the weaker no-fallback-only constraint is replaced, not duplicated");
+  // The contract encodes the same possession-flow rule.
   assert(M.AuthTransport.WHATSAPP_POSSESSION_FLOW === "vendor_whatsapp_verify", "the possession flow is vendor_whatsapp_verify");
 });
 
@@ -428,6 +433,66 @@ check("28-29. unknown_outcome is NEVER fallback-eligible; definitive_failure onl
   const vwv = { ...policyEnabled, authFlow: "vendor_whatsapp_verify" };
   assert(A.evaluateAutomaticFallback("vendor_whatsapp_verify", mk("definitive_failure"), vwv).eligible === false, "vendor_whatsapp_verify never falls back");
   assert(A.isAutomaticFallbackEligible("vendor_whatsapp_verify", mk("definitive_failure"), vwv) === false, "…via the boolean helper too");
+});
+
+check("28b. evaluateAutomaticFallback fails closed on an authFlow/policy.authFlow mismatch", () => {
+  const A = M.AuthTransport;
+  const mk = (certainty) => ({ attemptNumber: 1, channel: "whatsapp", providerKey: "mock", certainty, failureClassification: null });
+  // (8,9) A FULLY enabled policy for a DIFFERENT flow is STILL ineligible — mismatch first.
+  const wrongFlowPolicy = {
+    authFlow: "vendor_password_reset", primaryChannel: "whatsapp", primaryProviderKey: "mock",
+    fallbackChannel: "sms", fallbackProviderKey: "mock_sms",
+    automaticFallbackEnabled: true, userRequestedFallbackEnabled: false, hardFailureOnly: true, isOperationallyEnabled: true,
+  };
+  const res = A.evaluateAutomaticFallback("client_login_otp", mk("definitive_failure"), wrongFlowPolicy);
+  assert(res.eligible === false && res.reason === "policy_flow_mismatch", `wrong-flow policy must be policy_flow_mismatch, got ${JSON.stringify(res)}`);
+  assert(A.isAutomaticFallbackEligible("client_login_otp", mk("definitive_failure"), wrongFlowPolicy) === false, "…and ineligible via the boolean helper");
+  assert(A.FallbackIneligibleReason.POLICY_FLOW_MISMATCH === "policy_flow_mismatch", "mismatch reason vocabulary present");
+  // The mismatch is checked BEFORE certainty: even an unknown outcome reports the mismatch.
+  const res2 = A.evaluateAutomaticFallback("client_login_otp", mk("unknown_outcome"), wrongFlowPolicy);
+  assert(res2.eligible === false && res2.reason === "policy_flow_mismatch", "mismatch takes precedence over certainty");
+  // (10,11) A CORRECT client_login_otp policy still evaluates normally.
+  const rightPolicy = { ...wrongFlowPolicy, authFlow: "client_login_otp" };
+  assert(A.evaluateAutomaticFallback("client_login_otp", mk("definitive_failure"), rightPolicy).eligible === true, "a correct-flow definitive_failure is still eligible");
+  assert(A.evaluateAutomaticFallback("client_login_otp", mk("unknown_outcome"), rightPolicy).eligible === false, "unknown_outcome remains ineligible under the correct policy");
+});
+
+check("28c. buildAuthTransportPlan fails closed on a semantically invalid possession-flow policy", () => {
+  const A = M.AuthTransport;
+  const base = {
+    authFlow: "vendor_whatsapp_verify", primaryChannel: "whatsapp", primaryProviderKey: "mock",
+    fallbackChannel: null, fallbackProviderKey: null,
+    automaticFallbackEnabled: false, userRequestedFallbackEnabled: false, hardFailureOnly: true, isOperationallyEnabled: false,
+  };
+  // A VALID possession policy → a plan with NO fallback step.
+  const okRes = A.buildAuthTransportPlan(base);
+  assert(okRes.ok === true, "a valid whatsapp-primary possession policy builds a plan");
+  assert(okRes.plan.primary.channel === "whatsapp" && okRes.plan.fallback === null, "possession plan is whatsapp-primary with no fallback step");
+  // (4,6) An SMS-primary vendor_whatsapp_verify is INVALID — no executable-looking plan, no sms->whatsapp rewrite.
+  const smsPrimary = A.buildAuthTransportPlan({ ...base, primaryChannel: "sms", primaryProviderKey: "mock_sms" });
+  assert(smsPrimary.ok === false && smsPrimary.reason === "whatsapp_verify_primary_not_whatsapp", "sms-primary vendor_whatsapp_verify is rejected");
+  assert(!("plan" in smsPrimary), "no plan object is returned for the invalid sms-primary policy");
+  // (5) An RCS-primary vendor_whatsapp_verify is likewise impossible (rcs !== whatsapp).
+  const rcsPrimary = A.buildAuthTransportPlan({ ...base, primaryChannel: "rcs", primaryProviderKey: "mock_rcs" });
+  assert(rcsPrimary.ok === false && rcsPrimary.reason === "whatsapp_verify_primary_not_whatsapp", "rcs-primary vendor_whatsapp_verify is rejected");
+  // (7) A vendor_whatsapp_verify that declares a fallback is INVALID — no fallback step ever.
+  const withFallback = A.buildAuthTransportPlan({ ...base, fallbackChannel: "sms", fallbackProviderKey: "mock_sms" });
+  assert(withFallback.ok === false && withFallback.reason === "whatsapp_verify_has_fallback", "a declared fallback for vendor_whatsapp_verify is rejected");
+  // A normal flow with a declared fallback still builds a plan WITH a fallback step (behavior preserved).
+  const otp = A.buildAuthTransportPlan({ ...base, authFlow: "client_login_otp", fallbackChannel: "sms", fallbackProviderKey: "mock_sms" });
+  assert(otp.ok === true && otp.plan.fallback !== null && otp.plan.fallback.channel === "sms", "a normal flow still declares its fallback step");
+});
+
+check("28d. the transport-policy correction adds NO send path / provider activation / fallback / RCS auth", () => {
+  // (12) The contract stays pure: no client, no network, no send, no OTP generation.
+  const code = stripTs(readFileSync(AUTH_TRANSPORT_SRC, "utf8"));
+  assert(!/\.send\(|sendAuthenticationMessage|sendTemplateMessage|fetch\s*\(|https?:\/\/|createClient|supabaseClient/i.test(code), "authTransport remains a pure contract (no send/network/client)");
+  // (13,14) Nothing activates an SMS provider or a fallback; the seed stays fully disabled.
+  for (const row of SQL.transportSeed.rows) {
+    assert(row.is_operationally_enabled === "false" && row.automatic_fallback_enabled === "false" && row.user_requested_fallback_enabled === "false", `${row.auth_flow} stays fully disabled`);
+  }
+  // (15) RCS is never an auth channel; a vendor_whatsapp_verify can never be rcs-primary (schema).
+  assert(/chk_auth_transport_no_rcs/.test(SQL.stripped5fa), "RCS remains forbidden in auth transport");
 });
 
 // ============================================================================
@@ -956,6 +1021,40 @@ tsMutation("MUT: make unknown_outcome fallback-eligible in the transport contrac
       automaticFallbackEnabled: true, userRequestedFallbackEnabled: false, hardFailureOnly: true, isOperationallyEnabled: true,
     };
     const outcome = { attemptNumber: 1, channel: "whatsapp", providerKey: "mock", certainty: "unknown_outcome", failureClassification: null };
+    return mm.AuthTransport.evaluateAutomaticFallback("client_login_otp", outcome, policy).eligible === true;
+  });
+
+// --- TRANSPORT-POLICY HARDENING mutations -----------------------------------
+// (A) Remove the WhatsApp-primary requirement from the schema constraint.
+sqlMutation("MUT: allow a non-whatsapp primary for vendor_whatsapp_verify (drop the whatsapp-only requirement)",
+  MIGRATION_5FA,
+  "check (auth_flow <> 'vendor_whatsapp_verify'\n           or (primary_channel = 'whatsapp' and fallback_channel is null))",
+  "check (auth_flow <> 'vendor_whatsapp_verify'\n           or (fallback_channel is null))",
+  () => {
+    // The schema no longer forces vendor_whatsapp_verify to be whatsapp-primary.
+    return !/chk_auth_transport_whatsapp_verify_whatsapp_only[\s\S]*?primary_channel = 'whatsapp' and fallback_channel is null/.test(SQL.stripped5fa);
+  });
+
+// (B) Let buildAuthTransportPlan emit an SMS-primary plan for vendor_whatsapp_verify.
+tsMutation("MUT: allow an SMS-primary vendor_whatsapp_verify transport plan",
+  [["lib/identity/authTransport.ts",
+    "    if (policy.primaryChannel !== AuthTransportChannel.WHATSAPP) {\n      return { ok: false, reason: InvalidTransportPolicyReason.WHATSAPP_VERIFY_PRIMARY_NOT_WHATSAPP };\n    }\n",
+    ""]],
+  (mm) => {
+    const p = { authFlow: "vendor_whatsapp_verify", primaryChannel: "sms", primaryProviderKey: "mock_sms", fallbackChannel: null, fallbackProviderKey: null, automaticFallbackEnabled: false, userRequestedFallbackEnabled: false, hardFailureOnly: true, isOperationallyEnabled: false };
+    const r = mm.AuthTransport.buildAuthTransportPlan(p);
+    return r.ok === true && r.plan.primary.channel === "sms"; // an sms-primary possession plan slipped through
+  });
+
+// (C) Remove the authFlow/policy.authFlow mismatch rejection.
+tsMutation("MUT: drop the authFlow/policy.authFlow mismatch rejection",
+  [["lib/identity/authTransport.ts",
+    "  if (authFlow !== policy.authFlow) {\n    return { eligible: false, reason: FallbackIneligibleReason.POLICY_FLOW_MISMATCH };\n  }\n",
+    ""]],
+  (mm) => {
+    const policy = { authFlow: "vendor_password_reset", primaryChannel: "whatsapp", primaryProviderKey: "mock", fallbackChannel: "sms", fallbackProviderKey: "mock_sms", automaticFallbackEnabled: true, userRequestedFallbackEnabled: false, hardFailureOnly: true, isOperationallyEnabled: true };
+    const outcome = { attemptNumber: 1, channel: "whatsapp", providerKey: "mock", certainty: "definitive_failure", failureClassification: null };
+    // A wrong-flow but fully-enabled policy now yields eligibility — the hazard.
     return mm.AuthTransport.evaluateAutomaticFallback("client_login_otp", outcome, policy).eligible === true;
   });
 

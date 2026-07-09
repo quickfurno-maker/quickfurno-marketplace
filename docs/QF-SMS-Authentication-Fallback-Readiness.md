@@ -5,7 +5,9 @@ transport fallback. Phase 5F-A connects **no** SMS provider, sends **no** SMS,
 activates **no** fallback, and claims **no** DLT approval. The `authentication_
 transport_policies` seed leaves every fallback `automatic_fallback_enabled = false`,
 `is_operationally_enabled = false`, and `fallback_policy_status = 'disabled'`, and
-`vendor_whatsapp_verify` has **no** fallback channel at all.
+`vendor_whatsapp_verify` is **WhatsApp-only** — primary `whatsapp`, no fallback
+channel at all, and an SMS-primary (or RCS-primary) `vendor_whatsapp_verify` is
+structurally impossible.
 
 ## Status
 
@@ -41,10 +43,19 @@ transport_policies` seed leaves every fallback `automatic_fallback_enabled = fal
   `definitive_failure` outcome (a proven non-delivery) — never on a timeout, a
   delayed/absent webhook, an unknown outcome, or merely `!result.ok`. See
   `lib/identity/authTransport.ts#evaluateAutomaticFallback`.
-- `vendor_whatsapp_verify` **never** falls back to SMS: that flow proves possession
-  of the WhatsApp destination, and SMS possession is a different claim. This is
-  enforced both in the contract and by a DB CHECK
-  (`chk_auth_transport_whatsapp_verify_no_fallback`).
+- `vendor_whatsapp_verify` is **WhatsApp-only as a transport plan**: its **primary is
+  WhatsApp** and its **fallback is none**. This is stronger than "no SMS fallback": an
+  **SMS-primary (or RCS-primary) `vendor_whatsapp_verify` is also impossible**,
+  because that flow proves possession of the WhatsApp destination and SMS/RCS
+  possession is a different claim. Enforced in the contract — `buildAuthTransportPlan`
+  fails closed (returns `{ ok: false }`, never a plan) on an sms/rcs primary or any
+  declared fallback for this flow, and `evaluateAutomaticFallback` never makes it
+  eligible — and by a DB CHECK
+  (`chk_auth_transport_whatsapp_verify_whatsapp_only`:
+  `primary_channel = 'whatsapp' and fallback_channel is null`).
+- A policy governs exactly one auth flow: `evaluateAutomaticFallback` fails closed
+  (`policy_flow_mismatch`) when the evaluated flow is not the policy's own flow, so a
+  wrong-flow policy can never yield eligibility.
 - Fallback additionally requires the policy to be operationally enabled and
   automatic fallback enabled — all currently `false`.
 

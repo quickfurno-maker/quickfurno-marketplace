@@ -13,7 +13,11 @@ campaigns) — encoded as `QUICKFURNO_PLANNED_FIRST_RCS_USE_CASE = promotional`.
 is deliberately **not** an authentication channel: the authentication transport
 vocabulary is WhatsApp/SMS only, a DB CHECK forbids `rcs` in any
 `authentication_transport_policies` row, and `verification_challenges.delivery_
-channel` remains `('whatsapp','sms')`.
+channel` remains `('whatsapp','sms')`. In particular, the possession flow
+`vendor_whatsapp_verify` is **WhatsApp-only** (primary `whatsapp`, no fallback), so
+an RCS-primary — like an SMS-primary — `vendor_whatsapp_verify` is structurally
+impossible (`chk_auth_transport_whatsapp_verify_whatsapp_only` +
+`buildAuthTransportPlan` fail-closed).
 
 ## Required future work (none done here)
 

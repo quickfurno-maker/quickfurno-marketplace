@@ -243,6 +243,14 @@ function loadSqlArtifacts() {
         /c\.vendor_id is not distinct from p_vendor_id/.test(bodies.consumeReset),
       revokesOlderOpenGrants: /set revoked_at = v_now/.test(bodies.consumeReset),
       storesHashOnly: /p_grant_token_hash/.test(bodies.consumeReset),
+      // FIX 1: the reset-grant TTL is DATABASE-OWNED — no caller expiry param, the
+      // expiry comes from an internal `now() + interval` constant.
+      noCallerExpiry: !/p_expires_at/.test(bodies.consumeReset),
+      grantTtlFromConstant: /now\(\) \+ c_reset_grant_ttl/.test(bodies.consumeReset),
+      grantTtlMs: (() => {
+        const m = bodies.consumeReset.match(/c_reset_grant_ttl\s+constant\s+interval\s*:=\s*interval\s*'([^']+)'/i);
+        return m ? intervalToMs(m[1]) : null;
+      })(),
     },
     claim: {
       checksConsumed: /g\.consumed_at is null/.test(bodies.claim),
@@ -313,6 +321,9 @@ function issueGuards(body) {
     maxPerHour: intConst("c_max_per_hour"),
     maxPerDay: intConst("c_max_per_day"),
     maxAttempts: intConst("c_max_attempts"),
+    // FIX 2: issuance must NOT stamp last_sent_at (nothing has been sent yet). The
+    // column only reappears in the insert if a mutation restores the false stamp.
+    stampsLastSentAt: /last_sent_at/.test(body),
   };
 }
 
@@ -721,6 +732,7 @@ function rpcConsumeWhatsapp(p) {
 }
 
 function rpcConsumeResetIssueGrant(p) {
+  lastGrantParams = { ...p };
   const g = SQL.guards.consumeReset;
   const now = Date.now();
   const c = challengeById(p.p_challenge_id);
@@ -747,6 +759,13 @@ function rpcConsumeResetIssueGrant(p) {
     }
   }
 
+  // FIX 1: the grant expiry is DATABASE-OWNED (now() + internal TTL constant). If a
+  // mutation swaps the constant for a caller param, grantTtlFromConstant is false and
+  // the expiry falls back to the (undefined) caller value — breaking enforcement.
+  const grantExpiresAt = g.grantTtlFromConstant
+    ? new Date(now + (g.grantTtlMs ?? 0)).toISOString()
+    : p.p_expires_at;
+
   const row = {
     id: crypto.randomUUID(),
     vendor_id: p.p_vendor_id,
@@ -754,7 +773,7 @@ function rpcConsumeResetIssueGrant(p) {
     vendor_dashboard_user_id: p.p_vendor_dashboard_user_id,
     challenge_id: p.p_challenge_id,
     grant_token_hash: p.p_grant_token_hash,
-    expires_at: p.p_expires_at,
+    expires_at: grantExpiresAt,
     consumed_at: null,
     revoked_at: null,
     created_at: stamp,
@@ -798,6 +817,7 @@ function rpcClaimGrant(p) {
  * exists to prevent.
  */
 let lastIssueParams = null;
+let lastGrantParams = null;
 async function rpcIssueChallenge(p) {
   lastIssueParams = { ...p };
   const g = SQL.guards.issue;
@@ -862,7 +882,9 @@ async function rpcIssueChallenge(p) {
     id: p.p_challenge_id, principal_type: "vendor", principal_id: p.p_vendor_id,
     purpose: p.p_purpose, destination_hash: p.p_destination_hash, otp_hash: p.p_otp_hash,
     status: "pending", expires_at: expiresAt, attempt_count: 0, max_attempts: maxAttempts,
-    resend_count: 0, verified_at: null, consumed_at: null, last_sent_at: nowIso(), last_attempt_at: null,
+    // FIX 2: issuance sends nothing → last_sent_at NULL unless a mutation restores it.
+    resend_count: 0, verified_at: null, consumed_at: null,
+    last_sent_at: g.stampsLastSentAt ? nowIso() : null, last_attempt_at: null,
     delivery_channel: null, delivery_provider: null, communication_message_id: null,
     vendor_dashboard_user_id: p.p_vendor_dashboard_user_id, user_id: p.p_user_id, vendor_id: p.p_vendor_id,
     created_at: nowIso(),
@@ -981,6 +1003,7 @@ function resetDb() {
   adminUpdateFailure = null;
   challengeLinkageFault = null;
   lastIssueParams = null;
+  lastGrantParams = null;
 
   db.vendors = [{ id: VENDOR_A }, { id: VENDOR_B }];
   db.vendor_dashboard_users = [
@@ -2059,6 +2082,14 @@ check("122c. the atomic function guards are all present in the SQL", () => {
   // The 7-arg signature carries no policy params.
   const issueSig = SQL.stripped5e.match(/create or replace function public\.vendor_auth_issue_challenge\(([\s\S]*?)\)\s*returns/);
   assert(issueSig && !/p_(expires_at|max_attempts|cooldown_seconds|max_per_hour|max_per_day)/.test(issueSig[1]), "the issuance signature has no policy parameter");
+  // FIX 2 (this pass): issuance must NOT stamp last_sent_at.
+  assert(g.issue.stampsLastSentAt === false, "issuance leaves last_sent_at NULL (nothing sent yet)");
+  // FIX 1 (this pass): the reset-grant TTL is database-owned, not caller-supplied.
+  assert(g.consumeReset.noCallerExpiry, "grant issuance accepts NO caller expiry parameter");
+  assert(g.consumeReset.grantTtlFromConstant, "the grant expiry comes from an internal now()+interval constant");
+  assert(g.consumeReset.grantTtlMs === 10 * 60 * 1000, `authoritative reset-grant TTL is 10 min, got ${g.consumeReset.grantTtlMs}`);
+  const grantSig = SQL.stripped5e.match(/create or replace function public\.vendor_auth_consume_reset_challenge_and_issue_grant\(([\s\S]*?)\)\s*returns/);
+  assert(grantSig && !/p_expires_at/.test(grantSig[1]), "the grant-issuance signature has no expiry parameter");
   // The migration declares the four indexes the identity model depends on.
   const names = Object.values(SQL.uniqueIndexes).flat().map((i) => i.name);
   for (const required of ["uq_vendor_dashboard_users_phone_e164", "uq_verification_challenges_one_pending", "uq_password_reset_grants_one_open", "uq_password_reset_grants_token"]) {
@@ -2387,6 +2418,151 @@ check("P8. the app constant cannot weaken SQL enforcement (it never reaches the 
   assert(M.VerifyLib.VENDOR_OTP_MAX_ATTEMPTS === SQL.guards.issue.maxAttempts, "advisory attempts matches");
   assert(M.VerifyLib.VENDOR_OTP_TTL_MS === SQL.guards.issue.ttlMs, "advisory TTL matches");
   assert(M.VerifyLib.VENDOR_CHALLENGE_COOLDOWN_MS === SQL.guards.issue.cooldownMs, "advisory cooldown matches");
+});
+
+// ============================================================================
+// FIX 1 (this pass) — DATABASE-OWNED RESET GRANT TTL
+// ============================================================================
+async function issueResetGrant(mod = M) {
+  const { res, otp } = await eligibleResetChallenge(mod);
+  const out = await mod.Reset.verifyVendorPasswordResetOtp({ challengeId: res.reference, otp });
+  return out;
+}
+
+check("G1-5. the reset-grant RPC sends no expiry; the DB owns exactly a 10-min TTL and returns it", async () => {
+  const t0 = Date.now();
+  const out = await issueResetGrant();
+  assert(out.ok === true, "grant issued");
+  // 1. the grant-issuance RPC accepts NO expiry parameter (the caller sent none).
+  assert(lastGrantParams, "the grant RPC was called");
+  assert(!("p_expires_at" in lastGrantParams), "the caller must not send p_expires_at");
+  assert(JSON.stringify(Object.keys(lastGrantParams).sort()) === JSON.stringify([
+    "p_challenge_id", "p_grant_token_hash", "p_user_id", "p_vendor_dashboard_user_id", "p_vendor_id",
+  ]), `the grant RPC takes exactly 5 identity/hash params, got ${Object.keys(lastGrantParams).join(",")}`);
+
+  // 4. the SQL owns exactly a 10-minute TTL, from the database clock.
+  const g = grants()[0];
+  const ttl = Date.parse(g.expires_at) - t0;
+  assert(ttl > 9 * 60 * 1000 && ttl <= 10 * 60 * 1000 + 5000, `grant TTL must be ~10 min, got ${Math.round(ttl / 1000)}s`);
+
+  // 5. the returned expiry equals the persisted grant expiry (came from the SQL result).
+  assert(out.data.expiresAt === g.expires_at, "the service returns the DB-generated expires_at");
+  // The application never computes the authoritative grant expiry.
+  assert(!/resetGrantExpiryIso\(\)/.test(RESET_SVC_SRC), "the reset service never computes the authoritative grant expiry");
+  assert(!/p_expires_at/.test(CHALLENGE_SVC_SRC), "the wrapper never sends p_expires_at");
+});
+
+check("G6. grant claim still rejects an expired grant", async () => {
+  const out = await issueResetGrant();
+  const token = out.data.grantToken;
+  grants()[0].expires_at = new Date(Date.now() - 1000).toISOString();
+  const done = await M.Reset.completeVendorPasswordReset({ grantToken: token, newPassword: "NewPassw0rd!" });
+  assert(done.ok === false, "an expired grant cannot be claimed");
+  assert(adminUpdateCalls.length === 0, "no Supabase password update on an expired grant");
+});
+
+check("G7-9. atomic consume+issue, one-open-grant, and single-winner concurrency remain intact", async () => {
+  // Atomic consume + issue: the challenge is consumed exactly when the grant is issued.
+  const first = await issueResetGrant();
+  assert(first.ok === true && grants().length === 1, "one grant issued");
+  assert(challenges()[0].status === "consumed", "challenge consumed atomically with grant issue");
+
+  // One open grant per Auth user across a second cycle.
+  challenges()[0].created_at = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const second = await issueResetChallenge(M);
+  const pending = challenges().find((c) => c.status === "pending");
+  const g2 = await M.Reset.verifyVendorPasswordResetOtp({ challengeId: pending.id, otp: second.otp });
+  assert(g2.ok === true, "second grant issued");
+  assert(openGrants().length === 1, `exactly one open grant, got ${openGrants().length}`);
+
+  // Concurrent verification yields exactly one issued grant.
+  const c = await eligibleResetChallenge();
+  const [a, b] = await Promise.all([
+    M.Reset.verifyVendorPasswordResetOtp({ challengeId: c.res.reference, otp: c.otp }),
+    M.Reset.verifyVendorPasswordResetOtp({ challengeId: c.res.reference, otp: c.otp }),
+  ]);
+  assert([a, b].filter((r) => r.ok).length === 1, "exactly one concurrent verification wins");
+  assert(openGrants().length === 1, "still exactly one open grant");
+});
+
+// ============================================================================
+// FIX 2 (this pass) — last_sent_at MEANS ACTUAL SEND/LINKAGE
+// ============================================================================
+check("L1-4. a newly issued challenge has NULL delivery metadata (nothing sent yet)", async () => {
+  resetAll();
+  enableBothAutomations();
+  // Issue a challenge but make delivery fail so linkage never runs — the row is the
+  // raw issuance state.
+  loginAs(USER_A);
+  await M.Verify.requestVendorWhatsappVerification({ phone: FAIL_PHONE });
+  // The dispatch failed, so the challenge is cancelled — but its delivery metadata
+  // was NEVER stamped at issuance. Inspect the row directly.
+  const c = challenges()[0];
+  assert(c.last_sent_at === null, `last_sent_at must be NULL at issuance, got ${c.last_sent_at}`);
+  assert(c.delivery_channel === null, "delivery_channel NULL at issuance");
+  assert(c.delivery_provider === null, "delivery_provider NULL at issuance");
+  assert(c.communication_message_id === null, "communication_message_id NULL at issuance");
+
+  // Prove it directly against the atomic function too (no dispatch involved at all).
+  resetAll();
+  enableBothAutomations();
+  const cid = crypto.randomUUID();
+  await M.ChallengeSvc.issueChallengeAtomic({
+    challengeId: cid, purpose: "vendor_whatsapp_verify",
+    vendorDashboardUserId: VDU_A, authUserId: USER_A, vendorId: VENDOR_A,
+    destinationHash: M.Phone.hashPhoneE164(PHONE_A), otpHash: "a".repeat(64),
+  });
+  const raw = challenges().find((x) => x.id === cid);
+  assert(raw && raw.status === "pending", "issued pending");
+  assert(raw.last_sent_at === null && raw.delivery_channel === null && raw.delivery_provider === null && raw.communication_message_id === null,
+    "the freshly issued row carries no send/linkage metadata");
+});
+
+check("L5. a successful delivery linkage stamps all four fields correctly", async () => {
+  resetAll();
+  enableBothAutomations();
+  const { res } = await issueWhatsappChallenge(M);
+  const c = challenges()[0];
+  const msg = db.communication_messages[0];
+  assert(c.communication_message_id === msg.id, "message id linked to the exact ledger row");
+  assert(c.delivery_channel === "whatsapp", "channel stamped");
+  assert(c.delivery_provider === "mock", "provider stamped");
+  assert(typeof c.last_sent_at === "string" && Date.parse(c.last_sent_at) > 0, "last_sent_at stamped at linkage");
+});
+
+check("L6-9. dispatch/linkage failure never fabricates send metadata; no second send; no revival", async () => {
+  // Dispatch failure → challenge cancelled, last_sent_at stays NULL.
+  resetAll();
+  enableBothAutomations();
+  loginAs(USER_A);
+  const fail = await M.Verify.requestVendorWhatsappVerification({ phone: FAIL_PHONE });
+  assert(fail.ok === false && challenges()[0].status === "cancelled", "dispatch failure cancels the challenge");
+  assert(challenges()[0].last_sent_at === null, "dispatch failure leaves last_sent_at NULL");
+  assert(challenges()[0].communication_message_id === null, "no ledger id fabricated");
+
+  // Linkage DB error → fail closed, no false successful linkage, provider called once.
+  resetAll();
+  enableBothAutomations();
+  loginAs(USER_A);
+  challengeLinkageFault = "error";
+  const linkErr = await M.Verify.requestVendorWhatsappVerification({ phone: PHONE_A });
+  assert(linkErr.ok === false, "linkage DB error fails closed");
+  const c = challenges()[0];
+  assert(c.status === "cancelled", "the challenge is cancelled");
+  assert(c.last_sent_at === null && c.communication_message_id === null && c.delivery_provider === null && c.delivery_channel === null,
+    "a failed linkage never leaves false successful-linkage metadata");
+  assert(sends().length === 1, "the provider was called exactly once (no resend)");
+
+  // Zero-row linkage (challenge concurrently terminalized) → not revived, no metadata.
+  resetAll();
+  enableBothAutomations();
+  loginAs(USER_A);
+  challengeLinkageFault = "zero_rows";
+  const zero = await M.Verify.requestVendorWhatsappVerification({ phone: PHONE_A });
+  assert(zero.ok === false, "zero-row linkage fails closed");
+  assert(challenges()[0].status !== "pending", "a terminalized challenge is not revived to pending");
+  assert(challenges()[0].last_sent_at === null, "no false last_sent_at on a zero-row linkage");
+  assert(sends().length === 1, "no second provider call");
 });
 
 // ============================================================================
@@ -2990,6 +3166,54 @@ tsMutation("MUT(channel): removing the channel binding lets a wrong-channel row 
     loginAs(USER_A);
     const out = await mm.Verify.verifyVendorWhatsappChallenge({ challengeId: res.data.challengeId, phone: PHONE_A, otp });
     return out.ok === true; // a wrong-channel row attested
+  });
+
+// --- FIX 1 (this pass): DATABASE-OWNED RESET GRANT TTL ----------------------
+sqlMutation("MUT(grant-ttl): reintroduce a caller-supplied grant expiry",
+  "  v_grant_expires_at timestamptz := now() + c_reset_grant_ttl;",
+  "  v_grant_expires_at timestamptz := p_expires_at;",
+  async (mm) => {
+    // The grant expiry now comes from a caller param the wrapper never sends
+    // (undefined), so the persisted/returned expiry is no longer the ~10-min DB value.
+    const out = await issueResetGrant(mm);
+    if (!out.ok) return true; // any deviation from the safe path counts as broken
+    const ttl = Date.parse(grants()[0].expires_at) - Date.now();
+    return !(ttl > 9 * 60 * 1000 && ttl <= 10 * 60 * 1000 + 5000);
+  });
+
+tsMutation("MUT(grant-ttl): the wrapper sends an application-generated expiry",
+  [["services/vendorAuthChallengeService.ts",
+    "        p_grant_token_hash: params.grantTokenHash,\n      }",
+    "        p_grant_token_hash: params.grantTokenHash,\n        p_expires_at: new Date(Date.now() + 999 * 60000).toISOString(),\n      }"]],
+  async (mm) => {
+    // The app must transmit NO expiry to the grant authority.
+    await issueResetGrant(mm);
+    return !!lastGrantParams && "p_expires_at" in lastGrantParams; // the app sent an expiry
+  });
+
+sqlMutation("MUT(grant-ttl): widen the DB grant TTL to an unsafe longer value",
+  "c_reset_grant_ttl constant interval := interval '10 minutes';",
+  "c_reset_grant_ttl constant interval := interval '10 days';",
+  async (mm) => {
+    // The DB TTL is no longer the authoritative 10 minutes.
+    if (SQL.guards.consumeReset.grantTtlMs === 10 * 60 * 1000) return false;
+    const out = await issueResetGrant(mm);
+    if (!out.ok) return true;
+    const ttl = Date.parse(grants()[0].expires_at) - Date.now();
+    return ttl > 60 * 60 * 1000; // far longer than the safe 10-minute ceiling
+  });
+
+// --- FIX 2 (this pass): last_sent_at MUST MEAN ACTUAL SEND ------------------
+sqlMutation("MUT(last-sent): restore last_sent_at = v_now in challenge issuance",
+  "     vendor_id)\n  values\n    (p_challenge_id, 'vendor', p_vendor_id, p_purpose, p_destination_hash, p_otp_hash,\n     'pending', v_now + c_ttl, 0, c_max_attempts, p_vendor_dashboard_user_id, p_user_id,\n     p_vendor_id);",
+  "     vendor_id, last_sent_at)\n  values\n    (p_challenge_id, 'vendor', p_vendor_id, p_purpose, p_destination_hash, p_otp_hash,\n     'pending', v_now + c_ttl, 0, c_max_attempts, p_vendor_dashboard_user_id, p_user_id,\n     p_vendor_id, v_now);",
+  async (mm) => {
+    // Stamping last_sent_at at issuance fabricates send history even when nothing was
+    // delivered — exercise a DISPATCH FAILURE and observe the false stamp.
+    resetDb(); enableBothAutomations(); loginAs(USER_A);
+    await mm.Verify.requestVendorWhatsappVerification({ phone: FAIL_PHONE });
+    const c = challenges()[0];
+    return c && c.last_sent_at !== null; // false send history despite no delivery
   });
 
 // ============================================================================

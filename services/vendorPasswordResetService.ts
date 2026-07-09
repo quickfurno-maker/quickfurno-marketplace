@@ -34,10 +34,7 @@ import {
 } from "../lib/identity/verification";
 import { isActiveVendorMembership } from "../lib/identity/vendorAccess";
 import { VENDOR_PASSWORD_RESET_BINDING } from "../lib/identity/vendorAuthAutomation";
-import {
-  isChallengeExpired,
-  resetGrantExpiryIso,
-} from "../lib/identity/vendorVerification";
+import { isChallengeExpired } from "../lib/identity/vendorVerification";
 import {
   VENDOR_PASSWORD_RESET_FAILED_CODE,
   VENDOR_PASSWORD_RESET_FAILED_MESSAGE,
@@ -603,16 +600,16 @@ export async function verifyVendorPasswordResetOtp(
     // High-entropy token in request memory. Only its SHA-256 reaches the database.
     const grantToken = generateResetGrantToken();
     const grantTokenHash = hashResetGrantToken(grantToken);
-    const expiresAt = resetGrantExpiryIso();
 
     // ATOMIC: CAS the challenge to consumed, revoke older open grants, insert one.
+    // The grant TTL is DATABASE-OWNED — no expiry is passed from here; the function
+    // returns the authoritative expires_at.
     const issued = await consumeResetChallengeAndIssueGrant({
       challengeId: challenge.id,
       vendorDashboardUserId: challenge.vendor_dashboard_user_id as string,
       authUserId: challenge.user_id as string,
       vendorId: challenge.vendor_id as string,
       grantTokenHash,
-      expiresAt,
     });
     if (!issued.ok) {
       await auditResetFailure({

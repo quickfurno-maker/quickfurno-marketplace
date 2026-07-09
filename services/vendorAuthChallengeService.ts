@@ -455,6 +455,10 @@ export interface IssuedGrantIdentity {
  * Atomically consume the password-reset challenge, revoke every older open grant
  * for this Auth user, and insert the new grant HASH. Returns only non-secret
  * identity/metadata — never the token or its hash.
+ *
+ * SECURITY POLICY AUTHORITY: this wrapper passes NO expiry. The database function
+ * owns the reset-grant TTL (now() + 10 minutes) and RETURNS the authoritative
+ * `expires_at`, which the caller surfaces unchanged.
  */
 export async function consumeResetChallengeAndIssueGrant(params: {
   challengeId: string;
@@ -462,7 +466,6 @@ export async function consumeResetChallengeAndIssueGrant(params: {
   authUserId: string;
   vendorId: string;
   grantTokenHash: string;
-  expiresAt: string;
 }): Promise<Result<IssuedGrantIdentity>> {
   try {
     const { data, error } = await adminClient().rpc(
@@ -473,7 +476,6 @@ export async function consumeResetChallengeAndIssueGrant(params: {
         p_user_id: params.authUserId,
         p_vendor_id: params.vendorId,
         p_grant_token_hash: params.grantTokenHash,
-        p_expires_at: params.expiresAt,
       }
     );
     if (error) throw error;
@@ -491,6 +493,7 @@ export async function consumeResetChallengeAndIssueGrant(params: {
       authUserId: row.user_id,
       vendorId: row.vendor_id,
       vendorDashboardUserId: row.vendor_dashboard_user_id,
+      // The DATABASE-generated expiry, surfaced unchanged.
       expiresAt: row.expires_at,
     });
   } catch (e) {

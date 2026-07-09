@@ -158,6 +158,28 @@ for UI countdown display, documentation, tests, and user messaging. They are not
 security authority and never reach the function; the harness asserts they equal the
 SQL constants but proves enforcement is independent of them.
 
+The same rule applies to the **reset-grant TTL** (post-push correction).
+`vendor_auth_consume_reset_challenge_and_issue_grant` takes **no `p_expires_at`**: it
+computes `expires_at = now() + interval '10 minutes'` from the database clock, inserts
+the grant with it, and **returns** it. The wrapper passes no expiry, and the reset
+service surfaces the DB-generated `expires_at` unchanged — the application never
+computes the authoritative grant expiry. `RESET_GRANT_TTL_MS` remains an advisory
+value for UI/docs/tests only.
+
+### `last_sent_at` means an actual send (post-push correction)
+
+`vendor_auth_issue_challenge` inserts a new challenge with `last_sent_at`,
+`delivery_channel`, `delivery_provider`, and `communication_message_id` all **NULL** —
+issuance has sent nothing yet. Those four fields are stamped **only** by
+`recordChallengeDelivery`, and only after the provider accepted the OTP and the
+challenge→ledger link was written (`last_sent_at` = the linkage timestamp,
+`delivery_channel` = `whatsapp`, `delivery_provider` = the authorized provider,
+`communication_message_id` = the exact ledger row). A dispatch failure or a linkage
+failure cancels the challenge and leaves `last_sent_at` NULL; a zero-row linkage (the
+challenge was concurrently terminalized) never revives it and never fabricates send
+metadata. This prevents false send history for a provider failure, a request failure
+after issuance, or a challenge that was never delivered.
+
 ### Delivery-linkage failure fails closed (Fix 3)
 
 After the provider accepts the OTP, the challenge is linked to the ledger row via a
@@ -274,7 +296,8 @@ row locking — not application code — serializes concurrent callers:
   bind the verified identity; a phone conflict (23505) aborts the whole
   transaction.
 - `vendor_auth_consume_reset_challenge_and_issue_grant` — CAS the challenge, revoke
-  older open grants, insert one new grant hash.
+  older open grants, insert one new grant hash with a **database-owned** expiry
+  (`now() + interval '10 minutes'`; no caller `p_expires_at`), and return that expiry.
 - `vendor_auth_claim_reset_grant` — a single conditional update; exactly one
   concurrent completion can claim (burn) a grant.
 

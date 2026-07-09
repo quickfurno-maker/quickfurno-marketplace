@@ -549,13 +549,19 @@ grant execute on function public.vendor_auth_consume_whatsapp_challenge(uuid, uu
 -- Atomically: CAS the pending password-reset challenge to 'consumed', revoke every
 -- older open grant for that Auth user (expired ones included), and insert the new
 -- grant HASH. Returns only non-secret identity/metadata — never the token or hash.
+--
+-- SECURITY POLICY AUTHORITY: the reset-grant TTL is DATABASE-OWNED, exactly like the
+-- challenge TTL / attempt limit / rate limits. The function takes NO p_expires_at —
+-- it computes expires_at = now() + interval '10 minutes' from the database clock and
+-- RETURNS it. A caller (even the service-role application) can never lengthen,
+-- shorten, or otherwise control the grant lifetime. The application keeps a matching
+-- advisory RESET_GRANT_TTL_MS for UI/docs/tests only; it never reaches this function.
 create or replace function public.vendor_auth_consume_reset_challenge_and_issue_grant(
   p_challenge_id             uuid,
   p_vendor_dashboard_user_id uuid,
   p_user_id                  uuid,
   p_vendor_id                uuid,
-  p_grant_token_hash         text,
-  p_expires_at               timestamptz
+  p_grant_token_hash         text
 )
 returns table (
   grant_id                 uuid,
@@ -569,9 +575,12 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_now      timestamptz := now();
-  v_consumed uuid;
-  v_grant    uuid;
+  -- Authoritative reset-grant lifetime. Not caller-controllable.
+  c_reset_grant_ttl constant interval := interval '10 minutes';
+  v_now             timestamptz := now();
+  v_grant_expires_at timestamptz := now() + c_reset_grant_ttl;
+  v_consumed        uuid;
+  v_grant           uuid;
 begin
   update public.verification_challenges c
      set status      = 'consumed',
@@ -601,21 +610,21 @@ begin
 
   -- uq_password_reset_grants_one_open is the final authority: if a racing writer
   -- somehow left an open grant standing, this insert raises rather than producing
-  -- two usable reset tokens.
+  -- two usable reset tokens. The expires_at is database-owned (now() + TTL).
   insert into public.password_reset_grants
     (vendor_id, user_id, vendor_dashboard_user_id, challenge_id, grant_token_hash, expires_at)
   values
-    (p_vendor_id, p_user_id, p_vendor_dashboard_user_id, p_challenge_id, p_grant_token_hash, p_expires_at)
+    (p_vendor_id, p_user_id, p_vendor_dashboard_user_id, p_challenge_id, p_grant_token_hash, v_grant_expires_at)
   returning id into v_grant;
 
-  return query select v_grant, p_user_id, p_vendor_id, p_vendor_dashboard_user_id, p_expires_at;
+  return query select v_grant, p_user_id, p_vendor_id, p_vendor_dashboard_user_id, v_grant_expires_at;
 end
 $$;
 
-revoke all on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text, timestamptz) from public;
-revoke all on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text, timestamptz) from anon;
-revoke all on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text, timestamptz) from authenticated;
-grant execute on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text, timestamptz) to service_role;
+revoke all on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text) from public;
+revoke all on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text) from anon;
+revoke all on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text) from authenticated;
+grant execute on function public.vendor_auth_consume_reset_challenge_and_issue_grant(uuid, uuid, uuid, uuid, text) to service_role;
 
 
 -- ----------------------------------------------------------------------------
@@ -786,6 +795,14 @@ begin
   -- then insert exactly one new pending challenge. A rate-limited request never
   -- reaches this point, so it can never cancel a still-valid challenge. The
   -- expires_at and max_attempts are database-owned: (now() + c_ttl) and c_max_attempts.
+  --
+  -- last_sent_at / delivery_channel / delivery_provider / communication_message_id
+  -- are DELIBERATELY LEFT NULL here. Issuance has sent nothing yet — the OTP is
+  -- dispatched by CommunicationService AFTER this returns, and only a successful
+  -- delivery + linkage (recordChallengeDelivery) stamps last_sent_at and the channel/
+  -- provider/message id. Stamping last_sent_at at issuance would fabricate send
+  -- history for a provider failure, a linkage failure, or a challenge that was never
+  -- delivered.
   update public.verification_challenges c
      set status = 'cancelled'
    where c.vendor_dashboard_user_id = p_vendor_dashboard_user_id
@@ -795,11 +812,11 @@ begin
   insert into public.verification_challenges
     (id, principal_type, principal_id, purpose, destination_hash, otp_hash, status,
      expires_at, attempt_count, max_attempts, vendor_dashboard_user_id, user_id,
-     vendor_id, last_sent_at)
+     vendor_id)
   values
     (p_challenge_id, 'vendor', p_vendor_id, p_purpose, p_destination_hash, p_otp_hash,
      'pending', v_now + c_ttl, 0, c_max_attempts, p_vendor_dashboard_user_id, p_user_id,
-     p_vendor_id, v_now);
+     p_vendor_id);
 
   return query select 'issued'::text, null::text, p_challenge_id;
   return;

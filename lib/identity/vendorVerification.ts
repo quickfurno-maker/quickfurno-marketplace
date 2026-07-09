@@ -36,7 +36,15 @@ export const VENDOR_CHALLENGES_PER_DAY = 12;
 export const VENDOR_RATE_WINDOW_HOUR_MS = 60 * 60 * 1000;
 export const VENDOR_RATE_WINDOW_DAY_MS = 24 * 60 * 60 * 1000;
 
-/** How long a single-use password reset grant stays claimable. */
+/**
+ * How long a single-use password reset grant stays claimable — ADVISORY ONLY.
+ *
+ * The authoritative reset-grant TTL is owned by the database function
+ * `vendor_auth_consume_reset_challenge_and_issue_grant` (now() + interval
+ * '10 minutes'), which computes and returns the grant's `expires_at`. This constant
+ * exists solely for UI display, documentation, and tests; it is never passed to the
+ * function and never used to compute the authoritative grant expiry.
+ */
 export const RESET_GRANT_TTL_MS = 10 * 60 * 1000;
 
 export const VendorRateLimitScope = {
@@ -96,7 +104,11 @@ export function challengeExpiryIso(nowMs: number = Date.now()): string {
   return new Date(nowMs + VENDOR_OTP_TTL_MS).toISOString();
 }
 
-/** The `expires_at` a freshly issued reset grant carries. */
+/**
+ * ADVISORY reset-grant expiry for UI display only. The AUTHORITATIVE grant expiry
+ * is computed and returned by the database function — never by this helper. Do not
+ * use this to set a grant's persisted `expires_at`.
+ */
 export function resetGrantExpiryIso(nowMs: number = Date.now()): string {
   return new Date(nowMs + RESET_GRANT_TTL_MS).toISOString();
 }

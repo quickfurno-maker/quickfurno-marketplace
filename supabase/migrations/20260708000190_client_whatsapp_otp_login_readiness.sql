@@ -10,7 +10,8 @@
 --   • client_accounts carries exactly the least-privilege grants the server layer
 --     needs (authenticated: SELECT only; service_role: SELECT/INSERT/UPDATE);
 --   • a partial index supports the WhatsApp delivery ATTESTATION lookup the verify
---     service performs — indexing only hashes/ids/status/time, never plaintext.
+--     service performs — indexing only hashes/ids/provider/status/time, never
+--     plaintext.
 --
 -- IDENTITY MODEL (unchanged, do not merge):
 --   • Supabase Auth               = OTP generation/validity/verification + session
@@ -80,11 +81,21 @@ begin
   where automation_key = 'client_login_otp';
 
   -- Structural invariants that must hold in BOTH acceptable states.
-  if v_row.lane <> 'authentication'
-     or v_row.channel <> 'whatsapp'
-     or v_row.template_key <> 'client_login_otp'
-     or v_row.provider_required <> 'mock'
-     or v_row.is_operationally_enabled <> false then
+  --
+  -- NULL-SAFETY (why `is distinct from`, never `<>`):
+  --   communication_automation_catalog.template_key is NULLABLE. In PostgreSQL
+  --   `NULL <> 'client_login_otp'` evaluates to NULL — not TRUE — so an OR-chain of
+  --   `<>` tests yields NULL for a NULL field, the `if` does not fire, and a
+  --   malformed row (e.g. an already-mock_ready row whose template_key is NULL)
+  --   would slip past this guard instead of RAISING. `is distinct from` is the
+  --   null-safe comparison: it returns TRUE when exactly one side is NULL.
+  --   Every structural field is compared this way, including the NOT NULL ones, so
+  --   the guard also fails closed under future schema drift that relaxes them.
+  if v_row.lane is distinct from 'authentication'
+     or v_row.channel is distinct from 'whatsapp'
+     or v_row.template_key is distinct from 'client_login_otp'
+     or v_row.provider_required is distinct from 'mock'
+     or v_row.is_operationally_enabled is distinct from false then
     raise exception
       'Phase 5D: client_login_otp automation is in an unexpected state (lane=%, channel=%, template=%, provider=%, enabled=%)',
       v_row.lane, v_row.channel, v_row.template_key, v_row.provider_required, v_row.is_operationally_enabled
@@ -92,7 +103,9 @@ begin
             hint = 'Phase 5D refuses to run against an unexpected or already-operational automation state.';
   end if;
 
-  if v_row.readiness_status = 'wiring_pending' then
+  -- Null-safe dispatch: a NULL readiness matches neither branch and falls to the
+  -- final `else`, which RAISEs. It is never silently treated as an accepted state.
+  if v_row.readiness_status is not distinct from 'wiring_pending' then
     -- CASE A — expected transition.
     update public.communication_automation_catalog
     set readiness_status = 'mock_ready', updated_at = now()
@@ -109,7 +122,7 @@ begin
         using errcode = 'cardinality_violation';
     end if;
 
-  elsif v_row.readiness_status = 'mock_ready' then
+  elsif v_row.readiness_status is not distinct from 'mock_ready' then
     -- CASE B — already correct. Idempotent no-op.
     null;
 
@@ -161,15 +174,22 @@ grant select, insert, update on public.client_accounts to service_role;
 -- 3) COMMUNICATION ATTESTATION INDEX — support the verify-time ledger lookup
 -- ----------------------------------------------------------------------------
 -- The client verify service confirms a recent successful client_login_otp
--- WhatsApp communication for the verified Supabase Auth user + phone, using the
--- EXISTING communication_messages ledger (no second OTP/challenge table is
--- created). This partial index covers exactly that lookup.
+-- WhatsApp communication for the verified Supabase Auth user + phone, DELIVERED BY
+-- THE PROVIDER THE OPERATIONAL GATE AUTHORIZED, using the EXISTING
+-- communication_messages ledger (no second OTP/challenge table is created). This
+-- partial index covers exactly that lookup.
+--
+-- `provider` is part of the key because the verify service binds the attestation to
+-- `gate.provider_required`: once an operator switches from the mock adapter to a
+-- real one, a stale `provider = 'mock'` row must not attest a real-provider login.
+-- The equality columns lead, then the ordering column.
 --
 -- It indexes ONLY entity_id (the auth user id), destination_hash (sha256 of the
--- canonical phone), status, and created_at. There is no plaintext phone or OTP
--- column in communication_messages, and none is referenced here.
+-- canonical phone), provider (an adapter key such as 'mock'), status, and
+-- created_at. There is no plaintext phone or OTP column in communication_messages,
+-- and none is referenced here.
 create index if not exists idx_comm_messages_client_login_attestation
-  on public.communication_messages (entity_id, destination_hash, status, created_at desc)
+  on public.communication_messages (entity_id, destination_hash, provider, status, created_at desc)
   where message_type = 'client_login_otp'
     and lane = 'authentication'
     and entity_type = 'auth_user';

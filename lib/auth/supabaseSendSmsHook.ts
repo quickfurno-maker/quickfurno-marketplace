@@ -140,19 +140,33 @@ export async function readBoundedRawBody(
 /**
  * The server-only environment variable holding the Send SMS hook secret(s).
  *
- * FORMAT: NEWLINE-delimited (one secret per line). A comma is NOT a valid
- * delimiter because the Supabase hook-secret representation `v1,whsec_<base64>`
- * itself contains a comma; splitting on it would corrupt the secret. Newlines
- * never appear inside a valid secret representation, so the format is
- * unambiguous. Blank lines are ignored, each line is trimmed, and duplicates are
- * de-duplicated (so a repeated secret is tried once, never ambiguously twice).
+ * FORMAT (Supabase-documented): each secret is the versioned representation
+ * `v1,whsec_<base64-secret>`, and MULTIPLE secrets are separated by a PIPE:
  *
- * Rotation: put the current and previous secret on separate lines; verification
- * succeeds if ANY configured secret validates.
+ *     v1,whsec_SECRET_A|v1,whsec_SECRET_B
+ *
+ * A COMMA IS NEVER A SEPARATOR. The comma in `v1,whsec_…` belongs to the secret's
+ * own version marker; splitting on it would slice every secret in half and the
+ * hook would fail to verify a legitimately signed request.
+ *
+ * A newline is additionally accepted as an operator-friendly separator (it never
+ * appears inside a valid secret representation), so a multi-line env value works
+ * the same way. Empty segments are ignored, each complete secret is trimmed, and
+ * exact duplicates are collapsed so a repeated secret is tried once. Order is
+ * preserved: list the CURRENT secret first, the previous one after it.
+ *
+ * Rotation: verification succeeds if ANY configured secret validates. An empty
+ * final configuration means "not configured" and the caller FAILS CLOSED.
  *
  * Documented only — Phase 5D does NOT create or modify any .env file.
  */
 export const SEND_SMS_HOOK_SECRETS_ENV = "SEND_SMS_HOOK_SECRETS";
+
+/**
+ * The separators between whole secrets: the documented pipe, plus newlines for
+ * operator convenience. Deliberately EXCLUDES the comma — see above.
+ */
+const HOOK_SECRET_SEPARATORS = /[|\r\n]+/;
 
 /**
  * Parse the configured secrets. Returns a de-duplicated, order-preserving list.
@@ -163,10 +177,10 @@ export function loadSendSmsHookSecrets(env: NodeJS.ProcessEnv = process.env): st
   if (typeof raw !== "string") return [];
   const seen = new Set<string>();
   const secrets: string[] = [];
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) continue; // blank lines are not secrets
-    if (seen.has(trimmed)) continue; // duplicates are collapsed
+  for (const candidate of raw.split(HOOK_SECRET_SEPARATORS)) {
+    const trimmed = candidate.trim();
+    if (trimmed.length === 0) continue; // empty segments are not secrets
+    if (seen.has(trimmed)) continue; // exact duplicates are collapsed
     seen.add(trimmed);
     secrets.push(trimmed);
   }
@@ -177,9 +191,12 @@ export function loadSendSmsHookSecrets(env: NodeJS.ProcessEnv = process.env): st
  * Supabase issues the secret as `v1,whsec_<base64>`. The `standardwebhooks`
  * library strips a leading `whsec_` itself, so we only strip the `v1,` version
  * marker; a bare `whsec_...` or raw base64 secret passes through untouched.
+ * The value is trimmed first so a stray space around a rotation entry cannot
+ * silently break verification.
  */
 export function normalizeHookSecret(secret: string): string {
-  return secret.startsWith("v1,") ? secret.slice(3) : secret;
+  const trimmed = secret.trim();
+  return trimmed.startsWith("v1,") ? trimmed.slice(3) : trimmed;
 }
 
 // ----------------------------------------------------------------------------

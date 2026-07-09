@@ -12,6 +12,20 @@
 //   worker, a scheduled send, or a retry. Phase 5B's authentication lane already
 //   enforces single-shot, non-schedulable, non-redispatchable behaviour.
 //
+// HOOK TIME BUDGET (deliberately NOT a Promise.race)
+//   Supabase gives an HTTP Auth Hook a bounded time to respond. We do NOT wrap the
+//   provider send in a Promise.race timeout: a race REJECTS the waiter but does not
+//   CANCEL the underlying request. The provider call would keep running, Supabase
+//   would see a timeout and retry, and the original request could still succeed —
+//   which is a duplicate-OTP hazard, exactly what the idempotency key exists to
+//   prevent. For mock-only Phase 5D readiness the send is effectively instantaneous,
+//   so the behaviour stays synchronous.
+//   REQUIREMENT FOR A REAL PROVIDER: the adapter itself must enforce an ABORTABLE
+//   network timeout (AbortController/AbortSignal on the outbound HTTP call, or the
+//   SDK's own cancellation) set comfortably inside the Supabase hook budget, so a
+//   timed-out send is genuinely cancelled rather than merely abandoned. Do not
+//   activate a real provider before that adapter-level timeout exists.
+//
 // ORDER OF OPERATIONS (never reordered)
 //   size ceiling → headers → secret → SIGNATURE VERIFICATION → parse/validate →
 //   operational gate → build intent → single dispatch → map status to outcome.
@@ -43,6 +57,8 @@ import { CommunicationService } from "./communicationService";
 // ----------------------------------------------------------------------------
 export const SendSmsHookRejectReason = {
   OVERSIZED_BODY: "oversized_body",
+  /** The bounded reader could not read the request body. */
+  READ_FAILED: "read_failed",
   MISSING_HEADERS: "missing_headers",
   SECRET_NOT_CONFIGURED: "secret_not_configured",
   INVALID_SIGNATURE: "invalid_signature",
@@ -81,51 +97,102 @@ function reject(reason: SendSmsHookRejectReasonValue): SendSmsHookOutcome {
   return { kind: SendSmsHookOutcomeKind.REJECTED, rejectReason: reason, dispatchAttempted: false };
 }
 
+/**
+ * Build a rejection outcome for a failure detected by the transport adapter BEFORE
+ * the service runs (an oversized or unreadable body), so the route maps it through
+ * the same single HTTP response contract instead of hand-rolling one.
+ */
+export function rejectSendSmsHookRequest(reason: SendSmsHookRejectReasonValue): SendSmsHookOutcome {
+  return reject(reason);
+}
+
 // ----------------------------------------------------------------------------
 // HTTP response contract (Supabase Send SMS Hook)
 // ----------------------------------------------------------------------------
+export const CONTENT_TYPE_HEADER = "Content-Type";
+export const RETRY_AFTER_HEADER = "Retry-After";
+export const JSON_CONTENT_TYPE = "application/json";
+
+/**
+ * Supabase's HTTP Auth Hook client retries a 429/503 ONLY when the response
+ * carries a NON-EMPTY `Retry-After` header; it tests the header's presence, not
+ * its value. `"true"` is the value Supabase's own hook documentation uses.
+ */
+export const RETRY_AFTER_VALUE = "true";
+
 /**
  * The deterministic HTTP shape for a hook outcome. `body: null` means an EMPTY
  * response body (success). Every non-success body carries ONLY a safe, generic
  * code — never the OTP, phone, secret, signature, raw provider error, raw
- * payload, or any token.
+ * payload, or any token. `headers` is always explicit: every JSON body declares
+ * `application/json`, and ONLY the retryable in-progress state sets `Retry-After`.
  */
 export interface SendSmsHookHttpResponse {
   readonly status: number;
   readonly body: Record<string, unknown> | null;
+  readonly headers: Readonly<Record<string, string>>;
+}
+
+/** A safe generic JSON error response with an explicit content type. */
+function jsonResponse(
+  status: number,
+  code: string,
+  extraHeaders: Record<string, string> = {}
+): SendSmsHookHttpResponse {
+  return {
+    status,
+    body: { ok: false, code },
+    headers: { [CONTENT_TYPE_HEADER]: JSON_CONTENT_TYPE, ...extraHeaders },
+  };
 }
 
 export function sendSmsHookHttpResponse(outcome: SendSmsHookOutcome): SendSmsHookHttpResponse {
   switch (outcome.kind) {
     // Delivered / accepted (incl. an accepted idempotent replay) → 200, empty body.
     case SendSmsHookOutcomeKind.DELIVERED:
-      return { status: 200, body: null };
-    // Automation not operationally enabled (the Phase 5D shipped state).
+      return {
+        status: 200,
+        body: null,
+        headers: { [CONTENT_TYPE_HEADER]: JSON_CONTENT_TYPE, "Content-Length": "0" },
+      };
+
+    // Automation not operationally enabled (the Phase 5D shipped state). This is a
+    // STANDING state, not a transient one: deliberately NO Retry-After, so Supabase
+    // does not burn its hook budget retrying a switch only an operator can flip.
     case SendSmsHookOutcomeKind.SERVICE_UNAVAILABLE:
-      return { status: 503, body: { ok: false, code: "service_unavailable" } };
-    // Provider failed/cancelled/dead_letter — no blind resend.
+      return jsonResponse(503, "service_unavailable");
+
+    // Provider failed/cancelled/dead_letter — a terminal single-shot auth failure.
+    // No Retry-After: a retry must never blindly resend an OTP.
     case SendSmsHookOutcomeKind.DELIVERY_FAILED:
-      return { status: 502, body: { ok: false, code: "delivery_failed" } };
-    // Queued/dispatching — not confirmed delivered, never a 2xx, never a resend.
+      return jsonResponse(502, "delivery_failed");
+
+    // Queued/dispatching — the FIRST delivery is still in flight and this request is
+    // its idempotent duplicate. 503 + a non-empty Retry-After asks Supabase to retry
+    // inside its own hook budget; the replay then observes the accepted/sent row and
+    // returns 200. Nothing is resent, no new webhook id or message row is created.
     case SendSmsHookOutcomeKind.IN_PROGRESS:
-      return { status: 503, body: { ok: false, code: "in_progress" } };
+      return jsonResponse(503, "in_progress", { [RETRY_AFTER_HEADER]: RETRY_AFTER_VALUE });
+
     case SendSmsHookOutcomeKind.REJECTED:
       switch (outcome.rejectReason) {
         case SendSmsHookRejectReason.MISSING_HEADERS:
         case SendSmsHookRejectReason.INVALID_SIGNATURE:
-          return { status: 401, body: { ok: false, code: "unauthorized" } };
+          return jsonResponse(401, "unauthorized");
         case SendSmsHookRejectReason.OVERSIZED_BODY:
-          return { status: 413, body: { ok: false, code: "oversized_body" } };
+          return jsonResponse(413, "oversized_body");
+        case SendSmsHookRejectReason.READ_FAILED:
+          return jsonResponse(400, "read_failed");
         case SendSmsHookRejectReason.MALFORMED_PAYLOAD:
-          return { status: 400, body: { ok: false, code: "malformed_payload" } };
+          return jsonResponse(400, "malformed_payload");
         case SendSmsHookRejectReason.SECRET_NOT_CONFIGURED:
           // Never reveal secret existence/absence in detail — a generic 500.
-          return { status: 500, body: { ok: false, code: "configuration_error" } };
+          return jsonResponse(500, "configuration_error");
         default:
-          return { status: 400, body: { ok: false, code: "rejected" } };
+          return jsonResponse(400, "rejected");
       }
     default:
-      return { status: 500, body: { ok: false, code: "server_error" } };
+      return jsonResponse(500, "server_error");
   }
 }
 

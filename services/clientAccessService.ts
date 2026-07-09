@@ -163,6 +163,103 @@ async function fetchByPhone(phoneE164: string): Promise<ClientAccountRow | null>
 }
 
 /**
+ * THE canonical success postcondition. NOTHING returns a provisioning success
+ * without passing through here, so a success result can never carry an
+ * incompletely-bound identity.
+ *
+ * A successful Phase 5D provisioning ALWAYS satisfies, on the FINAL persisted row:
+ *   • authUserId          === the verified Supabase Auth user id
+ *   • phoneE164           === the verified canonical phone (never null)
+ *   • status              === active
+ *   • whatsappVerifiedAt  !== null
+ *
+ * Anything else is a conflict, not a partially-good login.
+ */
+function finalizeSuccess(
+  row: ClientAccountRow | null,
+  authUserId: string,
+  phoneE164: string
+): ClientProvisioningResult {
+  if (!row || !row.id || !row.user_id || !isClientAccountStatus(row.status)) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.PROVISIONING_FAILED);
+  }
+  // The row must belong to the auth user we verified — never another principal.
+  if (row.user_id !== authUserId) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
+  }
+  // Suspended/disabled never becomes a success, on any path.
+  if (!isActiveClientAccount(row.status)) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.ACCOUNT_NOT_ACTIVE);
+  }
+  // A null or divergent phone means the identity is not bound. Never succeed.
+  if (row.phone_e164 !== phoneE164) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
+  }
+  // The WhatsApp verification stamp is the proof this login wrote. Never succeed
+  // without it — a null timestamp means some path skipped or lost the write.
+  if (!row.whatsapp_verified_at) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.PROVISIONING_FAILED);
+  }
+  return { ok: true, context: toContext(row, authUserId) };
+}
+
+/**
+ * A conditional (compare-and-set) update matched zero rows because a concurrent
+ * request for the SAME user won. Re-read the FINAL row and validate every success
+ * invariant against it — never return the stale pre-update context.
+ */
+async function finalizeFromRefetch(
+  authUserId: string,
+  phoneE164: string
+): Promise<ClientProvisioningResult> {
+  const final = await fetchByUser(authUserId);
+  return finalizeSuccess(final, authUserId, phoneE164);
+}
+
+/**
+ * Reconcile an EXISTING client_accounts row for this auth user against the
+ * verified phone. Shared by the first-pass lookup and the concurrent-insert
+ * loser, so both obey exactly the same identity rules and the same success
+ * postcondition.
+ */
+async function reconcileExistingClient(
+  row: ClientAccountRow,
+  authUserId: string,
+  phoneE164: string
+): Promise<ClientProvisioningResult> {
+  if (!row.id || !row.user_id || !isClientAccountStatus(row.status)) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.PROVISIONING_FAILED);
+  }
+  if (row.user_id !== authUserId) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
+  }
+  // Suspended/disabled → deny, never reactivate.
+  if (!isActiveClientAccount(row.status)) {
+    return provisioningConflict(ClientOtpVerifyFailureClassification.ACCOUNT_NOT_ACTIVE);
+  }
+
+  // Same user, same phone → idempotent. Preserve an existing first verification
+  // timestamp; stamp one only if it is still null.
+  if (row.phone_e164 === phoneE164) {
+    if (row.whatsapp_verified_at) return finalizeSuccess(row, authUserId, phoneE164);
+    const stamped = await stampVerifiedTimestamp(row.id);
+    // Zero rows → a concurrent same-user request stamped it first. Re-read the
+    // final row rather than returning the stale, still-null context.
+    if (!stamped) return await finalizeFromRefetch(authUserId, phoneE164);
+    return finalizeSuccess(stamped, authUserId, phoneE164);
+  }
+
+  // User row with a NULL phone → may adopt the verified phone, under compare-and-set.
+  if (row.phone_e164 === null) {
+    return await adoptPhone(row.id, authUserId, phoneE164);
+  }
+
+  // User row with a DIFFERENT non-null phone → never overwrite established
+  // identity. Fail closed.
+  return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
+}
+
+/**
  * Resolve or create the client_accounts row for a verified (authUserId, phoneE164).
  *
  * The unique index on user_id and the partial unique index on phone_e164 are the
@@ -188,35 +285,7 @@ export async function provisionVerifiedClientAccount(input: {
       return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
     }
 
-    if (byUser) {
-      if (!byUser.id || !isClientAccountStatus(byUser.status)) {
-        return provisioningConflict(ClientOtpVerifyFailureClassification.PROVISIONING_FAILED);
-      }
-      // Suspended/disabled → deny, never reactivate.
-      if (!isActiveClientAccount(byUser.status)) {
-        return provisioningConflict(ClientOtpVerifyFailureClassification.ACCOUNT_NOT_ACTIVE);
-      }
-
-      // Same user, same phone → idempotent. Preserve an existing first verification
-      // timestamp; stamp one only if it is still null.
-      if (byUser.phone_e164 === phoneE164) {
-        if (!byUser.whatsapp_verified_at) {
-          const stamped = await stampVerifiedTimestamp(byUser.id);
-          return { ok: true, context: toContext(stamped ?? byUser, authUserId) };
-        }
-        return { ok: true, context: toContext(byUser, authUserId) };
-      }
-
-      // User row with a NULL phone → may adopt the verified phone, but only if no
-      // other account owns it (already checked above: byPhone is null or ours).
-      if (byUser.phone_e164 === null) {
-        return await adoptPhone(byUser.id, authUserId, phoneE164);
-      }
-
-      // User row with a DIFFERENT non-null phone → never overwrite established
-      // identity. Fail closed.
-      return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
-    }
+    if (byUser) return await reconcileExistingClient(byUser, authUserId, phoneE164);
 
     // No row for this user, but a row already holds this phone for THIS user with
     // no user-id match above — a contradiction under the unique user_id index.
@@ -231,6 +300,11 @@ export async function provisionVerifiedClientAccount(input: {
   }
 }
 
+/**
+ * Compare-and-set the first verification timestamp. Returns null when zero rows
+ * matched — i.e. a concurrent request stamped it first, which the caller must
+ * resolve by re-reading the final row.
+ */
 async function stampVerifiedTimestamp(clientAccountId: string): Promise<ClientAccountRow | null> {
   const nowIso = new Date().toISOString();
   const { data, error } = await adminClient()
@@ -244,6 +318,14 @@ async function stampVerifiedTimestamp(clientAccountId: string): Promise<ClientAc
   return rows[0] ?? null;
 }
 
+/**
+ * Adopt the verified phone onto a null-phone row belonging to this user, setting
+ * the verification timestamp in the SAME statement so the two can never diverge.
+ *
+ * The update is a compare-and-set: it matches only while the row still belongs to
+ * `authUserId` AND its phone is still null. Zero rows therefore means a concurrent
+ * same-user request adopted first, and the final row is re-read and re-validated.
+ */
 async function adoptPhone(
   clientAccountId: string,
   authUserId: string,
@@ -254,6 +336,7 @@ async function adoptPhone(
     .from(CLIENT_ACCOUNTS_TABLE)
     .update({ phone_e164: phoneE164, whatsapp_verified_at: nowIso, updated_at: nowIso })
     .eq("id", clientAccountId)
+    .eq("user_id", authUserId)
     .is("phone_e164", null)
     .select(CLIENT_ACCOUNT_COLUMNS);
 
@@ -266,10 +349,10 @@ async function adoptPhone(
     throw error;
   }
   const rows = (data ?? []) as ClientAccountRow[];
-  if (rows.length !== 1) {
-    return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
-  }
-  return { ok: true, context: toContext(rows[0], authUserId) };
+  if (rows.length === 1) return finalizeSuccess(rows[0], authUserId, phoneE164);
+  if (rows.length === 0) return await finalizeFromRefetch(authUserId, phoneE164);
+  // More than one row matched an id-scoped update — impossible; fail closed.
+  return provisioningConflict(ClientOtpVerifyFailureClassification.PROVISIONING_FAILED);
 }
 
 async function insertNewClient(
@@ -296,28 +379,32 @@ async function insertNewClient(
     }
     throw error;
   }
-  if (!data) return provisioningConflict(ClientOtpVerifyFailureClassification.PROVISIONING_FAILED);
-  return { ok: true, context: toContext(data as ClientAccountRow, authUserId) };
+  return finalizeSuccess((data as ClientAccountRow | null) ?? null, authUserId, phoneE164);
 }
 
+/**
+ * Our INSERT lost a 23505 race. Adopt the winning row only if it can be brought to
+ * the full success postcondition — including safely completing a phone adoption
+ * the winner had not finished. A winner with a null phone is NEVER returned as-is.
+ */
 async function resolveConcurrentWinner(
   authUserId: string,
   phoneE164: string
 ): Promise<ClientProvisioningResult> {
-  const winnerByUser = await fetchByUser(authUserId);
   const winnerByPhone = await fetchByPhone(phoneE164);
-
+  // The phone belongs to a different auth user → identity conflict, no adoption.
   if (winnerByPhone && winnerByPhone.user_id && winnerByPhone.user_id !== authUserId) {
     return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
   }
-  if (winnerByUser && winnerByUser.id && isClientAccountStatus(winnerByUser.status)) {
-    if (!isActiveClientAccount(winnerByUser.status)) {
-      return provisioningConflict(ClientOtpVerifyFailureClassification.ACCOUNT_NOT_ACTIVE);
-    }
-    if (winnerByUser.phone_e164 === phoneE164 || winnerByUser.phone_e164 === null) {
-      return { ok: true, context: toContext(winnerByUser, authUserId) };
-    }
+
+  const winnerByUser = await fetchByUser(authUserId);
+  // We lost the insert but no row exists for this user — a contradiction under the
+  // unique user_id index. Fail closed rather than invent an identity.
+  if (!winnerByUser) {
     return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
   }
-  return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);
+
+  // Same rules as the first-pass path: adopt a null phone under compare-and-set,
+  // stamp a missing timestamp, deny a divergent phone or a non-active status.
+  return await reconcileExistingClient(winnerByUser, authUserId, phoneE164);
 }

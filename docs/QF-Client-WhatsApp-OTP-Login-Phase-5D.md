@@ -71,11 +71,18 @@ Supabase Auth
 2. `serverClient().auth.verifyOtp({ phone, token, type: "sms" })`.
 3. Require an authenticated user id and that the Auth user's verified phone
    normalizes to the same canonical phone.
-4. Require a **fresh, successful QuickFurno WhatsApp communication attestation**
-   in `communication_messages` (accepted/sent/delivered/read), and an
-   operationally acceptable automation/provider relationship.
+4. Require an operationally acceptable automation/provider relationship, then a
+   **fresh, successful QuickFurno WhatsApp communication attestation** in
+   `communication_messages` (accepted/sent/delivered/read) that is **bound to the
+   provider the gate authorized** (`provider = gate.provider_required`). The
+   provider is both filtered in the query and re-validated in code, so neither a
+   stale `mock` row after a real adapter is switched on, nor a real row while the
+   mock adapter is active, can ever attest a login.
 5. Resolve/provision `client_accounts` safely; set `whatsapp_verified_at` **only
-   after** every condition passes.
+   after** every condition passes. A provisioning success is only ever returned
+   through one canonical validator that requires the verified auth user, the
+   verified phone (never null), an `active` status, and a non-null
+   `whatsapp_verified_at` — every concurrency path included.
 6. Any denial after a session was established invalidates **only** that local
    session (`signOut({ scope: "local" })`, bounded retry, never global) and
    returns one generic public failure.
@@ -104,52 +111,97 @@ Additive, idempotent, **not applied by this phase**:
    `wiring_pending → mock_ready` **only** in the exact safe state; it never sets
    `is_operationally_enabled = true` or `readiness_status = 'active'`, never
    changes `provider_required` (stays `mock`), and never touches another row.
+   Every structural guard uses **`IS DISTINCT FROM`**, never `<>`:
+   `communication_automation_catalog.template_key` is nullable, and in PostgreSQL
+   `NULL <> 'client_login_otp'` evaluates to `NULL` — not `TRUE` — so a `<>` guard
+   would not fire and a malformed row could slip past instead of raising.
 2. `client_accounts` privilege hardening: **REVOKE ALL then GRANT** so that
    `anon` has no privileges, `authenticated` has `SELECT` only, and
    `service_role` has exactly `SELECT, INSERT, UPDATE` (no DELETE / TRUNCATE /
    REFERENCES / TRIGGER). RLS stays enabled and the Phase 5A owner/admin policies
    are preserved.
 3. A partial index on `communication_messages (entity_id, destination_hash,
-   status, created_at desc)` for the attestation lookup — indexing only
-   hashes/ids/status/time, never plaintext.
+   provider, status, created_at desc)` for the provider-bound attestation lookup
+   — indexing only hashes/ids/provider-key/status/time, never plaintext.
 
 ## Environment variable (documented only — not created here)
 
 ```
 SEND_SMS_HOOK_SECRETS   # server-only; the Standard Webhooks secret(s) for the
-                        # Supabase Send SMS Hook. NEWLINE-delimited (one secret
-                        # per line) — NOT comma-separated, because the Supabase
-                        # `v1,whsec_<base64>` form itself contains a comma.
-                        # Blank lines are ignored, lines are trimmed, duplicates
-                        # collapsed. Rotation: put the current and previous secret
-                        # on separate lines; verification succeeds if ANY validates.
+                        # Supabase Send SMS Hook. Each secret is the versioned
+                        # Supabase form `v1,whsec_<base64>`, and MULTIPLE secrets
+                        # are separated by a PIPE `|`.
+                        #
+                        # The COMMA is NEVER A SEPARATOR: it belongs to the
+                        # `v1,` version marker inside each secret, and splitting
+                        # on it would shred every secret in half.
+                        #
+                        # A newline is additionally accepted as an operator-
+                        # friendly separator. Empty segments are ignored, each
+                        # complete secret is trimmed, exact duplicates collapse,
+                        # and order is preserved (current first, previous next).
+                        # Verification succeeds if ANY configured secret validates.
+                        # An empty final configuration FAILS CLOSED.
 ```
 
-Example (rotation): `SEND_SMS_HOOK_SECRETS=$'v1,whsec_NEW\nv1,whsec_PREV'`.
+Examples:
+
+- single: `SEND_SMS_HOOK_SECRETS='v1,whsec_SECRET_A'`
+- rotation (documented format):
+  `SEND_SMS_HOOK_SECRETS='v1,whsec_SECRET_A|v1,whsec_SECRET_B'`
+- rotation (newline compatibility):
+  `SEND_SMS_HOOK_SECRETS=$'v1,whsec_SECRET_A\nv1,whsec_SECRET_B'`
 
 Phase 5D does **not** create or modify `.env` / `.env.local`.
 
 ## HTTP response contract (Supabase Send SMS Hook)
 
 Deterministic, and never carries the OTP, phone, secret, signature, raw provider
-error, raw payload, or any token:
+error, raw payload, or any token. Every response sets an explicit `Content-Type`,
+and every JSON body is `application/json`:
 
-| Condition | Status | Body |
-| --- | --- | --- |
-| accepted / sent / delivered / read (incl. accepted idempotent replay) | `200` | *empty* |
-| automation not operationally enabled | `503` | `{ ok:false, code:"service_unavailable" }` |
-| queued / dispatching (in progress) | `503` | `{ ok:false, code:"in_progress" }` |
-| provider failed / cancelled / dead_letter | `502` | `{ ok:false, code:"delivery_failed" }` |
-| missing headers / invalid signature | `401` | `{ ok:false, code:"unauthorized" }` |
-| oversized body | `413` | `{ ok:false, code:"oversized_body" }` |
-| malformed verified payload | `400` | `{ ok:false, code:"malformed_payload" }` |
-| secret not configured | `500` | `{ ok:false, code:"configuration_error" }` |
+| Condition | Status | Body | `Retry-After` |
+| --- | --- | --- | --- |
+| accepted / sent / delivered / read (incl. accepted idempotent replay) | `200` | *empty* | — |
+| queued / dispatching (in progress duplicate) | `503` | `{ ok:false, code:"in_progress" }` | **`true`** |
+| automation not operationally enabled | `503` | `{ ok:false, code:"service_unavailable" }` | — |
+| provider failed / cancelled / dead_letter | `502` | `{ ok:false, code:"delivery_failed" }` | — |
+| missing headers / invalid signature | `401` | `{ ok:false, code:"unauthorized" }` | — |
+| oversized body | `413` | `{ ok:false, code:"oversized_body" }` | — |
+| unreadable body | `400` | `{ ok:false, code:"read_failed" }` | — |
+| malformed verified payload | `400` | `{ ok:false, code:"malformed_payload" }` | — |
+| secret not configured | `500` | `{ ok:false, code:"configuration_error" }` | — |
+
+**Why `Retry-After` on `in_progress` only.** Supabase retries a `429`/`503` hook
+response only when a **non-empty `Retry-After` header** is present. The in-progress
+case is the one genuinely transient state: the first delivery is still dispatching
+and this request is its idempotent duplicate. Retrying lets Supabase observe the
+`accepted` row and return `200` — the provider is still invoked exactly once, and
+no OTP is resent, no auth retry is scheduled, no new webhook id or message row is
+created. A disabled automation and a terminal delivery failure deliberately carry
+**no** `Retry-After`: neither can change inside a hook budget, and retrying a
+single-shot auth failure would risk a duplicate OTP send.
 
 The route reads the body through a **bounded streaming reader** (Content-Length
 pre-check + a per-chunk byte cap at 16 KiB), so an oversized or missing-length
 body is rejected before unbounded buffering. The exact accepted bytes are used
 for Standard Webhooks verification; JSON is parsed only after verification. No
 n8n / cron / queue / async retry is involved — the hook is synchronous.
+
+## Hook time budget (and why there is no `Promise.race`)
+
+Supabase gives an HTTP Auth Hook a bounded time to respond. Phase 5D deliberately
+does **not** wrap the provider send in a `Promise.race` timeout: a race *rejects the
+waiter* but does **not cancel** the underlying request. The provider call would keep
+running, Supabase would see a timeout and retry, and the original request could
+still succeed afterwards — a duplicate-OTP hazard. For mock-only readiness the send
+is effectively instantaneous, so the behaviour stays synchronous.
+
+**Prerequisite for activating a real provider:** the provider adapter itself must
+enforce an **abortable** network timeout (an `AbortController`/`AbortSignal` on its
+outbound HTTP call, or the SDK's own cancellation), set comfortably inside the
+Supabase hook budget, so a timed-out send is genuinely cancelled rather than merely
+abandoned. Do not connect a real provider before that adapter-level timeout exists.
 
 ## Live activation checklist (documented, NOT performed here)
 

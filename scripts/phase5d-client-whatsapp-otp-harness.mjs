@@ -129,6 +129,21 @@ const db = {};
 let insertFaults = [];
 function failNextInsert(table, error, sideEffect = null) { insertFaults.push({ table, error, sideEffect }); }
 
+/**
+ * Commit a concurrent writer's change immediately BEFORE the next UPDATE on
+ * `table` evaluates its filters — the way a racing transaction would. This is how
+ * a compare-and-set update is made to match ZERO rows deterministically.
+ */
+let updateHooks = [];
+function beforeNextUpdate(table, sideEffect) { updateHooks.push({ table, sideEffect }); }
+
+/**
+ * Simulate a LENIENT query layer that silently drops an `.eq("provider", …)`
+ * filter. The service's defence-in-depth recheck must still reject the row, so a
+ * PostgREST/driver quirk could never turn a wrong-provider row into attestation.
+ */
+let lenientProviderFilter = false;
+
 // Supabase Auth trackers
 let signInOtpCalls = [];
 let signInOtpResult = { error: null };
@@ -141,6 +156,8 @@ let signOutFailure = null;
 
 function resetDb() {
   insertFaults = [];
+  updateHooks = [];
+  lenientProviderFilter = false;
   signInOtpCalls = [];
   signInOtpResult = { error: null };
   verifyOtpCalls = [];
@@ -183,7 +200,12 @@ class MockQueryBuilder {
   select() { return this; }
   order(col, opts) { this.orderCol = col; this.orderAsc = opts?.ascending !== false; return this; }
   limit(n) { this.limitVal = n; return this; }
-  eq(col, val) { this.filters.push((it) => it[col] === val); return this; }
+  eq(col, val) {
+    // A lenient layer would return the row anyway; the service must re-check.
+    if (col === "provider" && lenientProviderFilter) return this;
+    this.filters.push((it) => it[col] === val);
+    return this;
+  }
   in(col, vals) { this.filters.push((it) => vals.includes(it[col])); return this; }
   is(col, val) { this.filters.push((it) => (it[col] ?? null) === val); return this; }
   insert(row) { this.action = "insert"; this.actionData = row; return this; }
@@ -223,6 +245,13 @@ class MockQueryBuilder {
     }
 
     if (this.action === "update") {
+      // A racing writer commits BEFORE our compare-and-set evaluates its filters.
+      const hookIndex = updateHooks.findIndex((h) => h.table === this.table);
+      if (hookIndex !== -1) {
+        const [hook] = updateHooks.splice(hookIndex, 1);
+        hook.sideEffect();
+        list = db[this.table] || [];
+      }
       for (const f of this.filters) list = list.filter(f);
       for (const item of list) {
         const candidate = { ...item, ...this.actionData };
@@ -366,16 +395,47 @@ function signedRequest({ webhookId = "wh_signed", payloadObj = hookPayload(), se
   return { rawBody, getHeader: (n) => (n.toLowerCase() in h ? h[n.toLowerCase()] : null) };
 }
 
-function seedAttestation(M, { userId = AUTH_USER, phone = PHONE, status = "accepted", ageMs = 0 } = {}) {
+const REAL_PROVIDER_KEY = "real_whatsapp";
+
+function seedAttestation(
+  M,
+  { userId = AUTH_USER, phone = PHONE, status = "accepted", ageMs = 0, provider = "mock" } = {}
+) {
   db.communication_messages.push({
     id: crypto.randomUUID(),
     message_type: "client_login_otp", lane: "authentication", channel: "whatsapp",
     recipient_type: "client", recipient_id: null, destination_source: "ephemeral_auth_destination",
     destination_hash: M.Phone.hashPhoneE164(phone), destination_masked: "masked",
     template_key: "client_login_otp", entity_type: "auth_user", entity_id: userId,
-    idempotency_key: `seed:${crypto.randomUUID()}`, status, priority: "critical", provider: "mock",
+    idempotency_key: `seed:${crypto.randomUUID()}`, status, priority: "critical", provider,
     variables: {}, metadata: {}, created_at: new Date(Date.now() - ageMs).toISOString(),
   });
+}
+
+/**
+ * A stand-in for a LATER real WhatsApp adapter: identical mock behaviour, but it
+ * reports a different providerKey, so the gate can be satisfied with
+ * provider_required = 'real_whatsapp' without any real delivery ever happening.
+ */
+function makeRealishProvider(mod) {
+  const p = new mod.MockWhatsAppProvider();
+  p.providerKey = REAL_PROVIDER_KEY;
+  return p;
+}
+
+/** Seed a communication_messages row the hook's idempotency lookup will find. */
+function seedInFlightMessage(M, { webhookId, status = "dispatching" } = {}) {
+  db.communication_messages.push({
+    id: crypto.randomUUID(),
+    message_type: "client_login_otp", lane: "authentication", channel: "whatsapp",
+    recipient_type: "client", recipient_id: null, destination_source: "ephemeral_auth_destination",
+    destination_hash: M.Phone.hashPhoneE164(PHONE), destination_masked: "masked",
+    template_key: "client_login_otp", entity_type: "auth_user", entity_id: AUTH_USER,
+    idempotency_key: `client_login_otp:${webhookId}`, status, priority: "critical", provider: "mock",
+    attempt_count: 1, max_attempts: 1, variables: {}, metadata: {},
+    created_at: new Date().toISOString(),
+  });
+  return db.communication_messages[db.communication_messages.length - 1];
 }
 
 // ----------------------------------------------------------------------------
@@ -404,6 +464,10 @@ const SESSION_INV_SRC = readCode("lib/identity/sessionInvalidation.ts");
 const ROUTE_SRC = readCode("app/api/auth/hooks/supabase-send-sms/route.ts");
 const VENDOR_AUTH_SRC = readCode("services/vendorAuthService.ts");
 const CLIENT_OTP_LIB_SRC = readCode("lib/identity/clientOtp.ts");
+// Raw (comments INCLUDED) — used only to assert documented operator requirements.
+const HOOK_SVC_RAW = readFileSync("services/supabaseSendSmsHookService.ts", "utf8");
+const HOOK_LIB_RAW = readFileSync("lib/auth/supabaseSendSmsHook.ts", "utf8");
+const PHASE_5D_DOC = readFileSync("docs/QF-Client-WhatsApp-OTP-Login-Phase-5D.md", "utf8");
 const ALL_5D_SRC =
   OTP_AUTH_SRC + "\n" + HOOK_SVC_SRC + "\n" + HOOK_LIB_SRC + "\n" + ACCESS_SRC + "\n" + GATE_SRC + "\n" +
   SESSION_INV_SRC + "\n" + ROUTE_SRC + "\n" + CLIENT_OTP_LIB_SRC + "\n" +
@@ -437,32 +501,75 @@ function applyPrivilegeStatements(sql, initialState) {
 }
 const HISTORICAL_BROAD = () => ({ anon: [...ALL_TABLE_PRIVILEGES], authenticated: [...ALL_TABLE_PRIVILEGES], service_role: [...ALL_TABLE_PRIVILEGES] });
 
+// ----------------------------------------------------------------------------
+// PostgreSQL three-valued logic (so the `<>` vs `IS DISTINCT FROM` difference is
+// modelled for real, not merely pattern-matched in the SQL text)
+// ----------------------------------------------------------------------------
+/** SQL `a <> b`: UNKNOWN (null) when either operand is NULL. */
+function sqlNotEquals(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined) return null;
+  return a !== b;
+}
+/** SQL `a IS DISTINCT FROM b`: never UNKNOWN; NULL-vs-value is TRUE. */
+function sqlIsDistinctFrom(a, b) {
+  const x = a === undefined ? null : a;
+  const y = b === undefined ? null : b;
+  return x !== y;
+}
+/** SQL OR over {TRUE, FALSE, UNKNOWN}: TRUE wins, else UNKNOWN wins, else FALSE. */
+function sqlOr(values) {
+  if (values.some((v) => v === true)) return true;
+  if (values.some((v) => v === null)) return null;
+  return false;
+}
+/** A PL/pgSQL `if <expr> then` fires ONLY on TRUE — never on UNKNOWN. */
+function sqlIfFires(value) { return value === true; }
+
 /**
- * Faithful JS port of the migration's fail-loud DO block. THROWS on any
- * unexpected state (missing/duplicate/enabled/wrong lane/channel/template/
- * provider/readiness); transitions exactly one wiring_pending row; no-ops an
- * already-mock_ready row.
+ * Faithful JS port of the migration's fail-loud DO block, evaluated under real SQL
+ * three-valued logic. THROWS on any unexpected state (missing/duplicate/enabled/
+ * wrong-or-NULL lane/channel/template/provider, unexpected readiness); transitions
+ * exactly one wiring_pending row; no-ops an already-mock_ready row.
+ *
+ * `comparator` selects the structural comparison operator so the harness can prove
+ * that `IS DISTINCT FROM` is load-bearing and `<>` silently admits NULL fields.
  */
 class MigrationError extends Error {
   constructor(reason) { super(reason); this.reason = reason; }
 }
-function applyReadinessMigration(rows) {
+function applyReadinessMigration(rows, { comparator = sqlIsDistinctFrom } = {}) {
   const matches = rows.filter((r) => r.automation_key === "client_login_otp");
   if (matches.length === 0) throw new MigrationError("missing_row");
   if (matches.length > 1) throw new MigrationError("duplicate_rows");
   const r = matches[0];
-  if (
-    r.lane !== "authentication" || r.channel !== "whatsapp" || r.template_key !== "client_login_otp" ||
-    r.provider_required !== "mock" || r.is_operationally_enabled !== false
-  ) {
-    throw new MigrationError("unexpected_state");
+  const field = (name) => (r[name] === undefined ? null : r[name]);
+
+  const structural = sqlOr([
+    comparator(field("lane"), "authentication"),
+    comparator(field("channel"), "whatsapp"),
+    comparator(field("template_key"), "client_login_otp"),
+    comparator(field("provider_required"), "mock"),
+    comparator(field("is_operationally_enabled"), false),
+  ]);
+  if (sqlIfFires(structural)) throw new MigrationError("unexpected_state");
+
+  // `is not distinct from` — a NULL readiness matches neither branch and RAISEs.
+  if (!sqlIsDistinctFrom(field("readiness_status"), "wiring_pending")) {
+    // CASE A. The UPDATE's WHERE uses plain equality: a NULL field matches nothing,
+    // so v_updated would be 0 and the cardinality assertion RAISEs.
+    const matched =
+      r.readiness_status === "wiring_pending" && r.lane === "authentication" &&
+      r.channel === "whatsapp" && r.template_key === "client_login_otp" &&
+      r.provider_required === "mock" && r.is_operationally_enabled === false;
+    if (!matched) throw new MigrationError("transition_cardinality");
+    r.readiness_status = "mock_ready";
+    return 1;
   }
-  if (r.readiness_status === "wiring_pending") { r.readiness_status = "mock_ready"; return 1; }
-  if (r.readiness_status === "mock_ready") return 0;
+  if (!sqlIsDistinctFrom(field("readiness_status"), "mock_ready")) return 0; // CASE B
   throw new MigrationError("unexpected_readiness");
 }
-function expectMigrationThrows(rows, reason) {
-  try { applyReadinessMigration(rows); }
+function expectMigrationThrows(rows, reason, options) {
+  try { applyReadinessMigration(rows, options); }
   catch (e) { if (e instanceof MigrationError) { if (reason) assert(e.reason === reason, `expected ${reason}, got ${e.reason}`); return; } throw e; }
   throw new Error(`expected the migration to RAISE (${reason})`);
 }
@@ -473,15 +580,20 @@ const FAILLOUD_CLAUSES = {
   raise_present: /raise exception/,
   raise_missing_row: /if v_count = 0 then raise exception/,
   raise_duplicate: /elsif v_count > 1 then raise exception/,
-  guard_enabled: /is_operationally_enabled <> false/,
-  guard_lane: /lane <> 'authentication'/,
-  guard_channel: /channel <> 'whatsapp'/,
-  guard_template: /template_key <> 'client_login_otp'/,
-  guard_provider: /provider_required <> 'mock'/,
+  // Every structural guard MUST be the null-safe comparison.
+  guard_enabled: /is_operationally_enabled is distinct from false/,
+  guard_lane: /lane is distinct from 'authentication'/,
+  guard_channel: /channel is distinct from 'whatsapp'/,
+  guard_template: /template_key is distinct from 'client_login_otp'/,
+  guard_provider: /provider_required is distinct from 'mock'/,
   transition_assert: /get diagnostics v_updated = row_count; if v_updated <> 1 then raise exception/,
   readiness_else: /else raise exception[\s\S]*expected wiring_pending or mock_ready/,
 };
+/** No structural v_row field may be compared with the NULL-unsafe `<>`. */
+const UNSAFE_STRUCTURAL_NEQ = /v_row\.[a-z_]+ <> /;
+
 function migrationIsFailLoud(sqlNormalized) {
+  if (UNSAFE_STRUCTURAL_NEQ.test(sqlNormalized)) return false;
   return Object.values(FAILLOUD_CLAUSES).every((re) => re.test(sqlNormalized));
 }
 
@@ -1108,20 +1220,25 @@ check("92. no real provider is activated by the migration", () => {
   assert(!/provider_required\s*=\s*'(?!mock)/i.test(normalizedSql), "provider_required is never set to a non-mock value");
 });
 
-check("93. the attestation index contains no plaintext field", () => {
+check("93. the attestation index covers the provider-bound lookup and contains no plaintext field", () => {
   const idx = normalizedSql.match(/create index[\s\S]*?on public\.communication_messages\s*\(([^)]*)\)/);
   assert(idx, "attestation index present");
   const columnList = idx[1];
   // The indexed columns must be a subset of the safe attestation columns.
   const cols = columnList.split(",").map((c) => c.trim().replace(/\s+(asc|desc)$/i, ""));
-  const SAFE = new Set(["entity_id", "destination_hash", "status", "created_at"]);
+  // `provider` is an adapter key ('mock'), never a plaintext destination or OTP.
+  const SAFE = new Set(["entity_id", "destination_hash", "provider", "status", "created_at"]);
   for (const c of cols) assert(SAFE.has(c), `indexed column "${c}" is not a safe attestation column`);
   // No plaintext-bearing column anywhere in the index definition.
   const full = normalizedSql.match(/create index[\s\S]*?communication_messages[\s\S]*?;/)[0];
   for (const forbidden of ["variables", "masked", "plaintext"]) {
     assert(!full.includes(forbidden), `index must not reference ${forbidden}`);
   }
-  assert(cols.includes("entity_id") && cols.includes("destination_hash") && cols.includes("status") && cols.includes("created_at"), "index covers the attestation columns");
+  for (const required of ["entity_id", "destination_hash", "provider", "status", "created_at"]) {
+    assert(cols.includes(required), `index must cover ${required} for the attestation lookup`);
+  }
+  // The equality columns must precede the ordering column.
+  assert(cols.indexOf("provider") < cols.indexOf("created_at"), "provider is an equality column, so it precedes created_at");
 });
 
 check("94-95. the readiness migration is idempotent and RAISES (never silently accepts) on an unexpected state", () => {
@@ -1141,9 +1258,10 @@ check("95b. the fail-loud validator is load-bearing (removing any guard flags th
   // In-memory mutants of the migration SQL — each removes one guard and must fail.
   const mut = {
     "remove the RAISE": normalizedSql.replace(/raise exception/g, "perform 1"),
-    "allow enabled=true": normalizedSql.replace(/is_operationally_enabled <> false/g, "false"),
-    "allow wrong provider": normalizedSql.replace(/provider_required <> 'mock'/g, "false"),
+    "allow enabled=true": normalizedSql.replace(/is_operationally_enabled is distinct from false/g, "false"),
+    "allow wrong provider": normalizedSql.replace(/provider_required is distinct from 'mock'/g, "false"),
     "allow missing row": normalizedSql.replace(/if v_count = 0 then raise exception/g, "if false then perform 1"),
+    "revert template guard to NULL-unsafe <>": normalizedSql.replace(/template_key is distinct from 'client_login_otp'/g, "template_key <> 'client_login_otp'"),
   };
   for (const [name, mutated] of Object.entries(mut)) {
     assert(migrationIsFailLoud(mutated) === false, `mutant "${name}" must be flagged unsafe`);
@@ -1200,41 +1318,115 @@ check("wiring. test:phase5d + Standard Webhooks dependency + doc + route + migra
 });
 
 // ============================================================================
-// FIX 3 — DELIMITER-SAFE HOOK SECRET ROTATION (newline-delimited)
+// FIX 5 (this audit) — SUPABASE-FORMAT HOOK SECRET ROTATION (PIPE-delimited)
+//
+// Supabase issues SEND_SMS_HOOK_SECRETS as `v1,whsec_<base64>`, with multiple
+// secrets separated by `|`. The comma belongs to the secret's version marker and
+// is NEVER a separator. A newline is additionally accepted for operators.
 // ============================================================================
 const SECRET_B64_2 = crypto.randomBytes(24).toString("base64");
+const V1_A = `v1,whsec_${SECRET_B64}`;
+const V1_B = `v1,whsec_${SECRET_B64_2}`;
 
-check("F3a. loadSendSmsHookSecrets is newline-delimited, trimmed, deduped, blank-safe", () => {
+check("F3a. loadSendSmsHookSecrets is pipe-delimited, trimmed, deduped, blank-safe", () => {
   const load = (v) => M.hookLib.loadSendSmsHookSecrets({ SEND_SMS_HOOK_SECRETS: v });
-  assert(JSON.stringify(load("s1")) === JSON.stringify(["s1"]), "one secret");
-  assert(JSON.stringify(load("s1\ns2")) === JSON.stringify(["s1", "s2"]), "two rotation secrets");
-  assert(JSON.stringify(load("  s1  \n\n  s2 \n")) === JSON.stringify(["s1", "s2"]), "trimmed + blank lines ignored");
-  assert(JSON.stringify(load("s1\ns1")) === JSON.stringify(["s1"]), "duplicates collapsed");
+  // 1. single versioned secret
+  assert(JSON.stringify(load(V1_A)) === JSON.stringify([V1_A]), "one versioned secret");
+  // 2. pipe-separated current + previous, order preserved
+  assert(JSON.stringify(load(`${V1_A}|${V1_B}`)) === JSON.stringify([V1_A, V1_B]), "pipe rotation, order preserved");
+  // 3. newline compatibility retained
+  assert(JSON.stringify(load(`${V1_A}\n${V1_B}`)) === JSON.stringify([V1_A, V1_B]), "newline rotation still works");
+  assert(JSON.stringify(load(`  ${V1_A}  |\n|  ${V1_B} \n`)) === JSON.stringify([V1_A, V1_B]), "trimmed + empty segments ignored");
+  // 4. the comma inside `v1,whsec_` is NEVER a separator
+  assert(load(V1_A).length === 1, "a comma-bearing secret is ONE secret");
+  assert(load(V1_A)[0] === V1_A, "the version marker survives intact");
+  for (const s of load(`${V1_A}|${V1_B}`)) {
+    assert(s.startsWith("v1,whsec_"), `secret "${s}" was split at its comma`);
+  }
+  // 5. duplicates collapse (exact full secrets)
+  assert(JSON.stringify(load(`${V1_A}|${V1_A}`)) === JSON.stringify([V1_A]), "duplicates collapsed");
+  assert(JSON.stringify(load(`${V1_A}|${V1_A}|${V1_B}`)) === JSON.stringify([V1_A, V1_B]), "dedupe preserves order");
+  // 6. empty configuration fails closed (caller rejects on an empty list)
   assert(JSON.stringify(load("")) === JSON.stringify([]), "empty config → none");
-  assert(JSON.stringify(load("   \n  ")) === JSON.stringify([]), "all-blank config → none");
-  // A comma is NOT a delimiter: the Supabase `v1,whsec_...` form is ONE secret.
-  assert(JSON.stringify(load(`v1,whsec_${SECRET_B64}`)) === JSON.stringify([`v1,whsec_${SECRET_B64}`]), "comma-bearing secret stays intact");
+  assert(JSON.stringify(load("   \n | ")) === JSON.stringify([]), "all-blank config → none");
+  assert(JSON.stringify(M.hookLib.loadSendSmsHookSecrets({})) === JSON.stringify([]), "absent env var → none");
+  // normalizeHookSecret strips ONLY the version marker, and trims safely.
+  assert(M.hookLib.normalizeHookSecret(V1_A) === `whsec_${SECRET_B64}`, "v1, marker stripped");
+  assert(M.hookLib.normalizeHookSecret(`  ${V1_A} `) === `whsec_${SECRET_B64}`, "surrounding space trimmed");
+  assert(M.hookLib.normalizeHookSecret(SECRET_B64) === SECRET_B64, "a bare secret passes through");
 });
 
-check("F3b. one valid secret verifies", async () => {
+check("F3b. one valid secret verifies (versioned v1,whsec_ form)", async () => {
   resetAll();
   enableAutomation();
-  process.env[SECRET_ENV] = SECRET_B64;
+  process.env[SECRET_ENV] = V1_A;
   M.hookLib.setActiveSendSmsHookVerifier(new M.hookLib.StandardWebhooksSignatureVerifier());
   const out = await M.HookSvc.handleSupabaseSendSmsHook(signedRequest({ secret: SECRET_B64, webhookId: "wh_f3b" }));
   assert(out.kind === "delivered", `got ${out.kind}`);
 });
 
-check("F3c. rotation: both the new and the previous secret verify", async () => {
-  // Config lists NEW then PREVIOUS, one per line.
-  for (const [label, signWith] of [["new", SECRET_B64], ["previous", SECRET_B64_2]]) {
+check("F3c. pipe rotation: both the current and the previous secret verify", async () => {
+  for (const [label, signWith] of [["current", SECRET_B64], ["previous", SECRET_B64_2]]) {
     resetAll();
     enableAutomation();
-    process.env[SECRET_ENV] = `${SECRET_B64}\n${SECRET_B64_2}`;
+    process.env[SECRET_ENV] = `${V1_A}|${V1_B}`; // the documented Supabase format
     M.hookLib.setActiveSendSmsHookVerifier(new M.hookLib.StandardWebhooksSignatureVerifier());
     const out = await M.HookSvc.handleSupabaseSendSmsHook(signedRequest({ secret: signWith, webhookId: `wh_rot_${label}` }));
     assert(out.kind === "delivered", `${label} secret must verify, got ${out.kind}`);
   }
+});
+
+check("F3c2. newline rotation compatibility still verifies both secrets", async () => {
+  for (const [label, signWith] of [["current", SECRET_B64], ["previous", SECRET_B64_2]]) {
+    resetAll();
+    enableAutomation();
+    process.env[SECRET_ENV] = `${V1_A}\n${V1_B}`;
+    M.hookLib.setActiveSendSmsHookVerifier(new M.hookLib.StandardWebhooksSignatureVerifier());
+    const out = await M.HookSvc.handleSupabaseSendSmsHook(signedRequest({ secret: signWith, webhookId: `wh_nl_${label}` }));
+    assert(out.kind === "delivered", `${label} secret must verify, got ${out.kind}`);
+  }
+});
+
+check("F3c3. the comma is never a separator — the parser is the guard, not verification", () => {
+  const load = (v) => M.hookLib.loadSendSmsHookSecrets({ SEND_SMS_HOOK_SECRETS: v });
+
+  // A naive comma split shreds each versioned secret into a bare "v1" marker plus a
+  // detached `whsec_…` body. Only the PARSER can prevent this: `standardwebhooks`
+  // strips a leading `whsec_` itself, so the detached half would coincidentally
+  // still verify and the corruption would pass unnoticed until a secret format
+  // without that prefix (or a genuinely comma-bearing one) silently failed.
+  const naiveCommaSplit = `${V1_A}|${V1_B}`.split(/[,|]/).map((s) => s.trim());
+  assert(naiveCommaSplit.includes("v1"), "fixture: a comma split really does produce a bare 'v1' fragment");
+  assert(naiveCommaSplit.length === 4, "fixture: two secrets become four fragments");
+
+  // The real parser keeps each secret whole: exactly two, each fully intact.
+  const parsed = load(`${V1_A}|${V1_B}`);
+  assert(parsed.length === 2, `pipe rotation yields 2 secrets, got ${parsed.length}`);
+  assert(parsed[0] === V1_A && parsed[1] === V1_B, "each versioned secret survives whole and in order");
+  assert(!parsed.includes("v1"), "the version marker is never emitted as its own secret");
+
+  // A single versioned secret is never split either.
+  assert(load(V1_A).length === 1, "a lone v1,whsec_ secret is ONE secret");
+});
+
+check("F3c4. a pipe-delimited rotation must be split, or a legitimately signed request is rejected", async () => {
+  // Anti-vacuity for the pipe separator: the UNSPLIT config cannot verify anything.
+  const headers = signedRequest({ secret: SECRET_B64, webhookId: "wh_pipe_whole" });
+  const verifier = new M.hookLib.StandardWebhooksSignatureVerifier();
+  const unsplit = verifier.verify(headers.rawBody, {
+    webhookId: "wh_pipe_whole",
+    webhookTimestamp: headers.getHeader("webhook-timestamp"),
+    webhookSignature: headers.getHeader("webhook-signature"),
+  }, [`${V1_A}|${V1_B}`]); // the whole string treated as one secret
+  assert(unsplit.ok === false, "an unsplit pipe config must not verify");
+
+  // …while the real parser splits it and the same request verifies.
+  resetAll();
+  enableAutomation();
+  process.env[SECRET_ENV] = `${V1_A}|${V1_B}`;
+  M.hookLib.setActiveSendSmsHookVerifier(new M.hookLib.StandardWebhooksSignatureVerifier());
+  const real = await M.HookSvc.handleSupabaseSendSmsHook(signedRequest({ secret: SECRET_B64, webhookId: "wh_pipe_ok" }));
+  assert(real.kind === "delivered", "the real parser splits on the pipe and verifies");
 });
 
 check("F3d. malformed / empty config fails closed", async () => {
@@ -1342,12 +1534,22 @@ check("F4e. the signature verifier receives the exact bounded raw body", async (
 // ============================================================================
 const HK = M.HookSvc;
 
-check("F5a. success → 200 with an EMPTY body", () => {
+/** Case-insensitive header lookup over the mapped response. */
+function header(mapped, name) {
+  const key = Object.keys(mapped.headers ?? {}).find((k) => k.toLowerCase() === name.toLowerCase());
+  return key === undefined ? undefined : mapped.headers[key];
+}
+
+check("F5a. success → 200 with an EMPTY body and explicit headers", () => {
   const r = HK.sendSmsHookHttpResponse({ kind: HK.SendSmsHookOutcomeKind.DELIVERED, dispatchAttempted: true });
   assert(r.status === 200 && r.body === null, `expected 200/empty, got ${r.status}/${JSON.stringify(r.body)}`);
+  assert(r.headers && typeof r.headers === "object", "success declares explicit response headers");
+  assert(header(r, "content-type") === "application/json", "success sets an explicit Content-Type");
+  assert(header(r, "content-length") === "0", "success declares an empty body");
+  assert(header(r, "retry-after") === undefined, "a success must never ask Supabase to retry");
 });
 
-check("F5b. every failure maps to an exact, non-sensitive status + code", () => {
+check("F5b. every failure maps to an exact, non-sensitive status + code + content type", () => {
   const K = HK.SendSmsHookOutcomeKind;
   const RR = HK.SendSmsHookRejectReason;
   const cases = [
@@ -1357,13 +1559,18 @@ check("F5b. every failure maps to an exact, non-sensitive status + code", () => 
     [{ kind: K.REJECTED, rejectReason: RR.MISSING_HEADERS, dispatchAttempted: false }, 401, "unauthorized"],
     [{ kind: K.REJECTED, rejectReason: RR.INVALID_SIGNATURE, dispatchAttempted: false }, 401, "unauthorized"],
     [{ kind: K.REJECTED, rejectReason: RR.OVERSIZED_BODY, dispatchAttempted: false }, 413, "oversized_body"],
+    [{ kind: K.REJECTED, rejectReason: RR.READ_FAILED, dispatchAttempted: false }, 400, "read_failed"],
     [{ kind: K.REJECTED, rejectReason: RR.MALFORMED_PAYLOAD, dispatchAttempted: false }, 400, "malformed_payload"],
     [{ kind: K.REJECTED, rejectReason: RR.SECRET_NOT_CONFIGURED, dispatchAttempted: false }, 500, "configuration_error"],
+    [{ kind: "unknown_kind", dispatchAttempted: false }, 500, "server_error"],
+    [{ kind: K.REJECTED, rejectReason: "unknown_reason", dispatchAttempted: false }, 400, "rejected"],
   ];
   for (const [outcome, status, code] of cases) {
     const r = HK.sendSmsHookHttpResponse(outcome);
     assert(r.status === status, `${code}: expected ${status}, got ${r.status}`);
     assert(r.body && r.body.ok === false && r.body.code === code, `${code}: body mismatch ${JSON.stringify(r.body)}`);
+    // FIX 4: every JSON error response declares application/json explicitly.
+    assert(header(r, "content-type") === "application/json", `${code}: missing application/json content type`);
     // Never leak the internal signature/secret-hinting reason for auth failures.
     assert(!JSON.stringify(r.body).includes("signature"), "response must not name signature internals");
   }
@@ -1400,11 +1607,490 @@ check("F5d. no sensitive value can appear in any response body", async () => {
 });
 
 // ============================================================================
+// AUDIT FIX 1 — COMMUNICATION ATTESTATION IS BOUND TO THE AUTHORIZED PROVIDER
+//
+// The gate proves `provider_required === activeProvider`. The attestation query
+// must additionally require `communication_messages.provider = providerRequired`,
+// so a stale mock-provider row cannot attest once a real adapter is switched on.
+// ============================================================================
+/** Enable the automation AND make a matching "real" adapter the active provider. */
+function enableRealProvider() {
+  enableAutomation(REAL_PROVIDER_KEY);
+  M.comm.setActiveWhatsAppProvider(makeRealishProvider(M.MockProviderMod));
+}
+
+check("A1a. gate requires a real provider + a recent MOCK accepted row → rejected", async () => {
+  resetAll();
+  enableRealProvider();
+  seedAttestation(M, { provider: "mock", status: "accepted" }); // fresh, right user, right hash
+  verifySuccessResponder();
+  const res = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+  assert(res.ok === false, "a mock-provider row must never attest a real-provider login");
+  assert(db.client_accounts.length === 0, "no account provisioned");
+  assert(signOutCalls === 1, "the post-auth denial invalidated the local session");
+  assert(lastEvent().metadata.failure_classification === "attestation_missing", "classified as attestation_missing");
+});
+
+check("A1b. gate requires a real provider + a matching real-provider accepted row → accepted", async () => {
+  resetAll();
+  enableRealProvider();
+  seedAttestation(M, { provider: REAL_PROVIDER_KEY, status: "accepted" });
+  verifySuccessResponder();
+  const res = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+  assert(res.ok === true, `a matching-provider row must attest: ${res.ok ? "" : JSON.stringify(res)}`);
+  assert(db.client_accounts.length === 1, "account provisioned");
+  assert(typeof db.client_accounts[0].whatsapp_verified_at === "string", "verified timestamp written");
+});
+
+check("A1c. provider mismatch is rejected even when EVERY other field matches", async () => {
+  // Identical user, hash, status and freshness; only `provider` differs.
+  for (const [gateProvider, rowProvider] of [[REAL_PROVIDER_KEY, "mock"], ["mock", REAL_PROVIDER_KEY]]) {
+    resetAll();
+    if (gateProvider === REAL_PROVIDER_KEY) enableRealProvider();
+    else enableAutomation("mock");
+    seedAttestation(M, { provider: rowProvider, status: "accepted", ageMs: 0 });
+    verifySuccessResponder();
+    const res = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+    assert(res.ok === false, `gate=${gateProvider} must not accept a ${rowProvider} row`);
+    assert(db.client_accounts.length === 0, "no provisioning on a provider mismatch");
+  }
+});
+
+check("A1d. the provider is defence-in-depth rechecked AFTER the query (a lenient layer cannot attest)", async () => {
+  resetAll();
+  enableRealProvider();
+  seedAttestation(M, { provider: "mock", status: "accepted" });
+  lenientProviderFilter = true; // the query layer silently drops .eq("provider", …)
+  verifySuccessResponder();
+  const res = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+  assert(res.ok === false, "the returned row's provider must be re-validated in code");
+  assert(db.client_accounts.length === 0, "no provisioning via a lenient query layer");
+
+  // Anti-vacuity: with the lenient layer ON and a MATCHING provider, it still succeeds,
+  // so the rejection above came from the provider recheck, not from the lenient flag.
+  resetAll();
+  enableRealProvider();
+  seedAttestation(M, { provider: REAL_PROVIDER_KEY, status: "accepted" });
+  lenientProviderFilter = true;
+  verifySuccessResponder();
+  const okRes = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+  assert(okRes.ok === true, "a matching provider still attests under the lenient layer");
+});
+
+check("A1e. source: the attestation query selects AND filters AND rechecks the provider", () => {
+  assert(/\.eq\("provider", expectedProvider\)/.test(OTP_AUTH_SRC), "query filters on provider");
+  assert(/\.select\([^)]*provider[^)]*\)/.test(OTP_AUTH_SRC), "query selects provider for the recheck");
+  assert(/row\.provider !== expectedProvider/.test(OTP_AUTH_SRC), "defence-in-depth provider recheck present");
+  assert(/const expectedProvider = gate\.providerRequired;/.test(OTP_AUTH_SRC), "expectedProvider comes from the gate");
+  // The attestation must never grow a plaintext column.
+  assert(!/\.select\([^)]*(destination_masked|variables|otp|phone_e164)[^)]*\)/.test(OTP_AUTH_SRC), "no plaintext field selected");
+});
+
+check("A1f. a mock attestation cannot become proof merely because the gate later changes", async () => {
+  resetAll();
+  // Phase 1: mock automation enabled, mock delivery, mock attestation → login works.
+  enableAutomation("mock");
+  seedAttestation(M, { provider: "mock", status: "accepted" });
+  verifySuccessResponder();
+  const before = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+  assert(before.ok === true, "mock-gate + mock-row logs in");
+  const mockRows = db.communication_messages.length;
+
+  // Phase 2: the operator switches the automation AND the adapter to a real provider.
+  // NO new delivery happens. The very same mock row must no longer attest.
+  enableRealProvider();
+  signOutCalls = 0;
+  verifySuccessResponder();
+  const after = await M.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+  assert(after.ok === false, "the pre-existing mock row must not attest under the real-provider gate");
+  assert(db.communication_messages.length === mockRows, "no new delivery was created");
+  assert(signOutCalls === 1, "the denial invalidated the local session");
+});
+
+// ============================================================================
+// AUDIT FIX 2 — NULL-SAFE MIGRATION STRUCTURAL GUARDS (IS DISTINCT FROM)
+//
+// communication_automation_catalog.template_key is NULLABLE, and in PostgreSQL
+// `NULL <> 'client_login_otp'` is NULL — not TRUE — so a `<>` guard would not fire.
+// ============================================================================
+const validRow = (over = {}) => ({
+  automation_key: "client_login_otp", lane: "authentication", channel: "whatsapp",
+  template_key: "client_login_otp", provider_required: "mock",
+  is_operationally_enabled: false, readiness_status: "wiring_pending", ...over,
+});
+
+check("A2a. the three-valued logic model matches PostgreSQL (fixture sanity)", () => {
+  assert(sqlNotEquals(null, "x") === null, "NULL <> 'x' is UNKNOWN");
+  assert(sqlIsDistinctFrom(null, "x") === true, "NULL IS DISTINCT FROM 'x' is TRUE");
+  assert(sqlOr([false, null, false]) === null, "OR with an UNKNOWN and no TRUE is UNKNOWN");
+  assert(sqlOr([false, null, true]) === true, "a TRUE dominates an UNKNOWN");
+  assert(sqlIfFires(null) === false, "an `if UNKNOWN then` never fires");
+});
+
+check("A2b. mock_ready + template_key NULL → RAISE", () => {
+  expectMigrationThrows([validRow({ readiness_status: "mock_ready", template_key: null })], "unexpected_state");
+});
+
+check("A2c. wiring_pending + template_key NULL → RAISE", () => {
+  const rows = [validRow({ template_key: null })];
+  expectMigrationThrows(rows, "unexpected_state");
+  assert(rows[0].readiness_status === "wiring_pending", "state unchanged when it RAISEs");
+});
+
+check("A2d. provider_required NULL → RAISE (both readiness states)", () => {
+  expectMigrationThrows([validRow({ provider_required: null })], "unexpected_state");
+  expectMigrationThrows([validRow({ readiness_status: "mock_ready", provider_required: null })], "unexpected_state");
+});
+
+check("A2e. enablement / lane / channel / readiness NULL → RAISE (fail closed under drift)", () => {
+  expectMigrationThrows([validRow({ is_operationally_enabled: null })], "unexpected_state");
+  expectMigrationThrows([validRow({ lane: null })], "unexpected_state");
+  expectMigrationThrows([validRow({ channel: null })], "unexpected_state");
+  // A NULL readiness matches neither `wiring_pending` nor `mock_ready` → final else.
+  expectMigrationThrows([validRow({ readiness_status: null })], "unexpected_readiness");
+});
+
+check("A2f. a valid mock_ready row remains an idempotent no-op; a valid wiring_pending row transitions once", () => {
+  const done = [validRow({ readiness_status: "mock_ready" })];
+  assert(applyReadinessMigration(done) === 0, "mock_ready is a no-op");
+  assert(done[0].readiness_status === "mock_ready", "unchanged");
+  assert(done[0].is_operationally_enabled === false, "still disabled");
+  assert(done[0].provider_required === "mock", "still mock");
+
+  const pending = [validRow()];
+  assert(applyReadinessMigration(pending) === 1, "exactly one row transitions");
+  assert(pending[0].readiness_status === "mock_ready", "now mock_ready");
+  assert(applyReadinessMigration(pending) === 0, "re-running is a no-op");
+});
+
+check("A2g. reverting the template guard to `<>` lets a NULL template_key bypass the RAISE", () => {
+  // The real (null-safe) migration RAISEs …
+  expectMigrationThrows([validRow({ readiness_status: "mock_ready", template_key: null })], "unexpected_state");
+
+  // … while the NULL-unsafe `<>` comparator silently accepts the malformed row.
+  let bypassed = false;
+  try {
+    const changed = applyReadinessMigration(
+      [validRow({ readiness_status: "mock_ready", template_key: null })],
+      { comparator: sqlNotEquals }
+    );
+    bypassed = changed === 0; // no RAISE: the guard never fired
+  } catch (e) {
+    if (!(e instanceof MigrationError)) throw e;
+  }
+  assert(bypassed === true, "the `<>` mutant must demonstrate the NULL bypass this fix closes");
+
+  // And the SQL text validator flags the reverted migration as unsafe.
+  const reverted = normalizedSql.replace(/template_key is distinct from 'client_login_otp'/g, "template_key <> 'client_login_otp'");
+  assert(migrationIsFailLoud(normalizedSql) === true, "the real migration is fail-loud");
+  assert(migrationIsFailLoud(reverted) === false, "a `<>` structural guard must be flagged unsafe");
+});
+
+check("A2h. every structural guard in the SQL uses IS DISTINCT FROM, never `<>`", () => {
+  assert(!UNSAFE_STRUCTURAL_NEQ.test(normalizedSql), "no v_row field is compared with the NULL-unsafe `<>`");
+  for (const field of ["lane", "channel", "template_key", "provider_required", "is_operationally_enabled"]) {
+    assert(new RegExp(`v_row\\.${field} is distinct from`).test(normalizedSql), `${field} must use IS DISTINCT FROM`);
+  }
+});
+
+// ============================================================================
+// AUDIT FIX 3 — CLIENT PROVISIONING CONCURRENCY SUCCESS POSTCONDITION
+//
+// A provisioning success may NEVER carry an incompletely-bound identity:
+//   authUserId + verified phone + active + non-null whatsapp_verified_at.
+// ============================================================================
+const UNIQUE_USER_VIOLATION = { code: "23505", message: "duplicate", constraint: "uq_client_accounts_user" };
+
+/** Every success from every provisioning path must satisfy the full postcondition. */
+function assertSuccessPostcondition(res, { authUserId = AUTH_USER, phoneE164 = PHONE } = {}) {
+  assert(res.ok === true, "expected success");
+  assert(res.context.authUserId === authUserId, "success must bind the verified auth user");
+  assert(res.context.phoneE164 === phoneE164, `success must bind the verified phone, got ${res.context.phoneE164}`);
+  assert(res.context.status === "active", "success must be an active account");
+  assert(res.context.whatsappVerifiedAt !== null && res.context.whatsappVerifiedAt !== undefined, "success must carry a WhatsApp verified timestamp");
+  assert(typeof res.context.clientAccountId === "string" && res.context.clientAccountId.length > 0, "success must carry a client account id");
+}
+
+check("A3a. a concurrent insert winner with a NULL phone is adopted before success", async () => {
+  resetAll();
+  const winner = { id: "ca-null", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null };
+  failNextInsert("client_accounts", UNIQUE_USER_VIOLATION, () => db.client_accounts.push(winner));
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assertSuccessPostcondition(res);
+  assert(db.client_accounts.length === 1, "no duplicate identity");
+  assert(db.client_accounts[0].phone_e164 === PHONE, "the winner adopted the verified phone");
+  assert(typeof db.client_accounts[0].whatsapp_verified_at === "string", "and was stamped verified");
+});
+
+check("A3b. a concurrent same-user ADOPTION race refetches and validates the final row", async () => {
+  resetAll();
+  const OTHER_TS = "2026-03-03T03:03:03.000Z";
+  const row = { id: "ca-adopt", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null };
+  db.client_accounts.push(row);
+  // A racing same-user request commits the adoption first → our compare-and-set
+  // (`.is("phone_e164", null)`) matches ZERO rows.
+  beforeNextUpdate("client_accounts", () => {
+    row.phone_e164 = PHONE;
+    row.whatsapp_verified_at = OTHER_TS;
+  });
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assertSuccessPostcondition(res);
+  assert(res.context.whatsappVerifiedAt === OTHER_TS, "returns the FINAL row, not a stale pre-update context");
+  assert(db.client_accounts.length === 1, "no duplicate row");
+});
+
+check("A3c. a concurrent TIMESTAMP race returns the final verified context, never a null stamp", async () => {
+  resetAll();
+  const OTHER_TS = "2026-04-04T04:04:04.000Z";
+  const row = { id: "ca-ts", user_id: AUTH_USER, phone_e164: PHONE, status: "active", whatsapp_verified_at: null };
+  db.client_accounts.push(row);
+  // A racing request stamps the timestamp first → `.is("whatsapp_verified_at", null)`
+  // matches ZERO rows. The pre-fix code returned the stale null-timestamp context.
+  beforeNextUpdate("client_accounts", () => { row.whatsapp_verified_at = OTHER_TS; });
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assertSuccessPostcondition(res);
+  assert(res.context.whatsappVerifiedAt === OTHER_TS, "the first verification timestamp is preserved and returned");
+});
+
+check("A3d. a concurrent winner holding a DIFFERENT non-null phone fails closed", async () => {
+  resetAll();
+  const winner = { id: "ca-diffphone", user_id: AUTH_USER, phone_e164: OTHER_PHONE, status: "active", whatsapp_verified_at: "2026-01-01T00:00:00Z" };
+  failNextInsert("client_accounts", UNIQUE_USER_VIOLATION, () => db.client_accounts.push(winner));
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assert(res.ok === false && res.classification === "identity_conflict", `expected identity_conflict, got ${JSON.stringify(res)}`);
+  assert(db.client_accounts[0].phone_e164 === OTHER_PHONE, "established identity untouched");
+});
+
+check("A3e. a concurrent winner whose phone belongs to ANOTHER user fails closed", async () => {
+  resetAll();
+  const otherOwner = { id: "ca-otheruser", user_id: OTHER_USER, phone_e164: PHONE, status: "active", whatsapp_verified_at: "2026-01-01T00:00:00Z" };
+  failNextInsert("client_accounts", { code: "23505", message: "duplicate", constraint: "uq_client_accounts_phone_e164" }, () => db.client_accounts.push(otherOwner));
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assert(res.ok === false && res.classification === "identity_conflict", `expected identity_conflict, got ${JSON.stringify(res)}`);
+  assert(db.client_accounts.length === 1 && db.client_accounts[0].user_id === OTHER_USER, "ownership never reassigned");
+});
+
+check("A3f. a suspended / disabled concurrent winner fails closed and is never reactivated", async () => {
+  for (const status of ["suspended", "disabled"]) {
+    resetAll();
+    const winner = { id: `ca-${status}`, user_id: AUTH_USER, phone_e164: PHONE, status, whatsapp_verified_at: null };
+    failNextInsert("client_accounts", UNIQUE_USER_VIOLATION, () => db.client_accounts.push(winner));
+    const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+    assert(res.ok === false && res.classification === "account_not_active", `${status}: expected account_not_active, got ${JSON.stringify(res)}`);
+    assert(db.client_accounts[0].status === status, `${status}: never reactivated`);
+    assert(db.client_accounts[0].whatsapp_verified_at === null, `${status}: never stamped verified`);
+  }
+});
+
+check("A3g. a null-phone winner belonging to a DIFFERENT user never yields success", async () => {
+  resetAll();
+  // fetchByUser finds nothing for AUTH_USER; a foreign row exists but holds no phone.
+  db.client_accounts.push({ id: "ca-foreign", user_id: OTHER_USER, phone_e164: null, status: "active", whatsapp_verified_at: null });
+  failNextInsert("client_accounts", UNIQUE_USER_VIOLATION, () => {});
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assert(res.ok === false, "a lost insert with no row for this user must fail closed");
+  assert(db.client_accounts[0].phone_e164 === null, "the foreign row is untouched");
+});
+
+check("A3h. NO provisioning success can carry a null phone or a null whatsapp_verified_at", async () => {
+  const scenarios = [
+    ["fresh insert", async () => { resetAll(); }],
+    ["existing verified row", async () => { resetAll(); db.client_accounts.push({ id: "s1", user_id: AUTH_USER, phone_e164: PHONE, status: "active", whatsapp_verified_at: "2026-01-01T00:00:00Z" }); }],
+    ["existing unstamped row", async () => { resetAll(); db.client_accounts.push({ id: "s2", user_id: AUTH_USER, phone_e164: PHONE, status: "active", whatsapp_verified_at: null }); }],
+    ["existing null-phone row", async () => { resetAll(); db.client_accounts.push({ id: "s3", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null }); }],
+    ["insert race, null-phone winner", async () => { resetAll(); failNextInsert("client_accounts", UNIQUE_USER_VIOLATION, () => db.client_accounts.push({ id: "s4", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null })); }],
+    ["insert race, unstamped winner", async () => { resetAll(); failNextInsert("client_accounts", UNIQUE_USER_VIOLATION, () => db.client_accounts.push({ id: "s5", user_id: AUTH_USER, phone_e164: PHONE, status: "active", whatsapp_verified_at: null })); }],
+    ["adoption race lost", async () => { resetAll(); const r = { id: "s6", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null }; db.client_accounts.push(r); beforeNextUpdate("client_accounts", () => { r.phone_e164 = PHONE; r.whatsapp_verified_at = "2026-05-05T05:05:05.000Z"; }); }],
+    ["timestamp race lost", async () => { resetAll(); const r = { id: "s7", user_id: AUTH_USER, phone_e164: PHONE, status: "active", whatsapp_verified_at: null }; db.client_accounts.push(r); beforeNextUpdate("client_accounts", () => { r.whatsapp_verified_at = "2026-06-06T06:06:06.000Z"; }); }],
+  ];
+  let successes = 0;
+  for (const [label, setup] of scenarios) {
+    await setup();
+    const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+    if (res.ok) {
+      successes++;
+      assert(res.context.phoneE164 === PHONE, `${label}: success carried phoneE164=${res.context.phoneE164}`);
+      assert(res.context.whatsappVerifiedAt != null, `${label}: success carried a null whatsappVerifiedAt`);
+      assert(res.context.status === "active", `${label}: success carried status=${res.context.status}`);
+      assert(res.context.authUserId === AUTH_USER, `${label}: success carried the wrong auth user`);
+    }
+  }
+  assert(successes === scenarios.length, `every scenario should succeed safely, got ${successes}/${scenarios.length}`);
+});
+
+check("A3i. an adoption-race refetch that finds a still-unbound row fails closed", async () => {
+  resetAll();
+  const row = { id: "ca-lost", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null };
+  db.client_accounts.push(row);
+  // The compare-and-set matches zero rows AND the refetched row is still unbound
+  // (e.g. the racing writer rolled back). Never invent a success.
+  beforeNextUpdate("client_accounts", () => { row.id = "ca-moved"; });
+  const res = await M.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+  assert(res.ok === false, "an unbound final row must never be a success");
+  assert(res.classification === "identity_conflict" || res.classification === "provisioning_failed", `fail-closed classification, got ${res.classification}`);
+});
+
+check("A3j. source: every provisioning success routes through the one canonical validator", () => {
+  assert(/function finalizeSuccess\(/.test(ACCESS_SRC), "finalizeSuccess exists");
+  for (const guard of [
+    /if \(!row\.whatsapp_verified_at\)/,
+    /if \(row\.phone_e164 !== phoneE164\)/,
+    /if \(row\.user_id !== authUserId\)/,
+    /if \(!isActiveClientAccount\(row\.status\)\)/,
+  ]) {
+    assert(guard.test(ACCESS_SRC), `finalizeSuccess must enforce ${guard}`);
+  }
+  // The ONLY `ok: true` literal in the provisioning code is inside finalizeSuccess.
+  const okTrue = ACCESS_SRC.match(/\{\s*ok:\s*true,\s*context:/g) ?? [];
+  assert(okTrue.length === 1, `exactly one success construction site, found ${okTrue.length}`);
+  // The concurrent winner is never returned unvalidated.
+  assert(!/return \{ ok: true, context: toContext\(winnerByUser/.test(ACCESS_SRC), "the concurrent winner is never returned directly");
+  assert(/\.eq\("user_id", authUserId\)/.test(ACCESS_SRC), "adoption is a compare-and-set on the owning user");
+});
+
+// ============================================================================
+// AUDIT FIX 4 — SUPABASE HTTP HOOK RETRY HEADERS
+//
+// Supabase retries a 429/503 only when a NON-EMPTY Retry-After header is present.
+// The in-progress duplicate is the ONLY retryable state.
+// ============================================================================
+check("A4a. an in-progress duplicate maps to 503 with a non-empty Retry-After", async () => {
+  resetAll();
+  enableAutomation();
+  // The first delivery is still dispatching; the duplicate sees that exact row.
+  seedInFlightMessage(M, { webhookId: "wh_inprog", status: "dispatching" });
+  const out = await M.HookSvc.handleSupabaseSendSmsHook(unsignedRequest(hookPayload(), { "webhook-id": "wh_inprog" }));
+  assert(out.kind === "in_progress", `expected in_progress, got ${out.kind}`);
+
+  const r = HK.sendSmsHookHttpResponse(out);
+  assert(r.status === 503, `expected 503, got ${r.status}`);
+  const retryAfter = header(r, "retry-after");
+  assert(typeof retryAfter === "string" && retryAfter.length > 0, `Retry-After must be a non-empty string, got ${JSON.stringify(retryAfter)}`);
+  assert(header(r, "content-type") === "application/json", "in_progress body declares application/json");
+  assert(r.body.ok === false && r.body.code === "in_progress", "safe generic body");
+});
+
+check("A4b. a queued duplicate is also retryable (never a 2xx, never a resend)", async () => {
+  resetAll();
+  enableAutomation();
+  seedInFlightMessage(M, { webhookId: "wh_queued", status: "queued" });
+  const out = await M.HookSvc.handleSupabaseSendSmsHook(unsignedRequest(hookPayload(), { "webhook-id": "wh_queued" }));
+  const r = HK.sendSmsHookHttpResponse(out);
+  assert(out.kind === "in_progress" && r.status === 503, "queued → retryable 503");
+  assert(header(r, "retry-after"), "queued carries Retry-After");
+  assert(sends().length === 0, "the duplicate invoked the provider zero times");
+});
+
+check("A4c. the in-progress replay invokes the provider ZERO extra times and creates no new row", async () => {
+  resetAll();
+  enableAutomation();
+  const inFlight = seedInFlightMessage(M, { webhookId: "wh_replay", status: "dispatching" });
+  const rowsBefore = db.communication_messages.length;
+  const req = unsignedRequest(hookPayload(), { "webhook-id": "wh_replay" });
+
+  const first = await M.HookSvc.handleSupabaseSendSmsHook(req);
+  const second = await M.HookSvc.handleSupabaseSendSmsHook(req);
+  assert(first.kind === "in_progress" && second.kind === "in_progress", "both duplicates are in_progress");
+  assert(sends().length === 0, `provider invoked zero extra times, got ${sends().length}`);
+  assert(db.communication_messages.length === rowsBefore, "no new communication message row");
+  assert(db.communication_messages[0].idempotency_key === "client_login_otp:wh_replay", "the webhook-id keyed row is reused");
+
+  // The first delivery lands: the SAME webhook id now replays as an accepted 200.
+  inFlight.status = "accepted";
+  const settled = await M.HookSvc.handleSupabaseSendSmsHook(req);
+  const r = HK.sendSmsHookHttpResponse(settled);
+  assert(settled.kind === "delivered", `accepted replay → delivered, got ${settled.kind}`);
+  assert(r.status === 200 && r.body === null, "accepted replay → 200 with an empty body");
+  assert(sends().length === 0, "still no extra provider invocation — nothing was resent");
+  assert(db.communication_messages.length === rowsBefore, "still exactly one message row");
+});
+
+check("A4d. only the in-progress state is retryable; standing failures are NOT", () => {
+  const K = HK.SendSmsHookOutcomeKind;
+  const RR = HK.SendSmsHookRejectReason;
+  const retryable = [{ kind: K.IN_PROGRESS, dispatchAttempted: true }];
+  const notRetryable = [
+    { kind: K.DELIVERED, dispatchAttempted: true },
+    // A disabled automation is a standing state only an operator can change.
+    { kind: K.SERVICE_UNAVAILABLE, dispatchAttempted: false },
+    // A single-shot auth failure must never be retried into a second OTP send.
+    { kind: K.DELIVERY_FAILED, dispatchAttempted: true },
+    { kind: K.REJECTED, rejectReason: RR.INVALID_SIGNATURE, dispatchAttempted: false },
+    { kind: K.REJECTED, rejectReason: RR.MALFORMED_PAYLOAD, dispatchAttempted: false },
+    { kind: K.REJECTED, rejectReason: RR.OVERSIZED_BODY, dispatchAttempted: false },
+    { kind: K.REJECTED, rejectReason: RR.SECRET_NOT_CONFIGURED, dispatchAttempted: false },
+  ];
+  for (const o of retryable) {
+    assert(header(HK.sendSmsHookHttpResponse(o), "retry-after"), `${o.kind} must be retryable`);
+  }
+  for (const o of notRetryable) {
+    const r = HK.sendSmsHookHttpResponse(o);
+    assert(header(r, "retry-after") === undefined, `${o.kind}/${o.rejectReason ?? ""} must NOT carry Retry-After`);
+  }
+});
+
+check("A4e. no sensitive value can appear in any response header or body", async () => {
+  resetAll();
+  enableAutomation();
+  process.env[SECRET_ENV] = V1_A;
+  await M.HookSvc.handleSupabaseSendSmsHook(unsignedRequest(hookPayload({ otp: "778899" }), { "webhook-id": "wh_a4e" }));
+  const K = HK.SendSmsHookOutcomeKind;
+  const RR = HK.SendSmsHookRejectReason;
+  const responses = [
+    HK.sendSmsHookHttpResponse({ kind: K.DELIVERED, dispatchAttempted: true, webhookId: "wh_a4e" }),
+    HK.sendSmsHookHttpResponse({ kind: K.IN_PROGRESS, dispatchAttempted: true, webhookId: "wh_a4e" }),
+    HK.sendSmsHookHttpResponse({ kind: K.SERVICE_UNAVAILABLE, dispatchAttempted: false }),
+    HK.sendSmsHookHttpResponse({ kind: K.DELIVERY_FAILED, dispatchAttempted: true }),
+    HK.sendSmsHookHttpResponse({ kind: K.REJECTED, rejectReason: RR.INVALID_SIGNATURE, dispatchAttempted: false }),
+    HK.sendSmsHookHttpResponse({ kind: K.REJECTED, rejectReason: RR.SECRET_NOT_CONFIGURED, dispatchAttempted: false }),
+  ];
+  const blob = responses.map((r) => `${JSON.stringify(r.body)}|${JSON.stringify(r.headers)}`).join("\n");
+  for (const s of ["778899", OTP, PHONE, PHONE_DIGITS, SECRET_B64, "whsec_", "v1,", "wh_a4e", "signature"]) {
+    assert(!blob.includes(s), `a response header or body leaked ${s.slice(0, 8)}…`);
+  }
+});
+
+check("A4f. the route emits the mapped headers and does not hand-roll a response", () => {
+  assert(/new NextResponse\(null, \{ status, headers \}\)/.test(ROUTE_SRC), "empty success body carries the mapped headers");
+  assert(/NextResponse\.json\(body, \{ status, headers \}\)/.test(ROUTE_SRC), "JSON body carries the mapped headers");
+  assert(/rejectSendSmsHookRequest/.test(ROUTE_SRC), "bounded-read failures map through the same contract");
+  assert(/"Content-Type": "application\/json"/.test(ROUTE_SRC), "the catch-all 500 declares its content type");
+  // The route must not resend, reschedule, or mint a new webhook id.
+  for (const banned of ["setTimeout", "setInterval", "randomUUID", "signInWithOtp", "resend", "retryOtp"]) {
+    assert(!ROUTE_SRC.includes(banned), `the route must not ${banned}`);
+  }
+});
+
+check("A4g. no fake timeout wrapper races the provider send; the real-adapter requirement is documented", () => {
+  // A Promise.race timeout REJECTS but does not CANCEL: the provider request would
+  // keep running, Supabase would retry, and the OTP could be sent twice.
+  for (const banned of ["Promise.race", "AbortController", "AbortSignal", "setTimeout"]) {
+    assert(!HOOK_SVC_SRC.includes(banned), `the hook service must not wrap the send in ${banned} (an uncancelled race risks a duplicate OTP)`);
+  }
+  assert(/abortable/i.test(HOOK_SVC_RAW), "the future real-provider adapter must be required to enforce an abortable timeout");
+  assert(/abortable/i.test(PHASE_5D_DOC), "the abortable-timeout prerequisite is documented for operators");
+});
+
+check("A4h. the secret rotation format is documented as pipe-delimited, never comma-split", () => {
+  assert(/SEND_SMS_HOOK_SECRETS/.test(PHASE_5D_DOC), "the env var is documented");
+  assert(/v1,whsec_/.test(PHASE_5D_DOC), "the versioned secret representation is documented");
+  assert(/\|/.test(PHASE_5D_DOC), "the pipe separator is documented");
+  assert(/never a separator|not a separator|never split on comma/i.test(PHASE_5D_DOC), "the comma rule is documented");
+  assert(/never a separator|not a separator|NEVER A SEPARATOR/i.test(HOOK_LIB_RAW), "the comma rule is documented in code");
+});
+
+// ============================================================================
 // MUTATION TESTS — edit real source, recompile, assert the vulnerability appears
 // ============================================================================
 const mutationChecks = [];
-function mutation(name, { file, from, to, scenario }) {
-  mutationChecks.push({ name, file, from, to, scenario });
+/**
+ * `edits` lets one mutation remove a defence-in-depth PAIR (e.g. a query filter and
+ * its post-query recheck), which is the only way to expose a vulnerability that two
+ * redundant guards jointly prevent.
+ */
+function mutation(name, { file, from, to, edits, scenario }) {
+  const list = edits ?? [{ file, from, to }];
+  mutationChecks.push({ name, edits: list, scenario });
 }
 
 mutation("MUT: skipping signature verification (and parsing the raw body) lets a forged event dispatch", {
@@ -1484,8 +2170,9 @@ mutation("MUT: accepting a stale attestation provisions on an old delivery", {
 
 mutation("MUT: skipping the identity conflict check overwrites an established phone identity", {
   file: "services/clientAccessService.ts",
-  from: "      return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);\n    }\n\n    // No row for this user",
-  to: "      return { ok: true, context: toContext(byUser, authUserId) };\n    }\n\n    // No row for this user",
+  // The final `return` of reconcileExistingClient — the different-non-null-phone denial.
+  from: "  return provisioningConflict(ClientOtpVerifyFailureClassification.IDENTITY_CONFLICT);\n}\n\n/**\n * Resolve or create the client_accounts row",
+  to: "  return { ok: true, context: toContext(row, authUserId) };\n}\n\n/**\n * Resolve or create the client_accounts row",
   scenario: async (mm) => {
     resetDb();
     db.client_accounts.push({ id: "ca-diff", user_id: AUTH_USER, phone_e164: OTHER_PHONE, status: "active", whatsapp_verified_at: null });
@@ -1496,8 +2183,8 @@ mutation("MUT: skipping the identity conflict check overwrites an established ph
 
 mutation("MUT: skipping the attestation gate sets whatsapp_verified_at without any WhatsApp delivery", {
   file: "services/clientOtpAuthService.ts",
-  from: "const attested = await hasFreshCommunicationAttestation(authUserId, phoneE164);",
-  to: "const attested = true;",
+  from: "      const attested = await hasFreshCommunicationAttestation(\n        authUserId,\n        phoneE164,\n        expectedProvider\n      );",
+  to: "      const attested = true as boolean;",
   scenario: async (mm) => {
     resetDb(); enableAutomation(); // NO attestation seeded
     verifySuccessResponder();
@@ -1506,10 +2193,14 @@ mutation("MUT: skipping the attestation gate sets whatsapp_verified_at without a
   },
 });
 
-mutation("MUT: not reactivating a suspended account is defeated if the status guard is removed", {
-  file: "services/clientAccessService.ts",
-  from: "if (!isActiveClientAccount(byUser.status)) {\n        return provisioningConflict(ClientOtpVerifyFailureClassification.ACCOUNT_NOT_ACTIVE);\n      }",
-  to: "if ((false as boolean)) {\n        return provisioningConflict(ClientOtpVerifyFailureClassification.ACCOUNT_NOT_ACTIVE);\n      }",
+// The active-status guard is now enforced TWICE (in reconcileExistingClient and
+// again in finalizeSuccess), so removing either alone changes nothing — that is the
+// point of defence in depth. Mutating the shared predicate defeats both layers and
+// proves the guarantee, not merely one call site.
+mutation("MUT: treating every status as active grants a suspended account access", {
+  file: "lib/identity/clientAccess.ts",
+  from: 'return typeof status === "string" && status.trim().toLowerCase() === CLIENT_ACCOUNT_ACTIVE;',
+  to: "return true;",
   scenario: async (mm) => {
     resetDb(); enableAutomation();
     db.client_accounts.push({ id: "ca-susp", user_id: AUTH_USER, phone_e164: PHONE, status: "suspended", whatsapp_verified_at: null });
@@ -1517,6 +2208,95 @@ mutation("MUT: not reactivating a suspended account is defeated if the status gu
     verifySuccessResponder();
     const res = await mm.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
     return res.ok === true; // a suspended account was wrongly granted access
+  },
+});
+
+// ----------------------------------------------------------------------------
+// AUDIT MUTATIONS — one per reviewed fix
+// ----------------------------------------------------------------------------
+mutation("MUT(fix 1): removing the provider condition lets a MOCK row attest a real-provider login", {
+  // Both the query filter and its defence-in-depth recheck must go: either one alone
+  // still rejects the row, which is exactly the redundancy this fix introduced.
+  edits: [
+    {
+      file: "services/clientOtpAuthService.ts",
+      from: '    .eq("provider", expectedProvider)\n',
+      to: "",
+    },
+    {
+      file: "services/clientOtpAuthService.ts",
+      from: "  if (row.provider !== expectedProvider) return false;\n",
+      to: "",
+    },
+  ],
+  scenario: async (mm) => {
+    resetDb();
+    enableAutomation(REAL_PROVIDER_KEY);
+    mm.comm.setActiveWhatsAppProvider(makeRealishProvider(mm.MockProviderMod));
+    seedAttestation(mm, { provider: "mock", status: "accepted" }); // stale mock delivery
+    verifySuccessResponder();
+    const res = await mm.OtpAuth.verifyClientWhatsappOtp({ phone: PHONE, token: OTP });
+    return res.ok === true; // a mock row attested a real-provider login
+  },
+});
+
+mutation("MUT(fix 3): returning success for a null-phone concurrent winner yields an unbound identity", {
+  file: "services/clientAccessService.ts",
+  from: "  if (row.phone_e164 === null) {\n    return await adoptPhone(row.id, authUserId, phoneE164);\n  }",
+  to: "  if (row.phone_e164 === null) {\n    return { ok: true, context: toContext(row, authUserId) };\n  }",
+  scenario: async (mm) => {
+    resetDb();
+    const winner = { id: "ca-null", user_id: AUTH_USER, phone_e164: null, status: "active", whatsapp_verified_at: null };
+    failNextInsert("client_accounts", { code: "23505", message: "duplicate", constraint: "uq_client_accounts_user" }, () => db.client_accounts.push(winner));
+    const res = await mm.Access.provisionVerifiedClientAccount({ authUserId: AUTH_USER, phoneE164: PHONE });
+    // The mutant "succeeds" with an unbound identity: no phone, no verified stamp.
+    return res.ok === true && (res.context.phoneE164 === null || res.context.whatsappVerifiedAt === null);
+  },
+});
+
+mutation("MUT(fix 4): dropping Retry-After makes Supabase abandon the in-progress duplicate", {
+  file: "services/supabaseSendSmsHookService.ts",
+  from: 'return jsonResponse(503, "in_progress", { [RETRY_AFTER_HEADER]: RETRY_AFTER_VALUE });',
+  to: 'return jsonResponse(503, "in_progress");',
+  scenario: async (mm) => {
+    resetDb(); enableAutomation();
+    seedInFlightMessage(mm, { webhookId: "wh_mut_retry", status: "dispatching" });
+    const out = await mm.HookSvc.handleSupabaseSendSmsHook(unsignedRequest(hookPayload(), { "webhook-id": "wh_mut_retry" }));
+    const r = mm.HookSvc.sendSmsHookHttpResponse(out);
+    const retryAfter = Object.entries(r.headers ?? {}).find(([k]) => k.toLowerCase() === "retry-after");
+    // 503 without Retry-After: Supabase treats it as terminal and never retries.
+    return out.kind === "in_progress" && r.status === 503 && retryAfter === undefined;
+  },
+});
+
+mutation("MUT(fix 5): breaking the pipe separator makes a rotated secret fail verification", {
+  file: "lib/auth/supabaseSendSmsHook.ts",
+  from: "const HOOK_SECRET_SEPARATORS = /[|\\r\\n]+/;",
+  to: "const HOOK_SECRET_SEPARATORS = /[\\r\\n]+/;",
+  scenario: async (mm) => {
+    resetDb(); enableAutomation();
+    // The documented pipe-delimited rotation config.
+    process.env[SECRET_ENV] = `v1,whsec_${SECRET_B64}|v1,whsec_${SECRET_B64_2}`;
+    mm.hookLib.setActiveSendSmsHookVerifier(new mm.hookLib.StandardWebhooksSignatureVerifier());
+    const out = await mm.HookSvc.handleSupabaseSendSmsHook(signedRequest({ secret: SECRET_B64, webhookId: "wh_mut_pipe" }));
+    process.env[SECRET_ENV] = SECRET_B64;
+    // The mutant parses the whole string as ONE secret → a valid request is rejected.
+    return out.kind === "rejected" && out.rejectReason === "invalid_signature";
+  },
+});
+
+mutation("MUT(fix 5): splitting on the comma shreds each versioned secret", {
+  file: "lib/auth/supabaseSendSmsHook.ts",
+  from: "const HOOK_SECRET_SEPARATORS = /[|\\r\\n]+/;",
+  to: "const HOOK_SECRET_SEPARATORS = /[,|\\r\\n]+/;",
+  scenario: async (mm) => {
+    // Observed at the PARSER, deliberately: `standardwebhooks` strips a leading
+    // `whsec_` itself, so the detached half of a shredded secret would still verify
+    // and the corruption would hide until a secret without that prefix appeared.
+    const one = `v1,whsec_${SECRET_B64}`;
+    const parsed = mm.hookLib.loadSendSmsHookSecrets({ SEND_SMS_HOOK_SECRETS: one });
+    // The mutant emits a bare "v1" marker and a detached secret body.
+    return parsed.length !== 1 || parsed[0] !== one;
   },
 });
 
@@ -1581,12 +2361,20 @@ async function runMutations() {
   let passed = 0, failed = 0;
   console.log("\nRunning Phase 5D mutation tests (recompiling per mutation)...\n");
   for (const mut of mutationChecks) {
-    const filePath = resolve(mut.file);
-    const original = readFileSync(filePath, "utf8");
     const mutDir = resolve(`.phase5d-mut-${mutationChecks.indexOf(mut)}`);
+    // Snapshot every touched file ONCE so the restore is exact even on failure.
+    const originals = new Map();
+    for (const edit of mut.edits) {
+      const filePath = resolve(edit.file);
+      if (!originals.has(filePath)) originals.set(filePath, readFileSync(filePath, "utf8"));
+    }
     try {
-      if (!original.includes(mut.from)) throw new Error(`mutation anchor not found in ${mut.file}`);
-      writeFileSync(filePath, original.replace(mut.from, mut.to));
+      for (const edit of mut.edits) {
+        const filePath = resolve(edit.file);
+        const current = readFileSync(filePath, "utf8");
+        if (!current.includes(edit.from)) throw new Error(`mutation anchor not found in ${edit.file}`);
+        writeFileSync(filePath, current.replace(edit.from, edit.to));
+      }
       compileTo(mutDir);
       const mm = wireBuild(mutDir);
       mm.comm.setActiveWhatsAppProvider(new mm.MockProviderMod.MockWhatsAppProvider());
@@ -1598,7 +2386,7 @@ async function runMutations() {
     } catch (e) {
       console.log(`FAIL ${mut.name}`); console.error(e); failed++;
     } finally {
-      writeFileSync(filePath, original);
+      for (const [filePath, original] of originals) writeFileSync(filePath, original);
       rmSync(mutDir, { recursive: true, force: true });
     }
   }

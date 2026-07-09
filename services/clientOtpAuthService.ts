@@ -289,7 +289,15 @@ export async function verifyClientWhatsappOtp(
         });
       }
 
-      const attested = await hasFreshCommunicationAttestation(authUserId, phoneE164);
+      // Bind the attestation to the provider the gate authorized. A message carried
+      // by any OTHER provider — notably a historical `mock` row written before a
+      // real adapter was switched on — must never prove this login.
+      const expectedProvider = gate.providerRequired;
+      const attested = await hasFreshCommunicationAttestation(
+        authUserId,
+        phoneE164,
+        expectedProvider
+      );
       if (!attested) {
         return await denyAfterAuth({
           sb,
@@ -367,22 +375,34 @@ async function denyAfterAuth(params: {
 
 /**
  * Confirm a recent, successful QuickFurno WhatsApp communication for this auth
- * user + phone. The ledger match proves QuickFurno's transport carried the OTP;
- * the verified OTP proves possession of the code. Both are required.
+ * user + phone, carried by `expectedProvider`. The ledger match proves
+ * QuickFurno's transport carried the OTP; the verified OTP proves possession of
+ * the code. Both are required.
+ *
+ * `expectedProvider` is the gate's `providerRequired`, which the gate has already
+ * proven equal to the ACTIVE adapter's key. Binding the ledger row to it closes
+ * the cross-provider gap: once an operator switches from `mock` to a real
+ * adapter, a stale `mock` row can no longer attest a real-provider login, and a
+ * real row can never attest while the mock adapter is active.
  */
 async function hasFreshCommunicationAttestation(
   authUserId: string,
-  phoneE164: string
+  phoneE164: string,
+  expectedProvider: string
 ): Promise<boolean> {
+  // Never let an empty/absent provider degrade into an unbound query.
+  if (typeof expectedProvider !== "string" || expectedProvider.trim() === "") return false;
+
   const destinationHash = hashPhoneE164(phoneE164);
   const { data, error } = await adminClient()
     .from(COMMUNICATION_MESSAGES_TABLE)
-    .select("id, status, created_at, entity_id, destination_hash")
+    .select("id, status, created_at, entity_id, destination_hash, provider")
     .eq("message_type", CLIENT_LOGIN_OTP_MESSAGE_TYPE)
     .eq("lane", CLIENT_LOGIN_OTP_LANE)
     .eq("entity_type", CLIENT_LOGIN_OTP_ENTITY_TYPE)
     .eq("entity_id", authUserId)
     .eq("destination_hash", destinationHash)
+    .eq("provider", expectedProvider)
     .in("status", ATTESTATION_SUCCESS_STATUSES as string[])
     .order("created_at", { ascending: false })
     .limit(1);
@@ -393,6 +413,7 @@ async function hasFreshCommunicationAttestation(
     created_at: string;
     entity_id: string;
     destination_hash: string;
+    provider: string | null;
   }>;
   const row = rows[0];
   if (!row) return false;
@@ -400,6 +421,7 @@ async function hasFreshCommunicationAttestation(
   // Defence in depth (never trust a lenient query layer): re-check every field.
   if (row.entity_id !== authUserId) return false;
   if (row.destination_hash !== destinationHash) return false;
+  if (row.provider !== expectedProvider) return false;
   if (!isAttestationSuccessStatus(row.status)) return false;
   if (!isAttestationFresh(row.created_at)) return false;
   return true;

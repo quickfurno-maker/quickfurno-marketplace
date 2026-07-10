@@ -44,8 +44,11 @@ const IDENTITY_MISMATCH_MESSAGE =
 type EnvSource = Record<string, string | undefined>;
 
 /**
- * The candidate the runtime would use, or a fail-closed error. Production always fails
- * closed today: no commercial SMS provider exists and a mock may never carry a live OTP.
+ * The candidate the runtime would use, or a fail-closed error. In production an absent mode
+ * and an explicit mock both fail closed — a mock may never carry a live OTP. A reviewed
+ * commercial provider resolves to a candidate only when its complete server-only config is
+ * present, and a CANDIDATE IS NOT AUTHORIZATION: no provider is activated, and nothing here
+ * or downstream in this module can dispatch a message.
  */
 export function resolveSmsProviderCandidate(env: EnvSource = process.env): Result<SmsProviderCandidate> {
   const selection: SmsProviderSelection = selectSmsProvider(env);

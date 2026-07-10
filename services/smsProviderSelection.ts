@@ -1,5 +1,5 @@
 // ============================================================================
-// QuickFurno — services/smsProviderSelection.ts   (Phase 5F-C2, server-only)
+// QuickFurno — services/smsProviderSelection.ts   (Phase 5F-C2, extended 5F-C3-A)
 //
 // Controlled, LAZY SMS provider selection.
 //
@@ -9,26 +9,34 @@
 // the SMS runtime infrastructure gate AND Phase 5F-C1's fallback decision, failure rule,
 // attempt budget and atomic attempt claim.
 //
-// NO COMMERCIAL PROVIDER IS CHOSEN. The mode vocabulary is closed and contains exactly one
-// value — `mock` — which is the deterministic test/dev adapter. There is no MSG91, Exotel,
-// Twilio, Gupshup, Kaleyra, Plivo, Vonage or AWS SNS mode, and none may be added here
-// without the C3 review.
+// PHASE 5F-C3-A — the mode vocabulary gains EXACTLY ONE reviewed value, `exotel_sms`, and
+// remains CLOSED. There is no MSG91, Twilio, Gupshup, Kaleyra, Plivo, Vonage or AWS SNS
+// mode, no alias, and no normalization: an unrecognised mode fails closed and never
+// silently becomes mock. NO ACCOUNT EXISTS, NOTHING IS ACTIVATED, and no code path
+// constructs the adapter — a reviewed mode only makes a provider a CANDIDATE.
 //
-// Consequently PRODUCTION ALWAYS FAILS CLOSED — including on an explicit `mock`, which
-// must never send a live OTP. Selection is resolved at RUNTIME, never at import time, so a
-// missing environment variable can never break the build.
+// Production remains fail-closed EXACTLY as C2 defined it: an absent mode is closed, and an
+// explicit `mock` is closed (a mock must never carry a live OTP). Selection is resolved at
+// RUNTIME, never at import time, so a missing environment variable can never break the
+// build.
 //
-// It returns a CANDIDATE DESCRIPTOR, not an adapter instance: Phase 5F-C2 constructs no
-// SMS provider anywhere in production code.
+// It returns a CANDIDATE DESCRIPTOR, not an adapter instance: nothing here constructs an
+// SMS provider, so no adapter, credential, or HTTP endpoint enters this module.
 // ============================================================================
 
 import { MOCK_SMS_PROVIDER_KEY } from "../lib/communication/providers/mockSmsProvider";
+import {
+  EXOTEL_SMS_PROVIDER_KEY,
+  firstExotelConfigVariable,
+  resolveExotelConfig,
+} from "../lib/communication/providers/exotelConfig";
 
 export const SMS_PROVIDER_MODE_ENV = "SMS_PROVIDER_MODE";
 
-/** The CLOSED mode vocabulary. Exactly one value exists in Phase 5F-C2. */
+/** The CLOSED mode vocabulary. Exactly two reviewed values exist in Phase 5F-C3-A. */
 export const SmsProviderMode = {
   MOCK: "mock",
+  EXOTEL_SMS: "exotel_sms",
 } as const;
 
 export type SmsProviderModeValue = (typeof SmsProviderMode)[keyof typeof SmsProviderMode];
@@ -44,26 +52,39 @@ export const SmsSelectionBlockReason = {
   MOCK_FORBIDDEN_IN_PRODUCTION: "mock_forbidden_in_production",
   /** Any mode outside the closed vocabulary. Never downgraded to mock. */
   UNSUPPORTED_PROVIDER_MODE: "unsupported_provider_mode",
+  /**
+   * A reviewed provider mode whose server-only configuration is absent or malformed. The
+   * provider is NOT a candidate. Never downgraded to mock, in any environment.
+   */
+  PROVIDER_CONFIG_INCOMPLETE: "provider_config_incomplete",
 } as const;
 
 export type SmsSelectionBlockReasonValue =
   (typeof SmsSelectionBlockReason)[keyof typeof SmsSelectionBlockReason];
 
 /**
- * The selected candidate. An IDENTITY, never an adapter instance — Phase 5F-C2 sends
- * nothing, so it constructs nothing.
+ * The selected candidate. An IDENTITY, never an adapter instance — selection sends nothing,
+ * so it constructs nothing.
  */
 export interface SmsProviderCandidate {
   readonly mode: SmsProviderModeValue;
   readonly providerKey: string;
   readonly channel: "sms";
   /** True only for the deterministic test/dev adapter. */
-  readonly isMock: true;
+  readonly isMock: boolean;
 }
 
 export type SmsProviderSelection =
   | { readonly ok: true; readonly candidate: SmsProviderCandidate }
-  | { readonly ok: false; readonly reason: SmsSelectionBlockReasonValue; readonly variable: string };
+  | {
+      readonly ok: false;
+      readonly reason: SmsSelectionBlockReasonValue;
+      /** A variable NAME. A variable VALUE can never appear here. */
+      readonly variable: string;
+      /** Variable NAMES only — supplied for a config failure, never values. */
+      readonly missing?: readonly string[];
+      readonly invalid?: readonly string[];
+    };
 
 type EnvSource = Record<string, string | undefined>;
 
@@ -79,26 +100,66 @@ const MOCK_CANDIDATE: SmsProviderCandidate = Object.freeze({
   isMock: true,
 });
 
+const EXOTEL_CANDIDATE: SmsProviderCandidate = Object.freeze({
+  mode: SmsProviderMode.EXOTEL_SMS,
+  providerKey: EXOTEL_SMS_PROVIDER_KEY,
+  channel: "sms",
+  isMock: false,
+});
+
+/**
+ * A reviewed real provider is a CANDIDATE only when its complete server-only config
+ * resolves. An incomplete config fails closed with variable NAMES only — never a value, and
+ * never a fallback to mock.
+ */
+function selectExotel(env: EnvSource): SmsProviderSelection {
+  const config = resolveExotelConfig(env);
+  if (!config.ok) {
+    return {
+      ok: false,
+      reason: SmsSelectionBlockReason.PROVIDER_CONFIG_INCOMPLETE,
+      variable: firstExotelConfigVariable(config),
+      missing: config.missing,
+      invalid: config.invalid,
+    };
+  }
+  return { ok: true, candidate: EXOTEL_CANDIDATE };
+}
+
 /**
  * Select the SMS provider candidate for the current environment. LAZY: called per request,
  * never at module import.
+ *
+ *   ANY ENVIRONMENT
+ *     `exotel_sms` + complete config   → Exotel CANDIDATE (still not permission to send)
+ *     `exotel_sms` + incomplete config → FAIL CLOSED (provider_config_incomplete)
  *
  *   NON-PRODUCTION
  *     mode absent      → controlled mock
  *     explicit `mock`  → controlled mock
  *     unknown mode     → FAIL CLOSED
  *
- *   PRODUCTION (no commercial provider exists yet)
+ *   PRODUCTION
  *     mode absent      → FAIL CLOSED (mode_required_in_production)
  *     explicit `mock`  → FAIL CLOSED (mock_forbidden_in_production)
  *     unknown mode     → FAIL CLOSED (unsupported_provider_mode)
  *
- * There is NO implicit mock fallback in production, and an unknown mode never silently
- * becomes mock.
+ * There is NO implicit mock fallback in production, an unknown mode never silently becomes
+ * mock, and a reviewed provider with an incomplete config never becomes mock either.
+ *
+ * A CANDIDATE IS NOT AUTHORIZATION. Even a complete Exotel config cannot send: the SMS
+ * runtime gate has no Exotel policy, account, template mapping or canary row, and Phase
+ * 5F-C1 ships zero active failure rules.
  */
 export function selectSmsProvider(env: EnvSource = process.env): SmsProviderSelection {
   const raw = readTrimmed(env, SMS_PROVIDER_MODE_ENV);
   const isProduction = readTrimmed(env, "NODE_ENV") === "production";
+
+  // A reviewed real provider behaves identically in every environment: candidacy depends on
+  // its config alone, and candidacy authorizes nothing.
+  if (raw === SmsProviderMode.EXOTEL_SMS) {
+    return selectExotel(env);
+  }
 
   if (isProduction) {
     if (raw === null) {

@@ -76,6 +76,8 @@ value:
 SMS_PROVIDER_MODE = mock        // the deterministic test/dev adapter
 ```
 
+> Superseded in part by Phase 5F-C3-A: the closed vocabulary is now ["mock", "exotel_sms"]. C2's fail-closed rules are unchanged.
+
 No real adapter, no credential, no HTTP endpoint, and no webhook route exists. The runtime
 resolution boundary does not even *name* an adapter: it takes a caller-injected factory and
 applies a provider-identity fence to whatever that factory returns.

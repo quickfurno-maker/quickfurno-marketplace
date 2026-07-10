@@ -32,6 +32,9 @@ const TS_FILES = [
   "lib/communication/providers/whatsappProvider.ts",
   "lib/communication/providers/smsProvider.ts",
   "lib/communication/providers/mockSmsProvider.ts",
+  // Phase 5F-C3-A: selection consults the Exotel config loader to decide candidacy. The
+  // Exotel ADAPTER is deliberately absent — C2's own surface still constructs no provider.
+  "lib/communication/providers/exotelConfig.ts",
   "lib/communication/providers/smsRuntimeGate.ts",
   "services/smsProviderSelection.ts",
   "services/smsProviderRuntimeService.ts",
@@ -99,11 +102,19 @@ const C1_ATTEMPT_SVC_SRC = "services/authenticationDeliveryAttemptService.ts";
 const readCode = (p) =>
   readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/[^\n]*/gm, "");
 
-/** The commercial vendors C2 must never name. */
+/** Every commercial SMS vendor. Used verbatim for the documentation check. */
 const COMMERCIAL_PROVIDERS = [
   /twilio/i, /msg91/i, /exotel/i, /gupshup/i, /kaleyra/i, /plivo/i, /vonage/i, /nexmo/i,
   /aws[_ -]?sns/i, /textlocal/i, /sinch/i, /infobip/i, /karix/i, /routemobile/i, /netcore/i,
 ];
+
+/**
+ * Phase 5F-C3-A performed the C3 review C2 required, and admitted EXACTLY ONE vendor into
+ * the still-closed selection vocabulary. That vendor may be named in the selection module
+ * and NOWHERE else in C2's surface; every other vendor remains unnameable everywhere.
+ */
+const REVIEWED_PROVIDER = /exotel/i;
+const UNREVIEWED_PROVIDERS = COMMERCIAL_PROVIDERS.filter((v) => v.source !== REVIEWED_PROVIDER.source);
 
 // ============================================================================
 // REGISTRY
@@ -380,12 +391,18 @@ check("16-23. selection is lazy, controlled, and ALWAYS fails closed in producti
   assert(!/^\s*(const|let|var)\s+\w+\s*=\s*selectSmsProvider\(/m.test(src), "22: no module-level resolution");
   assert(/env: EnvSource = process\.env/.test(src), "22: env is a default parameter, evaluated per call");
 
-  // 23 — the mode vocabulary is closed and names no commercial provider anywhere in C2.
-  assert(S.KNOWN_SMS_PROVIDER_MODES.length === 1 && S.KNOWN_SMS_PROVIDER_MODES[0] === "mock", "23: closed vocabulary");
-  const allC2 = [OUTCOME_SRC, SMS_IFACE_SRC, MOCK_SMS_SRC, GATE_SRC, SELECTION_SRC, RUNTIME_SVC_SRC, RUNTIME_PROVIDER_SRC]
-    .map((f) => readCode(f)).join("\n");
-  for (const vendor of COMMERCIAL_PROVIDERS) {
-    assert(!vendor.test(allC2), `23: no commercial provider literal (${vendor})`);
+  // 23 — the mode vocabulary stays CLOSED. It holds mock plus exactly one reviewed vendor,
+  // which may be named only in the selection module. No other vendor exists anywhere in C2.
+  assert(S.KNOWN_SMS_PROVIDER_MODES.length === 2, "23: closed vocabulary");
+  assert(S.KNOWN_SMS_PROVIDER_MODES[0] === "mock" && S.KNOWN_SMS_PROVIDER_MODES[1] === "exotel_sms",
+    `23: exactly mock + the one reviewed provider, got ${S.KNOWN_SMS_PROVIDER_MODES}`);
+  const c2Files = [OUTCOME_SRC, SMS_IFACE_SRC, MOCK_SMS_SRC, GATE_SRC, SELECTION_SRC, RUNTIME_SVC_SRC, RUNTIME_PROVIDER_SRC];
+  const allC2 = c2Files.map((f) => readCode(f)).join("\n");
+  for (const vendor of UNREVIEWED_PROVIDERS) {
+    assert(!vendor.test(allC2), `23: no unreviewed commercial provider literal (${vendor})`);
+  }
+  for (const f of c2Files.filter((x) => x !== SELECTION_SRC)) {
+    assert(!REVIEWED_PROVIDER.test(readCode(f)), `23: the reviewed vendor is confined to selection, found in ${f}`);
   }
   assert(!/https?:\/\//.test(allC2), "23: no provider HTTP endpoint");
 });
@@ -946,11 +963,11 @@ srcMutation("MUT V: an SMS send call is introduced into the runtime readiness pa
   "    await (globalThis as { provider?: { sendAuthenticationMessage: (a: string, b: string, c: Record<string, string>) => Promise<unknown> } }).provider?.sendAuthenticationMessage(\"+10000000000\", query.templateKey, {});\n    return evaluateSmsRuntimeGate({",
   () => /sendAuthenticationMessage/.test(readF(RUNTIME_SVC_SRC)));
 
-srcMutation("MUT W: a commercial provider literal appears in the selection vocabulary",
+srcMutation("MUT W: an UNREVIEWED commercial provider literal appears in the selection vocabulary",
   SELECTION_SRC,
-  "export const SmsProviderMode = {\n  MOCK: \"mock\",\n} as const;",
-  "export const SmsProviderMode = {\n  MOCK: \"mock\",\n  MSG91: \"msg91\",\n} as const;",
-  () => COMMERCIAL_PROVIDERS.some((v) => v.test(readF(SELECTION_SRC))));
+  "export const SmsProviderMode = {\n  MOCK: \"mock\",\n  EXOTEL_SMS: \"exotel_sms\",\n} as const;",
+  "export const SmsProviderMode = {\n  MOCK: \"mock\",\n  EXOTEL_SMS: \"exotel_sms\",\n  MSG91: \"msg91\",\n} as const;",
+  () => UNREVIEWED_PROVIDERS.some((v) => v.test(readF(SELECTION_SRC))));
 
 srcMutation("MUT X: a transport policy activation appears in the runtime service",
   RUNTIME_SVC_SRC,

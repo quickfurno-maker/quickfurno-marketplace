@@ -164,6 +164,66 @@ function tableGrants(sql, table) {
   return { granted, revoked };
 }
 
+/**
+ * Extract a `where` clause out of a SQL function body. The interpreter turns it into a
+ * real row predicate, so re-scoping a query in the migration genuinely re-scopes the
+ * model's lookup — it is never a hardcoded assumption about what the SQL "probably" does.
+ */
+function whereClause(body, re) {
+  const m = body.match(re);
+  return m ? m[1].replace(/\s+/g, " ").trim() : null;
+}
+
+/** Compile `a.col = p_param` / `a.col = 3` conjunctions into a row predicate. */
+function wherePredicate(where) {
+  if (!where) return null;
+  const atoms = [...where.matchAll(/a\.(\w+)\s*=\s*(p_\w+|\d+)/g)].map(([, col, operand]) =>
+    /^\d+$/.test(operand)
+      ? (row) => row[col] === Number(operand)
+      : (row, params) => row[col] === params[operand]
+  );
+  if (atoms.length === 0) throw new Error(`unsupported where clause: "${where}"`);
+  return (row, params) => atoms.every((f) => f(row, params));
+}
+
+/**
+ * Evaluate a PostgreSQL `||` concatenation of literals and `p_*` parameters into the real
+ * advisory-lock key. Re-namespace the lock in the SQL and callers really do stop (or
+ * start) serializing together.
+ */
+function evaluateLockKey(expression, params) {
+  if (!expression) return null;
+  return expression
+    .split("||")
+    .map((part) => {
+      const token = part.trim();
+      const literal = token.match(/^'([^']*)'$/);
+      if (literal) return literal[1];
+      if (/^p_\w+$/.test(token)) return String(params[token] ?? "");
+      throw new Error(`unsupported advisory lock token: "${token}"`);
+    })
+    .join("");
+}
+
+/** A per-key async mutex — the model of `pg_advisory_xact_lock`. */
+function createMutex() {
+  let tail = Promise.resolve();
+  return async () => {
+    let unlock;
+    const held = new Promise((resolve) => { unlock = resolve; });
+    const previous = tail;
+    tail = tail.then(() => held);
+    await previous;
+    return unlock;
+  };
+}
+const advisoryLocks = new Map();
+async function acquireAdvisoryLock(key) {
+  if (key === null) return null;
+  if (!advisoryLocks.has(key)) advisoryLocks.set(key, createMutex());
+  return advisoryLocks.get(key)();
+}
+
 const UNIQUE_INDEX_RE =
   /create\s+unique\s+index(?:\s+if\s+not\s+exists)?\s+(\w+)\s+on\s+public\.(\w+)\s*\(([^)]*)\)(?:\s*where\s+([^;]+))?;/gi;
 
@@ -264,6 +324,8 @@ function loadSql() {
 
   const claimBody = functionBody(stripped, CLAIM_FN);
   const finalizeBody = functionBody(stripped, FINALIZE_FN);
+  const lockMatch = claimBody.match(/pg_advisory_xact_lock\(hashtextextended\(([\s\S]*?), 0\)\)/);
+  const lockExpression = lockMatch ? lockMatch[1].trim() : null;
 
   // The interpreter's guard set is DERIVED from the SQL, never hardcoded.
   const guards = {
@@ -281,13 +343,25 @@ function loadSql() {
         return m ? new RegExp(m[1]) : null;
       })(),
       serializes: /pg_advisory_xact_lock/.test(claimBody),
-      // The lock identity must be the ACTION, and must include the flow.
+      // The ADVISORY LOCK EXPRESSION, parsed verbatim. The interpreter evaluates it to a
+      // real lock key, so re-namespacing the lock in the SQL genuinely changes which
+      // callers serialize — the lock is not merely asserted to exist.
+      lockExpression: lockExpression,
+      lockIncludesActionId: /p_auth_action_id/.test(lockExpression ?? ""),
+      lockIncludesAuthFlow: /p_auth_flow/.test(lockExpression ?? ""),
+      lockIncludesReference: /p_auth_reference/.test(lockExpression ?? ""),
+      /** The lock namespace must be the action identity ALONE. */
       locksOnAction:
-        /pg_advisory_xact_lock\(hashtextextended\(p_auth_flow \|\| ':' \|\| p_auth_action_id, 0\)\)/.test(claimBody),
-      countsByAction: /a\.auth_flow\s*= p_auth_flow\s*and a\.auth_action_id = p_auth_action_id/.test(claimBody),
+        /p_auth_action_id/.test(lockExpression ?? "") &&
+        !/p_auth_flow/.test(lockExpression ?? "") &&
+        !/p_auth_reference/.test(lockExpression ?? ""),
+      // The attempt-budget count, scoped by the SQL's own `where` clause.
+      countWhere: whereClause(claimBody, /select count\(\*\) into v_count[\s\S]*?where ([\s\S]*?);/),
+      countsByAction: /select count\(\*\) into v_count[\s\S]{0,200}?where a\.auth_action_id = p_auth_action_id;/.test(claimBody),
       countsAttempts: /v_count >= 2/.test(claimBody),
       primaryIdempotent: /'already_exists'/.test(claimBody),
-      // The primary-claim existence probe must key on the ACTION id.
+      // The primary-claim conflict probe, scoped by the SQL's own `where` clause.
+      primaryProbeWhere: whereClause(claimBody, /select \* into v_existing[\s\S]*?where ([\s\S]*?)\s*order by/),
       primaryLookupByAction: /where a\.auth_action_id = p_auth_action_id\s*order by a\.attempt_number/.test(claimBody),
       primaryLineage:
         /v_existing\.auth_flow is distinct from p_auth_flow/.test(claimBody) &&
@@ -295,7 +369,8 @@ function loadSql() {
         /v_existing\.auth_reference_id is distinct from p_auth_reference_id/.test(claimBody) &&
         /v_existing\.destination_hash is distinct from p_destination_hash/.test(claimBody),
       requiresPrimary: /'primary_required'/.test(claimBody),
-      // The fallback's primary lookup must key on the ACTION id, never the reference.
+      // The fallback's primary lookup, scoped by the SQL's own `where` clause.
+      fallbackLookupWhere: whereClause(claimBody, /select \* into v_primary[\s\S]*?where ([\s\S]*?)\s*limit 1/),
       fallbackLookupByAction: /where a\.auth_action_id = p_auth_action_id\s*and a\.attempt_number = 1/.test(claimBody),
       checksFallbackAuthFlow: /v_primary\.auth_flow is distinct from p_auth_flow/.test(claimBody),
       checksFallbackAuthAction: /v_primary\.auth_action_id is distinct from p_auth_action_id/.test(claimBody),
@@ -308,6 +383,7 @@ function loadSql() {
       refusesUnknown: /v_primary\.outcome_certainty = 'unknown_outcome'/.test(claimBody),
       requiresDefinitive: /v_primary\.outcome_certainty <> 'definitive_failure'/.test(claimBody),
       requiresTerminalStatus: /v_primary\.status not in \('failed', 'cancelled'\)/.test(claimBody),
+      existingFallbackWhere: whereClause(claimBody, /if exists \(\s*select 1 from public\.authentication_delivery_attempts a\s*where ([\s\S]*?)\s*\) then/),
       refusesExistingFallback: /if exists \([\s\S]{0,400}?a\.auth_action_id = p_auth_action_id[\s\S]{0,200}?attempt_number = 2[\s\S]{0,200}?\) then[\s\S]{0,200}?attempt_limit_reached/.test(claimBody),
       linksLineage: /v_primary\.id,\s*'requested'/.test(claimBody) || /fallback_from_attempt_id, status/.test(claimBody),
     },
@@ -372,7 +448,10 @@ const DB_TABLES = [
   "authentication_delivery_attempts",
 ];
 const db = {};
-function resetDb() { for (const t of DB_TABLES) db[t] = []; }
+function resetDb() {
+  for (const t of DB_TABLES) db[t] = [];
+  advisoryLocks.clear(); // every lock is released by then; drop the empty mutex chains
+}
 resetDb();
 
 function pgError(code, constraint) {
@@ -492,15 +571,18 @@ function claimRow(outcome, detail, attempt) {
 }
 
 /**
- * `qf_claim_auth_delivery_attempt`. When the advisory lock is present the critical
- * section contains NO await, so JS run-to-completion makes it atomic. Remove
- * `pg_advisory_xact_lock` from the SQL and the interpreter yields between the read and
- * the insert — a genuine SELECT-then-INSERT race.
+ * `qf_claim_auth_delivery_attempt`.
  *
- * Every lookup is scoped by the SQL's OWN key: the guard set records whether the
- * function keys on the ACTION or on the long-lived reference, and the interpreter
- * follows it. Re-point a `where` clause in the migration and the model really does
- * start grouping attempts by the wrong thing.
+ * CONCURRENCY IS MODELLED, NOT ASSUMED. The interpreter evaluates the migration's OWN
+ * `pg_advisory_xact_lock(hashtextextended(<expr>, 0))` expression into a real lock key and
+ * takes a per-key async mutex. It then YIELDS inside the critical section, so JS
+ * run-to-completion can never mask a missing or wrongly-namespaced lock: only holding the
+ * right lock keeps the read and the insert atomic. Re-namespace the lock in the SQL and
+ * callers really do stop (or start) serializing together; delete it and they interleave.
+ *
+ * Every lookup is likewise scoped by the SQL's OWN `where` clause, compiled into a row
+ * predicate. Re-point a `where` clause in the migration and the model really does start
+ * grouping attempts by the wrong thing.
  */
 async function rpcClaim(p) {
   const g = SQL.guards.claim;
@@ -526,29 +608,35 @@ async function rpcClaim(p) {
     return claimRow("whatsapp_verify_fallback_forbidden", "possession_flow", null);
   }
 
-  const attempts = () => db.authentication_delivery_attempts;
-  const sameAction = () => attempts().filter((a) => a.auth_action_id === p.p_auth_action_id);
-  const sameRef = () =>
-    attempts().filter(
-      (a) => a.auth_reference_type === p.p_auth_reference_type && a.auth_reference_id === p.p_auth_reference_id
-    );
-  // The budget scope follows the SQL's own `where` clause.
-  const budget = () =>
-    g.countsByAction
-      ? attempts().filter((a) => a.auth_flow === p.p_auth_flow && a.auth_action_id === p.p_auth_action_id)
-      : sameRef();
+  // The advisory lock the SQL actually takes (null when it takes none).
+  const lockKey = g.serializes ? evaluateLockKey(g.lockExpression, p) : null;
+  const unlock = await acquireAdvisoryLock(lockKey);
+  try {
+    return await claimCriticalSection(p, g);
+  } finally {
+    if (unlock) unlock();
+  }
+}
 
-  // ---- critical section ----
-  if (!g.serializes) await tick(); // no advisory lock → concurrent claimers interleave
+async function claimCriticalSection(p, g) {
+  const attempts = () => db.authentication_delivery_attempts;
+  const scoped = (where) => {
+    const predicate = wherePredicate(where);
+    return attempts().filter((a) => predicate(a, p));
+  };
+  const budget = () => scoped(g.countWhere);
+
+  // The section yields, so ONLY the advisory lock can make it atomic.
+  await tick();
 
   if (g.countsAttempts && budget().length >= 2) {
     return claimRow("attempt_limit_reached", "two_attempts_already_recorded", null);
   }
 
   if (p.p_attempt_number === 1) {
-    const scope = g.primaryLookupByAction ? sameAction() : sameRef();
+    const scope = scoped(g.primaryProbeWhere);
     const existing = [...scope].sort((a, b) => a.attempt_number - b.attempt_number)[0];
-    if (!g.serializes) await tick();
+    await tick();
     if (existing) {
       if (
         g.primaryLineage &&
@@ -575,8 +663,7 @@ async function rpcClaim(p) {
   }
 
   // ---- fallback claim ----
-  const lookupScope = g.fallbackLookupByAction ? sameAction() : sameRef();
-  const primary = lookupScope.find((a) => a.attempt_number === 1);
+  const primary = scoped(g.fallbackLookupWhere)[0];
   if (!primary) {
     if (g.requiresPrimary) return claimRow("primary_required", "no_primary_attempt", null);
     throw pgError("23514", "chk_auth_attempt_shape");
@@ -611,10 +698,10 @@ async function rpcClaim(p) {
   if (g.requiresTerminalStatus && !["failed", "cancelled"].includes(primary.status)) {
     return claimRow("primary_not_definitive", "status_not_terminal_failure", null);
   }
-  if (g.refusesExistingFallback && budget().some((a) => a.attempt_number === 2)) {
+  if (g.refusesExistingFallback && scoped(g.existingFallbackWhere).length > 0) {
     return claimRow("attempt_limit_reached", "fallback_already_claimed", null);
   }
-  if (!g.serializes) await tick();
+  await tick();
   const row = insertRow("authentication_delivery_attempts", {
     auth_flow: p.p_auth_flow, auth_action_id: p.p_auth_action_id,
     auth_reference_type: p.p_auth_reference_type,
@@ -1458,14 +1545,188 @@ check("G13-17. locks are action-scoped: same action serializes, different action
   assert(actionAttempts(ACTION_A).filter((a) => a.attempt_number === 2).length === 1, "G15: exactly one fallback");
   assert(outcomes.join(",") === "ATTEMPT_LIMIT_REACHED,CLAIMED", `G15: got ${outcomes}`);
 
-  // G16/G17 — the lock identity is the ACTION, and it includes the auth flow so that
-  // unrelated flows cannot share a lock namespace by accident.
+  // G16/G17 — the lock identity is the ACTION HASH ALONE. `auth_flow` is deliberately
+  // absent: it is already inside the domain-separated digest, and including it would give
+  // two same-hash/different-flow callers two different locks.
   assert(SQL.guards.claim.serializes, "G16: a transaction-scoped advisory lock exists");
-  assert(SQL.guards.claim.locksOnAction, "G16/G17: the lock key is hashtextextended(auth_flow || ':' || auth_action_id)");
+  assert(SQL.guards.claim.locksOnAction, `G16/G17: the lock key is the action hash alone, got ${SQL.guards.claim.lockExpression}`);
   assert(/pg_advisory_xact_lock/.test(SQL.claimBody), "G16: transaction-scoped, not session-scoped");
   assert(!/pg_advisory_xact_lock\(hashtextextended\(p_auth_reference_type/.test(SQL.claimBody), "G17: the lock is never keyed on the long-lived reference");
   assert(/for update/.test(SQL.claimBody), "row locking is preserved");
-  assert(SQL.guards.claim.countsByAction, "the attempt budget is counted per action");
+  assert(SQL.guards.claim.countsByAction, "the attempt budget is counted per action hash");
+});
+
+// ============================================================================
+// GLOBAL SAME-HASH CONCURRENCY (C1–C20)
+// ============================================================================
+// The RPC treats the action hash as a GLOBAL identity: reusing one hash under a different
+// flow / reference / destination is `action_identity_conflict`. The advisory lock and both
+// unique indexes must agree with that, or two same-hash callers could each insert a
+// primary and silently break the invariant the RPC claims to enforce.
+//
+// These tests deliberately CLAIM ONE HASH UNDER A DIFFERENT FLOW. That combination can
+// only arise from misuse or replay — a correctly derived action hash already carries its
+// flow inside the digest — so it must fail atomically, never race.
+const rowsFor = (id) => db.authentication_delivery_attempts.filter((a) => a.auth_action_id === id);
+
+check("C1-C5. same action hash always serializes, whatever flow/reference/destination is claimed", async () => {
+  const noDbError = (outcomes) => assert(!outcomes.includes("DATABASE_ERROR"), `5: a database error is never the concurrency control result, got ${outcomes}`);
+
+  // 1 — same hash + same flow: exactly one CLAIMED, the rest idempotent.
+  resetDb();
+  let results = await Promise.all([1, 2, 3].map(() => claimPrimary({ authActionId: ACTION_A })));
+  let outcomes = results.map((r) => r.data.outcome).sort();
+  assert(rowsFor(ACTION_A).length === 1, `1: exactly one row, got ${rowsFor(ACTION_A).length}`);
+  assert(outcomes.filter((o) => o === "CLAIMED").length === 1, `1: exactly one CLAIMED, got ${outcomes}`);
+  assert(outcomes.filter((o) => o === "ALREADY_EXISTS").length === 2, `1: the losers are idempotent, got ${outcomes}`);
+  noDbError(outcomes);
+
+  // 2 — same hash + DIFFERENT flow, concurrently. One wins; the other fails closed.
+  resetDb();
+  results = await Promise.all([
+    claimPrimary({ authActionId: ACTION_A, authFlow: "client_login_otp" }),
+    claimPrimary({ authActionId: ACTION_A, authFlow: "vendor_password_reset", authReferenceType: "verification_challenge", authReferenceId: "chal-1" }),
+  ]);
+  outcomes = results.map((r) => r.data.outcome).sort();
+  assert(db.authentication_delivery_attempts.length === 1, `2: exactly ONE physical primary row, got ${db.authentication_delivery_attempts.length}`);
+  assert(outcomes.join(",") === "CLAIMED,LINEAGE_MISMATCH", `2: got ${outcomes}`);
+  const conflict = results.find((r) => r.data.outcome === "LINEAGE_MISMATCH");
+  assert(conflict.data.detail === "action_identity_conflict", `2: got ${conflict.data.detail}`);
+  noDbError(outcomes);
+
+  // 3 — same hash + different auth reference, concurrently.
+  resetDb();
+  results = await Promise.all([
+    claimPrimary({ authActionId: ACTION_A, authReferenceId: "user-1" }),
+    claimPrimary({ authActionId: ACTION_A, authReferenceId: "user-2" }),
+  ]);
+  outcomes = results.map((r) => r.data.outcome).sort();
+  assert(db.authentication_delivery_attempts.length === 1, `3: exactly one physical row, got ${db.authentication_delivery_attempts.length}`);
+  assert(outcomes.join(",") === "CLAIMED,LINEAGE_MISMATCH", `3: got ${outcomes}`);
+  noDbError(outcomes);
+
+  // 4 — same hash + different destination hash, concurrently.
+  resetDb();
+  results = await Promise.all([
+    claimPrimary({ authActionId: ACTION_A, destinationHash: HASH_A }),
+    claimPrimary({ authActionId: ACTION_A, destinationHash: HASH_B }),
+  ]);
+  outcomes = results.map((r) => r.data.outcome).sort();
+  assert(db.authentication_delivery_attempts.length === 1, `4: exactly one physical row, got ${db.authentication_delivery_attempts.length}`);
+  assert(outcomes.join(",") === "CLAIMED,LINEAGE_MISMATCH", `4: got ${outcomes}`);
+  noDbError(outcomes);
+
+  // …and sequentially, the conflict is the same fail-closed result.
+  resetDb();
+  await claimPrimary({ authActionId: ACTION_A });
+  const seq = await claimPrimary({ authActionId: ACTION_A, authFlow: "vendor_password_reset", authReferenceType: "verification_challenge", authReferenceId: "chal-1" });
+  assert(seq.data.outcome === "LINEAGE_MISMATCH" && seq.data.detail === "action_identity_conflict", `sequential conflict: got ${seq.data.detail}`);
+  assert(db.authentication_delivery_attempts.length === 1, "sequential conflict writes nothing");
+});
+
+check("C6-C9. attempt uniqueness and single-fallback uniqueness are GLOBAL to the action hash", () => {
+  const idx = SQL.uniqueIndexes.authentication_delivery_attempts ?? [];
+  // 6/7 — the attempt-number authority is (auth_action_id, attempt_number).
+  const attemptIdx = idx.find((i) => i.name === "uq_auth_delivery_attempt_action_number");
+  assert(attemptIdx, "6: uq_auth_delivery_attempt_action_number exists");
+  assert(attemptIdx.cols.join(",") === "auth_action_id,attempt_number", `6: got ${attemptIdx.cols}`);
+  assert(!attemptIdx.cols.includes("auth_flow"), "7: it does not include auth_flow");
+  // 8/9 — the single-fallback authority is (auth_action_id) where attempt_number = 2.
+  const fallbackIdx = idx.find((i) => i.name === "uq_auth_delivery_attempt_single_fallback");
+  assert(fallbackIdx, "8: uq_auth_delivery_attempt_single_fallback exists");
+  assert(fallbackIdx.cols.join(",") === "auth_action_id", `8: got ${fallbackIdx.cols}`);
+  assert(!fallbackIdx.cols.includes("auth_flow"), "9: it does not include auth_flow");
+  assert(/where attempt_number = 2/.test(SQL.stripped), "8: it is partial on attempt_number = 2");
+  // The database itself refuses two primaries for one hash, whatever flow they claim.
+  resetDb();
+  const seed = (flow) => insertRow("authentication_delivery_attempts", {
+    auth_flow: flow, auth_action_id: ACTION_A, auth_reference_type: "auth_user", auth_reference_id: "u",
+    destination_hash: HASH_A, attempt_number: 1, channel: "whatsapp", provider_key: "mock",
+    fallback_from_attempt_id: null, status: "requested", outcome_certainty: "unknown_outcome",
+  });
+  seed("client_login_otp");
+  let refused = false;
+  try { seed("vendor_password_reset"); } catch (e) { refused = e.constraint === "uq_auth_delivery_attempt_action_number"; }
+  assert(refused, "6/7: the index refuses a second primary for one action hash under another flow");
+  assert(db.authentication_delivery_attempts.length === 1, "…and no second row survives");
+});
+
+check("C10-C13. the advisory lock is namespaced by the action hash alone", () => {
+  const g = SQL.guards.claim;
+  assert(g.serializes, "an advisory lock exists");
+  // 10 — the key contains the action hash.
+  assert(g.lockIncludesActionId, `10: the lock key contains p_auth_action_id, got ${g.lockExpression}`);
+  // 11 — and NOT the auth flow.
+  assert(!g.lockIncludesAuthFlow, `11: the lock key must not contain p_auth_flow, got ${g.lockExpression}`);
+  // 12 — and NOT the long-lived reference (nor any other stand-in identity).
+  assert(!g.lockIncludesReference, `12: the lock key must not contain the auth reference, got ${g.lockExpression}`);
+  for (const forbidden of ["p_auth_user_id", "p_challenge_id", "p_destination_hash"]) {
+    assert(!g.lockExpression.includes(forbidden), `12: the lock key must not contain ${forbidden}`);
+  }
+  assert(/^'qf-auth-action:' \|\| p_auth_action_id$/.test(g.lockExpression), `the lock key is domain-tagged, got ${g.lockExpression}`);
+  // 13 — distinct legitimate actions never share a lock key, so nothing legitimate merges.
+  const keyOf = (flow, action) => evaluateLockKey(g.lockExpression, { p_auth_flow: flow, p_auth_action_id: action });
+  assert(keyOf("client_login_otp", ACTION_A) !== keyOf("client_login_otp", ACTION_B), "13: two login actions take different locks");
+  assert(keyOf("vendor_whatsapp_verify", VERIFY_CHAL_1) !== keyOf("vendor_password_reset", RESET_CHAL_1), "13: verify and reset of one challenge take different locks");
+  // …and the SAME hash claimed under two flows takes the SAME lock — that is the point.
+  assert(keyOf("client_login_otp", ACTION_A) === keyOf("vendor_password_reset", ACTION_A), "13: one hash, one lock, whatever flow is claimed");
+});
+
+check("C14-C20. domain separation, replay, repeated logins and fallback lineage all survive", async () => {
+  // 14 — one challenge id under two flows still derives two different action hashes.
+  assert(VERIFY_CHAL_1 !== RESET_CHAL_1, "14: verify and reset never share an action hash");
+  assert(challengeAction("vendor_whatsapp_verify", "chal-9") !== challengeAction("vendor_password_reset", "chal-9"), "14: holds for any challenge");
+  // 15 — one authoritative id under two source kinds still differs.
+  assert(derive("client_login_otp", "supabase_webhook", "x") !== derive("client_login_otp", "verification_challenge", "x"), "15: source kind still separates");
+  // 16 — repeated client logins remain independent.
+  resetDb();
+  assert((await claimPrimary({ authActionId: ACTION_A })).data.outcome === "CLAIMED", "16: action A");
+  assert((await claimPrimary({ authActionId: ACTION_B })).data.outcome === "CLAIMED", "16: action B");
+  assert(db.authentication_delivery_attempts.length === 2, "16: two independent primaries for one auth user");
+  // 17 — replaying one verified action is still idempotent.
+  const replay = await claimPrimary({ authActionId: ACTION_A });
+  assert(replay.data.outcome === "ALREADY_EXISTS", `17: got ${replay.data.outcome}`);
+  assert(db.authentication_delivery_attempts.length === 2, "17: no new row");
+
+  // 18 — at most ONE attempt 2 per action hash, globally.
+  resetDb();
+  await claimPrimary({ authActionId: ACTION_A });
+  forcePrimary({ status: "failed", outcome_certainty: "definitive_failure" }, ACTION_A);
+  assert((await claimFallback({ authActionId: ACTION_A })).data.outcome === "CLAIMED", "18: first fallback");
+  assert((await claimFallback({ authActionId: ACTION_A })).data.outcome === "ATTEMPT_LIMIT_REACHED", "18: second fallback refused");
+  assert(rowsFor(ACTION_A).filter((a) => a.attempt_number === 2).length === 1, "18: exactly one attempt 2");
+  // …enforced at the database too, even for a hand-written row claiming another flow.
+  let refused = false;
+  try {
+    insertRow("authentication_delivery_attempts", {
+      auth_flow: "vendor_password_reset", auth_action_id: ACTION_A,
+      auth_reference_type: "verification_challenge", auth_reference_id: "chal-1",
+      destination_hash: HASH_A, attempt_number: 2, channel: "sms", provider_key: "sms_mock",
+      fallback_from_attempt_id: crypto.randomUUID(), status: "requested", outcome_certainty: "unknown_outcome",
+    });
+  } catch (e) { refused = ["uq_auth_delivery_attempt_action_number", "uq_auth_delivery_attempt_single_fallback"].includes(e.constraint); }
+  assert(refused, "18: the database refuses a second attempt 2 for one action hash");
+
+  // 19 — cross-action fallback remains impossible.
+  resetDb();
+  await claimPrimary({ authActionId: ACTION_A });
+  forcePrimary({ status: "failed", outcome_certainty: "definitive_failure" }, ACTION_A);
+  const cross = await claimFallback({ authActionId: ACTION_B });
+  assert(cross.data.outcome === "PRIMARY_REQUIRED", `19: got ${cross.data.outcome}`);
+  assert(db.authentication_delivery_attempts.length === 1, "19: nothing written");
+
+  // 20 — vendor_whatsapp_verify still cannot claim attempt 2.
+  resetDb();
+  const verify = { authFlow: "vendor_whatsapp_verify", authActionId: VERIFY_CHAL_1, authReferenceType: "verification_challenge", authReferenceId: "chal-1" };
+  await claimPrimary(verify);
+  forcePrimary({ status: "failed", outcome_certainty: "definitive_failure" }, VERIFY_CHAL_1);
+  assert((await claimFallback(verify)).data.outcome === "WHATSAPP_VERIFY_FALLBACK_FORBIDDEN", "20: still forbidden");
+  assert(db.authentication_delivery_attempts.length === 1, "20: nothing written");
+
+  // The RPC still validates auth_flow lineage explicitly on both paths.
+  assert(SQL.guards.claim.primaryLineage, "auth_flow lineage is still checked on the primary probe");
+  assert(SQL.guards.claim.checksFallbackAuthFlow, "auth_flow lineage is still checked on the fallback");
+  assert(SQL.guards.claim.checksFallbackAuthAction && SQL.guards.claim.checksFallbackReference && SQL.guards.claim.checksFallbackDestination, "every fallback lineage field is still checked");
 });
 
 // ============================================================================
@@ -1477,13 +1738,13 @@ check("G18-22. the uniqueness authority moved from the reference to the action, 
   // G18 — the Phase 5F-A reference-scoped authority is retired.
   assert(SQL.droppedIndexes.has("uq_auth_delivery_attempt_number"), "G18: the old index is dropped");
   assert(!names.includes("uq_auth_delivery_attempt_number"), "G18: it no longer governs the model");
-  // G19 — the new authority is action-scoped.
+  // G19 — the new authority is scoped to the action hash ALONE (globally).
   const action = idx.find((i) => i.name === "uq_auth_delivery_attempt_action_number");
   assert(action, "G19: uq_auth_delivery_attempt_action_number exists");
-  assert(action.cols.join(",") === "auth_flow,auth_action_id,attempt_number", `G19: got ${action.cols}`);
-  // The single-fallback guarantee is action-scoped too.
+  assert(action.cols.join(",") === "auth_action_id,attempt_number", `G19: got ${action.cols}`);
+  // The single-fallback guarantee is action-scoped too, and equally global.
   const single = idx.find((i) => i.name === "uq_auth_delivery_attempt_single_fallback");
-  assert(single && single.cols.join(",") === "auth_flow,auth_action_id", `G19: single-fallback index is action-scoped, got ${single?.cols}`);
+  assert(single && single.cols.join(",") === "auth_action_id", `G19: single-fallback index is action-scoped, got ${single?.cols}`);
   // …and lineage still permits exactly one fallback per primary.
   assert(names.includes("uq_auth_delivery_attempt_fallback_lineage"), "one fallback per primary");
   // G20 — the migration validates the OLD index definition before replacing it.
@@ -1858,7 +2119,7 @@ sqlMutation("MUT H: the claim RPC drops the auth-flow lineage check",
 
 sqlMutation("MUT I: the claim RPC drops the advisory lock (SELECT-then-INSERT race)",
   [[MIGRATION_5FC,
-    "  perform pg_advisory_xact_lock(hashtextextended(p_auth_flow || ':' || p_auth_action_id, 0));",
+    "  perform pg_advisory_xact_lock(hashtextextended('qf-auth-action:' || p_auth_action_id, 0));",
     ""]],
   async () => {
     resetDb();
@@ -1874,7 +2135,7 @@ sqlMutation("MUT J: the claim RPC allows a second fallback attempt",
     "  if v_count >= 2 then\n    return query select 'attempt_limit_reached'::text, 'two_attempts_already_recorded'::text, null::uuid, null::integer, null::text, null::uuid;\n    return;\n  end if;",
     ""],
    [MIGRATION_5FC,
-    "  if exists (\n    select 1 from public.authentication_delivery_attempts a\n     where a.auth_flow      = p_auth_flow\n       and a.auth_action_id = p_auth_action_id\n       and a.attempt_number = 2\n  ) then\n    return query select 'attempt_limit_reached'::text, 'fallback_already_claimed'::text, null::uuid, null::integer, null::text, null::uuid;\n    return;\n  end if;",
+    "  if exists (\n    select 1 from public.authentication_delivery_attempts a\n     where a.auth_action_id = p_auth_action_id\n       and a.attempt_number = 2\n  ) then\n    return query select 'attempt_limit_reached'::text, 'fallback_already_claimed'::text, null::uuid, null::integer, null::text, null::uuid;\n    return;\n  end if;",
     ""]],
   async () => {
     resetDb(); await claimPrimary();
@@ -1974,7 +2235,7 @@ sqlMutation("MUT act-A: the retired reference-scoped uniqueness authority is res
 
 sqlMutation("MUT act-B: the new unique index omits auth_action_id",
   [[MIGRATION_5FC,
-    "create unique index if not exists uq_auth_delivery_attempt_action_number\n  on public.authentication_delivery_attempts (auth_flow, auth_action_id, attempt_number);",
+    "create unique index if not exists uq_auth_delivery_attempt_action_number\n  on public.authentication_delivery_attempts (auth_action_id, attempt_number);",
     "create unique index if not exists uq_auth_delivery_attempt_action_number\n  on public.authentication_delivery_attempts (auth_flow, auth_reference_id, attempt_number);"]],
   async () => {
     resetDb();
@@ -1983,15 +2244,95 @@ sqlMutation("MUT act-B: the new unique index omits auth_action_id",
     return a.data.outcome === "CLAIMED" && b.data.outcome !== "CLAIMED";
   });
 
-sqlMutation("MUT act-C: the advisory lock is keyed on the long-lived auth reference",
-  [[MIGRATION_5FC,
-    "  perform pg_advisory_xact_lock(hashtextextended(p_auth_flow || ':' || p_auth_action_id, 0));",
-    "  perform pg_advisory_xact_lock(hashtextextended(p_auth_reference_type || ':' || p_auth_reference_id, 0));"]],
+// --- CONCURRENCY-CONSISTENCY mutations (c-A … c-F) --------------------------
+// The action hash is a GLOBAL identity in the RPC's conflict detection. The lock and both
+// unique indexes must agree. Each of these re-introduces `auth_flow` (or the reference)
+// somewhere and re-opens the same-hash race.
+const LOCK_LINE = "  perform pg_advisory_xact_lock(hashtextextended('qf-auth-action:' || p_auth_action_id, 0));";
+const FLOW_LOCK_LINE = "  perform pg_advisory_xact_lock(hashtextextended(p_auth_flow || ':' || p_auth_action_id, 0));";
+const ACTION_IDX = "create unique index if not exists uq_auth_delivery_attempt_action_number\n  on public.authentication_delivery_attempts (auth_action_id, attempt_number);";
+const FLOW_IDX = "create unique index if not exists uq_auth_delivery_attempt_action_number\n  on public.authentication_delivery_attempts (auth_flow, auth_action_id, attempt_number);";
+const FALLBACK_IDX = "create unique index if not exists uq_auth_delivery_attempt_single_fallback\n  on public.authentication_delivery_attempts (auth_action_id)\n  where attempt_number = 2;";
+
+/** Two concurrent primary claims for ONE hash under two different flows. */
+async function sameHashDifferentFlowRace() {
+  resetDb();
+  const results = await Promise.all([
+    claimPrimary({ authActionId: ACTION_A, authFlow: "client_login_otp" }),
+    claimPrimary({ authActionId: ACTION_A, authFlow: "vendor_password_reset", authReferenceType: "verification_challenge", authReferenceId: "chal-1" }),
+  ]);
+  return { outcomes: results.map((r) => r.data.outcome), rows: db.authentication_delivery_attempts.length };
+}
+
+sqlMutation("MUT c-A: auth_flow is restored to the advisory lock key",
+  [[MIGRATION_5FC, LOCK_LINE, FLOW_LOCK_LINE]],
+  async () => {
+    rebuildSqlModel();
+    const { outcomes } = await sameHashDifferentFlowRace();
+    // Two locks, two callers, one empty ledger observed twice. The unique index is now the
+    // only thing standing between them, and the loser gets a raw database error instead of
+    // the `action_identity_conflict` the RPC promises.
+    return outcomes.includes("DATABASE_ERROR");
+  });
+
+sqlMutation("MUT c-B: auth_flow is restored to the action-number unique index",
+  [[MIGRATION_5FC, ACTION_IDX, FLOW_IDX]],
   () => {
     rebuildSqlModel();
-    // Distinct OTP actions for one user would contend on a single lock, and the lock no
-    // longer identifies the thing whose invariants it protects.
-    return !SQL.guards.claim.locksOnAction;
+    resetDb();
+    const seed = (flow) => insertRow("authentication_delivery_attempts", {
+      auth_flow: flow, auth_action_id: ACTION_A, auth_reference_type: "auth_user", auth_reference_id: "u",
+      destination_hash: HASH_A, attempt_number: 1, channel: "whatsapp", provider_key: "mock",
+      fallback_from_attempt_id: null, status: "requested", outcome_certainty: "unknown_outcome",
+    });
+    seed("client_login_otp");
+    try { seed("vendor_password_reset"); } catch { return false; }
+    // Two physical primary attempts now exist for ONE action hash.
+    return rowsFor(ACTION_A).filter((a) => a.attempt_number === 1).length === 2;
+  });
+
+sqlMutation("MUT c-C: auth_flow is restored to the single-fallback unique index",
+  [[MIGRATION_5FC, FALLBACK_IDX,
+    "create unique index if not exists uq_auth_delivery_attempt_single_fallback\n  on public.authentication_delivery_attempts (auth_flow, auth_action_id)\n  where attempt_number = 2;"],
+   // Also widen the attempt-number authority, or it would still catch the second row.
+   [MIGRATION_5FC, ACTION_IDX, FLOW_IDX]],
+  () => {
+    rebuildSqlModel();
+    resetDb();
+    const seedFallback = (flow) => insertRow("authentication_delivery_attempts", {
+      auth_flow: flow, auth_action_id: ACTION_A, auth_reference_type: "auth_user", auth_reference_id: "u",
+      destination_hash: HASH_A, attempt_number: 2, channel: "sms", provider_key: "sms_mock",
+      fallback_from_attempt_id: crypto.randomUUID(), status: "requested", outcome_certainty: "unknown_outcome",
+    });
+    seedFallback("client_login_otp");
+    try { seedFallback("vendor_password_reset"); } catch { return false; }
+    // Two SMS fallbacks now exist for ONE action hash — two OTP deliveries.
+    return rowsFor(ACTION_A).filter((a) => a.attempt_number === 2).length === 2;
+  });
+
+sqlMutation("MUT c-D: concurrent same-hash/different-flow primaries are both inserted",
+  [[MIGRATION_5FC, LOCK_LINE, FLOW_LOCK_LINE],
+   [MIGRATION_5FC, ACTION_IDX, FLOW_IDX]],
+  async () => {
+    rebuildSqlModel();
+    const { outcomes, rows } = await sameHashDifferentFlowRace();
+    // The exact race the correction closes: two primary rows for one action identity,
+    // both callers told they CLAIMED it.
+    return rows === 2 && outcomes.filter((o) => o === "CLAIMED").length === 2;
+  });
+
+sqlMutation("MUT c-E: the primary conflict probe is scoped by auth_flow (no global lookup)",
+  [[MIGRATION_5FC,
+    "    select * into v_existing\n      from public.authentication_delivery_attempts a\n     where a.auth_action_id = p_auth_action_id\n     order by a.attempt_number\n     limit 1\n     for update;",
+    "    select * into v_existing\n      from public.authentication_delivery_attempts a\n     where a.auth_flow = p_auth_flow\n       and a.auth_action_id = p_auth_action_id\n     order by a.attempt_number\n     limit 1\n     for update;"]],
+  async () => {
+    rebuildSqlModel();
+    resetDb();
+    await claimPrimary({ authActionId: ACTION_A, authFlow: "client_login_otp" });
+    const conflicting = await claimPrimary({ authActionId: ACTION_A, authFlow: "vendor_password_reset", authReferenceType: "verification_challenge", authReferenceId: "chal-1" });
+    // The probe no longer sees the other flow's row, so the RPC cannot report
+    // `action_identity_conflict`; only the unique index stops it, as a raw error.
+    return conflicting.data.outcome !== "LINEAGE_MISMATCH";
   });
 
 sqlMutation("MUT act-D: the fallback lookup ignores auth_action_id",
@@ -2008,6 +2349,22 @@ sqlMutation("MUT act-D: the fallback lookup ignores auth_action_id",
     const cross = await claimFallback({ authActionId: ACTION_B });
     // Login action B would send its SMS fallback off login action A's failed primary.
     return cross.data.outcome === "CLAIMED";
+  });
+
+sqlMutation("MUT c-F: the advisory lock reverts to the long-lived auth reference",
+  [[MIGRATION_5FC, LOCK_LINE,
+    "  perform pg_advisory_xact_lock(hashtextextended(p_auth_reference_type || ':' || p_auth_reference_id, 0));"]],
+  async () => {
+    rebuildSqlModel();
+    if (SQL.guards.claim.locksOnAction) return false;
+    // Same hash under two references now takes two different locks, so both callers
+    // observe an empty ledger and race; only the unique index stops the second insert.
+    resetDb();
+    const results = await Promise.all([
+      claimPrimary({ authActionId: ACTION_A, authReferenceId: "user-1" }),
+      claimPrimary({ authActionId: ACTION_A, authReferenceId: "user-2" }),
+    ]);
+    return results.map((r) => r.data.outcome).includes("DATABASE_ERROR");
   });
 
 sqlMutation("MUT act-E: a second login action for the same auth user is rejected",

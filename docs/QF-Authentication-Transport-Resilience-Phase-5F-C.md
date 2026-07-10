@@ -298,9 +298,11 @@ Enforced by:
 - `chk_auth_attempt_action_id_shape` — `^[0-9a-f]{64}$` (a SHA-256 action identity)
 - `chk_auth_attempt_sanitized_codes` — identifier-shaped codes only, so a raw provider
   payload (which could contain a phone number) cannot be stored
-- `uq_auth_delivery_attempt_action_number` — no duplicate attempt number **per action**
+- `uq_auth_delivery_attempt_action_number` — `(auth_action_id, attempt_number)`: no duplicate
+  attempt number **per action hash**, globally
 - `uq_auth_delivery_attempt_fallback_lineage` — one fallback per primary
-- `uq_auth_delivery_attempt_single_fallback` — one fallback **per action**
+- `uq_auth_delivery_attempt_single_fallback` — `(auth_action_id) where attempt_number = 2`:
+  one fallback **per action hash**, globally
 
 ### The uniqueness authority moved from the reference to the action
 
@@ -312,7 +314,15 @@ permanently blocked every login after the user's first. Phase 5F-C1 retires it:
 2. **fail loud** if it is missing, or if it has drifted from the exact 5F-A definition;
 3. only then `drop index if exists public.uq_auth_delivery_attempt_number` — the *index*,
    never any row;
-4. create `uq_auth_delivery_attempt_action_number (auth_flow, auth_action_id, attempt_number)`.
+4. create `uq_auth_delivery_attempt_action_number (auth_action_id, attempt_number)`.
+
+The authority is `auth_action_id` **alone**, deliberately without `auth_flow`. The RPC's
+conflict detection treats the action hash as a **global** identity — reusing one hash under
+a different flow, reference, or destination is `action_identity_conflict` — so the indexes
+and the advisory lock must agree with it. Including `auth_flow` in the index would let two
+same-hash/different-flow callers each insert a primary and silently break that invariant.
+Nothing legitimate is merged: `auth_flow` is already mixed into the domain-separated digest,
+so two correctly derived actions under different flows can never share a hash.
 
 `auth_action_id` is added as nullable, and the migration **fails loud** rather than
 backfill it: a pre-existing row cannot be given a trustworthy action id. Deriving one from
@@ -335,13 +345,21 @@ authentication success and never enables a policy. **The application decision en
 run first** — the RPC is the *race-safety boundary*, not the business policy authority, and
 it independently re-checks every structural property.
 
-Concurrency is handled by a transaction-scoped advisory lock keyed on the **action** —
-`pg_advisory_xact_lock(hashtextextended(auth_flow || ':' || auth_action_id, 0))` — plus
-`FOR UPDATE` row locks. Two racing callers **for one action** can never both observe an
-empty ledger, so a SELECT-then-INSERT race cannot produce two primaries or two fallbacks.
-Two **distinct** login actions by the same auth user take different locks and never
-collide. Including `auth_flow` keeps unrelated flows out of one another's lock namespace.
-The unique indexes are the last line of defence.
+Concurrency is handled by a transaction-scoped advisory lock keyed on the **action identity
+alone** — `pg_advisory_xact_lock(hashtextextended('qf-auth-action:' || auth_action_id, 0))`
+— plus `FOR UPDATE` row locks.
+
+`auth_flow` is deliberately **absent** from the lock key. A lock namespaced by flow would
+hand two same-hash/different-flow callers two *different* locks, so both could observe an
+empty ledger and both insert — breaking the very `action_identity_conflict` invariant this
+function enforces. Locking on the hash alone makes every same-hash caller serialize,
+whatever flow it claims. Nothing legitimate is merged by that, because `auth_flow` is
+already inside the domain-separated digest.
+
+Two racing callers **for one action** therefore can never both observe an empty ledger, so
+a SELECT-then-INSERT race cannot produce two primaries or two fallbacks. Two **distinct**
+login actions by the same auth user derive different hashes, take different locks, and never
+collide. The unique indexes are the last line of defence, never the concurrency control.
 
 Primary claim (attempt 1): requires `channel = 'whatsapp'` and a well-formed
 `auth_action_id`; an identical replay of the same action returns `already_exists` with the

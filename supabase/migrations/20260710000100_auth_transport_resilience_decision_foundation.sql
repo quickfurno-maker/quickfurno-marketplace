@@ -340,9 +340,10 @@ create unique index if not exists uq_auth_delivery_attempt_fallback_lineage
   on public.authentication_delivery_attempts (fallback_from_attempt_id)
   where fallback_from_attempt_id is not null;
 
--- At most one fallback attempt per authentication ACTION (not per user).
+-- At most one fallback attempt per authentication ACTION (not per user, and NOT per
+-- (flow, action) pair — the action hash is the transport-sequence identity, globally).
 create unique index if not exists uq_auth_delivery_attempt_single_fallback
-  on public.authentication_delivery_attempts (auth_flow, auth_action_id)
+  on public.authentication_delivery_attempts (auth_action_id)
   where attempt_number = 2;
 
 
@@ -354,6 +355,14 @@ create unique index if not exists uq_auth_delivery_attempt_single_fallback
 -- permanently block every login action after the user's first one. The uniqueness
 -- authority moves to the AUTH ACTION. `auth_reference_type` / `auth_reference_id` are
 -- PRESERVED — they remain the lineage identity a fallback must match.
+--
+-- The authority is `auth_action_id` ALONE, deliberately WITHOUT `auth_flow`. The RPC's
+-- conflict detection treats the action hash as a GLOBAL identity (reusing one hash under
+-- a different flow is `action_identity_conflict`), so the index and the advisory lock
+-- must agree with it. Including `auth_flow` here would let two same-hash/different-flow
+-- callers each insert a primary and silently break that invariant. `auth_flow` is safely
+-- absent because it is already mixed into the domain-separated SHA-256 derivation, so two
+-- legitimate actions under different flows can never share a hash.
 --
 -- This is a controlled replacement of a security-relevant constraint, so it FAILS LOUD
 -- if the index it is about to drop is missing or has drifted from the exact Phase 5F-A
@@ -388,12 +397,13 @@ $$;
 -- The old reference-scoped authority is retired (index only — no data is removed).
 drop index if exists public.uq_auth_delivery_attempt_number;
 
--- The new authority: attempt numbers are unique within ONE authentication action.
+-- The new authority: attempt numbers are unique within ONE authentication action,
+-- GLOBALLY. No `auth_flow` — see the note above.
 create unique index if not exists uq_auth_delivery_attempt_action_number
-  on public.authentication_delivery_attempts (auth_flow, auth_action_id, attempt_number);
+  on public.authentication_delivery_attempts (auth_action_id, attempt_number);
 
 create index if not exists idx_auth_delivery_attempt_action
-  on public.authentication_delivery_attempts (auth_flow, auth_action_id, attempt_number);
+  on public.authentication_delivery_attempts (auth_action_id, attempt_number);
 
 
 -- ============================================================================
@@ -477,17 +487,25 @@ begin
   end if;
 
   -- ---- serialize every claimer for this authentication ACTION -------------------
-  -- Transaction-scoped advisory lock, keyed on the ACTION (auth_flow + auth_action_id),
-  -- never on the long-lived reference. Two concurrent claimers for one action cannot
-  -- both observe an empty ledger; the loser sees the winner's row. Two DISTINCT login
-  -- actions by the same auth user take different locks and never collide. Including
-  -- auth_flow keeps unrelated flows out of one another's lock namespace.
-  perform pg_advisory_xact_lock(hashtextextended(p_auth_flow || ':' || p_auth_action_id, 0));
+  -- Transaction-scoped advisory lock, keyed on the ACTION IDENTITY ALONE — never on the
+  -- long-lived reference, and deliberately NOT on (auth_flow, auth_action_id).
+  --
+  -- The conflict detection below treats the action hash as a GLOBAL identity: reusing one
+  -- hash under a different flow / reference / destination is `action_identity_conflict`.
+  -- A lock namespaced by flow would hand two same-hash/different-flow callers two
+  -- DIFFERENT locks, so both could observe an empty ledger and both insert — breaking the
+  -- very invariant this function enforces. Locking on the hash alone makes every
+  -- same-hash caller serialize, whatever flow they claim.
+  --
+  -- Nothing legitimate is merged by that: `auth_flow` is already mixed into the
+  -- domain-separated SHA-256 derivation (see authenticationActionIdentity.ts), so two
+  -- correctly derived actions under different flows never share a hash. Two DISTINCT
+  -- login actions by the same auth user take different locks and never collide.
+  perform pg_advisory_xact_lock(hashtextextended('qf-auth-action:' || p_auth_action_id, 0));
 
   select count(*) into v_count
     from public.authentication_delivery_attempts a
-   where a.auth_flow      = p_auth_flow
-     and a.auth_action_id = p_auth_action_id;
+   where a.auth_action_id = p_auth_action_id;
 
   if v_count >= 2 then
     return query select 'attempt_limit_reached'::text, 'two_attempts_already_recorded'::text, null::uuid, null::integer, null::text, null::uuid;
@@ -591,11 +609,11 @@ begin
     return;
   end if;
 
-  -- Exactly one fallback per ACTION, ever.
+  -- Exactly one fallback per ACTION, ever — scoped to the action hash alone, matching
+  -- both the advisory lock and uq_auth_delivery_attempt_single_fallback.
   if exists (
     select 1 from public.authentication_delivery_attempts a
-     where a.auth_flow      = p_auth_flow
-       and a.auth_action_id = p_auth_action_id
+     where a.auth_action_id = p_auth_action_id
        and a.attempt_number = 2
   ) then
     return query select 'attempt_limit_reached'::text, 'fallback_already_claimed'::text, null::uuid, null::integer, null::text, null::uuid;

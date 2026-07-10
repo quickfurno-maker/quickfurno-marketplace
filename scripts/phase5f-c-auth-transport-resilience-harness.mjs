@@ -543,10 +543,19 @@ function updateRow(table, row, patch) {
 }
 
 // ---- query builder ---------------------------------------------------------
+/**
+ * Records every `.eq()` a service issued, so "which provider identity did the failure-rule
+ * lookup actually key on?" is an observable fact rather than an assumption.
+ */
+const dbQueries = [];
+const resetQueries = () => { dbQueries.length = 0; };
+const queriedValue = (table, col) =>
+  dbQueries.filter((q) => q.table === table && q.col === col).map((q) => q.val);
+
 class QB {
   constructor(table) { this.table = table; this.filters = []; }
   select() { return this; }
-  eq(col, val) { this.filters.push((r) => r[col] === val); return this; }
+  eq(col, val) { dbQueries.push({ table: this.table, col, val }); this.filters.push((r) => r[col] === val); return this; }
   rows() {
     let list = db[this.table] ?? [];
     for (const f of this.filters) list = list.filter(f);
@@ -1032,6 +1041,184 @@ check("45-48. precedence is deterministic; ambiguity, absence and inactivity all
   // The migration's unique indexes make ambiguity impossible at rest.
   const idx = (SQL.uniqueIndexes.authentication_transport_failure_rules ?? []).map((i) => i.name);
   assert(idx.includes("uq_auth_failure_rule_active_flow") && idx.includes("uq_auth_failure_rule_active_provider_wide"), "ambiguity is impossible at rest");
+});
+
+// ============================================================================
+// PROVIDER LINEAGE (Phase 5F-C3-0, PL1–PL10)
+//
+// The provider that ACTUALLY owned attempt 1 must equal the primary provider the policy
+// DECLARES. Failure-rule eligibility is provider-scoped: a failure from provider A must
+// never be authorized by a rule belonging to provider B.
+// ============================================================================
+check("PL1-2. matching provider evaluates normally; a mismatched provider is PRIMARY_PROVIDER_MISMATCH", () => {
+  // PL1 — same provider as the policy: evaluation continues all the way to ALLOWED.
+  const same = decide();
+  assert(same.allowed === true, `PL1: matching provider must continue: ${same.reason}`);
+  assert(same.providerKey === "sms_mock" && same.attemptNumber === 2, "PL1: the allowed decision names the FALLBACK provider");
+
+  // PL2 — a different actual primary provider fails closed with the dedicated reason.
+  const diff = decide({ primaryAttempt: definitivePrimary({ providerKey: "other_whatsapp_provider" }) });
+  assert(diff.allowed === false, "PL2: mismatched provider must block");
+  assert(diff.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL2: got ${diff.reason}`);
+  assert(typeof REASON().PRIMARY_PROVIDER_MISMATCH === "string", "PL2: the reason code is stable and ledger-safe");
+});
+
+check("PL3-4. neither an exact-flow rule nor a provider-wide rule can cross provider ownership", () => {
+  const E = M.Engine;
+  const actual = "other_whatsapp_provider"; // the provider that really emitted the failure
+  const declared = "mock";                  // the provider the policy declares
+  const crit = { authFlow: "client_login_otp", primaryChannel: "whatsapp", primaryProviderKey: actual, failureCode: "META_ERROR_131026" };
+
+  // PL3 — an ELIGIBLE, ACTIVE, exact auth-flow rule owned by the DECLARED provider does
+  // not match a failure emitted by the ACTUAL provider. Rule ownership is part of identity.
+  const exactForDeclared = failureRule({ auth_flow: "client_login_otp", primary_provider_key: declared, is_active: true, automatic_fallback_eligible: true });
+  const r3 = E.resolveFailureRule([exactForDeclared], crit);
+  assert(r3.resolved === false && r3.reason === "no_rule", `PL3: exact-flow rule crossed providers (${JSON.stringify(r3)})`);
+
+  // PL4 — the same for a provider-wide rule. "Wide" spans auth flows, never providers.
+  const wideForDeclared = failureRule({ auth_flow: null, primary_provider_key: declared, is_active: true, automatic_fallback_eligible: true });
+  const r4 = E.resolveFailureRule([wideForDeclared], crit);
+  assert(r4.resolved === false && r4.reason === "no_rule", `PL4: provider-wide rule crossed providers (${JSON.stringify(r4)})`);
+
+  // Both tiers together still deny.
+  const r34 = E.resolveFailureRule([exactForDeclared, wideForDeclared], crit);
+  assert(r34.resolved === false && r34.reason === "no_rule", "PL3/4: neither tier may authorize another provider's failure");
+
+  // And even if a rule DID resolve, the engine blocks the mismatch before eligibility runs.
+  const d = decide({ primaryAttempt: definitivePrimary({ providerKey: actual }), failureEligibility: ELIGIBLE });
+  assert(d.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL3/4: an eligible rule must not rescue a provider mismatch: ${d.reason}`);
+});
+
+check("PL5. changing ONLY primaryAttempt.providerKey turns an allowed decision into a blocked one", () => {
+  const base = definitivePrimary();
+  const allowed = decide({ primaryAttempt: base });
+  assert(allowed.allowed === true, `PL5: baseline must be allowed: ${allowed.reason}`);
+  // One field differs. Everything else — flow, action, reference, hash, status, certainty,
+  // failure code, history, policy, eligibility — is byte-identical.
+  const mutatedInput = { ...base, providerKey: "mock_2" };
+  for (const k of Object.keys(base)) {
+    if (k !== "providerKey") assert(mutatedInput[k] === base[k], `PL5: only providerKey may differ (${k})`);
+  }
+  const blockedNow = decide({ primaryAttempt: mutatedInput });
+  assert(blockedNow.allowed === false && blockedNow.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL5: got ${blockedNow.reason}`);
+});
+
+check("PL6-7. accepted and unknown_outcome primaries with a provider mismatch stay blocked (fail closed)", () => {
+  // PL6 — an ACCEPTED primary can never fall back; with a provider mismatch it is blocked
+  // on the more fundamental structural fact. Either way: never allowed.
+  const acc = decide({ primaryAttempt: definitivePrimary({ providerKey: "other_whatsapp_provider", status: "sent", outcomeCertainty: "accepted" }) });
+  assert(acc.allowed === false, "PL6: accepted + mismatch must never be allowed");
+  assert(acc.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL6: provider lineage precedes outcome: ${acc.reason}`);
+  // The matching-provider accepted case still reports PRIMARY_ACCEPTED — unchanged.
+  assert(decide({ primaryAttempt: definitivePrimary({ status: "sent", outcomeCertainty: "accepted" }) }).reason === REASON().PRIMARY_ACCEPTED, "PL6: accepted reason unchanged when providers match");
+
+  // PL7 — an UNKNOWN outcome can never fall back; with a mismatch it is still blocked.
+  const unk = decide({ primaryAttempt: definitivePrimary({ providerKey: "other_whatsapp_provider", status: "outcome_unknown", outcomeCertainty: "unknown_outcome" }) });
+  assert(unk.allowed === false, "PL7: unknown_outcome + mismatch must never be allowed");
+  assert(unk.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL7: provider lineage precedes outcome: ${unk.reason}`);
+  assert(decide({ primaryAttempt: definitivePrimary({ status: "outcome_unknown", outcomeCertainty: "unknown_outcome" }) }).reason === REASON().PRIMARY_OUTCOME_UNKNOWN, "PL7: unknown reason unchanged when providers match");
+});
+
+check("PL8. provider identity comparison is EXACT: case-sensitive, whitespace-sensitive, no aliasing", () => {
+  // policy.primary_provider_key is "mock". None of these is "mock".
+  for (const near of ["Mock", "MOCK", "mock ", " mock", "mock\t", "m0ck", "mock_sms", "mock-whatsapp"]) {
+    const d = decide({ primaryAttempt: definitivePrimary({ providerKey: near }) });
+    assert(d.allowed === false && d.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL8: "${near}" must not equal "mock" (got ${d.reason})`);
+  }
+  // Only the exact string continues.
+  assert(decide({ primaryAttempt: definitivePrimary({ providerKey: "mock" }) }).allowed === true, "PL8: the exact identity continues");
+  // The engine performs no normalization anywhere.
+  const src = readCode(ENGINE_SRC);
+  for (const forbidden of [/toLowerCase\(/, /toUpperCase\(/, /\.trim\(/, /normalize\(/, /localeCompare\(/, /providerAlias/i, /providerFamily/i]) {
+    assert(!forbidden.test(src), `PL8: the engine must not normalize provider identity (${forbidden})`);
+  }
+});
+
+check("PL9. the engine never consults provider readiness, and PL10 vendor_whatsapp_verify protection is unchanged", () => {
+  // PL9 — readiness is INFRASTRUCTURE, never authorization. The pure engine cannot see it.
+  const src = readCode(ENGINE_SRC);
+  for (const forbidden of [
+    /readiness_status/, /provider_ready/, /configuration_status/, /health_status/,
+    /SMS_RUNTIME_READY/, /smsRuntimeGate/, /evaluateSmsRuntimeGate/, /selectSmsProvider/,
+    /canary/i, /outbound_enabled/,
+  ]) {
+    assert(!forbidden.test(src), `PL9: the engine must not consult provider readiness (${forbidden})`);
+  }
+  const engineImports = src.match(/from\s+"([^"]+)"/g) ?? [];
+  assert(engineImports.every((i) => i.includes("identity/authTransport")), `PL9: the engine imports only the auth transport vocabulary: ${engineImports}`);
+
+  // PL10 — the WhatsApp-possession flow is refused BEFORE any provider fact is examined,
+  // so the new lineage check can never become a way to reach that flow's fallback.
+  const d = decide({
+    authFlow: "vendor_whatsapp_verify",
+    policy: greenPolicy({ auth_flow: "vendor_whatsapp_verify" }),
+    primaryAttempt: definitivePrimary({ authFlow: "vendor_whatsapp_verify", providerKey: "other_whatsapp_provider" }),
+  });
+  assert(d.allowed === false && d.reason === REASON().WHATSAPP_VERIFICATION_FALLBACK_FORBIDDEN, `PL10: got ${d.reason}`);
+  // Also with a matching provider, and via a user-requested mode.
+  const d2 = decide({
+    authFlow: "vendor_whatsapp_verify", requestMode: MODE().USER_REQUESTED,
+    policy: greenPolicy({ auth_flow: "vendor_whatsapp_verify" }),
+    primaryAttempt: definitivePrimary({ authFlow: "vendor_whatsapp_verify" }),
+  });
+  assert(d2.reason === REASON().WHATSAPP_VERIFICATION_FALLBACK_FORBIDDEN, `PL10: user-requested is equally forbidden: ${d2.reason}`);
+});
+
+check("PL-svc. the failure-rule lookup is keyed on the ACTUAL primary provider, not the declared one", async () => {
+  const RULES = "authentication_transport_failure_rules";
+
+  // The policy declares "mock"; attempt 1 was actually owned by "other_whatsapp_provider".
+  resetDb(); resetQueries();
+  db.authentication_transport_policies.push(greenPolicy({ primary_provider_key: "mock" }));
+  const res = await M.PolicySvc.decideAuthenticationFallback({
+    authFlow: "client_login_otp", requestMode: "automatic",
+    primaryAttempt: definitivePrimary({ providerKey: "other_whatsapp_provider" }),
+    attemptHistory: HISTORY(), request: { ...REF },
+  });
+  const looked = queriedValue(RULES, "primary_provider_key");
+  assert(looked.length === 1, `PL-svc: exactly one rule lookup, got ${looked.length}`);
+  assert(looked[0] === "other_whatsapp_provider", `PL-svc: the lookup must use the ACTUAL provider, got "${looked[0]}"`);
+  assert(res.ok && res.data.allowed === false && res.data.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL-svc: the decision blocks: ${res.data.reason}`);
+
+  // An eligible ACTIVE rule owned by the DECLARED provider cannot rescue it, end to end.
+  resetDb(); resetQueries();
+  db.authentication_transport_policies.push(greenPolicy({ primary_provider_key: "mock" }));
+  db.authentication_transport_failure_rules.push(failureRule({ primary_provider_key: "mock", auth_flow: "client_login_otp" }));
+  db.authentication_transport_failure_rules.push(failureRule({ primary_provider_key: "mock", auth_flow: null }));
+  const rescued = await M.PolicySvc.decideAuthenticationFallback({
+    authFlow: "client_login_otp", requestMode: "automatic",
+    primaryAttempt: definitivePrimary({ providerKey: "other_whatsapp_provider" }),
+    attemptHistory: HISTORY(), request: { ...REF },
+  });
+  assert(rescued.ok && rescued.data.allowed === false, "PL-svc: another provider's eligible rules never authorize");
+  assert(rescued.data.reason === REASON().PRIMARY_PROVIDER_MISMATCH, `PL-svc: got ${rescued.data.reason}`);
+
+  // With a null primary attempt, default deny is preserved and no lookup is even attempted.
+  resetDb(); resetQueries();
+  db.authentication_transport_policies.push(greenPolicy());
+  const none = await M.PolicySvc.decideAuthenticationFallback({
+    authFlow: "client_login_otp", requestMode: "automatic",
+    primaryAttempt: null, attemptHistory: HISTORY(), request: { ...REF },
+  });
+  assert(queriedValue(RULES, "primary_provider_key").length === 0, "PL-svc: a null primary attempt performs no rule lookup");
+  assert(none.ok && none.data.allowed === false && none.data.reason === REASON().ATTEMPT_LINEAGE_INVALID, `PL-svc: null primary → default deny: ${none.data.reason}`);
+
+  // The matching case still resolves and is keyed on that same (identical) identity.
+  resetDb(); resetQueries();
+  db.authentication_transport_policies.push(greenPolicy());
+  db.authentication_transport_failure_rules.push(failureRule());
+  const okRes = await M.PolicySvc.decideAuthenticationFallback({
+    authFlow: "client_login_otp", requestMode: "automatic",
+    primaryAttempt: definitivePrimary(), attemptHistory: HISTORY(), request: { ...REF },
+  });
+  assert(queriedValue(RULES, "primary_provider_key")[0] === "mock", "PL-svc: the matching identity is used verbatim");
+  assert(okRes.ok && okRes.data.allowed === true, `PL-svc: the legitimate path still allows: ${okRes.data.reason}`);
+
+  // The service never repairs the mismatch by rewriting either identity.
+  const svc = readCode(POLICY_SVC_SRC);
+  assert(!/primaryAttempt\.providerKey\s*=/.test(svc), "PL-svc: the service never assigns to primaryAttempt.providerKey");
+  assert(!/primary_provider_key\s*=[^=]/.test(svc), "PL-svc: the service never assigns to policy.primary_provider_key");
+  assert(!/Object\.assign|structuredClone|\.\.\.input\.primaryAttempt/.test(svc), "PL-svc: no input projection is mutated or rebuilt");
 });
 
 check("policy service: default deny end to end (empty rule table, disabled policy)", async () => {
@@ -2018,7 +2205,7 @@ tsMutation("MUT C: every definitive failure is treated as fallback-eligible",
 
 tsMutation("MUT D: the policy service bypasses the failure-rule lookup",
   [[POLICY_SVC_SRC,
-    "    const failureEligibility = await resolveFailureEligibility({\n      authFlow: input.authFlow,\n      primaryProviderKey: policy.primary_provider_key,\n      failureCode: input.primaryAttempt?.failureCode ?? null,\n    });",
+    "    const failureEligibility = await resolveFailureEligibility({\n      authFlow: input.authFlow,\n      primaryProviderKey: actualPrimaryProviderKey,\n      failureCode: input.primaryAttempt?.failureCode ?? null,\n    });",
     "    const failureEligibility = { resolved: true as const, ruleId: null, scope: \"auth_flow\" as const, automaticFallbackEligible: true, userRequestedFallbackEligible: true };"]],
   async (mm) => {
     stubDb(mm); resetDb();
@@ -2042,6 +2229,72 @@ tsMutation("MUT E: the engine allows a vendor_whatsapp_verify SMS fallback",
     }, mm);
     return d.allowed === true; // SMS possession was accepted as WhatsApp possession
   });
+
+// ---- provider lineage (Phase 5F-C3-0) -------------------------------------
+const PROVIDER_EQUALITY_CHECK =
+  "  if (primaryAttempt.providerKey !== policy.primary_provider_key) {\n" +
+  "    return blocked(AuthFallbackBlockReason.PRIMARY_PROVIDER_MISMATCH);\n" +
+  "  }";
+const MISMATCHED_PRIMARY = () => definitivePrimary({ providerKey: "other_whatsapp_provider" });
+
+tsMutation("MUT pl-A: the primary-provider equality check is removed",
+  [[ENGINE_SRC, PROVIDER_EQUALITY_CHECK, ""]],
+  (mm) => decide({ primaryAttempt: MISMATCHED_PRIMARY() }, mm).allowed === true);
+
+tsMutation("MUT pl-B: a provider mismatch is allowed to continue to failure-rule evaluation",
+  [[ENGINE_SRC,
+    "    return blocked(AuthFallbackBlockReason.PRIMARY_PROVIDER_MISMATCH);",
+    "    void primaryAttempt.providerKey;"]],
+  (mm) => decide({ primaryAttempt: MISMATCHED_PRIMARY() }, mm).allowed === true);
+
+tsMutation("MUT pl-C: the policy service keys the failure-rule lookup on the DECLARED provider",
+  [[POLICY_SVC_SRC,
+    "    const actualPrimaryProviderKey = input.primaryAttempt?.providerKey ?? null;",
+    "    const actualPrimaryProviderKey = policy.primary_provider_key;"]],
+  async (mm) => {
+    stubDb(mm); resetDb(); resetQueries();
+    db.authentication_transport_policies.push(greenPolicy({ primary_provider_key: "mock" }));
+    await mm.PolicySvc.decideAuthenticationFallback({
+      authFlow: "client_login_otp", requestMode: "automatic",
+      primaryAttempt: MISMATCHED_PRIMARY(), attemptHistory: HISTORY(), request: { ...REF },
+    });
+    // The rule lookup was keyed on the policy's declared provider, not on the provider
+    // that actually owned attempt 1 — provider A's failure judged by provider B's rules.
+    return queriedValue("authentication_transport_failure_rules", "primary_provider_key")[0] === "mock";
+  });
+
+tsMutation("MUT pl-D: the engine normalizes provider identities before comparing",
+  [[ENGINE_SRC,
+    "  if (primaryAttempt.providerKey !== policy.primary_provider_key) {",
+    "  if (primaryAttempt.providerKey.trim().toLowerCase() !== policy.primary_provider_key.trim().toLowerCase()) {"]],
+  (mm) => decide({ primaryAttempt: definitivePrimary({ providerKey: "  MOCK " }) }, mm).allowed === true);
+
+tsMutation("MUT pl-E: a provider mismatch is downgraded to a recoverable warning",
+  [[ENGINE_SRC,
+    PROVIDER_EQUALITY_CHECK,
+    "  const providerMismatchWarning = primaryAttempt.providerKey !== policy.primary_provider_key;\n" +
+    "  if (providerMismatchWarning && policy.primary_provider_key === \"__never_matches__\") {\n" +
+    "    return blocked(AuthFallbackBlockReason.PRIMARY_PROVIDER_MISMATCH);\n" +
+    "  }"]],
+  (mm) => decide({ primaryAttempt: MISMATCHED_PRIMARY() }, mm).allowed === true);
+
+/** Criteria naming the provider that ACTUALLY emitted the failure. */
+const CROSS_CRIT = {
+  authFlow: "client_login_otp", primaryChannel: "whatsapp",
+  primaryProviderKey: "other_whatsapp_provider", failureCode: "META_ERROR_131026",
+};
+
+tsMutation("MUT pl-F: a provider-wide rule can authorize a different actual primary provider",
+  [[ENGINE_SRC,
+    "    row.primary_channel === c.primaryChannel &&\n    row.primary_provider_key === c.primaryProviderKey &&\n    row.failure_code === c.failureCode",
+    "    row.primary_channel === c.primaryChannel &&\n    (row.auth_flow === null || row.primary_provider_key === c.primaryProviderKey) &&\n    row.failure_code === c.failureCode"]],
+  (mm) => mm.Engine.resolveFailureRule([failureRule({ auth_flow: null, primary_provider_key: "mock" })], CROSS_CRIT).resolved === true);
+
+tsMutation("MUT pl-G: an exact auth-flow rule can authorize a different actual primary provider",
+  [[ENGINE_SRC,
+    "    row.primary_provider_key === c.primaryProviderKey &&\n    row.failure_code === c.failureCode",
+    "    row.failure_code === c.failureCode"]],
+  (mm) => mm.Engine.resolveFailureRule([failureRule({ auth_flow: "client_login_otp", primary_provider_key: "mock" })], CROSS_CRIT).resolved === true);
 
 // ---- attempt claim RPC ----------------------------------------------------
 sqlMutation("MUT A-rpc: the claim RPC allows a fallback after an unknown outcome",

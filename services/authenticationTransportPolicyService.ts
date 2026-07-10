@@ -9,6 +9,11 @@
 // provider, reads a secret, generates or verifies an OTP, or sends anything. The
 // decision engine it delegates to has no database access at all.
 //
+// PROVIDER LINEAGE (Phase 5F-C3-0): the failure-rule lookup is keyed on the provider that
+// ACTUALLY owned attempt 1, never on the policy's declared primary provider. The two are
+// kept as separate facts and the pure engine proves their equality. Grounding the lookup
+// in the declared provider would let provider A's failure be judged by provider B's rule.
+//
 // Phase 5F-C1 ships every fallback BLOCKED: the policy rows are operationally
 // disabled and `authentication_transport_failure_rules` is empty (default deny).
 // ============================================================================
@@ -89,14 +94,20 @@ export async function loadFailureRuleCandidates(criteria: {
 /**
  * Resolve the single governing failure rule, DEFAULT DENY. Delegates the precedence
  * and ambiguity rules to the pure resolver.
+ *
+ * `primaryProviderKey` MUST be the provider that ACTUALLY owned attempt 1, because that
+ * is the provider which emitted `failureCode`. It is never the policy's declared primary
+ * provider: judging provider A's failure by provider B's rule is exactly the cross-provider
+ * authorization this lookup must make impossible. Absent either identity, deny.
  */
 export async function resolveFailureEligibility(criteria: {
   readonly authFlow: AuthFlowValue;
-  readonly primaryProviderKey: string;
+  readonly primaryProviderKey: string | null;
   readonly failureCode: string | null;
 }): Promise<FailureEligibility> {
-  if (!criteria.failureCode) {
-    // No sanitized failure code means nothing to look a rule up by. Deny.
+  if (!criteria.primaryProviderKey || !criteria.failureCode) {
+    // No actual primary provider, or no sanitized failure code, means nothing to look a
+    // rule up by. Deny; never substitute a provider identity to make a lookup succeed.
     return { resolved: false, reason: FailureRuleUnresolvedReason.NO_RULE };
   }
   const rows = await loadFailureRuleCandidates({
@@ -135,9 +146,18 @@ export async function decideAuthenticationFallback(
       return ok({ allowed: false, reason: AuthFallbackBlockReason.POLICY_MISSING });
     }
 
+    // TWO INDEPENDENT PROVIDER FACTS, neither derived from the other:
+    //   actualPrimaryProviderKey — who actually owned attempt 1 (lineage fact)
+    //   policy.primary_provider_key — who the policy declares (policy fact)
+    // The rule lookup is grounded in the ACTUAL provider, because that provider emitted
+    // the failure code. The PURE engine then proves the two identities are equal and
+    // blocks with PRIMARY_PROVIDER_MISMATCH otherwise. Neither value is copied onto the
+    // other, and no input projection is mutated.
+    const actualPrimaryProviderKey = input.primaryAttempt?.providerKey ?? null;
+
     const failureEligibility = await resolveFailureEligibility({
       authFlow: input.authFlow,
-      primaryProviderKey: policy.primary_provider_key,
+      primaryProviderKey: actualPrimaryProviderKey,
       failureCode: input.primaryAttempt?.failureCode ?? null,
     });
 

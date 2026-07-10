@@ -123,6 +123,12 @@ export const AuthFallbackBlockReason = {
   ATTEMPT_LIMIT_REACHED: "ATTEMPT_LIMIT_REACHED",
   /** The primary attempt's shape (number/channel/flow) cannot anchor a fallback. */
   ATTEMPT_LINEAGE_INVALID: "ATTEMPT_LINEAGE_INVALID",
+  /**
+   * The provider that ACTUALLY owned attempt 1 is not the primary provider this policy
+   * declares. Failure-rule eligibility is provider-scoped, so a failure emitted by
+   * provider A must never be judged by a rule that belongs to provider B.
+   */
+  PRIMARY_PROVIDER_MISMATCH: "PRIMARY_PROVIDER_MISMATCH",
   DESTINATION_HASH_MISMATCH: "DESTINATION_HASH_MISMATCH",
   AUTH_REFERENCE_MISMATCH: "AUTH_REFERENCE_MISMATCH",
   /** The primary attempt belongs to a DIFFERENT authentication action. */
@@ -178,6 +184,13 @@ export interface PrimaryAttemptSummary {
   readonly destinationHash: string;
   readonly attemptNumber: number;
   readonly channel: string;
+  /**
+   * The provider that ACTUALLY owned attempt 1, as recorded on the attempt row. This is a
+   * LINEAGE FACT. It is never overwritten by, nor reconciled with, the policy's declared
+   * `primary_provider_key`: the engine proves the two are equal (step 8) and blocks
+   * otherwise. It is also the identity a failure rule must be looked up under, because
+   * the failure code being judged was emitted by THIS provider.
+   */
   readonly providerKey: string;
   readonly status: string;
   readonly outcomeCertainty: string;
@@ -258,10 +271,19 @@ export type FailureEligibility =
 export interface FailureRuleCriteria {
   readonly authFlow: string;
   readonly primaryChannel: string;
+  /**
+   * The provider that ACTUALLY emitted the failure code being judged — i.e. the primary
+   * attempt's `providerKey`, not the policy's declared primary provider. A rule owned by
+   * another provider can never match, at either tier.
+   */
   readonly primaryProviderKey: string;
   readonly failureCode: string;
 }
 
+/**
+ * Provider ownership is part of a rule's identity, at EVERY tier. A provider-wide rule is
+ * "wide" only across auth flows — never across providers.
+ */
 function matchesProviderAndCode(row: AuthTransportFailureRuleRow, c: FailureRuleCriteria): boolean {
   return (
     row.primary_channel === c.primaryChannel &&
@@ -359,10 +381,12 @@ const DEFINITIVE_FAILURE_STATUSES: readonly string[] = Object.freeze(["failed", 
  *   6. the mode's own enable flag is set (and, for automatic, `hard_failure_only`);
  *   7. a primary attempt exists with legal lineage, belonging to the SAME authentication
  *      action, the same auth reference and the same destination hash;
- *   8. the primary outcome is EXACTLY a definitive failure (never accepted, never
+ *   8. the provider that ACTUALLY owned attempt 1 is EXACTLY the primary provider this
+ *      policy declares (PROVIDER LINEAGE — see below);
+ *   9. the primary outcome is EXACTLY a definitive failure (never accepted, never
  *      unknown_outcome, never a status that contradicts the certainty);
- *   9. the attempt history is scoped to THIS action and its budget is not spent;
- *  10. an explicit, active, unambiguous failure rule permits THIS mode.
+ *  10. the attempt history is scoped to THIS action and its budget is not spent;
+ *  11. an explicit, active, unambiguous failure rule permits THIS mode.
  *
  * Nothing here infers authorization from provider readiness, and nothing here reads
  * a secret, a credential, or an OTP.
@@ -441,7 +465,27 @@ export function evaluateAuthenticationFallback(
     return blocked(AuthFallbackBlockReason.DESTINATION_HASH_MISMATCH);
   }
 
-  // 8 — the outcome must be a PROVEN failure. Accepted and unknown both stop here, and
+  // 8 — PROVIDER LINEAGE. Two INDEPENDENT facts must be proven equal here:
+  //
+  //   primaryAttempt.providerKey   the provider that ACTUALLY owned attempt 1 (lineage
+  //                                fact, recorded on the attempt row when it was claimed)
+  //   policy.primary_provider_key  the primary provider this transport policy DECLARES
+  //                                (policy fact, independent of any attempt)
+  //
+  // Failure-rule eligibility is provider-scoped. Without this proof, a failure emitted by
+  // provider A could be authorized by an eligible rule that belongs to provider B — at
+  // either the exact auth-flow tier or the provider-wide tier. Neither identity is ever
+  // allowed to overwrite, repair, or substitute for the other.
+  //
+  // The comparison is EXACT: no case folding, no trimming, no alias table, no provider
+  // "family" widening. Two provider keys are the same provider only when they are the
+  // same string. This precedes the outcome and failure-rule steps, so a mismatch can
+  // never reach eligibility evaluation, and it is a hard block, never a warning.
+  if (primaryAttempt.providerKey !== policy.primary_provider_key) {
+    return blocked(AuthFallbackBlockReason.PRIMARY_PROVIDER_MISMATCH);
+  }
+
+  // 9 — the outcome must be a PROVEN failure. Accepted and unknown both stop here, and
   // a certainty that contradicts the recorded status is treated as not definitive.
   if (primaryAttempt.outcomeCertainty === AuthOutcomeCertainty.ACCEPTED) {
     return blocked(AuthFallbackBlockReason.PRIMARY_ACCEPTED);
@@ -456,7 +500,7 @@ export function evaluateAuthenticationFallback(
     return blocked(AuthFallbackBlockReason.PRIMARY_NOT_DEFINITIVE);
   }
 
-  // 9 — the attempt budget: two transport attempts per AUTHENTICATION ACTION, not per
+  // 10 — the attempt budget: two transport attempts per AUTHENTICATION ACTION, not per
   // auth user. A history that is not scoped to this action fails closed rather than
   // silently counting every login the user ever performed.
   if (attemptHistory.authActionId !== request.authActionId) {
@@ -469,8 +513,10 @@ export function evaluateAuthenticationFallback(
     return blocked(AuthFallbackBlockReason.ATTEMPT_LIMIT_REACHED);
   }
 
-  // 10 — DEFAULT DENY: an explicit, active, unambiguous rule must permit THIS mode for
+  // 11 — DEFAULT DENY: an explicit, active, unambiguous rule must permit THIS mode for
   // THIS failure code. A definitive failure is never eligible merely by being definitive.
+  // Step 8 has already proven the rule tier being consulted belongs to the provider that
+  // actually owned attempt 1.
   const eligibility = input.failureEligibility;
   if (!eligibility.resolved) return blocked(AuthFallbackBlockReason.FAILURE_NOT_FALLBACK_ELIGIBLE);
   const permitted =

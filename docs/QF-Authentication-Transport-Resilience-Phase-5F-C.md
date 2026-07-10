@@ -397,6 +397,92 @@ It refuses:
 Verified provider-event reconciliation of a parked `outcome_unknown` is deliberately **not**
 invented here; it belongs to a later, controlled integration.
 
+## 8b. Provider lineage — the ACTUAL provider vs the DECLARED provider
+
+Two provider identities exist. They are **different kinds of fact**, they are stored in
+different places, and neither may ever be derived from, repaired by, or substituted for the
+other.
+
+| Identity | Kind of fact | Source of truth |
+|---|---|---|
+| `primaryAttempt.providerKey` | **lineage fact** — who *actually* owned attempt 1 | `authentication_delivery_attempts.provider_key`, written when the attempt was atomically claimed |
+| `policy.primary_provider_key` | **declared policy fact** — who the policy *says* the primary provider is | `authentication_transport_policies` |
+
+The pure engine **proves they are equal** before any fallback can be authorized. A mismatch
+returns the block reason:
+
+```
+PRIMARY_PROVIDER_MISMATCH
+```
+
+### Why this must exist
+
+**Failure-rule eligibility is provider-scoped.** `authentication_transport_failure_rules`
+keys every rule on `primary_provider_key`. Without the equality proof, a failure emitted by
+provider **A** could be authorized by an eligible rule that belongs to provider **B** — a
+rule an operator activated after reviewing *B's* failure semantics, never A's. This becomes
+concrete the moment a real `Meta WhatsApp → SMS` integration exists.
+
+### Where the check sits
+
+Step **8** of `evaluateAuthenticationFallback`: **after** the structural primary-attempt
+existence and lineage checks (attempt number, channel, flow, auth action, auth reference,
+destination hash), and **before** the primary-outcome and failure-rule steps. A mismatch can
+therefore never reach eligibility evaluation, and an `accepted` or `unknown_outcome` primary
+with a mismatched provider is blocked on the more fundamental structural fact.
+
+### Comparison semantics
+
+Exact string equality. **No** case folding, **no** trimming, **no** alias table, **no**
+provider-family widening, **no** locale comparison. Two provider keys name the same provider
+only when they are the same string. A mismatch is a hard block — never a warning, never
+recoverable, never repaired by rewriting the attempt in memory.
+
+### Failure rules never cross provider ownership
+
+Provider ownership is part of a rule's identity **at every tier**:
+
+- an **exact `auth_flow`** rule owned by provider B never matches a failure from provider A;
+- a **provider-wide** (`auth_flow is null`) rule owned by provider B never matches a failure
+  from provider A either. "Wide" spans *auth flows*, never *providers*.
+
+Accordingly the failure-rule lookup is keyed on the **actual** primary provider —
+`services/authenticationTransportPolicyService.ts` passes `primaryAttempt.providerKey`, not
+`policy.primary_provider_key`. Absent a primary attempt, there is no provider identity to
+look a rule up under, and the decision defaults to deny.
+
+### The RPC boundary is structural, not policy
+
+`qf_claim_auth_delivery_attempt` deliberately does **not** read
+`authentication_transport_policies`, and this is correct — not a gap:
+
+- **Application fallback authorization** owns the policy/provider match. Provider identity
+  equality is a *business policy* question and lives in the pure engine.
+- **The RPC** owns the atomic, race-safe *structural* attempt lineage: the advisory lock on
+  the action identity, the attempt-number and single-fallback unique indexes, and the
+  attempt-2 lineage checks (same flow, action, reference, destination hash).
+- **The orchestrator added later in C3** must pass the provider returned by the *allowed
+  decision* into the fallback claim — never a provider re-derived from configuration.
+- **Runtime SMS provider identity must exactly match the allowed decision's provider before
+  dispatch.**
+
+### The C3 runtime fence
+
+Before any SMS is dispatched, all four of these must be the **same exact string**:
+
+```
+allowed decision provider  (decision.providerKey, from policy.fallback_provider_key)
+        ==
+SMS runtime candidate provider  (selectSmsProvider → candidate.providerKey)
+        ==
+actual SMS adapter providerKey  (the constructed SmsProvider)
+        ==
+fallback attempt provider_key   (persisted by qf_claim_auth_delivery_attempt)
+```
+
+Any inequality is a fail-closed abort, not a substitution. Provider readiness still
+authorizes nothing.
+
 ## 9. Future SMS provider integration boundary
 
 Phase 5F-C1 **chooses no SMS vendor**. There is no Twilio, MSG91, Exotel, AWS SNS, Plivo,

@@ -17,7 +17,7 @@
 
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
-import { getActiveWhatsAppProvider } from "./communicationService";
+import { resolveRuntimeWhatsAppProvider } from "./runtimeCommunicationService";
 import {
   COMMUNICATION_AUTOMATION_READINESS_STATES,
   isAutomationDispatchable,
@@ -398,8 +398,11 @@ export async function getTemplateReadinessSummary(): Promise<Result<{
  */
 export async function getProviderHealthSummary(): Promise<Result<WhatsAppProviderHealth>> {
   try {
-    const provider = getActiveWhatsAppProvider();
-    const health = await provider.healthCheck();
+    // Report the health of the RUNTIME-selected adapter, failing closed when the
+    // provider cannot be resolved (never silently reporting mock health for Meta).
+    const provider = resolveRuntimeWhatsAppProvider();
+    if (!provider.ok) return provider;
+    const health = await provider.data.healthCheck();
     return ok(health);
   } catch (e) {
     return fail(e);

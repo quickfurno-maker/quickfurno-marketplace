@@ -99,3 +99,22 @@ export class FetchHttpTransport implements HttpTransport {
 
 /** Default response-body cap for provider calls (generous; content is never persisted). */
 export const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
+
+/** Never let a request run for less than this once a ceiling has been applied. */
+export const MIN_REQUEST_TIMEOUT_MS = 1;
+
+/**
+ * The single definition of "the effective request timeout": it is NEVER above the
+ * adapter's configured timeout, and NEVER above a caller-supplied ceiling (the
+ * remaining safe network budget of an enclosing request deadline). Absent a ceiling
+ * the configured timeout is used unchanged — so no lane without a deadline is
+ * affected. The result still drives the AbortController, so the ACTUAL request is
+ * cancelled; this only shortens it.
+ */
+export function effectiveRequestTimeoutMs(
+  configuredMs: number,
+  ceilingMs?: number | null
+): number {
+  if (typeof ceilingMs !== "number" || !Number.isFinite(ceilingMs)) return configuredMs;
+  return Math.max(MIN_REQUEST_TIMEOUT_MS, Math.min(configuredMs, Math.floor(ceilingMs)));
+}

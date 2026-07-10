@@ -55,7 +55,7 @@ import {
   verifyVendorOtp,
 } from "../lib/identity/vendorOtpCrypto";
 import { ephemeralAuthDestination, type CommunicationIntent } from "../lib/communication/types";
-import { CommunicationService } from "./communicationService";
+import { createRuntimeCommunicationService } from "./runtimeCommunicationService";
 import { recordAuthSecurityEvent } from "./authSecurityEventService";
 import { requireVendorAccess } from "./vendorAccessService";
 import { evaluateVendorAuthAutomationGate } from "./vendorAuthAutomationService";
@@ -268,7 +268,10 @@ export async function requestVendorWhatsappVerification(
       metadata: { purpose: PURPOSE, transport_origin: "vendor_whatsapp_verification" },
     };
 
-    const sent = await new CommunicationService().send(intent);
+    // Dispatch through the RUNTIME-selected provider (mock or Meta). An unresolvable
+    // provider fails closed here: nothing is sent and the challenge is cancelled.
+    const runtime = createRuntimeCommunicationService();
+    const sent = runtime.ok ? await runtime.data.send(intent) : runtime;
     const delivered =
       sent.ok &&
       (sent.data.status === "accepted" ||

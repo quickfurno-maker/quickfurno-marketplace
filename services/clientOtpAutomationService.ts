@@ -19,7 +19,7 @@ import {
   evaluateClientOtpOperationalGate,
   type ClientOtpGateDecision,
 } from "../lib/identity/clientOtpAutomation";
-import { getActiveWhatsAppProvider } from "./communicationService";
+import { resolveRuntimeWhatsAppProvider } from "./runtimeCommunicationService";
 
 const AUTOMATION_CATALOG_TABLE = "communication_automation_catalog";
 
@@ -48,9 +48,15 @@ export async function evaluateClientLoginOtpGate(): Promise<ClientOtpGateDecisio
       return { ok: false, reason: ClientOtpGateBlockReason.MISSING_CATALOG_ROW };
     }
 
+    // The catalog's required provider must match the RUNTIME-selected adapter. An
+    // unresolvable provider (e.g. production without a provider mode) fails closed.
+    const provider = resolveRuntimeWhatsAppProvider();
+    if (!provider.ok) {
+      return { ok: false, reason: ClientOtpGateBlockReason.PROVIDER_MISMATCH };
+    }
     return evaluateClientOtpOperationalGate(
       data as Parameters<typeof evaluateClientOtpOperationalGate>[0],
-      getActiveWhatsAppProvider().providerKey
+      provider.data.providerKey
     );
   } catch {
     return { ok: false, reason: ClientOtpGateBlockReason.MISSING_CATALOG_ROW };

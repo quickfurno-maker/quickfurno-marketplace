@@ -20,7 +20,7 @@ import {
   type VendorAuthAutomationBinding,
   type VendorAuthGateDecision,
 } from "../lib/identity/vendorAuthAutomation";
-import { getActiveWhatsAppProvider } from "./communicationService";
+import { resolveRuntimeWhatsAppProvider } from "./runtimeCommunicationService";
 
 const AUTOMATION_CATALOG_TABLE = "communication_automation_catalog";
 
@@ -51,9 +51,15 @@ export async function evaluateVendorAuthAutomationGate(
       return { ok: false, reason: VendorAuthGateBlockReason.MISSING_CATALOG_ROW };
     }
 
+    // The catalog's required provider must match the RUNTIME-selected adapter. An
+    // unresolvable provider (e.g. production without a provider mode) fails closed.
+    const provider = resolveRuntimeWhatsAppProvider();
+    if (!provider.ok) {
+      return { ok: false, reason: VendorAuthGateBlockReason.PROVIDER_MISMATCH };
+    }
     return evaluateVendorAuthGate(
       data as Parameters<typeof evaluateVendorAuthGate>[0],
-      getActiveWhatsAppProvider().providerKey,
+      provider.data.providerKey,
       binding
     );
   } catch {

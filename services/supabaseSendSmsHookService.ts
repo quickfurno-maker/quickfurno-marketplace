@@ -18,18 +18,31 @@
 //   CANCEL the underlying request. The provider call would keep running, Supabase
 //   would see a timeout and retry, and the original request could still succeed —
 //   which is a duplicate-OTP hazard, exactly what the idempotency key exists to
-//   prevent. For mock-only Phase 5D readiness the send is effectively instantaneous,
-//   so the behaviour stays synchronous.
-//   REQUIREMENT FOR A REAL PROVIDER: the adapter itself must enforce an ABORTABLE
-//   network timeout (AbortController/AbortSignal on the outbound HTTP call, or the
-//   SDK's own cancellation) set comfortably inside the Supabase hook budget, so a
-//   timed-out send is genuinely cancelled rather than merely abandoned. Do not
-//   activate a real provider before that adapter-level timeout exists.
+//   prevent.
+//
+//   Instead the verified path establishes a MONOTONIC TOTAL DEADLINE (see
+//   lib/auth/hookDeadline.ts) and threads it into the dispatch. Immediately before the
+//   provider request the dispatcher clamps the adapter's configured auth timeout to
+//   the remaining safe budget, and refuses locally — zero provider calls — when the
+//   budget is already spent.
+//   REQUIREMENT FOR A REAL PROVIDER (unchanged): the adapter itself must enforce an
+//   abortable network timeout (AbortController/AbortSignal on the outbound HTTP call,
+//   or the SDK's own cancellation), so a timed-out send is genuinely cancelled rather
+//   than merely abandoned. The deadline above only SHORTENS that abortable timeout; it
+//   never replaces it. Do not activate a real provider before that adapter-level
+//   abortable timeout exists.
 //
 // ORDER OF OPERATIONS (never reordered)
-//   size ceiling → headers → secret → SIGNATURE VERIFICATION → parse/validate →
-//   operational gate → build intent → single dispatch → map status to outcome.
-//   Nothing in the payload is trusted, parsed, or processed before verification.
+//   size ceiling → headers → secret → SIGNATURE VERIFICATION → start total deadline →
+//   parse/validate → operational gate → build intent → single dispatch → map status to
+//   outcome. Nothing in the payload is trusted, parsed, or processed before verification.
+//
+// UNCERTAIN DELIVERY
+//   A provider outcome that can be neither proven nor disproven parks the message in
+//   `outcome_unknown`. That is NOT "in progress": asking Supabase to retry would either
+//   replay into the same parked row forever or, worse, imply a resend of an OTP that may
+//   already have arrived. It maps to an explicit `delivery_uncertain` outcome with NO
+//   Retry-After.
 //
 // NEVER LOGGED (never returned, either): raw body, OTP, phone, hook secret,
 // signature, access/refresh token.
@@ -48,9 +61,10 @@ import {
   CLIENT_LOGIN_OTP_MESSAGE_TYPE,
   CLIENT_LOGIN_OTP_TEMPLATE_KEY,
 } from "../lib/identity/clientOtpAutomation";
+import { startAuthHookDeadline, type AuthNetworkDeadline } from "../lib/auth/hookDeadline";
 import { ephemeralAuthDestination, type CommunicationIntent } from "../lib/communication/types";
 import { evaluateClientLoginOtpGate } from "./clientOtpAutomationService";
-import { CommunicationService } from "./communicationService";
+import { createRuntimeCommunicationService } from "./runtimeCommunicationService";
 
 // ----------------------------------------------------------------------------
 // Outcome vocabulary
@@ -75,6 +89,13 @@ export const SendSmsHookOutcomeKind = {
   SERVICE_UNAVAILABLE: "service_unavailable",
   /** Provider failed/cancelled/dead_letter — hook failure, no blind resend. */
   DELIVERY_FAILED: "delivery_failed",
+  /**
+   * `outcome_unknown` — the provider may or may not have accepted the OTP (timeout /
+   * abort / ambiguous network / ambiguous 5xx / 2xx without a usable message id). It is
+   * NOT in progress and NOT a proven failure. Terminal for this hook attempt: no
+   * Retry-After, no resend, no fallback. A later verified webhook reconciles the row.
+   */
+  DELIVERY_UNCERTAIN: "delivery_uncertain",
   /** Queued/dispatching — temporary/in-progress; must not double-dispatch. */
   IN_PROGRESS: "in_progress",
   /** Rejected before dispatch (size/headers/secret/signature/payload). */
@@ -167,6 +188,14 @@ export function sendSmsHookHttpResponse(outcome: SendSmsHookOutcome): SendSmsHoo
     case SendSmsHookOutcomeKind.DELIVERY_FAILED:
       return jsonResponse(502, "delivery_failed");
 
+    // `outcome_unknown` — the OTP may already have been delivered. Deliberately NOT the
+    // IN_PROGRESS branch: a Retry-After here would ask Supabase to retry a request whose
+    // idempotent replay can only ever observe the same parked row, and it would signal a
+    // resend of an OTP we cannot prove was never sent. Same 502 family as a terminal
+    // provider outcome, a DISTINCT safe code, and no Retry-After.
+    case SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN:
+      return jsonResponse(502, "delivery_uncertain");
+
     // Queued/dispatching — the FIRST delivery is still in flight and this request is
     // its idempotent duplicate. 503 + a non-empty Retry-After asks Supabase to retry
     // inside its own hook budget; the replay then observes the accepted/sent row and
@@ -237,6 +266,11 @@ export interface SupabaseSendSmsHookRequest {
   readonly rawBody: string;
   /** Case-insensitive header accessor (e.g. `req.headers.get`). */
   readonly getHeader: (name: string) => string | null | undefined;
+  /**
+   * The total hook deadline. Injected only by tests (with a deterministic monotonic
+   * clock); production starts its own at the beginning of the verified path.
+   */
+  readonly deadline?: AuthNetworkDeadline;
 }
 
 /**
@@ -264,6 +298,12 @@ export async function handleSupabaseSendSmsHook(
     const verification = getActiveSendSmsHookVerifier().verify(req.rawBody, headers, secrets);
     if (!verification.ok) return reject(SendSmsHookRejectReason.INVALID_SIGNATURE);
 
+    // 4b) TOTAL DEADLINE. Everything from here on — parsing, the operational gate, the
+    // runtime policy / provider account / canary / mapping lookups, the ledger insert,
+    // the dispatch claim, the final runtime gate, the provider request, the result
+    // write, and this response — shares one monotonic budget.
+    const deadline = req.deadline ?? startAuthHookDeadline();
+
     // 5) Parse/validate ONLY the verified payload.
     const parsed = parseSendSmsHookEvent(verification.payload);
     if (!parsed.ok) return reject(SendSmsHookRejectReason.MALFORMED_PAYLOAD);
@@ -279,10 +319,21 @@ export async function handleSupabaseSendSmsHook(
       };
     }
 
-    // 7) Single, immediate CommunicationService dispatch. Idempotency is keyed on
-    // the verified webhook id, so a replay/concurrent duplicate cannot re-send.
+    // 7) Single, immediate CommunicationService dispatch through the RUNTIME-selected
+    // provider (mock or Meta; fail closed when unresolvable — never a silent mock).
+    // Idempotency is keyed on the verified webhook id, so a replay/concurrent
+    // duplicate cannot re-send. No queue, no n8n, no retry, no OTP persistence.
+    const runtime = createRuntimeCommunicationService();
+    if (!runtime.ok) {
+      // The provider could not be resolved: nothing was dispatched, nothing persisted.
+      return {
+        kind: SendSmsHookOutcomeKind.DELIVERY_FAILED,
+        dispatchAttempted: false,
+        webhookId: headers.webhookId,
+      };
+    }
     const intent = buildClientLoginOtpIntent(event, headers.webhookId);
-    const result = await new CommunicationService().send(intent);
+    const result = await runtime.data.send(intent, { authDeadline: deadline });
 
     // 8) Map the message status — NOT merely Result.ok — to a hook outcome.
     if (!result.ok) {
@@ -298,6 +349,16 @@ export async function handleSupabaseSendSmsHook(
     if (status === "accepted" || status === "sent" || status === "delivered" || status === "read") {
       return {
         kind: SendSmsHookOutcomeKind.DELIVERED,
+        dispatchAttempted: true,
+        webhookId: headers.webhookId,
+      };
+    }
+    // An UNPROVEN outcome, checked BEFORE the terminal-failure and in-progress branches:
+    // it is neither. An idempotent replay observes this same parked row, re-enters here,
+    // dispatches nothing, and returns the identical Retry-After-free response.
+    if (status === "outcome_unknown") {
+      return {
+        kind: SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN,
         dispatchAttempted: true,
         webhookId: headers.webhookId,
       };

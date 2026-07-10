@@ -32,10 +32,11 @@ import type {
 import type { MetaProviderRuntime } from "./metaCloudWhatsAppConfig";
 import {
   DEFAULT_MAX_RESPONSE_BYTES,
+  effectiveRequestTimeoutMs,
   type HttpTransport,
   type HttpTransportResult,
 } from "../httpTransport";
-import type { WhatsAppResolvedTemplate } from "../whatsappTemplate";
+import type { ResolvedTemplateSendOptions, WhatsAppResolvedTemplate } from "../whatsappTemplate";
 import { renderWhatsAppTemplateComponents, type MetaTemplateComponent } from "./whatsappTemplateBinding";
 import {
   classifyMetaWebhook,
@@ -192,12 +193,17 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
    * The real Meta template send. Renders components strictly from the binding schema
    * (render failure → no network call), then posts through the abortable transport
    * with the lane-appropriate timeout (authentication uses the short AUTH timeout).
+   *
+   * `options.maxNetworkTimeoutMs` is an optional CEILING supplied by an enclosing
+   * request deadline (the Supabase Auth Hook budget). It can only SHORTEN the
+   * configured lane timeout, never extend it, and the shortened value still drives the
+   * AbortController — the actual request is cancelled, never merely abandoned.
    */
   async sendResolvedTemplate(
     toE164: string,
     resolved: WhatsAppResolvedTemplate,
     sourceVariables: Record<string, string>,
-    options: { readonly lane?: "authentication" | "business" } = {}
+    options: ResolvedTemplateSendOptions = {}
   ): Promise<WhatsAppSendResult> {
     if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
       return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
@@ -209,7 +215,8 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
         "The template could not be rendered from its binding schema; no request was sent.");
     }
 
-    const timeoutMs = options.lane === "authentication" ? this.runtime.authHttpTimeoutMs : this.runtime.businessHttpTimeoutMs;
+    const configuredMs = options.lane === "authentication" ? this.runtime.authHttpTimeoutMs : this.runtime.businessHttpTimeoutMs;
+    const timeoutMs = effectiveRequestTimeoutMs(configuredMs, options.maxNetworkTimeoutMs);
     const payload = buildMetaTemplatePayload(toE164, resolved, rendered.components);
     const result = await this.transport.request({
       url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),

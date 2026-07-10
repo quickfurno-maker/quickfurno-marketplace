@@ -44,3 +44,30 @@ export async function resolveApprovedMetaMapping(input: {
     language: input.language,
   });
 }
+
+/**
+ * RESTART-SAFE retry resolution: re-resolve the EXACT mapping row pinned on the
+ * message at initial send, then re-validate it through the same strict selector
+ * (template/channel/provider/language must still match, and it must still be
+ * approved + active with a non-empty provider template name). A superseded or
+ * de-activated mapping fails closed — it is never silently swapped for another.
+ */
+export async function resolveApprovedMetaMappingById(input: {
+  readonly mappingId: string;
+  readonly templateKey: string;
+  readonly language: string;
+  readonly providerKey?: string;
+}): Promise<MappingResolution> {
+  const providerKey = input.providerKey ?? META_WHATSAPP_CLOUD_PROVIDER_KEY;
+  const { data, error } = await adminClient()
+    .from("communication_provider_template_mappings")
+    .select("*")
+    .eq("id", input.mappingId)
+    .maybeSingle();
+  if (error || !data) return { ok: false, reason: "no_mapping_found" };
+  return selectApprovedProviderMapping([data as ProviderTemplateMappingRow], {
+    templateKey: input.templateKey,
+    providerKey,
+    language: input.language,
+  });
+}

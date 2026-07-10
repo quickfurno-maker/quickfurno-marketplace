@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import crypto from "node:crypto";
@@ -24,13 +24,19 @@ const TS_FILES = [
   "lib/errors.ts",
   "lib/supabase.ts",
   "lib/identity/authSecurityEvent.ts",
+  "lib/identity/clientOtpAutomation.ts",
+  "lib/auth/hookDeadline.ts",
+  "lib/auth/supabaseSendSmsHook.ts",
   "lib/communication/types.ts",
   "lib/communication/phone.ts",
   "lib/communication/dbErrors.ts",
   "lib/communication/recipientResolver.ts",
   "lib/communication/channelDispatchGuard.ts",
   "lib/communication/httpTransport.ts",
+  "lib/communication/canonicalJson.ts",
   "lib/communication/whatsappTemplate.ts",
+  "lib/communication/providerMappingFingerprint.ts",
+  "lib/communication/approvedTemplateOutbound.ts",
   "lib/communication/providers/whatsappProvider.ts",
   "lib/communication/providers/providerError.ts",
   "lib/communication/providers/mockWhatsAppProvider.ts",
@@ -42,8 +48,13 @@ const TS_FILES = [
   "services/communicationRecipientResolver.ts",
   "services/communicationService.ts",
   "services/communicationProviderRuntimeService.ts",
+  "services/providerTemplateMappingService.ts",
+  "services/metaWhatsAppOutboundService.ts",
+  "services/runtimeCommunicationService.ts",
   "services/metaWhatsAppWebhookService.ts",
   "services/whatsAppProviderSelection.ts",
+  "services/clientOtpAutomationService.ts",
+  "services/supabaseSendSmsHookService.ts",
 ];
 
 function compileTo(outDir) {
@@ -85,10 +96,18 @@ function wireBuild(outDir) {
     Mock: req("./lib/communication/providers/mockWhatsAppProvider.js"),
     Selection: req("./services/whatsAppProviderSelection.js"),
     Comm: req("./services/communicationService.js"),
+    Runtime: req("./services/runtimeCommunicationService.js"),
+    Outbound: req("./services/metaWhatsAppOutboundService.js"),
     WebhookSvc: req("./services/metaWhatsAppWebhookService.js"),
     Resolver: req("./lib/communication/recipientResolver.js"),
     Phone: req("./lib/communication/phone.js"),
     Supabase: req("./lib/supabase.js"),
+    Transport: req("./lib/communication/httpTransport.js"),
+    Canonical: req("./lib/communication/canonicalJson.js"),
+    Fingerprint: req("./lib/communication/providerMappingFingerprint.js"),
+    Deadline: req("./lib/auth/hookDeadline.js"),
+    HookLib: req("./lib/auth/supabaseSendSmsHook.js"),
+    HookSvc: req("./services/supabaseSendSmsHookService.js"),
   };
 }
 
@@ -218,13 +237,15 @@ compileTo(MAIN_DIR);
 const M = wireBuild(MAIN_DIR);
 
 // ---- In-memory adminClient stub (for behavioral CommunicationService tests) ----
-const db = { communication_messages: [], communication_webhook_receipts: [], communication_provider_runtime_policies: [], communication_delivery_events: [] };
-function resetDb() {
-  db.communication_messages = [];
-  db.communication_webhook_receipts = [];
-  db.communication_provider_runtime_policies = [];
-  db.communication_delivery_events = [];
-}
+const DB_TABLES = [
+  "communication_messages", "communication_templates", "communication_webhook_receipts",
+  "communication_delivery_events", "communication_provider_runtime_policies",
+  "communication_provider_accounts", "communication_provider_template_mappings",
+  "communication_provider_canary_destinations", "communication_automation_catalog",
+];
+const db = {};
+function resetDb() { for (const t of DB_TABLES) db[t] = []; }
+resetDb();
 class QB {
   constructor(table) { this.table = table; this.filters = []; this.limitVal = null; this.action = "select"; this.data = null; }
   select() { return this; }
@@ -828,7 +849,7 @@ function seedMessage(over = {}) {
 }
 function fakeProvider(sendResult) {
   return {
-    providerKey: "metafake", channel: "whatsapp", templateResolutionMode: "approved_provider_mapping",
+    providerKey: "metafake", channel: "whatsapp", templateResolutionMode: "internal_template",
     async sendAuthenticationMessage() { return sendResult; },
     async sendTemplateMessage() { return sendResult; },
     verifyWebhookSignature() { return false; }, deriveWebhookEventId() { return "x"; },
@@ -999,7 +1020,7 @@ check("50-54. production fail-closed provider mode; lazy (no import-time validat
 let providerCallCount = 0;
 function countingProvider(result) {
   return {
-    providerKey: "metafake", channel: "whatsapp", templateResolutionMode: "approved_provider_mapping",
+    providerKey: "metafake", channel: "whatsapp", templateResolutionMode: "internal_template",
     async sendAuthenticationMessage() { providerCallCount += 1; return result; },
     async sendTemplateMessage() { providerCallCount += 1; return result; },
     verifyWebhookSignature() { return false; }, deriveWebhookEventId() { return "x"; },
@@ -1044,7 +1065,7 @@ check("D1-16. canonical outcome decision order (unknown dominates; missing → u
 // ============================================================================
 function throwingProvider(err) {
   return {
-    providerKey: "metafake", channel: "whatsapp", templateResolutionMode: "approved_provider_mapping",
+    providerKey: "metafake", channel: "whatsapp", templateResolutionMode: "internal_template",
     async sendAuthenticationMessage() { providerCallCount += 1; throw err; },
     async sendTemplateMessage() { providerCallCount += 1; throw err; },
     verifyWebhookSignature() { return false; }, deriveWebhookEventId() { return "x"; },
@@ -1110,12 +1131,787 @@ check("E1-24. provider exceptions classified by PROVABLE certainty (ambiguous �
   assert(biz.status === "retry_scheduled", `24: business definitive-retryable throw → retry_scheduled, got ${biz.status}`);
 });
 
+// ============================================================================
+// OUTBOUND INTEGRATION (N1–N40) — runtime selection → gate → mapping → resolved send
+// ============================================================================
+const RUNTIME_SERVICE_FILE = "services/runtimeCommunicationService.ts";
+const OUTBOUND_SERVICE_SRC = "services/metaWhatsAppOutboundService.ts";
+const META_ACCEPTED_BODY = '{"messages":[{"id":"wamid.INTEG"}]}';
+
+function seedTemplate(over = {}) {
+  db.communication_templates.push({
+    id: crypto.randomUUID(), template_key: "vendor_new_lead", channel: "whatsapp", category: "business",
+    description: null, language: "en", version: "1.0", provider_template_name: null, provider_template_id: null,
+    readiness_status: "mock_ready", is_active: true, created_at: "", updated_at: "", ...over,
+  });
+}
+function seedRuntimePolicyRow(over = {}) { db.communication_provider_runtime_policies.push({ ...okPolicy(), ...over }); }
+function seedAccount(over = {}) { db.communication_provider_accounts.push({ ...okAccount(), ...over }); }
+function seedMapping(over = {}) {
+  db.communication_provider_template_mappings.push({
+    id: "map-1", template_key: "vendor_new_lead", channel: "whatsapp", provider_key: "meta_whatsapp_cloud",
+    language: "en", version: "1.0", provider_template_name: "qf_vendor_new_lead", provider_template_id: "tid-1",
+    approval_status: "approved", is_active: true,
+    variables_schema: { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "city", parameterType: "text" }] },
+    ...over,
+  });
+}
+function seedCanary(over = {}) {
+  db.communication_provider_canary_destinations.push({
+    provider_key: "meta_whatsapp_cloud", channel: "whatsapp", destination_hash: M.Phone.hashPhoneE164(DEST),
+    is_active: true, expires_at: null, ...over,
+  });
+}
+function bizIntent(over = {}) {
+  return { type: "vendor_new_lead", lane: "business", channel: "whatsapp", recipient_type: "vendor", recipient_id: "v1",
+    template_key: "vendor_new_lead", variables: { city: "Delhi" }, entity_type: null, entity_id: null,
+    correlation_id: null, idempotency_key: crypto.randomUUID(), priority: "normal", scheduled_at: null,
+    policy_decision_id: null, metadata: {}, ...over };
+}
+function authIntent(over = {}) {
+  return { type: "client_login_otp", lane: "authentication", channel: "whatsapp", recipient_type: "client", recipient_id: null,
+    destination_source: { kind: "ephemeral_auth_destination", destination: DEST },
+    template_key: "client_login_otp", variables: { otp: "483920" }, entity_type: null, entity_id: null,
+    correlation_id: null, idempotency_key: crypto.randomUUID(), priority: "critical", scheduled_at: null,
+    policy_decision_id: null, metadata: {}, ...over };
+}
+/** REAL Meta adapter, instrumented to count bare vs resolved-descriptor dispatch. */
+function spyMetaProvider(transport, build = M) {
+  const p = new build.Provider.MetaCloudWhatsAppProvider(META_CONFIG, transport);
+  const spy = { bare: 0, resolved: 0, lanes: [], lastResolved: null, lastVars: null };
+  const oAuth = p.sendAuthenticationMessage.bind(p), oTpl = p.sendTemplateMessage.bind(p), oRes = p.sendResolvedTemplate.bind(p);
+  p.sendAuthenticationMessage = async (...a) => { spy.bare += 1; return oAuth(...a); };
+  p.sendTemplateMessage = async (...a) => { spy.bare += 1; return oTpl(...a); };
+  p.sendResolvedTemplate = async (to, r, v, o) => { spy.resolved += 1; spy.lanes.push(o && o.lane); spy.lastResolved = r; spy.lastVars = v; return oRes(to, r, v, o); };
+  return { provider: p, spy };
+}
+const okMetaResponse = () => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false });
+function metaService(transport, build = M, coordinator = null) {
+  const { provider, spy } = spyMetaProvider(transport, build);
+  const coord = coordinator ?? new build.Outbound.MetaWhatsAppOutboundCoordinator(completeMetaEnv());
+  const svc = new build.Comm.CommunicationService(provider, new build.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), coord);
+  return { svc, spy, provider };
+}
+/**
+ * The REAL coordinator, instrumented. `afterInitial` simulates an operator acting in
+ * the window between the early preflight and the network request (pause, disable
+ * outbound, un-ready the account, expire the canary row) — the exact race the FINAL
+ * network-boundary gate exists to close.
+ */
+function countingCoordinator(build = M, hooks = {}) {
+  const real = new build.Outbound.MetaWhatsAppOutboundCoordinator(completeMetaEnv());
+  const counts = { initial: 0, final: 0 };
+  return {
+    counts,
+    async prepareInitialOutbound(input) {
+      counts.initial += 1;
+      const result = await real.prepareInitialOutbound(input);
+      if (hooks.afterInitial) hooks.afterInitial();
+      return result;
+    },
+    async prepareFinalOutbound(input) {
+      counts.final += 1;
+      return real.prepareFinalOutbound(input);
+    },
+  };
+}
+/** Fully-green Meta infrastructure: active policy, ready account, approved active mapping. */
+function seedGreenMetaInfra(over = {}) {
+  resetDb();
+  seedTemplate(over.template);
+  seedRuntimePolicyRow(over.policy);
+  seedAccount(over.account);
+  if (over.mapping !== null) seedMapping(over.mapping);
+  if (over.canary) seedCanary(over.canary);
+}
+
+check("N1-6. the runtime path uses the selector; prod fail-closed; Meta never becomes mock", () => {
+  const R = M.Runtime;
+  M.Comm.clearWhatsAppProviderOverride();
+  // 1 — the runtime resolution boundary genuinely consults the selector.
+  assert(/selectWhatsAppProvider\(/.test(readFileSync(RUNTIME_SERVICE_FILE, "utf8")), "1: runtime path uses selectWhatsAppProvider");
+  // 2 — non-production implicit mock reaches mock.
+  const implicit = R.resolveRuntimeWhatsAppProvider({});
+  assert(implicit.ok && implicit.data.providerKey === "mock", "2: non-prod implicit mock");
+  // 3 — production missing mode fails closed.
+  const prodMissing = R.resolveRuntimeWhatsAppProvider({ NODE_ENV: "production" });
+  assert(!prodMissing.ok && prodMissing.code === R.RUNTIME_PROVIDER_UNAVAILABLE, "3: production missing mode fails closed");
+  // 4 — explicit production mock reaches mock.
+  const prodMock = R.resolveRuntimeWhatsAppProvider({ NODE_ENV: "production", WHATSAPP_PROVIDER_MODE: "mock" });
+  assert(prodMock.ok && prodMock.data.providerKey === "mock", "4: explicit production mock");
+  // 5 — explicit Meta reaches the Meta candidate.
+  const meta = R.resolveRuntimeWhatsAppProvider(completeMetaEnv({ NODE_ENV: "production" }));
+  assert(meta.ok && meta.data.providerKey === "meta_whatsapp_cloud" && meta.data.templateResolutionMode === "approved_provider_mapping", "5: explicit Meta candidate");
+  // 6 — invalid Meta config NEVER reaches mock.
+  const bad = R.resolveRuntimeWhatsAppProvider({ WHATSAPP_PROVIDER_MODE: "meta_cloud" });
+  assert(!bad.ok, "6: invalid Meta config fails closed");
+  assert(!("data" in bad), "6: no provider on failure (never a mock)");
+  // The explicit override always wins (test-injection compatibility preserved).
+  const mockProvider = new M.Mock.MockWhatsAppProvider();
+  M.Comm.setActiveWhatsAppProvider(mockProvider);
+  const overridden = R.resolveRuntimeWhatsAppProvider(completeMetaEnv());
+  assert(overridden.ok && overridden.data === mockProvider, "override wins over selection");
+  M.Comm.clearWhatsAppProviderOverride();
+  // Real auth/business callers go through the runtime factory.
+  for (const f of ["services/supabaseSendSmsHookService.ts", "services/vendorVerificationService.ts", "services/vendorPasswordResetService.ts"]) {
+    assert(/createRuntimeCommunicationService\(/.test(readFileSync(f, "utf8")), `${f} uses the runtime factory`);
+    assert(!/new CommunicationService\(\)/.test(readFileSync(f, "utf8")), `${f} no longer constructs a default CommunicationService`);
+  }
+});
+
+check("N7-15. Meta send chain: gate + mapping run, resolved dispatch only, zero calls on any gate failure", async () => {
+  // 7-11 — happy path: resolved dispatch, never a bare method.
+  seedGreenMetaInfra();
+  let t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  let { svc, spy } = metaService(t);
+  let res = await svc.send(bizIntent());
+  assert(res.ok, `happy-path send ok: ${res.ok ? "" : res.code}`);
+  assert(spy.bare === 0, "7-8: bare sendAuthenticationMessage/sendTemplateMessage never used for Meta");
+  assert(spy.resolved === 1, "11: sendResolvedTemplate called exactly once");
+  assert(spy.lastResolved.providerTemplateName === "qf_vendor_new_lead" && spy.lastResolved.mappingId === "map-1", "9: approved mapping resolved");
+  assert(t.calls.length === 1 && t.calls[0].url.endsWith("/PN_123/messages"), "10-11: Meta network call only after gate + mapping pass");
+  const row = db.communication_messages[0];
+  assert(row.provider === "meta_whatsapp_cloud", "persisted provider is the runtime-selected one");
+  assert(row.provider_template_mapping_id === "map-1" && row.provider_template_version === "1.0", "mapping identity pinned for restart-safe retry");
+
+  // 12 — missing mapping → zero Meta calls, zero ledger rows.
+  seedGreenMetaInfra({ mapping: null });
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc, spy } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(!res.ok && res.code === "META_APPROVED_MAPPING_UNRESOLVED", `12: missing mapping fails closed, got ${res.ok ? "ok" : res.code}`);
+  assert(t.calls.length === 0 && spy.resolved === 0, "12: zero Meta calls");
+  assert(db.communication_messages.length === 0, "12: zero ledger rows (fails before persist)");
+
+  // 13 — runtime gate failure (outbound disabled) → zero Meta calls, zero ledger rows.
+  seedGreenMetaInfra({ policy: { outbound_enabled: false } });
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc, spy } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(!res.ok && res.code === "META_RUNTIME_GATE_BLOCKED", `13: gate blocked, got ${res.ok ? "ok" : res.code}`);
+  assert(t.calls.length === 0 && db.communication_messages.length === 0, "13: zero Meta calls, zero ledger rows");
+
+  // 14 — canary activation without an allowlisted destination → zero Meta calls.
+  seedGreenMetaInfra({ policy: { activation_status: "canary" } });
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(!res.ok && res.code === "META_RUNTIME_GATE_BLOCKED", "14: canary without allowlist fails closed");
+  assert(t.calls.length === 0 && db.communication_messages.length === 0, "14: zero Meta calls");
+  // …and WITH an allowlisted destination hash it proceeds.
+  seedGreenMetaInfra({ policy: { activation_status: "canary" }, canary: {} });
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc, spy } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(res.ok && spy.resolved === 1, "14: canary + allowlisted hash dispatches");
+
+  // 15 — provider-account readiness failure → zero Meta calls.
+  seedGreenMetaInfra({ account: { webhook_status: "pending" } });
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(!res.ok && res.code === "META_RUNTIME_GATE_BLOCKED", "15: unready provider account fails closed");
+  assert(t.calls.length === 0 && db.communication_messages.length === 0, "15: zero Meta calls");
+});
+
+check("N16-22. auth Meta path: auth timeout, OTP request-memory only, never persisted, single-shot", async () => {
+  const authTemplate = { template_key: "client_login_otp", category: "authentication", language: "en" };
+  const authMapping = { id: "map-otp", template_key: "client_login_otp", provider_template_name: "qf_login_otp",
+    variables_schema: { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "otp", parameterType: "text" }] } };
+  for (const [n, tplKey] of [[16, "client_login_otp"], [17, "vendor_whatsapp_verify"], [18, "vendor_password_reset"]]) {
+    seedGreenMetaInfra({ template: { ...authTemplate, template_key: tplKey }, mapping: { ...authMapping, template_key: tplKey } });
+    const t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+    const { svc, spy } = metaService(t);
+    const res = await svc.send(authIntent({ template_key: tplKey, type: tplKey }));
+    assert(res.ok, `${n}: auth send ok for ${tplKey}`);
+    assert(spy.lanes[0] === "authentication", `${n}: dispatched on the authentication lane`);
+    assert(t.calls[0].timeoutMs === META_CONFIG.authHttpTimeoutMs, `${n}: auth send uses the AUTH timeout (${t.calls[0].timeoutMs})`);
+    assert(spy.bare === 0 && spy.resolved === 1, `${n}: resolved-descriptor dispatch only`);
+  }
+  // 19 — the OTP reaches the binding from request memory (it is in the rendered body).
+  const t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  seedGreenMetaInfra({ template: authTemplate, mapping: authMapping });
+  const { svc, spy } = metaService(t);
+  const res = await svc.send(authIntent());
+  assert(res.ok && spy.lastVars.otp === "483920", "19: OTP reaches binding from request memory");
+  assert(JSON.parse(t.calls[0].body).template.components[0].parameters[0].text === "483920", "19: OTP rendered into the Meta body");
+  // 20 — the OTP is NEVER persisted on the ledger row.
+  const row = db.communication_messages[0];
+  assert(JSON.stringify(row.variables) === "{}", "20: auth lane persists no variables");
+  assert(!JSON.stringify(row).includes("483920"), "20: OTP never persisted");
+  // 21 — auth unknown outcome → outcome_unknown (no retry).
+  seedGreenMetaInfra({ template: authTemplate, mapping: authMapping });
+  const t2 = fakeTransport(() => ({ kind: "aborted" }));
+  const r2 = await metaService(t2).svc.send(authIntent());
+  assert(r2.ok && r2.data.status === "outcome_unknown", `21: auth unknown outcome → outcome_unknown, got ${r2.ok ? r2.data.status : r2.code}`);
+  assert(db.communication_messages[0].next_retry_at === null, "21: no next_retry_at");
+  // 22 — auth never redispatches (single-shot).
+  const authRow = db.communication_messages[0];
+  authRow.status = "retry_scheduled";
+  const again = await metaService(fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }))).svc.dispatchPersistedMessage(authRow.id);
+  assert(!again.ok, "22: authentication lane never re-dispatches");
+});
+
+check("N23-28. business Meta path: business timeout, retry rules, restart-safe deterministic mapping", async () => {
+  // 23 — business send uses the BUSINESS timeout.
+  seedGreenMetaInfra();
+  let t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  let { svc, spy } = metaService(t);
+  let res = await svc.send(bizIntent());
+  assert(res.ok && spy.lanes[0] === "business", "23: business lane");
+  assert(t.calls[0].timeoutMs === META_CONFIG.businessHttpTimeoutMs, "23: business send uses the BUSINESS timeout");
+
+  // 24 — an explicit definitive retryable failure keeps the existing retry scheduling.
+  seedGreenMetaInfra();
+  // A PROVEN pre-connect failure (a thrown ENOTFOUND) is definitive + safely retryable.
+  t = fakeTransport(() => { throw Object.assign(new Error("dns"), { code: "ENOTFOUND" }); });
+  ({ svc } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(res.ok && res.data.status === "retry_scheduled", `24: proven pre-connect throw → retry_scheduled, got ${res.ok ? res.data.status : res.code}`);
+
+  // 25 — business unknown outcome never retries.
+  seedGreenMetaInfra();
+  t = fakeTransport(() => ({ kind: "aborted" }));
+  ({ svc } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(res.ok && res.data.status === "outcome_unknown" && res.data.next_retry_at === null, "25: business unknown outcome → outcome_unknown, no retry");
+
+  // 26-28 — RESTART-SAFE retry: no in-memory descriptor; the pinned mapping is re-resolved.
+  seedGreenMetaInfra();
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc, spy } = metaService(t));
+  res = await svc.send(bizIntent());
+  assert(res.ok, "initial business send ok");
+  const msg = db.communication_messages[0];
+  const providerBefore = msg.provider, channelBefore = msg.channel;
+  msg.status = "retry_scheduled"; msg.attempt_count = 1; msg.next_retry_at = new Date(Date.now() - 1000).toISOString();
+  // A FRESH service (fresh process): no in-memory resolved descriptor whatsoever.
+  const t2 = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  const fresh = metaService(t2);
+  const retried = await fresh.svc.dispatchPersistedMessage(msg.id);
+  assert(retried.ok, `26: restart-safe retry dispatched: ${retried.ok ? "" : retried.code}`);
+  assert(fresh.spy.resolved === 1 && fresh.spy.bare === 0, "26: retry used the resolved-descriptor path");
+  assert(fresh.spy.lastResolved.mappingId === "map-1" && fresh.spy.lastResolved.providerTemplateName === "qf_vendor_new_lead", "26: retry reproduced the pinned mapping deterministically");
+  const after = db.communication_messages.find((m) => m.id === msg.id);
+  assert(after.provider === providerBefore, "27: retry never changes provider");
+  assert(after.channel === channelBefore, "28: retry never changes channel");
+
+  // A superseded/de-activated pinned mapping fails closed on retry — never silently swapped.
+  seedGreenMetaInfra();
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  ({ svc } = metaService(t));
+  await svc.send(bizIntent());
+  const m2 = db.communication_messages[0];
+  m2.status = "retry_scheduled"; m2.attempt_count = 1; m2.next_retry_at = new Date(Date.now() - 1000).toISOString();
+  db.communication_provider_template_mappings[0].is_active = false;
+  const t3 = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  const blocked = metaService(t3);
+  const blockedRes = await blocked.svc.dispatchPersistedMessage(m2.id);
+  assert(blockedRes.ok && blockedRes.data.status === "failed", "de-activated pinned mapping fails closed on retry");
+  assert(t3.calls.length === 0 && blocked.spy.resolved === 0, "…with zero Meta calls");
+  assert(blockedRes.data.next_retry_at === null, "…and no retry scheduled for a standing configuration failure");
+});
+
+check("N29-36. mapping gates block the network; approved active exact mapping reaches binding", async () => {
+  const cases = [
+    [29, { approval_status: "draft", is_active: false }],
+    [30, { approval_status: "submitted", is_active: false }],
+    [31, { approval_status: "rejected", is_active: false }],
+    [32, { approval_status: "approved", is_active: false }],
+    [33, { provider_key: "mock" }],
+    [34, { language: "hi" }],
+  ];
+  for (const [n, over] of cases) {
+    seedGreenMetaInfra({ mapping: over });
+    const t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+    const { svc, spy } = metaService(t);
+    const res = await svc.send(bizIntent());
+    assert(!res.ok && res.code === "META_APPROVED_MAPPING_UNRESOLVED", `${n}: mapping ${JSON.stringify(over)} blocks`);
+    assert(t.calls.length === 0 && spy.resolved === 0 && db.communication_messages.length === 0, `${n}: zero network calls`);
+  }
+  // 35 — approved active exact mapping reaches deterministic binding.
+  seedGreenMetaInfra();
+  let t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  let res = await metaService(t).svc.send(bizIntent());
+  assert(res.ok, "35: approved active exact mapping dispatches");
+  const body = JSON.parse(t.calls[0].body);
+  assert(body.template.name === "qf_vendor_new_lead" && body.template.components[0].parameters[0].text === "Delhi", "35: declared position binding rendered");
+  // 36 — a render failure (missing declared source key) produces ZERO network calls.
+  seedGreenMetaInfra({ mapping: { variables_schema: { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "not_supplied", parameterType: "text" }] } } });
+  t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  const { svc, spy } = metaService(t);
+  res = await svc.send(bizIntent());
+  assert(res.ok && res.data.status === "failed" && /RENDER/.test(res.data.failure_code), `36: render failure recorded, got ${res.ok ? res.data.failure_code : res.code}`);
+  assert(t.calls.length === 0, "36: zero network calls on render failure");
+  assert(spy.resolved === 1, "36: the failure happened inside the resolved-descriptor path (pre-network)");
+});
+
+check("N37-40. provider identity fences hold across mock and Meta; no reroute, no rewrite", async () => {
+  // 37 — a mock-owned message can never dispatch through Meta.
+  seedGreenMetaInfra();
+  const t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+  const { svc, spy } = metaService(t);
+  const mockOwned = seedMessage({ provider: "mock", template_key: "vendor_new_lead" });
+  const r1 = await svc.dispatchMessage(mockOwned, { rawVariables: { city: "Delhi" } });
+  assert(!r1.ok && r1.code === "UNSUPPORTED_DISPATCH_PROVIDER", "37: mock-owned message cannot Meta dispatch");
+  assert(t.calls.length === 0 && spy.resolved === 0, "37: zero provider calls");
+  assert(db.communication_messages.find((m) => m.id === mockOwned.id).provider === "mock", "40: message.provider never rewritten");
+  // 38 — a Meta-owned message can never dispatch through mock.
+  resetDb();
+  const metaOwned = seedMessage({ provider: "meta_whatsapp_cloud", template_key: "vendor_new_lead" });
+  const mockSvc = new M.Comm.CommunicationService(new M.Mock.MockWhatsAppProvider(), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+  const r2 = await mockSvc.dispatchMessage(metaOwned, { rawVariables: {} });
+  assert(!r2.ok && r2.code === "UNSUPPORTED_DISPATCH_PROVIDER", "38: Meta-owned message cannot mock dispatch");
+  assert(db.communication_messages.find((m) => m.id === metaOwned.id).provider === "meta_whatsapp_cloud", "39-40: no reroute, no rewrite");
+});
+
+check("N-boundary. the coordinator prepares transport only — no authorization, OTP, n8n or Jarvis", () => {
+  const src = stripTs(readFileSync(OUTBOUND_SERVICE_SRC, "utf8"));
+  assert(!/n8n/i.test(src) && !/jarvis/i.test(src), "no n8n / Jarvis");
+  assert(!/generateOtp|verifyOtp|policy_decision|authorize/i.test(src), "no OTP generation/verification, no authorization");
+  assert(!/sendSms|smsFallback|SmsProvider|fallbackChannel/i.test(src), "no SMS fallback");
+  // EARLY preflight ordering: outbound config → runtime gate → approved mapping.
+  const raw = readFileSync(OUTBOUND_SERVICE_SRC, "utf8");
+  assert(raw.indexOf("resolveOutboundMetaConfig") < raw.indexOf("evaluateMetaOutboundGateForMessage"), "config before gate");
+  const initialBody = raw.slice(raw.indexOf("async prepareInitialOutbound"), raw.indexOf("async prepareFinalOutbound"));
+  assert(initialBody.indexOf("this.gate(input.destinationHash") < initialBody.indexOf("resolveApprovedMetaMapping("), "early preflight: gate before mapping");
+  // FINAL fence ordering: pinned mapping → FINAL gate → fingerprint verification.
+  const finalBody = raw.slice(raw.indexOf("async prepareFinalOutbound"));
+  assert(finalBody.indexOf("resolveApprovedMetaMappingById(") < finalBody.indexOf("this.gate(input.destinationHash"), "final fence: pinned mapping before gate");
+  assert(finalBody.indexOf("this.gate(input.destinationHash") < finalBody.indexOf("mappingFingerprintMatches("), "final fence: gate before fingerprint");
+  // CommunicationService branches on the CAPABILITY, never on a provider-key literal.
+  const comm = stripTs(readFileSync(COMM_SERVICE_SRC, "utf8"));
+  assert(/requiresApprovedMapping\(\)/.test(comm) && /supportsResolvedTemplate\(/.test(comm), "capability branch present");
+  assert(!/meta_whatsapp_cloud/.test(comm), "no provider-key literal in CommunicationService");
+});
+
+// ============================================================================
+// SAFETY CORRECTION — MAPPING REPLAY INTEGRITY (P1–P11)
+// ============================================================================
+const FINGERPRINT_SRC = "lib/communication/providerMappingFingerprint.ts";
+const CANONICAL_SRC = "lib/communication/canonicalJson.ts";
+const DEADLINE_SRC = "lib/auth/hookDeadline.ts";
+const HOOK_SERVICE_SRC = "services/supabaseSendSmsHookService.ts";
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** Initial Meta business send, then a FRESH-process retry after `mutate(db)`. */
+async function retryAfter(mutate, over = {}) {
+  seedGreenMetaInfra(over);
+  const first = metaService(fakeTransport(okMetaResponse));
+  const sent = await first.svc.send(bizIntent());
+  if (!sent.ok) throw new Error(`initial send failed: ${sent.code}`);
+  const msg = db.communication_messages[0];
+  const pinned = { ...msg };
+  msg.status = "retry_scheduled";
+  msg.attempt_count = 1;
+  msg.next_retry_at = new Date(Date.now() - 1000).toISOString();
+  mutate(db);
+  const transport = fakeTransport(okMetaResponse);
+  const fresh = metaService(transport, M);
+  const retried = await fresh.svc.dispatchPersistedMessage(msg.id);
+  return { retried, transport, spy: fresh.spy, pinned, row: db.communication_messages.find((m) => m.id === msg.id) };
+}
+const firstMapping = (d) => d.communication_provider_template_mappings[0];
+
+check("P1-3. canonical JSON is stable; the fingerprint is SHA-256 lowercase hex over the mapping content", () => {
+  const C = M.Canonical, F = M.Fingerprint;
+  // Key INSERTION order must never change the canonical form, at any nesting depth.
+  const a = { b: 1, a: { z: [1, { q: 2, p: 3 }], y: "s" } };
+  const b = { a: { y: "s", z: [1, { p: 3, q: 2 }] }, b: 1 };
+  assert(C.canonicalJsonStringify(a) === C.canonicalJsonStringify(b), "key order irrelevant (nested)");
+  // Array order IS significant.
+  assert(C.canonicalJsonStringify([1, 2]) !== C.canonicalJsonStringify([2, 1]), "array order significant");
+  // The serializer is not merely JSON.stringify.
+  assert(C.canonicalJsonStringify({ b: 1, a: 2 }) === '{"a":2,"b":1}', "keys sorted");
+  assert(JSON.stringify({ b: 1, a: 2 }) === '{"b":1,"a":2}', "…unlike JSON.stringify");
+  const src = stripTs(readFileSync(FINGERPRINT_SRC, "utf8"));
+  assert(/sha256/.test(src) && /digest\("hex"\)/.test(src), "sha256 lowercase hex");
+  assert(!/accessToken|appSecret|verifyToken|otp|destination/i.test(src), "no secret/OTP/destination in the fingerprint input");
+  const resolved = { mappingId: "m1", internalTemplateKey: "t", providerTemplateName: "p", providerTemplateId: null, language: "en", version: "1.0", variablesSchema: { bindingVersion: 1, bindings: [] }, providerKey: "meta_whatsapp_cloud", channel: "whatsapp" };
+  assert(SHA256_HEX.test(F.computeMappingFingerprint(resolved)), "fingerprint is 64 lowercase hex chars");
+  // Every dispatch-critical field is covered.
+  const base = F.computeMappingFingerprint(resolved);
+  for (const over of [
+    { mappingId: "m2" }, { internalTemplateKey: "t2" }, { providerTemplateName: "p2" },
+    { providerTemplateId: "x" }, { language: "hi" }, { version: "2.0" },
+    { providerKey: "mock" }, { channel: "sms" },
+    { variablesSchema: { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "a", parameterType: "text" }] } },
+  ]) {
+    assert(F.computeMappingFingerprint({ ...resolved, ...over }) !== base, `fingerprint covers ${Object.keys(over)[0]}`);
+  }
+  // A schema that differs only by key insertion order is the SAME mapping.
+  const s1 = { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "a", parameterType: "text" }] };
+  const s2 = { bindings: [{ parameterType: "text", sourceKey: "a", position: 1, component: "body" }], bindingVersion: 1 };
+  assert(F.computeMappingFingerprint({ ...resolved, variablesSchema: s1 }) === F.computeMappingFingerprint({ ...resolved, variablesSchema: s2 }), "re-ordered schema keys are the same mapping");
+  // Exact equality only.
+  const fp = F.computeMappingFingerprint(resolved);
+  assert(F.mappingFingerprintMatches(fp, fp) === true, "exact match");
+  assert(F.mappingFingerprintMatches(fp, null) === false && F.mappingFingerprintMatches(null, fp) === false, "missing never matches");
+  assert(F.mappingFingerprintMatches(fp, fp.toUpperCase()) === false, "case-shifted never matches");
+  assert(F.mappingFingerprintMatches(fp.slice(0, 63), fp.slice(0, 63)) === false, "malformed never matches");
+});
+
+check("P1-4. initial Meta send pins mapping id + version + fingerprint; identical mapping replays", async () => {
+  seedGreenMetaInfra();
+  const t = fakeTransport(okMetaResponse);
+  const { svc } = metaService(t);
+  const res = await svc.send(bizIntent());
+  assert(res.ok, "initial send ok");
+  const row = db.communication_messages[0];
+  assert(row.provider_template_mapping_id === "map-1", "1: mapping id persisted");
+  assert(row.provider_template_version === "1.0", "2: mapping version persisted");
+  assert(SHA256_HEX.test(row.provider_template_mapping_fingerprint), "3: mapping fingerprint persisted (sha256 hex)");
+  // The pinned fingerprint is the fingerprint OF THE ROW THAT WAS SENT.
+  const expected = M.Fingerprint.computeMappingFingerprint({
+    mappingId: "map-1", internalTemplateKey: "vendor_new_lead", providerTemplateName: "qf_vendor_new_lead",
+    providerTemplateId: "tid-1", language: "en", version: "1.0",
+    variablesSchema: firstMapping(db).variables_schema, providerKey: "meta_whatsapp_cloud", channel: "whatsapp",
+  });
+  assert(row.provider_template_mapping_fingerprint === expected, "3: fingerprint covers the exact dispatched mapping");
+
+  // 4 — an UNCHANGED mapping replays cleanly through fingerprint verification.
+  const clean = await retryAfter(() => {});
+  assert(clean.retried.ok && clean.spy.resolved === 1, "4: identical mapping retry dispatches");
+  assert(clean.transport.calls.length === 1, "4: exactly one Meta request");
+  assert(clean.row.provider_template_mapping_fingerprint === clean.pinned.provider_template_mapping_fingerprint, "4: fingerprint unchanged");
+});
+
+check("P5-11. an in-place mapping edit under the same id/version blocks the retry, with zero Meta calls", async () => {
+  const cases = [
+    [5, "META_MAPPING_FINGERPRINT_MISMATCH", (d) => { firstMapping(d).provider_template_name = "qf_hijacked"; }],
+    [6, "META_MAPPING_FINGERPRINT_MISMATCH", (d) => { firstMapping(d).variables_schema = { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "city", parameterType: "text" }, { component: "body", position: 2, sourceKey: "city", parameterType: "text" }] }; }],
+    [6.1, "META_MAPPING_FINGERPRINT_MISMATCH", (d) => { firstMapping(d).provider_template_id = "tid-swapped"; }],
+    [7, "META_APPROVED_MAPPING_UNRESOLVED", (d) => { firstMapping(d).language = "hi"; }],
+    [8, "META_APPROVED_MAPPING_UNRESOLVED", (d) => { firstMapping(d).provider_key = "mock"; }],
+    [9, "META_MAPPING_IDENTITY_CHANGED", (d) => { firstMapping(d).version = "2.0"; }],
+  ];
+  for (const [n, code, mutate] of cases) {
+    const { retried, transport, spy, row } = await retryAfter(mutate);
+    assert(retried.ok, `${n}: dispatch resolved to a ledger state`);
+    assert(row.failure_code === code, `${n}: expected ${code}, got ${row.failure_code}`);
+    assert(transport.calls.length === 0 && spy.resolved === 0, `${n}/10: zero Meta calls`);
+    assert(row.status === "failed", `${n}/11: deterministic failed, got ${row.status}`);
+    assert(row.status !== "retry_scheduled" && row.status !== "outcome_unknown", `${n}/11: never retry_scheduled, never outcome_unknown`);
+    assert(row.next_retry_at === null, `${n}/11: no retry scheduled`);
+  }
+  // A message pinned WITHOUT a fingerprint (pre-column row) also fails closed.
+  const noFp = await retryAfter((d) => { d.communication_messages[0].provider_template_mapping_fingerprint = null; });
+  assert(noFp.row.failure_code === "META_MAPPING_FINGERPRINT_MISSING", `missing fingerprint fails closed, got ${noFp.row.failure_code}`);
+  assert(noFp.transport.calls.length === 0, "…with zero Meta calls");
+  // As does a message with no pinned mapping identity at all.
+  const noId = await retryAfter((d) => { d.communication_messages[0].provider_template_mapping_id = null; });
+  assert(noId.row.failure_code === "META_MAPPING_IDENTITY_MISSING", `missing identity fails closed, got ${noId.row.failure_code}`);
+  assert(noId.transport.calls.length === 0, "…with zero Meta calls");
+});
+
+// ============================================================================
+// SAFETY CORRECTION — FINAL NETWORK-BOUNDARY GATE (P12–P20)
+// ============================================================================
+check("P12-15,19-20. an operator action AFTER the early preflight blocks the request (race closed)", async () => {
+  const races = [
+    [12, "runtime paused", {}, (d) => { d.communication_provider_runtime_policies[0].activation_status = "paused"; }],
+    [13, "outbound disabled", {}, (d) => { d.communication_provider_runtime_policies[0].outbound_enabled = false; }],
+    [14, "provider account un-readied", {}, (d) => { d.communication_provider_accounts[0].health_status = "unhealthy"; }],
+    [14.1, "phone-number id changed", {}, (d) => { d.communication_provider_accounts[0].phone_number_reference = "PN_OTHER"; }],
+    [15, "canary row expired", { policy: { activation_status: "canary" }, canary: {} }, (d) => { d.communication_provider_canary_destinations[0].expires_at = new Date(Date.now() - 1000).toISOString(); }],
+    [15.1, "canary row de-activated", { policy: { activation_status: "canary" }, canary: {} }, (d) => { d.communication_provider_canary_destinations[0].is_active = false; }],
+  ];
+  for (const [n, label, infra, pause] of races) {
+    seedGreenMetaInfra(infra);
+    const transport = fakeTransport(okMetaResponse);
+    // The early preflight passes; the operator acts; THEN the request would be issued.
+    const coord = countingCoordinator(M, { afterInitial: () => pause(db) });
+    const { svc, spy } = metaService(transport, M, coord);
+    const res = await svc.send(bizIntent());
+    assert(res.ok, `${n} (${label}): resolved to a ledger state`);
+    assert(coord.counts.initial === 1 && coord.counts.final === 1, `${n}: early preflight AND final gate both ran`);
+    assert(transport.calls.length === 0 && spy.resolved === 0, `${n} (${label}): ZERO Meta HTTP requests`);
+    const row = db.communication_messages[0];
+    assert(row.failure_code === "META_FINAL_RUNTIME_GATE_BLOCKED", `${n}: final gate reason, got ${row.failure_code}`);
+    assert(row.status === "failed", `19: deterministic failure, got ${row.status}`);
+    assert(row.status !== "outcome_unknown", "19: never outcome_unknown — no provider request occurred");
+    assert(row.status !== "retry_scheduled" && row.status !== "dead_letter", "19: no retry, no dead_letter from the gate alone");
+    assert(row.next_retry_at === null, "20: next_retry_at is null");
+  }
+});
+
+check("P16-18. the final gate is invoked on initial auth send, initial business send, and restart retry", async () => {
+  const authTpl = { template_key: "client_login_otp", category: "authentication", language: "en" };
+  const authMap = { id: "map-otp", template_key: "client_login_otp", provider_template_name: "qf_login_otp",
+    variables_schema: { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "otp", parameterType: "text" }] } };
+
+  // 16 — INITIAL AUTH SEND: a pause after the preflight stops the OTP at the boundary.
+  seedGreenMetaInfra({ template: authTpl, mapping: authMap });
+  let transport = fakeTransport(okMetaResponse);
+  let coord = countingCoordinator(M, { afterInitial: () => { db.communication_provider_runtime_policies[0].activation_status = "paused"; } });
+  let { svc, spy } = metaService(transport, M, coord);
+  let res = await svc.send(authIntent());
+  assert(coord.counts.final === 1, "16: final gate ran on the initial auth send");
+  assert(res.ok && res.data.status === "failed" && transport.calls.length === 0 && spy.resolved === 0, "16: auth OTP never left the process");
+  assert(db.communication_messages[0].failure_code === "META_FINAL_RUNTIME_GATE_BLOCKED", "16: blocked by the final gate");
+
+  // 17 — INITIAL BUSINESS SEND: the final gate runs even on the happy path.
+  seedGreenMetaInfra();
+  transport = fakeTransport(okMetaResponse);
+  coord = countingCoordinator(M);
+  ({ svc, spy } = metaService(transport, M, coord));
+  res = await svc.send(bizIntent());
+  assert(res.ok && spy.resolved === 1, "17: business send dispatches");
+  assert(coord.counts.initial === 1 && coord.counts.final === 1, "17: early preflight once, final gate once");
+
+  // 18 — RESTART-SAFE BUSINESS RETRY: the final gate runs again, with no early preflight.
+  const msg = db.communication_messages[0];
+  msg.status = "retry_scheduled"; msg.attempt_count = 1; msg.next_retry_at = new Date(Date.now() - 1000).toISOString();
+  const retryTransport = fakeTransport(okMetaResponse);
+  const retryCoord = countingCoordinator(M);
+  const fresh = metaService(retryTransport, M, retryCoord);
+  const retried = await fresh.svc.dispatchPersistedMessage(msg.id);
+  assert(retried.ok && fresh.spy.resolved === 1, "18: restart retry dispatches");
+  assert(retryCoord.counts.final === 1, "18: final gate ran on the restart retry");
+  assert(retryCoord.counts.initial === 0, "18: no early preflight on a retry — the pinned identity is the source of truth");
+
+  // The required send order is structural, not incidental.
+  const comm = readFileSync(COMM_SERVICE_SRC, "utf8");
+  const claim = comm.indexOf("const claim = await this.claimMessageForDispatch(message);");
+  const invoke = comm.indexOf("const result = await this.invokeProvider(claimed, destination, providerTemplate, options);");
+  assert(claim > 0 && invoke > claim, "atomic claim precedes provider invocation");
+  const body = comm.slice(comm.indexOf("private async invokeProvider("));
+  assert(body.indexOf("prepareFinalOutbound(") < body.indexOf("sendResolvedTemplate("), "final preparation precedes the provider request");
+});
+
+// ============================================================================
+// SAFETY CORRECTION — AUTH outcome_unknown HTTP CONTRACT (P21–P27)
+// ============================================================================
+const AUTH_USER_ID = "11111111-1111-4111-8111-111111111111";
+const HOOK_SECRET_ENV = "SEND_SMS_HOOK_SECRETS";
+const AUTH_TEMPLATE = { template_key: "client_login_otp", category: "authentication", language: "en" };
+const AUTH_MAPPING = { id: "map-otp", template_key: "client_login_otp", provider_template_name: "qf_login_otp",
+  variables_schema: { bindingVersion: 1, bindings: [{ component: "body", position: 1, sourceKey: "otp", parameterType: "text" }] } };
+
+function passThroughVerifier() {
+  return { verifierKey: "test-passthrough", verify(rawBody) { try { return { ok: true, payload: JSON.parse(rawBody) }; } catch { return { ok: false }; } } };
+}
+function enableOtpAutomation() {
+  db.communication_automation_catalog.push({
+    automation_key: "client_login_otp", lane: "authentication", channel: "whatsapp",
+    template_key: "client_login_otp", readiness_status: "active",
+    provider_required: "meta_whatsapp_cloud", is_operationally_enabled: true,
+  });
+}
+function fullMetaProcessEnv() {
+  const env = completeMetaEnv();
+  const previous = {};
+  for (const [k, v] of Object.entries(env)) { previous[k] = process.env[k]; process.env[k] = v; }
+  previous[HOOK_SECRET_ENV] = process.env[HOOK_SECRET_ENV];
+  process.env[HOOK_SECRET_ENV] = crypto.randomBytes(24).toString("base64");
+  return () => { for (const [k, v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } };
+}
+function hookRequest(webhookId, deadline) {
+  const rawBody = JSON.stringify({ user: { id: AUTH_USER_ID, phone: DEST.slice(1) }, sms: { otp: "483920" } });
+  const h = { "webhook-id": webhookId, "webhook-timestamp": String(Math.floor(Date.now() / 1000)), "webhook-signature": "v1,placeholder" };
+  return { rawBody, getHeader: (n) => (n.toLowerCase() in h ? h[n.toLowerCase()] : null), deadline };
+}
+const retryAfterHeader = (r) => Object.entries(r.headers).find(([k]) => k.toLowerCase() === "retry-after")?.[1];
+
+check("P21-27. an uncertain auth outcome is delivery_uncertain: no Retry-After, no resend, no fallback", async () => {
+  const restoreEnv = fullMetaProcessEnv();
+  const previousVerifier = M.HookLib.getActiveSendSmsHookVerifier();
+  try {
+    seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+    enableOtpAutomation();
+    M.HookLib.setActiveSendSmsHookVerifier(passThroughVerifier());
+    // The runtime factory resolves THIS provider; its transport times out mid-flight.
+    const transport = fakeTransport(() => ({ kind: "aborted" }));
+    const { provider, spy } = spyMetaProvider(transport);
+    M.Comm.setActiveWhatsAppProvider(provider);
+
+    // 21 — the auth Meta timeout parks the message in outcome_unknown.
+    const first = await M.HookSvc.handleSupabaseSendSmsHook(hookRequest("wh_uncertain"));
+    const row = db.communication_messages[0];
+    assert(row.status === "outcome_unknown", `21: expected outcome_unknown, got ${row.status}`);
+    assert(row.next_retry_at === null, "21: no retry scheduled");
+
+    // 22 — the hook maps it to an EXPLICIT delivery-uncertain outcome, not in_progress.
+    assert(first.kind === M.HookSvc.SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN, `22: expected delivery_uncertain, got ${first.kind}`);
+    assert(first.kind !== M.HookSvc.SendSmsHookOutcomeKind.IN_PROGRESS, "22: never in_progress");
+    assert(first.kind !== M.HookSvc.SendSmsHookOutcomeKind.DELIVERED, "22: never reported as delivered");
+
+    // 23 — the response carries NO Retry-After and no sensitive value.
+    const r1 = M.HookSvc.sendSmsHookHttpResponse(first);
+    assert(retryAfterHeader(r1) === undefined, "23: no Retry-After on an uncertain outcome");
+    assert(r1.body && r1.body.ok === false && r1.body.code === "delivery_uncertain", `23: safe generic body, got ${JSON.stringify(r1.body)}`);
+    const blob = `${JSON.stringify(r1.body)}|${JSON.stringify(r1.headers)}`;
+    for (const secret of ["483920", DEST, DEST.slice(1), "SUPER_SECRET_TOKEN_VALUE", "APP_SECRET_VALUE", "META_TIMEOUT", "aborted"]) {
+      assert(!blob.includes(secret), `23: response leaked ${secret.slice(0, 8)}…`);
+    }
+
+    // 24-26 — the idempotent replay observes the SAME parked row.
+    const rowsBefore = db.communication_messages.length;
+    const callsBefore = transport.calls.length;
+    const second = await M.HookSvc.handleSupabaseSendSmsHook(hookRequest("wh_uncertain"));
+    assert(db.communication_messages.length === rowsBefore, "24: replay creates zero new message rows");
+    assert(transport.calls.length === callsBefore && spy.resolved === 1, "25: replay makes zero second provider calls");
+    assert(second.kind === M.HookSvc.SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN, "26: replay is still delivery_uncertain");
+    assert(retryAfterHeader(M.HookSvc.sendSmsHookHttpResponse(second)) === undefined, "26: replay still has no Retry-After");
+
+    // 27 — no fallback of any kind exists on this path. (The module is NAMED for the
+    // Supabase "Send SMS" hook, so a bare /sms/i grep is meaningless here: what matters
+    // is that no code ever selects an sms/rcs channel or a fallback transport.)
+    const hookSrc = stripTs(readFileSync(HOOK_SERVICE_SRC, "utf8"));
+    assert(!/fallback/i.test(hookSrc), "27: no fallback of any kind in the hook");
+    assert(!/["'](sms|rcs)["']/.test(hookSrc), "27: the hook never selects an sms/rcs channel");
+    assert(/channel: "whatsapp"/.test(hookSrc), "27: the OTP intent is always whatsapp");
+    assert(!/n8n/i.test(hookSrc) && !/jarvis/i.test(hookSrc), "27: no n8n / Jarvis");
+    assert(db.communication_messages.every((m) => m.channel === "whatsapp"), "27: no message left the whatsapp channel");
+    // Only IN_PROGRESS may ever ask Supabase to retry.
+    const K = M.HookSvc.SendSmsHookOutcomeKind;
+    assert(retryAfterHeader(M.HookSvc.sendSmsHookHttpResponse({ kind: K.IN_PROGRESS, dispatchAttempted: true })) !== undefined, "in_progress remains the only retryable outcome");
+    for (const kind of [K.DELIVERY_UNCERTAIN, K.DELIVERY_FAILED, K.SERVICE_UNAVAILABLE, K.DELIVERED]) {
+      assert(retryAfterHeader(M.HookSvc.sendSmsHookHttpResponse({ kind, dispatchAttempted: true })) === undefined, `${kind} must not carry Retry-After`);
+    }
+  } finally {
+    M.HookLib.setActiveSendSmsHookVerifier(previousVerifier);
+    M.Comm.clearWhatsAppProviderOverride();
+    restoreEnv();
+  }
+});
+
+// ============================================================================
+// SAFETY CORRECTION — AUTH HOOK TOTAL DEADLINE (P28–P34)
+// ============================================================================
+/** A frozen monotonic clock, so `remaining` is exactly `remainingMs`. */
+function fixedDeadline(remainingMs) {
+  return M.Deadline.startAuthHookDeadline({ totalBudgetMs: remainingMs + 100, responseReserveMs: 100, now: () => 1000 });
+}
+
+check("P28-29,32. the effective auth timeout is min(configured, remaining budget); business is untouched", async () => {
+  const D = M.Deadline;
+  // The pure formula.
+  assert(D.computeRemainingNetworkBudgetMs({ startedAtMs: 100, nowMs: 1100, totalBudgetMs: 5000, responseReserveMs: 750 }) === 3250, "remaining = total − elapsed − reserve");
+  assert(D.resolveAuthNetworkTimeoutMs(3000, 10000).timeoutMs === 3000, "28: never exceeds the configured timeout");
+  assert(D.resolveAuthNetworkTimeoutMs(3000, 1100).timeoutMs === 1100, "29: never exceeds the remaining budget");
+  assert(D.resolveAuthNetworkTimeoutMs(3000, 400).ok === false, "an exhausted budget resolves to no timeout at all");
+  assert(M.Config.AUTH_TIMEOUT_MAX_MS <= 4000, "the configured auth maximum is still ≤ 4000 ms");
+
+  // 28 — a generous budget leaves the configured auth timeout untouched.
+  seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+  let t = fakeTransport(okMetaResponse);
+  let res = await metaService(t).svc.send(authIntent(), { authDeadline: fixedDeadline(10000) });
+  assert(res.ok && t.calls[0].timeoutMs === META_CONFIG.authHttpTimeoutMs, `28: got ${t.calls[0].timeoutMs}`);
+
+  // 29 — a tight budget shortens the ACTUAL request timeout.
+  seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+  t = fakeTransport(okMetaResponse);
+  res = await metaService(t).svc.send(authIntent(), { authDeadline: fixedDeadline(1100) });
+  assert(res.ok && t.calls[0].timeoutMs === 1100, `29: expected 1100, got ${t.calls[0].timeoutMs}`);
+  assert(t.calls[0].timeoutMs < META_CONFIG.authHttpTimeoutMs, "29: strictly below the configured auth timeout");
+
+  // 32 — business dispatch never consults a deadline and never changes its timeout.
+  seedGreenMetaInfra();
+  t = fakeTransport(okMetaResponse);
+  res = await metaService(t).svc.send(bizIntent());
+  assert(res.ok && t.calls[0].timeoutMs === META_CONFIG.businessHttpTimeoutMs, "32: business timeout unchanged (no deadline)");
+  seedGreenMetaInfra();
+  t = fakeTransport(okMetaResponse);
+  res = await metaService(t).svc.send(bizIntent(), { authDeadline: fixedDeadline(600) });
+  assert(res.ok && t.calls[0].timeoutMs === META_CONFIG.businessHttpTimeoutMs, "32: a deadline never shortens a business send");
+  assert(M.Transport.effectiveRequestTimeoutMs(5000, null) === 5000 && M.Transport.effectiveRequestTimeoutMs(5000) === 5000, "no ceiling → configured timeout");
+});
+
+check("P30-31,33-34. an exhausted deadline fails locally before the network; abort still cancels the request", async () => {
+  // 30-31 — below the minimum viable budget: refuse locally, zero Meta calls.
+  seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+  const t = fakeTransport(okMetaResponse);
+  const { svc, spy } = metaService(t);
+  const res = await svc.send(authIntent(), { authDeadline: fixedDeadline(400) });
+  assert(res.ok, "resolved to a ledger state");
+  assert(t.calls.length === 0 && spy.resolved === 0, "30: ZERO Meta calls on an exhausted deadline");
+  const row = db.communication_messages[0];
+  assert(row.failure_code === "AUTH_NETWORK_DEADLINE_EXHAUSTED", `31: expected AUTH_NETWORK_DEADLINE_EXHAUSTED, got ${row.failure_code}`);
+  assert(row.status === "failed", `31: deterministic failure, got ${row.status}`);
+  assert(row.status !== "outcome_unknown", "31: never outcome_unknown — no request was initiated");
+  assert(row.next_retry_at === null, "31: no retry scheduled");
+  // A budget exactly AT the minimum is still viable.
+  seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+  const t2 = fakeTransport(okMetaResponse);
+  const ok2 = await metaService(t2).svc.send(authIntent(), { authDeadline: fixedDeadline(M.Deadline.MIN_VIABLE_AUTH_NETWORK_BUDGET_MS) });
+  assert(ok2.ok && t2.calls.length === 1 && t2.calls[0].timeoutMs === M.Deadline.MIN_VIABLE_AUTH_NETWORK_BUDGET_MS, "a minimum-viable budget still dispatches, clamped");
+
+  // 33 — no Promise.race anywhere on the auth path.
+  for (const f of [HOOK_SERVICE_SRC, COMM_SERVICE_SRC, PROVIDER_SRC, TRANSPORT_SRC, DEADLINE_SRC]) {
+    assert(!/Promise\.race/.test(stripTs(readFileSync(f, "utf8"))), `33: ${f} must not use Promise.race`);
+  }
+  // 34 — the ACTUAL request is still aborted by an AbortController/AbortSignal.
+  const tsrc = readFileSync(TRANSPORT_SRC, "utf8");
+  assert(/new AbortController\(\)/.test(tsrc) && /signal: controller\.signal/.test(tsrc), "34: AbortSignal attached to the real request");
+  assert(/controller\.abort\(\)/.test(tsrc) && /setTimeout\(/.test(tsrc), "34: the timeout aborts the request");
+  // …and the timeout the adapter hands the transport is the CLAMPED one.
+  assert(/effectiveRequestTimeoutMs\(configuredMs, options\.maxNetworkTimeoutMs\)/.test(readFileSync(PROVIDER_SRC, "utf8")), "34: the adapter clamps before issuing the request");
+  // The deadline is established on the VERIFIED path, before the gate and the dispatch.
+  const hook = readFileSync(HOOK_SERVICE_SRC, "utf8");
+  const verify = hook.indexOf("getActiveSendSmsHookVerifier().verify(");
+  const start = hook.indexOf("startAuthHookDeadline()");
+  const gate = hook.indexOf("await evaluateClientLoginOtpGate()");
+  assert(verify > 0 && start > verify && gate > start, "the total deadline starts on the verified path, before the gate");
+});
+
+// ============================================================================
+// SAFETY CORRECTION — PRODUCTION CONSTRUCTOR GUARD (P35–P38)
+// ============================================================================
+/** A default-constructed service resolves NO provider explicitly — never allowed in production. */
+const DEFAULT_CONSTRUCTED = /new\s+CommunicationService\s*\(\s*\)/;
+const PRODUCTION_SEND_SERVICES = [
+  "services/supabaseSendSmsHookService.ts",
+  "services/vendorVerificationService.ts",
+  "services/vendorPasswordResetService.ts",
+];
+function productionSourceFiles(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) productionSourceFiles(path, out);
+    else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) out.push(path);
+  }
+  return out;
+}
+/** Every production source file that default-constructs a CommunicationService. */
+function defaultConstructorOffenders() {
+  const files = [...productionSourceFiles("services"), ...productionSourceFiles("app"), ...productionSourceFiles("lib")];
+  return files.filter((f) => DEFAULT_CONSTRUCTED.test(stripTs(readFileSync(f, "utf8"))));
+}
+
+check("P35-38. no production send service default-constructs CommunicationService", () => {
+  // 36 — the structural guard: the runtime factory is the ONLY real-send construction path.
+  const offenders = defaultConstructorOffenders();
+  assert(offenders.length === 0, `36: default-constructed CommunicationService in ${offenders.join(", ")}`);
+  // 35 — every current production auth send caller resolves through the runtime factory.
+  for (const f of PRODUCTION_SEND_SERVICES) {
+    const src = readFileSync(f, "utf8");
+    assert(/createRuntimeCommunicationService\(/.test(src), `35: ${f} uses the runtime factory`);
+    assert(!DEFAULT_CONSTRUCTED.test(stripTs(src)), `35: ${f} never default-constructs`);
+  }
+  // 37 — webhook processing may construct with an EXPLICITLY injected webhook-only provider.
+  const webhookSrc = readFileSync(WEBHOOK_SERVICE_SRC, "utf8");
+  assert(/new CommunicationService\(provider\)/.test(webhookSrc), "37: webhook constructs with an explicit provider");
+  assert(!DEFAULT_CONSTRUCTED.test(stripTs(webhookSrc)), "37: …and never default-constructs");
+  // 38 — explicit dependency injection (used by every behavioral test) still works.
+  const svc = new M.Comm.CommunicationService(
+    new M.Mock.MockWhatsAppProvider(),
+    new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }),
+    null
+  );
+  assert(svc instanceof M.Comm.CommunicationService, "38: 3-arg dependency injection preserved");
+  assert(typeof M.Comm.setActiveWhatsAppProvider === "function" && typeof M.Comm.clearWhatsAppProviderOverride === "function", "38: test provider injection preserved");
+});
+
 check("wiring. test:phase5f:b + created files exist", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   assert(pkg.scripts["test:phase5f:b"] === "node scripts/phase5f-b-whatsapp-cloud-api-harness.mjs", "test:phase5f:b wired");
-  for (const f of [MIGRATION_5FB, CONFIG_SRC, GATE_SRC, BINDING_SRC, TEMPLATE_SRC, WEBHOOK_LIB_SRC, PROVIDER_SRC, TRANSPORT_SRC, SELECTION_SRC, RUNTIME_SERVICE_SRC, MAPPING_SERVICE_SRC, HEALTH_SERVICE_SRC, WEBHOOK_SERVICE_SRC, ROUTE_SRC, RUNBOOK_DOC]) {
+  for (const f of [MIGRATION_5FB, CONFIG_SRC, GATE_SRC, BINDING_SRC, TEMPLATE_SRC, WEBHOOK_LIB_SRC, PROVIDER_SRC, TRANSPORT_SRC, SELECTION_SRC, RUNTIME_SERVICE_SRC, MAPPING_SERVICE_SRC, HEALTH_SERVICE_SRC, WEBHOOK_SERVICE_SRC, ROUTE_SRC, RUNBOOK_DOC, FINGERPRINT_SRC, CANONICAL_SRC, DEADLINE_SRC]) {
     assert(existsSync(f), `${f} exists`);
   }
+  // The migration carries the fingerprint column + its shape guard, and nothing secret.
+  assert(/provider_template_mapping_fingerprint text/i.test(SQL.stripped), "migration adds the fingerprint column");
+  assert(/\[0-9a-f\]\{64\}/.test(SQL.raw), "migration constrains the fingerprint to sha256 lowercase hex");
 });
 
 // ============================================================================
@@ -1344,8 +2140,8 @@ tsMutation("MUT cD: allow unknown_outcome + accepted=true to enter success handl
 
 tsMutation("MUT F: auth send uses the business timeout",
   [[PROVIDER_SRC,
-    'const timeoutMs = options.lane === "authentication" ? this.runtime.authHttpTimeoutMs : this.runtime.businessHttpTimeoutMs;',
-    "const timeoutMs = this.runtime.businessHttpTimeoutMs;"]],
+    'const configuredMs = options.lane === "authentication" ? this.runtime.authHttpTimeoutMs : this.runtime.businessHttpTimeoutMs;',
+    "const configuredMs = this.runtime.businessHttpTimeoutMs;"]],
   async (mm) => {
     const t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: '{"messages":[{"id":"a"}]}', truncated: false }));
     await new mm.Provider.MetaCloudWhatsAppProvider(META_CONFIG, t).sendResolvedTemplate("+15550001111", RESOLVED_OTP, { otp: "1" }, { lane: "authentication" });
@@ -1422,6 +2218,237 @@ tsMutation("MUT eF: allow a thrown ProviderDispatchError with accepted certainty
     '    const certainty: ProviderOutcomeCertainty = outcomeCertainty === "accepted" ? "unknown_outcome" : outcomeCertainty;',
     "    const certainty: ProviderOutcomeCertainty = outcomeCertainty;"]],
   (mm) => new (mm.req("./lib/communication/providers/providerError.js").ProviderDispatchError)("A", "m", "accepted", false).outcomeCertainty === "accepted");
+
+// --- OUTBOUND-INTEGRATION mutations (nA–nJ) --------------------------------
+const RUNTIME_SVC_FILE = "services/runtimeCommunicationService.ts";
+const OUTBOUND_SVC_FILE = "services/metaWhatsAppOutboundService.ts";
+
+tsMutation("MUT nA: the runtime path ignores the provider selector (env not consulted)",
+  [[RUNTIME_SVC_FILE, "  const selection = selectWhatsAppProvider(env);", "  const selection = selectWhatsAppProvider({});"]],
+  (mm) => {
+    mm.Comm.clearWhatsAppProviderOverride();
+    const r = mm.Runtime.resolveRuntimeWhatsAppProvider(completeMetaEnv());
+    return r.ok && r.data.providerKey === "mock"; // Meta env wrongly yielded mock
+  });
+
+tsMutation("MUT nJ: Meta falls back to mock when its config is invalid",
+  [[RUNTIME_SVC_FILE,
+    "  if (!selection.ok) {\n    return fail(new AppError(RUNTIME_PROVIDER_UNAVAILABLE, RUNTIME_PROVIDER_MESSAGE));\n  }",
+    "  if (!selection.ok) {\n    return resolveRuntimeWhatsAppProvider({});\n  }"]],
+  (mm) => {
+    mm.Comm.clearWhatsAppProviderOverride();
+    const r = mm.Runtime.resolveRuntimeWhatsAppProvider({ WHATSAPP_PROVIDER_MODE: "meta_cloud" });
+    return r.ok && r.data.providerKey === "mock"; // silent Meta → mock downgrade
+  });
+
+tsMutation("MUT nB: the Meta path calls a bare provider method",
+  [[COMM_SERVICE_SRC,
+    '    return this.provider.templateResolutionMode === "approved_provider_mapping";',
+    "    return false;"]],
+  async (mm) => {
+    stubDb(mm); seedGreenMetaInfra();
+    const t = fakeTransport(okMetaResponse);
+    const { svc, spy } = metaService(t, mm);
+    await svc.send(bizIntent());
+    return spy.bare > 0; // bare sendTemplateMessage was used for an approved-mapping adapter
+  });
+
+tsMutation("MUT nC: the coordinator skips the runtime gate",
+  [[OUTBOUND_SVC_FILE,
+    "    const blocked = await this.gate(input.destinationHash, OutboundPreparationReason.RUNTIME_GATE_BLOCKED);\n    if (blocked) return blocked;\n\n    const mapping = await resolveApprovedMetaMapping({",
+    "    const mapping = await resolveApprovedMetaMapping({"]],
+  async (mm) => {
+    stubDb(mm); seedGreenMetaInfra({ policy: { outbound_enabled: false } });
+    const coord = new mm.Outbound.MetaWhatsAppOutboundCoordinator(completeMetaEnv());
+    const prep = await coord.prepareInitialOutbound({ templateKey: "vendor_new_lead", language: "en", destinationHash: M.Phone.hashPhoneE164(DEST) });
+    return prep.ok === true; // a disabled runtime policy still prepared an outbound send
+  });
+
+tsMutation("MUT nD: the coordinator skips the approved-mapping resolver (fabricates a mapping)",
+  [[OUTBOUND_SVC_FILE,
+    "    const mapping = await resolveApprovedMetaMapping({\n      templateKey: input.templateKey,\n      language: input.language,\n    });\n    if (!mapping.ok) {\n      return { ok: false, reason: OutboundPreparationReason.MAPPING_UNRESOLVED, detail: mapping.reason };\n    }",
+    "    const mapping = { ok: true as const, template: { mappingId: \"fabricated\", internalTemplateKey: input.templateKey, providerTemplateName: \"fabricated\", providerTemplateId: null, language: input.language, version: \"1.0\", variablesSchema: { bindingVersion: 1, bindings: [] }, providerKey: \"meta_whatsapp_cloud\", channel: \"whatsapp\" as const } };"]],
+  async (mm) => {
+    stubDb(mm); seedGreenMetaInfra({ mapping: null });
+    const coord = new mm.Outbound.MetaWhatsAppOutboundCoordinator(completeMetaEnv());
+    const prep = await coord.prepareInitialOutbound({ templateKey: "vendor_new_lead", language: "en", destinationHash: M.Phone.hashPhoneE164(DEST) });
+    return prep.ok === true; // no approved mapping exists, yet one was fabricated
+  });
+
+tsMutation("MUT nE: the provider is called even though final preparation failed (fence bypassed)",
+  [[COMM_SERVICE_SRC,
+    "      if (!prepared.ok) {\n        return this.preflightFailure(prepared.reason, OUTBOUND_PREPARATION_MESSAGE);\n      }",
+    "      if (!prepared.ok) {\n        return await this.provider.sendResolvedTemplate(\n          destination,\n          { mappingId: null, internalTemplateKey: \"\", providerTemplateName: \"bypass\", providerTemplateId: null, language, version: \"0\", variablesSchema: { bindingVersion: 1, bindings: [] }, providerKey: this.provider.providerKey, channel: \"whatsapp\" },\n          {},\n          { lane: \"business\" }\n        );\n      }"]],
+  async (mm) => {
+    stubDb(mm); seedGreenMetaInfra();
+    const t = fakeTransport(okMetaResponse);
+    const { svc } = metaService(t, mm);
+    const res = await svc.send(bizIntent());
+    if (!res.ok) return false;
+    const msg = db.communication_messages[0];
+    msg.status = "retry_scheduled"; msg.attempt_count = 1; msg.next_retry_at = new Date(Date.now() - 1000).toISOString();
+    db.communication_provider_runtime_policies[0].outbound_enabled = false; // gate now blocks
+    const t2 = fakeTransport(okMetaResponse);
+    const fresh = metaService(t2, mm);
+    await fresh.svc.dispatchPersistedMessage(msg.id);
+    return fresh.spy.resolved > 0; // the provider was invoked despite a blocked gate
+  });
+
+tsMutation("MUT nH: the provider identity fence is removed (a mock-owned message reroutes to Meta)",
+  [[COMM_SERVICE_SRC,
+    "      if (this.isForeignProvider(message.provider)) {\n        return fail(commError(\"UNSUPPORTED_DISPATCH_PROVIDER\"));\n      }\n",
+    ""]],
+  async (mm) => {
+    stubDb(mm); seedGreenMetaInfra();
+    const t = fakeTransport(() => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false }));
+    const { svc, spy } = metaService(t, mm);
+    const mockOwned = seedMessage({ provider: "mock", template_key: "vendor_new_lead" });
+    await svc.dispatchMessage(mockOwned, { rawVariables: { city: "Delhi" }, templateLanguage: "en" });
+    return spy.resolved > 0; // a mock-owned message was rerouted through Meta
+  });
+
+/**
+ * The restart-safe retry must reproduce the EXACT pinned mapping row. Both edits
+ * together let a superseded-but-identical-looking mapping be substituted: the resolver
+ * stops honouring the pinned id, and the fingerprint stops covering it.
+ */
+tsMutation("MUT nI: restart-safe retry silently swaps to a superseded mapping",
+  [[MAPPING_SERVICE_SRC, '    .eq("id", input.mappingId)', '    .eq("is_active", true)'],
+   [FINGERPRINT_SRC, "    mappingId: resolved.mappingId,", "    mappingId: null,"]],
+  async (mm) => {
+    stubDb(mm); seedGreenMetaInfra();
+    const t = fakeTransport(okMetaResponse);
+    const { svc } = metaService(t, mm);
+    const res = await svc.send(bizIntent());
+    if (!res.ok) return false;
+    const msg = db.communication_messages[0];
+    msg.status = "retry_scheduled"; msg.attempt_count = 1; msg.next_retry_at = new Date(Date.now() - 1000).toISOString();
+    // The pinned mapping is retired and replaced by an identical-content successor.
+    const superseded = { ...db.communication_provider_template_mappings[0] };
+    db.communication_provider_template_mappings[0].is_active = false;
+    db.communication_provider_template_mappings.push({ ...superseded, id: "map-2", is_active: true });
+    const t2 = fakeTransport(okMetaResponse);
+    const fresh = metaService(t2, mm);
+    await fresh.svc.dispatchPersistedMessage(msg.id);
+    return fresh.spy.resolved > 0; // a DIFFERENT mapping row was dispatched on retry
+  });
+
+// --- SAFETY-CORRECTION mutations (sA–sI) ------------------------------------
+const HOOK_SVC_FILE = "services/supabaseSendSmsHookService.ts";
+const FINGERPRINT_FILE = "lib/communication/providerMappingFingerprint.ts";
+
+/** Initial send, mutate the pinned mapping/infra, retry from a fresh process. */
+async function mutatedRetry(mm, mutate) {
+  stubDb(mm); seedGreenMetaInfra();
+  const t = fakeTransport(okMetaResponse);
+  const res = await metaService(t, mm).svc.send(bizIntent());
+  if (!res.ok) return { dispatched: false, calls: 0 };
+  const msg = db.communication_messages[0];
+  msg.status = "retry_scheduled"; msg.attempt_count = 1; msg.next_retry_at = new Date(Date.now() - 1000).toISOString();
+  mutate(db);
+  const t2 = fakeTransport(okMetaResponse);
+  const fresh = metaService(t2, mm);
+  await fresh.svc.dispatchPersistedMessage(msg.id);
+  return { dispatched: fresh.spy.resolved > 0, calls: t2.calls.length };
+}
+
+tsMutation("MUT sA: a mapping fingerprint mismatch is ignored",
+  [[OUTBOUND_SVC_FILE,
+    "    if (!mappingFingerprintMatches(input.mappingFingerprint, recomputed)) {\n      return { ok: false, reason: OutboundPreparationReason.MAPPING_FINGERPRINT_MISMATCH };\n    }",
+    "    if (false) {\n      return { ok: false, reason: OutboundPreparationReason.MAPPING_FINGERPRINT_MISMATCH };\n    }"]],
+  async (mm) => {
+    // The pinned row is edited in place, same id + version. It must never be replayed.
+    const r = await mutatedRetry(mm, (d) => { d.communication_provider_template_mappings[0].provider_template_name = "qf_hijacked"; });
+    return r.dispatched;
+  });
+
+tsMutation("MUT sB: the fingerprint hashes only the mapping identity, not the rendering-critical content",
+  [[FINGERPRINT_FILE,
+    "    providerTemplateName: resolved.providerTemplateName,\n    providerTemplateId: resolved.providerTemplateId,\n    variablesSchema: resolved.variablesSchema,",
+    "    providerTemplateName: \"\",\n    providerTemplateId: null,\n    variablesSchema: null,"]],
+  async (mm) => {
+    const F = mm.req("./lib/communication/providerMappingFingerprint.js");
+    const base = { mappingId: "m1", internalTemplateKey: "t", providerTemplateName: "p", providerTemplateId: null, language: "en", version: "1.0", variablesSchema: { bindingVersion: 1, bindings: [] }, providerKey: "meta_whatsapp_cloud", channel: "whatsapp" };
+    const renamed = { ...base, providerTemplateName: "HIJACKED" };
+    // Two DIFFERENT templates now share one fingerprint.
+    return F.computeMappingFingerprint(base) === F.computeMappingFingerprint(renamed);
+  });
+
+tsMutation("MUT sC: the FINAL runtime infrastructure gate is removed",
+  [[OUTBOUND_SVC_FILE,
+    "    const blocked = await this.gate(input.destinationHash, OutboundPreparationReason.FINAL_RUNTIME_GATE_BLOCKED);\n    if (blocked) return blocked;",
+    ""]],
+  async (mm) => {
+    const r = await mutatedRetry(mm, (d) => { d.communication_provider_runtime_policies[0].activation_status = "paused"; });
+    return r.dispatched; // a paused provider still issued a Meta request
+  });
+
+tsMutation("MUT sD: the FINAL gate no longer precedes the request (its result is observed too late)",
+  [[OUTBOUND_SVC_FILE,
+    "    const blocked = await this.gate(input.destinationHash, OutboundPreparationReason.FINAL_RUNTIME_GATE_BLOCKED);\n    if (blocked) return blocked;",
+    "    const deferred = this.gate(input.destinationHash, OutboundPreparationReason.FINAL_RUNTIME_GATE_BLOCKED);\n    void deferred;"]],
+  async (mm) => {
+    const r = await mutatedRetry(mm, (d) => { d.communication_provider_runtime_policies[0].outbound_enabled = false; });
+    return r.calls > 0; // the Meta HTTP request was issued before the gate was enforced
+  });
+
+tsMutation("MUT sE: an uncertain auth outcome is reported as in_progress",
+  [[HOOK_SVC_FILE,
+    "    if (status === \"outcome_unknown\") {\n      return {\n        kind: SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN,",
+    "    if (status === \"outcome_unknown\") {\n      return {\n        kind: SendSmsHookOutcomeKind.IN_PROGRESS,"]],
+  async (mm) => {
+    const restoreEnv = fullMetaProcessEnv();
+    const previousVerifier = mm.HookLib.getActiveSendSmsHookVerifier();
+    try {
+      stubDb(mm);
+      seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+      enableOtpAutomation();
+      mm.HookLib.setActiveSendSmsHookVerifier(passThroughVerifier());
+      const { provider } = spyMetaProvider(fakeTransport(() => ({ kind: "aborted" })), mm);
+      mm.Comm.setActiveWhatsAppProvider(provider);
+      const out = await mm.HookSvc.handleSupabaseSendSmsHook(hookRequest("wh_mut_se"));
+      const r = mm.HookSvc.sendSmsHookHttpResponse(out);
+      // An unproven OTP outcome now sits in the retryable branch and asks for a resend.
+      return out.kind === "in_progress" && retryAfterHeader(r) !== undefined;
+    } finally {
+      mm.HookLib.setActiveSendSmsHookVerifier(previousVerifier);
+      mm.Comm.clearWhatsAppProviderOverride();
+      restoreEnv();
+    }
+  });
+
+tsMutation("MUT sF: the uncertain-outcome response asks Supabase to retry",
+  [[HOOK_SVC_FILE,
+    "    case SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN:\n      return jsonResponse(502, \"delivery_uncertain\");",
+    "    case SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN:\n      return jsonResponse(503, \"delivery_uncertain\", { [RETRY_AFTER_HEADER]: RETRY_AFTER_VALUE });"]],
+  (mm) => {
+    const r = mm.HookSvc.sendSmsHookHttpResponse({ kind: mm.HookSvc.SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN, dispatchAttempted: true });
+    return retryAfterHeader(r) !== undefined; // an OTP resend was requested
+  });
+
+tsMutation("MUT sG: the dispatcher ignores the remaining hook deadline",
+  [[COMM_SERVICE_SRC, "        maxNetworkTimeoutMs = remainingMs;", "        maxNetworkTimeoutMs = undefined;"]],
+  async (mm) => {
+    stubDb(mm);
+    seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+    const t = fakeTransport(okMetaResponse);
+    const deadline = mm.Deadline.startAuthHookDeadline({ totalBudgetMs: 1200, responseReserveMs: 100, now: () => 1000 });
+    await metaService(t, mm).svc.send(authIntent(), { authDeadline: deadline });
+    // The request now runs for the full configured auth timeout, past the hook budget.
+    return t.calls.length === 1 && t.calls[0].timeoutMs === META_CONFIG.authHttpTimeoutMs;
+  });
+
+tsMutation("MUT sH: the adapter uses its configured timeout even when the remaining budget is lower",
+  [[TRANSPORT_SRC,
+    "  if (typeof ceilingMs !== \"number\" || !Number.isFinite(ceilingMs)) return configuredMs;\n  return Math.max(MIN_REQUEST_TIMEOUT_MS, Math.min(configuredMs, Math.floor(ceilingMs)));",
+    "  return configuredMs;"]],
+  (mm) => mm.req("./lib/communication/httpTransport.js").effectiveRequestTimeoutMs(4000, 900) === 4000);
+
+srcMutation("MUT sI: a production send service default-constructs CommunicationService",
+  "services/vendorVerificationService.ts",
+  "    const runtime = createRuntimeCommunicationService();",
+  "    const runtime = { ok: true, data: new CommunicationService() };",
+  () => defaultConstructorOffenders().length > 0);
 
 // ============================================================================
 // EXECUTE

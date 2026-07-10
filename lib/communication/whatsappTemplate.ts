@@ -12,6 +12,7 @@
 // ============================================================================
 
 import type { WhatsAppTemplateBindingSchema } from "./providers/whatsappTemplateBinding";
+import type { WhatsAppProvider, WhatsAppSendResult } from "./providers/whatsappProvider";
 
 /**
  * How a provider resolves the template it will send.
@@ -30,6 +31,8 @@ export type TemplateResolutionModeValue =
 
 /** A fully-resolved provider template descriptor handed to a real adapter. */
 export interface WhatsAppResolvedTemplate {
+  /** The approved mapping row id — pinned on the message for restart-safe retry. */
+  readonly mappingId: string | null;
   readonly internalTemplateKey: string;
   readonly providerTemplateName: string;
   readonly providerTemplateId: string | null;
@@ -40,8 +43,46 @@ export interface WhatsAppResolvedTemplate {
   readonly channel: "whatsapp";
 }
 
+/**
+ * Per-dispatch options for a resolved-descriptor send.
+ *
+ * `maxNetworkTimeoutMs` is a CEILING, never a floor: the adapter still uses its own
+ * configured lane timeout, clamped down to whatever an enclosing request deadline has
+ * left. Absent (the business lane, and any auth path with no enclosing deadline) the
+ * adapter's configured timeout is used unchanged.
+ */
+export interface ResolvedTemplateSendOptions {
+  readonly lane?: "authentication" | "business";
+  readonly maxNetworkTimeoutMs?: number;
+}
+
+/**
+ * Capability of an adapter that dispatches from an APPROVED resolved descriptor
+ * (Meta). Business logic branches on `templateResolutionMode` + this type guard —
+ * never on `providerKey === "meta_whatsapp_cloud"`.
+ */
+export interface ResolvedTemplateSender {
+  sendResolvedTemplate(
+    toE164: string,
+    resolved: WhatsAppResolvedTemplate,
+    sourceVariables: Record<string, string>,
+    options?: ResolvedTemplateSendOptions
+  ): Promise<WhatsAppSendResult>;
+}
+
+/** True only for an approved-mapping adapter that can send a resolved descriptor. */
+export function supportsResolvedTemplate(
+  provider: WhatsAppProvider
+): provider is WhatsAppProvider & ResolvedTemplateSender {
+  return (
+    provider.templateResolutionMode === "approved_provider_mapping" &&
+    typeof (provider as Partial<ResolvedTemplateSender>).sendResolvedTemplate === "function"
+  );
+}
+
 /** Projection of a `communication_provider_template_mappings` row (non-secret). */
 export interface ProviderTemplateMappingRow {
+  readonly id?: string | null;
   readonly template_key: string;
   readonly channel: string;
   readonly provider_key: string;
@@ -120,6 +161,7 @@ export function selectApprovedProviderMapping(
   return {
     ok: true,
     template: {
+      mappingId: row.id ?? null,
       internalTemplateKey: row.template_key,
       providerTemplateName: row.provider_template_name.trim(),
       providerTemplateId: row.provider_template_id,

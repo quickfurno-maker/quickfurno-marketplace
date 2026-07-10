@@ -58,6 +58,17 @@ import type {
   WhatsAppWebhookEvent,
 } from "../lib/communication/providers/whatsappProvider";
 import { effectiveOutcomeCertainty } from "../lib/communication/providers/whatsappProvider";
+import { supportsResolvedTemplate } from "../lib/communication/whatsappTemplate";
+import {
+  OutboundPreparationReason,
+  type ApprovedTemplateOutboundCoordinator,
+} from "../lib/communication/approvedTemplateOutbound";
+import {
+  AUTH_NETWORK_DEADLINE_EXHAUSTED,
+  AUTH_NETWORK_DEADLINE_MESSAGE,
+  isViableAuthNetworkBudget,
+  type AuthNetworkDeadline,
+} from "../lib/auth/hookDeadline";
 import { normalizeProviderException } from "../lib/communication/providers/providerError";
 import { MockWhatsAppProvider } from "../lib/communication/providers/mockWhatsAppProvider";
 
@@ -71,16 +82,43 @@ export {
 
 // ----------------------------------------------------------------------------
 // Provider registry — provider-neutral switching, no literal ever hardcoded.
+//
+// `setActiveWhatsAppProvider` is the EXPLICIT OVERRIDE used by tests and by any
+// caller that injects an adapter. The runtime resolution boundary
+// (`services/runtimeCommunicationService.ts`) honours the override first and only
+// then consults `selectWhatsAppProvider`, so a test injection always wins and a
+// missing override never silently becomes a Meta send. `getActiveWhatsAppProvider`
+// keeps its historical default (mock) so `new CommunicationService()` is unchanged.
+// No secret is read at module import time.
 // ----------------------------------------------------------------------------
-let activeWhatsAppProvider: WhatsAppProvider = new MockWhatsAppProvider();
+let whatsAppProviderOverride: WhatsAppProvider | null = null;
+let defaultMockProvider: WhatsAppProvider | null = null;
 
 export function getActiveWhatsAppProvider(): WhatsAppProvider {
-  return activeWhatsAppProvider;
+  if (whatsAppProviderOverride) return whatsAppProviderOverride;
+  return (defaultMockProvider ??= new MockWhatsAppProvider());
 }
 
 export function setActiveWhatsAppProvider(provider: WhatsAppProvider): void {
-  activeWhatsAppProvider = provider;
+  whatsAppProviderOverride = provider;
 }
+
+/** The explicit override, or null when none was ever registered. */
+export function getWhatsAppProviderOverride(): WhatsAppProvider | null {
+  return whatsAppProviderOverride;
+}
+
+/** Clears the explicit override so runtime selection applies again. */
+export function clearWhatsAppProviderOverride(): void {
+  whatsAppProviderOverride = null;
+}
+
+/**
+ * Ledger-safe message for every approved-mapping preparation failure. The specific
+ * reason travels as the error CODE; no secret or provider payload is ever included.
+ */
+const OUTBOUND_PREPARATION_MESSAGE =
+  "The approved provider template dispatch could not be prepared (runtime gate or approved mapping); no provider request was made.";
 
 /** The authentication lane is single-shot: one attempt, no asynchronous retry. */
 export const AUTHENTICATION_MAX_ATTEMPTS = 1;
@@ -231,6 +269,25 @@ export interface DispatchOptions {
    * `destination_hash` before use, so it can never redirect a message.
    */
   readonly preResolvedDestination?: string;
+  /**
+   * The internal template language. Required by an approved-mapping adapter, which
+   * re-resolves the pinned mapping at the network boundary on EVERY dispatch — the
+   * initial send included. There is deliberately no in-memory resolved-descriptor
+   * fast path: a descriptor prepared before the ledger insert could no longer be
+   * trusted by the time the request is issued.
+   */
+  readonly templateLanguage?: string | null;
+  /**
+   * The enclosing request's total deadline (Supabase Auth Hook). When present, the
+   * authentication-lane network timeout is clamped to the remaining safe budget, and
+   * an already-spent budget fails locally with ZERO provider calls.
+   */
+  readonly authDeadline?: AuthNetworkDeadline;
+}
+
+/** Per-send options threaded from an enclosing, time-bounded request. */
+export interface SendOptions {
+  readonly authDeadline?: AuthNetworkDeadline;
 }
 
 export interface WebhookProcessingOutcome {
@@ -248,13 +305,39 @@ type EventApplication = "applied" | "ignored_transition" | "noop_same_state" | "
 export class CommunicationService {
   private readonly provider: WhatsAppProvider;
   private readonly recipientResolver: CommunicationRecipientResolver;
+  /**
+   * Injected ONLY for an `approved_provider_mapping` adapter (Meta). The mock path
+   * never touches it. Absent + approved-mapping adapter ⇒ fail closed.
+   */
+  private readonly approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null;
 
   constructor(
     provider: WhatsAppProvider = getActiveWhatsAppProvider(),
-    recipientResolver: CommunicationRecipientResolver = getActiveRecipientResolver()
+    recipientResolver: CommunicationRecipientResolver = getActiveRecipientResolver(),
+    approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null = null
   ) {
     this.provider = provider;
     this.recipientResolver = recipientResolver;
+    this.approvedTemplateCoordinator = approvedTemplateCoordinator;
+  }
+
+  /** True when this adapter requires an approved provider mapping (capability, not a key). */
+  private requiresApprovedMapping(): boolean {
+    return this.provider.templateResolutionMode === "approved_provider_mapping";
+  }
+
+  /** A preflight failure that never reached the provider — definitive, never retried. */
+  private preflightFailure(code: string, message: string): WhatsAppSendResult {
+    return {
+      accepted: false,
+      provider: this.provider.providerKey,
+      providerMessageId: null,
+      normalizedStatus: "failed",
+      errorCode: code,
+      errorMessage: message,
+      retryable: false,
+      outcomeCertainty: "definitive_failure",
+    };
   }
 
   /**
@@ -307,7 +390,10 @@ export class CommunicationService {
    * server-side, unless the caller supplied a fenced ephemeral authentication
    * destination (first-time client OTP, before any client_accounts row exists).
    */
-  async send(intent: CommunicationIntent): Promise<Result<CommunicationMessage>> {
+  async send(
+    intent: CommunicationIntent,
+    sendOptions: SendOptions = {}
+  ): Promise<Result<CommunicationMessage>> {
     try {
       if (!intent.idempotency_key || !intent.template_key) {
         throw appError("VALIDATION");
@@ -382,6 +468,39 @@ export class CommunicationService {
         destination = resolved.data;
       }
 
+      const destinationHash = hashPhoneE164(destination);
+
+      // EARLY APPROVED-MAPPING PREFLIGHT (Phase 5F-B). For an approved_provider_mapping
+      // adapter (Meta) the infrastructure gate and the approved active mapping are
+      // resolved BEFORE the ledger row is persisted and BEFORE any provider call:
+      //   outbound config → runtime policy → provider account → canary → mapping
+      // Any failure returns here: ZERO communication_messages insert, ZERO Meta call.
+      //
+      // This is a cheap early exit, NOT the security boundary: the FINAL runtime
+      // infrastructure gate and the fingerprint verification run again after the
+      // dispatch claim, immediately before the request. What this preflight
+      // contributes to the dispatch is the pinned mapping IDENTITY + FINGERPRINT.
+      // The mock (internal_template) adapter never enters this branch.
+      let mappingId: string | null = null;
+      let mappingVersion: string | null = null;
+      let mappingFingerprint: string | null = null;
+      if (this.requiresApprovedMapping()) {
+        if (!this.approvedTemplateCoordinator) {
+          return fail(new AppError(OutboundPreparationReason.COORDINATOR_UNAVAILABLE, OUTBOUND_PREPARATION_MESSAGE));
+        }
+        const prepared = await this.approvedTemplateCoordinator.prepareInitialOutbound({
+          templateKey: intent.template_key,
+          language: template.language,
+          destinationHash,
+        });
+        if (!prepared.ok) {
+          return fail(new AppError(prepared.reason, OUTBOUND_PREPARATION_MESSAGE));
+        }
+        mappingId = prepared.mappingId;
+        mappingVersion = prepared.mappingVersion;
+        mappingFingerprint = prepared.mappingFingerprint;
+      }
+
       const sanitizedMetadata = sanitizeAuthSecurityMetadata(intent.metadata);
       // The authentication lane persists NO variables at all: `variables` carries
       // the OTP, and a redacted copy still tells an attacker the shape of it.
@@ -397,7 +516,7 @@ export class CommunicationService {
         destination_source: destinationSource.kind,
         // Only the hash and the mask are ever written. `destination` itself dies
         // with this request — for BOTH sources, identically.
-        destination_hash: hashPhoneE164(destination),
+        destination_hash: destinationHash,
         destination_masked: maskPhoneE164(destination),
         template_key: intent.template_key,
         entity_type: intent.entity_type,
@@ -411,7 +530,15 @@ export class CommunicationService {
         attempt_count: 0,
         max_attempts:
           intent.lane === "authentication" ? AUTHENTICATION_MAX_ATTEMPTS : BUSINESS_MAX_ATTEMPTS,
+        // PROVIDER IDENTITY: the runtime-selected provider OWNS this message. It is
+        // never rewritten, never rerouted, never migrated between providers.
         provider: this.provider.providerKey,
+        // Deterministic replay: pin WHICH approved mapping was used (id + version) and
+        // a fingerprint of its EXACT content, so an in-place edit under the same
+        // id + version cannot be replayed on a later dispatch.
+        provider_template_mapping_id: mappingId,
+        provider_template_version: mappingVersion,
+        provider_template_mapping_fingerprint: mappingFingerprint,
         variables: dbVariables,
         metadata: sanitizedMetadata,
       };
@@ -444,6 +571,8 @@ export class CommunicationService {
         rawVariables: intent.variables,
         providerTemplateName: template.provider_template_name,
         preResolvedDestination: destination,
+        templateLanguage: template.language,
+        authDeadline: sendOptions.authDeadline,
       });
     } catch (e) {
       return fail(e);
@@ -490,6 +619,10 @@ export class CommunicationService {
 
       return await this.dispatchMessage(message, {
         providerTemplateName: template?.provider_template_name ?? null,
+        // Nothing in-memory survives a restart: an approved-mapping adapter re-resolves
+        // the mapping from the identity + fingerprint pinned on the message, behind the
+        // final runtime gate.
+        templateLanguage: template?.language ?? null,
       });
     } catch (e) {
       return fail(e);
@@ -649,6 +782,78 @@ export class CommunicationService {
         outcomeCertainty: "definitive_failure",
       };
     }
+    // APPROVED-MAPPING DISPATCH (Phase 5F-B). An `approved_provider_mapping` adapter
+    // is NEVER called through the bare sendAuthenticationMessage/sendTemplateMessage
+    // methods. It dispatches an approved RESOLVED DESCRIPTOR only, re-resolved HERE —
+    // at the network boundary, on EVERY dispatch including the initial send — from the
+    // mapping identity pinned on the message.
+    //
+    // The final fence runs, in order: pinned mapping (by id, re-validated) → FINAL
+    // runtime infrastructure gate (freshly-read runtime policy / provider account /
+    // canary rows) → mapping content fingerprint verification. This closes the race in
+    // which an operator pauses Meta, disables outbound, un-readies the account, expires
+    // the canary row, or edits the mapping row in place AFTER the early preflight but
+    // BEFORE the request is issued.
+    //
+    // Any failure is a standing configuration failure: definitive, never retried, never
+    // outcome_unknown (no provider request occurred), and ZERO network calls.
+    if (this.requiresApprovedMapping()) {
+      if (!supportsResolvedTemplate(this.provider)) {
+        return this.preflightFailure(OutboundPreparationReason.SENDER_UNSUPPORTED, OUTBOUND_PREPARATION_MESSAGE);
+      }
+      if (!this.approvedTemplateCoordinator) {
+        return this.preflightFailure(OutboundPreparationReason.COORDINATOR_UNAVAILABLE, OUTBOUND_PREPARATION_MESSAGE);
+      }
+      const language = options.templateLanguage ?? null;
+      if (!message.template_key || !language) {
+        return this.preflightFailure(OutboundPreparationReason.TEMPLATE_UNRESOLVED, OUTBOUND_PREPARATION_MESSAGE);
+      }
+
+      const prepared = await this.approvedTemplateCoordinator.prepareFinalOutbound({
+        templateKey: message.template_key,
+        language,
+        destinationHash: message.destination_hash,
+        mappingId: message.provider_template_mapping_id ?? null,
+        mappingVersion: message.provider_template_version ?? null,
+        mappingFingerprint: message.provider_template_mapping_fingerprint ?? null,
+      });
+      if (!prepared.ok) {
+        return this.preflightFailure(prepared.reason, OUTBOUND_PREPARATION_MESSAGE);
+      }
+
+      const lane = message.lane === "authentication" ? "authentication" : "business";
+      // Authentication carries the OTP from REQUEST MEMORY to the provider call and
+      // nowhere else; business uses the persisted, already-sanitized variables.
+      const sourceVariables =
+        message.lane === "authentication"
+          ? (options.rawVariables as Record<string, string>)
+          : this.sanitizeVariables(options.rawVariables ?? message.variables ?? {});
+
+      // AUTH TOTAL DEADLINE. Read the remaining safe budget HERE — after signature
+      // verification, the operational gate, the DB lookups, the ledger insert, the
+      // claim, and the final gate have all consumed part of the hook window. An
+      // exhausted budget fails LOCALLY: zero provider calls, a deterministic definitive
+      // failure, never outcome_unknown (no request was initiated). Business dispatch
+      // never carries a deadline and is unaffected.
+      let maxNetworkTimeoutMs: number | undefined;
+      if (lane === "authentication" && options.authDeadline) {
+        const remainingMs = options.authDeadline.remainingNetworkBudgetMs();
+        if (!isViableAuthNetworkBudget(remainingMs)) {
+          return this.preflightFailure(AUTH_NETWORK_DEADLINE_EXHAUSTED, AUTH_NETWORK_DEADLINE_MESSAGE);
+        }
+        maxNetworkTimeoutMs = remainingMs;
+      }
+
+      try {
+        return await this.provider.sendResolvedTemplate(destination, prepared.resolved, sourceVariables, {
+          lane,
+          maxNetworkTimeoutMs,
+        });
+      } catch (providerException) {
+        return normalizeProviderException(providerException, this.provider.providerKey);
+      }
+    }
+
     try {
       if (message.lane === "authentication") {
         // Sensitive variables travel to the provider call and nowhere else.

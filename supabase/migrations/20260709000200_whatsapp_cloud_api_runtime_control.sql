@@ -218,6 +218,59 @@ $$;
 
 
 -- ============================================================================
+-- SECTION 3C — DETERMINISTIC PROVIDER TEMPLATE MAPPING REPLAY (non-secret)
+-- ============================================================================
+-- A business message may be dispatched again after a process restart. To reproduce
+-- the EXACT approved provider dispatch deterministically, the initial send records
+-- WHICH approved mapping it used. On retry the dispatcher re-resolves that exact
+-- mapping BY ID and re-validates it (still approved, still active, same template /
+-- channel / provider / language) — it never silently picks a different mapping and
+-- never relies on an in-memory descriptor.
+--
+-- An id + version pair is NOT sufficient on its own: a mapping row can be edited IN
+-- PLACE while keeping both (a changed provider_template_name, a changed
+-- variables_schema). So the initial send also pins a SHA-256 (lowercase hex)
+-- FINGERPRINT of the exact dispatch-critical mapping content, and the retry
+-- recomputes it from the freshly-read row and compares with exact equality. A
+-- mismatch fails closed: zero provider calls, no retry scheduled.
+--
+-- All three columns are NON-SECRET operational references and nullable (a
+-- mock-provider message never sets them). No token, no plaintext destination, no OTP:
+-- the fingerprint input is mapping id, template key, channel, provider key, language,
+-- version, provider template name/id, and the canonicalized variables schema.
+alter table public.communication_messages
+  add column if not exists provider_template_mapping_id          uuid,
+  add column if not exists provider_template_version             text,
+  add column if not exists provider_template_mapping_fingerprint text;
+
+-- Shape guard: SHA-256 lowercase hex when present. Existing rows hold NULL, so this
+-- is additive and safe; a malformed fingerprint can never be written later.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.communication_messages'::regclass
+      and conname = 'communication_messages_mapping_fingerprint_chk'
+  ) then
+    alter table public.communication_messages
+      add constraint communication_messages_mapping_fingerprint_chk
+      check (
+        provider_template_mapping_fingerprint is null
+        or provider_template_mapping_fingerprint ~ '^[0-9a-f]{64}$'
+      );
+  end if;
+end
+$$;
+
+comment on column public.communication_messages.provider_template_mapping_id is
+  'Phase 5F-B: the approved communication_provider_template_mappings row used for this dispatch. Re-resolved by id on restart-safe retry. Non-secret.';
+comment on column public.communication_messages.provider_template_version is
+  'Phase 5F-B: the approved mapping version pinned at initial send; a changed version fails closed on retry. Non-secret.';
+comment on column public.communication_messages.provider_template_mapping_fingerprint is
+  'Phase 5F-B: SHA-256 (lowercase hex) of the canonicalized dispatch-critical mapping content pinned at initial send. A mapping edited in place under the same id+version fails closed on retry. Non-secret.';
+
+
+-- ============================================================================
 -- SECTION 4 — RLS + PRIVILEGES (least privilege; no browser policies)
 -- ============================================================================
 -- Both new tables: RLS on, ZERO policies (so anon/authenticated see nothing), and

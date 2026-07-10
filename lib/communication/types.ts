@@ -247,6 +247,17 @@ export interface CommunicationMessage {
   readonly next_retry_at: string | null;
   readonly provider: string;
   readonly provider_message_id: string | null;
+  /**
+   * Phase 5F-B: the approved provider template mapping used for this dispatch — its
+   * id, the version pinned at initial send, and a SHA-256 (lowercase hex) fingerprint
+   * of its exact dispatch-critical content. All NON-SECRET; null for the mock
+   * provider. Every dispatch re-resolves this exact mapping by id, re-validates it,
+   * and recomputes the fingerprint, so a row edited in place under the same id +
+   * version can never be replayed.
+   */
+  readonly provider_template_mapping_id?: string | null;
+  readonly provider_template_version?: string | null;
+  readonly provider_template_mapping_fingerprint?: string | null;
   readonly failure_code: string | null;
   readonly failure_reason_sanitized: string | null;
   readonly variables: Record<string, string>;

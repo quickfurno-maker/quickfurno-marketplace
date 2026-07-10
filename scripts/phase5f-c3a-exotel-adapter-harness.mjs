@@ -85,6 +85,9 @@ const TRANSPORT_SRC = "lib/communication/httpTransport.ts";
 const SMS_IFACE_SRC = "lib/communication/providers/smsProvider.ts";
 const MOCK_SMS_SRC = "lib/communication/providers/mockSmsProvider.ts";
 const DOC_C3A = "docs/QF-Exotel-SMS-Provider-Integration-Phase-5F-C3A.md";
+/** Phase 5F-C3-B: the single construction site and the single fence caller. */
+const SMS_FACTORY_SRC = "services/runtimeSmsAdapterFactory.ts";
+const ORCHESTRATOR_SRC = "services/clientLoginOtpDeliveryOrchestrator.ts";
 
 /** Authority files this phase may never touch. */
 const UNTOUCHABLE = [
@@ -728,16 +731,21 @@ check("21. the adapter authorizes nothing: no fallback, no policy, no ledger, no
   ]) {
     assert(!forbidden.test(src), `C3-A must never touch ${forbidden}`);
   }
-  // The adapter is never constructed by APPLICATION code — only by this harness. Scanned on
-  // the working tree so the guard holds before the phase is committed as well as after.
+  // Phase 5F-C3-B introduced exactly ONE construction site and exactly ONE caller. The
+  // adapter must remain unreachable from anywhere else. Scanned on the working tree, so the
+  // guard holds before the phase is committed as well as after.
   const appSources = ["app", "lib", "services", "components", "pages"].flatMap((d) => walkSources(d));
   const constructors = appSources.filter((f) => /new\s+ExotelSmsProvider\s*\(/.test(readF(f)));
-  assert(constructors.length === 0, `no application file may construct the adapter, found ${constructors}`);
-  // `createRuntimeSmsProvider` exists, but nothing CALLS it: no caller injects a factory.
+  assert(constructors.length === 1 && constructors[0] === SMS_FACTORY_SRC,
+    `only ${SMS_FACTORY_SRC} may construct the adapter, found ${constructors}`);
+  // `createRuntimeSmsProvider` is called by the orchestrator alone; the fence is never bypassed.
   const callers = appSources
     .filter((f) => f !== RUNTIME_PROVIDER_SRC)
     .filter((f) => /createRuntimeSmsProvider\s*\(/.test(readF(f)));
-  assert(callers.length === 0, `no application file injects an SMS provider factory yet, found ${callers}`);
+  assert(callers.length === 1 && callers[0] === ORCHESTRATOR_SRC,
+    `only ${ORCHESTRATOR_SRC} may inject an SMS provider factory, found ${callers}`);
+  // The factory never instantiates the mock: a mock may never carry a live OTP.
+  assert(!/MockSmsProvider/.test(readCode(SMS_FACTORY_SRC)), "the factory never constructs the mock adapter");
   // Docs and the fail-closed statement are explicit.
   assert(/CANDIDATE IS NOT AUTHORIZATION/i.test(readF(SELECTION_SRC)), "selection states that candidacy is not authorization");
 });

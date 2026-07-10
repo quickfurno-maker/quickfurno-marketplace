@@ -27,6 +27,7 @@
     "test:phase5f:c": "node scripts/phase5f-c-auth-transport-resilience-harness.mjs",
     "test:phase5f:c2": "node scripts/phase5f-c2-sms-runtime-foundation-harness.mjs",
     "test:phase5f:c3a": "node scripts/phase5f-c3a-exotel-adapter-harness.mjs",
+    "test:phase5f:c3b": "node scripts/phase5f-c3b-client-otp-fallback-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",

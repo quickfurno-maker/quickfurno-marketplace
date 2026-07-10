@@ -1256,11 +1256,17 @@ check("N1-6. the runtime path uses the selector; prod fail-closed; Meta never be
   const overridden = R.resolveRuntimeWhatsAppProvider(completeMetaEnv());
   assert(overridden.ok && overridden.data === mockProvider, "override wins over selection");
   M.Comm.clearWhatsAppProviderOverride();
-  // Real auth/business callers go through the runtime factory.
-  for (const f of ["services/supabaseSendSmsHookService.ts", "services/vendorVerificationService.ts", "services/vendorPasswordResetService.ts"]) {
+  // Real auth/business callers go through the runtime factory. Phase 5F-C3-B moved the
+  // client-OTP send behind an orchestrator: the hook now delegates to it and resolves no
+  // provider itself, so the send path still passes through exactly one runtime factory.
+  for (const f of ["services/clientLoginOtpDeliveryOrchestrator.ts", "services/vendorVerificationService.ts", "services/vendorPasswordResetService.ts"]) {
     assert(/createRuntimeCommunicationService\(/.test(readFileSync(f, "utf8")), `${f} uses the runtime factory`);
     assert(!/new CommunicationService\(\)/.test(readFileSync(f, "utf8")), `${f} no longer constructs a default CommunicationService`);
   }
+  const hookSrc = readFileSync("services/supabaseSendSmsHookService.ts", "utf8");
+  assert(/deliverClientLoginOtp\(/.test(hookSrc), "the hook delegates its send to the orchestrator");
+  assert(!/new CommunicationService\(\)/.test(hookSrc), "the hook never constructs a default CommunicationService");
+  assert(!/createRuntimeCommunicationService\(/.test(hookSrc), "…and no longer resolves a provider itself");
 });
 
 check("N7-15. Meta send chain: gate + mapping run, resolved dispatch only, zero calls on any gate failure", async () => {
@@ -1864,8 +1870,13 @@ check("P30-31,33-34. an exhausted deadline fails locally before the network; abo
 // ============================================================================
 /** A default-constructed service resolves NO provider explicitly — never allowed in production. */
 const DEFAULT_CONSTRUCTED = /new\s+CommunicationService\s*\(\s*\)/;
+/**
+ * Every production file that actually RESOLVES a provider and sends. Phase 5F-C3-B moved the
+ * client-OTP send out of the hook and into the orchestrator; the hook itself now sends
+ * nothing directly (see the delegation assertions in N1-6).
+ */
 const PRODUCTION_SEND_SERVICES = [
-  "services/supabaseSendSmsHookService.ts",
+  "services/clientLoginOtpDeliveryOrchestrator.ts",
   "services/vendorVerificationService.ts",
   "services/vendorPasswordResetService.ts",
 ];
@@ -2507,6 +2518,8 @@ tsMutation("MUT nI: restart-safe retry silently swaps to a superseded mapping",
 
 // --- SAFETY-CORRECTION mutations (sA–sI) ------------------------------------
 const HOOK_SVC_FILE = "services/supabaseSendSmsHookService.ts";
+/** Phase 5F-C3-B: the client-OTP send path and its status→outcome mapping live here. */
+const ORCHESTRATOR_FILE = "services/clientLoginOtpDeliveryOrchestrator.ts";
 const FINGERPRINT_FILE = "lib/communication/providerMappingFingerprint.ts";
 
 /** Initial send, mutate the pinned mapping/infra, retry from a fresh process. */
@@ -2564,10 +2577,12 @@ tsMutation("MUT sD: the FINAL gate no longer precedes the request (its result is
     return r.calls > 0; // the Meta HTTP request was issued before the gate was enforced
   });
 
+// Phase 5F-C3-B: the status → outcome mapping now lives in the orchestrator. The hazard is
+// unchanged — an unproven OTP outcome must never carry a Retry-After, or Supabase resends.
 tsMutation("MUT sE: an uncertain auth outcome is reported as in_progress",
-  [[HOOK_SVC_FILE,
-    "    if (status === \"outcome_unknown\") {\n      return {\n        kind: SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN,",
-    "    if (status === \"outcome_unknown\") {\n      return {\n        kind: SendSmsHookOutcomeKind.IN_PROGRESS,"]],
+  [[ORCHESTRATOR_FILE,
+    '  if (status === "outcome_unknown") return ClientOtpDeliveryKind.DELIVERY_UNCERTAIN;',
+    '  if (status === "outcome_unknown") return ClientOtpDeliveryKind.IN_PROGRESS;']],
   async (mm) => {
     const restoreEnv = fullMetaProcessEnv();
     const previousVerifier = mm.HookLib.getActiveSendSmsHookVerifier();

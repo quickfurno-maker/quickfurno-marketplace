@@ -67,7 +67,11 @@ import {
 import { startAuthHookDeadline, type AuthNetworkDeadline } from "../lib/auth/hookDeadline";
 import { ephemeralAuthDestination, type CommunicationIntent } from "../lib/communication/types";
 import { evaluateClientLoginOtpGate } from "./clientOtpAutomationService";
-import { createRuntimeCommunicationService } from "./runtimeCommunicationService";
+import {
+  ClientOtpDeliveryKind,
+  deliverClientLoginOtp,
+  type ClientOtpDeliveryKindValue,
+} from "./clientLoginOtpDeliveryOrchestrator";
 
 // ----------------------------------------------------------------------------
 // Outcome vocabulary
@@ -107,6 +111,18 @@ export const SendSmsHookOutcomeKind = {
 
 export type SendSmsHookOutcomeKindValue =
   (typeof SendSmsHookOutcomeKind)[keyof typeof SendSmsHookOutcomeKind];
+
+/**
+ * The orchestrator's delivery kind → this hook's outcome kind. Total and 1:1, so a new
+ * delivery kind cannot silently fall through to a wrong HTTP response.
+ */
+const HOOK_OUTCOME_BY_DELIVERY_KIND: Readonly<Record<ClientOtpDeliveryKindValue, SendSmsHookOutcomeKindValue>> =
+  Object.freeze({
+    [ClientOtpDeliveryKind.DELIVERED]: SendSmsHookOutcomeKind.DELIVERED,
+    [ClientOtpDeliveryKind.DELIVERY_FAILED]: SendSmsHookOutcomeKind.DELIVERY_FAILED,
+    [ClientOtpDeliveryKind.DELIVERY_UNCERTAIN]: SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN,
+    [ClientOtpDeliveryKind.IN_PROGRESS]: SendSmsHookOutcomeKind.IN_PROGRESS,
+  });
 
 export interface SendSmsHookOutcome {
   readonly kind: SendSmsHookOutcomeKindValue;
@@ -328,61 +344,29 @@ export async function handleSupabaseSendSmsHook(
       };
     }
 
-    // 7) Single, immediate CommunicationService dispatch through the RUNTIME-selected
-    // provider (mock or Meta; fail closed when unresolvable — never a silent mock).
-    // Idempotency is keyed on the verified webhook id, so a replay/concurrent
-    // duplicate cannot re-send. No queue, no n8n, no retry, no OTP persistence.
-    const runtime = createRuntimeCommunicationService();
-    if (!runtime.ok) {
-      // The provider could not be resolved: nothing was dispatched, nothing persisted.
-      return {
-        kind: SendSmsHookOutcomeKind.DELIVERY_FAILED,
-        dispatchAttempted: false,
-        webhookId: headers.webhookId,
-      };
-    }
-    const intent = buildClientLoginOtpIntent(event, headers.webhookId);
-    const result = await runtime.data.send(intent, { authDeadline: deadline });
+    // 7) Delivery, orchestrated (Phase 5F-C3-B). The WhatsApp primary is dispatched
+    // exactly as before — a single, immediate CommunicationService send through the
+    // RUNTIME-selected provider, idempotent on the verified webhook id, no queue, no
+    // n8n, no retry, no OTP persistence. The orchestrator additionally records the
+    // attempt in the Phase 5F-C1 ledger and, ONLY after a PROVEN definitive failure that
+    // an explicit active failure rule permits, may fall back to SMS.
+    //
+    // It ships operationally DISABLED: the transport policy is not operationally enabled
+    // and the failure-rule table is empty, so in production this reduces to the exact
+    // Phase 5D behaviour. The OTP is the SAME value in both attempts, from request memory.
+    const delivery = await deliverClientLoginOtp({
+      authUserId: event.authUserId,
+      phoneE164: event.phoneE164,
+      otp: event.otp,
+      verifiedWebhookId: headers.webhookId,
+      deadline,
+      buildPrimaryIntent: () => buildClientLoginOtpIntent(event, headers.webhookId),
+    });
 
-    // 8) Map the message status — NOT merely Result.ok — to a hook outcome.
-    if (!result.ok) {
-      // The send itself failed (e.g. template gate). Do not resend.
-      return {
-        kind: SendSmsHookOutcomeKind.DELIVERY_FAILED,
-        dispatchAttempted: true,
-        webhookId: headers.webhookId,
-      };
-    }
-
-    const status = result.data.status;
-    if (status === "accepted" || status === "sent" || status === "delivered" || status === "read") {
-      return {
-        kind: SendSmsHookOutcomeKind.DELIVERED,
-        dispatchAttempted: true,
-        webhookId: headers.webhookId,
-      };
-    }
-    // An UNPROVEN outcome, checked BEFORE the terminal-failure and in-progress branches:
-    // it is neither. An idempotent replay observes this same parked row, re-enters here,
-    // dispatches nothing, and returns the identical Retry-After-free response.
-    if (status === "outcome_unknown") {
-      return {
-        kind: SendSmsHookOutcomeKind.DELIVERY_UNCERTAIN,
-        dispatchAttempted: true,
-        webhookId: headers.webhookId,
-      };
-    }
-    if (status === "failed" || status === "cancelled" || status === "dead_letter") {
-      return {
-        kind: SendSmsHookOutcomeKind.DELIVERY_FAILED,
-        dispatchAttempted: true,
-        webhookId: headers.webhookId,
-      };
-    }
-    // queued / dispatching — the auth lane sends immediately, so this is defensive.
+    // 8) The orchestrator's kind maps 1:1 onto the hook's outcome vocabulary.
     return {
-      kind: SendSmsHookOutcomeKind.IN_PROGRESS,
-      dispatchAttempted: true,
+      kind: HOOK_OUTCOME_BY_DELIVERY_KIND[delivery.kind],
+      dispatchAttempted: delivery.dispatchAttempted,
       webhookId: headers.webhookId,
     };
   } catch {

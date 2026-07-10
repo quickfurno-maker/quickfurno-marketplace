@@ -24,7 +24,11 @@
 // it consumes is `normalizeProviderException`, which returns WhatsAppSendResult.
 // ============================================================================
 
-import type { ProviderOutcomeCertainty, WhatsAppSendResult } from "./whatsappProvider";
+// `ProviderOutcomeCertainty` comes straight from the generic module; `WhatsAppSendResult`
+// is a type-only import, so nothing here creates a runtime cycle with providerOutcome.ts
+// (which imports the code SETS below as values).
+import type { ProviderOutcomeCertainty } from "./providerOutcome";
+import type { WhatsAppSendResult } from "./whatsappProvider";
 
 /** Fallback code for a throw we cannot classify. */
 export const PROVIDER_EXCEPTION_CODE = "PROVIDER_EXCEPTION";

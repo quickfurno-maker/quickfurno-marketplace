@@ -10,15 +10,30 @@
 // anywhere outside the mock adapter itself (see `providerKey`).
 // ============================================================================
 
-/** Normalized delivery lifecycle vocabulary shared by every provider adapter. */
-export type WhatsAppNormalizedEventType = "accepted" | "sent" | "delivered" | "read" | "failed";
+import type { ProviderOutcomeCertainty } from "./providerOutcome";
 
 /**
- * Safe outcome-certainty vocabulary (Phase 5F-B), aligned with the Phase 5F-A auth
- * transport vocabulary. `unknown_outcome` (timeout / ambiguous / 5xx) is NEVER
- * automatically fallback-eligible and must not be auto-resent inside an adapter.
+ * Safe outcome-certainty vocabulary (Phase 5F-B), now defined once for EVERY channel in
+ * `providerOutcome.ts` (Phase 5F-C2). `unknown_outcome` (timeout / ambiguous / 5xx) is
+ * NEVER automatically fallback-eligible and must not be auto-resent inside an adapter.
+ *
+ * Re-exported under its historical name so every existing WhatsApp import — the Meta
+ * adapter, `providerError.ts`, `communicationService.ts` — keeps working unchanged.
  */
-export type ProviderOutcomeCertainty = "accepted" | "definitive_failure" | "unknown_outcome";
+export type { ProviderOutcomeCertainty };
+
+/**
+ * The certainty helpers, re-exported under their historical WhatsApp names. There is ONE
+ * implementation (`providerOutcome.ts`), so the SMS contract can never drift into a weaker
+ * copy of these rules.
+ */
+export {
+  isContradictoryProviderOutcome as isContradictorySendResult,
+  effectiveProviderOutcomeCertainty as effectiveOutcomeCertainty,
+} from "./providerOutcome";
+
+/** Normalized delivery lifecycle vocabulary shared by every provider adapter. */
+export type WhatsAppNormalizedEventType = "accepted" | "sent" | "delivered" | "read" | "failed";
 
 /**
  * How an adapter resolves the template it sends — a capability, so business logic
@@ -45,39 +60,6 @@ export interface WhatsAppSendResult {
    * here — Phase 5F-C owns any fallback decision.
    */
   readonly outcomeCertainty: ProviderOutcomeCertainty;
-}
-
-/**
- * A provider result is CONTRADICTORY when a PRESENT certainty disagrees with the
- * acceptance flag — e.g. `accepted=true` with a non-`accepted` certainty, or
- * `accepted=false` with `accepted` certainty. A contradictory result must never be
- * treated as a normal success; callers fold it into a conservative `unknown_outcome`.
- * An ABSENT certainty is not contradictory here — the defensive path in
- * {@link effectiveOutcomeCertainty} handles it conservatively.
- */
-export function isContradictorySendResult(result: WhatsAppSendResult): boolean {
-  if (!result.outcomeCertainty) return false;
-  const acceptedCertainty = result.outcomeCertainty === "accepted";
-  return result.accepted !== acceptedCertainty;
-}
-
-/** The certainty values that are recognised at runtime. */
-const KNOWN_OUTCOME_CERTAINTIES: readonly ProviderOutcomeCertainty[] = ["accepted", "definitive_failure", "unknown_outcome"];
-
-/**
- * The effective certainty of a result, failing CONSERVATIVE. The field is required at
- * the type level; this is the defensive RUNTIME path for a legacy/duck-typed/unsafe
- * result. Certainty is NEVER inferred from `result.accepted`:
- *   • missing or invalid certainty → `unknown_outcome` (never `accepted`, never
- *     `definitive_failure`).
- *   • present but contradictory (disagrees with `accepted`) → `unknown_outcome`.
- *   • otherwise the declared certainty.
- */
-export function effectiveOutcomeCertainty(result: WhatsAppSendResult): ProviderOutcomeCertainty {
-  const c = result.outcomeCertainty;
-  if (!KNOWN_OUTCOME_CERTAINTIES.includes(c)) return "unknown_outcome";
-  if (isContradictorySendResult(result)) return "unknown_outcome";
-  return c;
 }
 
 export interface WhatsAppWebhookEvent {

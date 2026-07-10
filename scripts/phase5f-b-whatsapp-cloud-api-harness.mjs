@@ -37,6 +37,7 @@ const TS_FILES = [
   "lib/communication/whatsappTemplate.ts",
   "lib/communication/providerMappingFingerprint.ts",
   "lib/communication/approvedTemplateOutbound.ts",
+  "lib/communication/providers/providerOutcome.ts",
   "lib/communication/providers/whatsappProvider.ts",
   "lib/communication/providers/providerError.ts",
   "lib/communication/providers/mockWhatsAppProvider.ts",
@@ -2253,14 +2254,16 @@ tsMutation("MUT C: block outcome_unknown → delivered reconciliation",
   (mm) => mm.Comm.isValidTransition("outcome_unknown", "delivered") === false);
 
 tsMutation("MUT D: missing certainty falls through to definitive_failure (must stay unknown)",
-  [["lib/communication/providers/whatsappProvider.ts",
+  // The ONE implementation lives in providerOutcome.ts (Phase 5F-C2); whatsappProvider.ts
+  // re-exports it as `effectiveOutcomeCertainty`, so the scenario is unchanged.
+  [["lib/communication/providers/providerOutcome.ts",
     '  if (!KNOWN_OUTCOME_CERTAINTIES.includes(c)) return "unknown_outcome";',
     '  if (!KNOWN_OUTCOME_CERTAINTIES.includes(c)) return "definitive_failure";']],
   (mm) => mm.req("./lib/communication/providers/whatsappProvider.js").effectiveOutcomeCertainty({ accepted: false }) === "definitive_failure");
 
 // --- OUTCOME-CERTAINTY correction mutations (this pass) ---------------------
 tsMutation("MUT cA: infer accepted certainty from accepted=true when certainty is missing",
-  [["lib/communication/providers/whatsappProvider.ts",
+  [["lib/communication/providers/providerOutcome.ts",
     '  if (!KNOWN_OUTCOME_CERTAINTIES.includes(c)) return "unknown_outcome";',
     '  if (!KNOWN_OUTCOME_CERTAINTIES.includes(c)) return result.accepted ? "accepted" : "unknown_outcome";']],
   (mm) => {

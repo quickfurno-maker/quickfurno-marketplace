@@ -9,10 +9,12 @@
 // projections; turning an automation on is a separate, authorized write, and it
 // never bypasses Phase 4 authorization at dispatch time.
 //
-// The projections deliberately cover every state the Center must show:
-// automation readiness, operational enablement, provider health, template
-// readiness, queued, retry scheduled, failed, dead letter, and webhook
-// processing state.
+// The projections deliberately cover every state the Center must show: automation
+// readiness, operational enablement, provider health, template readiness, queued,
+// retry scheduled, failed, dead letter, outcome unknown, and webhook processing
+// state (including deliberately-ignored receipts). The status vocabularies below
+// mirror the database CHECK constraints exactly — a state the ledger can hold must
+// never be silently dropped from a total.
 // ============================================================================
 
 import { adminClient } from "../lib/supabase";
@@ -24,6 +26,7 @@ import {
   type CommunicationAutomationCatalog,
   type CommunicationAutomationReadiness,
   type CommunicationMessage,
+  type CommunicationMessageStatus,
   type CommunicationTemplate,
   type CommunicationWebhookProcessingStatus,
   type CommunicationWebhookReceipt,
@@ -43,6 +46,12 @@ export interface CommunicationOverview {
   retryScheduledCount: number;
   deadLetterCount: number;
   cancelledCount: number;
+  /**
+   * Phase 5F-B: provider acceptance could be neither proven nor disproven. It is NOT a
+   * failure and NOT in flight, so it is surfaced on its own rather than folded into
+   * `failedCount` — an operator must be able to see it and wait for the webhook.
+   */
+  outcomeUnknownCount: number;
 }
 
 export interface AutomationActivitySummary {
@@ -75,7 +84,11 @@ export interface WebhookProcessingSummary {
   lastReceivedAt: string | null;
 }
 
-const MESSAGE_STATUS_KEYS = [
+/**
+ * Every status `communication_messages.status` may hold. The breakdown must account
+ * for all of them, or `totalMessages` would exceed the sum of its parts.
+ */
+const MESSAGE_STATUS_KEYS: readonly CommunicationMessageStatus[] = [
   "queued",
   "dispatching",
   "accepted",
@@ -86,8 +99,10 @@ const MESSAGE_STATUS_KEYS = [
   "retry_scheduled",
   "dead_letter",
   "cancelled",
-] as const;
+  "outcome_unknown",
+];
 
+/** Every status `communication_webhook_receipts.processing_status` may hold. */
 const WEBHOOK_PROCESSING_KEYS: readonly CommunicationWebhookProcessingStatus[] = [
   "received",
   "verified",
@@ -95,6 +110,7 @@ const WEBHOOK_PROCESSING_KEYS: readonly CommunicationWebhookProcessingStatus[] =
   "duplicate",
   "rejected",
   "failed",
+  "ignored",
 ];
 
 function emptyCounts<K extends string>(keys: readonly K[]): Record<K, number> {
@@ -119,7 +135,7 @@ export async function getCommunicationOverview(): Promise<Result<CommunicationOv
     const breakdown = emptyCounts(MESSAGE_STATUS_KEYS);
 
     messages.forEach((msg) => {
-      const status = (msg.status || "queued") as (typeof MESSAGE_STATUS_KEYS)[number];
+      const status = (msg.status || "queued") as CommunicationMessageStatus;
       if (status in breakdown) breakdown[status]++;
     });
 
@@ -136,6 +152,7 @@ export async function getCommunicationOverview(): Promise<Result<CommunicationOv
       retryScheduledCount: breakdown.retry_scheduled,
       deadLetterCount: breakdown.dead_letter,
       cancelledCount: breakdown.cancelled,
+      outcomeUnknownCount: breakdown.outcome_unknown,
     });
   } catch (e) {
     return fail(e);
@@ -306,8 +323,10 @@ export async function listWebhookReceipts(limit = 50): Promise<Result<Communicat
 }
 
 /**
- * Webhook processing health: how many payloads were verified, processed,
- * rejected, or arrived as redeliveries of an already-recorded receipt.
+ * Webhook processing health: how many payloads were verified, processed, rejected,
+ * deliberately ignored (a verified non-delivery or unrecognized class), or arrived as
+ * redeliveries of an already-recorded receipt. Every receipt lands in exactly one
+ * bucket, so `totalReceipts` always equals the sum of the breakdown.
  */
 export async function getWebhookProcessingSummary(): Promise<Result<WebhookProcessingSummary>> {
   try {

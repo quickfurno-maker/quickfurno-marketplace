@@ -61,6 +61,25 @@ export type CommunicationMessageStatus =
   // reconciles it forward to sent/delivered/read/failed.
   | "outcome_unknown";
 
+/**
+ * The RUNTIME mirror of {@link CommunicationMessageStatus}. Any read model that breaks
+ * messages down by status must account for every entry here, so a state the ledger can
+ * actually hold is never silently dropped from a total.
+ */
+export const COMMUNICATION_MESSAGE_STATUSES: readonly CommunicationMessageStatus[] = Object.freeze([
+  "queued",
+  "dispatching",
+  "accepted",
+  "sent",
+  "delivered",
+  "read",
+  "failed",
+  "retry_scheduled",
+  "dead_letter",
+  "cancelled",
+  "outcome_unknown",
+]);
+
 export type CommunicationPriority = "critical" | "high" | "normal" | "low";
 
 export type CommunicationNormalizedEventType = "accepted" | "sent" | "delivered" | "read" | "failed";
@@ -71,7 +90,16 @@ export type CommunicationWebhookProcessingStatus =
   | "processed"
   | "duplicate"
   | "rejected"
-  | "failed";
+  | "failed"
+  // Phase 5F-B: verified, but deliberately NOT processed — a known non-delivery
+  // payload (inbound message / template status / account status), or a verified but
+  // unrecognized structure. Distinct from `rejected`, which means unsupported or
+  // malformed. The database CHECK already permits it; this completes the read model.
+  | "ignored";
+
+/** The RUNTIME mirror of {@link CommunicationWebhookProcessingStatus}. */
+export const COMMUNICATION_WEBHOOK_PROCESSING_STATUSES: readonly CommunicationWebhookProcessingStatus[] =
+  Object.freeze(["received", "verified", "processed", "duplicate", "rejected", "failed", "ignored"]);
 
 export type CommunicationTemplateReadiness =
   | "draft"

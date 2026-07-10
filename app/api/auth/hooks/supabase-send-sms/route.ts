@@ -16,12 +16,20 @@
 // maps the service outcome to a deterministic HTTP status/body. It never logs —
 // and never returns — the raw body, OTP, phone, secret, signature, or any token.
 //
+// TOTAL DEADLINE STARTS HERE. Supabase's Auth Hook budget covers this ENTIRE HTTP
+// execution — including the bounded body read, which for a slow or trickling client
+// is real elapsed time. So the monotonic QuickFurno deadline is established at POST
+// entry, before the body is read, and threaded all the way down to the provider call,
+// where it clamps the auth network timeout to whatever safe budget remains. It is not
+// a Promise.race: the adapter still aborts the ACTUAL request with an AbortSignal.
+//
 // NOTE: deploying this route does NOT make OTP delivery live. The client_login_otp
 // automation ships operationally DISABLED, so the service returns
 // `service_unavailable` until an operator enables it in a controlled rollout.
 // ============================================================================
 
 import { NextResponse } from "next/server";
+import { startAuthHookDeadline } from "@/lib/auth/hookDeadline";
 import { MAX_HOOK_BODY_BYTES, readBoundedRawBody } from "@/lib/auth/supabaseSendSmsHook";
 import {
   handleSupabaseSendSmsHook,
@@ -48,6 +56,8 @@ function toResponse(mapped: SendSmsHookHttpResponse): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // FIRST statement of the handler: the hook budget is already running.
+  const deadline = startAuthHookDeadline();
   try {
     // Bounded read: Content-Length pre-check + streaming byte cap. Never buffers
     // more than the ceiling, even without a Content-Length header.
@@ -62,10 +72,13 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // The exact accepted raw body goes to signature verification; JSON is parsed
-    // only after verification succeeds (inside the service).
+    // only after verification succeeds (inside the service). The deadline started at
+    // POST entry travels with it, so the time already spent reading the body is
+    // subtracted from the budget available to the provider request.
     const outcome = await handleSupabaseSendSmsHook({
       rawBody: bounded.rawBody,
       getHeader: (name) => request.headers.get(name),
+      deadline,
     });
 
     return toResponse(sendSmsHookHttpResponse(outcome));

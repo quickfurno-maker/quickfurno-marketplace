@@ -20,8 +20,9 @@
 //   which is a duplicate-OTP hazard, exactly what the idempotency key exists to
 //   prevent.
 //
-//   Instead the verified path establishes a MONOTONIC TOTAL DEADLINE (see
-//   lib/auth/hookDeadline.ts) and threads it into the dispatch. Immediately before the
+//   Instead a MONOTONIC TOTAL DEADLINE (see lib/auth/hookDeadline.ts) is established at
+//   the HTTP route's POST entry — before the bounded body read — and threaded into the
+//   dispatch; a caller that supplies none gets a fresh one here. Immediately before the
 //   provider request the dispatcher clamps the adapter's configured auth timeout to
 //   the remaining safe budget, and refuses locally — zero provider calls — when the
 //   budget is already spent.
@@ -33,9 +34,11 @@
 //   abortable timeout exists.
 //
 // ORDER OF OPERATIONS (never reordered)
-//   size ceiling → headers → secret → SIGNATURE VERIFICATION → start total deadline →
-//   parse/validate → operational gate → build intent → single dispatch → map status to
-//   outcome. Nothing in the payload is trusted, parsed, or processed before verification.
+//   [route: start total deadline → bounded body read] → size ceiling → headers →
+//   secret → SIGNATURE VERIFICATION → adopt/fall back to the deadline → parse/validate
+//   → operational gate → runtime provider selection → runtime infrastructure checks →
+//   ledger → final gate → provider request → ledger result → response.
+//   Nothing in the payload is trusted, parsed, or processed before verification.
 //
 // UNCERTAIN DELIVERY
 //   A provider outcome that can be neither proven nor disproven parks the message in
@@ -267,8 +270,11 @@ export interface SupabaseSendSmsHookRequest {
   /** Case-insensitive header accessor (e.g. `req.headers.get`). */
   readonly getHeader: (name: string) => string | null | undefined;
   /**
-   * The total hook deadline. Injected only by tests (with a deterministic monotonic
-   * clock); production starts its own at the beginning of the verified path.
+   * The total hook deadline. In production the HTTP route creates it at POST entry —
+   * BEFORE the bounded body read — and passes it here, so the elapsed transport time
+   * is charged against the budget. It is optional so a direct or internal invocation
+   * (and a test with a deterministic monotonic clock) stays safe: when it is absent
+   * the service starts its own deadline rather than dispatching without one.
    */
   readonly deadline?: AuthNetworkDeadline;
 }
@@ -298,10 +304,13 @@ export async function handleSupabaseSendSmsHook(
     const verification = getActiveSendSmsHookVerifier().verify(req.rawBody, headers, secrets);
     if (!verification.ok) return reject(SendSmsHookRejectReason.INVALID_SIGNATURE);
 
-    // 4b) TOTAL DEADLINE. Everything from here on — parsing, the operational gate, the
-    // runtime policy / provider account / canary / mapping lookups, the ledger insert,
-    // the dispatch claim, the final runtime gate, the provider request, the result
-    // write, and this response — shares one monotonic budget.
+    // 4b) TOTAL DEADLINE. The HTTP route started it at POST entry, before the bounded
+    // body read, and handed it to us; a direct/internal caller that supplied none gets
+    // a fresh one here rather than an unbounded dispatch. Everything from here on —
+    // parsing, the operational gate, the runtime policy / provider account / canary /
+    // mapping lookups, the ledger insert, the dispatch claim, the final runtime gate,
+    // the provider request, the result write, and this response — shares that one
+    // monotonic budget.
     const deadline = req.deadline ?? startAuthHookDeadline();
 
     // 5) Parse/validate ONLY the verified payload.

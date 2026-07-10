@@ -55,6 +55,7 @@ const TS_FILES = [
   "services/whatsAppProviderSelection.ts",
   "services/clientOtpAutomationService.ts",
   "services/supabaseSendSmsHookService.ts",
+  "services/communicationAdminService.ts",
 ];
 
 function compileTo(outDir) {
@@ -103,6 +104,8 @@ function wireBuild(outDir) {
     Phone: req("./lib/communication/phone.js"),
     Supabase: req("./lib/supabase.js"),
     Transport: req("./lib/communication/httpTransport.js"),
+    Types: req("./lib/communication/types.js"),
+    Admin: req("./services/communicationAdminService.js"),
     Canonical: req("./lib/communication/canonicalJson.js"),
     Fingerprint: req("./lib/communication/providerMappingFingerprint.js"),
     Deadline: req("./lib/auth/hookDeadline.js"),
@@ -1903,6 +1906,172 @@ check("P35-38. no production send service default-constructs CommunicationServic
   assert(typeof M.Comm.setActiveWhatsAppProvider === "function" && typeof M.Comm.clearWhatsAppProviderOverride === "function", "38: test provider injection preserved");
 });
 
+// ============================================================================
+// CONSISTENCY CORRECTION — ADMIN/TYPE STATUS VOCABULARY (Q1–Q7)
+// ============================================================================
+const TYPES_SRC = "lib/communication/types.ts";
+const ADMIN_SERVICE_SRC = "services/communicationAdminService.ts";
+const AUTH_HOOK_ROUTE_SRC = "app/api/auth/hooks/supabase-send-sms/route.ts";
+/** The webhook processing union must carry `ignored` — the DB CHECK already does. */
+const UNION_HAS_IGNORED = /CommunicationWebhookProcessingStatus =[\s\S]{0,600}?\|\s*"ignored";/;
+
+function seedReceipt(over = {}) {
+  db.communication_webhook_receipts.push({
+    id: crypto.randomUUID(), provider: "meta_whatsapp_cloud", provider_event_id: crypto.randomUUID(),
+    payload_hash: crypto.randomUUID(), signature_valid: true, processing_status: "processed",
+    duplicate_count: 0, received_at: new Date().toISOString(), ...over,
+  });
+}
+
+check("Q1-3,6-7. the message status vocabulary is complete and outcome_unknown is surfaced", async () => {
+  // 1/A — the runtime vocabularies mirror the database CHECK constraints.
+  const T = M.Types;
+  assert(T.COMMUNICATION_WEBHOOK_PROCESSING_STATUSES.includes("ignored"), "1: webhook vocabulary includes ignored");
+  assert(T.COMMUNICATION_MESSAGE_STATUSES.includes("outcome_unknown"), "message vocabulary includes outcome_unknown");
+  assert(UNION_HAS_IGNORED.test(readFileSync(TYPES_SRC, "utf8")), "1: CommunicationWebhookProcessingStatus union includes ignored");
+
+  // Exactly one message in every valid state.
+  resetDb();
+  for (const status of T.COMMUNICATION_MESSAGE_STATUSES) seedMessage({ status });
+  const res = await M.Admin.getCommunicationOverview();
+  assert(res.ok, "overview ok");
+  const overview = res.data;
+  const keys = Object.keys(overview.statusBreakdown);
+
+  // 2/B — the Communication Center breakdown carries outcome_unknown…
+  assert(keys.includes("outcome_unknown"), "2: statusBreakdown includes outcome_unknown");
+  // …E — and every other status the ledger may hold.
+  for (const status of T.COMMUNICATION_MESSAGE_STATUSES) {
+    assert(keys.includes(status), `E: statusBreakdown accounts for ${status}`);
+  }
+  // 3/D — the overview exposes an explicit outcomeUnknownCount, populated from the breakdown.
+  assert(typeof overview.outcomeUnknownCount === "number", "3: outcomeUnknownCount exposed");
+  // 6 — an outcome_unknown message increments it.
+  assert(overview.outcomeUnknownCount === 1, `6: outcomeUnknownCount === 1, got ${overview.outcomeUnknownCount}`);
+  assert(overview.statusBreakdown.outcome_unknown === 1, "6: breakdown counts it too");
+  // It is NOT folded into any other bucket.
+  assert(overview.failedCount === 1 && overview.deadLetterCount === 1 && overview.dispatchingCount === 1, "6: not folded into failed/dead_letter/dispatching");
+
+  // 7/E — the total counts every message, and the breakdown sums to the total.
+  assert(overview.totalMessages === T.COMMUNICATION_MESSAGE_STATUSES.length, `7: totalMessages ${overview.totalMessages}`);
+  const sum = Object.values(overview.statusBreakdown).reduce((a, b) => a + b, 0);
+  assert(sum === overview.totalMessages, `7: breakdown sums to the total (${sum} vs ${overview.totalMessages})`);
+});
+
+check("Q4-5. the webhook processing summary counts ignored receipts rather than dropping them", async () => {
+  resetDb();
+  seedReceipt({ processing_status: "processed" });
+  seedReceipt({ processing_status: "rejected", signature_valid: false });
+  seedReceipt({ processing_status: "ignored" });
+  seedReceipt({ processing_status: "ignored", duplicate_count: 2 });
+
+  const res = await M.Admin.getWebhookProcessingSummary();
+  assert(res.ok, "summary ok");
+  const summary = res.data;
+  // 4/C — the summary keys include ignored.
+  assert(Object.keys(summary.processingBreakdown).includes("ignored"), "4: processingBreakdown includes ignored");
+  // 5/F — an ignored receipt increments the ignored count instead of vanishing.
+  assert(summary.processingBreakdown.ignored === 2, `5: two ignored receipts, got ${summary.processingBreakdown.ignored}`);
+  assert(summary.processingBreakdown.processed === 1 && summary.processingBreakdown.rejected === 1, "other buckets unchanged");
+  assert(summary.totalReceipts === 4, "every receipt counted");
+  const sum = Object.values(summary.processingBreakdown).reduce((a, b) => a + b, 0);
+  assert(sum === summary.totalReceipts, `every receipt lands in exactly one bucket (${sum} vs ${summary.totalReceipts})`);
+  assert(summary.invalidSignatureCount === 1 && summary.duplicateRedeliveryCount === 2, "signature/redelivery counters unchanged");
+  // The admin keys mirror the type vocabulary exactly.
+  assert(Object.keys(summary.processingBreakdown).sort().join(",") === [...M.Types.COMMUNICATION_WEBHOOK_PROCESSING_STATUSES].sort().join(","), "admin webhook keys mirror the vocabulary");
+});
+
+// ============================================================================
+// CONSISTENCY CORRECTION — ROUTE-BOUNDARY AUTH DEADLINE (Q8–Q15)
+// ============================================================================
+check("Q8-11,14-15. the auth hook deadline starts at the HTTP route boundary", () => {
+  const route = readFileSync(AUTH_HOOK_ROUTE_SRC, "utf8");
+  const hook = readFileSync(HOOK_SERVICE_SRC, "utf8");
+
+  // 8 — created at POST entry, BEFORE the bounded body read.
+  assert(/from "@\/lib\/auth\/hookDeadline"/.test(route), "8: the route imports the deadline");
+  const post = route.indexOf("export async function POST(");
+  const start = route.indexOf("const deadline = startAuthHookDeadline();");
+  const read = route.indexOf("readBoundedRawBody(request, MAX_HOOK_BODY_BYTES)");
+  assert(post > 0 && start > post, "8: the deadline is created inside POST");
+  assert(start < read, "8: the deadline is created BEFORE the bounded body read");
+  assert(route.indexOf("try {", post) > start, "8: …and before the handler's try block");
+
+  // 9 — the SAME deadline object is handed to the service (not a fresh one).
+  assert(/deadline,\s*\}\);/.test(route), "9: the route passes `deadline` into handleSupabaseSendSmsHook");
+  assert((route.match(/startAuthHookDeadline\(\)/g) || []).length === 1, "9: exactly one deadline is created in the route");
+  assert(read > 0, "the bounded body read is preserved");
+  assert(/MAX_HOOK_BODY_BYTES/.test(route), "the body ceiling is preserved");
+
+  // 10 — the service fallback deadline still exists for safe direct invocation.
+  assert(/req\.deadline \?\? startAuthHookDeadline\(\)/.test(hook), "10: the service falls back to its own deadline");
+  assert(!/Injected only by tests/.test(hook), "10: the misleading tests-only comment is gone");
+
+  // 11 — signature verification still precedes JSON parsing; the route parses nothing.
+  const verify = hook.indexOf("getActiveSendSmsHookVerifier().verify(");
+  const parse = hook.indexOf("parseSendSmsHookEvent(verification.payload)");
+  const adopt = hook.indexOf("req.deadline ?? startAuthHookDeadline()");
+  assert(verify > 0 && parse > verify, "11: signature verification precedes parse/validate");
+  assert(adopt > verify && adopt < parse, "11: the deadline is adopted after verification, before parsing");
+  assert(!/JSON\.parse/.test(stripTs(route)), "11: the route never parses the body");
+
+  // 14 — still no Promise.race anywhere on the auth path.
+  for (const f of [AUTH_HOOK_ROUTE_SRC, HOOK_SERVICE_SRC, DEADLINE_SRC, TRANSPORT_SRC, PROVIDER_SRC, COMM_SERVICE_SRC]) {
+    assert(!/Promise\.race/.test(stripTs(readFileSync(f, "utf8"))), `14: ${f} must not use Promise.race`);
+  }
+  // 15 — the ACTUAL provider request is still cancelled by an AbortController/AbortSignal.
+  const tsrc = readFileSync(TRANSPORT_SRC, "utf8");
+  assert(/new AbortController\(\)/.test(tsrc) && /signal: controller\.signal/.test(tsrc) && /controller\.abort\(\)/.test(tsrc), "15: AbortSignal controls the real request");
+  assert(/effectiveRequestTimeoutMs\(configuredMs, options\.maxNetworkTimeoutMs\)/.test(readFileSync(PROVIDER_SRC, "utf8")), "15: the adapter clamps before issuing the request");
+  assert(M.Config.AUTH_TIMEOUT_MAX_MS <= 4000, "the configured auth maximum is unchanged");
+});
+
+check("Q12-13. an externally supplied deadline reaches CommunicationService and bounds the request", async () => {
+  const restoreEnv = fullMetaProcessEnv();
+  const previousVerifier = M.HookLib.getActiveSendSmsHookVerifier();
+  try {
+    // 12 — a spent budget: the OTP never reaches the network.
+    seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+    enableOtpAutomation();
+    M.HookLib.setActiveSendSmsHookVerifier(passThroughVerifier());
+    let transport = fakeTransport(okMetaResponse);
+    let spy = spyMetaProvider(transport);
+    M.Comm.setActiveWhatsAppProvider(spy.provider);
+    let out = await M.HookSvc.handleSupabaseSendSmsHook(hookRequest("wh_route_spent", fixedDeadline(400)));
+    assert(transport.calls.length === 0 && spy.spy.resolved === 0, "12: zero Meta calls on an exhausted deadline");
+    const spent = db.communication_messages[0];
+    assert(spent.failure_code === "AUTH_NETWORK_DEADLINE_EXHAUSTED", `12: got ${spent.failure_code}`);
+    assert(spent.status === "failed" && spent.status !== "outcome_unknown", "12: deterministic failure, never outcome_unknown");
+    assert(out.kind === M.HookSvc.SendSmsHookOutcomeKind.DELIVERY_FAILED, `12: hook outcome ${out.kind}`);
+    assert(retryAfterHeader(M.HookSvc.sendSmsHookHttpResponse(out)) === undefined, "12: no Retry-After");
+
+    // 13 — a tight but viable budget clamps the ACTUAL request timeout.
+    seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+    enableOtpAutomation();
+    transport = fakeTransport(okMetaResponse);
+    spy = spyMetaProvider(transport);
+    M.Comm.setActiveWhatsAppProvider(spy.provider);
+    out = await M.HookSvc.handleSupabaseSendSmsHook(hookRequest("wh_route_tight", fixedDeadline(1100)));
+    assert(out.kind === M.HookSvc.SendSmsHookOutcomeKind.DELIVERED, `13: delivered, got ${out.kind}`);
+    assert(transport.calls.length === 1, "13: exactly one Meta request");
+    assert(transport.calls[0].timeoutMs === 1100, `13: clamped to the remaining budget, got ${transport.calls[0].timeoutMs}`);
+    assert(transport.calls[0].timeoutMs < META_CONFIG.authHttpTimeoutMs, "13: strictly below the configured auth timeout");
+
+    // A generous budget leaves the configured auth timeout untouched.
+    seedGreenMetaInfra({ template: AUTH_TEMPLATE, mapping: AUTH_MAPPING });
+    enableOtpAutomation();
+    transport = fakeTransport(okMetaResponse);
+    spy = spyMetaProvider(transport);
+    M.Comm.setActiveWhatsAppProvider(spy.provider);
+    await M.HookSvc.handleSupabaseSendSmsHook(hookRequest("wh_route_roomy", fixedDeadline(10000)));
+    assert(transport.calls[0].timeoutMs === META_CONFIG.authHttpTimeoutMs, "13: min(configured, remaining) never exceeds configured");
+  } finally {
+    M.HookLib.setActiveSendSmsHookVerifier(previousVerifier);
+    M.Comm.clearWhatsAppProviderOverride();
+    restoreEnv();
+  }
+});
+
 check("wiring. test:phase5f:b + created files exist", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   assert(pkg.scripts["test:phase5f:b"] === "node scripts/phase5f-b-whatsapp-cloud-api-harness.mjs", "test:phase5f:b wired");
@@ -2449,6 +2618,71 @@ srcMutation("MUT sI: a production send service default-constructs CommunicationS
   "    const runtime = createRuntimeCommunicationService();",
   "    const runtime = { ok: true, data: new CommunicationService() };",
   () => defaultConstructorOffenders().length > 0);
+
+// --- CONSISTENCY-CORRECTION mutations (qA–qF) -------------------------------
+const ADMIN_SVC_FILE = "services/communicationAdminService.ts";
+const ROUTE_FILE = "app/api/auth/hooks/supabase-send-sms/route.ts";
+
+/** Seed one message per status and read the Communication Center overview. */
+async function overviewOf(mm) {
+  stubDb(mm); resetDb();
+  for (const status of mm.Types.COMMUNICATION_MESSAGE_STATUSES) seedMessage({ status });
+  const res = await mm.Admin.getCommunicationOverview();
+  return res.ok ? res.data : null;
+}
+
+srcMutation("MUT qA: `ignored` is dropped from the webhook processing type vocabulary",
+  TYPES_SRC, "| \"ignored\";", "| \"removed_by_mutation\";",
+  // The union no longer admits a status the database CHECK already writes, so an
+  // `ignored` receipt has no place in the read model. (`npm run typecheck` rejects it
+  // independently; the structural check keeps the harness itself honest.)
+  () => !UNION_HAS_IGNORED.test(readF(TYPES_SRC)));
+
+tsMutation("MUT qB: the admin webhook summary drops the ignored bucket",
+  [[ADMIN_SVC_FILE, "  \"failed\",\n  \"ignored\",\n];", "  \"failed\",\n];"]],
+  async (mm) => {
+    stubDb(mm); resetDb();
+    seedReceipt({ processing_status: "ignored" });
+    const res = await mm.Admin.getWebhookProcessingSummary();
+    // The receipt exists but is counted nowhere: total ≠ sum of the breakdown.
+    const sum = Object.values(res.data.processingBreakdown).reduce((a, b) => a + b, 0);
+    return res.ok && res.data.processingBreakdown.ignored === undefined && sum !== res.data.totalReceipts;
+  });
+
+tsMutation("MUT qC: the admin message breakdown drops outcome_unknown",
+  [[ADMIN_SVC_FILE, "  \"cancelled\",\n  \"outcome_unknown\",\n];", "  \"cancelled\",\n];"]],
+  async (mm) => {
+    const overview = await overviewOf(mm);
+    if (!overview) return false;
+    const sum = Object.values(overview.statusBreakdown).reduce((a, b) => a + b, 0);
+    // An outcome_unknown message is invisible: the breakdown no longer sums to the total.
+    return overview.statusBreakdown.outcome_unknown === undefined && sum !== overview.totalMessages;
+  });
+
+tsMutation("MUT qD: CommunicationOverview stops exposing outcomeUnknownCount",
+  [[ADMIN_SVC_FILE, "  outcomeUnknownCount: number;\n}", "}"],
+   [ADMIN_SVC_FILE, "      outcomeUnknownCount: breakdown.outcome_unknown,\n", ""]],
+  async (mm) => {
+    const overview = await overviewOf(mm);
+    return overview !== null && overview.outcomeUnknownCount === undefined;
+  });
+
+srcMutation("MUT qE: the deadline is created after the bounded body read",
+  ROUTE_FILE,
+  "  // FIRST statement of the handler: the hook budget is already running.\n  const deadline = startAuthHookDeadline();\n  try {\n    // Bounded read: Content-Length pre-check + streaming byte cap. Never buffers\n    // more than the ceiling, even without a Content-Length header.\n    const bounded = await readBoundedRawBody(request, MAX_HOOK_BODY_BYTES);",
+  "  try {\n    // Bounded read: Content-Length pre-check + streaming byte cap. Never buffers\n    // more than the ceiling, even without a Content-Length header.\n    const bounded = await readBoundedRawBody(request, MAX_HOOK_BODY_BYTES);\n    const deadline = startAuthHookDeadline();",
+  () => {
+    const route = readF(ROUTE_FILE);
+    // Time spent reading a slow/trickling body is no longer charged to the budget.
+    return route.indexOf("const deadline = startAuthHookDeadline();") >
+      route.indexOf("readBoundedRawBody(request, MAX_HOOK_BODY_BYTES)");
+  });
+
+srcMutation("MUT qF: the route never passes its deadline to the hook service",
+  ROUTE_FILE,
+  "      getHeader: (name) => request.headers.get(name),\n      deadline,\n    });",
+  "      getHeader: (name) => request.headers.get(name),\n    });",
+  () => !/getHeader: \(name\) => request\.headers\.get\(name\),\n      deadline,/.test(readF(ROUTE_FILE)));
 
 // ============================================================================
 // EXECUTE

@@ -251,37 +251,112 @@ After C2:
 Nothing in C2's sources contains an `insert into`, an `outbound_enabled = true`, or any
 reference to `authentication_transport_policies`.
 
-## 13. C3 integration boundary
+## 13. C3 integration boundary — Phase 5F-C3: Client Login OTP Fallback Integration
 
-Phase 5F-C3 may:
+C3 is the controlled integration phase for **`client_login_otp` only**.
 
-1. choose a commercial SMS provider **after review** and add its mode to the closed
-   vocabulary in `smsProviderSelection.ts`;
-2. add a real adapter implementing `SmsProvider`, using the abortable `HttpTransport`, that
+C3 **is** the phase that integrates the client fallback path. It may also carry the reviewed
+real SMS provider integration and the operational readiness work that path depends on — but
+those are prerequisites, not the goal. The end goal of C3 is the controlled `client_login_otp`
+fallback integration.
+
+### Prerequisites C3 may introduce, under reviewed operational rollout procedures
+
+1. a **reviewed** commercial SMS provider, added to the closed mode vocabulary in
+   `smsProviderSelection.ts`;
+2. a real adapter implementing `SmsProvider` on the abortable `HttpTransport`, which
    classifies **its own** provider payload into `accepted` / `definitive_failure` /
    `unknown_outcome` explicitly;
-3. add server-only credentials as environment variables (never committed);
-4. create the provider account row and drive it to `provider_ready` + `complete` + `healthy`;
-5. register DLT content templates and record the approved mappings with
-   `provider_category = 'authentication'`.
+3. server-only credentials as environment variables (never committed);
+4. the provider account row, driven to `provider_ready` + `complete` + `healthy`;
+5. registered DLT authentication content templates and their **approved** mappings with
+   `provider_category = 'authentication'`;
+6. the SMS runtime policy with its `canary` → `active` rollout controls;
+7. the reviewed operational enablement of the `client_login_otp` transport policy, plus the
+   explicit **active, eligible** failure rule that authorizes fallback for it.
 
-C3 may **not** enable a fallback, seed a failure rule, or change an authentication authority.
+None of the above is fallback authorization by itself. **Provider readiness never authorizes a
+fallback.**
 
-## 14. C4 integration boundary
+### The required client flow
 
-Phase 5F-C4 may wire the actual attempt-2 dispatch, and only in this order:
+**Supabase Auth remains the OTP and session authority.** One auth action. One OTP authority.
+One OTP value.
+
+**Attempt 1 — WhatsApp.**
+
+**Attempt 2 — SMS**, if and *only* if all seven hold:
+
+1. the WhatsApp primary reaches a proven `definitive_failure`;
+2. the C1 fallback decision returns **allowed**;
+3. an explicit **eligible failure rule** exists;
+4. the transport policy is **operationally enabled** for this reviewed rollout;
+5. the C2 SMS runtime gate returns `SMS_RUNTIME_READY`;
+6. the attempt budget remains available;
+7. the C1 **atomic fallback claim** succeeds.
+
+Attempt 2 then sends the **SAME OTP already present in request memory**. C1 attempt
+finalization records the SMS transport result.
+
+### C3 must never
+
+- generate a second OTP;
+- create a second OTP authority;
+- persist the OTP;
+- persist a plaintext destination in the communication or attempt ledgers;
+- fall back after `accepted`;
+- fall back after `unknown_outcome`;
+- exceed two transport attempts;
+- introduce an SMS resend loop;
+- wire the `vendor_password_reset` fallback yet (that is C4);
+- allow `vendor_whatsapp_verify` to use SMS;
+- give n8n any authentication or fallback authority.
+
+## 14. C4 integration boundary — Phase 5F-C4: Vendor Password Reset Fallback + Final Transport Security Audit
+
+C4 introduces no new transport model and no new authority. It **reuses**:
+
+- the C1 decision engine;
+- the C1 attempt ledger;
+- the C1 atomic claim / finalization;
+- the C2 SMS provider & runtime foundation;
+- the reviewed SMS provider infrastructure introduced or completed during C3.
+
+C4 wires the SMS fallback for **`vendor_password_reset` only**, under the same locked model:
 
 ```
-C1 decision engine says ALLOWED
-  → C2 SMS runtime gate says SMS_RUNTIME_READY
-    → C1 atomic fallback attempt claim succeeds
-      → the SAME OTP, from request memory, is re-sent over SMS
-        → C1 finalizes the attempt outcome
+one auth action · one challenge authority · one OTP value
+attempt 1 — WhatsApp
+attempt 2 — SMS (maximum), carrying the SAME OTP
+no persistence · no retry loop
+no fallback after accepted · no fallback after unknown_outcome
+maximum two transport attempts
 ```
 
-It must reuse the **same OTP value** from request memory (never generate a second one),
-never persist an OTP, never persist a plaintext destination, and never exceed two transport
-attempts per authentication action. `vendor_whatsapp_verify` never enters this path.
+Here the challenge authority is `verification_challenges`, not Supabase Auth. C4 must
+explicitly preserve: **`vendor_whatsapp_verify` remains permanently WhatsApp-only.**
+
+### The final C4 transport security audit must verify
+
+- `client_login_otp` and `vendor_password_reset` are isolated by **action identity**;
+- challenge IDs cannot cross flows;
+- auth user IDs cannot cross actions;
+- destination hashes cannot cross lineages;
+- the same action replayed is **idempotent**;
+- repeated login actions remain **independent**;
+- attempt 2 requires the exact attempt-1 lineage;
+- a maximum of two transport attempts;
+- no SMS retry loop;
+- no `WhatsApp → SMS → WhatsApp` sequence;
+- no fallback after `accepted`;
+- no fallback after `unknown_outcome`;
+- no duplicate OTP authority;
+- no OTP persistence;
+- no plaintext phone persistence in the communication or attempt ledgers;
+- **provider readiness never equals fallback authorization**;
+- n8n never decides authentication or fallback;
+- `vendor_whatsapp_verify` cannot reach SMS through the transport policy, the decision
+  engine, the RPCs, or the database constraints.
 
 ## 15. India DLT readiness — external and pending
 

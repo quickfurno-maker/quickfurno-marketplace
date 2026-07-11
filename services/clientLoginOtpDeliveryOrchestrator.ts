@@ -47,6 +47,10 @@ import {
 } from "../lib/auth/authAttemptOutcomeMapping";
 import { deriveClientLoginActionId } from "../lib/communication/authenticationActionIdentity";
 import type { AuthenticationActionId } from "../lib/communication/authenticationActionIdentity";
+import {
+  resolveAuthenticationSmsContent,
+  type AuthSmsRenderResult,
+} from "../lib/communication/authSmsBodyRenderer";
 import { hashPhoneE164 } from "../lib/communication/phone";
 import {
   AuthFallbackRequestMode,
@@ -128,6 +132,12 @@ export const OrchestratorFallbackBlockReason = {
   SMS_PROVIDER_UNAVAILABLE: "SMS_PROVIDER_UNAVAILABLE",
   /** The runtime adapter is not the provider the decision allowed. */
   SMS_PROVIDER_IDENTITY_MISMATCH: "SMS_PROVIDER_IDENTITY_MISMATCH",
+  /**
+   * The reviewed authentication SMS body could not be resolved (no reviewed template, a
+   * template-identity mismatch, or a malformed OTP). A LOCAL/preflight failure — deny-only,
+   * and evaluated BEFORE any attempt-2 claim, so it never consumes the fallback budget.
+   */
+  RESOLVED_BODY_UNAVAILABLE: "RESOLVED_BODY_UNAVAILABLE",
   BUDGET_EXHAUSTED: AUTH_NETWORK_DEADLINE_EXHAUSTED,
   FALLBACK_CLAIM_REJECTED: "FALLBACK_CLAIM_REJECTED",
 } as const;
@@ -164,6 +174,12 @@ export interface ClientOtpDeliveryDeps {
   readonly decideAuthenticationFallback: typeof decideAuthenticationFallback;
   readonly evaluateSmsRuntimeReadiness: typeof evaluateSmsRuntimeReadiness;
   readonly createRuntimeSmsProvider: typeof createRuntimeSmsProvider;
+  /**
+   * Renders the reviewed, code-owned authentication SMS body. PURE and provider-neutral; the
+   * default binds the one reviewed renderer. Injected so the harness can force a render
+   * failure without a real provider.
+   */
+  readonly resolveAuthenticationSmsContent: typeof resolveAuthenticationSmsContent;
   /**
    * Emits the DB-INDEPENDENT `ledger_unavailable` server log line. Runs BEFORE the security
    * event write, because it is the only signal that survives a full database outage.
@@ -211,6 +227,7 @@ export function defaultClientOtpDeliveryDeps(): ClientOtpDeliveryDeps {
     decideAuthenticationFallback,
     evaluateSmsRuntimeReadiness,
     createRuntimeSmsProvider: (factory, env) => createRuntimeSmsProvider(factory, env),
+    resolveAuthenticationSmsContent,
     // A single structured, sanitized, DB-INDEPENDENT server log line under a fixed greppable
     // prefix. Deliberately not a database write: it must survive a total DB outage.
     logLedgerUnavailable: (line) => {
@@ -359,11 +376,18 @@ async function emitLedgerUnavailable(
  *  11   blocked → delivery_failed;
  *  12   allowed → evaluate the C2 SMS runtime infrastructure gate;
  *  13   prove the runtime SMS adapter IS the provider the decision allowed;
+ *  13b  resolve the reviewed authentication SMS body (PURE, BEFORE any claim);
  *  14   check the remaining budget, then claim attempt 2 atomically;
  *  15   claim rejected → NO SMS;
- *  16   send the SAME OTP over SMS;
+ *  16   send the SAME resolved OTP body over SMS;
  *  17   finalize attempt 2;
  *  18   the hook response comes from attempt 2's outcome.
+ *
+ * RENDER/CLAIM/SEND ORDERING. The reviewed body is resolved at 13b, BEFORE the atomic
+ * attempt-2 claim at 14. Rendering is pure and side-effect-free, so a render or template-
+ * identity failure fails closed without consuming the one-and-only fallback attempt or
+ * leaving a claimed-but-unsent attempt-2 row. The send at 16 still occurs ONLY after a
+ * CLAIMED atomic attempt-2 (the claim remains mandatory, immediately before the send).
  */
 export async function deliverClientLoginOtp(
   input: ClientOtpDeliveryInput,
@@ -529,6 +553,27 @@ export async function deliverClientLoginOtp(
     return blocked(OrchestratorFallbackBlockReason.SMS_PROVIDER_IDENTITY_MISMATCH);
   }
 
+  // 13b — RESOLVE the reviewed authentication SMS body, BEFORE any attempt-2 claim. This is
+  // PURE and has no external side effect (see the render/claim ordering rationale in the
+  // module header), so a render or template-identity failure fails closed WITHOUT consuming
+  // the single fallback attempt budget and WITHOUT leaving a claimed-but-unsent attempt-2 row.
+  // The provider decides NONE of the QuickFurno content — only reviewed code does. The
+  // reviewed template key IS the auth flow, cross-checked against the runtime mapping identity.
+  // A local content failure is deny-only: it never authorizes a fallback, retry, or attempt 3.
+  const rendered: AuthSmsRenderResult = deps.resolveAuthenticationSmsContent({
+    reviewedTemplateKey: ORCHESTRATED_AUTH_FLOW,
+    language: CLIENT_OTP_SMS_LANGUAGE,
+    otp: input.otp,
+    runtimeMapping: {
+      templateKey: gate.mapping.templateKey,
+      language: gate.mapping.language,
+      providerTemplateName: gate.mapping.providerTemplateName,
+      providerTemplateId: gate.mapping.providerTemplateId,
+      providerCategory: gate.mapping.providerCategory,
+    },
+  });
+  if (!rendered.ok) return blocked(OrchestratorFallbackBlockReason.RESOLVED_BODY_UNAVAILABLE);
+
   // 14a — the deadline covers BOTH attempts. Below the minimum viable network budget a
   // request is not worth starting: it would abort mid-flight and park as `outcome_unknown`,
   // i.e. a possible silent second OTP. Nothing is claimed and nothing is sent.
@@ -554,12 +599,14 @@ export async function deliverClientLoginOtp(
   const fallbackAttemptId = fallbackClaim.data.attemptId;
   if (!fallbackAttemptId) return blocked(OrchestratorFallbackBlockReason.FALLBACK_CLAIM_REJECTED);
 
-  // 16 — the SAME OTP, from request memory, over the second transport. Never regenerated.
-  // The remaining budget CEILING can only shorten the adapter's abortable timeout.
-  const smsResult = await smsProvider.sendAuthenticationMessage(
+  // 16 — the SAME OTP, from request memory, rendered into the reviewed body at step 13b, over
+  // the second transport. Never regenerated. Provider-neutral: the orchestrator hands over a
+  // resolved descriptor and never constructs a provider request, names an endpoint, or knows a
+  // provider's payload shape. The remaining budget CEILING can only shorten the adapter's
+  // abortable timeout.
+  const smsResult = await smsProvider.sendResolvedAuthenticationSms(
     input.phoneE164,
-    gate.mapping.templateKey,
-    { otp: input.otp },
+    rendered.resolved,
     { maxNetworkTimeoutMs: remainingMs }
   );
 

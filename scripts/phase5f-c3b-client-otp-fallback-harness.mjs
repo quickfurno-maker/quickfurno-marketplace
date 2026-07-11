@@ -33,6 +33,8 @@ const TS_FILES = [
   "lib/communication/authenticationTransportDecision.ts",
   "lib/auth/hookDeadline.ts",
   "lib/auth/authAttemptOutcomeMapping.ts",
+  // Phase 5F-C3-C-1: the orchestrator now renders the reviewed SMS body via this PURE module.
+  "lib/communication/authSmsBodyRenderer.ts",
 ];
 
 function compileTo(outDir) {
@@ -186,6 +188,7 @@ function wireBuild(outDir) {
     Deadline: req("./lib/auth/hookDeadline.js"),
     Mapping: req("./lib/auth/authAttemptOutcomeMapping.js"),
     Gate: req("./lib/communication/providers/smsRuntimeGate.js"),
+    Renderer: req("./lib/communication/authSmsBodyRenderer.js"),
     Orchestrator: req("./services/clientLoginOtpDeliveryOrchestrator.js"),
   };
 }
@@ -261,8 +264,10 @@ function makeDeps(over = {}) {
   const smsProvider = {
     providerKey: SMS_PROVIDER,
     channel: "sms",
-    async sendAuthenticationMessage(to, templateKey, variables, options) {
-      calls.smsSends.push({ to, templateKey, variables, options });
+    // Phase 5F-C3-C-1: the orchestrator now delivers a RESOLVED body (OTP already rendered in),
+    // never a bare template key. The fake records the resolved descriptor it was handed.
+    async sendResolvedAuthenticationSms(to, resolved, options) {
+      calls.smsSends.push({ to, resolved, options });
       return over.smsResult ?? {
         accepted: true, provider: SMS_PROVIDER, channel: "sms",
         providerMessageId: "exotel-sid-1", normalizedStatus: "accepted",
@@ -306,6 +311,10 @@ function makeDeps(over = {}) {
       calls.smsFactoriesUsed.push(factory);
       return ok(over.smsProvider ?? smsProvider);
     }),
+    // Phase 5F-C3-C-1: the PURE reviewed-body renderer. Bound to the REAL renderer so the
+    // same-OTP-in-body invariant is exercised end to end; overridable to force a render failure.
+    resolveAuthenticationSmsContent: over.resolveAuthenticationSmsContent ??
+      ((input) => M.Renderer.resolveAuthenticationSmsContent(input)),
     logLedgerUnavailable: over.logLedgerUnavailable ?? ((line) => {
       calls.serverLogs.push(line);
       if (over.serverLogThrows) throw new Error("simulated server-log failure");
@@ -567,7 +576,8 @@ check("12. the SAME OTP is used for BOTH attempts — never regenerated", async 
   const { r, deps } = await run(definitiveFailureOver({ decision: ALLOWED_DECISION, gate: READY_GATE() }));
   assert(r.smsSent === true, "the fallback ran");
   assert(deps.calls.sends[0].intent.variables.otp === OTP, "attempt 1 carried the caller's OTP");
-  assert(deps.calls.smsSends[0].variables.otp === OTP, "attempt 2 carried the SAME OTP");
+  // Phase 5F-C3-C-1: attempt 2 now carries the SAME OTP rendered INTO the reviewed body.
+  assert(deps.calls.smsSends[0].resolved.messageBody.includes(OTP), "attempt 2 carried the SAME OTP (in the resolved body)");
   assert(deps.calls.smsSends[0].to === PHONE, "the SMS went to the same destination");
 
   // The orchestrator contains no OTP generator of any kind.
@@ -747,10 +757,11 @@ check("19. no migration, no SQL, no env change, and C1's authority files are unt
     assert(!path.endsWith(".sql"), `no SQL file may be created or modified (${path})`);
     assert(!/(^|\/)\.env/.test(path), `no env file may be created or modified (${path})`);
   }
-  // The C1 decision engine and the Exotel adapter internals are byte-for-byte unchanged.
-  for (const authority of [DECISION_SRC, EXOTEL_ADAPTER_SRC]) {
-    assert(!dirty.includes(authority), `${authority} must be unmodified`);
-  }
+  // The C1 decision engine — the fallback AUTHORITY — is byte-for-byte unchanged. (Phase
+  // 5F-C3-C-1 legitimately widens the Exotel adapter's RESOLVED-send contract, so the adapter's
+  // byte-identity is no longer asserted here; its invariants are owned by the C3-C-1 harness.
+  // The C1 authority guard, which is the security-critical one, is preserved.)
+  assert(!dirty.includes(DECISION_SRC), `${DECISION_SRC} must be unmodified`);
   // The orchestrator touches no database and issues no SQL of its own.
   const src = readCode(ORCHESTRATOR_SRC);
   assert(!/adminClient|from\(["']|\.rpc\(/.test(src), "the orchestrator never touches the database directly");
@@ -1030,7 +1041,7 @@ tsMutation("MUT E: the provider identity fence is removed",
     '  if (smsProvider.providerKey !== allowedProviderKey || smsProvider.channel !== "sms") {',
     "  if (false) {"]],
   async (mm) => {
-    const impostor = { providerKey: "msg91_sms", channel: "sms", sendAuthenticationMessage: async () => ({ accepted: true, outcomeCertainty: "accepted", errorCode: null, provider: "msg91_sms", channel: "sms", providerMessageId: "x", normalizedStatus: "accepted", errorMessage: null, retryable: false }) };
+    const impostor = { providerKey: "msg91_sms", channel: "sms", sendResolvedAuthenticationSms: async () => ({ accepted: true, outcomeCertainty: "accepted", errorCode: null, provider: "msg91_sms", channel: "sms", providerMessageId: "x", normalizedStatus: "accepted", errorMessage: null, retryable: false }) };
     const deps = makeDeps(definitiveFailureOver({ decision: ALLOWED_DECISION, gate: READY_GATE(), smsProvider: impostor }));
     const r = await mm.Orchestrator.deliverClientLoginOtp(baseInput(), deps);
     return r.smsSent === true;
@@ -1121,12 +1132,13 @@ tsMutation("MUT M: the raw verified webhook id is used as the action identity",
 
 tsMutation("MUT N: a fresh OTP is generated for the fallback attempt",
   [[ORCHESTRATOR_SRC,
-    "    { otp: input.otp },",
-    '    { otp: String(Number(input.otp) + 1) },']],
+    "    otp: input.otp,",
+    "    otp: String(Number(input.otp) + 1),"]],
   async (mm) => {
     const deps = makeDeps(definitiveFailureOver({ decision: ALLOWED_DECISION, gate: READY_GATE() }));
     await mm.Orchestrator.deliverClientLoginOtp(baseInput(), deps);
-    return deps.calls.smsSends.length > 0 && deps.calls.smsSends[0].variables.otp !== OTP;
+    // The reviewed body now carries a DIFFERENT OTP than the one Supabase issued.
+    return deps.calls.smsSends.length > 0 && !deps.calls.smsSends[0].resolved.messageBody.includes(OTP);
   });
 
 tsMutation("MUT O: a structural primary-claim refusal still dispatches the OTP",
@@ -1158,7 +1170,7 @@ tsMutation("MUT P: a fallback is anchored on a synthesized attempt when the ledg
 srcMutation("MUT Q: a retry loop is introduced into the orchestrator",
   ORCHESTRATOR_SRC,
   "  // 17 — finalize attempt 2.",
-  "  for (let i = 0; i < 2; i++) { await smsProvider.sendAuthenticationMessage(input.phoneE164, gate.mapping.templateKey, { otp: input.otp }); }\n  // 17 — finalize attempt 2.",
+  "  for (let i = 0; i < 2; i++) { await smsProvider.sendResolvedAuthenticationSms(input.phoneE164, rendered.resolved); }\n  // 17 — finalize attempt 2.",
   () => /\bfor\s*\(/.test(readCode(ORCHESTRATOR_SRC)));
 
 srcMutation("MUT R: the orchestrator logs the OTP",

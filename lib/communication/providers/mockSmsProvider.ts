@@ -28,6 +28,7 @@
 import crypto from "crypto";
 import type { ProviderOutcomeCertainty } from "./providerOutcome";
 import type {
+  ResolvedAuthenticationSms,
   SmsAuthenticationSendOptions,
   SmsProvider,
   SmsProviderHealth,
@@ -119,6 +120,31 @@ export class MockSmsProvider implements SmsProvider {
     return result;
   }
 
+  /**
+   * Phase 5F-C3-C-1. A deterministic, NO-WIRE resolved send. Zero network calls. The
+   * `resolved.messageBody` contains the OTP and is NEVER inspected, retained, logged, or
+   * echoed — the destination steers the simulation transiently and is then dropped, exactly
+   * as {@link sendAuthenticationMessage}. Widening the contract must not weaken this: a mock
+   * still never becomes a live OTP sender (see `smsProviderSelection.ts` / the runtime fence).
+   */
+  async sendResolvedAuthenticationSms(
+    to: string,
+    resolved: ResolvedAuthenticationSms,
+    _options: SmsAuthenticationSendOptions = {}
+  ): Promise<SmsSendResult> {
+    this.sendSequence += 1;
+    const result = this.simulateResolvedSend(to, resolved.providerTemplateName);
+
+    // SECURITY: the NON-SECRET provider template name only — never the body, OTP, or number.
+    this.lastSentRecords.push({
+      templateKey: resolved.providerTemplateName,
+      variableKeys: [],
+      sequence: this.sendSequence,
+      outcome: result.outcomeCertainty as MockSmsOutcome,
+    });
+    return result;
+  }
+
   private failure(
     errorCode: string,
     errorMessage: string,
@@ -138,11 +164,12 @@ export class MockSmsProvider implements SmsProvider {
     };
   }
 
-  private simulateSend(
-    to: string,
-    templateKey: string,
-    variables: Record<string, string>
-  ): SmsSendResult {
+  /**
+   * The reserved test destinations steer a simulated failure. Returns `null` for an ordinary
+   * destination (i.e. an acceptance). The destination is compared transiently and dropped —
+   * it is never retained and never seeds a message id.
+   */
+  private simulateFailureForDestination(to: string): SmsSendResult | null {
     if (to === MOCK_SMS_DESTINATIONS.RETRYABLE_FAILURE) {
       // Provably never reached the provider, so a resend cannot duplicate a message.
       return this.failure(
@@ -169,14 +196,12 @@ export class MockSmsProvider implements SmsProvider {
         false
       );
     }
+    return null;
+  }
 
-    // Deterministic id: monotonic counter + stable hash of the NON-SENSITIVE send input.
-    // Neither the OTP value nor the destination participates.
-    const idSeed = stableHash({
-      seq: this.sendSequence,
-      templateKey,
-      keys: Object.keys(variables).sort(),
-    });
+  /** Deterministic acceptance whose id derives only from NON-SENSITIVE markers. */
+  private acceptedResult(idSeedInput: unknown): SmsSendResult {
+    const idSeed = stableHash(idSeedInput);
     return {
       accepted: true,
       provider: this.providerKey,
@@ -188,6 +213,32 @@ export class MockSmsProvider implements SmsProvider {
       retryable: false,
       outcomeCertainty: "accepted",
     };
+  }
+
+  private simulateSend(
+    to: string,
+    templateKey: string,
+    variables: Record<string, string>
+  ): SmsSendResult {
+    const steered = this.simulateFailureForDestination(to);
+    if (steered) return steered;
+    // Deterministic id: monotonic counter + stable hash of the NON-SENSITIVE send input.
+    // Neither the OTP value nor the destination participates.
+    return this.acceptedResult({
+      seq: this.sendSequence,
+      templateKey,
+      keys: Object.keys(variables).sort(),
+    });
+  }
+
+  /**
+   * The resolved-send simulation. Same destination steering; the id derives only from the
+   * sequence and the NON-SECRET provider template name — never the body or the OTP.
+   */
+  private simulateResolvedSend(to: string, providerTemplateName: string): SmsSendResult {
+    const steered = this.simulateFailureForDestination(to);
+    if (steered) return steered;
+    return this.acceptedResult({ seq: this.sendSequence, providerTemplateName });
   }
 
   async healthCheck(): Promise<SmsProviderHealth> {

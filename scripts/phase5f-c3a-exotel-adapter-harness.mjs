@@ -162,8 +162,10 @@ const OTP = "482913";
 const RESOLVED = Object.freeze({
   providerTemplateName: "QF_CLIENT_LOGIN_OTP_DLT",
   messageBody: `Your QuickFurno code is ${OTP}. Valid 10 minutes.`,
-  dltEntityId: "1234567890123456789",
-  dltTemplateId: "9876543210987654321",
+  // Phase 5F-C3-C-1: the neutral resolved contract. The provider TEMPLATE id is a per-send
+  // mapping fact carried on the descriptor; the DLT ENTITY id is account-level and owned by the
+  // adapter's own config, never this descriptor.
+  providerTemplateId: "9876543210987654321",
 });
 
 /** A 4xx body that deliberately embeds the token, the destination and the OTP. */
@@ -649,26 +651,38 @@ check("18. credentials travel only in the Authorization header — never a URL, 
   assert(req.headers["Content-Type"] === "application/x-www-form-urlencoded", "form encoding");
   assert(req.maxResponseBytes > 0, "the response body read is bounded");
 
-  // The DLT ids are forwarded as opaque passthrough, never derived.
+  // Phase 5F-C3-C-1 (corrected) DLT ownership — ONE template-identity authority, NO fallback:
+  //   • TEMPLATE id ← the resolved descriptor (the runtime mapping's providerTemplateId) ONLY;
+  //   • ENTITY id   ← the adapter's account config ONLY.
   const form = new URLSearchParams(req.body);
   assert(form.get("From") === FAKE_SENDER && form.get("To") === DESTINATION, "From/To");
-  assert(form.get("DltEntityId") === RESOLVED.dltEntityId, "DLT entity id passthrough");
-  assert(form.get("DltTemplateId") === RESOLVED.dltTemplateId, "DLT template id passthrough");
+  assert(form.get("DltTemplateId") === RESOLVED.providerTemplateId, "DLT template id from the descriptor");
+  assert(!form.has("DltEntityId"), "no account-level DLT entity id configured → absent");
 
-  // Falling back to the account-level DLT ids when the mapping carries none.
+  // With account config present: the ENTITY id comes from config; the config TEMPLATE id can
+  // NEVER override the descriptor template id.
   const envWithDlt = { ...EXOTEL_ENV, EXOTEL_DLT_ENTITY_ID: "111", EXOTEL_DLT_TEMPLATE_ID: "222" };
   const t2 = fakeTransport(response(200, OK_BODY));
-  await exotelProvider(M, t2, envWithDlt).sendResolvedAuthenticationSms(DESTINATION,
-    { providerTemplateName: RESOLVED.providerTemplateName, messageBody: RESOLVED.messageBody });
+  await exotelProvider(M, t2, envWithDlt).sendResolvedAuthenticationSms(DESTINATION, RESOLVED);
   const form2 = new URLSearchParams(t2.calls[0].body);
-  assert(form2.get("DltEntityId") === "111" && form2.get("DltTemplateId") === "222", "account-level DLT ids");
+  assert(form2.get("DltEntityId") === "111", "entity id from account config");
+  assert(form2.get("DltTemplateId") === RESOLVED.providerTemplateId, "descriptor template id is the sole authority");
+  assert(form2.get("DltTemplateId") !== "222", "the config template id can NEVER override the descriptor");
 
-  // No DLT ids anywhere → the fields are simply absent. Nothing is invented.
+  // A descriptor with NO template id → the config template id can NEVER rescue it. Nothing invented.
   const t3 = fakeTransport(response(200, OK_BODY));
-  await exotelProvider(M, t3).sendResolvedAuthenticationSms(DESTINATION,
-    { providerTemplateName: "T", messageBody: "B" });
+  await exotelProvider(M, t3, envWithDlt).sendResolvedAuthenticationSms(DESTINATION,
+    { providerTemplateName: RESOLVED.providerTemplateName, messageBody: RESOLVED.messageBody, providerTemplateId: null });
   const form3 = new URLSearchParams(t3.calls[0].body);
-  assert(!form3.has("DltEntityId") && !form3.has("DltTemplateId"), "no fabricated DLT id");
+  assert(!form3.has("DltTemplateId"), "no config template-id rescue for a missing descriptor id");
+  assert(form3.get("DltEntityId") === "111", "the account entity id is still forwarded");
+
+  // No account config and no descriptor template id → the fields are simply absent. Nothing invented.
+  const t4 = fakeTransport(response(200, OK_BODY));
+  await exotelProvider(M, t4).sendResolvedAuthenticationSms(DESTINATION,
+    { providerTemplateName: "T", messageBody: "B", providerTemplateId: null });
+  const form4 = new URLSearchParams(t4.calls[0].body);
+  assert(!form4.has("DltEntityId") && !form4.has("DltTemplateId"), "no fabricated DLT id");
 });
 
 check("19. the bare SmsProvider send method can never put a message on the wire", async () => {

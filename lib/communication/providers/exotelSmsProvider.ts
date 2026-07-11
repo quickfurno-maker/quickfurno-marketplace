@@ -47,6 +47,7 @@ import { classifyTransportCertainty } from "./providerOutcome";
 import type { ProviderOutcomeCertainty } from "./providerOutcome";
 import {
   resolveSmsNetworkTimeoutMs,
+  type ResolvedAuthenticationSms,
   type SmsAuthenticationSendOptions,
   type SmsProvider,
   type SmsProviderHealth,
@@ -76,21 +77,6 @@ export function buildExotelAccountUrl(cfg: Pick<ExotelConfig, "subdomain" | "acc
  */
 function basicAuthorizationHeader(apiKey: string, apiToken: string): string {
   return `Basic ${Buffer.from(`${apiKey}:${apiToken}`, "utf8").toString("base64")}`;
-}
-
-/**
- * An APPROVED, DLT-registered content descriptor resolved by the CALLER (from the C2 runtime
- * gate's `ResolvedSmsTemplateMapping`). The adapter never renders, fabricates, or guesses a
- * template — exactly as the Meta adapter refuses a bare template key.
- */
-export interface ExotelResolvedSms {
-  /** The registered DLT content template name the mapping approved. */
-  readonly providerTemplateName: string;
-  /** Already rendered by the caller from that approved template. Never logged or retained. */
-  readonly messageBody: string;
-  /** Per-mapping DLT ids; fall back to the account-level config values when absent. */
-  readonly dltEntityId?: string | null;
-  readonly dltTemplateId?: string | null;
 }
 
 function safeParseJson(text: string): Record<string, unknown> | null {
@@ -308,7 +294,7 @@ export class ExotelSmsProvider implements SmsProvider {
    */
   async sendResolvedAuthenticationSms(
     toE164: string,
-    resolved: ExotelResolvedSms,
+    resolved: ResolvedAuthenticationSms,
     options: SmsAuthenticationSendOptions = {}
   ): Promise<SmsSendResult> {
     if (typeof toE164 !== "string" || !E164_PATTERN.test(toE164)) {
@@ -333,8 +319,17 @@ export class ExotelSmsProvider implements SmsProvider {
       To: toE164,
       Body: resolved.messageBody,
     });
-    const dltEntityId = resolved.dltEntityId ?? this.config.dltEntityId;
-    const dltTemplateId = resolved.dltTemplateId ?? this.config.dltTemplateId;
+    // India DLT passthrough — EXACT identity, NO cross-domain fallback:
+    //   • the TEMPLATE id comes ONLY from the resolved descriptor (the runtime mapping's
+    //     `providerTemplateId`). `this.config.dltTemplateId` is DELIBERATELY not read here: a
+    //     config value must never substitute for a missing mapping template id on the
+    //     authentication resolved-send path (the renderer already fails closed when it is
+    //     missing, so a valid descriptor always carries a non-empty id).
+    //   • the ENTITY id is an ACCOUNT-level fact owned by the adapter's own config, never the
+    //     per-send descriptor.
+    // The adapter forwards both; it never derives, invents, or substitutes either.
+    const dltEntityId = this.config.dltEntityId;
+    const dltTemplateId = resolved.providerTemplateId;
     if (dltEntityId) form.set("DltEntityId", dltEntityId);
     if (dltTemplateId) form.set("DltTemplateId", dltTemplateId);
 

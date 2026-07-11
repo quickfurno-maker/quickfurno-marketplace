@@ -96,6 +96,34 @@ export interface SmsProviderHealth {
   readonly detailsSanitized: Record<string, unknown>;
 }
 
+/**
+ * A QuickFurno-RESOLVED authentication SMS (Phase 5F-C3-C-1). Provider-neutral: it carries
+ * DELIVERY FACTS only, and QuickFurno — never the provider — decides the message content.
+ *
+ *   • `messageBody` is already rendered by the reviewed, code-owned renderer with the OTP
+ *     substituted in. The provider forwards it verbatim; it never re-renders or edits it. It
+ *     is highly confidential (it contains the OTP) and is never logged, stored, or echoed.
+ *   • `providerTemplateName` / `providerTemplateId` are the approved provider template
+ *     identity the runtime mapping resolved (a readiness fact). A provider forwards them to
+ *     any regulatory registry it must satisfy (e.g. India DLT); it never derives or invents
+ *     them, and their presence is not proof of approval.
+ *
+ * ONE TEMPLATE-IDENTITY AUTHORITY, NO FALLBACK. For the authentication resolved-send path the
+ * DLT content-template identity follows exactly ONE chain:
+ *   reviewed QuickFurno template → runtime mapping → `providerTemplateId` → this descriptor →
+ *   the provider's template id.
+ * `providerTemplateId` is therefore REQUIRED and non-empty: the renderer fails closed when the
+ * runtime mapping lacks a usable id rather than emit a descriptor a provider could rescue from
+ * its own configuration. Account-level registry ids (e.g. a DLT ENTITY id) live in the
+ * provider's OWN config and are NOT part of this neutral contract — and a provider must never
+ * substitute a config template id for a missing `providerTemplateId`.
+ */
+export interface ResolvedAuthenticationSms {
+  readonly messageBody: string;
+  readonly providerTemplateName: string;
+  readonly providerTemplateId: string;
+}
+
 export interface SmsProvider {
   /**
    * Stable provider identity persisted on communication_messages.provider. The single
@@ -118,6 +146,24 @@ export interface SmsProvider {
     to: string,
     templateKey: string,
     variables: Record<string, string>,
+    options?: SmsAuthenticationSendOptions
+  ): Promise<SmsSendResult>;
+
+  /**
+   * Dispatches a QuickFurno-RESOLVED authentication OTP (Phase 5F-C3-C-1). The body is
+   * already rendered from a reviewed, code-owned template — the provider decides NONE of the
+   * QuickFurno message content; it only formats and delivers the transport request. Same OTP
+   * secrecy rules (never logged/stored/echoed), same `outcomeCertainty` vocabulary, same
+   * `maxNetworkTimeoutMs` ceiling, and the same one-request rule: it must never loop, resend,
+   * or make more than one request.
+   *
+   * This is the ONLY method that can put an authentication SMS on the wire. A real adapter
+   * (e.g. Exotel) that needs an approved registered content descriptor refuses
+   * {@link sendAuthenticationMessage} (a bare template key) and delivers only here.
+   */
+  sendResolvedAuthenticationSms(
+    to: string,
+    resolved: ResolvedAuthenticationSms,
     options?: SmsAuthenticationSendOptions
   ): Promise<SmsSendResult>;
 

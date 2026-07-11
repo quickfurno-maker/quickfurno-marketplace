@@ -12,7 +12,9 @@
 //   (a same-phone client+vendor conflict, or two vendors, is AMBIGUOUS)
 //   There is NO `LIMIT 1`, NO first-row-win, and NO client-over-vendor (or vendor-over-client)
 //   priority. Candidates are de-duplicated only by PROVABLE identity equality
-//   (principalType + principalId). A read failure fails SAFE to UNKNOWN.
+//   (principalType + principalId). A candidate-source read failure is an OPERATIONAL
+//   `IDENTITY_LOOKUP_FAILED` — NEVER durable UNKNOWN — so a transient DB fault stays retryable and
+//   is never persisted as permanent "no identity" truth.
 //
 // WHY A LEAD IS NOT AN IDENTITY. `leads.phone` is non-unique and a lead is NOT a verified
 // principal (one phone → many leads), so leads are deliberately NOT a candidate source. A
@@ -54,13 +56,31 @@ export interface InboundPrincipalCandidate {
   readonly principalId: string;
 }
 
-/** The observable result. Non-secret: a confidence, an optional principal, and a count. */
+/** The observable DURABLE identity truth. Non-secret: a confidence, an optional principal, count. */
 export interface InboundIdentityResult {
   readonly confidence: InboundIdentityConfidenceValue;
   readonly principalType: InboundPrincipalTypeValue | null;
   readonly principalId: string | null;
   readonly candidateCount: number;
 }
+
+/**
+ * The stable code for an OPERATIONAL identity-lookup failure — the candidate sources could not be
+ * evaluated (a query error, a thrown dependency, an unavailable database). NOT a raw error; it
+ * carries no database text.
+ */
+export const IDENTITY_LOOKUP_FAILED = "IDENTITY_LOOKUP_FAILED" as const;
+
+/**
+ * The resolution OUTCOME, which explicitly separates two very different things:
+ *   • `ok: true`  → the lookup SUCCEEDED; `identity` is a durable truth (exact/ambiguous/unknown).
+ *     UNKNOWN here means a successful search found NO provable candidate — a valid durable result.
+ *   • `ok: false` → the lookup INFRASTRUCTURE FAILED; identity truth could NOT be evaluated. This
+ *     is NEVER durable UNKNOWN — a caller must not persist it and should fail closed (retryable).
+ */
+export type InboundIdentityResolutionOutcome =
+  | { readonly ok: true; readonly identity: InboundIdentityResult }
+  | { readonly ok: false; readonly code: typeof IDENTITY_LOOKUP_FAILED };
 
 /** Every candidate source is injectable. The default binds the real read-only queries. */
 export interface InboundIdentityDeps {
@@ -108,17 +128,18 @@ function unknown(): InboundIdentityResult {
 }
 
 /**
- * Resolve an inbound sender to EXACT / AMBIGUOUS / UNKNOWN. `senderPhoneE164` is request-memory
- * only and never persisted or logged here.
+ * Resolve an inbound sender. Returns an OUTCOME that distinguishes a SUCCESSFUL lookup (with a
+ * durable EXACT/AMBIGUOUS/UNKNOWN identity) from an OPERATIONAL lookup failure that must never be
+ * persisted as durable UNKNOWN. `senderPhoneE164` is request-memory only and never persisted/logged.
  */
 export async function resolveInboundSenderIdentity(
   input: { readonly senderPhoneE164: string },
   deps: InboundIdentityDeps = defaultInboundIdentityDeps()
-): Promise<InboundIdentityResult> {
-  // Canonicalize first through the ONE canonical helper. A non-normalizable sender resolves
-  // UNKNOWN — never fabricated, and its plaintext value is never surfaced.
+): Promise<InboundIdentityResolutionOutcome> {
+  // Canonicalize first through the ONE canonical helper. A non-normalizable sender is a SUCCESSFUL
+  // lookup that can prove no candidate → durable UNKNOWN (never fabricated; plaintext never surfaced).
   const normalized = normalizePhoneE164(input.senderPhoneE164);
-  if (!normalized.ok) return unknown();
+  if (!normalized.ok) return { ok: true, identity: unknown() };
   const e164 = normalized.e164;
 
   let candidates: InboundPrincipalCandidate[];
@@ -130,8 +151,10 @@ export async function resolveInboundSenderIdentity(
     ]);
     candidates = [...clients, ...vendors, ...admins];
   } catch {
-    // A read failure is FAIL-SAFE: never fabricate a principal.
-    return unknown();
+    // INFRASTRUCTURE FAILURE — the candidate sources could NOT be evaluated. This is NOT durable
+    // UNKNOWN: a transient DB fault must never become permanent "no identity" truth. Report the
+    // operational failure (no raw error) so the caller fails closed and a retry can succeed.
+    return { ok: false, code: IDENTITY_LOOKUP_FAILED };
   }
 
   // De-duplicate by PROVABLE identity equality only. Never first-row-win.
@@ -142,11 +165,11 @@ export async function resolveInboundSenderIdentity(
   }
   const unique = [...uniqueById.values()];
 
-  if (unique.length === 0) return unknown();
+  if (unique.length === 0) return { ok: true, identity: unknown() };
   if (unique.length === 1) {
     const only = unique[0];
-    return { confidence: InboundIdentityConfidence.EXACT, principalType: only.principalType, principalId: only.principalId, candidateCount: 1 };
+    return { ok: true, identity: { confidence: InboundIdentityConfidence.EXACT, principalType: only.principalType, principalId: only.principalId, candidateCount: 1 } };
   }
   // More than one provable principal (cross-type conflict, multiple vendors, …) → AMBIGUOUS.
-  return { confidence: InboundIdentityConfidence.AMBIGUOUS, principalType: null, principalId: null, candidateCount: unique.length };
+  return { ok: true, identity: { confidence: InboundIdentityConfidence.AMBIGUOUS, principalType: null, principalId: null, candidateCount: unique.length } };
 }

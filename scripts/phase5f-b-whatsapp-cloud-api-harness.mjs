@@ -980,14 +980,23 @@ check("40-49. verified non-delivery + unknown → 200 ack (no mutation/send/n8n/
   const W = M.Webhook, WS = M.WebhookSvc;
   resetDb(); seedWebhookPolicy(); setMetaEnv();
   const sign = (b) => W.computeMetaWebhookSignature(b, "APP_SECRET_VALUE");
-  for (const [k, body] of [["inbound", NON_DELIVERY.inbound], ["template", NON_DELIVERY.template], ["account", NON_DELIVERY.account]]) {
+  // Phase 5F-D1-B COMPATIBILITY: INBOUND_MESSAGE is now CAPTURED (verified → deterministically
+  // rejected here, since this fixture message carries no sender), NOT ignored. It is still a 200
+  // ACK with no send/lifecycle mutation — only the receipt vocabulary changed (verified→rejected
+  // instead of ignored). Template/account remain acknowledged_ignored.
+  const inb = await WS.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.inbound, signature: sign(NON_DELIVERY.inbound) });
+  assert(inb.status === 200 && inb.result === "inbound_acknowledged_rejected", `inbound → 200 ack (captured, no sender → rejected), got ${JSON.stringify(inb)}`); // 40
+  for (const [k, body] of [["template", NON_DELIVERY.template], ["account", NON_DELIVERY.account]]) {
     const res = await WS.handleMetaWhatsAppWebhookPost({ rawBody: body, signature: sign(body) });
-    assert(res.status === 200 && res.result === "acknowledged_ignored", `${k} → 200 ack, got ${JSON.stringify(res)}`); // 40-42
+    assert(res.status === 200 && res.result === "acknowledged_ignored", `${k} → 200 ack, got ${JSON.stringify(res)}`); // 41-42
   }
   const ures = await WS.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.unknown, signature: sign(NON_DELIVERY.unknown) });
   assert(ures.status === 200 && ures.result === "acknowledged_unknown", "unknown → 200 ack"); // 43
-  assert(db.communication_messages.length === 0, "no message lifecycle mutation from ignored classes"); // 44-45
-  assert(db.communication_webhook_receipts.length > 0 && db.communication_webhook_receipts.every((r) => r.processing_status === "ignored"), "only ignored receipts recorded");
+  assert(db.communication_messages.length === 0, "no message lifecycle mutation from these classes"); // 44-45
+  // No DELIVERY lifecycle receipt is produced by these non-delivery classes: template/account/
+  // unknown record 'ignored'; the D1-B inbound capture records 'verified'→'rejected'. None is a
+  // delivery 'processed'/'failed'.
+  assert(db.communication_webhook_receipts.length > 0 && db.communication_webhook_receipts.every((r) => ["ignored", "verified", "rejected"].includes(r.processing_status)), "only non-delivery receipts recorded");
   const mres = await WS.handleMetaWhatsAppWebhookPost({ rawBody: "{not json", signature: sign("{not json") });
   assert(mres.status === 400, "malformed JSON → 400"); // 48
   const badSig = await WS.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.inbound, signature: "sha256=deadbeef" });

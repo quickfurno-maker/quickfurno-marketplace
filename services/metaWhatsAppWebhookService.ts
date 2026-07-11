@@ -33,11 +33,23 @@ import {
   verifyMetaWebhookSignature,
   MetaWebhookClassification,
 } from "../lib/communication/providers/metaWhatsAppWebhook";
+import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
 
 const CHANNEL = "whatsapp";
 
 export type MetaWebhookPostOutcome =
-  | { readonly status: 200; readonly result: "delivery_processed" | "duplicate" | "acknowledged_ignored" | "acknowledged_unknown" }
+  | {
+      readonly status: 200;
+      readonly result:
+        | "delivery_processed"
+        | "duplicate"
+        | "acknowledged_ignored"
+        | "acknowledged_unknown"
+        // Phase 5F-D1-B — verified INBOUND_MESSAGE capture outcomes.
+        | "inbound_processed"
+        | "inbound_duplicate"
+        | "inbound_acknowledged_rejected";
+    }
   | { readonly status: 400 | 401 | 403 | 500 | 503; readonly code: string };
 
 function safeParse(rawBody: string): Record<string, unknown> | null {
@@ -126,8 +138,27 @@ export async function handleMetaWhatsAppWebhookPost(input: {
     return { status: 200, result: "acknowledged_unknown" };
   }
 
-  // inbound_message / template_status / account_status — later phases own these.
-  // Acknowledge safely: NO lifecycle mutation, NO outbound send, NO n8n, NO Jarvis.
+  if (classification === MetaWebhookClassification.INBOUND_MESSAGE) {
+    // Phase 5F-D1-B: the ALREADY-VERIFIED inbound payload is durably CAPTURED (normalize →
+    // resolve identity → persist minimized rows, idempotent on the provider message id). NO
+    // reply, NO consent mutation, NO STOP/START/HELP handling, NO domain event, NO outbox, NO
+    // n8n, NO Jarvis/AI, NO conversation/24h-window. On a real persistence failure the webhook
+    // returns 500 so Meta retries (a retry makes progress via the per-message unique fence); a
+    // deterministic all-rejected batch is acknowledged so Meta does not retry forever.
+    const inbound = await handleInboundWhatsAppMessages({ rawBody: input.rawBody, payload });
+    if (!inbound.ok) return { status: 500, code: "inbound_processing_failed" };
+    const r = inbound.result;
+    if (r.messagesPersisted === 0 && r.messagesDuplicate === 0 && r.messagesRejected > 0) {
+      return { status: 200, result: "inbound_acknowledged_rejected" };
+    }
+    if (r.messagesPersisted === 0 && r.messagesDuplicate > 0) {
+      return { status: 200, result: "inbound_duplicate" };
+    }
+    return { status: 200, result: "inbound_processed" };
+  }
+
+  // template_status / account_status — later phases own these. Acknowledge safely: NO lifecycle
+  // mutation, NO outbound send, NO n8n, NO Jarvis.
   await recordIgnoredReceipt(input.rawBody, payload, "ignored_non_delivery");
   return { status: 200, result: "acknowledged_ignored" };
 }

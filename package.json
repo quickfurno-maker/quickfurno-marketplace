@@ -31,6 +31,7 @@
     "test:phase5f:c3c1": "node scripts/phase5f-c3c1-client-otp-resolved-sms-harness.mjs",
     "test:phase5f:c3c2": "node scripts/phase5f-c3c2-sms-canary-readiness-probe-harness.mjs",
     "test:phase5f:d1a": "node scripts/phase5f-d1a-whatsapp-inbound-foundation-harness.mjs",
+    "test:phase5f:d1b": "node scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",

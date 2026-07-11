@@ -68,15 +68,26 @@ headers, credentialled URLs, whole payloads, or arbitrary provider error objects
 
 ## Identity: EXACT / AMBIGUOUS / UNKNOWN
 
-Sender identity resolves fail-safe. Every provable principal candidate is collected, de-duplicated
-by provable identity equality, then: **zero → UNKNOWN**, **exactly one → EXACT**, **more than one →
-AMBIGUOUS**. A same-phone client+vendor conflict, or two vendors, is **AMBIGUOUS**. There is no
-`LIMIT 1`, no first-row-win, and no client-over-vendor (or vendor-over-client) priority. Ambiguous
-and unknown carry **no principal id** — enforced both in code and by a **complete** schema CHECK
+Sender identity resolves to a discriminated OUTCOME. On a **successful** lookup, every provable
+principal candidate is collected, de-duplicated by provable identity equality, then: **zero →
+UNKNOWN**, **exactly one → EXACT**, **more than one → AMBIGUOUS**. A same-phone client+vendor
+conflict, or two vendors, is **AMBIGUOUS**. There is no `LIMIT 1`, no first-row-win, and no
+client-over-vendor (or vendor-over-client) priority. Ambiguous and unknown carry **no principal
+id** — enforced both in code and by a **complete** schema CHECK
 (`chk_comm_inbound_identity_confidence_principal`): EXACT ⟺ both principal fields present;
 AMBIGUOUS/UNKNOWN ⟹ both NULL; a partially-populated pair is impossible. So a contradictory
 identity state (e.g. `exact` with a null principal, or `unknown` carrying one) can never be
 persisted, even by a service bug.
+
+**UNKNOWN vs IDENTITY_LOOKUP_FAILED (reliability, Phase 5F-D1-B correction).** These are
+deliberately distinct. **UNKNOWN** means a **successful** identity search found **no provable
+candidate** — a valid, durable identity result (persistable, 200). **IDENTITY_LOOKUP_FAILED** means
+the identity truth **could not be evaluated** because the lookup infrastructure failed (a
+candidate-source query error, a thrown dependency, an unavailable database). The resolver returns
+`{ ok: false, code: "IDENTITY_LOOKUP_FAILED" }` for the latter — it is **never** collapsed into
+durable UNKNOWN, carries **no** raw database error, and causes a **retryable** processing failure
+in D1-B (the message is not persisted; the receipt is failed; the webhook returns 500). A
+non-normalizable sender phone is still a *successful* lookup with no provable candidate → UNKNOWN.
 
 **Processing-status decision (deliberate).** No cross-constraint couples `processing_status` to
 `identity_confidence`. `processing_status` is **pipeline progress** (captured → normalized → …),

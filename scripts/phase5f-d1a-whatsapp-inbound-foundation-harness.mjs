@@ -305,7 +305,14 @@ function idDeps(over = {}) {
     findAdminCandidates: over.findAdminCandidates ?? (async () => over.admins ?? []),
   };
 }
-const resolve1 = (over, phone = E164) => M.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: phone }, idDeps(over));
+// Phase 5F-D1-B: the resolver returns a discriminated OUTCOME. A SUCCESSFUL lookup (ok:true)
+// carries a durable identity; these behavioural checks all use successful lookups, so unwrap
+// `.identity` here. The operational IDENTITY_LOOKUP_FAILED case is exercised in check 41.
+const resolve1 = async (over, phone = E164) => {
+  const out = await M.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: phone }, idDeps(over));
+  assert(out.ok === true, `resolution succeeded (got ${safeStringify(out)})`);
+  return out.identity;
+};
 
 check("29. one client candidate → EXACT", async () => {
   const r = await resolve1({ clients: [clientCand("client-1")] });
@@ -357,6 +364,17 @@ check("40. a malformed sender phone → UNKNOWN, no principal", async () => {
     const r = await resolve1({ clients: [clientCand("c")] }, bad);
     assert(r.confidence === "unknown" && r.principalId === null, `${bad} → ${r.confidence}`);
   }
+});
+
+check("ID-FAIL. a candidate-source read failure → IDENTITY_LOOKUP_FAILED, never durable UNKNOWN", async () => {
+  for (const finder of ["findClientCandidates", "findVendorCandidates", "findAdminCandidates"]) {
+    const out = await M.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: E164 }, idDeps({ [finder]: async () => { throw new Error("db unavailable: connection reset by peer"); } }));
+    assert(out.ok === false && out.code === "IDENTITY_LOOKUP_FAILED", `${finder} throw → ${safeStringify(out)}`);
+    assert(!safeStringify(out).includes("db unavailable") && !safeStringify(out).includes("connection reset"), "no raw DB error is exposed");
+  }
+  // A SUCCESSFUL zero-candidate lookup remains a durable UNKNOWN (ok:true) — the distinction is explicit.
+  const zero = await M.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: E164 }, idDeps({}));
+  assert(zero.ok === true && zero.identity.confidence === "unknown", "zero candidates → durable UNKNOWN");
 });
 
 // ============================================================================
@@ -420,16 +438,16 @@ check("I2. the COMPLETE identity invariant is enforced by a stable CHECK (both b
 // ============================================================================
 // PHASE BOUNDARIES (55-64)
 // ============================================================================
-check("55-64. the live webhook is frozen; no wiring, no activation, no env, no new route", () => {
+check("55-64. no wiring, no activation, no env, no new route (D1-A boundaries; webhook owned by D1-B)", () => {
   const dirty = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).split("\n").map((l) => l.slice(3).trim()).filter(Boolean);
-  // 55-57: the webhook service, route, and CommunicationService are UNCHANGED by this phase.
-  for (const f of [WEBHOOK_SVC_SRC, WEBHOOK_ROUTE_SRC, COMM_SERVICE_SRC]) {
-    assert(!dirty.includes(f), `${f} must be unchanged in D1-A`);
+  // 55-57: the webhook ROUTE and CommunicationService are UNCHANGED. (Phase 5F-D1-B legitimately
+  // wires the INBOUND_MESSAGE branch of the webhook SERVICE, and its RELIABILITY correction updates
+  // the identity RESOLVER to distinguish an operational IDENTITY_LOOKUP_FAILED from a durable
+  // UNKNOWN — so neither the webhook service nor the resolver is asserted byte-unchanged here. The
+  // pure normalizer — the other D1-A deliverable — remains byte-unchanged, reused by D1-B.)
+  for (const f of [WEBHOOK_ROUTE_SRC, COMM_SERVICE_SRC, NORMALIZER_SRC]) {
+    assert(!dirty.includes(f), `${f} must be unchanged`);
   }
-  // …and the webhook service does NOT import the new normalizer/resolver yet (frozen behavior).
-  const svc = readCode(WEBHOOK_SVC_SRC);
-  assert(!/metaWhatsAppInbound|inboundIdentityResolutionService|normalizeMetaInboundWebhook|resolveInboundSenderIdentity/.test(svc), "the webhook service does not wire D1-A yet");
-  assert(/acknowledged_ignored|ignored_non_delivery/.test(svc), "INBOUND_MESSAGE still follows the ignored/acknowledged path");
   // 58-61: consent/suppression/event tables untouched (no migration references them; none dirty).
   for (const p of dirty) {
     assert(!/\.env/.test(p), `no env file changed (${p})`); // 64
@@ -491,20 +509,29 @@ srcMutation("MUT C: a plaintext sender-phone column is added to the inbound sche
 
 tsMutation("MUT D: identity uses first-row-win instead of AMBIGUOUS",
   [[RESOLVER_SRC,
-    "  return { confidence: InboundIdentityConfidence.AMBIGUOUS, principalType: null, principalId: null, candidateCount: unique.length };",
-    "  return { confidence: InboundIdentityConfidence.EXACT, principalType: unique[0].principalType, principalId: unique[0].principalId, candidateCount: unique.length };"]],
+    "  return { ok: true, identity: { confidence: InboundIdentityConfidence.AMBIGUOUS, principalType: null, principalId: null, candidateCount: unique.length } };",
+    "  return { ok: true, identity: { confidence: InboundIdentityConfidence.EXACT, principalType: unique[0].principalType, principalId: unique[0].principalId, candidateCount: unique.length } };"]],
   async (mm) => {
     const r = await mm.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: E164 }, idDeps({ vendors: [vendorCand("v1"), vendorCand("v2")] }));
-    return r.confidence === "exact"; // two distinct principals collapsed to the first
+    return r.ok && r.identity.confidence === "exact"; // two distinct principals collapsed to the first
   });
 
 tsMutation("MUT E: identity silently prefers a client over a vendor",
   [[RESOLVER_SRC,
-    "  if (unique.length === 0) return unknown();",
-    "  const preferred = unique.find((x) => x.principalType === InboundPrincipalType.CLIENT);\n  if (preferred) return { confidence: InboundIdentityConfidence.EXACT, principalType: preferred.principalType, principalId: preferred.principalId, candidateCount: unique.length };\n  if (unique.length === 0) return unknown();"]],
+    "  if (unique.length === 0) return { ok: true, identity: unknown() };",
+    "  const preferred = unique.find((x) => x.principalType === InboundPrincipalType.CLIENT);\n  if (preferred) return { ok: true, identity: { confidence: InboundIdentityConfidence.EXACT, principalType: preferred.principalType, principalId: preferred.principalId, candidateCount: unique.length } };\n  if (unique.length === 0) return { ok: true, identity: unknown() };"]],
   async (mm) => {
     const r = await mm.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: E164 }, idDeps({ clients: [clientCand("c")], vendors: [vendorCand("v")] }));
-    return r.confidence === "exact" && r.principalType === "client"; // client preferred over an equal vendor conflict
+    return r.ok && r.identity.confidence === "exact" && r.identity.principalType === "client"; // client preferred over an equal vendor conflict
+  });
+
+tsMutation("MUT R (reliability): a candidate-source read failure collapses to durable UNKNOWN",
+  [[RESOLVER_SRC,
+    "    return { ok: false, code: IDENTITY_LOOKUP_FAILED };",
+    "    return { ok: true, identity: unknown() };"]],
+  async (mm) => {
+    const out = await mm.Resolver.resolveInboundSenderIdentity({ senderPhoneE164: E164 }, idDeps({ findClientCandidates: async () => { throw new Error("db down"); } }));
+    return out.ok === true && out.identity.confidence === "unknown"; // an infra failure became durable UNKNOWN
   });
 
 tsMutation("MUT F: the raw provider message is returned in the normalized content",

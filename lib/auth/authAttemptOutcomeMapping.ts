@@ -125,6 +125,7 @@ export const LOCAL_PREFLIGHT_FAILURE_CODES: ReadonlySet<string> = new Set([
   "EXOTEL_DESTINATION_INVALID",
   "EXOTEL_TEMPLATE_NAME_MISSING",
   "EXOTEL_TEMPLATE_BODY_MISSING",
+  "EXOTEL_DLT_TEMPLATE_ID_MISSING",
   // Template / lane validation, and an unclassifiable adapter throw
   "VALIDATION",
   "TEMPLATE_NOT_FOUND_OR_INACTIVE",

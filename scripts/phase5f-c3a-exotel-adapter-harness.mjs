@@ -669,20 +669,22 @@ check("18. credentials travel only in the Authorization header — never a URL, 
   assert(form2.get("DltTemplateId") === RESOLVED.providerTemplateId, "descriptor template id is the sole authority");
   assert(form2.get("DltTemplateId") !== "222", "the config template id can NEVER override the descriptor");
 
-  // A descriptor with NO template id → the config template id can NEVER rescue it. Nothing invented.
+  // A descriptor with NO template id → a DEFINITIVE local preflight failure with ZERO calls.
+  // The config template id can NEVER rescue it: the request never happens.
   const t3 = fakeTransport(response(200, OK_BODY));
-  await exotelProvider(M, t3, envWithDlt).sendResolvedAuthenticationSms(DESTINATION,
+  const r3 = await exotelProvider(M, t3, envWithDlt).sendResolvedAuthenticationSms(DESTINATION,
     { providerTemplateName: RESOLVED.providerTemplateName, messageBody: RESOLVED.messageBody, providerTemplateId: null });
-  const form3 = new URLSearchParams(t3.calls[0].body);
-  assert(!form3.has("DltTemplateId"), "no config template-id rescue for a missing descriptor id");
-  assert(form3.get("DltEntityId") === "111", "the account entity id is still forwarded");
+  assert(r3.accepted === false && r3.errorCode === "EXOTEL_DLT_TEMPLATE_ID_MISSING", `missing id → ${r3.errorCode}`);
+  assert(r3.outcomeCertainty === "definitive_failure" && r3.retryable === false && r3.providerMessageId === null, "definitive, not retryable, no id");
+  assert(t3.calls.length === 0, "no config template-id rescue: ZERO network calls");
 
-  // No account config and no descriptor template id → the fields are simply absent. Nothing invented.
-  const t4 = fakeTransport(response(200, OK_BODY));
-  await exotelProvider(M, t4).sendResolvedAuthenticationSms(DESTINATION,
-    { providerTemplateName: "T", messageBody: "B", providerTemplateId: null });
-  const form4 = new URLSearchParams(t4.calls[0].body);
-  assert(!form4.has("DltEntityId") && !form4.has("DltTemplateId"), "no fabricated DLT id");
+  // Empty / whitespace-only / undefined descriptor id → the same definitive preflight failure, zero calls.
+  for (const badId of ["", "   ", undefined]) {
+    const tb = fakeTransport(response(200, OK_BODY));
+    const rb = await exotelProvider(M, tb).sendResolvedAuthenticationSms(DESTINATION,
+      { providerTemplateName: "T", messageBody: "B", providerTemplateId: badId });
+    assert(rb.errorCode === "EXOTEL_DLT_TEMPLATE_ID_MISSING" && tb.calls.length === 0, `id=${JSON.stringify(badId)} refused with no request`);
+  }
 });
 
 check("19. the bare SmsProvider send method can never put a message on the wire", async () => {

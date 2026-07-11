@@ -120,7 +120,7 @@ before any provider send — when the runtime mapping lacks a usable id.
 interface ResolvedAuthenticationSms {
   readonly messageBody: string;            // reviewed, code-rendered, OTP already substituted
   readonly providerTemplateName: string;   // approved provider template identity (readiness fact)
-  readonly providerTemplateId: string | null;
+  readonly providerTemplateId: string;     // REQUIRED, non-empty — the sole DLT template authority
 }
 
 sendResolvedAuthenticationSms(
@@ -135,17 +135,34 @@ vocabulary (`accepted` / `definitive_failure` / `unknown_outcome`) and `SmsSendR
 unchanged; no new outcome model is introduced. Account-level registry ids (e.g. a DLT **entity**
 id) are the provider's own config, not part of this neutral contract.
 
+### Three layers guard the DLT template id
+
+The DLT content-template id is protected in depth, so a missing/empty id can never reach a
+provider request from any caller:
+
+1. **Renderer** — rejects a `null` / `undefined` / `""` / `"   "` runtime-mapping id
+   (`AUTH_SMS_PROVIDER_TEMPLATE_ID_MISSING`), before the attempt-2 claim and before any send.
+2. **Neutral type** — `ResolvedAuthenticationSms.providerTemplateId` is a **required** `string`,
+   so a compliant TypeScript caller cannot even express a missing id.
+3. **Exotel adapter** — **independently runtime-validates** `resolved.providerTemplateId` before
+   constructing or sending the request. A missing/empty id is a **definitive local preflight
+   failure** (`EXOTEL_DLT_TEMPLATE_ID_MISSING`, `outcomeCertainty = definitive_failure`,
+   `retryable = false`, `providerMessageId = null`) with **zero transport calls**. This is
+   defense-in-depth for a direct adapter caller, a future canary path, JavaScript misuse, or
+   malformed boundary data. `config.dltTemplateId` **cannot repair or substitute** it.
+
 - **MockSmsProvider**: implements a deterministic, **no-wire** version — zero network calls. It
   retains only the non-secret provider template name; never the body or the OTP. Widening the
   contract does not weaken the production mock prohibition (the runtime factory still never
   constructs the mock).
 - **ExotelSmsProvider**: formats the transport request only. `Body = messageBody`;
   `DltTemplateId = resolved.providerTemplateId` (the descriptor is the **sole** template-id
-  authority — `config.dltTemplateId` is deliberately **not** read here, so a config value can
-  never substitute for a missing mapping id); `DltEntityId = config.dltEntityId` (account-level,
-  config-owned). All transport invariants are preserved: one request, `AbortController` timeout,
-  bounded response read, certainty classification, no `Promise.race`, no retry/loop, no
-  secret/OTP/body leak. The bare `sendAuthenticationMessage` still refuses.
+  authority, runtime-validated non-empty — `config.dltTemplateId` is deliberately **not** read,
+  so a config value can never substitute for or rescue a missing mapping id);
+  `DltEntityId = config.dltEntityId` (account-level, config-owned). All transport invariants are
+  preserved: one request, `AbortController` timeout, bounded response read, certainty
+  classification, no `Promise.race`, no retry/loop, no secret/OTP/body leak. The bare
+  `sendAuthenticationMessage` still refuses.
 
 ---
 
@@ -226,6 +243,11 @@ preserving), because the resolved-send contract they exercised evolved:
   **no real provider canary SMS may be sent** until the exact reviewed body is reconciled with
   the externally approved DLT content during the later C3-C-3 readiness step — a placeholder body
   would be rejected by the carrier and must never reach a real handset.
+  The future canary must use the same path — reviewed renderer → resolved descriptor → provider
+  adapter — and, crucially, **even if a future canary caller is malformed, the Exotel adapter
+  independently refuses to send without a valid resolved `providerTemplateId`** (zero transport
+  calls). The adapter's runtime preflight (added in this correction) is what makes that boundary
+  safe regardless of how the canary is wired. (Not implemented in this correction.)
 - **Phase 5F-C3-C-3:** reconcile the reviewed body to the DLT-registered content; prepare the
   reviewed runtime rows; external Exotel/DLT registration.
 - Full activation (enable policy, add a failure rule, enable Meta) remains behind the later

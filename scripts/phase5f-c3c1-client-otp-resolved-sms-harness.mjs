@@ -502,24 +502,34 @@ check("B3. ExotelSmsProvider implements the resolved send: form built from neutr
   assert(!t.calls[0].body.includes(EXOTEL_ENV.EXOTEL_API_TOKEN), "no credential in the body");
 });
 
-check("B4. DLT ownership: entity from config, template ONLY from the descriptor, NO cross-domain fallback", async () => {
+check("B4. DLT ownership: entity from config, template ONLY from the descriptor; a MISSING id fails closed with ZERO calls", async () => {
   const envWithDlt = { ...EXOTEL_ENV, EXOTEL_DLT_ENTITY_ID: "111", EXOTEL_DLT_TEMPLATE_ID: "222" };
-  // Entity id from account config; template id from the descriptor. A config template id can
-  // NEVER override a descriptor template id.
+  // Valid path: entity id from config; template id from the descriptor; config NEVER overrides;
+  // body from resolved.messageBody; exactly one network call.
   const t = fakeTransport();
-  await exotelProvider(envWithDlt, t).sendResolvedAuthenticationSms(PHONE,
-    { messageBody: "B", providerTemplateName: "T", providerTemplateId: PROVIDER_TEMPLATE_ID });
+  const okr = await exotelProvider(envWithDlt, t).sendResolvedAuthenticationSms(PHONE,
+    { messageBody: "reviewed-body", providerTemplateName: "T", providerTemplateId: PROVIDER_TEMPLATE_ID });
   const form = new URLSearchParams(t.calls[0].body);
+  assert(okr.accepted === true, "a valid request is accepted");
   assert(form.get("DltEntityId") === "111", "entity id from account config");
   assert(form.get("DltTemplateId") === PROVIDER_TEMPLATE_ID, "template id from the descriptor");
   assert(form.get("DltTemplateId") !== "222", "the config template id can NEVER override the descriptor");
-  // A descriptor with no template id: the config template id can NEVER rescue it. Nothing invented.
-  const t2 = fakeTransport();
-  await exotelProvider(envWithDlt, t2).sendResolvedAuthenticationSms(PHONE, { messageBody: "B", providerTemplateName: "T", providerTemplateId: null });
-  const form2 = new URLSearchParams(t2.calls[0].body);
-  assert(!form2.has("DltTemplateId"), "no config template-id rescue for a missing descriptor id");
-  assert(form2.get("DltEntityId") === "111", "the account entity id is still forwarded");
-  // Preflight fences still refuse before any request.
+  assert(form.get("Body") === "reviewed-body", "body from resolved.messageBody");
+  assert(t.calls.length === 1, "exactly one network call for a valid request");
+
+  // A missing/empty/whitespace descriptor id → DEFINITIVE local preflight failure, ZERO calls.
+  // The account config template id can NEVER rescue it: the request simply never happens.
+  for (const badId of [null, undefined, "", "   "]) {
+    const tt = fakeTransport();
+    const r = await exotelProvider(envWithDlt, tt).sendResolvedAuthenticationSms(PHONE,
+      { messageBody: "reviewed-body", providerTemplateName: "T", providerTemplateId: badId });
+    assert(r.accepted === false, `id=${JSON.stringify(badId)}: not accepted`);
+    assert(r.errorCode === "EXOTEL_DLT_TEMPLATE_ID_MISSING", `id=${JSON.stringify(badId)}: ${r.errorCode}`);
+    assert(r.outcomeCertainty === "definitive_failure" && r.retryable === false && r.providerMessageId === null,
+      `id=${JSON.stringify(badId)}: definitive, not retryable, no message id`);
+    assert(tt.calls.length === 0, `id=${JSON.stringify(badId)}: ZERO network calls (config cannot rescue)`);
+  }
+  // The earlier preflight fences still refuse first (destination/name/body), also with zero calls.
   for (const [dest, resolved, code] of [
     ["9812345678", { messageBody: "B", providerTemplateName: "T", providerTemplateId: "1" }, "EXOTEL_DESTINATION_INVALID"],
     [PHONE, { messageBody: "B", providerTemplateName: "", providerTemplateId: "1" }, "EXOTEL_TEMPLATE_NAME_MISSING"],
@@ -812,15 +822,28 @@ tsMutation("MUT H: the Exotel adapter reads the CONFIG template id instead of th
     return new URLSearchParams(t.calls[0].body).get("DltTemplateId") === "222";
   });
 
-tsMutation("MUT I: the Exotel adapter restores a nullish CONFIG fallback for the template id",
-  [[EXOTEL_ADAPTER_SRC, "    const dltTemplateId = resolved.providerTemplateId;", "    const dltTemplateId = resolved.providerTemplateId ?? this.config.dltTemplateId;"]],
+tsMutation("MUT I: with the preflight bypassed, a nullish CONFIG fallback rescues a missing template id onto the wire",
+  [
+    [EXOTEL_ADAPTER_SRC, "    if (typeof resolved.providerTemplateId !== \"string\" || resolved.providerTemplateId.trim() === \"\") {", "    if (false) {"],
+    [EXOTEL_ADAPTER_SRC, "    const dltTemplateId = resolved.providerTemplateId;", "    const dltTemplateId = resolved.providerTemplateId ?? this.config.dltTemplateId;"],
+  ],
   async (mm) => {
     const env = { ...EXOTEL_ENV, EXOTEL_DLT_ENTITY_ID: "111", EXOTEL_DLT_TEMPLATE_ID: "222" };
     const cfg = mm.ExotelConfig.resolveExotelConfig(env);
     const t = fakeTransport();
-    // A descriptor with no template id: with the fallback restored, config "222" wrongly rescues it.
+    // The correct code's preflight refuses a null id with ZERO calls; here config "222" reaches the wire.
     await new mm.Exotel.ExotelSmsProvider(cfg.config, t).sendResolvedAuthenticationSms(PHONE, { messageBody: "B", providerTemplateName: "T", providerTemplateId: null });
-    return new URLSearchParams(t.calls[0].body).get("DltTemplateId") === "222";
+    return t.calls.length > 0 && new URLSearchParams(t.calls[0].body).get("DltTemplateId") === "222";
+  });
+
+tsMutation("MUT K: the Exotel DLT-template-id preflight is removed, letting a missing id reach transport",
+  [[EXOTEL_ADAPTER_SRC, "    if (typeof resolved.providerTemplateId !== \"string\" || resolved.providerTemplateId.trim() === \"\") {", "    if (false) {"]],
+  async (mm) => {
+    const cfg = mm.ExotelConfig.resolveExotelConfig(EXOTEL_ENV);
+    const t = fakeTransport();
+    await new mm.Exotel.ExotelSmsProvider(cfg.config, t).sendResolvedAuthenticationSms(PHONE, { messageBody: "B", providerTemplateName: "T", providerTemplateId: null });
+    // Without the preflight, a request left the process despite a missing DLT template id.
+    return t.calls.length > 0;
   });
 
 tsMutation("MUT J: the renderer drops the missing-template-id guard",

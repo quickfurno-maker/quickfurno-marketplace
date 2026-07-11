@@ -309,6 +309,16 @@ export class ExotelSmsProvider implements SmsProvider {
       return preflightFailure(this.providerKey, "EXOTEL_TEMPLATE_BODY_MISSING",
         "The approved template rendered no message body; no request was sent.");
     }
+    // The DLT content-template id is the SINGLE template-identity authority for this send, and
+    // it is validated INDEPENDENTLY here — defense in depth for any direct caller, a future
+    // canary path, JavaScript misuse, or malformed boundary data, on top of the renderer's own
+    // check and the required TypeScript contract. A missing or empty id is a DEFINITIVE local
+    // preflight failure: NO request is made, and the id is NEVER substituted from config,
+    // aliased, provider-family-mapped, or repaired from the environment.
+    if (typeof resolved.providerTemplateId !== "string" || resolved.providerTemplateId.trim() === "") {
+      return preflightFailure(this.providerKey, "EXOTEL_DLT_TEMPLATE_ID_MISSING",
+        "No resolved DLT content-template id was provided; no request was sent.");
+    }
 
     const timeoutMs = resolveSmsNetworkTimeoutMs(this.config.authHttpTimeoutMs, options);
 
@@ -320,14 +330,13 @@ export class ExotelSmsProvider implements SmsProvider {
       Body: resolved.messageBody,
     });
     // India DLT passthrough — EXACT identity, NO cross-domain fallback:
-    //   • the TEMPLATE id comes ONLY from the resolved descriptor (the runtime mapping's
-    //     `providerTemplateId`). `this.config.dltTemplateId` is DELIBERATELY not read here: a
-    //     config value must never substitute for a missing mapping template id on the
-    //     authentication resolved-send path (the renderer already fails closed when it is
-    //     missing, so a valid descriptor always carries a non-empty id).
+    //   • the TEMPLATE id comes ONLY from the resolved descriptor, validated non-empty by the
+    //     preflight just above. `this.config.dltTemplateId` is DELIBERATELY not read here: a
+    //     config value must never substitute for, or rescue, a missing mapping template id.
     //   • the ENTITY id is an ACCOUNT-level fact owned by the adapter's own config, never the
-    //     per-send descriptor.
-    // The adapter forwards both; it never derives, invents, or substitutes either.
+    //     per-send descriptor, and is forwarded only when configured.
+    // The adapter forwards both; it never derives, invents, or substitutes either. The
+    // preflight above is what guarantees a request never leaves without the exact template id.
     const dltEntityId = this.config.dltEntityId;
     const dltTemplateId = resolved.providerTemplateId;
     if (dltEntityId) form.set("DltEntityId", dltEntityId);

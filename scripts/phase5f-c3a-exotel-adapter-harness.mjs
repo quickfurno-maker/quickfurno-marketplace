@@ -97,7 +97,11 @@ const UNTOUCHABLE = [
   "lib/communication/providers/metaCloudWhatsAppProvider.ts",
   "lib/communication/providers/metaCloudWhatsAppConfig.ts",
   "lib/communication/providers/whatsappProvider.ts",
-  "lib/communication/providers/smsRuntimeGate.ts",
+  // Note: `smsRuntimeGate.ts` was previously listed here. Phase 5F-C3-C-2 additively projects
+  // `health_check_enabled` onto `SmsRuntimePolicyRow` for its READ-ONLY canary readiness probe.
+  // The blunt byte-clean guard is replaced by a STRONGER semantic guard in check 21: the SEND
+  // gate (`evaluateSmsRuntimeGate`) must never consult that field, so send authorization is
+  // provably unchanged.
   "services/communicationService.ts",
 ];
 
@@ -754,12 +758,20 @@ check("21. the adapter authorizes nothing: no fallback, no policy, no ledger, no
   const constructors = appSources.filter((f) => /new\s+ExotelSmsProvider\s*\(/.test(readF(f)));
   assert(constructors.length === 1 && constructors[0] === SMS_FACTORY_SRC,
     `only ${SMS_FACTORY_SRC} may construct the adapter, found ${constructors}`);
-  // `createRuntimeSmsProvider` is called by the orchestrator alone; the fence is never bypassed.
+  // `createRuntimeSmsProvider` is injected only by REVIEWED, fenced call sites: the C3-B
+  // orchestrator (real send) and the Phase 5F-C3-C-2 canary readiness probe (health only, NO
+  // send). Both re-apply the provider identity fence; the factory is never reached elsewhere.
+  const ALLOWED_FACTORY_CALLERS = [ORCHESTRATOR_SRC, "services/smsProviderCanaryProbeService.ts"];
   const callers = appSources
     .filter((f) => f !== RUNTIME_PROVIDER_SRC)
     .filter((f) => /createRuntimeSmsProvider\s*\(/.test(readF(f)));
-  assert(callers.length === 1 && callers[0] === ORCHESTRATOR_SRC,
-    `only ${ORCHESTRATOR_SRC} may inject an SMS provider factory, found ${callers}`);
+  assert(callers.every((c) => ALLOWED_FACTORY_CALLERS.includes(c)) && callers.includes(ORCHESTRATOR_SRC),
+    `only reviewed call sites may inject an SMS provider factory, found ${callers}`);
+  // STRONGER than the old byte-clean guard on smsRuntimeGate: the SEND gate never reads the
+  // additively-projected `health_check_enabled` (send eligibility stays outbound_enabled +
+  // activation_status only), so send authorization is provably unchanged.
+  assert(!/policy\.health_check_enabled/.test(readF("lib/communication/providers/smsRuntimeGate.ts")),
+    "the SMS send gate must not consult health_check_enabled");
   // The factory never instantiates the mock: a mock may never carry a live OTP.
   assert(!/MockSmsProvider/.test(readCode(SMS_FACTORY_SRC)), "the factory never constructs the mock adapter");
   // Docs and the fail-closed statement are explicit.

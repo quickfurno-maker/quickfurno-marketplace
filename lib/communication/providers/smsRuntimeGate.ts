@@ -46,6 +46,15 @@ export interface SmsRuntimePolicyRow {
   readonly channel: string;
   readonly activation_status: string;
   readonly outbound_enabled: boolean;
+  /**
+   * Whether an operator has enabled explicit provider HEALTH CHECKS for this (provider, sms)
+   * — parity with `MetaRuntimePolicyRow`. Projected here so an EXPLICIT, read-only caller (the
+   * Phase 5F-C3-C-2 canary readiness probe) can honour it. THE SEND GATE
+   * (`evaluateSmsRuntimeGate`) DOES NOT CONSULT THIS FIELD: outbound send eligibility is
+   * decided ONLY by `outbound_enabled` + `activation_status`, exactly as before. Adding this
+   * projection changes nothing about who may send.
+   */
+  readonly health_check_enabled: boolean;
 }
 
 export interface SmsProviderAccountRow {

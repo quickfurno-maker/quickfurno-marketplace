@@ -19,8 +19,24 @@ const WEBHOOK_ROUTE_SRC = "app/api/webhooks/whatsapp/meta/route.ts";
 const COMM_SERVICE_SRC = "services/communicationService.ts";
 const INBOUND_SVC_SRC = "services/inboundWhatsAppMessageService.ts";
 
-/** The exact repository delta D2-B is allowed to produce. */
-const ALLOWED_DELTA = new Set([MIGRATION_SRC, HARNESS_SRC, DOC_SRC, "package.json"]);
+/**
+ * The D2-B COMMIT's historical delta — validated against LOCAL git history, NEVER the current
+ * worktree. A completed-phase harness proves WHAT THAT PHASE INTRODUCED, not what the repository is
+ * allowed to contain forever: a legitimate later phase (e.g. D2-C's decision service) is irrelevant
+ * to D2-B's own delta and must not fail D2-B.
+ */
+// REACHABILITY: this fixed D2-B commit must remain reachable in local git history. Normal chained
+// commits, fast-forward, and normal merges preserve it; a squash workflow that DISCARDS the D2-B
+// commit would make `git diff-tree`/`git rev-parse` below fail LOUD (an error, never a silent
+// fall-back to current-worktree validation) and require a documented harness adaptation.
+const D2B_COMMIT = "2606739ea849daecfef0a736b572e6406db8f925";
+const D2B_EXPECTED_PARENT = "44bc18c1cffdc8fee060c78920faf58cbbf1cc5f"; // Phase 5F-D1-B (one D2-B commit over the D1-B base)
+const D2B_HISTORICAL_FILES = [
+  "docs/QF-Consent-Evidence-Schema-Phase-5F-D2-B.md",
+  "package.json",
+  "scripts/phase5f-d2b-consent-evidence-schema-harness.mjs",
+  "supabase/migrations/20260711000200_communication_consent_evidence_and_state_hardening.sql",
+];
 
 // ----------------------------------------------------------------------------
 // Fresh reads (never cached — mutation edits must be observed)
@@ -58,9 +74,37 @@ const execRegion = (name) => collapse(stripSql(region(name)).replace(/comment on
 // and survive. (Literals here contain no internal single-quote, so pairing is exact.)
 const dmlScanText = () => collapse(stripSql(readF(MIGRATION_SRC)).replace(/'[^']*'/g, "''"));
 
-function gitDirty() {
-  return execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
-    .split("\n").map((l) => l.slice(3).trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
+/**
+ * PURE historical-scope validator (testable in isolation). Given the file list + parent SHA of the
+ * D2-B commit, returns an array of violation strings (empty = valid). It rejects an unexpected fifth
+ * file, a missing approved file, a service/route/webhook/env/lockfile, and an incorrect parent.
+ */
+function validateD2BHistoricalDelta(files, parent) {
+  const problems = [];
+  const set = new Set(files);
+  if (files.length !== D2B_HISTORICAL_FILES.length) problems.push(`expected ${D2B_HISTORICAL_FILES.length} files, got ${files.length} [${files.join(", ")}]`);
+  for (const f of D2B_HISTORICAL_FILES) if (!set.has(f)) problems.push(`missing approved D2-B file: ${f}`);
+  for (const f of files) if (!D2B_HISTORICAL_FILES.includes(f)) problems.push(`unexpected file in the D2-B delta: ${f}`);
+  if (parent !== D2B_EXPECTED_PARENT) problems.push(`expected parent ${D2B_EXPECTED_PARENT}, got ${parent}`);
+  for (const f of files) {
+    if (/^services\//.test(f)) problems.push(`D2-B must introduce no service: ${f}`);
+    if (/(^|\/)(app|pages)\/api\//.test(f)) problems.push(`D2-B must introduce no API route: ${f}`);
+    if (/webhook/i.test(f)) problems.push(`D2-B must introduce no webhook file: ${f}`);
+    if (/(^|\/)\.env(\.|$)/.test(f)) problems.push(`D2-B must change no env file: ${f}`);
+    if (/(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(f)) problems.push(`D2-B must change no lockfile: ${f}`);
+    if (/communicationConsent(Decision|Writer|Authority)/.test(f)) problems.push(`D2-B must introduce no consent decision/writer/authority service: ${f}`);
+  }
+  const migrations = files.filter((f) => f.startsWith("supabase/migrations/"));
+  if (migrations.length !== 1 || migrations[0] !== MIGRATION_SRC) problems.push(`D2-B must ADD exactly its own migration (no earlier migration modified): [${migrations.join(", ")}]`);
+  return problems;
+}
+
+/** The REAL local git history for the fixed audited D2-B commit (no network access). */
+function d2bHistoricalDelta() {
+  const files = execFileSync("git", ["diff-tree", "--no-commit-id", "--name-only", "-r", D2B_COMMIT], { encoding: "utf8" })
+    .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
+  const parent = execFileSync("git", ["rev-parse", `${D2B_COMMIT}^`], { encoding: "utf8" }).trim();
+  return { files, parent };
 }
 
 const checks = [];
@@ -72,17 +116,13 @@ function hasNot(re, s, msg) { assert(!re.test(s), msg); }
 // ============================================================================
 // MIGRATION SCOPE (1-8)
 // ============================================================================
-check("1-8. exactly one new migration; no service/route/env/activation/STOP/n8n drift", () => {
-  assert(existsSync(MIGRATION_SRC), "1. the D2-B migration exists");
-  const dirty = gitDirty();
-  const migDirty = dirty.filter((p) => p.startsWith("supabase/migrations/"));
-  assert(migDirty.length <= 1 && (migDirty.length === 0 || migDirty[0] === MIGRATION_SRC),
-    `1-2. the only touched migration is the D2-B migration (got ${migDirty.join(", ")})`);
-  for (const p of dirty) assert(ALLOWED_DELTA.has(p), `3-6. unexpected changed file outside the D2-B delta: ${p}`);
-  // 3-4: no application service / API route change.
-  for (const f of [WEBHOOK_SVC_SRC, WEBHOOK_ROUTE_SRC, COMM_SERVICE_SRC, INBOUND_SVC_SRC]) {
-    assert(!dirty.includes(f), `3-4. ${f} must be unchanged in D2-B`);
-  }
+check("1-8. D2-B historical delta: exactly its four approved files, correct parent, no service/route/webhook/env/lockfile", () => {
+  assert(existsSync(MIGRATION_SRC), "1. the D2-B migration exists in the worktree");
+  // 1-6: validate the D2-B COMMIT's historical delta (local git history) — NOT the current worktree,
+  // so legitimate later-phase files (e.g. D2-C's decision service/doc/harness) never fail D2-B.
+  const { files, parent } = d2bHistoricalDelta();
+  const problems = validateD2BHistoricalDelta(files, parent);
+  assert(problems.length === 0, `1-6. D2-B historical-delta violation: ${problems.join(" | ")}`);
   const code = migCode();
   // 6-8: schema-only — no trigger/function/RPC, no policy, no DML, no Meta activation, no send.
   hasNot(/create trigger/i, code, "no trigger");
@@ -256,17 +296,18 @@ check("54-64. suppression hardening", () => {
 check("65-74. boundaries: no decision/writer/RPC/webhook mutation/send/AI/conversation; not applied", () => {
   const pkg = JSON.parse(readF("package.json"));
   assert(pkg.scripts["test:phase5f:d2b"] === "node scripts/phase5f-d2b-consent-evidence-schema-harness.mjs", "package script wired");
-  // 65-66: no decision service and no writer/RPC file was created by D2-B.
-  assert(!existsSync("services/communicationConsentDecisionService.ts"), "65. no decision service");
-  assert(!existsSync("services/communicationConsentWriterService.ts"), "66. no writer service");
-  assert(!existsSync("services/communicationConsentAuthorityService.ts"), "65-66. no authority service");
+  // 65-72: the D2-B COMMIT introduced no decision/writer/authority service, RPC, API route, or
+  // webhook file. HISTORICAL (the commit's delta), NOT a forever repo assertion — a legitimate later
+  // phase (D2-C) may create the decision service, which is irrelevant to D2-B's own delta.
+  const { files } = d2bHistoricalDelta();
+  for (const f of files) {
+    assert(!/^services\//.test(f), `65-72. D2-B introduced no service (got ${f})`);
+    assert(!/communicationConsent(Decision|Writer|Authority)/.test(f), `65-66. D2-B introduced no consent decision/writer/authority service (got ${f})`);
+    assert(!/(^|\/)(app|pages)\/api\//.test(f), `67. D2-B introduced no API route (got ${f})`);
+    assert(!/webhook/i.test(f), `67-72. D2-B introduced no webhook file (got ${f})`);
+  }
   const code = migCode();
   hasNot(/create (or replace )?function|security definer/i, code, "66. no RPC/writer function in the migration");
-  // 67-72: the webhook / comm / inbound services are untouched (no consent mutation, send, AI, conversation).
-  const dirty = gitDirty();
-  for (const f of [WEBHOOK_SVC_SRC, WEBHOOK_ROUTE_SRC, COMM_SERVICE_SRC, INBOUND_SVC_SRC]) {
-    assert(!dirty.includes(f), `67-72. ${f} must be unchanged`);
-  }
   // 73-74: nothing in this delta applies SQL or deploys. The migration is inert DDL (no auto-apply
   // directive), and the d2b script is a plain node invocation (asserted above) — never a db-push/deploy.
   hasNot(/\\copy\b|\\i\b|pg_dump|supabase (db )?push|supabase migration up/i, execCode(), "73. the migration carries no apply/deploy directive");
@@ -359,6 +400,8 @@ check("preference evidence cannot carry a destination_hash (suppression may opti
 const mutationChecks = [];
 function mut(name, file, from, to) { mutationChecks.push({ name, file, edits: [[from, to]] }); }
 function mutM(name, file, edits) { mutationChecks.push({ name, file, edits }); }
+/** A pure-scenario mutation (no file edit, no git-dirty): scenario() returns true when the vulnerability is caught. */
+function mutFn(name, scenario) { mutationChecks.push({ name, kind: "fn", scenario }); }
 
 mut("MUT A: remove the dormant-data guard", MIGRATION_SRC,
   "  if v_pref_rows > 0 or v_supp_rows > 0 then", "  if false then");
@@ -431,6 +474,15 @@ mut("MUT X: remove the PUBLIC revoke on the evidence ledger", MIGRATION_SRC,
   "revoke all on table public.communication_consent_events from public;\n",
   "");
 
+// ---- Cross-phase compatibility mutations (D2-C): the HISTORICAL boundary stays strict ----------
+// These exercise the PURE validator with a simulated delta — no git-dirty dependency.
+mutFn("MUT Y: a service file inside the simulated D2-B delta is rejected",
+  () => validateD2BHistoricalDelta([...D2B_HISTORICAL_FILES, "services/communicationConsentDecisionService.ts"], D2B_EXPECTED_PARENT).length > 0);
+mutFn("MUT Z: removing an approved file from the simulated D2-B delta is rejected",
+  () => validateD2BHistoricalDelta(D2B_HISTORICAL_FILES.filter((f) => f !== "package.json"), D2B_EXPECTED_PARENT).length > 0);
+mutFn("MUT AA: an incorrect expected D2-B parent is rejected",
+  () => validateD2BHistoricalDelta(D2B_HISTORICAL_FILES, "0000000000000000000000000000000000000000").length > 0);
+
 // ============================================================================
 // RUNNER
 // ============================================================================
@@ -448,6 +500,14 @@ async function runMutations() {
   let passed = 0, failed = 0;
   console.log("\nRunning Phase 5F-D2-B mutation tests...\n");
   for (const m of mutationChecks) {
+    if (m.kind === "fn") {
+      try {
+        const caught = await m.scenario();
+        if (caught) { console.log(`PASS ${m.name}`); passed++; }
+        else { console.log(`FAIL ${m.name} (historical guard did not prove load-bearing)`); failed++; }
+      } catch (e) { console.log(`FAIL ${m.name}`); console.error(e); failed++; }
+      continue;
+    }
     const p = resolve(m.file);
     const original = readFileSync(p, "utf8");
     try {

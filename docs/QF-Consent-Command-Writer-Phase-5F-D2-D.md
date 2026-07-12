@@ -244,7 +244,7 @@ writer is **not** called from `metaWhatsAppWebhookService`, `inboundWhatsAppMess
 `CommunicationService`, authentication transport, campaign code, an n8n bridge, or any API route or
 webhook. Integration happens only after the **D2-E** checkpoint. Meta remains disabled.
 
-## Migration-history drift (review-only migration)
+## Migration application status and migration-history drift
 
 The live consent schema was applied **manually** and recent migration files are not registered in
 `supabase_migrations.schema_migrations` (known drift).
@@ -266,7 +266,85 @@ It **does not alter any pre-existing consent table, column, enum or index** — 
 `DELETE`/`TRUNCATE`, no evidence `UPDATE`/`DELETE`, no trigger, no dynamic SQL, and no history rewrite.
 (`create table if not exists` + `create or replace function` make it idempotent and non-destructive.)
 
-The migration is prepared for **review only** — it is **not auto-applied**. D2-D does **not** run
-`supabase db push` / `migration up` / `migration repair` / `db reset` and does **not apply** the
-migration; eventual application is a reviewed, manual, single-transaction step with an explicit
-migration-history reconciliation plan.
+### Applied status (current)
+
+The reviewed SQL **has been manually applied to the production Supabase database, and verified.** The
+verification confirmed: `communication_consent_command_receipts` exists with RLS enabled; both validator
+functions exist and are `IMMUTABLE`; `apply_communication_consent_command` exists and is
+`SECURITY DEFINER`; `service_role` holds `SELECT` + `INSERT` only; `anon` and `authenticated` have no
+access; the receipt count was zero; and the fail-closed validator checks passed.
+
+**The migration must not be reapplied.** It is already live. Re-running it is not a supported step of this
+phase — no part of D2-D re-executes it.
+
+**Migration-history drift remains unresolved, intentionally.** The migration registry was **not repaired
+and not modified**: version `20260712000300` was deliberately **not** inserted into
+`supabase_migrations.schema_migrations`, so the file remains unregistered while the objects exist live.
+Reconciling that registry is a separate, explicitly-approved operation and is **not** part of this phase.
+
+These commands remain **prohibited** in this phase — none of them is run, and none may be run to
+"tidy up" the drift:
+
+```
+supabase db push
+supabase migration up
+supabase migration repair
+supabase db reset
+```
+
+Any future registry reconciliation must be a reviewed, deliberate, single-transaction step — never an
+incidental side effect of a build, a harness, or a deploy.
+
+## Post-merge harness boundary: the frozen audited range
+
+> **This section documents a tests-only change.** It **changes no production authority and no database
+> object** — not the writer, not the command normalizer, not D2-C, not D1-B, not the SQL migration, and
+> not the RPC. Only the D2-D harness's *phase-boundary* check and this document were touched.
+
+### The frozen audited historical range
+
+D2-D is merged and audited, so its phase scope is a **fixed, frozen slice of history** — not a moving one:
+
+| Anchor | Commit |
+|---|---|
+| D2-D base (the D2-C parent) | `c05b123b5ffb9a25e2dee125ae2f77b9cbad6ada` |
+| Audited **final** D2-D implementation commit | `ed7b68c6c7c5f77595b0ff6e590f7b2dd7b87bf8` |
+
+The harness validates **only** the delta `c05b123..ed7b68c`, and proves three things about it:
+
+1. the base **is an ancestor of** the audited head — so the audited range is real and measurable;
+2. the audited head **is an ancestor of the current HEAD** — so this checkout genuinely *contains* the
+   complete audited D2-D phase (the audit cannot be quietly evaluated against a tree that lacks it);
+3. that frozen delta is **exactly the six approved D2-D files**, and every **implementation** commit
+   inside it carries a `Phase 5F-D2-D:` subject.
+
+### Why merge commits and later phases are outside D2-D's historical scope
+
+The previous boundary validated `c05b123..HEAD` and demanded a `Phase 5F-D2-D:` subject on **every**
+commit in that range. That was correct only while D2-D was the tip of its branch. Once PR #2 merged, the
+rule became self-invalidating:
+
+- the **merge commit** (`b7ab22b`) is not a D2-D implementation commit and carries a merge subject;
+- every **later phase** (**D2-E** and beyond) legitimately adds commits and files *after* the audited head;
+- a frozen historical audit must not re-open simply because unrelated future history was appended.
+
+So the range now ends at the audited head, and the subject rule applies **only to implementation commits
+inside it** (merge commits are excluded via `--no-merges`). The PR merge and all post-audit commits are
+outside the range by construction and are never subject-checked. A regression back to a `..HEAD` boundary
+is caught: a mutation asserts the merge commit is present in history, carries a non-D2-D subject, and is
+nonetheless **excluded** from the frozen range.
+
+### How current protected-file dirtiness is checked separately
+
+Dropping the moving range must not drop *safety*. Worktree protection is therefore a **separate check**
+(`37b`), independent of the frozen historical scope. It fails if there is an **uncommitted edit to any
+protected production file**:
+
+`consentCommand.ts`, `consentPolicy.ts`, `communicationConsentWriterService.ts`, the D2-D SQL migration,
+`communicationConsentDecisionService.ts` (D2-C), `inboundWhatsAppMessageService.ts` (D1-B), and
+`metaWhatsAppWebhookService.ts` (the thin webhook boundary).
+
+It is a **closed list**, not "anything dirty" — that distinction is the whole point. A later phase editing
+*its own new files* is not a D2-D violation, but a later phase quietly editing the *frozen writer or
+migration* still is, and is still caught while D2-D runs. The approved maintenance surface for this branch
+(this harness plus this document) is explicitly allowed.

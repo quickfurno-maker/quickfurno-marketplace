@@ -23,7 +23,9 @@ const COMMAND_SRC = "lib/communication/consentCommand.ts";
 const POLICY_SRC = "lib/communication/consentPolicy.ts";
 const MIGRATION_SRC = "supabase/migrations/20260712000300_communication_consent_command_writer_rpc.sql";
 const DOC_SRC = "docs/QF-Consent-Command-Writer-Phase-5F-D2-D.md";
+const HARNESS_SRC = "scripts/phase5f-d2d-consent-command-writer-harness.mjs";
 const D2C_SVC_SRC = "services/communicationConsentDecisionService.ts";
+const D1B_SVC_SRC = "services/inboundWhatsAppMessageService.ts";
 const WEBHOOK_SVC_SRC = "services/metaWhatsAppWebhookService.ts";
 
 function compileTo(outDir) {
@@ -88,9 +90,37 @@ function gitDirty() {
 }
 
 // ----------------------------------------------------------------------------
-// D2-D PHASE BOUNDARY — TWO-MODE (pre-commit worktree | post-commit historical delta)
+// D2-D PHASE BOUNDARY — FROZEN AUDITED HISTORICAL RANGE
+//
+// D2-D is MERGED and AUDITED. Its phase scope is therefore a FIXED slice of history:
+//
+//     c05b123 (D2-D base)  ..  ed7b68c (the audited FINAL D2-D implementation commit)
+//
+// THE OLD DEFECT. The previous boundary validated `base..HEAD` and demanded a "Phase 5F-D2-D:" subject
+// on EVERY commit in that moving range. That held only while D2-D was the branch tip. After the PR merge
+// it is wrong and self-invalidating:
+//   • the PR MERGE commit is not a D2-D implementation commit and carries a merge subject;
+//   • every LATER phase (D2-E and beyond) legitimately adds commits and files after the audited head;
+//   • a frozen historical audit must not re-open merely because unrelated future history was appended.
+//
+// THE FROZEN RANGE. The historical scope is measured base..AUDITED-HEAD and never HEAD-relative. What
+// this harness proves:
+//   1. the base is an ancestor of the audited head        → the audited range is real and measurable;
+//   2. the audited head is an ancestor of the current HEAD → this checkout CONTAINS the whole audited phase;
+//   3. the delta base..audited-head is EXACTLY the approved six files;
+//   4. every IMPLEMENTATION commit INSIDE that range carries a "Phase 5F-D2-D:" subject.
+// The PR merge commit and every post-audit commit lie OUTSIDE the range and are never subject-checked.
+//
+// CURRENT-WORKTREE SAFETY IS A SEPARATE CONCERN (`validateD2DWorktree` + check 37b). An active,
+// uncommitted edit to a frozen D2-D / D2-C CONSENT-AUTHORITY file (the command normalizer, the policy
+// constant, the writer, the D2-D migration, the D2-C decision authority) is still caught. The D2-E
+// INTEGRATION SEAMS (D1-B persistence + the webhook service) and future-phase files are deliberately
+// EXCLUDED — D2-E is approved to modify them — and neither they nor the approved harness/doc maintenance
+// edits are EVER folded into the frozen historical scope.
 // ----------------------------------------------------------------------------
 const D2D_BASE = "c05b123b5ffb9a25e2dee125ae2f77b9cbad6ada"; // Phase 5F-D2-C — the D2-D base/parent
+const D2D_HEAD = "ed7b68c6c7c5f77595b0ff6e590f7b2dd7b87bf8"; // the audited FINAL D2-D implementation commit
+const D2D_SUBJECT = /^Phase 5F-D2-D:/;
 const D2D_EXPECTED_FILES = [
   "docs/QF-Consent-Command-Writer-Phase-5F-D2-D.md",
   "lib/communication/consentCommand.ts",
@@ -101,17 +131,46 @@ const D2D_EXPECTED_FILES = [
 ];
 
 /**
- * Validate a CUMULATIVE D2-D file set (base..HEAD, plus any uncommitted worktree files). `baseIsAncestor`
- * proves the delta is measured from the real D2-D base — a rebase/force-push that detaches the base makes
- * the whole scope claim meaningless, so it is a scope violation, not a warning.
+ * The AUTHORITY files D2-D froze: its own command normalizer, writer and migration, plus the read-only
+ * D2-C decision authority and the shared policy-version constant. An uncommitted edit to ANY of them must
+ * never pass unnoticed when D2-D is run — even from a later phase's branch.
+ *
+ * This is deliberately a CLOSED list of CONSENT-AUTHORITY files, not "anything dirty".
+ *
+ * DELIBERATELY EXCLUDED — the D2-E INTEGRATION SEAMS:
+ *   • services/inboundWhatsAppMessageService.ts (D1-B persistence)
+ *   • services/metaWhatsAppWebhookService.ts    (the thin webhook boundary)
+ * D2-E is APPROVED to modify both — they are precisely where inbound consent-command processing is wired
+ * in. Protecting them here would make the D2-D harness fail during D2-E pre-commit testing, which is the
+ * same "one phase's guard blocks the next phase" defect this maintenance branch exists to remove. Their
+ * scope is governed by their OWN harnesses (D1-B's content/scope guards and the future D2-E scope
+ * harness) — not by D2-D. D2-D still asserts the webhook does not import the writer (check 36), so the
+ * consent boundary itself stays enforced no matter what D2-E does to those files.
  */
-function validateD2DScope(files, baseIsAncestor) {
+const D2D_PROTECTED_FILES = [
+  COMMAND_SRC,      // lib/communication/consentCommand.ts             — the D2-D command normalizer
+  POLICY_SRC,       // lib/communication/consentPolicy.ts              — the shared policy-version constant
+  WRITER_SRC,       // services/communicationConsentWriterService.ts   — the D2-D writer
+  MIGRATION_SRC,    // the D2-D SQL migration (applied to production; frozen)
+  D2C_SVC_SRC,      // services/communicationConsentDecisionService.ts — D2-C, read-only
+];
+/** The D2-E integration seams: NOT D2-D-protected. D2-E is approved to modify them. */
+const D2E_INTEGRATION_SEAMS = [D1B_SVC_SRC, WEBHOOK_SVC_SRC];
+/** The ONLY files this post-merge maintenance branch is approved to touch (tests + docs). */
+const D2D_MAINTENANCE_FILES = [HARNESS_SRC, DOC_SRC];
+
+/**
+ * PURE. The FROZEN historical delta must be EXACTLY the six approved D2-D files. `anchorsProven` carries
+ * the ancestry result: without it the range is not measurable, so the whole scope claim is meaningless —
+ * a violation, not a warning.
+ */
+function validateD2DScope(files, anchorsProven) {
   const problems = [];
-  if (!baseIsAncestor) problems.push(`the D2-D base ${D2D_BASE} is not an ancestor of HEAD — the cumulative delta is not measurable`);
+  if (!anchorsProven) problems.push(`the frozen D2-D range ${D2D_BASE}..${D2D_HEAD} is not measurable (anchor ancestry unproven)`);
   const set = new Set(files);
   if (files.length !== D2D_EXPECTED_FILES.length) problems.push(`expected ${D2D_EXPECTED_FILES.length} files, got ${files.length} [${files.join(", ")}]`);
   for (const f of D2D_EXPECTED_FILES) if (!set.has(f)) problems.push(`missing approved D2-D file: ${f}`);
-  for (const f of files) if (!D2D_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the cumulative D2-D delta: ${f}`);
+  for (const f of files) if (!D2D_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the frozen D2-D delta: ${f}`);
   for (const f of files) {
     if (/(^|\/)\.env(\.|$)/.test(f)) problems.push(`D2-D must change no env file: ${f}`);
     if (/(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(f)) problems.push(`D2-D must change no lockfile: ${f}`);
@@ -125,27 +184,71 @@ function validateD2DScope(files, baseIsAncestor) {
   return problems;
 }
 
+/**
+ * PURE. Subjects are checked ONLY for implementation commits INSIDE the frozen range. The PR merge commit
+ * and every later-phase commit are out of range and are never passed here.
+ */
+function validateD2DSubjects(messages) {
+  const problems = [];
+  for (const m of messages) {
+    if (!D2D_SUBJECT.test(m)) problems.push(`a D2-D implementation commit carries a non-D2-D subject: '${String(m).slice(0, 60)}'`);
+  }
+  return problems;
+}
+
+/** PURE. The two ancestry proofs that make the frozen range meaningful (and prove HEAD contains it). */
+function validateD2DAnchors({ baseIsAncestorOfHead, headIsAncestorOfCurrent }) {
+  const problems = [];
+  if (!baseIsAncestorOfHead) problems.push(`the D2-D base ${D2D_BASE} is not an ancestor of the audited D2-D head ${D2D_HEAD} — the audited range is not real`);
+  if (!headIsAncestorOfCurrent) problems.push(`the audited D2-D head ${D2D_HEAD} is not an ancestor of the current HEAD — this checkout does not contain the complete audited D2-D phase`);
+  return problems;
+}
+
+/**
+ * PURE. Current-worktree safety, kept STRICTLY separate from the frozen historical scope: an uncommitted
+ * edit to a protected production file is a violation; the approved harness/doc maintenance edits and any
+ * future-phase file are not.
+ */
+function validateD2DWorktree(dirty) {
+  const problems = [];
+  for (const f of dirty) {
+    if (D2D_PROTECTED_FILES.includes(f)) problems.push(`a protected D2-D production file has uncommitted changes: ${f}`);
+  }
+  return problems;
+}
+
 function headSha() { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); }
 const gitFiles = (args) => execFileSync("git", args, { encoding: "utf8" })
   .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
+const subjectOf = (sha) => execFileSync("git", ["log", "-1", "--format=%s", sha], { encoding: "utf8" }).trim();
+function commitExists(sha) {
+  try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { stdio: "pipe" }); return true; } catch { return false; }
+}
+function isAncestor(a, b) {
+  if (!commitExists(a) || !commitExists(b)) return false;
+  try { execFileSync("git", ["merge-base", "--is-ancestor", a, b], { stdio: "pipe" }); return true; } catch { return false; }
+}
 
 /**
- * The REAL cumulative D2-D delta: every file changed by base..HEAD (ALL correction commits, not just the
- * first one — a seventh file smuggled into a later correction commit MUST be caught), unioned with the
- * uncommitted worktree so an in-flight correction cannot escape the approved six either.
+ * The FROZEN historical D2-D delta: base..auditedHead ONLY. It is NEVER HEAD-relative and is NEVER unioned
+ * with the worktree, so appending future history (the PR merge, D2-E, …) cannot change it. `--no-merges`
+ * makes the subject check what it claims to be: IMPLEMENTATION commits only.
  */
-function d2dCumulativeDelta() {
-  let baseIsAncestor = true;
-  try { execFileSync("git", ["merge-base", "--is-ancestor", D2D_BASE, "HEAD"], { stdio: "pipe" }); }
-  catch { baseIsAncestor = false; }
-  const commits = baseIsAncestor ? gitFiles(["rev-list", `${D2D_BASE}..HEAD`]) : [];
-  const messages = commits.map((c) => execFileSync("git", ["log", "-1", "--format=%s", c], { encoding: "utf8" }).trim());
-  const cumulative = baseIsAncestor ? gitFiles(["diff", "--name-only", `${D2D_BASE}..HEAD`]) : [];
-  // Per-commit deltas — used to PROVE the cumulative list is not merely the first commit's file list.
+function d2dFrozenRange(base = D2D_BASE, head = D2D_HEAD) {
+  const baseIsAncestorOfHead = isAncestor(base, head);
+  const headIsAncestorOfCurrent = isAncestor(head, headSha());
+  const anchorsProven = baseIsAncestorOfHead && headIsAncestorOfCurrent;
+  const commits = anchorsProven ? gitFiles(["rev-list", "--no-merges", `${base}..${head}`]) : [];
+  const messages = commits.map(subjectOf);
+  const files = anchorsProven ? gitFiles(["diff", "--name-only", `${base}..${head}`]) : [];
+  // Per-commit deltas — PROVE the frozen list is not merely the first commit's file list (a seventh file
+  // smuggled into a LATER correction commit inside the range must still be caught).
   const perCommit = commits.map((c) => gitFiles(["diff-tree", "--no-commit-id", "--name-only", "-r", c]));
-  const union = [...new Set([...cumulative, ...gitDirty()])];
-  return { baseIsAncestor, commits, messages, cumulative, perCommit, union };
+  return { baseIsAncestorOfHead, headIsAncestorOfCurrent, anchorsProven, commits, messages, files, perCommit };
 }
+
+/** Commits AFTER the audited head: the PR merge commit + every later phase. Outside the frozen D2-D scope. */
+const postAuditCommits = () => (isAncestor(D2D_HEAD, headSha()) ? gitFiles(["rev-list", `${D2D_HEAD}..HEAD`]) : []);
 
 const checks = [];
 function check(name, fn) { checks.push({ name, fn }); }
@@ -970,27 +1073,52 @@ check("36. D2-C stays read-only + unchanged; webhook does not import the writer"
 // ============================================================================
 // PHASE BOUNDARY (37) + WIRING/DOC (50)
 // ============================================================================
-check("37. two-mode phase boundary (pre-commit worktree | post-commit CUMULATIVE base..HEAD delta)", () => {
-  if (headSha() === D2D_BASE) {
-    // PRE-COMMIT: no D2-D commit exists yet — the worktree IS the whole delta (base is trivially HEAD).
-    const problems = validateD2DScope(gitDirty(), true);
-    assert(problems.length === 0, `pre-commit D2-D delta violation: ${problems.join(" | ")}`);
-    return;
+check("37. FROZEN audited phase boundary (base..audited-head), immune to the PR merge and later phases", () => {
+  const fr = d2dFrozenRange();
+  // 1-2. the ancestry proofs: the audited range is real, and THIS checkout contains all of it.
+  const anchorProblems = validateD2DAnchors(fr);
+  assert(anchorProblems.length === 0, anchorProblems.join(" | "));
+  assert(fr.commits.length >= 1, "the frozen D2-D range must contain at least one implementation commit");
+  // 4. subjects are checked ONLY for implementation commits INSIDE the frozen range. The PR merge commit
+  //    and every post-audit commit are out of range and are deliberately never subject-checked.
+  const subjectProblems = validateD2DSubjects(fr.messages);
+  assert(subjectProblems.length === 0, subjectProblems.join(" | "));
+  // The frozen delta is cumulative WITHIN the range: it must cover every file touched by EVERY commit in
+  // it (a seventh file added by a LATER correction commit inside the range must not be invisible).
+  const frozen = new Set(fr.files);
+  for (const files of fr.perCommit) {
+    for (const f of files) assert(frozen.has(f), `the frozen delta must cover every in-range commit's files (missing ${f})`);
   }
-  const { baseIsAncestor, commits, messages, cumulative, perCommit, union } = d2dCumulativeDelta();
-  assert(baseIsAncestor, `the D2-D base ${D2D_BASE} must be an ancestor of HEAD`);
-  assert(commits.length >= 1, "HEAD must be ahead of the D2-D base");
-  // EVERY commit in the cumulative range is D2-D work — no foreign commit rides along.
-  for (const m of messages) assert(/^Phase 5F-D2-D:/.test(m), `every commit after the base must be 'Phase 5F-D2-D:' (got '${m.slice(0, 60)}')`);
-  // The delta is CUMULATIVE, not first-commit-only: it must cover every file touched by EVERY commit in
-  // the range. (A seventh file added by a LATER correction commit is invisible to a first-commit check.)
-  const cum = new Set(cumulative);
-  for (const files of perCommit) {
-    for (const f of files) assert(cum.has(f), `the cumulative delta must cover every commit's files (missing ${f})`);
-  }
-  // ...and the uncommitted worktree is folded in, so an in-flight correction cannot escape the six either.
-  const problems = validateD2DScope(union, baseIsAncestor);
-  assert(problems.length === 0, `cumulative D2-D scope violation: ${problems.join(" | ")}`);
+  // 3. …and it is EXACTLY the approved six. The worktree is NOT unioned in (see check 37b).
+  const problems = validateD2DScope(fr.files, fr.anchorsProven);
+  assert(problems.length === 0, `frozen D2-D scope violation: ${problems.join(" | ")}`);
+});
+check("37b. current worktree: no frozen D2-D/D2-C CONSENT-AUTHORITY file is being edited", () => {
+  // A SEPARATE authority from the frozen historical scope. It catches an ACTIVE, uncommitted edit to a
+  // frozen consent-authority file — including from a later phase's branch — WITHOUT dragging that
+  // branch's own legitimate files into D2-D's historical delta.
+  const problems = validateD2DWorktree(gitDirty());
+  assert(problems.length === 0, `protected-file worktree violation: ${problems.join(" | ")}`);
+  // Every frozen consent-authority file still trips it (the writer and the migration explicitly).
+  for (const f of D2D_PROTECTED_FILES) assert(validateD2DWorktree([f]).length > 0, `a dirty protected file must be caught: ${f}`);
+  assert(validateD2DWorktree([WRITER_SRC]).length > 0, "a dirty D2-D writer must still be caught");
+  assert(validateD2DWorktree([MIGRATION_SRC]).length > 0, "a dirty D2-D migration must still be caught");
+  // The approved post-merge maintenance surface (this harness + its doc) is explicitly allowed…
+  assert(validateD2DWorktree(D2D_MAINTENANCE_FILES).length === 0, "the approved harness + doc maintenance edits must be allowed");
+  // …the D2-E INTEGRATION SEAMS are allowed, individually AND together: D2-E is approved to modify them,
+  // so D2-D must not go red during D2-E pre-commit testing…
+  for (const f of D2E_INTEGRATION_SEAMS) assert(validateD2DWorktree([f]).length === 0, `a D2-E integration seam must be allowed: ${f}`);
+  assert(validateD2DWorktree(D2E_INTEGRATION_SEAMS).length === 0, "D1-B + the webhook service dirty TOGETHER must be allowed");
+  // …and neither are D2-E's own new files (that conflation was the old defect).
+  assert(validateD2DWorktree([
+    "services/inboundConsentCommandService.ts",
+    "lib/communication/inboundConsentCommandInput.ts",
+    "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+    "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
+  ]).length === 0, "later-phase files must not be treated as D2-D worktree violations");
+  // A realistic FULL D2-E pre-commit worktree must leave D2-D green.
+  assert(validateD2DWorktree([...D2E_INTEGRATION_SEAMS, "services/inboundConsentCommandService.ts", "package.json"]).length === 0,
+    "a realistic D2-E pre-commit worktree must not trip the D2-D harness");
 });
 check("50. wiring: script + policy reuse + doc topics", () => {
   const pkg = JSON.parse(readF("package.json"));
@@ -1002,10 +1130,14 @@ check("50. wiring: script + policy reuse + doc topics", () => {
     /QuickFurno Core/i, /STOP/, /START/, /HELP/, /help_acknowledged/, /marketing.*transactional/i,
     /suppression-only|no preference/i, /receipt/i, /idempoten/i, /replay/i, /conflict/i,
     /expir|effective activity/i, /lock/i, /transaction/i, /read.only|D2-C/i, /Meta.*disabled/i,
-    /migration.history|drift/i, /not auto-applied|do not apply/i, /privacy|hash/i, /authentication|OTP/i,
+    /migration.history|drift/i, /must not be reapplied/i, /privacy|hash/i, /authentication|OTP/i,
     /policy[_ ]version/i, /CHECK constraint/i, /outcome ⟷ id consistency|outcome.*id consistency/i,
     /validated \*\*in SQL\*\*|in SQL, not only in TypeScript/i, /IMMUTABLE/,
     /fail-closed type guard/i, /jsonb_array_length/, /explicitly present|absent key is never/i,
+    // ---- post-merge harness stabilization (tests only; no production authority changed) ----
+    /frozen audited (historical )?range/i, /c05b123/, /ed7b68c/,
+    /merge commit/i, /later phase|future phase|D2-E/i,
+    /worktree/i, /protected/i, /tests only|test-only|changes no production/i,
   ]) has(topic, doc, `doc covers ${topic}`);
   // The doc must describe the migration's ACTUAL contents: 1 receipt table + 2 validator functions +
   // 1 SECURITY DEFINER RPC — and must NOT claim it adds only a function or changes no table.
@@ -1014,6 +1146,18 @@ check("50. wiring: script + policy reuse + doc topics", () => {
   has(/\*\*one new SECURITY DEFINER\*\*.*writer RPC/i, doc, "doc: one new SECURITY DEFINER writer RPC");
   has(/does not alter any pre-existing consent table, column, enum or index/i, doc, "doc: alters no pre-existing consent table/column/enum/index");
   hasNot(/additive \(one\s*\n?`create or replace function` \+ grants; no table/i, doc, "doc no longer claims 'one function, no table change'");
+  // ---- migration APPLICATION STATUS (the reviewed SQL is live; the registry is deliberately unreconciled) ----
+  // The stale "review only / not auto-applied" claim must never come back: the migration IS applied.
+  hasNot(/prepared for \*\*review only\*\*|not auto-applied/i, doc, "doc no longer claims the migration is review-only / not auto-applied");
+  has(/manually applied to the production Supabase database, and verified/i, doc, "doc: the reviewed SQL was manually applied AND verified");
+  has(/must not be reapplied/i, doc, "doc: the migration must not be reapplied");
+  has(/drift remains unresolved/i, doc, "doc: migration-history drift remains unresolved");
+  has(/registry was \*\*not repaired\s*\n?and not modified\*\*|not repaired and not modified/i, doc, "doc: the migration registry was not repaired or modified");
+  has(/not\*\* inserted into\s*\n?`supabase_migrations\.schema_migrations`/i, doc, "doc: version 20260712000300 was not inserted into the migration registry");
+  for (const cmd of ["supabase db push", "supabase migration up", "supabase migration repair", "supabase db reset"]) {
+    has(new RegExp(cmd.replace(/ /g, "\\s+"), "i"), doc, `doc lists the prohibited command: ${cmd}`);
+  }
+  has(/prohibited/i, doc, "doc: those commands are named as prohibited");
   // ...and the doc's claim is TRUE of the real migration source.
   const sql = sqlCode();
   assert((sql.match(/create table if not exists public\./gi) || []).length === 1, "the migration adds exactly one table");
@@ -1265,19 +1409,144 @@ tsMutation("MUT AO: normalizeRpcResult coerces an ABSENT id key to null and igno
     return absent.ok === true || conflict.ok === true;
   });
 
-fnMutation("MUT Y: a seventh file added by ANY later cumulative correction commit is rejected",
+fnMutation("MUT Y: a seventh file inside the FROZEN D2-D implementation range is rejected",
   () => {
-    // a 7th file anywhere in base..HEAD (env, route, webhook, unrelated service, second migration, other)
+    // a 7th file anywhere in base..audited-head (env, route, webhook, unrelated service, 2nd migration, other)
     const smuggled = ["services/somethingElse.ts", ".env.local", "app/api/consent/route.ts",
       "services/metaWhatsAppWebhookService.ts", "supabase/migrations/20260713000000_other.sql", "lib/random.ts"];
     return smuggled.every((f) => validateD2DScope([...D2D_EXPECTED_FILES, f], true).length > 0);
   });
-fnMutation("MUT Z: a cumulative delta modifying the D2-C service is rejected",
+fnMutation("MUT Z: a frozen delta modifying the D2-C service is rejected",
   () => validateD2DScope([...D2D_EXPECTED_FILES, D2C_SVC_SRC], true).length > 0
      && validateD2DScope(D2D_EXPECTED_FILES.filter((f) => f !== WRITER_SRC).concat(D2C_SVC_SRC), true).length > 0);
-fnMutation("MUT AA: a D2-D base that is NOT an ancestor of HEAD is rejected (the delta is unmeasurable)",
+fnMutation("MUT AA: an unmeasurable frozen range (anchor ancestry unproven) is rejected",
   () => validateD2DScope(D2D_EXPECTED_FILES, false).length > 0
      && validateD2DScope(D2D_EXPECTED_FILES, true).length === 0); // ...and the honest six still pass
+
+// ---- FROZEN-RANGE BOUNDARY mutations (post-merge stabilization) ------------------------------
+fnMutation("MUT AP: an APPROVED D2-D file missing from the frozen range is rejected",
+  () => D2D_EXPECTED_FILES.every((f) => validateD2DScope(D2D_EXPECTED_FILES.filter((x) => x !== f), true).length > 0));
+
+fnMutation("MUT AQ: a wrong / non-existent audited-head anchor fails closed (never silently empty)",
+  () => {
+    // A bogus anchor must NOT yield a vacuously-passing empty range: ancestry is unproven, so the scope
+    // validator must reject it outright.
+    const bogus = d2dFrozenRange(D2D_BASE, "0".repeat(40));
+    if (bogus.anchorsProven || bogus.commits.length !== 0 || bogus.files.length !== 0) return false;
+    if (validateD2DAnchors(bogus).length === 0) return false;
+    return validateD2DScope(bogus.files, bogus.anchorsProven).length > 0;
+  });
+
+fnMutation("MUT AR: base NOT an ancestor of the audited head is rejected (anchors swapped)",
+  () => {
+    const swapped = d2dFrozenRange(D2D_HEAD, D2D_BASE); // ed7b68c is NOT an ancestor of c05b123
+    return swapped.baseIsAncestorOfHead === false
+        && validateD2DAnchors(swapped).length > 0
+        && validateD2DAnchors({ baseIsAncestorOfHead: false, headIsAncestorOfCurrent: true }).length > 0;
+  });
+
+fnMutation("MUT AS: an audited head NOT contained in the current HEAD is rejected",
+  () => validateD2DAnchors({ baseIsAncestorOfHead: true, headIsAncestorOfCurrent: false }).length > 0
+     && validateD2DAnchors({ baseIsAncestorOfHead: true, headIsAncestorOfCurrent: true }).length === 0
+     // ...and the REAL repository satisfies it: HEAD genuinely contains the audited D2-D phase.
+     && isAncestor(D2D_HEAD, headSha()) === true);
+
+fnMutation("MUT AT: a D2-D implementation commit with a wrong subject is rejected",
+  () => validateD2DSubjects(["Phase 5F-D2-D: add transactional consent command writer", "wip: tweak"]).length > 0
+     && validateD2DSubjects(["Phase 5F-D2-E: add orchestrator"]).length > 0
+     && validateD2DSubjects(["Merge pull request #2 from quickfurno-maker/phase/x"]).length > 0
+     // ...and the REAL in-range subjects all pass.
+     && validateD2DSubjects(d2dFrozenRange().messages).length === 0);
+
+fnMutation("MUT AU: the PR merge commit is present, carries a non-D2-D subject, and is correctly IGNORED",
+  () => {
+    const fr = d2dFrozenRange();
+    const post = postAuditCommits(); // the PR merge + anything later
+    if (post.length === 0) return false; // at/after the merge there MUST be post-audit history
+    // The merge (and every later commit) must be OUTSIDE the frozen range — if the boundary regressed to
+    // base..HEAD, the merge commit would reappear here and its subject would fail the subject check.
+    if (post.some((c) => fr.commits.includes(c))) return false;
+    // At least one post-audit commit genuinely has a non-D2-D subject (today: the PR merge)…
+    if (!post.map(subjectOf).some((m) => !D2D_SUBJECT.test(m))) return false;
+    // …yet the frozen range's own subjects are clean, so the harness stays green.
+    return validateD2DSubjects(fr.messages).length === 0;
+  });
+
+fnMutation("MUT AV: later D2-E-style files after the audited head are IGNORED by the historical scope",
+  () => {
+    const fr = d2dFrozenRange();
+    const futureFiles = [
+      "services/inboundConsentCommandService.ts",
+      "lib/communication/inboundConsentCommandInput.ts",
+      "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+      "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
+    ];
+    // They are not in the frozen delta (it ends at the audited head), the frozen six still validate, and
+    // they are not worktree violations either — but they WOULD be rejected if smuggled INTO the range.
+    return futureFiles.every((f) => !fr.files.includes(f))
+        && validateD2DScope(fr.files, fr.anchorsProven).length === 0
+        && validateD2DWorktree(futureFiles).length === 0
+        && futureFiles.every((f) => validateD2DScope([...D2D_EXPECTED_FILES, f], true).length > 0);
+  });
+
+srcMutation("MUT AW: an uncommitted edit to a protected D2-D production file is DETECTED in the worktree",
+  WRITER_SRC,
+  'const CHANNELS: readonly string[] = ["whatsapp", "sms", "rcs"];',
+  'const CHANNELS: readonly string[] = ["whatsapp", "sms", "rcs", "email"];',
+  () => validateD2DWorktree(gitDirty()).some((p) => p.includes(WRITER_SRC)));
+
+srcMutation("MUT AX: an uncommitted edit to the frozen D2-D migration is DETECTED in the worktree",
+  MIGRATION_SRC,
+  "-- ── 10. SANITIZED RESULT",
+  "-- ── 10. SANITIZED RESULT (edited)",
+  () => validateD2DWorktree(gitDirty()).some((p) => p.includes(MIGRATION_SRC)));
+
+// ---- D2-E INTEGRATION SEAMS: dirty is ALLOWED (D2-D must not block D2-E pre-commit testing) ----
+/** A seam file really edited on disk must be dirty, raise NO D2-D violation, and leave the suite green. */
+const seamAllowed = (...files) => async () => {
+  const dirty = gitDirty();
+  if (!files.every((f) => dirty.includes(f))) return false;       // the edit must really be on disk
+  if (validateD2DWorktree(dirty).length !== 0) return false;      // …and must NOT be a D2-D violation
+  return (await suiteGoesRed()) === false;                        // …and the whole D2-D suite stays green
+};
+const D1B_ANCHOR = 'export const INBOUND_UNIQUE_FENCE = "uq_comm_inbound_provider_message";';
+const WEBHOOK_ANCHOR = 'const CHANNEL = "whatsapp";';
+
+srcMutation("MUT AY: a dirty D1-B integration service is ALLOWED (D2-E seam, not D2-D-protected)",
+  D1B_SVC_SRC, D1B_ANCHOR, `${D1B_ANCHOR}\n// d2e-seam-probe`,
+  seamAllowed(D1B_SVC_SRC));
+
+srcMutation("MUT AZ: a dirty webhook integration service is ALLOWED (D2-E seam, not D2-D-protected)",
+  WEBHOOK_SVC_SRC, WEBHOOK_ANCHOR, `${WEBHOOK_ANCHOR}\n// d2e-seam-probe`,
+  seamAllowed(WEBHOOK_SVC_SRC));
+
+mutationChecks.push({
+  name: "MUT BA: a dirty D1-B + webhook TOGETHER is ALLOWED (a realistic D2-E pre-commit worktree)",
+  kind: "src",
+  edits: [
+    { file: D1B_SVC_SRC, from: D1B_ANCHOR, to: `${D1B_ANCHOR}\n// d2e-seam-probe` },
+    { file: WEBHOOK_SVC_SRC, from: WEBHOOK_ANCHOR, to: `${WEBHOOK_ANCHOR}\n// d2e-seam-probe` },
+  ],
+  scenario: seamAllowed(D1B_SVC_SRC, WEBHOOK_SVC_SRC),
+});
+
+fnMutation("MUT BB: the protected list is exactly the consent authorities — seams excluded, authorities kept",
+  () => {
+    // the five frozen CONSENT-AUTHORITY files are protected…
+    const mustProtect = [COMMAND_SRC, POLICY_SRC, WRITER_SRC, MIGRATION_SRC, D2C_SVC_SRC];
+    if (!mustProtect.every((f) => D2D_PROTECTED_FILES.includes(f) && validateD2DWorktree([f]).length > 0)) return false;
+    if (D2D_PROTECTED_FILES.length !== mustProtect.length) return false;
+    // …the D2-E seams are NOT (individually or together)…
+    if (D2E_INTEGRATION_SEAMS.some((f) => D2D_PROTECTED_FILES.includes(f))) return false;
+    if (validateD2DWorktree(D2E_INTEGRATION_SEAMS).length !== 0) return false;
+    // …and D2-E's own NEW files remain allowed.
+    return validateD2DWorktree([
+      "services/inboundConsentCommandService.ts",
+      "lib/communication/inboundConsentCommandInput.ts",
+      "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+      "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
+    ]).length === 0;
+  });
 
 // ============================================================================
 // RUNNER

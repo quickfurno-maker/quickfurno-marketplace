@@ -3,16 +3,27 @@
 -- Phase 5F-D2-D — Controlled Transactional Communication Consent Writer (ADDITIVE)
 --
 -- WHAT THIS MIGRATION DOES
---   1. Adds public.communication_consent_command_receipts — an additive, service-role-only
+--   1. Adds TWO pure IMMUTABLE validator functions that are the SQL definition of a well-formed stored
+--      receipt result. They are enforced BOTH as a receipt CHECK constraint (a malformed row can never
+--      be inserted) and defensively inside the RPC before any replay (a row that is malformed anyway can
+--      never be replayed). SQL does not defer this to the TypeScript layer.
+--   2. Adds public.communication_consent_command_receipts — an additive, service-role-only
 --      processing/idempotency RECEIPT (NOT consent truth; NOT a replacement for
 --      communication_consent_events or communication_suppressions). It uniquely binds one provider
 --      event to its ORIGINAL sanitized scope_results (exact event + suppression ids) for stable replay.
---   2. Adds ONE SECURITY DEFINER function, public.apply_communication_consent_command(...), the SOLE
+--   3. Adds ONE SECURITY DEFINER function, public.apply_communication_consent_command(...), the SOLE
 --      transactional writer for inbound STOP/START. In ONE transaction it: reads the receipt for
 --      idempotent replay/conflict; computes EFFECTIVE suppression activity (expiring physically-active
 --      rows with immutable system evidence first); appends immutable inbound-command evidence; mutates
 --      the communication_suppressions projection; and writes the receipt — all-or-nothing. HELP /
 --      unsupported never reach this RPC (no consent-state transition; handled by the TypeScript writer).
+--
+-- RECEIPT REPLAY BINDING (all six, or it is NOT a replay)
+--   provider + provider_message_id + channel  → destination_hash + normalized_command + policy_version
+--   A stored destination / command / POLICY VERSION that differs  → WRITER_CONFLICT.
+--   A stored policy version that is missing/null, or scope_results that are not a 2-item
+--   marketing→transactional array with a closed outcome vocabulary, UUID-or-null ids and outcome/id
+--   consistency (duplicate, wrong-order, malformed, contradictory) → WRITER_INTEGRITY_VIOLATION.
 --
 -- LOCKED POLICY (Phase 5F-D2-D)
 --   P1 — STOP/START apply INDEPENDENTLY to 'marketing' + 'transactional' suppression scopes ONLY;
@@ -39,6 +50,96 @@
 -- ============================================================================
 
 
+-- @@ RECEIPT_VALIDATOR_BEGIN
+-- ============================================================================
+-- SECTION 0 — STORED-RECEIPT STRUCTURAL VALIDATORS (pure, immutable; SQL is the authority)
+-- ============================================================================
+-- The receipt's scope_results are the SOLE source of a replayed outcome, so their structure is a
+-- security boundary — NOT a TypeScript convenience. These IMMUTABLE validators are the single SQL
+-- definition of a well-formed receipt result, used in BOTH directions:
+--   • as a table CHECK constraint, so a malformed receipt row can never be INSERTED; and
+--   • defensively inside the RPC, so a receipt row that is malformed ANYWAY (written before this
+--     constraint existed, or by any out-of-band path) can never be REPLAYED.
+-- The TypeScript normalizeRpcResult layer re-checks the same contract; neither layer relies on the other.
+-- Pure, IMMUTABLE, no table access, no side effect. They return false (never NULL) on any bad input, so
+-- a NULL can never be mistaken for "valid" in the RPC's `if not ...` guard or by a CHECK constraint.
+
+-- One scope item, validated POSITIONALLY (p_scope is the scope required at that index).
+create or replace function public.communication_consent_receipt_scope_result_valid(
+  p_item  jsonb,
+  p_scope text
+)
+returns boolean
+language sql
+immutable
+parallel safe
+as $v$
+  select coalesce(
+    -- each item is an OBJECT bound to its REQUIRED scope (index 0 marketing, index 1 transactional)
+    jsonb_typeof(p_item) = 'object'
+    and (p_item ->> 'scope') = p_scope
+    -- outcome belongs to the CLOSED vocabulary (mirrors ConsentScopeOutcome exactly)
+    and (p_item ->> 'outcome') in (
+          'suppression_created', 'user_stop_already_active', 'stronger_suppression_preserved',
+          'user_stop_reversed', 'no_reversible_user_stop')
+    -- both id keys MUST be present and be a JSON string or JSON null (a missing key yields SQL NULL
+    -- from `->`, so jsonb_typeof is NULL and the `in` test is NULL → coalesced to false below)
+    and jsonb_typeof(p_item -> 'event_id') in ('string', 'null')
+    and jsonb_typeof(p_item -> 'suppression_id') in ('string', 'null')
+    -- a present id MUST be a canonical UUID string (never an arbitrary/free-form string)
+    and (jsonb_typeof(p_item -> 'event_id') = 'null'
+         or (p_item ->> 'event_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+    and (jsonb_typeof(p_item -> 'suppression_id') = 'null'
+         or (p_item ->> 'suppression_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+    -- outcome ⟷ id consistency: a contradictory receipt is NOT replayable evidence
+    and case p_item ->> 'outcome'
+          when 'suppression_created'            then jsonb_typeof(p_item -> 'event_id') = 'string'
+                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+          when 'user_stop_reversed'             then jsonb_typeof(p_item -> 'event_id') = 'string'
+                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+          when 'user_stop_already_active'       then jsonb_typeof(p_item -> 'event_id') = 'null'
+                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+          when 'stronger_suppression_preserved' then jsonb_typeof(p_item -> 'event_id') = 'null'
+                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+          when 'no_reversible_user_stop'        then jsonb_typeof(p_item -> 'event_id') = 'null'
+                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'null'
+          else false
+        end,
+    false)
+$v$;
+
+-- The whole stored scope_results value: a 2-item array in the DETERMINISTIC scope order.
+create or replace function public.communication_consent_receipt_results_valid(p_results jsonb)
+returns boolean
+language sql
+immutable
+parallel safe
+as $v$
+  select coalesce(
+    jsonb_typeof(p_results) = 'array'
+    and jsonb_array_length(p_results) = 2
+    and public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')
+    and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional'),
+    false)
+$v$;
+
+comment on function public.communication_consent_receipt_results_valid(jsonb) is
+  'Phase 5F-D2-D: the SQL definition of a well-formed stored consent-command receipt result — a 2-item '
+  'array, marketing then transactional, closed outcome vocabulary, UUID-or-null ids, and outcome/id '
+  'consistency. Enforced as a receipt CHECK constraint (no malformed row can be inserted) AND re-checked '
+  'defensively by apply_communication_consent_command before any replay. Returns false, never NULL.';
+
+revoke all on function public.communication_consent_receipt_scope_result_valid(jsonb, text) from public;
+revoke all on function public.communication_consent_receipt_scope_result_valid(jsonb, text) from anon;
+revoke all on function public.communication_consent_receipt_scope_result_valid(jsonb, text) from authenticated;
+grant execute on function public.communication_consent_receipt_scope_result_valid(jsonb, text) to service_role;
+revoke all on function public.communication_consent_receipt_results_valid(jsonb) from public;
+revoke all on function public.communication_consent_receipt_results_valid(jsonb) from anon;
+revoke all on function public.communication_consent_receipt_results_valid(jsonb) from authenticated;
+grant execute on function public.communication_consent_receipt_results_valid(jsonb) to service_role;
+-- @@ RECEIPT_VALIDATOR_END
+
+
 -- @@ RECEIPT_TABLE_BEGIN
 -- ============================================================================
 -- SECTION 1 — COMMAND PROCESSING / IDEMPOTENCY RECEIPT (additive, service-role only)
@@ -54,15 +155,33 @@ create table if not exists public.communication_consent_command_receipts (
   destination_hash     text not null check (destination_hash ~ '^[0-9a-f]{64}$'),
   normalized_command   text not null check (normalized_command in ('stop', 'start')),
   policy_version       text not null check (policy_version ~ '^[A-Za-z0-9._:-]{1,64}$'),
-  -- The exact sanitized scope_results returned for this event (2 elements; ids embedded). Bounded.
-  scope_results        jsonb not null check (
-                         jsonb_typeof(scope_results) = 'array'
-                         and jsonb_array_length(scope_results) = 2
-                         and octet_length(scope_results::text) <= 4096),
+  -- The exact sanitized scope_results returned for this event (2 elements; ids embedded). Bounded AND
+  -- STRUCTURALLY VALID — a malformed / duplicated / out-of-order / contradictory result can never be
+  -- inserted, so it can never become a replayable outcome.
+  scope_results        jsonb not null,
   created_at           timestamptz not null default now(),
   -- Idempotency anchor: one receipt per provider event identity.
-  constraint uq_consent_command_receipt unique (provider, provider_message_id, channel)
+  constraint uq_consent_command_receipt unique (provider, provider_message_id, channel),
+  constraint ck_consent_command_receipt_scope_results check (
+    octet_length(scope_results::text) <= 4096
+    and public.communication_consent_receipt_results_valid(scope_results))
 );
+
+-- Idempotent for a table created by an EARLIER revision of this file (before the structural CHECK).
+do $ck$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_constraint
+     where conname = 'ck_consent_command_receipt_scope_results'
+       and conrelid = 'public.communication_consent_command_receipts'::regclass
+  ) then
+    alter table public.communication_consent_command_receipts
+      add constraint ck_consent_command_receipt_scope_results check (
+        octet_length(scope_results::text) <= 4096
+        and public.communication_consent_receipt_results_valid(scope_results));
+  end if;
+end
+$ck$;
 
 comment on table public.communication_consent_command_receipts is
   'Phase 5F-D2-D: additive service-role-only PROCESSING/IDEMPOTENCY receipt for inbound consent commands. '
@@ -118,6 +237,7 @@ declare
   v_scope         text;
   v_r_dest        text;
   v_r_cmd         text;
+  v_r_policy      text;
   v_r_scope       jsonb;
   v_active_id     uuid;
   v_active_reason text;
@@ -170,18 +290,29 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('dst|' || p_destination_hash || '|' || p_channel, 0));
 
   -- ── 4. RECEIPT-BASED REPLAY / CONFLICT (the idempotency authority) ─────────────────────────
-  select destination_hash, normalized_command, scope_results
-    into v_r_dest, v_r_cmd, v_r_scope
+  -- The FULL replay binding is (provider, provider_message_id, channel) → destination_hash +
+  -- normalized_command + POLICY_VERSION + a structurally valid scope_results. A replay is only stable
+  -- if EVERY bound field matches; anything else is a conflict or an integrity violation, never a replay.
+  select destination_hash, normalized_command, policy_version, scope_results
+    into v_r_dest, v_r_cmd, v_r_policy, v_r_scope
     from public.communication_consent_command_receipts
    where provider = p_provider and provider_message_id = p_provider_message_id and channel = p_channel;
   if found then
-    -- Invalid / incomplete stored receipt → integrity violation.
-    if v_r_scope is null or jsonb_typeof(v_r_scope) <> 'array' or jsonb_array_length(v_r_scope) <> 2
-       or v_r_cmd is null or v_r_dest is null then
+    -- INTEGRITY (checked FIRST — a malformed receipt is never a comparable/replayable outcome). SQL is
+    -- the authority here: it does NOT defer to the TypeScript normalizer. A receipt missing its command,
+    -- destination or POLICY VERSION, or whose scope_results are not a 2-item marketing→transactional
+    -- array with a closed outcome vocabulary, UUID-or-null ids and outcome/id consistency (duplicate,
+    -- wrong-order, malformed or contradictory), is an integrity violation.
+    if v_r_cmd is null or v_r_dest is null or v_r_policy is null
+       or not public.communication_consent_receipt_results_valid(v_r_scope) then
       return jsonb_build_object('ok', false, 'code', 'WRITER_INTEGRITY_VIOLATION');
     end if;
-    -- Same provider event with a different command OR destination → conflict.
-    if v_r_cmd is distinct from p_command or v_r_dest is distinct from p_destination_hash then
+    -- CONFLICT: the same provider event bound to a different command, destination OR policy version.
+    -- (A receipt written under a different policy version is NOT replayable under this one — its stored
+    -- outcome was derived by different rules, so silently re-serving it would launder a stale policy.)
+    if v_r_cmd is distinct from p_command
+       or v_r_dest is distinct from p_destination_hash
+       or v_r_policy is distinct from p_policy_version then
       return jsonb_build_object('ok', false, 'code', 'WRITER_CONFLICT');
     end if;
     -- Stable replay: return the EXACT original stored scope_results (never re-derived from current state).

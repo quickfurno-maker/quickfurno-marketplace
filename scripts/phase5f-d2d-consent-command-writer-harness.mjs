@@ -152,7 +152,41 @@ function simUuid() { uuidCounter++; return `11111111-1111-4111-8111-${uuidCounte
 const SIM_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
 const SIM_IDENT = /^[A-Za-z0-9._:-]{1,200}$/;
 const SIM_PROVIDERS = ["meta_whatsapp", "exotel_sms", "system"];
+const SIM_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SIM_OUTCOMES = ["suppression_created", "user_stop_already_active", "stronger_suppression_preserved",
+  "user_stop_reversed", "no_reversible_user_stop"];
+const SIM_SCOPE_ORDER = ["marketing", "transactional"];
 const ms = (iso) => new Date(iso).getTime();
+
+/**
+ * Mirrors public.communication_consent_receipt_scope_result_valid(jsonb, text) EXACTLY. Positional:
+ * `scope` is the scope REQUIRED at that index. An absent id key is invalid (as in SQL, where `->` on a
+ * missing key yields NULL and the typeof test coalesces to false).
+ */
+function simScopeResultValid(item, scope) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+  if (item.scope !== scope) return false;
+  if (!SIM_OUTCOMES.includes(item.outcome)) return false;
+  if (!("event_id" in item) || !("suppression_id" in item)) return false;
+  const ev = item.event_id, su = item.suppression_id;
+  const evNull = ev === null, suNull = su === null;
+  if (!evNull && (typeof ev !== "string" || !SIM_UUID.test(ev))) return false;
+  if (!suNull && (typeof su !== "string" || !SIM_UUID.test(su))) return false;
+  switch (item.outcome) {
+    case "suppression_created":
+    case "user_stop_reversed": return !evNull && !suNull;
+    case "user_stop_already_active":
+    case "stronger_suppression_preserved": return evNull && !suNull;
+    case "no_reversible_user_stop": return evNull && suNull;
+    default: return false;
+  }
+}
+/** Mirrors public.communication_consent_receipt_results_valid(jsonb) EXACTLY. */
+function simReceiptResultsValid(sr) {
+  return Array.isArray(sr) && sr.length === 2
+    && simScopeResultValid(sr[0], SIM_SCOPE_ORDER[0])
+    && simScopeResultValid(sr[1], SIM_SCOPE_ORDER[1]);
+}
 
 function newStore() { return { events: [], suppressions: [], receipts: [], failOn: null }; }
 
@@ -184,12 +218,16 @@ function simApplyRawJson(store, a) {
   }
   const evaluatedAt = a.p_received_at;
   const scopes = ["marketing", "transactional"];
-  // 4. receipt-based replay / conflict / integrity
+  // 4. receipt-based replay / conflict / integrity. The FULL binding is destination + command +
+  // POLICY VERSION + structurally valid scope_results; integrity is checked FIRST (a malformed receipt
+  // is never a comparable outcome), and the SQL — not the TypeScript normalizer — is the authority.
   const receipt = store.receipts.find((r) => r.provider === a.p_provider && r.provider_message_id === a.p_provider_message_id && r.channel === a.p_channel);
   if (receipt) {
-    if (!Array.isArray(receipt.scope_results) || receipt.scope_results.length !== 2 || receipt.normalized_command == null || receipt.destination_hash == null)
+    if (receipt.normalized_command == null || receipt.destination_hash == null || receipt.policy_version == null
+        || !simReceiptResultsValid(receipt.scope_results))
       return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    if (receipt.normalized_command !== a.p_command || receipt.destination_hash !== a.p_destination_hash)
+    if (receipt.normalized_command !== a.p_command || receipt.destination_hash !== a.p_destination_hash
+        || receipt.policy_version !== a.p_policy_version)
       return { ok: false, code: "WRITER_CONFLICT" };
     return { ok: true, replayed: true, scope_results: JSON.parse(JSON.stringify(receipt.scope_results)) };
   }
@@ -239,6 +277,9 @@ function simApplyRawJson(store, a) {
   }
   if (store.failOn === "scope2" && scope_results.some((s) => s.event_id)) throw new Error("inject one-scope partial failure");
   if (store.failOn === "receipt") throw new Error("inject receipt failure");
+  // ck_consent_command_receipt_scope_results — the DB CHECK constraint: a malformed receipt row can
+  // never be INSERTED (a constraint violation aborts the whole transaction, like any other failure).
+  if (!simReceiptResultsValid(scope_results)) throw new Error("receipt CHECK constraint violation");
   // commit atomically (receipt + evidence + projection all-or-nothing)
   store.events.push(...newEvents); store.suppressions.push(...newSupps);
   for (const u of updates) { const s = store.suppressions.find((x) => x.id === u.id); s.is_active = false; s.deactivated_at = u.deactivated_at; s.last_event_id = u.eid; }
@@ -619,6 +660,118 @@ check("49. direct RPC: raw/free-form identifier rejected", () => {
 });
 
 // ============================================================================
+// RECEIPT BINDING + SQL-SIDE STRUCTURAL VALIDATION (51-62)
+//
+// The stored receipt is the SOLE source of a replayed outcome, so its binding and its structure are a
+// security boundary. Every case below is asserted TWICE: through the writer (the user-visible contract)
+// AND against the RAW RPC json (simApplyRawJson, which bypasses normalizeRpcResult entirely) — proving
+// the SQL layer itself rejects it and the TypeScript normalizer is a second fence, not the only one.
+// ============================================================================
+/** The p_* args for the SAME provider event as `inp` (the redelivery the RPC must classify). */
+const rpcArgsFor = (inp, command) => toP({
+  policyVersion: "qf-consent-v1", channel: inp.channel, command, destinationHash: inp.destinationHash,
+  principalType: null, principalId: null, provider: inp.provider, providerMessageId: inp.providerMessageId,
+  sourceEventType: inp.sourceEventType, sourceEventId: inp.providerMessageId, inboundMessageId: null,
+  occurredAt: inp.occurredAt, receivedAt: NOW().toISOString(), correlationId: null, causationId: null,
+});
+/** Apply one fresh command, CORRUPT the stored receipt, then redeliver the SAME provider event. */
+async function redeliverWithReceipt(mutate, over = {}) {
+  const store = newStore();
+  if (over.seed) over.seed(store);
+  const command = over.command ?? "stop";
+  const inp = input(command);
+  const first = await run(inp, store);
+  assert(first.r.ok === true && store.receipts.length === 1, "setup: the fresh command wrote exactly one receipt");
+  mutate(store.receipts[0], store);
+  return { viaWriter: (await run(inp, store)).r, raw: simApplyRawJson(store, rpcArgsFor(inp, command)) };
+}
+function assertCode(x, code, msg) {
+  assert(x.viaWriter.ok === false && x.viaWriter.code === code, `${msg}: writer → ${code} (got ${safeStringify(x.viaWriter)})`);
+  assert(x.raw.ok === false && x.raw.code === code, `${msg}: the RPC ITSELF returns ${code} — not the TS normalizer (got ${safeStringify(x.raw)})`);
+}
+const integrity = (x, msg) => assertCode(x, "WRITER_INTEGRITY_VIOLATION", msg);
+
+check("51. exact binding match (provider+message+channel+destination+command+policy) → stable replay", async () => {
+  const store = newStore(); const inp = input("stop");
+  const a = await run(inp, store);
+  const b = await run(inp, store);
+  const rec = store.receipts[0];
+  assert(rec.policy_version === "qf-consent-v1" && rec.destination_hash === HASH && rec.normalized_command === "stop", "receipt binds destination + command + policy");
+  assert(b.r.replayed === true && JSON.stringify(b.r.scopeResults) === JSON.stringify(a.r.scopeResults), "exact binding → stable replay of the original result");
+  const raw = simApplyRawJson(store, rpcArgsFor(inp, "stop"));
+  assert(raw.ok === true && raw.replayed === true, "the RPC itself replays an exactly-bound receipt");
+});
+check("52. receipt POLICY-VERSION mismatch → WRITER_CONFLICT (policy comparison is load-bearing)", async () => {
+  for (const stale of ["qf-consent-v0", "qf-consent-v2", "other"]) {
+    const x = await redeliverWithReceipt((r) => { r.policy_version = stale; });
+    assertCode(x, "WRITER_CONFLICT", `stored policy '${stale}' ≠ p_policy_version`);
+  }
+});
+check("53. missing/null stored policy version → WRITER_INTEGRITY_VIOLATION", async () => {
+  integrity(await redeliverWithReceipt((r) => { r.policy_version = null; }), "null stored policy version");
+  integrity(await redeliverWithReceipt((r) => { delete r.policy_version; }), "missing stored policy version");
+});
+check("54. duplicate marketing receipt scopes → WRITER_INTEGRITY_VIOLATION", async () => {
+  const x = await redeliverWithReceipt((r) => { r.scope_results = [r.scope_results[0], JSON.parse(JSON.stringify(r.scope_results[0]))]; });
+  integrity(x, "two marketing items");
+});
+check("55. transactional-first receipt (wrong scope order) → WRITER_INTEGRITY_VIOLATION", async () => {
+  const x = await redeliverWithReceipt((r) => { r.scope_results = [r.scope_results[1], r.scope_results[0]]; });
+  integrity(x, "transactional at index 0");
+});
+check("56. invalid event UUID in the receipt → WRITER_INTEGRITY_VIOLATION", async () => {
+  for (const bad of ["not-a-uuid", "", "11111111-1111-4111-8111", "'; drop table x; --", 42, {}])
+    integrity(await redeliverWithReceipt((r) => { r.scope_results[0].event_id = bad; }), `event_id = ${safeStringify(bad)}`);
+});
+check("57. invalid suppression UUID in the receipt → WRITER_INTEGRITY_VIOLATION", async () => {
+  for (const bad of ["not-a-uuid", "1234", true])
+    integrity(await redeliverWithReceipt((r) => { r.scope_results[0].suppression_id = bad; }), `suppression_id = ${safeStringify(bad)}`);
+});
+check("58. contradictory suppression_created ids → WRITER_INTEGRITY_VIOLATION", async () => {
+  integrity(await redeliverWithReceipt((r) => { r.scope_results[0].event_id = null; }), "created without an event_id");
+  integrity(await redeliverWithReceipt((r) => { r.scope_results[0].suppression_id = null; }), "created without a suppression_id");
+  integrity(await redeliverWithReceipt((r) => { delete r.scope_results[0].event_id; }), "created with the event_id key absent");
+});
+check("59. contradictory user_stop_already_active ids → WRITER_INTEGRITY_VIOLATION", async () => {
+  const seed = (store) => seedUserStop(store); // STOP over an existing user_stop → user_stop_already_active
+  const base = await redeliverWithReceipt((r) => { assert(r.scope_results[0].outcome === "user_stop_already_active", "setup: already-active outcome"); }, { seed });
+  assert(base.viaWriter.ok === true && base.viaWriter.replayed === true, "an intact already-active receipt still replays");
+  integrity(await redeliverWithReceipt((r) => { r.scope_results[0].event_id = UUID; }, { seed }), "already-active with an event_id");
+  integrity(await redeliverWithReceipt((r) => { r.scope_results[0].suppression_id = null; }, { seed }), "already-active without a suppression_id");
+});
+check("60. contradictory no_reversible_user_stop ids → WRITER_INTEGRITY_VIOLATION", async () => {
+  const over = { command: "start" }; // START with nothing active → no_reversible_user_stop (both ids null)
+  integrity(await redeliverWithReceipt((r) => { r.scope_results[0].suppression_id = UUID; }, over), "no_reversible with a suppression_id");
+  integrity(await redeliverWithReceipt((r) => { r.scope_results[0].event_id = UUID; r.scope_results[0].suppression_id = UUID; }, over), "no_reversible with both ids");
+});
+check("61. malformed two-item receipt → WRITER_INTEGRITY_VIOLATION", async () => {
+  const malformed = [
+    ["item is a string", (r) => { r.scope_results[1] = "transactional"; }],
+    ["item is an array", (r) => { r.scope_results[1] = []; }],
+    ["item is null", (r) => { r.scope_results[1] = null; }],
+    ["outcome outside the closed vocabulary", (r) => { r.scope_results[0].outcome = "suppression_deleted"; }],
+    ["outcome missing", (r) => { delete r.scope_results[0].outcome; }],
+    ["scope outside the closed vocabulary", (r) => { r.scope_results[0].scope = "global"; }],
+    ["scope missing", (r) => { delete r.scope_results[1].scope; }],
+    ["suppression_id key absent", (r) => { delete r.scope_results[1].suppression_id; }],
+    ["scope_results not an array", (r) => { r.scope_results = { scope: "marketing" }; }],
+    ["scope_results is null", (r) => { r.scope_results = null; }],
+    ["three items", (r) => { r.scope_results = [...r.scope_results, r.scope_results[1]]; }],
+  ];
+  for (const [name, mutate] of malformed) integrity(await redeliverWithReceipt(mutate), name);
+});
+check("62. a corrupted receipt NEVER replays and NEVER re-applies the command (fail closed, no mutation)", async () => {
+  const store = newStore(); const inp = input("stop");
+  await run(inp, store);
+  const before = JSON.stringify({ e: store.events, s: store.suppressions });
+  store.receipts[0].scope_results[0].event_id = "not-a-uuid";
+  const { r } = await run(inp, store);
+  assert(r.ok === false && r.code === "WRITER_INTEGRITY_VIOLATION", "fails closed");
+  assert(JSON.stringify({ e: store.events, s: store.suppressions }) === before, "no evidence / projection change on a corrupted receipt");
+  assert(store.receipts.length === 1, "no second receipt written");
+});
+
+// ============================================================================
 // STATIC SQL INVARIANTS (30-33 + receipt/lock/expiry)
 // ============================================================================
 check("30. receipt table + RPC least-privilege SECURITY DEFINER + service_role-only", () => {
@@ -647,7 +800,7 @@ check("32. RPC guards: START reverses ONLY user_stop; conflict + receipt-integri
   const sql = sqlCode();
   has(/'no_reversible_user_stop'\s*;\s*elsif\s+v_active_reason\s*=\s*'user_stop'\s+then\s+v_outcome\s*:=\s*'user_stop_reversed'/i, sql, "START reversal guarded by reason = user_stop");
   has(/v_r_cmd\s+is\s+distinct\s+from\s+p_command\s+or\s+v_r_dest\s+is\s+distinct\s+from\s+p_destination_hash[\s\S]*?WRITER_CONFLICT/i, sql, "command/destination conflict detection");
-  has(/jsonb_array_length\(v_r_scope\)\s*<>\s*2[\s\S]*?WRITER_INTEGRITY_VIOLATION/i, sql, "receipt-integrity guard");
+  has(/not\s+public\.communication_consent_receipt_results_valid\(v_r_scope\)[\s\S]{0,200}?WRITER_INTEGRITY_VIOLATION/i, sql, "receipt-integrity guard");
   has(/for\s+update/i, sql, "row locking (FOR UPDATE)");
   has(/exception\s*\n?\s*when\s+unique_violation\s+then/i, sql, "unique-violation → sanitized conflict, rollback");
 });
@@ -670,6 +823,58 @@ check("34. effective-activity expiry: guard + system-action evidence + fixed loc
   assert(evtIdx > 0 && dstIdx > evtIdx, "provider-event lock acquired before destination lock");
   // replay returns the stored scope_results verbatim (does not re-derive from current rows)
   has(/'replayed',\s*true,\s*'scope_results',\s*v_r_scope/i, sql, "replay returns stored v_r_scope verbatim");
+});
+
+check("63. SQL: the receipt replay binding includes the stored POLICY VERSION", () => {
+  const sql = sqlCode();
+  has(/select\s+destination_hash,\s*normalized_command,\s*policy_version,\s*scope_results\s+into\s+v_r_dest,\s*v_r_cmd,\s*v_r_policy,\s*v_r_scope/i, sql,
+    "the receipt lookup SELECTS the stored policy_version");
+  has(/v_r_cmd\s+is\s+null\s+or\s+v_r_dest\s+is\s+null\s+or\s+v_r_policy\s+is\s+null[\s\S]{0,240}?WRITER_INTEGRITY_VIOLATION/i, sql,
+    "missing/null stored policy version → WRITER_INTEGRITY_VIOLATION");
+  has(/or\s+v_r_policy\s+is\s+distinct\s+from\s+p_policy_version[\s\S]{0,200}?WRITER_CONFLICT/i, sql,
+    "stored policy version ≠ p_policy_version → WRITER_CONFLICT");
+  // integrity is decided BEFORE conflict: a malformed receipt is never a comparable outcome
+  assert(sql.indexOf("v_r_policy is null") < sql.indexOf("v_r_policy is distinct from p_policy_version"),
+    "the integrity guard precedes the conflict comparison");
+});
+check("64. SQL: stored scope_results are FULLY validated in SQL before replay (not only in TypeScript)", () => {
+  const sql = sqlCode();
+  has(/create or replace function public\.communication_consent_receipt_results_valid\(p_results jsonb\)/i, sql, "the results validator exists");
+  has(/create or replace function public\.communication_consent_receipt_scope_result_valid\(/i, sql, "the per-item validator exists");
+  has(/jsonb_typeof\(p_results\)\s*=\s*'array'\s*and\s+jsonb_array_length\(p_results\)\s*=\s*2/i, sql, "JSON array with EXACTLY two items");
+  has(/communication_consent_receipt_scope_result_valid\(p_results\s*->\s*0,\s*'marketing'\)/i, sql, "item 0 scope = marketing");
+  has(/communication_consent_receipt_scope_result_valid\(p_results\s*->\s*1,\s*'transactional'\)/i, sql, "item 1 scope = transactional");
+  has(/jsonb_typeof\(p_item\)\s*=\s*'object'/i, sql, "each item is an object");
+  has(/\(p_item\s*->>\s*'outcome'\)\s*in\s*\(\s*'suppression_created',\s*'user_stop_already_active',\s*'stronger_suppression_preserved',\s*'user_stop_reversed',\s*'no_reversible_user_stop'\)/i, sql,
+    "closed outcome vocabulary");
+  for (const f of ["event_id", "suppression_id"]) {
+    has(new RegExp(`jsonb_typeof\\(p_item -> '${f}'\\) in \\('string', 'null'\\)`, "i"), sql, `${f} is a JSON string or JSON null`);
+    has(new RegExp(`\\(p_item ->> '${f}'\\) ~\\* '\\^\\[0-9a-f\\]\\{8\\}-\\[0-9a-f\\]\\{4\\}-\\[0-9a-f\\]\\{4\\}-\\[0-9a-f\\]\\{4\\}-\\[0-9a-f\\]\\{12\\}\\$'`, "i"), sql, `${f} must be a valid UUID`);
+  }
+  // outcome ⟷ id consistency, one closed rule per outcome
+  const consistency = [
+    ["suppression_created", "string", "string"], ["user_stop_reversed", "string", "string"],
+    ["user_stop_already_active", "null", "string"], ["stronger_suppression_preserved", "null", "string"],
+    ["no_reversible_user_stop", "null", "null"],
+  ];
+  for (const [outcome, ev, su] of consistency) {
+    has(new RegExp(`when '${outcome}'\\s+then jsonb_typeof\\(p_item -> 'event_id'\\) = '${ev}'\\s+and jsonb_typeof\\(p_item -> 'suppression_id'\\) = '${su}'`, "i"), sql,
+      `${outcome} → event_id ${ev}, suppression_id ${su}`);
+  }
+  has(/else false\s*end/i, sql, "an unknown outcome is invalid (default-deny)");
+  // A NULL is NOT false: `if not NULL then` never fires, so a NULL-returning validator would let a
+  // malformed receipt replay. Both validators must coalesce to false.
+  has(/select coalesce\(\s*jsonb_typeof\(p_results\)\s*=\s*'array'/i, sql, "the results validator returns false, never NULL");
+  has(/select coalesce\(\s*jsonb_typeof\(p_item\)\s*=\s*'object'/i, sql, "the item validator returns false, never NULL");
+});
+check("65. SQL: a malformed receipt row cannot be INSERTED (CHECK constraint), and the RPC still re-validates", () => {
+  const sql = sqlCode();
+  has(/constraint ck_consent_command_receipt_scope_results check \(\s*octet_length\(scope_results::text\) <= 4096\s*and public\.communication_consent_receipt_results_valid\(scope_results\)\)/i, sql,
+    "the receipt CHECK constraint enforces the validator");
+  const enforced = (sql.match(/communication_consent_receipt_results_valid\(scope_results\)/gi) || []).length;
+  assert(enforced === 2, `the CHECK is declared inline AND added idempotently (expected 2 enforcement sites, got ${enforced})`);
+  has(/not\s+public\.communication_consent_receipt_results_valid\(v_r_scope\)/i, sql, "the RPC re-validates defensively before replay");
+  has(/revoke all on function public\.communication_consent_receipt_results_valid\(jsonb\) from public/i, sql, "validator least-privilege");
 });
 
 // ============================================================================
@@ -717,6 +922,8 @@ check("50. wiring: script + policy reuse + doc topics", () => {
     /suppression-only|no preference/i, /receipt/i, /idempoten/i, /replay/i, /conflict/i,
     /expir|effective activity/i, /lock/i, /transaction/i, /read.only|D2-C/i, /Meta.*disabled/i,
     /migration.history|drift/i, /not auto-applied|do not apply/i, /privacy|hash/i, /authentication|OTP/i,
+    /policy[_ ]version/i, /CHECK constraint/i, /outcome ⟷ id consistency|outcome.*id consistency/i,
+    /validated \*\*in SQL\*\*|in SQL, not only in TypeScript/i, /IMMUTABLE/,
   ]) has(topic, doc, `doc covers ${topic}`);
 });
 
@@ -816,8 +1023,8 @@ srcMutation("MUT O: RPC gains a communication_preferences write", MIGRATION_SRC,
   () => /(insert\s+into|update|from)\s+public\.communication_preferences/i.test(sqlCode()));
 
 srcMutation("MUT P: RPC command/destination conflict detection removed", MIGRATION_SRC,
-  "if v_r_cmd is distinct from p_command or v_r_dest is distinct from p_destination_hash then",
-  "if false then",
+  "    if v_r_cmd is distinct from p_command\n       or v_r_dest is distinct from p_destination_hash\n       or v_r_policy is distinct from p_policy_version then",
+  "    if false then",
   () => !/v_r_cmd\s+is\s+distinct\s+from\s+p_command\s+or\s+v_r_dest\s+is\s+distinct\s+from\s+p_destination_hash/i.test(sqlCode()));
 
 srcMutation("MUT Q: effective-activity expiry guard removed", MIGRATION_SRC,
@@ -858,6 +1065,62 @@ srcMutation("MUT X: receipt public-revoke removed", MIGRATION_SRC,
   "revoke all on table public.communication_consent_command_receipts from public;",
   "revoke all on table public.communication_consent_command_receipts from public_removed;",
   () => !/revoke all on table public\.communication_consent_command_receipts from public;/i.test(sqlCode()));
+
+// ---- receipt POLICY BINDING + SQL-side structural validation mutations ----------------------
+srcMutation("MUT AB: the receipt lookup stops selecting the stored policy_version", MIGRATION_SRC,
+  "  select destination_hash, normalized_command, policy_version, scope_results\n    into v_r_dest, v_r_cmd, v_r_policy, v_r_scope",
+  "  select destination_hash, normalized_command, scope_results\n    into v_r_dest, v_r_cmd, v_r_scope",
+  () => !/select\s+destination_hash,\s*normalized_command,\s*policy_version,\s*scope_results/i.test(sqlCode()));
+
+srcMutation("MUT AC: the receipt POLICY-VERSION comparison is removed (a stale-policy receipt would replay)", MIGRATION_SRC,
+  "       or v_r_policy is distinct from p_policy_version then",
+  "       or false then",
+  () => !/or\s+v_r_policy\s+is\s+distinct\s+from\s+p_policy_version/i.test(sqlCode()));
+
+srcMutation("MUT AD: the missing-stored-policy integrity guard is removed", MIGRATION_SRC,
+  "    if v_r_cmd is null or v_r_dest is null or v_r_policy is null",
+  "    if v_r_cmd is null or v_r_dest is null",
+  () => !/v_r_policy\s+is\s+null/i.test(sqlCode()));
+
+srcMutation("MUT AE: the RPC defers scope_results validation to TypeScript (no SQL check before replay)", MIGRATION_SRC,
+  "       or not public.communication_consent_receipt_results_valid(v_r_scope) then",
+  "       or false then",
+  () => !/not\s+public\.communication_consent_receipt_results_valid\(v_r_scope\)/i.test(sqlCode()));
+
+srcMutation("MUT AF: the receipt SCOPE-ORDER validation is removed (duplicate / transactional-first passes)", MIGRATION_SRC,
+  "    and public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')\n    and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional'),",
+  "    and true,",
+  () => !/communication_consent_receipt_scope_result_valid\(p_results\s*->\s*1,\s*'transactional'\)/i.test(sqlCode()));
+
+srcMutation("MUT AG: the receipt UUID validation is removed (an arbitrary id string would replay)", MIGRATION_SRC,
+  "    and (jsonb_typeof(p_item -> 'event_id') = 'null'\n         or (p_item ->> 'event_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')\n    and (jsonb_typeof(p_item -> 'suppression_id') = 'null'\n         or (p_item ->> 'suppression_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')",
+  "    and true",
+  () => !/\(p_item ->> 'event_id'\) ~\*/i.test(sqlCode()) || !/\(p_item ->> 'suppression_id'\) ~\*/i.test(sqlCode()));
+
+srcMutation("MUT AH: the suppression_created outcome/ID consistency rule is removed", MIGRATION_SRC,
+  "          when 'suppression_created'            then jsonb_typeof(p_item -> 'event_id') = 'string'\n                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'",
+  "          when 'suppression_created'            then true",
+  () => !/when 'suppression_created'\s+then jsonb_typeof\(p_item -> 'event_id'\) = 'string'/i.test(sqlCode()));
+
+srcMutation("MUT AI: the user_stop_already_active outcome/ID consistency rule is removed", MIGRATION_SRC,
+  "          when 'user_stop_already_active'       then jsonb_typeof(p_item -> 'event_id') = 'null'\n                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'",
+  "          when 'user_stop_already_active'       then true",
+  () => !/when 'user_stop_already_active'\s+then jsonb_typeof\(p_item -> 'event_id'\) = 'null'/i.test(sqlCode()));
+
+srcMutation("MUT AJ: the closed outcome vocabulary is opened (an unknown outcome would replay)", MIGRATION_SRC,
+  "          else false\n        end,",
+  "          else true\n        end,",
+  () => !/else false\s*end/i.test(sqlCode()));
+
+srcMutation("MUT AK: the receipt CHECK constraint no longer enforces the validator", MIGRATION_SRC,
+  "  constraint ck_consent_command_receipt_scope_results check (\n    octet_length(scope_results::text) <= 4096\n    and public.communication_consent_receipt_results_valid(scope_results))",
+  "  constraint ck_consent_command_receipt_scope_results check (\n    octet_length(scope_results::text) <= 4096)",
+  () => (sqlCode().match(/communication_consent_receipt_results_valid\(scope_results\)/gi) || []).length !== 2);
+
+srcMutation("MUT AL: the validator can return NULL (a NULL is not false — `if not NULL` would fall through)", MIGRATION_SRC,
+  "  select coalesce(\n    jsonb_typeof(p_results) = 'array'",
+  "  select (\n    jsonb_typeof(p_results) = 'array'",
+  () => !/select coalesce\(\s*jsonb_typeof\(p_results\)\s*=\s*'array'/i.test(sqlCode()));
 
 fnMutation("MUT Y: a seventh unrelated file in the D2-D delta is rejected",
   () => validateD2DHistoricalDelta([...D2D_EXPECTED_FILES, "services/somethingElse.ts"], D2D_BASE).length > 0);

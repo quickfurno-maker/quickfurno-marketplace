@@ -113,15 +113,59 @@ is **NOT consent truth** and is **not** read by any consent decision; consent tr
 `communication_consent_events` + `communication_suppressions`. Written evidence rows also carry the
 D2-B opaque sha256 `idempotency_key` as a structural defense-in-depth.
 
+### The replay binding (all six fields, or it is not a replay)
+
+A redelivery is only replayed when the stored receipt matches the incoming command on **every** bound
+field:
+
+| Bound field | Mismatch → |
+|---|---|
+| `provider` + `provider_message_id` + `channel` | (the lookup key — no row means "fresh") |
+| `destination_hash` | `WRITER_CONFLICT` |
+| `normalized_command` | `WRITER_CONFLICT` |
+| `policy_version` | `WRITER_CONFLICT` |
+
 Before applying, the RPC reads the receipt for `(provider, provider_message_id, channel)`: **no receipt**
-→ process fresh (and write one); **same command AND same destination** → stable **replay** returning the
-**exact stored `scope_results` verbatim** with `replayed: true` (the current/latest suppression row is
-**never** re-queried to reconstruct historical ids — even no-op STOP/START replays return their original
-outcome); **different command OR different destination** → `WRITER_CONFLICT` (the same provider event is
-never accepted first as STOP and later as START, or against a second destination); an **invalid or
-incomplete stored receipt** → `WRITER_INTEGRITY_VIOLATION`. A caller-supplied idempotency key is never
-trusted. Because a receipt is written for **every** accepted command (including a full no-op), replay
-and conflict detection cover no-op commands too.
+→ process fresh (and write one); **exact binding match** → stable **replay** returning the **exact stored
+`scope_results` verbatim** with `replayed: true` (the current/latest suppression row is **never**
+re-queried to reconstruct historical ids — even no-op STOP/START replays return their original outcome);
+a **different command, destination OR policy version** → `WRITER_CONFLICT` (the same provider event is
+never accepted first as STOP and later as START, against a second destination, or **re-served under a
+policy version other than the one that produced it** — a stored outcome was derived by the rules of its
+own policy version, so replaying it under another would silently launder a stale policy); a **missing/null
+stored policy version, or a structurally invalid stored `scope_results`** → `WRITER_INTEGRITY_VIOLATION`.
+A caller-supplied idempotency key is never trusted. Because a receipt is written for **every** accepted
+command (including a full no-op), replay and conflict detection cover no-op commands too.
+
+### Stored `scope_results` are validated **in SQL**, not only in TypeScript
+
+The receipt's `scope_results` are the sole source of a replayed outcome, so their structure is a security
+boundary. Two pure **`IMMUTABLE`** validator functions
+(`communication_consent_receipt_results_valid` / `..._scope_result_valid`) are the single SQL definition of
+a well-formed result, enforced in **both** directions:
+
+* as a table **CHECK constraint** (`ck_consent_command_receipt_scope_results`), so a malformed receipt row
+  can never be **inserted**; and
+* **defensively inside the RPC before any replay**, so a row that is malformed anyway (written before the
+  constraint existed, or by any out-of-band path) can never be **replayed**.
+
+A valid stored result is: a **JSON array of exactly two items**; **item 0 scope = `marketing`, item 1 scope
+= `transactional`** (so a duplicate or transactional-first result is rejected); each item an **object**;
+`outcome` in the **closed vocabulary**; `event_id` / `suppression_id` each a **valid UUID string or JSON
+null** (key present); and **outcome ⟷ id consistency** —
+
+| outcome | `event_id` | `suppression_id` |
+|---|---|---|
+| `suppression_created` | required | required |
+| `user_stop_reversed` | required | required |
+| `user_stop_already_active` | null | required |
+| `stronger_suppression_preserved` | null | required |
+| `no_reversible_user_stop` | null | null |
+
+Anything duplicated, out of order, malformed or contradictory → `WRITER_INTEGRITY_VIOLATION`, and the
+command is **not** re-applied. The validators `coalesce` to **false, never NULL** (a NULL is not false —
+`if not NULL` would fall through and let a malformed receipt replay). The TypeScript `normalizeRpcResult`
+layer re-checks the same contract independently: **neither layer relies on the other.**
 
 ## Effective-activity expiry
 

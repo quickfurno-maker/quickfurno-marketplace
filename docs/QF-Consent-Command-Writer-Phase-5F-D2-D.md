@@ -338,13 +338,39 @@ nonetheless **excluded** from the frozen range.
 
 Dropping the moving range must not drop *safety*. Worktree protection is therefore a **separate check**
 (`37b`), independent of the frozen historical scope. It fails if there is an **uncommitted edit to any
-protected production file**:
+frozen consent-authority file**:
 
-`consentCommand.ts`, `consentPolicy.ts`, `communicationConsentWriterService.ts`, the D2-D SQL migration,
-`communicationConsentDecisionService.ts` (D2-C), `inboundWhatsAppMessageService.ts` (D1-B), and
-`metaWhatsAppWebhookService.ts` (the thin webhook boundary).
+| Protected (D2-D-owned authority) | Why |
+|---|---|
+| `lib/communication/consentCommand.ts` | the D2-D command normalizer |
+| `lib/communication/consentPolicy.ts` | the shared policy-version constant |
+| `services/communicationConsentWriterService.ts` | the D2-D writer — the sole transactional authority |
+| `supabase/migrations/20260712000300_…rpc.sql` | the frozen, already-applied migration |
+| `services/communicationConsentDecisionService.ts` | D2-C, read-only |
 
-It is a **closed list**, not "anything dirty" — that distinction is the whole point. A later phase editing
-*its own new files* is not a D2-D violation, but a later phase quietly editing the *frozen writer or
-migration* still is, and is still caught while D2-D runs. The approved maintenance surface for this branch
-(this harness plus this document) is explicitly allowed.
+### Deliberately **not** protected: the D2-E integration seams
+
+`services/inboundWhatsAppMessageService.ts` (D1-B persistence) and `services/metaWhatsAppWebhookService.ts`
+(the thin webhook boundary) are **intentionally excluded** from D2-D worktree protection.
+
+They are the **approved D2-E integration seams** — the exact two files where inbound consent-command
+processing gets wired in — and **D2-E must modify them**. Protecting them here would make the D2-D harness
+go red during D2-E pre-commit testing, which is the very "one phase's guard blocks the next phase" defect
+this maintenance branch exists to remove.
+
+Their scope is governed by **their own harnesses**: D1-B's content and scope guards, and the future D2-E
+scope harness. It is **not** D2-D's job to police them. The consent boundary itself remains enforced
+regardless — check `36` still asserts that the webhook service does **not** import the writer
+(`communicationConsentWriterService` / `writeConsentCommand`), so however D2-E edits those seams, it cannot
+smuggle the writer into the webhook without D2-D catching it.
+
+### The distinction is the whole point
+
+The protected set is a **closed list of consent authorities**, not "anything dirty". A later phase editing
+*its own new files* — or the two seams it owns — is not a D2-D violation. A later phase quietly editing the
+*frozen writer or migration* still is, and is still caught while D2-D runs. The approved maintenance surface
+for this branch (this harness plus this document) is explicitly allowed.
+
+This is proved end-to-end by mutations that really dirty the files on disk: a dirty **writer** fails, a
+dirty **migration** fails, while a dirty **D1-B**, a dirty **webhook service**, **both together**, and
+**D2-E's own new files** all leave the D2-D harness green.

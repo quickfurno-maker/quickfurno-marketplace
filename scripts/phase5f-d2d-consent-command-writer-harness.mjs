@@ -128,21 +128,31 @@ const D2D_EXPECTED_FILES = [
 ];
 
 /**
- * The production files D2-D froze (its own writer/normalizer/migration, plus the upstream authorities it
- * must never disturb). An uncommitted edit to ANY of them must never pass unnoticed when D2-D is run —
- * even from a later phase's branch. This is deliberately a CLOSED list, not "anything dirty": a future
- * phase legitimately edits its own new files, and folding those into D2-D's scope is the very defect
- * this maintenance branch removes.
+ * The AUTHORITY files D2-D froze: its own command normalizer, writer and migration, plus the read-only
+ * D2-C decision authority and the shared policy-version constant. An uncommitted edit to ANY of them must
+ * never pass unnoticed when D2-D is run — even from a later phase's branch.
+ *
+ * This is deliberately a CLOSED list of CONSENT-AUTHORITY files, not "anything dirty".
+ *
+ * DELIBERATELY EXCLUDED — the D2-E INTEGRATION SEAMS:
+ *   • services/inboundWhatsAppMessageService.ts (D1-B persistence)
+ *   • services/metaWhatsAppWebhookService.ts    (the thin webhook boundary)
+ * D2-E is APPROVED to modify both — they are precisely where inbound consent-command processing is wired
+ * in. Protecting them here would make the D2-D harness fail during D2-E pre-commit testing, which is the
+ * same "one phase's guard blocks the next phase" defect this maintenance branch exists to remove. Their
+ * scope is governed by their OWN harnesses (D1-B's content/scope guards and the future D2-E scope
+ * harness) — not by D2-D. D2-D still asserts the webhook does not import the writer (check 36), so the
+ * consent boundary itself stays enforced no matter what D2-E does to those files.
  */
 const D2D_PROTECTED_FILES = [
-  COMMAND_SRC,      // lib/communication/consentCommand.ts            — the D2-D command normalizer
-  POLICY_SRC,       // lib/communication/consentPolicy.ts             — the shared policy-version constant
-  WRITER_SRC,       // services/communicationConsentWriterService.ts  — the D2-D writer
+  COMMAND_SRC,      // lib/communication/consentCommand.ts             — the D2-D command normalizer
+  POLICY_SRC,       // lib/communication/consentPolicy.ts              — the shared policy-version constant
+  WRITER_SRC,       // services/communicationConsentWriterService.ts   — the D2-D writer
   MIGRATION_SRC,    // the D2-D SQL migration (applied to production; frozen)
   D2C_SVC_SRC,      // services/communicationConsentDecisionService.ts — D2-C, read-only
-  D1B_SVC_SRC,      // services/inboundWhatsAppMessageService.ts       — D1-B persistence
-  WEBHOOK_SVC_SRC,  // services/metaWhatsAppWebhookService.ts          — the thin webhook boundary
 ];
+/** The D2-E integration seams: NOT D2-D-protected. D2-E is approved to modify them. */
+const D2E_INTEGRATION_SEAMS = [D1B_SVC_SRC, WEBHOOK_SVC_SRC];
 /** The ONLY files this post-merge maintenance branch is approved to touch (tests + docs). */
 const D2D_MAINTENANCE_FILES = [HARNESS_SRC, DOC_SRC];
 
@@ -1080,19 +1090,32 @@ check("37. FROZEN audited phase boundary (base..audited-head), immune to the PR 
   const problems = validateD2DScope(fr.files, fr.anchorsProven);
   assert(problems.length === 0, `frozen D2-D scope violation: ${problems.join(" | ")}`);
 });
-check("37b. current worktree: no protected D2-D/D2-C/D1-B production file is being edited", () => {
+check("37b. current worktree: no frozen D2-D/D2-C CONSENT-AUTHORITY file is being edited", () => {
   // A SEPARATE authority from the frozen historical scope. It catches an ACTIVE, uncommitted edit to a
-  // frozen production file — including from a later phase's branch — WITHOUT dragging that branch's own
-  // legitimate new files into D2-D's historical delta.
+  // frozen consent-authority file — including from a later phase's branch — WITHOUT dragging that
+  // branch's own legitimate files into D2-D's historical delta.
   const problems = validateD2DWorktree(gitDirty());
   assert(problems.length === 0, `protected-file worktree violation: ${problems.join(" | ")}`);
+  // Every frozen consent-authority file still trips it (the writer and the migration explicitly).
+  for (const f of D2D_PROTECTED_FILES) assert(validateD2DWorktree([f]).length > 0, `a dirty protected file must be caught: ${f}`);
+  assert(validateD2DWorktree([WRITER_SRC]).length > 0, "a dirty D2-D writer must still be caught");
+  assert(validateD2DWorktree([MIGRATION_SRC]).length > 0, "a dirty D2-D migration must still be caught");
   // The approved post-merge maintenance surface (this harness + its doc) is explicitly allowed…
   assert(validateD2DWorktree(D2D_MAINTENANCE_FILES).length === 0, "the approved harness + doc maintenance edits must be allowed");
-  // …and a future-phase file is NOT a D2-D violation (that conflation was the old defect).
-  assert(validateD2DWorktree(["services/inboundConsentCommandService.ts", "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs"]).length === 0,
-    "later-phase files must not be treated as D2-D worktree violations");
-  // …while every protected production file still trips it.
-  for (const f of D2D_PROTECTED_FILES) assert(validateD2DWorktree([f]).length > 0, `a dirty protected file must be caught: ${f}`);
+  // …the D2-E INTEGRATION SEAMS are allowed, individually AND together: D2-E is approved to modify them,
+  // so D2-D must not go red during D2-E pre-commit testing…
+  for (const f of D2E_INTEGRATION_SEAMS) assert(validateD2DWorktree([f]).length === 0, `a D2-E integration seam must be allowed: ${f}`);
+  assert(validateD2DWorktree(D2E_INTEGRATION_SEAMS).length === 0, "D1-B + the webhook service dirty TOGETHER must be allowed");
+  // …and neither are D2-E's own new files (that conflation was the old defect).
+  assert(validateD2DWorktree([
+    "services/inboundConsentCommandService.ts",
+    "lib/communication/inboundConsentCommandInput.ts",
+    "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+    "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
+  ]).length === 0, "later-phase files must not be treated as D2-D worktree violations");
+  // A realistic FULL D2-E pre-commit worktree must leave D2-D green.
+  assert(validateD2DWorktree([...D2E_INTEGRATION_SEAMS, "services/inboundConsentCommandService.ts", "package.json"]).length === 0,
+    "a realistic D2-E pre-commit worktree must not trip the D2-D harness");
 });
 check("50. wiring: script + policy reuse + doc topics", () => {
   const pkg = JSON.parse(readF("package.json"));
@@ -1474,6 +1497,53 @@ srcMutation("MUT AX: an uncommitted edit to the frozen D2-D migration is DETECTE
   "-- ── 10. SANITIZED RESULT",
   "-- ── 10. SANITIZED RESULT (edited)",
   () => validateD2DWorktree(gitDirty()).some((p) => p.includes(MIGRATION_SRC)));
+
+// ---- D2-E INTEGRATION SEAMS: dirty is ALLOWED (D2-D must not block D2-E pre-commit testing) ----
+/** A seam file really edited on disk must be dirty, raise NO D2-D violation, and leave the suite green. */
+const seamAllowed = (...files) => async () => {
+  const dirty = gitDirty();
+  if (!files.every((f) => dirty.includes(f))) return false;       // the edit must really be on disk
+  if (validateD2DWorktree(dirty).length !== 0) return false;      // …and must NOT be a D2-D violation
+  return (await suiteGoesRed()) === false;                        // …and the whole D2-D suite stays green
+};
+const D1B_ANCHOR = 'export const INBOUND_UNIQUE_FENCE = "uq_comm_inbound_provider_message";';
+const WEBHOOK_ANCHOR = 'const CHANNEL = "whatsapp";';
+
+srcMutation("MUT AY: a dirty D1-B integration service is ALLOWED (D2-E seam, not D2-D-protected)",
+  D1B_SVC_SRC, D1B_ANCHOR, `${D1B_ANCHOR}\n// d2e-seam-probe`,
+  seamAllowed(D1B_SVC_SRC));
+
+srcMutation("MUT AZ: a dirty webhook integration service is ALLOWED (D2-E seam, not D2-D-protected)",
+  WEBHOOK_SVC_SRC, WEBHOOK_ANCHOR, `${WEBHOOK_ANCHOR}\n// d2e-seam-probe`,
+  seamAllowed(WEBHOOK_SVC_SRC));
+
+mutationChecks.push({
+  name: "MUT BA: a dirty D1-B + webhook TOGETHER is ALLOWED (a realistic D2-E pre-commit worktree)",
+  kind: "src",
+  edits: [
+    { file: D1B_SVC_SRC, from: D1B_ANCHOR, to: `${D1B_ANCHOR}\n// d2e-seam-probe` },
+    { file: WEBHOOK_SVC_SRC, from: WEBHOOK_ANCHOR, to: `${WEBHOOK_ANCHOR}\n// d2e-seam-probe` },
+  ],
+  scenario: seamAllowed(D1B_SVC_SRC, WEBHOOK_SVC_SRC),
+});
+
+fnMutation("MUT BB: the protected list is exactly the consent authorities — seams excluded, authorities kept",
+  () => {
+    // the five frozen CONSENT-AUTHORITY files are protected…
+    const mustProtect = [COMMAND_SRC, POLICY_SRC, WRITER_SRC, MIGRATION_SRC, D2C_SVC_SRC];
+    if (!mustProtect.every((f) => D2D_PROTECTED_FILES.includes(f) && validateD2DWorktree([f]).length > 0)) return false;
+    if (D2D_PROTECTED_FILES.length !== mustProtect.length) return false;
+    // …the D2-E seams are NOT (individually or together)…
+    if (D2E_INTEGRATION_SEAMS.some((f) => D2D_PROTECTED_FILES.includes(f))) return false;
+    if (validateD2DWorktree(D2E_INTEGRATION_SEAMS).length !== 0) return false;
+    // …and D2-E's own NEW files remain allowed.
+    return validateD2DWorktree([
+      "services/inboundConsentCommandService.ts",
+      "lib/communication/inboundConsentCommandInput.ts",
+      "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+      "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
+    ]).length === 0;
+  });
 
 // ============================================================================
 // RUNNER

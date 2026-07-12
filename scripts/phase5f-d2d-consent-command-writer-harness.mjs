@@ -112,8 +112,11 @@ function gitDirty() {
 // The PR merge commit and every post-audit commit lie OUTSIDE the range and are never subject-checked.
 //
 // CURRENT-WORKTREE SAFETY IS A SEPARATE CONCERN (`validateD2DWorktree` + check 37b). An active,
-// uncommitted edit to a protected D2-D / D2-C / D1-B production file is still caught — but future-phase
-// files and the approved harness/doc maintenance edits are NEVER folded into the frozen historical scope.
+// uncommitted edit to a frozen D2-D / D2-C CONSENT-AUTHORITY file (the command normalizer, the policy
+// constant, the writer, the D2-D migration, the D2-C decision authority) is still caught. The D2-E
+// INTEGRATION SEAMS (D1-B persistence + the webhook service) and future-phase files are deliberately
+// EXCLUDED — D2-E is approved to modify them — and neither they nor the approved harness/doc maintenance
+// edits are EVER folded into the frozen historical scope.
 // ----------------------------------------------------------------------------
 const D2D_BASE = "c05b123b5ffb9a25e2dee125ae2f77b9cbad6ada"; // Phase 5F-D2-C — the D2-D base/parent
 const D2D_HEAD = "ed7b68c6c7c5f77595b0ff6e590f7b2dd7b87bf8"; // the audited FINAL D2-D implementation commit

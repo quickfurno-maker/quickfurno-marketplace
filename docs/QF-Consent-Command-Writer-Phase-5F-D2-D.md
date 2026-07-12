@@ -103,40 +103,60 @@ mutation; empty `scopeResults`/`eventIds`/`suppressionIds`; sends nothing (P3). 
 `unsupported_command`; no RPC, no evidence, no mutation, empty arrays. Neither is ever silently mapped
 to STOP/START/HELP.
 
-## Idempotency, replay & conflict
+## Idempotency, replay & conflict (command receipt)
 
-Each written evidence row carries a server-generated opaque sha256 `idempotency_key` over
-`policy_version | target_type | provider | provider_message_id | action | channel | scope` (the D2-B
-contract). Before applying, the RPC inspects the **command group** = inbound-command suppression
-evidence for `(provider, provider_message_id, channel)`. The normalized command is recoverable from the
-bounded structured evidence (`action`/`reason`, plus an allowlisted `nc` + scope-outcome map `so` in
-`metadata_sanitized` — never raw text). Rules: **no group** → process fresh; **same command** → stable
-**replay** (`replayed: true`, original scope results rebuilt from the immutable outcome map); **different
-command** → `WRITER_CONFLICT` (the same provider event is never accepted first as STOP and later as
-START); an **internally inconsistent or partially-present group** (an expected-transition scope missing
-its evidence row) → `WRITER_INTEGRITY_VIOLATION`, not a normal replay. A caller-supplied idempotency key
-is never trusted.
+An additive, **service-role-only** processing/idempotency **receipt** table
+`public.communication_consent_command_receipts` binds one provider event —
+**unique `(provider, provider_message_id, channel)`** — to its ORIGINAL sanitized `scope_results`
+(exact event + suppression ids), plus `destination_hash`, `normalized_command` and `policy_version`. It
+is **NOT consent truth** and is **not** read by any consent decision; consent truth remains
+`communication_consent_events` + `communication_suppressions`. Written evidence rows also carry the
+D2-B opaque sha256 `idempotency_key` as a structural defense-in-depth.
+
+Before applying, the RPC reads the receipt for `(provider, provider_message_id, channel)`: **no receipt**
+→ process fresh (and write one); **same command AND same destination** → stable **replay** returning the
+**exact stored `scope_results` verbatim** with `replayed: true` (the current/latest suppression row is
+**never** re-queried to reconstruct historical ids — even no-op STOP/START replays return their original
+outcome); **different command OR different destination** → `WRITER_CONFLICT` (the same provider event is
+never accepted first as STOP and later as START, or against a second destination); an **invalid or
+incomplete stored receipt** → `WRITER_INTEGRITY_VIOLATION`. A caller-supplied idempotency key is never
+trusted. Because a receipt is written for **every** accepted command (including a full no-op), replay
+and conflict detection cover no-op commands too.
+
+## Effective-activity expiry
+
+Suppression activity is **effective**, not merely physical:
+`is_active AND (expires_at IS NULL OR expires_at > evaluatedAt)` (evaluatedAt = the server receipt time).
+When a locked row is physically active but **expired**, the RPC first **appends an immutable
+system-action deactivation event** (`evidence_type = system_action`, `reason = system`) and **deactivates
+the projection** (`is_active = false`, `deactivated_at` set) — it **never silently mutates an expired
+row without evidence** — then processes STOP/START against the resulting effective state. So **STOP after
+expiry creates a fresh effective `user_stop` suppression**, and **START after expiry does not treat the
+expired row as a reversible active STOP** (→ `start_no_reversible_stop`).
 
 ## Transaction / RPC design
 
 One additive **SECURITY DEFINER** RPC `public.apply_communication_consent_command(...)` (plpgsql, fixed
 `search_path = pg_catalog, public`, schema-qualified tables, no dynamic SQL, no raw exception text
-returned, execute granted to `service_role` only) owns the whole transaction:
-validate fixed policy → validate inputs → deterministic destination/channel advisory lock → replay/
-conflict detection → lock suppression rows `FOR UPDATE` → decide both scopes → insert evidence FIRST →
-insert/update projection referencing it → return sanitized JSON. Any failure rolls back the ENTIRE
-command: never evidence without projection, never projection without evidence, never one scope committed
-without the other; a `unique_violation` from a raced duplicate surfaces as a sanitized `WRITER_CONFLICT`.
-HELP/unsupported never reach the RPC.
+returned, execute granted to `service_role` only) owns the whole transaction: validate fixed policy →
+validate inputs (provider allowlist + bounded-identifier regex, matching TypeScript exactly) → acquire
+locks in fixed order → receipt replay/conflict → lock suppression rows `FOR UPDATE`, expire+deactivate
+any expired row (with evidence) → decide both scopes → insert evidence FIRST → insert/update projection
+referencing it → **write the receipt** → return sanitized JSON. **Receipt, evidence and projection commit
+in one transaction or all roll back** — never evidence without projection, projection without evidence, or
+one scope without the other; a `unique_violation` from a raced duplicate surfaces as a sanitized
+`WRITER_CONFLICT`. HELP/unsupported never reach the RPC.
 
-## Concurrency
+## Concurrency (fixed-order locks)
 
-A transaction-level `pg_advisory_xact_lock` on `destination_hash + channel` serializes same-destination
-commands; `SELECT … FOR UPDATE` locks the affected suppression rows; the unique idempotency index and
-the partial-unique active-suppression index are the structural safety net. Concurrent identical
-STOP/START produce one authoritative transition and a deterministic replay for the duplicate — no
-duplicate active suppression, no duplicate evidence effect. Concurrent conflicting commands for the same
-provider event identity return `WRITER_CONFLICT`.
+Two `pg_advisory_xact_lock`s are acquired in a **fixed order** to prevent deadlock and races:
+**(1) provider-event identity** (`provider + provider_message_id + channel`) then
+**(2) destination** (`destination_hash + channel`). The provider-event lock first ensures concurrent
+calls sharing one provider event serialize **even when they carry a different destination or command**
+(the second sees the receipt → replay or `WRITER_CONFLICT`). `SELECT … FOR UPDATE` locks the affected
+suppression rows; the receipt unique key and the partial-unique active-suppression index are the
+structural safety net. Concurrent identical STOP/START produce one authoritative transition and a
+deterministic replay for the duplicate — no duplicate active suppression, no duplicate evidence effect.
 
 ## Timestamp validation (strict, timezone-qualified RFC3339)
 

@@ -292,10 +292,19 @@ export function defaultConsentWriterDeps(): ConsentWriterDeps {
   };
 }
 
+const OUTCOMES: readonly ConsentScopeOutcome[] = [
+  "suppression_created", "user_stop_already_active", "stronger_suppression_preserved",
+  "user_stop_reversed", "no_reversible_user_stop",
+];
+/** Deterministic scope order the RPC/receipt must always produce (one marketing, one transactional). */
+const SCOPE_ORDER: readonly ConsentScopeName[] = ["marketing", "transactional"];
+
 /**
- * Normalize the RPC's JSON into the typed contract WITHOUT trusting arbitrary shapes. An unrecognized
- * payload is a WRITER_INTEGRITY_VIOLATION (never a success). Exported for direct testing. It copies
- * only allowlisted fields — no raw row / error / value passes through.
+ * Normalize the RPC's JSON into the typed contract WITHOUT trusting arbitrary shapes. A success MUST be
+ * a fully-formed, deterministic TWO-scope result — exactly one marketing + one transactional in that
+ * order, valid UUIDs, and outcome⟷id consistency; anything empty / partial / duplicated / contradictory
+ * (or a non-boolean `replayed`) is a WRITER_INTEGRITY_VIOLATION (never a success). Exported for direct
+ * testing. It copies only allowlisted fields — no raw row / error / value passes through.
  */
 export function normalizeRpcResult(data: unknown): ConsentCommandRpcResult {
   if (!data || typeof data !== "object") return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
@@ -308,24 +317,35 @@ export function normalizeRpcResult(data: unknown): ConsentCommandRpcResult {
     }
     return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
   }
-  if (d.ok !== true || !Array.isArray(d.scopeResults ?? d.scope_results)) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-  const rawScopes = (d.scopeResults ?? d.scope_results) as unknown[];
+  if (d.ok !== true || typeof d.replayed !== "boolean") return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
+  const rawScopes = d.scopeResults ?? d.scope_results;
+  // Exactly two scope results — never empty, partial, or padded.
+  if (!Array.isArray(rawScopes) || rawScopes.length !== SCOPE_ORDER.length) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
   const scopeResults: ConsentScopeWriteResult[] = [];
-  for (const r of rawScopes) {
+  for (let i = 0; i < rawScopes.length; i++) {
+    const r = rawScopes[i];
     if (!r || typeof r !== "object") return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
     const s = r as Record<string, unknown>;
     const scope = s.scope;
     const outcome = s.outcome;
-    if (scope !== "marketing" && scope !== "transactional") return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    if (outcome !== "suppression_created" && outcome !== "user_stop_already_active" && outcome !== "stronger_suppression_preserved"
-        && outcome !== "user_stop_reversed" && outcome !== "no_reversible_user_stop") return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    const eventId = s.eventId ?? s.event_id;
-    const suppressionId = s.suppressionId ?? s.suppression_id;
+    // Deterministic order enforces one-marketing-one-transactional and rejects duplicates.
+    if (scope !== SCOPE_ORDER[i]) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
+    if (typeof outcome !== "string" || !OUTCOMES.includes(outcome as ConsentScopeOutcome)) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
+    const eventId = (s.eventId ?? s.event_id) ?? null;
+    const suppressionId = (s.suppressionId ?? s.suppression_id) ?? null;
     if (eventId !== null && (typeof eventId !== "string" || !UUID_SHAPE.test(eventId))) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
     if (suppressionId !== null && (typeof suppressionId !== "string" || !UUID_SHAPE.test(suppressionId))) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    scopeResults.push({ scope, outcome, eventId: (eventId as string | null) ?? null, suppressionId: (suppressionId as string | null) ?? null });
+    // Outcome ⟷ id consistency:
+    //   suppression_created / user_stop_reversed              → eventId + suppressionId
+    //   user_stop_already_active / stronger_suppression_preserved → suppressionId, eventId null
+    //   no_reversible_user_stop                               → eventId null + suppressionId null
+    const needsEvent = outcome === "suppression_created" || outcome === "user_stop_reversed";
+    const needsSuppression = needsEvent || outcome === "user_stop_already_active" || outcome === "stronger_suppression_preserved";
+    if (needsEvent ? eventId === null : eventId !== null) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
+    if (needsSuppression ? suppressionId === null : suppressionId !== null) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
+    scopeResults.push({ scope: scope as ConsentScopeName, outcome: outcome as ConsentScopeOutcome, eventId: eventId as string | null, suppressionId: suppressionId as string | null });
   }
-  return { ok: true, replayed: d.replayed === true, scopeResults };
+  return { ok: true, replayed: d.replayed, scopeResults };
 }
 
 // ----------------------------------------------------------------------------

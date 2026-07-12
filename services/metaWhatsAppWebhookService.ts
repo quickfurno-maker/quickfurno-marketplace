@@ -34,6 +34,7 @@ import {
   MetaWebhookClassification,
 } from "../lib/communication/providers/metaWhatsAppWebhook";
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
+import { processInboundConsentCommands } from "./inboundConsentCommandService";
 
 const CHANNEL = "whatsapp";
 
@@ -147,6 +148,18 @@ export async function handleMetaWhatsAppWebhookPost(input: {
     // deterministic all-rejected batch is acknowledged so Meta does not retry forever.
     const inbound = await handleInboundWhatsAppMessages({ rawBody: input.rawBody, payload });
     if (!inbound.ok) return { status: 500, code: "inbound_processing_failed" };
+
+    // Phase 5F-D2-E: persistence has ALREADY succeeded, so a durable inbound row exists for every message
+    // below. Command processing now runs SYNCHRONOUSLY over the SANITIZED per-message context D1-B
+    // returned — this webhook re-reads no raw body, holds no policy, mutates nothing, and sends nothing.
+    // It knows only the orchestrator; the writer, the RPC and the policy stay behind that boundary.
+    // A RETRYABLE command failure → 500 → Meta retries the whole verified path, which is convergent:
+    // D1-B's per-message unique fence makes re-persistence idempotent and D2-D's receipt makes the
+    // re-write a replay. DETERMINISTIC outcomes (help / unsupported / non-text / a rejected or
+    // conflicting command) are ACKNOWLEDGED below — the persisted row is their durable record.
+    const commands = await processInboundConsentCommands(inbound.result.processed);
+    if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };
+
     const r = inbound.result;
     if (r.messagesPersisted === 0 && r.messagesDuplicate === 0 && r.messagesRejected > 0) {
       return { status: 200, result: "inbound_acknowledged_rejected" };

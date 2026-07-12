@@ -1,0 +1,955 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
+
+/**
+ * Phase 5F-D2-E — inbound WhatsApp consent-command INTEGRATION.
+ *
+ * The D2-E orchestrator + the pure input builder are transpiled with a STUBBED Supabase and a STUBBED
+ * D2-D writer, then driven against a FAITHFUL in-memory reference of the frozen D2-D writer contract
+ * (`simWriter`) — including its REAL input fences (provider allowlist, `^[A-Za-z0-9._:-]{1,200}$`
+ * identifier regex, strict RFC3339, HEX64 destination, UUID shapes) and its receipt-based replay/conflict.
+ *
+ * That reference is what makes the two load-bearing seams provable:
+ *   • a RAW Meta wamid containing `+` / `/` / `=` is REJECTED by D2-D's own fence, while its SHA-256
+ *     digest is ACCEPTED — so the hashing is not cosmetic, it is what prevents a silently-dropped STOP;
+ *   • `meta_whatsapp_cloud` is REJECTED by D2-D's provider allowlist, while the explicitly-mapped
+ *     `meta_whatsapp` is ACCEPTED.
+ *
+ * The REAL D1-B service is also driven (with a fake PostgREST client) to prove persistence-before-command
+ * ordering, duplicate row-id resolution, and retryable-vs-deterministic failure propagation.
+ */
+
+const tsc = resolve("node_modules/typescript/bin/tsc");
+if (!existsSync(tsc)) throw new Error("TypeScript compiler not found. Run npm install first.");
+
+const TS_FILES = [
+  "lib/errors.ts",
+  "lib/communication/phone.ts",
+  "lib/communication/dbErrors.ts",
+  "lib/communication/providers/providerError.ts",
+  "lib/communication/providers/providerOutcome.ts",
+  "lib/communication/providers/whatsappProvider.ts",
+  "lib/communication/providers/metaWhatsAppWebhook.ts",
+  "lib/communication/providers/metaWhatsAppInbound.ts",
+  "lib/communication/consentCommand.ts",
+  "lib/communication/inboundConsentCommandInput.ts",
+];
+
+const BUILDER_SRC = "lib/communication/inboundConsentCommandInput.ts";
+const ORCH_SRC = "services/inboundConsentCommandService.ts";
+const D1B_SRC = "services/inboundWhatsAppMessageService.ts";
+const WEBHOOK_SVC_SRC = "services/metaWhatsAppWebhookService.ts";
+const WEBHOOK_ROUTE_SRC = "app/api/webhooks/whatsapp/meta/route.ts";
+const WRITER_SRC = "services/communicationConsentWriterService.ts";
+const COMMAND_SRC = "lib/communication/consentCommand.ts";
+const D2C_SVC_SRC = "services/communicationConsentDecisionService.ts";
+const HARNESS_SRC = "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs";
+const DOC_SRC = "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md";
+const D2D_MIGRATION = "supabase/migrations/20260712000300_communication_consent_command_writer_rpc.sql";
+
+function compileTo(outDir) {
+  rmSync(outDir, { recursive: true, force: true });
+  const tsconfigPath = resolve(`${outDir}.tsconfig.json`);
+  writeFileSync(tsconfigPath, JSON.stringify({
+    compilerOptions: {
+      module: "commonjs", target: "ES2020", moduleResolution: "node",
+      skipLibCheck: true, esModuleInterop: true, strict: true, jsx: "preserve",
+      outDir, rootDir: ".", baseUrl: ".", paths: { "@/*": ["./*"] }, lib: ["ES2021", "DOM"],
+    },
+    files: TS_FILES,
+  }, null, 2));
+  try { execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" }); }
+  finally { rmSync(tsconfigPath, { force: true }); }
+  return outDir;
+}
+
+/** Transpile the two SERVICES in isolation (noResolve) — their imports are stubbed or already emitted. */
+function transpileServices(outDir) {
+  const tsconfigPath = resolve(`${outDir}.svc.tsconfig.json`);
+  writeFileSync(tsconfigPath, JSON.stringify({
+    compilerOptions: {
+      module: "commonjs", target: "ES2020", moduleResolution: "node",
+      skipLibCheck: true, esModuleInterop: true, strict: false, isolatedModules: true,
+      outDir, rootDir: ".", types: [], noResolve: true,
+    },
+    files: [ORCH_SRC, D1B_SRC],
+  }, null, 2));
+  try { execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" }); }
+  catch { /* expected noResolve diagnostics */ }
+  finally { rmSync(tsconfigPath, { force: true }); }
+  for (const f of ["services/inboundConsentCommandService.js", "services/inboundWhatsAppMessageService.js"]) {
+    if (!existsSync(resolve(outDir, f))) throw new Error(`${f} did not transpile`);
+  }
+}
+
+/** The stubbed D2-D writer. Tests inject their own `writeCommand`; the DEFAULT binding must never run. */
+const WRITER_STUB = {
+  writeConsentCommand: async () => { throw new Error("the real D2-D writer must never run in the D2-E harness"); },
+};
+
+function wireBuild(outDir) {
+  const req = createRequire(`${outDir}/`);
+  const Module = req("module");
+  const original = Module._load;
+  const STUBS = {
+    "../lib/supabase": { adminClient: () => { throw new Error("real Supabase must never run in the D2-E harness") } },
+    "./inboundIdentityResolutionService": { resolveInboundSenderIdentity: () => { throw new Error("real resolver must never run") } },
+    "../lib/communication/providers/metaCloudWhatsAppProvider": { META_WHATSAPP_CLOUD_PROVIDER_KEY: "meta_whatsapp_cloud" },
+    "./communicationConsentWriterService": WRITER_STUB,
+  };
+  Module._load = function (request, parent, isMain) {
+    if (Object.prototype.hasOwnProperty.call(STUBS, request)) return STUBS[request];
+    return original.apply(this, [request, parent, isMain]);
+  };
+  return {
+    Orch: req("./services/inboundConsentCommandService.js"),
+    Input: req("./lib/communication/inboundConsentCommandInput.js"),
+    Command: req("./lib/communication/consentCommand.js"),
+    D1B: req("./services/inboundWhatsAppMessageService.js"),
+    Inbound: req("./lib/communication/providers/metaWhatsAppInbound.js"),
+  };
+}
+
+const readF = (f) => readFileSync(f, "utf8");
+const stripTs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/[^\n]*/gm, "");
+function safeStringify(v) { try { return JSON.stringify(v); } catch { return String(v); } }
+function gitDirty() {
+  return execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
+    .split("\n").map((l) => l.slice(3).trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"))
+    .filter((p) => !p.startsWith(".phase5fd2e"));
+}
+const gitFiles = (args) => execFileSync("git", args, { encoding: "utf8" })
+  .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
+function headSha() { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); }
+function isAncestor(a, b) {
+  try { execFileSync("git", ["merge-base", "--is-ancestor", a, b], { stdio: "pipe" }); return true; } catch { return false; }
+}
+
+// ----------------------------------------------------------------------------
+// D2-E PHASE SCOPE — exactly seven files, measured from the approved base
+// ----------------------------------------------------------------------------
+const D2E_BASE = "94b8c1522269635cdbbe53fb6d11ea2bf91b05a9"; // the merged D2-D post-merge harness stabilization
+const D2E_EXPECTED_FILES = [
+  "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
+  "lib/communication/inboundConsentCommandInput.ts",
+  "package.json",
+  "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+  "services/inboundConsentCommandService.ts",
+  "services/inboundWhatsAppMessageService.ts",
+  "services/metaWhatsAppWebhookService.ts",
+];
+/** Files D2-E must NEVER touch (the frozen consent authorities + the D1-A/D2-D substrate). */
+const D2E_FORBIDDEN_FILES = [
+  WRITER_SRC, COMMAND_SRC, "lib/communication/consentPolicy.ts", D2C_SVC_SRC, D2D_MIGRATION,
+  WEBHOOK_ROUTE_SRC, "lib/communication/providers/metaWhatsAppInbound.ts",
+  "scripts/phase5f-d2d-consent-command-writer-harness.mjs",
+  "scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
+  "scripts/phase5f-d2c-consent-decision-authority-harness.mjs",
+];
+
+/** PURE. The D2-E delta must be EXACTLY the approved seven, and must touch nothing forbidden. */
+function validateD2EScope(files, baseIsAncestor) {
+  const problems = [];
+  if (!baseIsAncestor) problems.push(`the D2-E base ${D2E_BASE} is not an ancestor of HEAD — the delta is not measurable`);
+  const set = new Set(files);
+  if (files.length !== D2E_EXPECTED_FILES.length) problems.push(`expected ${D2E_EXPECTED_FILES.length} files, got ${files.length} [${files.join(", ")}]`);
+  for (const f of D2E_EXPECTED_FILES) if (!set.has(f)) problems.push(`missing approved D2-E file: ${f}`);
+  for (const f of files) if (!D2E_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the D2-E delta: ${f}`);
+  for (const f of files) {
+    if (D2E_FORBIDDEN_FILES.includes(f)) problems.push(`D2-E must not modify the frozen file: ${f}`);
+    if (/^supabase\/migrations\//.test(f)) problems.push(`D2-E must add no migration: ${f}`);
+    if (/(^|\/)\.env(\.|$)/.test(f)) problems.push(`D2-E must change no env file: ${f}`);
+    if (/(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(f)) problems.push(`D2-E must change no lockfile: ${f}`);
+    if (/(^|\/)(app|pages)\/api\//.test(f)) problems.push(`D2-E must change no API route: ${f}`);
+  }
+  return problems;
+}
+
+function d2eDelta() {
+  const baseIsAncestor = isAncestor(D2E_BASE, headSha());
+  const committed = baseIsAncestor && headSha() !== D2E_BASE ? gitFiles(["diff", "--name-only", `${D2E_BASE}..HEAD`]) : [];
+  const union = [...new Set([...committed, ...gitDirty()])];
+  return { baseIsAncestor, union };
+}
+
+const checks = [];
+function check(name, fn) { checks.push({ name, fn }); }
+function assert(cond, msg) { if (!cond) throw new Error(msg); }
+function has(re, s, msg) { assert(re.test(s), msg); }
+function hasNot(re, s, msg) { assert(!re.test(s), msg); }
+
+const MAIN_DIR = resolve(".phase5fd2e-build-main");
+compileTo(MAIN_DIR);
+transpileServices(MAIN_DIR);
+const M = wireBuild(MAIN_DIR);
+
+// ============================================================================
+// FAITHFUL IN-MEMORY REFERENCE OF THE FROZEN D2-D WRITER CONTRACT
+// (its REAL input fences + receipt replay/conflict — copied from the D2-D source of truth)
+// ============================================================================
+const D2D_PROVIDERS = ["meta_whatsapp", "exotel_sms", "system"];
+const D2D_IDENT = /^[A-Za-z0-9._:-]{1,200}$/;            // the fence a raw wamid can violate
+const D2D_HEX64 = /^[0-9a-f]{64}$/;
+const D2D_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const D2D_EVENT_TYPE = /^[A-Za-z0-9._:-]{1,64}$/;
+const D2D_RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+
+const newWriterStore = () => ({ receipts: [], calls: [], failWith: null, throwOnce: false });
+
+/** Mirrors `writeConsentCommand` — including the validation that would DROP a raw wamid. */
+function simWriter(store) {
+  return async (input) => {
+    store.calls.push(input);
+    if (store.throwOnce) { store.throwOnce = false; throw new Error("db down: SQLSTATE 08006 connection reset by peer"); }
+    if (store.failWith) return { ok: false, code: store.failWith };
+
+    // --- the REAL D2-D input fences ---
+    if (!input || input.channel !== "whatsapp") return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!["stop", "start", "help", "unsupported"].includes(input.command)) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!D2D_HEX64.test(input.destinationHash || "")) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!["exact", "ambiguous", "unknown"].includes(input.identityConfidence)) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (input.identityConfidence === "exact") {
+      const p = input.principal;
+      if (!p || !["client", "vendor", "admin"].includes(p.type) || !D2D_UUID.test(p.id || "")) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    } else if (input.principal !== null) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!D2D_PROVIDERS.includes(input.provider)) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!D2D_IDENT.test(input.providerMessageId || "")) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!D2D_EVENT_TYPE.test(input.sourceEventType || "")) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (input.inboundMessageId !== null && !D2D_UUID.test(input.inboundMessageId || "")) return { ok: false, code: "INVALID_WRITER_INPUT" };
+    if (!D2D_RFC3339.test(input.occurredAt || "")) return { ok: false, code: "INVALID_WRITER_INPUT" };
+
+    // HELP / unsupported never reach the RPC (defence in depth — D2-E must short-circuit before here).
+    if (input.command === "help") return { ok: true, result: "help_acknowledged", replayed: false, scopeResults: [], eventIds: [], suppressionIds: [] };
+    if (input.command === "unsupported") return { ok: true, result: "unsupported_command", replayed: false, scopeResults: [], eventIds: [], suppressionIds: [] };
+
+    // --- receipt-based replay / conflict, keyed exactly as D2-D keys it ---
+    const key = `${input.provider}|${input.providerMessageId}|${input.channel}`;
+    const found = store.receipts.find((r) => r.key === key);
+    if (found) {
+      if (found.command !== input.command || found.destinationHash !== input.destinationHash) {
+        return { ok: false, code: "WRITER_CONFLICT" };
+      }
+      return { ok: true, result: found.result, replayed: true, scopeResults: [], eventIds: [], suppressionIds: [] };
+    }
+    const result = input.command === "stop" ? "stop_applied" : "start_no_reversible_stop";
+    store.receipts.push({ key, command: input.command, destinationHash: input.destinationHash, result });
+    return { ok: true, result, replayed: false, scopeResults: [], eventIds: [], suppressionIds: [] };
+  };
+}
+
+// ============================================================================
+// FIXTURES
+// ============================================================================
+const HASH = "a".repeat(64);
+const UUID = "11111111-2222-4333-8444-555555555555";
+const ROW_UUID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+const ROW_UUID_2 = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
+const OCCURRED = "2026-07-11T10:30:00.000Z";
+const RECEIVED = "2026-07-12T00:00:00.000Z";
+/** A REAL-shaped wamid: `wamid.` + base64, including the `+`, `/` and `=` D2-D's fence rejects. */
+const WAMID_BASE64 = "wamid.HBgMOTE5ODEyMzQ1Njc4FQIAEhgg+aB/cD3E4F5g6H7i8J9k0L1m2N3o4P5q6R7s8T9=";
+const WAMID_PLAIN = "wamid.HBgMOTE5ODEyMzQ1Njc4FQIAEhggABCDEF0123456789";
+
+const msg = (over = {}) => ({
+  provider: "meta_whatsapp_cloud",
+  providerMessageId: WAMID_PLAIN,
+  senderHash: HASH,
+  senderMasked: "+91******5678",
+  messageType: "text",
+  contentMinimized: { text: "STOP" },
+  providerOccurredAt: OCCURRED,
+  providerContext: { phoneNumberId: "111222333" },
+  ...over,
+});
+const rcpt = (over = {}) => ({
+  inboundMessageId: ROW_UUID,
+  provider: "meta_whatsapp_cloud",
+  providerMessageId: WAMID_PLAIN,
+  duplicate: false,
+  destinationHash: HASH,
+  identityConfidence: "unknown",
+  principalType: null,
+  principalId: null,
+  receivedAt: RECEIVED,
+  providerOccurredAt: OCCURRED,
+  ...over,
+});
+const candidate = (m = {}, r = {}) => {
+  const message = msg(m);
+  return { message, receipt: rcpt({ providerMessageId: message.providerMessageId, ...r }) };
+};
+
+const sha256hex = (s) => createHash("sha256").update(s, "utf8").digest("hex");
+
+function makeDeps(store, over = {}) {
+  return {
+    normalize: over.normalize ?? M.Command.normalizeConsentCommand,
+    writeCommand: over.writeCommand ?? simWriter(store),
+  };
+}
+const runOrch = (candidates, store = newWriterStore(), over = {}) =>
+  M.Orch.processInboundConsentCommands(candidates, makeDeps(store, over)).then((r) => ({ r, store }));
+
+// ============================================================================
+// 3-6. PROVIDER MAPPING + SHA-256 PROVIDER EVENT IDENTITY
+// ============================================================================
+check("3. provider mapping is EXPLICIT and CLOSED (meta_whatsapp_cloud → meta_whatsapp)", () => {
+  const map = M.Input.mapAdapterProviderToConsentProvider;
+  assert(map("meta_whatsapp_cloud") === "meta_whatsapp", "the adapter key maps to the consent-domain key");
+  for (const unknown of ["meta_whatsapp", "twilio", "exotel_sms", "system", "", "META_WHATSAPP_CLOUD", null, undefined, 42, {}]) {
+    assert(map(unknown) === null, `an unmapped key is REJECTED, never passed through: ${safeStringify(unknown)}`);
+  }
+  // The D2-D allowlist is NOT widened: the raw adapter key is not something D2-D accepts.
+  assert(!D2D_PROVIDERS.includes("meta_whatsapp_cloud"), "D2-D never accepts the raw adapter key");
+  assert(D2D_PROVIDERS.includes("meta_whatsapp"), "D2-D accepts the mapped key");
+});
+
+check("4. the provider event id is the LOWERCASE SHA-256 HEX of the original wamid (64 chars)", () => {
+  const d = M.Input.deriveProviderEventId(WAMID_PLAIN);
+  assert(/^[0-9a-f]{64}$/.test(d), "lowercase hex, exactly 64 chars");
+  assert(d === sha256hex(WAMID_PLAIN), "it is exactly sha256(wamid), not a truncation/salt/other digest");
+  assert(M.Input.deriveProviderEventId(WAMID_PLAIN) === d, "deterministic: the same wamid always yields the same identity");
+  assert(d !== WAMID_PLAIN, "the raw wamid is never passed through as the identity");
+});
+
+check("5. changing ONE character of the wamid changes the digest", () => {
+  const a = M.Input.deriveProviderEventId("wamid.AAAA1");
+  const b = M.Input.deriveProviderEventId("wamid.AAAA2");
+  assert(a !== b, "a one-character difference yields a different provider event id");
+  assert(M.Input.deriveProviderEventId(WAMID_BASE64) !== M.Input.deriveProviderEventId(`${WAMID_BASE64}x`), "distinct wamids never collide onto one identity");
+});
+
+check("6. a raw wamid with + / = is REJECTED by D2-D, but its digest is ACCEPTED (the whole point)", async () => {
+  // The raw wamid genuinely violates the frozen D2-D identifier fence…
+  assert(/[+/=]/.test(WAMID_BASE64), "the fixture really contains +, / or =");
+  assert(!D2D_IDENT.test(WAMID_BASE64), "a raw base64 wamid VIOLATES the D2-D identifier fence");
+  // …so passing it raw to the writer would be a DETERMINISTIC INVALID_WRITER_INPUT — a silently dropped STOP.
+  const store = newWriterStore();
+  const raw = await simWriter(store)({
+    channel: "whatsapp", command: "stop", destinationHash: HASH, identityConfidence: "unknown", principal: null,
+    provider: "meta_whatsapp", providerMessageId: WAMID_BASE64, sourceEventType: "whatsapp.inbound.command",
+    inboundMessageId: ROW_UUID, occurredAt: OCCURRED,
+  });
+  assert(raw.ok === false && raw.code === "INVALID_WRITER_INPUT", "the RAW wamid would be dropped by D2-D");
+  // …while the real D2-E path hashes it and D2-D accepts it.
+  const { r, store: s2 } = await runOrch([candidate({ providerMessageId: WAMID_BASE64 })]);
+  assert(r.ok === true && r.result.items[0].disposition === "stop_applied", "the hashed identity is ACCEPTED and the STOP is applied");
+  assert(D2D_IDENT.test(s2.calls[0].providerMessageId), "what reached D2-D satisfies its fence");
+  assert(s2.calls[0].providerMessageId === sha256hex(WAMID_BASE64), "it is the digest of the ORIGINAL wamid");
+  assert(!safeStringify(s2.calls[0]).includes(WAMID_BASE64), "the raw wamid NEVER reaches the D2-D receipt");
+});
+
+// ============================================================================
+// 7-8. TIMESTAMP CONTRACT
+// ============================================================================
+check("7. a valid provider timestamp is used as occurredAt", async () => {
+  const { store } = await runOrch([candidate({}, { providerOccurredAt: OCCURRED, receivedAt: RECEIVED })]);
+  assert(store.calls[0].occurredAt === new Date(OCCURRED).toISOString(), "the provider instant is used verbatim (ISO-normalized)");
+  assert(store.calls[0].occurredAt !== RECEIVED, "it did not silently fall back");
+});
+
+check("8. an absent/invalid provider timestamp falls back to receivedAt (never drops the command)", async () => {
+  for (const bad of [null, undefined, "", "not-a-date", "2026-07-11", "2026-07-11T10:30:00", "07/11/2026", 42, {}]) {
+    const { r, store } = await runOrch([candidate({}, { providerOccurredAt: bad, receivedAt: RECEIVED })]);
+    assert(store.calls.length === 1, `the command is still written for providerOccurredAt=${safeStringify(bad)}`);
+    assert(store.calls[0].occurredAt === new Date(RECEIVED).toISOString(), "occurredAt fell back to the server receive time");
+    assert(D2D_RFC3339.test(store.calls[0].occurredAt), "the fallback is strict RFC3339");
+    assert(r.ok === true && r.result.items[0].disposition === "stop_applied", "the STOP is applied, never dropped");
+  }
+  // Both unusable → fail closed, and NEVER fabricate an instant.
+  const { r } = await runOrch([candidate({}, { providerOccurredAt: null, receivedAt: "nonsense" })]);
+  assert(r.ok === true && r.result.items[0].disposition === "input_not_buildable", "both unusable → deterministic, not fabricated");
+  assert(M.Input.resolveOccurredAt(null, "nonsense") === null, "resolveOccurredAt fabricates nothing");
+});
+
+// ============================================================================
+// 9, 12-14. ELIGIBILITY + THE WRITER IS NEVER CALLED FOR HELP/UNSUPPORTED/NON-TEXT
+// ============================================================================
+check("9. ONLY text is command-eligible", () => {
+  assert(M.Input.isCommandEligible(msg({ messageType: "text" })) === true, "text is eligible");
+  for (const t of ["button_reply", "list_reply", "image", "document", "audio", "video", "location", "contact", "reaction", "unsupported"]) {
+    assert(M.Input.isCommandEligible(msg({ messageType: t })) === false, `${t} is NOT command-eligible`);
+    assert(M.Input.readCommandToken(msg({ messageType: t, contentMinimized: { text: "STOP" } })) === null, `${t} yields no command token even if it carries text`);
+  }
+});
+
+check("12. HELP never calls the writer (and sends nothing)", async () => {
+  for (const body of ["HELP", "help", "INFO", " Help "]) {
+    const { r, store } = await runOrch([candidate({ contentMinimized: { text: body } })]);
+    assert(store.calls.length === 0, `HELP ('${body}') NEVER reaches the writer`);
+    assert(r.ok === true && r.result.helpAcknowledged === 1, "help_acknowledged");
+    assert(r.result.items[0].disposition === "help_acknowledged" && r.result.items[0].command === "help", "sanitized help outcome");
+    assert(r.result.writerInvocations === 0, "no writer invocation counted");
+  }
+});
+
+check("13. unsupported text never calls the writer", async () => {
+  for (const body of ["please stop texting", "STOP.", "hello", "", "stahp", "🚫", "restart"]) {
+    const { r, store } = await runOrch([candidate({ contentMinimized: { text: body } })]);
+    assert(store.calls.length === 0, `unsupported ('${body}') NEVER reaches the writer`);
+    assert(r.ok === true && r.result.unsupported === 1 && r.result.items[0].disposition === "unsupported_command", "sanitized unsupported outcome");
+  }
+});
+
+check("14. a non-text message never calls the writer (no interpretation at all)", async () => {
+  for (const t of ["button_reply", "list_reply", "image", "location", "reaction", "unsupported"]) {
+    // even a button whose replyId literally says STOP is NOT a typed command
+    const { r, store } = await runOrch([candidate({ messageType: t, contentMinimized: { replyId: "STOP", text: "STOP" } })]);
+    assert(store.calls.length === 0, `${t} NEVER reaches the writer`);
+    assert(r.ok === true && r.result.skippedNotEligible === 1, `${t} skipped`);
+    assert(r.result.items[0].disposition === "not_command_eligible" && r.result.items[0].command === null, "no command was even inferred");
+  }
+});
+
+// ============================================================================
+// 10-11. STOP / START CALL THE WRITER EXACTLY ONCE, AFTER PERSISTENCE
+// ============================================================================
+check("10. STOP calls the D2-D writer EXACTLY ONCE with the adapted input", async () => {
+  const { r, store } = await runOrch([candidate({ contentMinimized: { text: "STOP" } })]);
+  assert(store.calls.length === 1, "the writer is called exactly once");
+  const c = store.calls[0];
+  assert(c.command === "stop" && c.channel === "whatsapp", "stop on the whatsapp channel");
+  assert(c.provider === "meta_whatsapp", "the MAPPED provider reaches D2-D");
+  assert(c.providerMessageId === sha256hex(WAMID_PLAIN), "the hashed provider event identity");
+  assert(c.inboundMessageId === ROW_UUID, "the durable D1-B row UUID is carried");
+  assert(c.destinationHash === HASH && c.sourceEventType === "whatsapp.inbound.command", "destination + provenance");
+  assert(r.ok === true && r.result.items[0].disposition === "stop_applied" && r.result.writerInvocations === 1, "stop_applied");
+  for (const w of ["STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "stop"]) {
+    const s = newWriterStore();
+    await runOrch([candidate({ contentMinimized: { text: w } })], s);
+    assert(s.calls.length === 1 && s.calls[0].command === "stop", `'${w}' → one stop write`);
+  }
+});
+
+check("11. START calls the D2-D writer EXACTLY ONCE", async () => {
+  const { r, store } = await runOrch([candidate({ contentMinimized: { text: "START" } })]);
+  assert(store.calls.length === 1 && store.calls[0].command === "start", "exactly one start write");
+  assert(r.ok === true && r.result.items[0].disposition === "start_no_reversible_stop", "the writer's own result is passed through verbatim");
+  for (const w of ["UNSTOP", "SUBSCRIBE", "start"]) {
+    const s = newWriterStore();
+    await runOrch([candidate({ contentMinimized: { text: w } })], s);
+    assert(s.calls.length === 1 && s.calls[0].command === "start", `'${w}' → one start write`);
+  }
+});
+
+// ============================================================================
+// 18. DUPLICATE DELIVERY → D2-D REPLAY (the same wamid → the same identity → the stored outcome)
+// ============================================================================
+check("18. a redelivered message replays through D2-D (no second effect), never a conflict", async () => {
+  const store = newWriterStore();
+  const first = await runOrch([candidate({ contentMinimized: { text: "STOP" } })], store);
+  // the SAME wamid, now flagged as a D1-B duplicate — it is deliberately RE-PROCESSED
+  const second = await runOrch([candidate({ contentMinimized: { text: "STOP" } }, { duplicate: true })], store);
+  assert(first.r.result.items[0].replayed === false, "the first delivery applies");
+  assert(second.r.ok === true && second.r.result.items[0].replayed === true, "the redelivery REPLAYS");
+  assert(second.r.result.items[0].disposition === "stop_applied", "the ORIGINAL stored outcome is returned");
+  assert(store.receipts.length === 1, "exactly one D2-D receipt — no second effect");
+  assert(store.calls.length === 2 && store.calls[0].providerMessageId === store.calls[1].providerMessageId, "the identity is stable across deliveries");
+  assert(second.r.result.replayed === 1 && second.r.result.applied === 0, "counted as a replay, not a fresh application");
+});
+
+// ============================================================================
+// 20-21. FAILURE SEMANTICS — RETRYABLE vs DETERMINISTIC
+// ============================================================================
+check("20. WRITER_TRANSACTION_FAILED is RETRYABLE (→ webhook 500)", async () => {
+  const store = newWriterStore(); store.failWith = "WRITER_TRANSACTION_FAILED";
+  const { r } = await runOrch([candidate()], store);
+  assert(r.ok === false, "the batch is retryable");
+  assert(r.code === M.Orch.COMMAND_WRITE_UNAVAILABLE, "a stable sanitized retryable code");
+  assert(r.result.items[0].retryable === true && r.result.items[0].disposition === "writer_unavailable", "the item is retryable");
+  // a THROWN dependency error is retryable too, and is sanitized
+  const t = newWriterStore(); t.throwOnce = true;
+  const thrown = await runOrch([candidate()], t);
+  assert(thrown.r.ok === false && thrown.r.code === M.Orch.COMMAND_WRITE_UNAVAILABLE, "a thrown dependency error is retryable + sanitized");
+});
+
+check("21. INVALID/CONFLICT/INTEGRITY are DETERMINISTIC — handled, never retried", async () => {
+  const map = {
+    INVALID_WRITER_INPUT: "writer_rejected_input",
+    WRITER_CONFLICT: "writer_conflict",
+    WRITER_INTEGRITY_VIOLATION: "writer_integrity_violation",
+    UNSUPPORTED_POLICY_VERSION: "writer_unsupported_policy_version",
+  };
+  for (const [code, disposition] of Object.entries(map)) {
+    const store = newWriterStore(); store.failWith = code;
+    const { r } = await runOrch([candidate()], store);
+    assert(r.ok === true, `${code} is DETERMINISTIC → the webhook acknowledges (no retry storm)`);
+    assert(r.result.items[0].retryable === false && r.result.items[0].disposition === disposition, `${code} → ${disposition}`);
+    assert(r.result.deterministicFailures === 1, `${code} counted as a deterministic failure`);
+  }
+  // A REAL conflict through the reference writer: the same event id bound to a different command.
+  const store = newWriterStore();
+  await runOrch([candidate({ contentMinimized: { text: "STOP" } })], store);
+  const conflict = await runOrch([candidate({ contentMinimized: { text: "START" } })], store);
+  assert(conflict.r.ok === true && conflict.r.result.items[0].disposition === "writer_conflict", "same event id, different command → deterministic conflict, acknowledged");
+});
+
+check("BATCH. any retryable item makes the webhook retryable; deterministic/no-op items never do", async () => {
+  // deterministic + no-op only → handled  (each message carries its OWN wamid; the receipt tracks it)
+  const ok = await runOrch([
+    candidate({ providerMessageId: "wamid.h", contentMinimized: { text: "HELP" } }),
+    candidate({ providerMessageId: "wamid.i", messageType: "image", contentMinimized: {} }),
+    candidate({ providerMessageId: "wamid.u", contentMinimized: { text: "hello" } }),
+  ]);
+  assert(ok.r.ok === true, "a batch of no-ops is handled");
+  assert(ok.r.result.helpAcknowledged === 1 && ok.r.result.skippedNotEligible === 1 && ok.r.result.unsupported === 1, "each no-op is classified");
+  // one retryable item poisons the whole batch (and every item is still attempted)
+  const store = newWriterStore(); store.failWith = "WRITER_TRANSACTION_FAILED";
+  const bad = await runOrch([
+    candidate({ providerMessageId: "wamid.h", contentMinimized: { text: "HELP" } }),
+    candidate({ providerMessageId: "wamid.s", contentMinimized: { text: "STOP" } }),
+  ], store);
+  assert(bad.r.ok === false && bad.r.code === M.Orch.COMMAND_WRITE_UNAVAILABLE, "one retryable item → the batch is retryable");
+  assert(bad.r.result.items.length === 2 && bad.r.result.helpAcknowledged === 1, "every item is still attempted");
+
+  // A receipt that does NOT describe its message is never silently reconciled — it is DETERMINISTIC.
+  const mismatched = await runOrch([{ message: msg({ providerMessageId: "wamid.a" }), receipt: rcpt({ providerMessageId: "wamid.b" }) }]);
+  assert(mismatched.r.ok === true && mismatched.r.result.items[0].disposition === "input_not_buildable", "a receipt/message mismatch is rejected before the writer");
+});
+
+// ============================================================================
+// IDENTITY / PRINCIPAL
+// ============================================================================
+check("IDENTITY. a principal is carried ONLY on an EXACT identity; ambiguous/unknown pass null", async () => {
+  const exact = await runOrch([candidate({}, { identityConfidence: "exact", principalType: "client", principalId: UUID })]);
+  assert(exact.store.calls[0].principal.type === "client" && exact.store.calls[0].principal.id === UUID, "exact carries the principal");
+  for (const conf of ["ambiguous", "unknown"]) {
+    const { r, store } = await runOrch([candidate({}, { identityConfidence: conf })]);
+    assert(store.calls[0].principal === null, `${conf} passes a NULL principal`);
+    assert(r.ok === true && r.result.items[0].disposition === "stop_applied", `${conf} still applies the STOP (suppression is destination-based)`);
+  }
+  // a principal smuggled onto a non-exact identity is REJECTED, never forwarded
+  const smuggled = await runOrch([candidate({}, { identityConfidence: "unknown", principalType: "client", principalId: UUID })]);
+  assert(smuggled.store.calls.length === 0 && smuggled.r.result.items[0].disposition === "input_not_buildable", "a non-exact principal is rejected before the writer");
+});
+
+// ============================================================================
+// 17, 19. D1-B: DURABLE ROW ID (insert + duplicate) AND RETRYABLE PERSISTENCE FAILURE
+// ============================================================================
+/** A minimal chainable fake PostgREST client, matching the D1-B adapter's usage. */
+function fakeClient(behavior) {
+  const make = () => {
+    const state = { table: null, op: null, row: null, filters: {} };
+    const b = {
+      insert(row) { state.op = "insert"; state.row = row; return b; },
+      update(o) { state.op = "update"; state.updates = o; return b; },
+      select() { if (!state.op) state.op = "select"; return b; },
+      eq(c, v) { state.filters[c] = v; return b; },
+      single() { return Promise.resolve().then(() => behavior(state)); },
+      limit() { return Promise.resolve().then(() => behavior(state)); },
+      then(f, r) { return Promise.resolve().then(() => behavior(state)).then(f, r); },
+    };
+    return b;
+  };
+  return () => ({ from: (t) => { const b = make(); b.table = t; return b; } });
+}
+
+const WA_ID = "919812345678";
+const envelope = (...messages) => ({
+  object: "whatsapp_business_account",
+  entry: [{ id: "WABA", changes: [{ field: "messages", value: {
+    messaging_product: "whatsapp",
+    metadata: { phone_number_id: "111222333" },
+    contacts: [{ profile: { name: "Priya Sharma" }, wa_id: WA_ID }],
+    messages,
+  } }] }],
+});
+const textMsg = (over = {}) => ({ from: WA_ID, id: WAMID_PLAIN, timestamp: "1752230000", type: "text", text: { body: "STOP" }, ...over });
+
+function d1bDeps(over = {}) {
+  const calls = { persists: [], resolves: [], finalizes: [] };
+  const persisted = over.persisted ?? new Set();
+  return {
+    calls,
+    deps: {
+      normalize: (payload) => M.Inbound.normalizeMetaInboundWebhook(payload),
+      resolveIdentity: async () => ({ ok: true, identity: { confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 } }),
+      createOrResolveReceipt: async () => ({ ok: true, receiptId: "receipt-1", duplicate: false }),
+      persistInboundRow: over.persistInboundRow ?? (async (row) => {
+        calls.persists.push(row);
+        if (over.failPersist) return "failed";
+        const w = row.provider_message_id;
+        if (persisted.has(w)) return "duplicate";
+        persisted.add(w);
+        return "created";
+      }),
+      resolveInboundRowId: over.resolveInboundRowId ?? (async (row) => { calls.resolves.push(row); return over.rowId ?? ROW_UUID; }),
+      finalizeReceipt: async (id, status, reason) => { calls.finalizes.push({ id, status, reason }); },
+      now: () => new Date(RECEIVED),
+    },
+  };
+}
+const runD1B = (payload, over = {}) => {
+  const { calls, deps } = d1bDeps(over);
+  return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps).then((r) => ({ r, calls }));
+};
+
+check("17. a duplicate inbound message resolves the SAME durable inbound UUID (never invented)", async () => {
+  const persisted = new Set();
+  const first = await runD1B(envelope(textMsg()), { persisted });
+  const second = await runD1B(envelope(textMsg()), { persisted });
+  assert(first.r.ok && first.r.result.messagesPersisted === 1, "first inserts");
+  assert(second.r.ok && second.r.result.messagesDuplicate === 1, "redelivery is an idempotent duplicate");
+  const a = first.r.result.processed[0].receipt;
+  const b = second.r.result.processed[0].receipt;
+  assert(a.inboundMessageId === ROW_UUID && b.inboundMessageId === ROW_UUID, "both carry the durable row UUID");
+  assert(a.inboundMessageId === b.inboundMessageId, "the SAME row id on the insert and the duplicate path");
+  assert(a.duplicate === false && b.duplicate === true, "insert vs duplicate is reported honestly");
+
+  // The REAL adapter: exactly one row → its id; zero or many → null (never invented).
+  const one = await M.D1B.resolveInboundRowIdViaDb({ provider: "meta_whatsapp_cloud", provider_message_id: "w" }, fakeClient(() => ({ data: [{ id: ROW_UUID }], error: null })));
+  assert(one === ROW_UUID, "exactly one row → its id");
+  const none = await M.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: [], error: null })));
+  assert(none === null, "zero rows → null, NEVER a fabricated id");
+  const many = await M.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: [{ id: ROW_UUID }, { id: ROW_UUID_2 }], error: null })));
+  assert(many === null, "a violated fence → null, NEVER a guess");
+  const err = await M.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: null, error: { code: "08006" } })));
+  assert(err === null, "a db error → null (the caller fails closed)");
+});
+
+check("19. persistence failure (and an unresolvable row id) is RETRYABLE", async () => {
+  const fail = await runD1B(envelope(textMsg()), { failPersist: true });
+  assert(fail.r.ok === false && fail.r.code === "inbound_persist_failed", "a real persistence failure → retryable");
+  assert(fail.r.result.processed.length === 0, "nothing is handed downstream from a failed persistence");
+  const unresolved = await runD1B(envelope(textMsg()), { resolveInboundRowId: async () => null });
+  assert(unresolved.r.ok === false && unresolved.r.code === "inbound_row_unresolved", "an unresolvable duplicate/row id → retryable");
+  const threw = await runD1B(envelope(textMsg()), { resolveInboundRowId: async () => { throw new Error("db down: SQLSTATE 08006"); } });
+  assert(threw.r.ok === false && threw.r.code === "inbound_row_unresolved", "a THROWN resolver error → retryable, sanitized");
+  assert(!safeStringify(threw.r).includes("SQLSTATE"), "no raw db error leaks");
+});
+
+check("ORDER. persistence STRICTLY precedes command processing (D1-B context feeds D2-E)", async () => {
+  const { r } = await runD1B(envelope(textMsg()));
+  assert(r.ok && r.result.processed.length === 1, "D1-B emits the per-message context only AFTER persisting");
+  const { message, receipt } = r.result.processed[0];
+  assert(receipt.inboundMessageId === ROW_UUID, "the durable row id already exists when the command runs");
+  // …and that exact context is what D2-E consumes.
+  const { store } = await runOrch([{ message, receipt }]);
+  assert(store.calls.length === 1 && store.calls[0].inboundMessageId === ROW_UUID, "the persisted row id reaches D2-D");
+  assert(store.calls[0].providerMessageId === sha256hex(WAMID_PLAIN), "the hashed identity of the persisted wamid reaches D2-D");
+  // The webhook seam: persistence call precedes the command call in the SOURCE.
+  const src = readF(WEBHOOK_SVC_SRC);
+  const iPersist = src.indexOf("handleInboundWhatsAppMessages(");
+  const iCommand = src.indexOf("processInboundConsentCommands(");
+  assert(iPersist > 0 && iCommand > 0 && iPersist < iCommand, "the webhook persists BEFORE it processes commands");
+  assert(/if \(!inbound\.ok\) return \{ status: 500[\s\S]{0,900}processInboundConsentCommands\(/.test(src), "commands run only after persistence returned ok");
+});
+
+// ============================================================================
+// 22. PRIVACY — nothing sensitive escapes
+// ============================================================================
+check("22. no raw phone / message body / destination hash / SQL error / stack in any outcome", async () => {
+  const BODY = "STOP";
+  const outcomes = [];
+  const s1 = newWriterStore();
+  outcomes.push((await runOrch([candidate({ contentMinimized: { text: BODY } })], s1)).r);
+  outcomes.push((await runOrch([candidate({ contentMinimized: { text: "please stop texting me now" } })])).r);
+  outcomes.push((await runOrch([candidate({ contentMinimized: { text: "HELP" } })])).r);
+  const s2 = newWriterStore(); s2.failWith = "WRITER_TRANSACTION_FAILED";
+  outcomes.push((await runOrch([candidate()], s2)).r);
+  const s3 = newWriterStore(); s3.throwOnce = true;
+  outcomes.push((await runOrch([candidate()], s3)).r);
+
+  for (const o of outcomes) {
+    const rendered = safeStringify(o);
+    assert(!rendered.includes(HASH), "no destination hash echoed");
+    assert(!rendered.includes(WA_ID) && !rendered.includes("+919812345678"), "no plaintext phone");
+    assert(!rendered.includes("please stop texting me now"), "no raw message body");
+    assert(!/SQLSTATE|connection reset|db down|stack|Error:|at Object\./i.test(rendered), "no raw db error / SQLSTATE / stack");
+    assert(!rendered.includes(WAMID_BASE64), "no raw base64 wamid");
+  }
+  // The BUILDER never returns the body or the raw destination either.
+  const rejected = M.Input.buildInboundConsentCommandInput("stop", msg({ messageType: "image" }), rcpt());
+  assert(rejected.ok === false && safeStringify(rejected) === safeStringify({ ok: false, reason: "NOT_COMMAND_ELIGIBLE" }), "a rejection is a bare sanitized reason code");
+});
+
+// ============================================================================
+// 15-16, 24. BOUNDARIES — D2-C never touched; the webhook never imports the writer
+// ============================================================================
+check("15. D2-C is NEVER imported or invoked (it is a SEND-authorization authority, not a command one)", () => {
+  for (const f of [ORCH_SRC, BUILDER_SRC, WEBHOOK_SVC_SRC, D1B_SRC]) {
+    const code = stripTs(readF(f));
+    hasNot(/communicationConsentDecisionService|decideCommunicationConsent/, code, `${f} does not import/invoke D2-C`);
+    hasNot(/CommunicationConsentDecision|ConsentDisposition/, code, `${f} does not use the D2-C contract`);
+  }
+});
+
+check("16. the webhook imports ONLY the D2-E orchestrator — never the D2-D writer", () => {
+  const code = stripTs(readF(WEBHOOK_SVC_SRC));
+  hasNot(/communicationConsentWriterService|writeConsentCommand/, code, "the webhook NEVER imports the D2-D writer");
+  hasNot(/apply_communication_consent_command/, code, "the webhook never calls the RPC");
+  hasNot(/consentCommand|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");
+  hasNot(/communication_preferences|communication_suppressions/, code, "the webhook never touches consent tables");
+  has(/import \{ processInboundConsentCommands \} from "\.\/inboundConsentCommandService"/, readF(WEBHOOK_SVC_SRC), "it imports the orchestrator only");
+  // The orchestrator is the ONLY consent-facing MODULE the webhook imports (checked on the module
+  // specifiers, not the binding names — `processInboundConsentCommands` legitimately contains "Consent").
+  const specifiers = [...readF(WEBHOOK_SVC_SRC).matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
+  const consentSpecifiers = specifiers.filter((s) => /consent/i.test(s));
+  assert(consentSpecifiers.length === 1 && consentSpecifiers[0] === "./inboundConsentCommandService",
+    `the orchestrator must be the ONLY consent-related module the webhook imports (got [${consentSpecifiers.join(", ")}])`);
+});
+
+check("24. the existing D1-B / D2-C / D2-D boundaries stay green", () => {
+  // D1-B remains CONSENT-AGNOSTIC (its own harness enforces this too — we assert it here as well).
+  const d1b = stripTs(readF(D1B_SRC));
+  hasNot(/consent/i, d1b, "D1-B contains no consent reference");
+  hasNot(/\bSTOP\b|\bSTART\b|\bUNSUBSCRIBE\b|opt_out|opt_in/, d1b, "D1-B contains no command literal");
+  hasNot(/communicationConsentWriterService|writeConsentCommand|inboundConsentCommandService/, d1b, "D1-B imports no consent module");
+  // D2-D + D2-C production files are byte-unchanged in this worktree.
+  const dirty = gitDirty();
+  for (const f of [WRITER_SRC, COMMAND_SRC, "lib/communication/consentPolicy.ts", D2C_SVC_SRC, D2D_MIGRATION]) {
+    assert(!dirty.includes(f), `${f} must be unchanged by D2-E`);
+  }
+  // The orchestrator is the SOLE writer touchpoint, and it calls the writer — it never re-implements it.
+  const orch = stripTs(readF(ORCH_SRC));
+  has(/writeConsentCommand\(input\)/, orch, "the orchestrator delegates to the D2-D writer");
+  hasNot(/\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.rpc\(/, orch, "the orchestrator performs NO direct db write");
+  hasNot(/adminClient/, orch, "the orchestrator holds no db client");
+  hasNot(/sendTemplateMessage|sendAuthenticationMessage|\.send\(|graph\.facebook|\bn8n\b/i, orch, "no send / Meta / n8n");
+  // The pure builder really is pure. (`.update(` is deliberately NOT probed: `createHash().update()` is a
+  // HASH update, not a database write — the database surface is `.from(`/`.insert(`/`.rpc(`/adminClient.)
+  const builder = stripTs(readF(BUILDER_SRC));
+  hasNot(/adminClient|supabase|fetch\(|console\.|Date\.now\(|Math\.random/i, builder, "the builder is PURE (no db/network/log/clock/randomness)");
+  hasNot(/\.from\(|\.insert\(|\.upsert\(|\.delete\(|\.rpc\(/, builder, "the builder performs no database operation");
+  hasNot(/writeConsentCommand|apply_communication_consent_command/, builder, "the builder never writes consent state");
+});
+
+// ============================================================================
+// 1-2, 23. PHASE SCOPE + ANCESTRY
+// ============================================================================
+check("1-2, 23. exactly seven files, correct base ancestry, nothing forbidden touched", () => {
+  const { baseIsAncestor, union } = d2eDelta();
+  assert(baseIsAncestor, `the D2-E base ${D2E_BASE} must be an ancestor of HEAD`);
+  const problems = validateD2EScope(union, baseIsAncestor);
+  assert(problems.length === 0, `D2-E scope violation: ${problems.join(" | ")}`);
+});
+
+check("WIRING. the d2e script + doc exist and the doc covers the contract", () => {
+  const pkg = JSON.parse(readF("package.json"));
+  assert(pkg.scripts["test:phase5f:d2e"] === "node scripts/phase5f-d2e-inbound-consent-integration-harness.mjs", "d2e script wired");
+  for (const f of [BUILDER_SRC, ORCH_SRC, HARNESS_SRC, DOC_SRC]) assert(existsSync(f), `${f} exists`);
+  const doc = readF(DOC_SRC);
+  for (const topic of [
+    /integration seam/i, /meta_whatsapp_cloud/, /meta_whatsapp\b/, /SHA-?256/i, /wamid/i,
+    /fallback/i, /receivedAt|received.at/i, /persistence.*before.*command|persist.*first/i,
+    /duplicate/i, /replay/i, /deterministic/i, /retryable/i, /HELP/, /no outbound|sends nothing/i,
+    /D2-C/, /Meta remains disabled|no Meta activation/i, /no (new )?migration|no SQL/i, /n8n/i,
+    /privacy/i, /rollback/i,
+  ]) has(topic, doc, `doc covers ${topic}`);
+});
+
+// ============================================================================
+// MUTATIONS
+// ============================================================================
+const mutationChecks = [];
+function srcMutation(name, file, from, to, scenario) { mutationChecks.push({ name, kind: "src", edits: [{ file, from, to }], scenario }); }
+function fnMutation(name, scenario) { mutationChecks.push({ name, kind: "fn", scenario }); }
+
+/** Rebuild from the mutated sources and re-drive the scenario. */
+async function withMutatedBuild(fn) {
+  const dir = resolve(`.phase5fd2e-mut-${Math.random().toString(36).slice(2, 8)}`);
+  try {
+    compileTo(dir);
+    transpileServices(dir);
+    return await fn(wireBuild(dir));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+srcMutation("MUT A: the provider mapping is bypassed (the raw adapter key reaches D2-D)", BUILDER_SRC,
+  "  const provider = mapAdapterProviderToConsentProvider(message.provider);\n  if (!provider) return reject(CommandInputRejectReason.UNMAPPED_PROVIDER);",
+  "  const provider = message.provider;",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    const r = await mm.Orch.processInboundConsentCommands([candidate()], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    // D2-D would REJECT meta_whatsapp_cloud → the STOP is silently dropped.
+    return store.calls[0]?.provider === "meta_whatsapp_cloud" || r.result.items[0].disposition !== "stop_applied";
+  }));
+
+srcMutation("MUT B: the RAW wamid is used as the provider event id (a base64 wamid would be dropped)", BUILDER_SRC,
+  "      providerMessageId: deriveProviderEventId(message.providerMessageId),",
+  "      providerMessageId: message.providerMessageId,",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    const r = await mm.Orch.processInboundConsentCommands([candidate({ providerMessageId: WAMID_BASE64 })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    // the raw base64 wamid violates D2-D's fence → INVALID_WRITER_INPUT → a silently dropped STOP
+    return r.result.items[0].disposition !== "stop_applied";
+  }));
+
+srcMutation("MUT C: the digest is truncated (identity collisions become possible)", BUILDER_SRC,
+  '  return createHash("sha256").update(providerMessageId, "utf8").digest("hex");',
+  '  return createHash("sha256").update(providerMessageId, "utf8").digest("hex").slice(0, 8);',
+  () => withMutatedBuild(async (mm) => !/^[0-9a-f]{64}$/.test(mm.Input.deriveProviderEventId(WAMID_PLAIN))));
+
+srcMutation("MUT D: the timestamp fallback is removed (a missing provider time DROPS the command)", BUILDER_SRC,
+  "  return toStrictIsoInstant(providerOccurredAt) ?? toStrictIsoInstant(receivedAt);",
+  "  return toStrictIsoInstant(providerOccurredAt);",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    const r = await mm.Orch.processInboundConsentCommands([candidate({}, { providerOccurredAt: null })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return store.calls.length === 0 && r.result.items[0].disposition === "input_not_buildable";
+  }));
+
+srcMutation("MUT E: eligibility is widened beyond text (a button reply becomes a command)", BUILDER_SRC,
+  "  return !!message && message.messageType === COMMAND_ELIGIBLE_MESSAGE_TYPE;",
+  "  return !!message;",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    await mm.Orch.processInboundConsentCommands([candidate({ messageType: "button_reply", contentMinimized: { text: "STOP" } })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return store.calls.length > 0; // a non-text message reached the writer
+  }));
+
+srcMutation("MUT F: HELP is routed through the writer (the short-circuit is removed)", ORCH_SRC,
+  '    if (command === "help") {',
+  '    if (false) {',
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    await mm.Orch.processInboundConsentCommands([candidate({ contentMinimized: { text: "HELP" } })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return store.calls.length > 0; // HELP reached the writer
+  }));
+
+srcMutation("MUT G: unsupported text is routed through the writer", ORCH_SRC,
+  '    if (command === "unsupported") {',
+  '    if (false) {',
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    await mm.Orch.processInboundConsentCommands([candidate({ contentMinimized: { text: "hello there" } })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return store.calls.length > 0;
+  }));
+
+srcMutation("MUT H: a non-text message is no longer skipped", ORCH_SRC,
+  "    if (!message || !receipt || !isCommandEligible(message)) {",
+  "    if (!message || !receipt) {",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    const r = await mm.Orch.processInboundConsentCommands([candidate({ messageType: "image", contentMinimized: { text: "STOP" } })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return store.calls.length > 0 || r.result.skippedNotEligible === 0;
+  }));
+
+srcMutation("MUT I: WRITER_TRANSACTION_FAILED is treated as DETERMINISTIC (a real STOP would be lost)", ORCH_SRC,
+  '    if (outcome.code === "WRITER_TRANSACTION_FAILED") {',
+  "    if (false) {",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore(); store.failWith = "WRITER_TRANSACTION_FAILED";
+    const r = await mm.Orch.processInboundConsentCommands([candidate()], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return r.ok === true; // acknowledged instead of retried → the STOP is lost
+  }));
+
+srcMutation("MUT J: a DETERMINISTIC writer failure is treated as retryable (an infinite retry storm)", ORCH_SRC,
+  "    const disposition = DETERMINISTIC_WRITER_FAILURES[outcome.code] ?? \"writer_integrity_violation\";\n    result = { ...result, deterministicFailures: result.deterministicFailures + 1 };\n    push({ inboundMessageId, command, disposition, replayed: false, retryable: false });",
+  "    retryableCode = retryableCode ?? COMMAND_WRITE_UNAVAILABLE;\n    push({ inboundMessageId, command, disposition: \"writer_conflict\", replayed: false, retryable: true });",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore(); store.failWith = "WRITER_CONFLICT";
+    const r = await mm.Orch.processInboundConsentCommands([candidate()], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return r.ok === false; // a deterministic conflict would now retry forever
+  }));
+
+srcMutation("MUT K: the writer is called for a non-exact identity carrying a principal", BUILDER_SRC,
+  "  } else if (receipt.principalType !== null || receipt.principalId !== null) {\n    return reject(CommandInputRejectReason.INVALID_IDENTITY);\n  }",
+  "  }",
+  () => withMutatedBuild(async (mm) => {
+    const store = newWriterStore();
+    await mm.Orch.processInboundConsentCommands([candidate({}, { identityConfidence: "unknown", principalType: "client", principalId: UUID })], { normalize: mm.Command.normalizeConsentCommand, writeCommand: simWriter(store) });
+    return store.calls.length > 0; // a smuggled principal reached the writer
+  }));
+
+srcMutation("MUT L: D1-B INVENTS a row id when the unique fence resolves ambiguously", D1B_SRC,
+  "    if (rows.length !== 1) return null;",
+  "    if (rows.length === 0) return null;",
+  () => withMutatedBuild(async (mm) => {
+    const many = await mm.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: [{ id: ROW_UUID }, { id: ROW_UUID_2 }], error: null })));
+    return many !== null; // it guessed a row instead of failing closed
+  }));
+
+srcMutation("MUT M: an unresolvable row id is SWALLOWED instead of failing closed", D1B_SRC,
+  '    if (!rowId) { failureReason = failureReason ?? "inbound_row_unresolved"; continue; }',
+  "    if (!rowId) { continue; }",
+  () => withMutatedBuild(async (mm) => {
+    const { deps } = d1bDeps({ resolveInboundRowId: async () => null });
+    const payload = envelope(textMsg());
+    const r = await mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);
+    return r.ok === true; // acknowledged with no downstream context → the command is silently lost
+  }));
+
+srcMutation("MUT N: the webhook processes commands BEFORE persistence succeeds", WEBHOOK_SVC_SRC,
+  '    if (!inbound.ok) return { status: 500, code: "inbound_processing_failed" };',
+  "",
+  () => {
+    const src = readF(WEBHOOK_SVC_SRC);
+    return !/if \(!inbound\.ok\) return \{ status: 500[\s\S]{0,900}processInboundConsentCommands\(/.test(src);
+  });
+
+srcMutation("MUT O: a retryable command failure no longer 500s the webhook", WEBHOOK_SVC_SRC,
+  '    if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };',
+  "",
+  () => !/if \(!commands\.ok\) return \{ status: 500/.test(readF(WEBHOOK_SVC_SRC)));
+
+fnMutation("MUT P: an eighth file in the D2-E delta is rejected",
+  () => ["services/other.ts", ".env.local", "app/api/consent/route.ts", "supabase/migrations/20260713000000_x.sql",
+    "services/communicationConsentWriterService.ts", "lib/communication/consentCommand.ts",
+    "services/communicationConsentDecisionService.ts", "package-lock.json"]
+    .every((f) => validateD2EScope([...D2E_EXPECTED_FILES, f], true).length > 0));
+
+fnMutation("MUT Q: a missing approved D2-E file is rejected",
+  () => D2E_EXPECTED_FILES.every((f) => validateD2EScope(D2E_EXPECTED_FILES.filter((x) => x !== f), true).length > 0)
+     && validateD2EScope(D2E_EXPECTED_FILES, true).length === 0);
+
+fnMutation("MUT R: an unmeasurable base (not an ancestor of HEAD) is rejected",
+  () => validateD2EScope(D2E_EXPECTED_FILES, false).length > 0 && isAncestor(D2E_BASE, headSha()) === true);
+
+// ============================================================================
+// RUNNER
+// ============================================================================
+async function runFunctional() {
+  let passed = 0, failed = 0;
+  console.log("Running Phase 5F-D2-E inbound consent-command integration checks...\n");
+  for (const c of checks) {
+    try { await c.fn(); console.log(`PASS ${c.name}`); passed++; }
+    catch (e) { console.log(`FAIL ${c.name}`); console.error(e); failed++; }
+  }
+  return { passed, failed };
+}
+async function suiteGoesRed() { for (const c of checks) { try { await c.fn(); } catch { return true; } } return false; }
+
+async function runMutations() {
+  let passed = 0, failed = 0;
+  console.log("\nRunning Phase 5F-D2-E mutation tests...\n");
+  for (const mut of mutationChecks) {
+    if (mut.kind === "fn") {
+      try {
+        const caught = await mut.scenario();
+        if (caught) { console.log(`PASS ${mut.name}`); passed++; }
+        else { console.log(`FAIL ${mut.name} (guard not load-bearing)`); failed++; }
+      } catch (e) { console.log(`FAIL ${mut.name}`); console.error(e); failed++; }
+      continue;
+    }
+    const originals = new Map();
+    for (const edit of mut.edits) { const p = resolve(edit.file); if (!originals.has(p)) originals.set(p, readFileSync(p, "utf8")); }
+    try {
+      for (const edit of mut.edits) {
+        const p = resolve(edit.file);
+        const cur = readFileSync(p, "utf8");
+        if (!cur.includes(edit.from)) throw new Error(`anchor not found in ${edit.file}`);
+        writeFileSync(p, cur.replace(edit.from, edit.to));
+      }
+      let violation = false;
+      try { violation = await mut.scenario(); }
+      catch { violation = true; /* the mutation broke the build/behaviour → it was load-bearing */ }
+      if (!violation) violation = await suiteGoesRed();
+      if (violation) { console.log(`PASS ${mut.name}`); passed++; }
+      else { console.log(`FAIL ${mut.name} (guard did not prove load-bearing)`); failed++; }
+    } catch (e) { console.log(`FAIL ${mut.name}`); console.error(e); failed++; }
+    finally { for (const [p, original] of originals) writeFileSync(p, original); }
+  }
+  return { passed, failed };
+}
+
+const functional = await runFunctional();
+const mutations = await runMutations();
+rmSync(MAIN_DIR, { recursive: true, force: true });
+const passed = functional.passed + mutations.passed;
+const failed = functional.failed + mutations.failed;
+console.log(`\nSummary: ${passed} passed, ${failed} failed (functional: ${functional.passed}/${functional.passed + functional.failed}, mutation: ${mutations.passed}/${mutations.passed + mutations.failed}).`);
+process.exit(failed > 0 ? 1 : 0);

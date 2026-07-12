@@ -77,7 +77,35 @@ export type ReceiptResolution =
   | { readonly ok: true; readonly receiptId: string; readonly duplicate: boolean }
   | { readonly ok: false };
 
-/** The sanitized processing result. Every field is a count or an id — never PII. */
+/**
+ * The MINIMAL sanitized persistence context for ONE durably-stored inbound message, handed to the
+ * downstream processing layer so it never has to re-read the raw webhook body.
+ *
+ * It carries NO plaintext phone, NO raw provider payload, NO token and NO message body — only the
+ * durable row identity, the HASHED destination, and the identity facts already proven at capture time.
+ * `duplicate` distinguishes a freshly-inserted row from a re-delivered one that already existed; BOTH
+ * carry the SAME durable row id, because the per-message unique fence guarantees exactly one row.
+ */
+export interface InboundPersistenceReceipt {
+  readonly inboundMessageId: string;
+  readonly provider: string;
+  readonly providerMessageId: string;
+  readonly duplicate: boolean;
+  readonly destinationHash: string;
+  readonly identityConfidence: string;
+  readonly principalType: string | null;
+  readonly principalId: string | null;
+  readonly receivedAt: string;
+  readonly providerOccurredAt: string | null;
+}
+
+/** A durably-persisted inbound message paired with its sanitized persistence context. */
+export interface InboundProcessedMessage {
+  readonly message: NormalizedInboundMessage;
+  readonly receipt: InboundPersistenceReceipt;
+}
+
+/** The sanitized processing result. Every field is a count, an id, or a minimized message — never PII. */
 export interface InboundProcessingResult {
   readonly receiptId: string | null;
   readonly receiptDuplicate: boolean;
@@ -88,6 +116,8 @@ export interface InboundProcessingResult {
   readonly identityExact: number;
   readonly identityAmbiguous: number;
   readonly identityUnknown: number;
+  /** Durably-stored messages + their sanitized context, in webhook order. Never a rejected message. */
+  readonly processed: readonly InboundProcessedMessage[];
 }
 
 export type InboundServiceOutcome =
@@ -108,6 +138,15 @@ export interface InboundWhatsAppDeps {
   readonly createOrResolveReceipt: (rawBody: string, payload: Record<string, unknown>) => Promise<ReceiptResolution>;
   readonly persistInboundRow: (row: InboundInsertRow) => Promise<InboundRowOutcome>;
   readonly finalizeReceipt: (receiptId: string, status: string, reason?: string) => Promise<void>;
+  /**
+   * OPTIONAL. Resolve the DURABLE row id of a just-inserted or already-existing row. Production ALWAYS
+   * binds it (see `defaultInboundWhatsAppDeps`). It is optional purely so a caller that injects a partial
+   * dependency set — and therefore wants no downstream context — keeps the original capture-only contract.
+   * When bound, a row that cannot be resolved to exactly ONE durable id is a RETRYABLE failure.
+   */
+  readonly resolveInboundRowId?: (row: InboundInsertRow) => Promise<string | null>;
+  /** OPTIONAL injected server clock for the receipt's `receivedAt`. Defaults to the real clock. */
+  readonly now?: () => Date;
 }
 
 export function defaultInboundWhatsAppDeps(): InboundWhatsAppDeps {
@@ -117,6 +156,8 @@ export function defaultInboundWhatsAppDeps(): InboundWhatsAppDeps {
     createOrResolveReceipt: (rawBody, payload) => createOrResolveReceiptViaDb(rawBody, payload),
     persistInboundRow: (row) => persistInboundRowViaDb(row),
     finalizeReceipt: (receiptId, status, reason) => finalizeReceiptViaDb(receiptId, status, reason),
+    resolveInboundRowId: (row) => resolveInboundRowIdViaDb(row),
+    now: () => new Date(),
   };
 }
 
@@ -133,6 +174,7 @@ const emptyResult = (): InboundProcessingResult => ({
   identityExact: 0,
   identityAmbiguous: 0,
   identityUnknown: 0,
+  processed: [],
 });
 
 /** The processing_status a resolved identity maps to. */
@@ -192,6 +234,10 @@ export async function handleInboundWhatsAppMessages(
   const receiptId = receipt.receiptId;
   let result: InboundProcessingResult = { ...counts, receiptId, receiptDuplicate: receipt.duplicate };
 
+  // The server receive time stamped onto every per-message context in this batch.
+  const receivedAt = (deps.now ? deps.now() : new Date()).toISOString();
+  const processed: InboundProcessedMessage[] = [];
+
   // 3) Per-message processing. A DUPLICATE receipt does NOT skip this loop — the per-message
   //    unique fence is the correctness authority, so re-processing a redelivery is idempotent.
   //    The FIRST stable failure reason (retryable) wins; every message is still attempted.
@@ -223,15 +269,46 @@ export async function handleInboundWhatsAppMessages(
     else if (identity.confidence === "ambiguous") result = { ...result, identityAmbiguous: result.identityAmbiguous + 1 };
     else result = { ...result, identityUnknown: result.identityUnknown + 1 };
 
-    const outcome = await deps.persistInboundRow(buildInboundRow(item.message, identity, receiptId));
+    const row = buildInboundRow(item.message, identity, receiptId);
+    const outcome = await deps.persistInboundRow(row);
     if (outcome === "created") result = { ...result, messagesPersisted: result.messagesPersisted + 1 };
     else if (outcome === "duplicate") result = { ...result, messagesDuplicate: result.messagesDuplicate + 1 };
-    else failureReason = failureReason ?? "inbound_persist_failed"; // a real (non-idempotency) db error
+    else {
+      failureReason = failureReason ?? "inbound_persist_failed"; // a real (non-idempotency) db error
+      continue;
+    }
+
+    // The DURABLE row id for the downstream processing layer. Resolution is attempted only when the
+    // adapter is bound (production always binds it). An id is NEVER invented: a row that cannot be
+    // resolved to exactly ONE durable id is a RETRYABLE failure, so a retry can resolve it correctly
+    // rather than silently dropping the message from the downstream context.
+    if (!deps.resolveInboundRowId) continue;
+    let rowId: string | null;
+    try { rowId = await deps.resolveInboundRowId(row); }
+    catch { rowId = null; }
+    if (!rowId) { failureReason = failureReason ?? "inbound_row_unresolved"; continue; }
+    processed.push({
+      message: item.message,
+      receipt: {
+        inboundMessageId: rowId,
+        provider: row.provider,
+        providerMessageId: row.provider_message_id,
+        duplicate: outcome === "duplicate",
+        destinationHash: row.sender_hash,
+        identityConfidence: row.identity_confidence,
+        principalType: row.resolved_principal_type,
+        principalId: row.resolved_principal_id,
+        receivedAt,
+        providerOccurredAt: row.provider_occurred_at,
+      },
+    });
   }
+  result = { ...result, processed };
 
   // 4) Finalize the receipt (best-effort; a finalize/count failure never corrupts correctness).
-  //    A real processing failure (identity infra OR persistence) → receipt failed, ok:false, → 500.
-  //    Already-persisted messages in the batch are NEVER rolled back; a retry idempotently resumes.
+  //    A real processing failure (identity infra OR persistence OR an unresolvable row id) → receipt
+  //    failed, ok:false, → 500. Already-persisted messages are NEVER rolled back; a retry idempotently
+  //    resumes via the per-message unique fence.
   if (failureReason) {
     await safe(deps.finalizeReceipt(receiptId, "failed", failureReason));
     return { ok: false, code: failureReason, result };
@@ -268,6 +345,34 @@ export async function persistInboundRowViaDb(row: InboundInsertRow, client: DbCl
   } catch (e) {
     if (isUniqueViolationOn(e, INBOUND_UNIQUE_FENCE)) return "duplicate";
     return "failed";
+  }
+}
+
+/**
+ * Resolve the DURABLE row id for a row we just inserted, or that a redelivery found already present.
+ * Equality filters ONLY (a provider-supplied id is never spliced into PostgREST filter syntax), and NO
+ * `.single()`/`.limit()` — cardinality is PRESERVED so a fence violation is visible rather than hidden.
+ *
+ * The per-message unique fence guarantees AT MOST ONE row for (provider, provider_message_id), so:
+ *   • exactly one row  → its id (the SAME id for the insert and the duplicate path);
+ *   • zero rows        → not durably there; NEVER invent an id;
+ *   • more than one    → the fence is violated; NEVER guess which row is authoritative.
+ * The last two return null, and the caller turns that into a RETRYABLE failure.
+ */
+export async function resolveInboundRowIdViaDb(row: InboundInsertRow, client: DbClient = adminClient): Promise<string | null> {
+  try {
+    const { data, error } = await client()
+      .from("communication_inbound_messages")
+      .select("id")
+      .eq("provider", row.provider)
+      .eq("provider_message_id", row.provider_message_id);
+    if (error) return null;
+    const rows = (data ?? []) as { id?: unknown }[];
+    if (rows.length !== 1) return null;
+    const id = rows[0]?.id;
+    return typeof id === "string" && id.trim() !== "" ? id : null;
+  } catch {
+    return null;
   }
 }
 

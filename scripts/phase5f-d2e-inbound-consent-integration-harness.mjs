@@ -130,6 +130,18 @@ function isAncestor(a, b) {
 
 // ----------------------------------------------------------------------------
 // D2-E PHASE SCOPE — exactly seven files, measured from the approved base
+//
+// TODO — HISTORICAL RANGE IS NOT FROZEN YET (deliberately).
+// D2-E is still IN FLIGHT: the audited implementation SHA does not exist until this correction is
+// committed, so there is no honest `D2E_HEAD` to hardcode and none is guessed. The scope check therefore
+// measures the LIVE delta (base..HEAD ∪ worktree), which is correct for a phase still being built.
+//
+// AFTER the corrected implementation commit is pushed and independently audited, a SEPARATE
+// harness/docs-only commit will:
+//   1. freeze `D2E_BASE..CORRECTED_D2E_HEAD` as the audited historical range;
+//   2. separate that frozen historical scope from current-worktree protection — exactly as the D2-D
+//      post-merge stabilization did, so a later phase (and the PR merge commit) cannot re-open this audit.
+// Do NOT hardcode a head SHA before that audit exists.
 // ----------------------------------------------------------------------------
 const D2E_BASE = "94b8c1522269635cdbbe53fb6d11ea2bf91b05a9"; // the merged D2-D post-merge harness stabilization
 const D2E_EXPECTED_FILES = [
@@ -245,6 +257,7 @@ function simWriter(store) {
 // ============================================================================
 const HASH = "a".repeat(64);
 const UUID = "11111111-2222-4333-8444-555555555555";
+const UUID_B = "99999999-8888-4777-8666-555555555555"; // a DIFFERENT principal (the redelivery's identity B)
 const ROW_UUID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const ROW_UUID_2 = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
 const OCCURRED = "2026-07-11T10:30:00.000Z";
@@ -351,18 +364,53 @@ check("7. a valid provider timestamp is used as occurredAt", async () => {
   assert(store.calls[0].occurredAt !== RECEIVED, "it did not silently fall back");
 });
 
-check("8. an absent/invalid provider timestamp falls back to receivedAt (never drops the command)", async () => {
-  for (const bad of [null, undefined, "", "not-a-date", "2026-07-11", "2026-07-11T10:30:00", "07/11/2026", 42, {}]) {
+check("8. C. an absent/invalid provider timestamp falls back to receivedAt (never drops, never rolls over)", async () => {
+  const INVALID = [
+    null, undefined, "", "not-a-date", 42, {},
+    "2026-07-11",                    // date-only
+    "2026-07-11T10:30:00",           // timezone-less
+    "07/11/2026",                    // locale
+    "2026-02-31T10:30:00Z",          // IMPOSSIBLE CALENDAR DAY (Date.parse would roll to 3 March)
+    "2026-02-30T00:00:00Z",          // impossible day
+    "2027-02-29T00:00:00Z",          // 2027 is not a leap year
+    "2026-13-01T00:00:00Z",          // month 13
+    "2026-00-10T00:00:00Z",          // month 0
+    "2026-01-00T00:00:00Z",          // day 0
+    "2026-01-01T24:00:00Z",          // hour 24 (Date.parse would roll to the next midnight)
+    "2026-01-01T10:60:00Z",          // minute 60
+    "2026-01-01T10:30:60Z",          // second 60
+    "2026-01-01T10:30:00+25:00",     // invalid offset hour
+    "2026-01-01T10:30:00+05:99",     // invalid offset minute
+  ];
+  for (const bad of INVALID) {
+    // the strict validator rejects it outright…
+    assert(M.Input.isStrictRfc3339(bad) === false, `strictly invalid: ${safeStringify(bad)}`);
+    assert(M.Input.toStrictIsoInstant(bad) === null, `never normalized into another date: ${safeStringify(bad)}`);
+    // …and the command still lands, using the received-at fallback.
     const { r, store } = await runOrch([candidate({}, { providerOccurredAt: bad, receivedAt: RECEIVED })]);
     assert(store.calls.length === 1, `the command is still written for providerOccurredAt=${safeStringify(bad)}`);
-    assert(store.calls[0].occurredAt === new Date(RECEIVED).toISOString(), "occurredAt fell back to the server receive time");
+    assert(store.calls[0].occurredAt === new Date(RECEIVED).toISOString(), "occurredAt fell back to the received-at time");
     assert(D2D_RFC3339.test(store.calls[0].occurredAt), "the fallback is strict RFC3339");
     assert(r.ok === true && r.result.items[0].disposition === "stop_applied", "the STOP is applied, never dropped");
   }
+  // The rollover trap explicitly: an impossible date must NEVER become a different real date.
+  assert(Number.isFinite(Date.parse("2026-02-31T10:30:00Z")), "Date.parse ALONE would accept 2026-02-31 (the trap)");
+  assert(new Date("2026-02-31T10:30:00Z").toISOString().startsWith("2026-03-03"), "…and would silently roll it to 3 March");
+  assert(M.Input.toStrictIsoInstant("2026-02-31T10:30:00Z") === null, "the strict validator refuses to roll it over");
+  const rolled = await runOrch([candidate({}, { providerOccurredAt: "2026-02-31T10:30:00Z", receivedAt: RECEIVED })]);
+  assert(!rolled.store.calls[0].occurredAt.startsWith("2026-03-03"), "an impossible date is NEVER rewritten into March");
+  assert(rolled.store.calls[0].occurredAt === new Date(RECEIVED).toISOString(), "it fell back instead");
+
+  // VALID forms are still accepted (including a real leap day and a real offset).
+  for (const good of ["2026-07-11T10:30:00Z", "2026-07-11T10:30:00.123456Z", "2024-02-29T00:00:00Z", "2026-07-11T10:30:00+05:30", "2026-07-11T10:30:00-08:00"]) {
+    assert(M.Input.isStrictRfc3339(good) === true, `strictly valid: ${good}`);
+  }
+
   // Both unusable → fail closed, and NEVER fabricate an instant.
   const { r } = await runOrch([candidate({}, { providerOccurredAt: null, receivedAt: "nonsense" })]);
   assert(r.ok === true && r.result.items[0].disposition === "input_not_buildable", "both unusable → deterministic, not fabricated");
   assert(M.Input.resolveOccurredAt(null, "nonsense") === null, "resolveOccurredAt fabricates nothing");
+  assert(M.Input.resolveOccurredAt("2026-02-31T00:00:00Z", "2026-02-31T00:00:00Z") === null, "two impossible dates fabricate nothing");
 });
 
 // ============================================================================
@@ -557,68 +605,197 @@ const envelope = (...messages) => ({
     messages,
   } }] }],
 });
-const textMsg = (over = {}) => ({ from: WA_ID, id: WAMID_PLAIN, timestamp: "1752230000", type: "text", text: { body: "STOP" }, ...over });
+/** The unix-seconds timestamp Meta would send for exactly `OCCURRED` (so the persisted instant is OCCURRED). */
+const OCCURRED_UNIX = String(Date.parse(OCCURRED) / 1000);
+const textMsg = (over = {}) => ({ from: WA_ID, id: WAMID_PLAIN, timestamp: OCCURRED_UNIX, type: "text", text: { body: "STOP" }, ...over });
+
+/** A DURABLE row exactly as PostgREST would return it (the authority for all downstream context). */
+const storedRow = (over = {}) => ({
+  id: ROW_UUID,
+  provider: "meta_whatsapp_cloud",
+  provider_message_id: WAMID_PLAIN,
+  sender_hash: HASH,
+  resolved_principal_type: null,
+  resolved_principal_id: null,
+  identity_confidence: "unknown",
+  message_type: "text",
+  content_minimized: { text: "STOP" },
+  provider_occurred_at: OCCURRED,
+  received_at: RECEIVED,
+  ...over,
+});
 
 function d1bDeps(over = {}) {
   const calls = { persists: [], resolves: [], finalizes: [] };
   const persisted = over.persisted ?? new Set();
+  // The DURABLE store: keyed by the unique fence, written ONCE on first insert and never overwritten
+  // by a redelivery — exactly like the real table.
+  const store = over.store ?? new Map();
   return {
-    calls,
+    calls, store,
     deps: {
       normalize: (payload) => M.Inbound.normalizeMetaInboundWebhook(payload),
-      resolveIdentity: async () => ({ ok: true, identity: { confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 } }),
+      resolveIdentity: over.resolveIdentity ?? (async () => ({ ok: true, identity: { confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 } })),
       createOrResolveReceipt: async () => ({ ok: true, receiptId: "receipt-1", duplicate: false }),
       persistInboundRow: over.persistInboundRow ?? (async (row) => {
         calls.persists.push(row);
         if (over.failPersist) return "failed";
-        const w = row.provider_message_id;
-        if (persisted.has(w)) return "duplicate";
-        persisted.add(w);
+        const key = `${row.provider}|${row.provider_message_id}`;
+        if (store.has(key)) return "duplicate";                 // the fence: the ORIGINAL row stands
+        store.set(key, storedRow({
+          provider: row.provider,
+          provider_message_id: row.provider_message_id,
+          sender_hash: row.sender_hash,
+          identity_confidence: row.identity_confidence,
+          resolved_principal_type: row.resolved_principal_type,
+          resolved_principal_id: row.resolved_principal_id,
+          message_type: row.message_type,
+          content_minimized: row.content_minimized,
+          provider_occurred_at: row.provider_occurred_at,
+          ...(over.storedOver ?? {}),
+        }));
+        persisted.add(row.provider_message_id);
         return "created";
       }),
-      resolveInboundRowId: over.resolveInboundRowId ?? (async (row) => { calls.resolves.push(row); return over.rowId ?? ROW_UUID; }),
+      resolvePersistedInboundContext: over.resolvePersistedInboundContext ?? (async (row) => {
+        calls.resolves.push(row);
+        const key = `${row.provider}|${row.provider_message_id}`;
+        const raw = store.get(key);
+        if (!raw) return null;
+        // Go through the REAL validator, exactly as the production adapter does.
+        return M.D1B.validatePersistedInboundRow(raw, { provider: row.provider, providerMessageId: row.provider_message_id });
+      }),
       finalizeReceipt: async (id, status, reason) => { calls.finalizes.push({ id, status, reason }); },
-      now: () => new Date(RECEIVED),
     },
   };
 }
 const runD1B = (payload, over = {}) => {
-  const { calls, deps } = d1bDeps(over);
-  return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps).then((r) => ({ r, calls }));
+  const d = d1bDeps(over);
+  return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, d.deps)
+    .then((r) => ({ r, calls: d.calls, store: d.store }));
 };
 
-check("17. a duplicate inbound message resolves the SAME durable inbound UUID (never invented)", async () => {
-  const persisted = new Set();
-  const first = await runD1B(envelope(textMsg()), { persisted });
-  const second = await runD1B(envelope(textMsg()), { persisted });
+check("17. B1-B2. context comes FROM THE PERSISTED ROW; a duplicate returns the SAME durable UUID", async () => {
+  const store = new Map();
+  const first = await runD1B(envelope(textMsg()), { store });
+  const second = await runD1B(envelope(textMsg()), { store });
   assert(first.r.ok && first.r.result.messagesPersisted === 1, "first inserts");
   assert(second.r.ok && second.r.result.messagesDuplicate === 1, "redelivery is an idempotent duplicate");
   const a = first.r.result.processed[0].receipt;
   const b = second.r.result.processed[0].receipt;
-  assert(a.inboundMessageId === ROW_UUID && b.inboundMessageId === ROW_UUID, "both carry the durable row UUID");
+  assert(a.inboundMessageId === ROW_UUID && b.inboundMessageId === ROW_UUID, "both carry the DURABLE row UUID");
   assert(a.inboundMessageId === b.inboundMessageId, "the SAME row id on the insert and the duplicate path");
   assert(a.duplicate === false && b.duplicate === true, "insert vs duplicate is reported honestly");
+  // B1: even the INSERT path reads its context back from the stored row (not from the in-flight object).
+  assert(first.calls.resolves.length === 1, "the insert path also resolves the persisted row");
+  assert(a.receivedAt === RECEIVED && a.providerOccurredAt === OCCURRED, "the PERSISTED timestamps are used");
 
-  // The REAL adapter: exactly one row → its id; zero or many → null (never invented).
-  const one = await M.D1B.resolveInboundRowIdViaDb({ provider: "meta_whatsapp_cloud", provider_message_id: "w" }, fakeClient(() => ({ data: [{ id: ROW_UUID }], error: null })));
-  assert(one === ROW_UUID, "exactly one row → its id");
-  const none = await M.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: [], error: null })));
-  assert(none === null, "zero rows → null, NEVER a fabricated id");
-  const many = await M.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: [{ id: ROW_UUID }, { id: ROW_UUID_2 }], error: null })));
-  assert(many === null, "a violated fence → null, NEVER a guess");
-  const err = await M.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: null, error: { code: "08006" } })));
+  // The REAL adapter: exactly one VALID row → its projection; anything else → null (never invented).
+  const fence = { provider: "meta_whatsapp_cloud", provider_message_id: WAMID_PLAIN };
+  const one = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [storedRow()], error: null })));
+  assert(one && one.id === ROW_UUID && one.contentMinimized.text === "STOP", "exactly one row → its validated projection");
+  const none = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [], error: null })));
+  assert(none === null, "zero rows → null, NEVER a fabricated row");
+  const many = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));
+  assert(many === null, "a violated fence (multi-row) → null, NEVER a guess — and never .single()/.limit()");
+  const err = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: null, error: { code: "08006" } })));
   assert(err === null, "a db error → null (the caller fails closed)");
+  // Equality filters only, and no cardinality-concealing modifiers — asserted on the RESOLVER ITSELF
+  // (the pre-existing receipt adapter legitimately uses .single()/.limit(); this is not about that).
+  const src = readF(D1B_SRC);
+  const start = src.indexOf("export async function resolvePersistedInboundContextViaDb");
+  assert(start > 0, "the resolver exists");
+  const body = src.slice(start, src.indexOf("\n}", start));
+  hasNot(/\.single\(|\.maybeSingle\(|\.limit\(/, body, "the resolver never conceals cardinality (no single/maybeSingle/limit)");
+  has(/\.eq\("provider", row\.provider\)[\s\S]{0,120}\.eq\("provider_message_id", row\.provider_message_id\)/, body, "equality filters on the unique fence only");
+  has(/rows\.length !== 1/, body, "exactly one row is required");
+  has(/validatePersistedInboundRow/, body, "the row is validated before it is trusted");
 });
 
-check("19. persistence failure (and an unresolvable row id) is RETRYABLE", async () => {
+check("B7. a malformed / zero / multi persisted row is RETRYABLE and never reaches D2-D", async () => {
+  const fence = { provider: "meta_whatsapp_cloud", providerMessageId: WAMID_PLAIN };
+  const malformed = [
+    ["bad uuid", storedRow({ id: "not-a-uuid" })],
+    ["fence provider mismatch", storedRow({ provider: "other" })],
+    ["fence wamid mismatch", storedRow({ provider_message_id: "wamid.other" })],
+    ["uppercase hash", storedRow({ sender_hash: "A".repeat(64) })],
+    ["short hash", storedRow({ sender_hash: "abc" })],
+    ["open confidence", storedRow({ identity_confidence: "maybe" })],
+    ["exact without principal", storedRow({ identity_confidence: "exact" })],
+    ["exact with bad principal id", storedRow({ identity_confidence: "exact", resolved_principal_type: "client", resolved_principal_id: "nope" })],
+    ["exact with bad principal type", storedRow({ identity_confidence: "exact", resolved_principal_type: "root", resolved_principal_id: UUID })],
+    ["unknown WITH a principal", storedRow({ identity_confidence: "unknown", resolved_principal_type: "client", resolved_principal_id: UUID })],
+    ["partial principal pair", storedRow({ identity_confidence: "exact", resolved_principal_type: "client", resolved_principal_id: null })],
+    ["unusable message type", storedRow({ message_type: "TEXT!" })],
+    ["content is an array", storedRow({ content_minimized: [] })],
+    ["content is null", storedRow({ content_minimized: null })],
+    ["content is a string", storedRow({ content_minimized: "text" })],
+    ["occurred_at not a string", storedRow({ provider_occurred_at: 1752230000 })],
+    ["occurred_at malformed", storedRow({ provider_occurred_at: "2026-07-11" })],
+    ["received_at missing", storedRow({ received_at: null })],
+    ["received_at malformed", storedRow({ received_at: "07/12/2026" })],
+    ["row is null", null],
+    ["row is an array", []],
+  ];
+  for (const [name, raw] of malformed) {
+    assert(M.D1B.validatePersistedInboundRow(raw, fence) === null, `a malformed durable row is NOT evidence: ${name}`);
+  }
+  // …and an EXACT row with a valid principal IS accepted.
+  const good = M.D1B.validatePersistedInboundRow(storedRow({ identity_confidence: "exact", resolved_principal_type: "client", resolved_principal_id: UUID }), fence);
+  assert(good && good.principalType === "client" && good.principalId === UUID, "a valid exact row is accepted");
+  // A malformed durable row must make the whole webhook RETRYABLE (never a silent downstream drop).
+  const bad = await runD1B(envelope(textMsg()), { storedOver: { sender_hash: "nope" } });
+  assert(bad.r.ok === false && bad.r.code === "inbound_persisted_row_unresolved", "a malformed durable row → retryable");
+  assert(bad.r.result.processed.length === 0, "nothing reaches D2-D from a malformed row");
+});
+
+check("19. persistence failure (and an unresolvable persisted row) is RETRYABLE", async () => {
   const fail = await runD1B(envelope(textMsg()), { failPersist: true });
   assert(fail.r.ok === false && fail.r.code === "inbound_persist_failed", "a real persistence failure → retryable");
   assert(fail.r.result.processed.length === 0, "nothing is handed downstream from a failed persistence");
-  const unresolved = await runD1B(envelope(textMsg()), { resolveInboundRowId: async () => null });
-  assert(unresolved.r.ok === false && unresolved.r.code === "inbound_row_unresolved", "an unresolvable duplicate/row id → retryable");
-  const threw = await runD1B(envelope(textMsg()), { resolveInboundRowId: async () => { throw new Error("db down: SQLSTATE 08006"); } });
-  assert(threw.r.ok === false && threw.r.code === "inbound_row_unresolved", "a THROWN resolver error → retryable, sanitized");
+  const unresolved = await runD1B(envelope(textMsg()), { resolvePersistedInboundContext: async () => null });
+  assert(unresolved.r.ok === false && unresolved.r.code === "inbound_persisted_row_unresolved", "an unresolvable durable row → retryable");
+  const threw = await runD1B(envelope(textMsg()), { resolvePersistedInboundContext: async () => { throw new Error("db down: SQLSTATE 08006"); } });
+  assert(threw.r.ok === false && threw.r.code === "inbound_persisted_row_unresolved", "a THROWN resolver error → retryable, sanitized");
   assert(!safeStringify(threw.r).includes("SQLSTATE"), "no raw db error leaks");
+});
+
+// ============================================================================
+// CORRECTION B — THE PERSISTED ROW OUTRANKS THE REDELIVERY (identity + content)
+// ============================================================================
+check("B3-B5. a REDELIVERY can never overwrite the stored facts (stored STOP + identity A wins over START + identity B)", async () => {
+  const store = new Map();
+
+  // 1) The ORIGINAL delivery: a text command equivalent to STOP, resolving to identity A (an EXACT client).
+  const identityA = { ok: true, identity: { confidence: "exact", principalType: "client", principalId: UUID, candidateCount: 1 } };
+  const original = await runD1B(envelope(textMsg({ text: { body: "STOP" } })), { store, resolveIdentity: async () => identityA });
+  assert(original.r.ok && original.r.result.messagesPersisted === 1, "the original message is persisted");
+  const stored = original.r.result.processed[0];
+  assert(stored.message.contentMinimized.text === "STOP" && stored.receipt.principalId === UUID, "the stored row holds STOP + identity A");
+
+  // 2) The REDELIVERY: the SAME wamid, but now carrying START and resolving to identity B (a vendor).
+  const identityB = { ok: true, identity: { confidence: "exact", principalType: "vendor", principalId: UUID_B, candidateCount: 1 } };
+  const redelivered = await runD1B(envelope(textMsg({ text: { body: "START" } })), { store, resolveIdentity: async () => identityB });
+  assert(redelivered.r.ok && redelivered.r.result.messagesDuplicate === 1, "the redelivery is a duplicate");
+  const dup = redelivered.r.result.processed[0];
+
+  // 3) The downstream candidate MUST still carry the STORED facts — not the redelivery's.
+  assert(dup.receipt.inboundMessageId === stored.receipt.inboundMessageId, "the same durable UUID");
+  assert(dup.message.contentMinimized.text === "STOP", "B4: the STORED content wins — NOT the redelivery's START");
+  assert(dup.message.messageType === "text", "the STORED message type wins");
+  assert(dup.receipt.identityConfidence === "exact" && dup.receipt.principalType === "client" && dup.receipt.principalId === UUID,
+    "B3: the STORED identity A wins — NOT the freshly-resolved identity B");
+  assert(dup.receipt.principalId !== UUID_B, "the redelivery's identity B never leaks downstream");
+  assert(dup.receipt.destinationHash === stored.receipt.destinationHash, "the STORED destination hash wins");
+  assert(dup.receipt.providerOccurredAt === stored.receipt.providerOccurredAt, "the STORED occurrence time wins");
+  assert(dup.receipt.receivedAt === stored.receipt.receivedAt, "the STORED capture time wins");
+
+  // 4) …and what D2-D is actually asked to write is the STORED command, not the redelivered one.
+  const store2 = newWriterStore();
+  const { r } = await runOrch([{ message: dup.message, receipt: dup.receipt }], store2);
+  assert(store2.calls.length === 1 && store2.calls[0].command === "stop", "D2-D is asked to apply the STORED stop, never the redelivered start");
+  assert(store2.calls[0].principal.type === "client" && store2.calls[0].principal.id === UUID, "the STORED principal reaches D2-D");
+  assert(r.ok === true, "handled");
 });
 
 check("ORDER. persistence STRICTLY precedes command processing (D1-B context feeds D2-E)", async () => {
@@ -630,12 +807,16 @@ check("ORDER. persistence STRICTLY precedes command processing (D1-B context fee
   const { store } = await runOrch([{ message, receipt }]);
   assert(store.calls.length === 1 && store.calls[0].inboundMessageId === ROW_UUID, "the persisted row id reaches D2-D");
   assert(store.calls[0].providerMessageId === sha256hex(WAMID_PLAIN), "the hashed identity of the persisted wamid reaches D2-D");
-  // The webhook seam: persistence call precedes the command call in the SOURCE.
+  // The webhook seam: persistence, then the ok-gate, then commands — in that SOURCE order.
   const src = readF(WEBHOOK_SVC_SRC);
   const iPersist = src.indexOf("handleInboundWhatsAppMessages(");
+  const iOkGate = src.indexOf('if (!inbound.ok) return { status: 500');
   const iCommand = src.indexOf("processInboundConsentCommands(");
-  assert(iPersist > 0 && iCommand > 0 && iPersist < iCommand, "the webhook persists BEFORE it processes commands");
-  assert(/if \(!inbound\.ok\) return \{ status: 500[\s\S]{0,900}processInboundConsentCommands\(/.test(src), "commands run only after persistence returned ok");
+  assert(iPersist > 0 && iOkGate > 0 && iCommand > 0, "all three steps are present");
+  assert(iPersist < iOkGate, "the persistence call precedes its ok-gate");
+  assert(iOkGate < iCommand, "commands run ONLY after persistence returned ok (the gate is between them)");
+  // …and nothing re-enters the command path before the gate.
+  assert(src.slice(iPersist, iOkGate).indexOf("processInboundConsentCommands(") === -1, "no command processing before the ok-gate");
 });
 
 // ============================================================================
@@ -855,30 +1036,154 @@ srcMutation("MUT K: the writer is called for a non-exact identity carrying a pri
     return store.calls.length > 0; // a smuggled principal reached the writer
   }));
 
-srcMutation("MUT L: D1-B INVENTS a row id when the unique fence resolves ambiguously", D1B_SRC,
-  "    if (rows.length !== 1) return null;",
-  "    if (rows.length === 0) return null;",
+srcMutation("MUT L: D1-B GUESSES a row when the unique fence resolves to multiple rows", D1B_SRC,
+  "    const rows = (data ?? []) as unknown[];\n    if (rows.length !== 1) return null;",
+  "    const rows = (data ?? []) as unknown[];\n    if (rows.length === 0) return null;",
   () => withMutatedBuild(async (mm) => {
-    const many = await mm.D1B.resolveInboundRowIdViaDb({ provider: "p", provider_message_id: "w" }, fakeClient(() => ({ data: [{ id: ROW_UUID }, { id: ROW_UUID_2 }], error: null })));
-    return many !== null; // it guessed a row instead of failing closed
+    const many = await mm.D1B.resolvePersistedInboundContextViaDb(
+      { provider: "meta_whatsapp_cloud", provider_message_id: WAMID_PLAIN },
+      fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));
+    return many !== null; // it guessed a row instead of failing closed on a violated fence
   }));
 
-srcMutation("MUT M: an unresolvable row id is SWALLOWED instead of failing closed", D1B_SRC,
-  '    if (!rowId) { failureReason = failureReason ?? "inbound_row_unresolved"; continue; }',
-  "    if (!rowId) { continue; }",
+srcMutation("MUT M: an unresolvable durable row is SWALLOWED instead of failing closed", D1B_SRC,
+  '    if (!persistedRow) { failureReason = failureReason ?? "inbound_persisted_row_unresolved"; continue; }',
+  "    if (!persistedRow) { continue; }",
   () => withMutatedBuild(async (mm) => {
-    const { deps } = d1bDeps({ resolveInboundRowId: async () => null });
+    const { deps } = d1bDeps({ resolvePersistedInboundContext: async () => null });
     const payload = envelope(textMsg());
     const r = await mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);
     return r.ok === true; // acknowledged with no downstream context → the command is silently lost
   }));
 
-srcMutation("MUT N: the webhook processes commands BEFORE persistence succeeds", WEBHOOK_SVC_SRC,
+// ---- CORRECTION B: the persisted row must OUTRANK the in-flight redelivery -------------------
+srcMutation("MUT S: duplicate context is rebuilt from the TRANSIENT redelivery (the pre-correction defect)", D1B_SRC,
+  `    processed.push({
+      message: {
+        provider: persistedRow.provider,
+        providerMessageId: persistedRow.providerMessageId,
+        messageType: persistedRow.messageType,
+        contentMinimized: persistedRow.contentMinimized,
+        providerOccurredAt: persistedRow.providerOccurredAt,
+      },
+      receipt: {
+        inboundMessageId: persistedRow.id,
+        provider: persistedRow.provider,
+        providerMessageId: persistedRow.providerMessageId,
+        duplicate: outcome === "duplicate",
+        destinationHash: persistedRow.senderHash,
+        identityConfidence: persistedRow.identityConfidence,
+        principalType: persistedRow.principalType,
+        principalId: persistedRow.principalId,
+        receivedAt: persistedRow.receivedAt,
+        providerOccurredAt: persistedRow.providerOccurredAt,
+      },
+    });`,
+  `    processed.push({
+      message: {
+        provider: row.provider,
+        providerMessageId: row.provider_message_id,
+        messageType: row.message_type,
+        contentMinimized: row.content_minimized,
+        providerOccurredAt: row.provider_occurred_at,
+      },
+      receipt: {
+        inboundMessageId: persistedRow.id,
+        provider: row.provider,
+        providerMessageId: row.provider_message_id,
+        duplicate: outcome === "duplicate",
+        destinationHash: row.sender_hash,
+        identityConfidence: row.identity_confidence,
+        principalType: row.resolved_principal_type,
+        principalId: row.resolved_principal_id,
+        receivedAt: persistedRow.receivedAt,
+        providerOccurredAt: row.provider_occurred_at,
+      },
+    });`,
+  () => withMutatedBuild(async (mm) => {
+    const store = new Map();
+    const idA = { ok: true, identity: { confidence: "exact", principalType: "client", principalId: UUID, candidateCount: 1 } };
+    const idB = { ok: true, identity: { confidence: "exact", principalType: "vendor", principalId: UUID_B, candidateCount: 1 } };
+    const run = async (body, resolveIdentity) => {
+      const { deps } = d1bDeps({ store, resolveIdentity: async () => resolveIdentity });
+      const payload = envelope(textMsg({ text: { body } }));
+      return mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);
+    };
+    await run("STOP", idA);
+    const dup = await run("START", idB);
+    const c = dup.result.processed[0];
+    // The redelivery's START / identity B would now leak downstream instead of the stored STOP / identity A.
+    return c.message.contentMinimized.text === "START" || c.receipt.principalId === UUID_B;
+  }));
+
+// ---- CORRECTION C: the strict calendar validator must not degrade to Date.parse ---------------
+srcMutation("MUT T: the timestamp validator degrades to Date.parse (an impossible date silently ROLLS OVER)", BUILDER_SRC,
+  "export function toStrictIsoInstant(value: unknown): string | null {\n  if (!isStrictRfc3339(value)) return null;\n  const t = Date.parse(value as string);",
+  "export function toStrictIsoInstant(value: unknown): string | null {\n  if (typeof value !== \"string\") return null;\n  const t = Date.parse(value as string);",
+  () => withMutatedBuild(async (mm) => {
+    // 2026-02-31 would be rolled into 3 March instead of falling back to received-at.
+    const rolled = mm.Input.toStrictIsoInstant("2026-02-31T10:30:00Z");
+    return typeof rolled === "string" && rolled.startsWith("2026-03-03");
+  }));
+
+// The explicit range checks and the setUTC ROUND-TRIP are DEFENCE IN DEPTH: either one alone still
+// rejects an impossible calendar value, so a load-bearing mutation must remove BOTH. (That redundancy is
+// the point — a single edit can never re-open the rollover hole.) Each mutation below proves the PAIR.
+const ROUND_TRIP_EDIT = {
+  file: BUILDER_SRC,
+  from: "  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day\n      || d.getUTCHours() !== hour || d.getUTCMinutes() !== minute || d.getUTCSeconds() !== second) return false;",
+  to: "  if (false) return false;",
+};
+
+mutationChecks.push({
+  name: "MUT U: BOTH the calendar-day check AND the round-trip removed (2026-02-31 would roll to 3 March)",
+  kind: "src",
+  edits: [
+    { file: BUILDER_SRC, from: "  if (day < 1 || day > daysInMonth(year, month)) return false;   // 2026-02-31 dies here", to: "  if (day < 1 || day > 31) return false;" },
+    ROUND_TRIP_EDIT,
+  ],
+  scenario: () => withMutatedBuild(async (mm) => {
+    if (mm.Input.isStrictRfc3339("2026-02-31T10:30:00Z") !== true) return false;
+    // …and it would then be silently NORMALIZED into a different real date.
+    return mm.Input.toStrictIsoInstant("2026-02-31T10:30:00Z")?.startsWith("2026-03-03") === true;
+  }),
+});
+
+mutationChecks.push({
+  name: "MUT V: BOTH the time-range check AND the round-trip removed (24:00:00 would roll to the next day)",
+  kind: "src",
+  edits: [
+    { file: BUILDER_SRC, from: "  if (hour > 23 || minute > 59 || second > 59) return false;      // 24:00:00 dies here", to: "  if (hour > 99) return false;" },
+    ROUND_TRIP_EDIT,
+  ],
+  scenario: () => withMutatedBuild(async (mm) => mm.Input.isStrictRfc3339("2026-01-01T24:00:00Z") === true),
+});
+
+// …and each fence ALONE still holds when the other is removed (proving the redundancy is real, not dead).
+srcMutation("MUT U2: the round-trip alone still rejects an impossible date when the day check is removed", BUILDER_SRC,
+  "  if (day < 1 || day > daysInMonth(year, month)) return false;   // 2026-02-31 dies here",
+  "  if (day < 1 || day > 31) return false;",
+  () => withMutatedBuild(async (mm) => mm.Input.isStrictRfc3339("2026-02-31T10:30:00Z") === false));
+
+srcMutation("MUT V2: the day check alone still rejects an impossible date when the round-trip is removed", BUILDER_SRC,
+  ROUND_TRIP_EDIT.from, ROUND_TRIP_EDIT.to,
+  () => withMutatedBuild(async (mm) => mm.Input.isStrictRfc3339("2026-02-31T10:30:00Z") === false
+    && mm.Input.isStrictRfc3339("2026-01-01T24:00:00Z") === false));
+
+srcMutation("MUT W: the UTC-offset range check is removed (+25:00 becomes acceptable)", BUILDER_SRC,
+  "    if (offsetHour > 23 || offsetMinute > 59) return false;       // an invalid offset dies here",
+  "    if (offsetHour > 99) return false;",
+  () => withMutatedBuild(async (mm) => mm.Input.isStrictRfc3339("2026-01-01T10:30:00+25:00") === true));
+
+srcMutation("MUT N: the webhook processes commands BEFORE persistence is confirmed (the ok-gate is removed)", WEBHOOK_SVC_SRC,
   '    if (!inbound.ok) return { status: 500, code: "inbound_processing_failed" };',
   "",
   () => {
     const src = readF(WEBHOOK_SVC_SRC);
-    return !/if \(!inbound\.ok\) return \{ status: 500[\s\S]{0,900}processInboundConsentCommands\(/.test(src);
+    const iOkGate = src.indexOf('if (!inbound.ok) return { status: 500');
+    const iCommand = src.indexOf("processInboundConsentCommands(");
+    // With the gate gone, commands would run on an UNCONFIRMED persistence result.
+    return iOkGate === -1 || iOkGate > iCommand;
   });
 
 srcMutation("MUT O: a retryable command failure no longer 500s the webhook", WEBHOOK_SVC_SRC,

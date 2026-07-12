@@ -79,13 +79,60 @@ export function deriveProviderEventId(providerMessageId: string): string {
 // ----------------------------------------------------------------------------
 // Occurrence time (strict RFC3339, with a documented server-clock fallback)
 // ----------------------------------------------------------------------------
-/** A timezone-qualified RFC3339 instant. Date-only / timezone-less / locale forms never match. */
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+/**
+ * STRICT, timezone-qualified, CALENDAR-VALID RFC3339 — deliberately equivalent to the frozen D2-D
+ * contract, because D2-D re-validates the same thing in TypeScript AND in SQL. Anything this accepts must
+ * be something D2-D will accept; anything it rejects must fall back rather than be smuggled through.
+ *
+ * `Date.parse` alone is NOT sufficient and is never relied upon: it is lenient and will happily ROLL OVER
+ * an impossible calendar date (`2026-02-31T10:30:00Z` → 3 March; `2026-01-01T24:00:00Z` → next midnight).
+ * Normalizing such a value into a DIFFERENT real date would silently rewrite when a consent command
+ * occurred. So the real calendar is checked explicitly, and a `setUTC*` ROUND-TRIP proves no rollover
+ * happened before the value is trusted.
+ */
+const RFC3339_TS = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|([+-])(\d{2}):(\d{2}))$/;
 
-/** Normalize a candidate instant to a strict ISO-8601 UTC string, or null when it is not a real instant. */
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
+  return [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+}
+
+/**
+ * True only for a well-formed, timezone-qualified, real calendar instant. Rejects: a date-only or
+ * timezone-less value, a locale format, an impossible day (`2026-02-31`), an out-of-range time
+ * (`24:00:00`, `:60`), and an out-of-range UTC offset. Pure + total; never throws.
+ */
+export function isStrictRfc3339(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const m = RFC3339_TS.exec(value);
+  if (!m) return false;
+  const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+  const hour = Number(m[4]), minute = Number(m[5]), second = Number(m[6]);
+  if (year < 1 || month < 1 || month > 12) return false;
+  if (day < 1 || day > daysInMonth(year, month)) return false;   // 2026-02-31 dies here
+  if (hour > 23 || minute > 59 || second > 59) return false;      // 24:00:00 dies here
+  const millis = m[7] ? Number((m[7] + "000").slice(0, 3)) : 0;
+  // ROUND-TRIP: prove the components survive unchanged — i.e. nothing silently rolled over.
+  const d = new Date(0);
+  d.setUTCFullYear(year, month - 1, day);
+  d.setUTCHours(hour, minute, second, millis);
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day
+      || d.getUTCHours() !== hour || d.getUTCMinutes() !== minute || d.getUTCSeconds() !== second) return false;
+  if (m[8] !== "Z") {
+    const offsetHour = Number(m[10]), offsetMinute = Number(m[11]);
+    if (offsetHour > 23 || offsetMinute > 59) return false;       // an invalid offset dies here
+  }
+  return true;
+}
+
+/**
+ * Normalize a candidate instant to a strict ISO-8601 UTC string, or null when it is not a REAL instant.
+ * An invalid calendar value is NEVER normalized into another date — it is rejected so the caller falls
+ * back, exactly as if it had been absent.
+ */
 export function toStrictIsoInstant(value: unknown): string | null {
-  if (typeof value !== "string" || !ISO_INSTANT.test(value)) return null;
-  const t = Date.parse(value);
+  if (!isStrictRfc3339(value)) return null;
+  const t = Date.parse(value as string);
   if (!Number.isFinite(t)) return null;
   return new Date(t).toISOString();
 }

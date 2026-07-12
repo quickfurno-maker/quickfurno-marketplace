@@ -76,31 +76,63 @@ D1-B emits per-message context **only after** a row is durably present.
 
 ---
 
-## Persistence receipt contract (D1-B → D2-E)
+## Persistence contract (D1-B → D2-E): **the persisted row is the authority**
 
-`handleInboundWhatsAppMessages` now returns `result.processed: InboundProcessedMessage[]`, one entry per
-durably-stored message (never a rejected one), each pairing the minimized message with:
+`handleInboundWhatsAppMessages` returns `result.processed: InboundProcessedMessage[]`, one entry per
+durably-stored message (never a rejected one). **Every field in it is read back from the persisted
+`communication_inbound_messages` row** — for the insert path *and* the duplicate path alike.
+
+### Why a redelivery can never override the durable row
+
+The unique fence means the **original** row wins. A redelivered envelope is only a *signal to look the row
+up* — it is not a fresh source of truth. If D2-E built its command context from the redelivery's freshly
+normalized message and freshly resolved identity, then a redelivery whose body or identity differed (a
+provider replay quirk, a re-resolved principal, a changed payload) could silently contradict what was
+durably captured. The stored row records what actually arrived; the retry does not get to rewrite it.
+
+So after `persistInboundRow` reports `created` **or** `duplicate`, D1-B re-reads the row through the fence
+`(provider, provider_message_id)` and derives everything downstream from it.
+
+**The two objects it returns are deliberately different in kind:**
+
+| | `message` (`PersistedInboundMessage`) | `receipt` (`InboundPersistenceReceipt`) |
+|---|---|---|
+| Purpose | the **internal, synchronous command candidate** | the sanitized persistence context |
+| Contains the body? | **Yes** — `contentMinimized` carries the stored minimized text, because the command layer must read the token | **No** — body-free |
+| Ever logged / returned to a caller / put in an error? | **Never** | Never |
+
+That distinction matters: the *receipt* is body-free, but the *paired command candidate* does carry the
+minimized text. Both are internal and synchronous. **Public and error outcomes expose neither** — they
+carry only counts, opaque ids and stable sanitized codes.
+
+`receipt` fields (all from the persisted row):
 
 | Field | Meaning |
 |---|---|
-| `inboundMessageId` | the **durable row UUID** — the same id on the insert path and the duplicate path |
-| `provider` / `providerMessageId` | the adapter key + the **original** wamid |
+| `inboundMessageId` | the **durable row UUID** — the same id on the insert and duplicate paths |
+| `provider` / `providerMessageId` | the stored adapter key + the stored **original** wamid |
 | `duplicate` | `false` = freshly inserted, `true` = the row already existed |
-| `destinationHash` | `sha256(canonical E.164)` — **never** a plaintext phone |
-| `identityConfidence` | `exact` / `ambiguous` / `unknown` |
-| `principalType` / `principalId` | populated **only** when the identity is `exact`, else `null` |
-| `receivedAt` | server receive time |
-| `providerOccurredAt` | the provider instant, or `null` |
+| `destinationHash` | the stored `sender_hash` = `sha256(canonical E.164)` — **never** a plaintext phone |
+| `identityConfidence` | the **stored** `exact` / `ambiguous` / `unknown` |
+| `principalType` / `principalId` | the **stored** principal — only when `exact`, else `null` |
+| `receivedAt` | the stored `received_at` — the durable capture time, **not** this request's clock |
+| `providerOccurredAt` | the stored provider instant, or `null` |
 
-It carries **no** plaintext phone, **no** access token, **no** raw webhook payload and **no** message body.
+### Resolver rules
 
-**Duplicate path.** The existing row is resolved through the per-message unique fence
-(`uq_comm_inbound_provider_message`) and its **real** UUID is returned. A UUID is **never invented**: zero
-rows, more than one row (a violated fence), or a database error all resolve to `null`, which becomes a
-**retryable** failure so the webhook returns 500 and a retry can resolve it correctly.
+The resolver (`resolvePersistedInboundContextViaDb`) uses **equality filters only** on the unique fence,
+**preserves cardinality** (no `.single()`, no `.maybeSingle()`, no `.limit()` — an impossible multi-row
+result must be *visible*, not silently collapsed), and **validates the row before trusting it**: UUID
+shape, fence match, lowercase `HEX64` sender hash, closed identity confidence, the complete
+exact⟺principal invariant, a usable `message_type`, a non-array object `content_minimized`, and
+string-or-null timestamps.
 
-**D1-B stays consent-agnostic** — no consent import, no writer import, no STOP/START/HELP literal, no
-command decision logic. It captures; it does not interpret.
+**Nothing is ever invented.** Zero rows, multiple rows, a malformed row, or a database error all yield
+`null` → `inbound_persisted_row_unresolved` → a **retryable** 500. A malformed durable row is *not
+evidence* and is never repaired, partially accepted, or substituted with the in-flight values.
+
+**D1-B stays consent-agnostic** — no consent import, no writer/orchestrator import, no STOP/START/HELP
+literal, no command interpretation. It captures and reports; it does not interpret.
 
 ---
 
@@ -146,17 +178,40 @@ providerMessageId = sha256(original wamid)   → lowercase hex, exactly 64 chara
 
 ---
 
-## Timestamp fallback
+## Timestamp handling: strict, calendar-valid RFC3339
 
 `providerOccurredAt` is nullable (Meta may omit or garble `timestamp`), but D2-D **requires** a strict
 timezone-qualified RFC3339 instant.
 
 ```
-occurredAt = valid provider instant   ?? server receivedAt
+occurredAt = valid persisted provider occurrence instant
+          ?? valid persisted received-at instant
 ```
 
-Output is always strict RFC3339 via ISO formatting. If **both** are unusable the build fails closed — an
-instant is never fabricated.
+Both candidates come from the **persisted row**. Output is always strict RFC3339 via ISO formatting. If
+**both** are unusable the build fails closed with the existing sanitized deterministic outcome
+(`input_not_buildable`) — an instant is never fabricated.
+
+### Why `Date.parse` alone is not enough
+
+`Date.parse` is lenient and will happily **roll an impossible date over into a different real one**:
+
+- `2026-02-31T10:30:00Z` → silently becomes **3 March**
+- `2026-01-01T24:00:00Z` → silently becomes the **next midnight**
+
+Normalizing such a value would **silently rewrite when a consent command occurred**. So validation is a
+strict, calendar-valid, timezone-qualified check equivalent to the frozen D2-D contract: explicit month /
+day-in-month (leap-year aware) / hour / minute / second / UTC-offset range checks, **plus** a `setUTC*`
+**round-trip** proving no rollover happened. These two fences are **defence in depth** — either alone
+still rejects an impossible value, so no single edit can re-open the hole (the mutation suite proves both
+the pair *and* each fence individually).
+
+Rejected → **falls back** to received-at, exactly as if the value had been absent. It is **never**
+normalized into another date.
+
+Rejected forms include: `2026-02-31T10:30:00Z`, `2027-02-29T00:00:00Z`, `2026-01-01T24:00:00Z`,
+`10:60:00`, `:60` seconds, `+25:00` / `+05:99` offsets, timezone-less values, date-only values, and locale
+formats.
 
 Dropping a STOP is far worse than an approximate occurrence time, so the fallback is deliberate. It is
 also **replay-safe**: D2-D's replay/conflict binding is
@@ -190,8 +245,17 @@ writer, the RPC, or any projection table.
 Duplicate inbound messages are **deliberately re-processed**. A first attempt may have persisted the row
 and *then* failed the command write; skipping duplicates would lose that command forever.
 
-Re-processing is safe by construction: the provider-event identity is deterministic, so D2-D's receipt
-returns the **original stored outcome** with `replayed: true` and applies **no second effect**.
+Re-processing is safe by construction, and now safe in a second way too:
+
+1. **The command context comes from the stored row**, so a redelivery re-processes *the original message's
+   facts* — the stored command token, message type, destination hash, identity and principal — never the
+   redelivery's own. See "the persisted row is the authority" above.
+2. **The provider-event identity is deterministic** (`sha256(wamid)`), so D2-D's receipt returns the
+   **original stored outcome** with `replayed: true` and applies **no second effect**.
+
+The worked case the tests pin: the stored row holds **STOP** with identity **A**; a redelivery of the same
+wamid arrives carrying **START** and resolves to identity **B**. The downstream candidate still carries
+**STOP and identity A**, and that is what D2-D is asked to apply. Identity B never leaves D1-B.
 
 ---
 
@@ -255,6 +319,44 @@ Because the provider-event identity is deterministic, a revert followed by a lat
 double-apply: the existing D2-D receipts turn every re-delivered command into a replay.
 
 ---
+
+## Correction tests
+
+The correctness corrections above are pinned by functional **and** load-bearing mutation tests:
+
+**Persisted-row authority**
+- the insert path resolves its context from the stored row (not the in-flight object);
+- the duplicate path returns the **same** durable UUID;
+- **stored STOP + identity A beats a redelivered START + identity B** — content, message type, destination
+  hash, identity, principal and both timestamps all come from the stored row, and what D2-D is asked to
+  apply is the stored `stop`;
+- a mutation that **restores the pre-correction behaviour** — rebuilding duplicate context from the
+  transient redelivery — makes the suite fail;
+- zero rows / multiple rows / a malformed row / a database error stay **retryable** and never reach D2-D;
+- a mutation that lets the resolver *guess* a row on a violated fence fails;
+- a mutation that *swallows* an unresolvable row instead of failing closed fails.
+
+**Strict timestamps**
+- every impossible calendar / range / offset value is rejected and **falls back** to received-at, and is
+  never normalized into another date (the `2026-02-31 → 3 March` rollover is asserted explicitly);
+- a mutation degrading the validator to `Date.parse` fails;
+- mutations removing **both** the explicit range check and the round-trip fail, *and* mutations removing
+  either fence alone prove the other still holds.
+
+## Historical range — not frozen yet
+
+The D2-E scope check deliberately measures the **live** delta (`D2E_BASE..HEAD` ∪ worktree), because D2-E
+is still in flight: **the audited implementation SHA does not exist until this correction is committed**,
+so no head SHA is hardcoded and none is guessed.
+
+**After** the corrected implementation commit is pushed and independently audited, a **separate
+harness/docs-only commit** will:
+
+1. freeze `D2E_BASE..CORRECTED_D2E_HEAD` as the audited historical range; and
+2. separate that frozen historical scope from current-worktree protection —
+
+exactly as the D2-D post-merge stabilization did, so that a later phase (and the PR merge commit) cannot
+re-open this audit.
 
 ## Phase scope (exactly seven files)
 

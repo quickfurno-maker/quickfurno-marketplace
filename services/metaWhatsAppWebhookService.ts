@@ -4,13 +4,24 @@
 // Orchestrates the Meta WhatsApp Cloud webhook in a strict FAIL-CLOSED order:
 //   signature header → server config → raw-body signature verification →
 //   runtime webhook-processing gate → JSON parse → classification →
-//   (delivery) CommunicationService lifecycle | (known non-delivery) safe ack.
+//   (delivery) CommunicationService lifecycle | (inbound) persist then process |
+//   (known non-delivery) safe ack.
+//
+// INBOUND MESSAGES (Phase 5F-D1-B → 5F-D2-E). An inbound payload is no longer merely
+// acknowledged. It is:
+//   1. durably PERSISTED FIRST by D1-B (the row is the provider-event record of record);
+//   2. then handed to the D2-E orchestrator, which interprets ONLY a complete TEXT command
+//      token (STOP / START / HELP); HELP, unsupported text and non-text never reach a writer.
+//   3. D2-D remains the SOLE writer of STOP/START consent state, behind that orchestrator.
+// This service holds NO consent policy, performs NO consent mutation, calls NO RPC, never
+// imports the D2-D writer, and never consults D2-C (send authorization is not a concern here).
+// It SENDS NOTHING — not even a HELP acknowledgement — and touches no n8n and no Jarvis.
 //
 // Never logs raw body / phone / WhatsApp id / token / signature / App Secret /
-// message content. JSON is NEVER parsed before the signature is verified. Inbound /
-// template / account payloads are classified and acknowledged only — no lifecycle
-// mutation, no outbound send, no n8n, no Jarvis. Delivery de-duplication + forward-
-// only lifecycle are reused from CommunicationService (Phase 5B protections).
+// message content. JSON is NEVER parsed before the signature is verified. Template /
+// account payloads are classified and acknowledged only — no lifecycle mutation, no
+// outbound send, no n8n, no Jarvis. Delivery de-duplication + forward-only lifecycle are
+// reused from CommunicationService (Phase 5B protections).
 // ============================================================================
 
 import { adminClient } from "../lib/supabase";
@@ -140,23 +151,25 @@ export async function handleMetaWhatsAppWebhookPost(input: {
   }
 
   if (classification === MetaWebhookClassification.INBOUND_MESSAGE) {
-    // Phase 5F-D1-B: the ALREADY-VERIFIED inbound payload is durably CAPTURED (normalize →
-    // resolve identity → persist minimized rows, idempotent on the provider message id). NO
-    // reply, NO consent mutation, NO STOP/START/HELP handling, NO domain event, NO outbox, NO
-    // n8n, NO Jarvis/AI, NO conversation/24h-window. On a real persistence failure the webhook
-    // returns 500 so Meta retries (a retry makes progress via the per-message unique fence); a
-    // deterministic all-rejected batch is acknowledged so Meta does not retry forever.
+    // Phase 5F-D1-B — PERSIST FIRST. The already-verified payload is durably CAPTURED (normalize →
+    // resolve identity → persist minimized rows, idempotent on the provider message id). A real
+    // persistence failure returns 500 so Meta retries (the per-message unique fence makes a retry make
+    // progress); a deterministic all-rejected batch is acknowledged so Meta does not retry forever.
     const inbound = await handleInboundWhatsAppMessages({ rawBody: input.rawBody, payload });
     if (!inbound.ok) return { status: 500, code: "inbound_processing_failed" };
 
-    // Phase 5F-D2-E: persistence has ALREADY succeeded, so a durable inbound row exists for every message
-    // below. Command processing now runs SYNCHRONOUSLY over the SANITIZED per-message context D1-B
-    // returned — this webhook re-reads no raw body, holds no policy, mutates nothing, and sends nothing.
-    // It knows only the orchestrator; the writer, the RPC and the policy stay behind that boundary.
-    // A RETRYABLE command failure → 500 → Meta retries the whole verified path, which is convergent:
-    // D1-B's per-message unique fence makes re-persistence idempotent and D2-D's receipt makes the
-    // re-write a replay. DETERMINISTIC outcomes (help / unsupported / non-text / a rejected or
-    // conflicting command) are ACKNOWLEDGED below — the persisted row is their durable record.
+    // Phase 5F-D2-E — THEN INTERPRET. Persistence has already succeeded, so a durable row exists for
+    // every message below, and `processed` is derived from those PERSISTED rows (never from this
+    // request's transient normalization — a redelivery must never overwrite the stored record).
+    //
+    // Command processing runs SYNCHRONOUSLY here. This webhook re-reads no raw body, holds no consent
+    // policy, mutates no consent state, calls no RPC, and sends nothing. It knows ONLY the orchestrator;
+    // the D2-D writer, the RPC and the policy all stay behind that boundary, and D2-C is never consulted.
+    //
+    // A RETRYABLE command failure → 500 → Meta retries the whole verified path, which is CONVERGENT:
+    // D1-B's unique fence makes re-persistence idempotent and D2-D's receipt makes the re-write a replay.
+    // DETERMINISTIC outcomes (HELP / unsupported / non-text / a rejected or conflicting command) are
+    // ACKNOWLEDGED below — the persisted row is their durable record, and retrying could never help.
     const commands = await processInboundConsentCommands(inbound.result.processed);
     if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };
 

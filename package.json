@@ -33,6 +33,7 @@
     "test:phase5f:d1a": "node scripts/phase5f-d1a-whatsapp-inbound-foundation-harness.mjs",
     "test:phase5f:d1b": "node scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
     "test:phase5f:d2b": "node scripts/phase5f-d2b-consent-evidence-schema-harness.mjs",
+    "test:phase5f:d2c": "node scripts/phase5f-d2c-consent-decision-authority-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",

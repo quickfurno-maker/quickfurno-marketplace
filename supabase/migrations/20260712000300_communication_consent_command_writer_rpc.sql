@@ -74,37 +74,45 @@ language sql
 immutable
 parallel safe
 as $v$
+  -- EXPLICIT type guard FIRST (a CASE, not `and`): every accessor below is evaluated ONLY for a JSON
+  -- object. A non-object (SQL NULL, JSON null / array / string / number / boolean) resolves to false
+  -- STRUCTURALLY — never by relying on boolean evaluation order.
   select coalesce(
-    -- each item is an OBJECT bound to its REQUIRED scope (index 0 marketing, index 1 transactional)
-    jsonb_typeof(p_item) = 'object'
-    and (p_item ->> 'scope') = p_scope
-    -- outcome belongs to the CLOSED vocabulary (mirrors ConsentScopeOutcome exactly)
-    and (p_item ->> 'outcome') in (
-          'suppression_created', 'user_stop_already_active', 'stronger_suppression_preserved',
-          'user_stop_reversed', 'no_reversible_user_stop')
-    -- both id keys MUST be present and be a JSON string or JSON null (a missing key yields SQL NULL
-    -- from `->`, so jsonb_typeof is NULL and the `in` test is NULL → coalesced to false below)
-    and jsonb_typeof(p_item -> 'event_id') in ('string', 'null')
-    and jsonb_typeof(p_item -> 'suppression_id') in ('string', 'null')
-    -- a present id MUST be a canonical UUID string (never an arbitrary/free-form string)
-    and (jsonb_typeof(p_item -> 'event_id') = 'null'
-         or (p_item ->> 'event_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
-    and (jsonb_typeof(p_item -> 'suppression_id') = 'null'
-         or (p_item ->> 'suppression_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
-    -- outcome ⟷ id consistency: a contradictory receipt is NOT replayable evidence
-    and case p_item ->> 'outcome'
-          when 'suppression_created'            then jsonb_typeof(p_item -> 'event_id') = 'string'
-                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
-          when 'user_stop_reversed'             then jsonb_typeof(p_item -> 'event_id') = 'string'
-                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
-          when 'user_stop_already_active'       then jsonb_typeof(p_item -> 'event_id') = 'null'
-                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
-          when 'stronger_suppression_preserved' then jsonb_typeof(p_item -> 'event_id') = 'null'
-                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'
-          when 'no_reversible_user_stop'        then jsonb_typeof(p_item -> 'event_id') = 'null'
-                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'null'
-          else false
-        end,
+    case jsonb_typeof(p_item)
+      when 'object' then
+        -- the item is bound POSITIONALLY to its REQUIRED scope (index 0 marketing, index 1 transactional)
+        (p_item ->> 'scope') = p_scope
+        -- outcome belongs to the CLOSED vocabulary (mirrors ConsentScopeOutcome exactly)
+        and (p_item ->> 'outcome') in (
+              'suppression_created', 'user_stop_already_active', 'stronger_suppression_preserved',
+              'user_stop_reversed', 'no_reversible_user_stop')
+        -- both id keys MUST be present and be a JSON string or JSON null (a missing key yields SQL NULL
+        -- from `->`, so jsonb_typeof is NULL and the `in` test is NULL → coalesced to false below)
+        and jsonb_typeof(p_item -> 'event_id') in ('string', 'null')
+        and jsonb_typeof(p_item -> 'suppression_id') in ('string', 'null')
+        -- a present id MUST be a canonical UUID string (never an arbitrary/free-form string)
+        and (jsonb_typeof(p_item -> 'event_id') = 'null'
+             or (p_item ->> 'event_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+        and (jsonb_typeof(p_item -> 'suppression_id') = 'null'
+             or (p_item ->> 'suppression_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+        -- outcome ⟷ id consistency: a contradictory receipt is NOT replayable evidence
+        and case p_item ->> 'outcome'
+              when 'suppression_created'            then jsonb_typeof(p_item -> 'event_id') = 'string'
+                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+              when 'user_stop_reversed'             then jsonb_typeof(p_item -> 'event_id') = 'string'
+                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+              when 'user_stop_already_active'       then jsonb_typeof(p_item -> 'event_id') = 'null'
+                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+              when 'stronger_suppression_preserved' then jsonb_typeof(p_item -> 'event_id') = 'null'
+                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'string'
+              when 'no_reversible_user_stop'        then jsonb_typeof(p_item -> 'event_id') = 'null'
+                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'null'
+              else false
+            end
+      else false
+    end,
+    -- inside the object branch a missing key still yields SQL NULL (`->>`), and a NULL is NOT false —
+    -- `if not NULL` would fall through — so the whole expression is coalesced to false here.
     false)
 $v$;
 
@@ -115,11 +123,23 @@ language sql
 immutable
 parallel safe
 as $v$
+  -- EXPLICIT type guard, NOT boolean evaluation order. jsonb_array_length RAISES on a non-array, and
+  -- SQL does NOT guarantee that `and` short-circuits left-to-right (the planner may reorder a cheap
+  -- clause ahead of the typeof test), so a `jsonb_typeof(...) = 'array' and jsonb_array_length(...)`
+  -- chain could still raise on a JSON object/string/number/boolean. A CASE fixes the evaluation order:
+  -- jsonb_array_length is reachable ONLY from inside the 'array' branch. Everything else — SQL NULL
+  -- (jsonb_typeof → NULL, matching no WHEN), JSON null, object, string, number, boolean, and an array
+  -- whose length is not exactly 2 — returns false rather than raising.
   select coalesce(
-    jsonb_typeof(p_results) = 'array'
-    and jsonb_array_length(p_results) = 2
-    and public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')
-    and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional'),
+    case jsonb_typeof(p_results)
+      when 'array' then
+        case when jsonb_array_length(p_results) = 2
+               then public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')
+                and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional')
+             else false
+        end
+      else false
+    end,
     false)
 $v$;
 

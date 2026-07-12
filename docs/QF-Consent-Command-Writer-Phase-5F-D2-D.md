@@ -164,8 +164,24 @@ null** (key present); and **outcome ⟷ id consistency** —
 
 Anything duplicated, out of order, malformed or contradictory → `WRITER_INTEGRITY_VIOLATION`, and the
 command is **not** re-applied. The validators `coalesce` to **false, never NULL** (a NULL is not false —
-`if not NULL` would fall through and let a malformed receipt replay). The TypeScript `normalizeRpcResult`
-layer re-checks the same contract independently: **neither layer relies on the other.**
+`if not NULL` would fall through and let a malformed receipt replay).
+
+**Fail-closed type guard.** `jsonb_array_length` **raises** on a non-array, and SQL does **not** guarantee
+that `and` short-circuits left to right (the planner may hoist a cheap clause ahead of the `jsonb_typeof`
+test). Both validators therefore lead with an explicit **`CASE jsonb_typeof(...)`** — never boolean
+evaluation order — so `jsonb_array_length` is reachable *only* from inside the `'array'` branch. SQL NULL
+and every non-conforming JSON type (`null`, object, string, number, boolean) and any array whose length is
+not exactly two **return false rather than raising**.
+
+**The TypeScript boundary is an independent fence, not a mirror.** `normalizeRpcResult` additionally
+requires each scope result to carry its id fields **explicitly present** (`event_id`/`eventId` and
+`suppression_id`/`suppressionId`): an **absent key is never silently coerced to `null`**, because a
+truncated row would otherwise masquerade as a legitimate "no id for this outcome" result and slip through
+the outcome⟷id consistency check. An **explicit `null` remains valid** where the outcome permits it, a
+present value must be a UUID, and if **both aliases are present they must carry the same value** — a row
+that disagrees with itself is not trustworthy evidence. Output stays sanitized: only `scope`, `outcome`,
+`eventId` and `suppressionId` are copied, so no raw row or unexpected property ever passes through.
+**Neither layer relies on the other.**
 
 ## Effective-activity expiry
 
@@ -231,9 +247,26 @@ webhook. Integration happens only after the **D2-E** checkpoint. Meta remains di
 ## Migration-history drift (review-only migration)
 
 The live consent schema was applied **manually** and recent migration files are not registered in
-`supabase_migrations.schema_migrations` (known drift). The D2-D migration is **additive** (one
-`create or replace function` + grants; no table/column/enum/index change, no DELETE/TRUNCATE, no
-history rewrite) and is prepared for **review only** — it is **not auto-applied**. D2-D does **not**
-run `supabase db push` / `migration up` / `migration repair` / `db reset` and does **not apply** the
+`supabase_migrations.schema_migrations` (known drift).
+
+The D2-D migration `20260712000300_communication_consent_command_writer_rpc.sql` is **strictly additive**.
+It adds exactly:
+
+| # | Object | Kind |
+|---|---|---|
+| 1 | `public.communication_consent_command_receipts` | **one new** processing/idempotency **receipt table** (service-role only, RLS enabled, `select`/`insert` only) |
+| 2 | `public.communication_consent_receipt_scope_result_valid(jsonb, text)` and `public.communication_consent_receipt_results_valid(jsonb)` | **two new IMMUTABLE** receipt-result **validator functions** (pure; no table access) |
+| 3 | `public.apply_communication_consent_command(...)` | **one new SECURITY DEFINER** transactional **writer RPC** |
+
+plus the receipt's `ck_consent_command_receipt_scope_results` CHECK constraint, its unique idempotency
+key, and the grants/revokes for the above.
+
+It **does not alter any pre-existing consent table, column, enum or index** — `communication_consent_events`,
+`communication_suppressions` and `communication_preferences` are untouched by DDL. There is no
+`DELETE`/`TRUNCATE`, no evidence `UPDATE`/`DELETE`, no trigger, no dynamic SQL, and no history rewrite.
+(`create table if not exists` + `create or replace function` make it idempotent and non-destructive.)
+
+The migration is prepared for **review only** — it is **not auto-applied**. D2-D does **not** run
+`supabase db push` / `migration up` / `migration repair` / `db reset` and does **not apply** the
 migration; eventual application is a reviewed, manual, single-transaction step with an explicit
 migration-history reconciliation plan.

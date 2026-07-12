@@ -100,13 +100,18 @@ const D2D_EXPECTED_FILES = [
   "supabase/migrations/20260712000300_communication_consent_command_writer_rpc.sql",
 ];
 
-function validateD2DHistoricalDelta(files, parent) {
+/**
+ * Validate a CUMULATIVE D2-D file set (base..HEAD, plus any uncommitted worktree files). `baseIsAncestor`
+ * proves the delta is measured from the real D2-D base — a rebase/force-push that detaches the base makes
+ * the whole scope claim meaningless, so it is a scope violation, not a warning.
+ */
+function validateD2DScope(files, baseIsAncestor) {
   const problems = [];
+  if (!baseIsAncestor) problems.push(`the D2-D base ${D2D_BASE} is not an ancestor of HEAD — the cumulative delta is not measurable`);
   const set = new Set(files);
   if (files.length !== D2D_EXPECTED_FILES.length) problems.push(`expected ${D2D_EXPECTED_FILES.length} files, got ${files.length} [${files.join(", ")}]`);
   for (const f of D2D_EXPECTED_FILES) if (!set.has(f)) problems.push(`missing approved D2-D file: ${f}`);
-  for (const f of files) if (!D2D_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the D2-D delta: ${f}`);
-  if (parent !== D2D_BASE) problems.push(`expected parent ${D2D_BASE}, got ${parent}`);
+  for (const f of files) if (!D2D_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the cumulative D2-D delta: ${f}`);
   for (const f of files) {
     if (/(^|\/)\.env(\.|$)/.test(f)) problems.push(`D2-D must change no env file: ${f}`);
     if (/(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(f)) problems.push(`D2-D must change no lockfile: ${f}`);
@@ -121,16 +126,25 @@ function validateD2DHistoricalDelta(files, parent) {
 }
 
 function headSha() { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); }
-function d2dHistoricalCommit() {
-  const revs = execFileSync("git", ["rev-list", "--first-parent", "--ancestry-path", `${D2D_BASE}..HEAD`], { encoding: "utf8" })
-    .split("\n").map((s) => s.trim()).filter(Boolean);
-  if (revs.length === 0) throw new Error("D2-D historical commit unresolvable: HEAD is not ahead of the D2-D base on the first-parent chain");
-  const commit = revs[revs.length - 1];
-  const parent = execFileSync("git", ["rev-parse", `${commit}^`], { encoding: "utf8" }).trim();
-  const files = execFileSync("git", ["diff-tree", "--no-commit-id", "--name-only", "-r", commit], { encoding: "utf8" })
-    .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
-  const message = execFileSync("git", ["log", "-1", "--format=%s", commit], { encoding: "utf8" }).trim();
-  return { commit, parent, files, message };
+const gitFiles = (args) => execFileSync("git", args, { encoding: "utf8" })
+  .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
+
+/**
+ * The REAL cumulative D2-D delta: every file changed by base..HEAD (ALL correction commits, not just the
+ * first one — a seventh file smuggled into a later correction commit MUST be caught), unioned with the
+ * uncommitted worktree so an in-flight correction cannot escape the approved six either.
+ */
+function d2dCumulativeDelta() {
+  let baseIsAncestor = true;
+  try { execFileSync("git", ["merge-base", "--is-ancestor", D2D_BASE, "HEAD"], { stdio: "pipe" }); }
+  catch { baseIsAncestor = false; }
+  const commits = baseIsAncestor ? gitFiles(["rev-list", `${D2D_BASE}..HEAD`]) : [];
+  const messages = commits.map((c) => execFileSync("git", ["log", "-1", "--format=%s", c], { encoding: "utf8" }).trim());
+  const cumulative = baseIsAncestor ? gitFiles(["diff", "--name-only", `${D2D_BASE}..HEAD`]) : [];
+  // Per-commit deltas — used to PROVE the cumulative list is not merely the first commit's file list.
+  const perCommit = commits.map((c) => gitFiles(["diff-tree", "--no-commit-id", "--name-only", "-r", c]));
+  const union = [...new Set([...cumulative, ...gitDirty()])];
+  return { baseIsAncestor, commits, messages, cumulative, perCommit, union };
 }
 
 const checks = [];
@@ -295,6 +309,7 @@ function simApplyRawJson(store, a) {
 const HASH = "a".repeat(64);
 const HASH_B = "b".repeat(64);
 const UUID = "11111111-2222-4333-8444-555555555555";
+const UUID_B = "99999999-8888-4777-8666-555555555555"; // a DIFFERENT valid UUID (alias-conflict fixture)
 const OCCURRED = "2026-07-11T10:30:00.000Z";
 const NOW = () => new Date("2026-07-12T00:00:00.000Z");
 const EXPIRED = "2026-06-01T00:00:00.000Z"; // before NOW → expired
@@ -644,6 +659,33 @@ check("47. normalizeRpcResult: strict two-scope shape + outcome/id consistency",
   assert(N(null).code === "WRITER_INTEGRITY_VIOLATION", "null");
   assert(N({ ok: false, code: "WRITER_CONFLICT" }).code === "WRITER_CONFLICT", "conflict preserved");
   assert(N({ ok: false, code: "haxx" }).code === "WRITER_INTEGRITY_VIOLATION", "unknown code → integrity");
+
+  // ---- ID-KEY PRESENCE (an ABSENT key is NOT an explicit null) ----------------------------------
+  const T_NULL = { scope: "transactional", outcome: "no_reversible_user_stop", event_id: null, suppression_id: null };
+  const two = (m) => ({ ok: true, replayed: false, scope_results: [m, T_NULL] });
+  // absent event_id / suppression_id key — even for an outcome whose ids are BOTH null — is rejected:
+  // a truncated row must never masquerade as a legitimate "no id for this outcome" result.
+  assert(N(two({ scope: "marketing", outcome: "no_reversible_user_stop", suppression_id: null })).code === "WRITER_INTEGRITY_VIOLATION", "absent event_id key");
+  assert(N(two({ scope: "marketing", outcome: "no_reversible_user_stop", event_id: null })).code === "WRITER_INTEGRITY_VIOLATION", "absent suppression_id key");
+  assert(N(two({ scope: "marketing", outcome: "no_reversible_user_stop" })).code === "WRITER_INTEGRITY_VIOLATION", "both id keys absent");
+  assert(N({ ok: true, replayed: false, scope_results: [
+    { scope: "marketing", outcome: "no_reversible_user_stop", event_id: null, suppression_id: null },
+    { scope: "transactional", outcome: "no_reversible_user_stop", suppression_id: null }] }).code === "WRITER_INTEGRITY_VIOLATION", "absent key in the SECOND scope too");
+  // explicit null REMAINS valid where the outcome permits null
+  assert(N(two({ scope: "marketing", outcome: "no_reversible_user_stop", event_id: null, suppression_id: null })).ok === true, "explicit null valid for no_reversible_user_stop");
+  assert(N(two({ scope: "marketing", outcome: "user_stop_already_active", event_id: null, suppression_id: UUID })).ok === true, "explicit null eventId valid for already_active");
+  // ---- ALIAS CONSISTENCY (camelCase + snake_case must agree) ------------------------------------
+  assert(N(two({ scope: "marketing", outcome: "suppression_created", event_id: UUID, eventId: UUID, suppression_id: UUID, suppressionId: UUID })).ok === true, "matching aliases accepted");
+  assert(N(two({ scope: "marketing", outcome: "suppression_created", event_id: UUID, eventId: UUID_B, suppression_id: UUID, suppressionId: UUID })).code === "WRITER_INTEGRITY_VIOLATION", "conflicting event_id aliases");
+  assert(N(two({ scope: "marketing", outcome: "suppression_created", event_id: UUID, suppression_id: UUID, suppressionId: UUID_B })).code === "WRITER_INTEGRITY_VIOLATION", "conflicting suppression_id aliases");
+  assert(N(two({ scope: "marketing", outcome: "user_stop_already_active", event_id: null, eventId: UUID, suppression_id: UUID })).code === "WRITER_INTEGRITY_VIOLATION", "null vs UUID aliases conflict");
+  // camelCase ALONE is accepted (the alias exists) — presence, not naming, is what is enforced
+  assert(N(two({ scope: "marketing", outcome: "suppression_created", eventId: UUID, suppressionId: UUID })).ok === true, "camelCase-only aliases accepted");
+  // ---- the sanitized output contract is preserved: ONLY the four allowlisted fields survive -------
+  const clean = N(two({ scope: "marketing", outcome: "suppression_created", event_id: UUID, suppression_id: UUID, raw_row: { phone: "+919999999999" }, sql: "boom" }));
+  assert(clean.ok === true, "extra properties do not break normalization");
+  assert(JSON.stringify(clean.scopeResults[0]) === JSON.stringify({ scope: "marketing", outcome: "suppression_created", eventId: UUID, suppressionId: UUID }), "only allowlisted fields are copied");
+  assert(!safeStringify(clean).includes("919999999999") && !safeStringify(clean).includes("boom"), "no raw row / unexpected property leaks");
 });
 check("48. direct RPC: arbitrary provider rejected", () => {
   const base = { p_policy_version: "qf-consent-v1", p_channel: "whatsapp", p_command: "stop", p_destination_hash: HASH,
@@ -757,8 +799,27 @@ check("61. malformed two-item receipt → WRITER_INTEGRITY_VIOLATION", async () 
     ["scope_results not an array", (r) => { r.scope_results = { scope: "marketing" }; }],
     ["scope_results is null", (r) => { r.scope_results = null; }],
     ["three items", (r) => { r.scope_results = [...r.scope_results, r.scope_results[1]]; }],
+    ["one item", (r) => { r.scope_results = [r.scope_results[0]]; }],
+    ["empty array", (r) => { r.scope_results = []; }],
+    ["scope_results is a JSON string", (r) => { r.scope_results = "marketing"; }],
+    ["scope_results is a JSON number", (r) => { r.scope_results = 2; }],
+    ["scope_results is a JSON boolean", (r) => { r.scope_results = true; }],
   ];
   for (const [name, mutate] of malformed) integrity(await redeliverWithReceipt(mutate), name);
+
+  // The validator is FAIL-CLOSED for EVERY JSON type: it returns false — it never throws (in SQL,
+  // jsonb_array_length RAISES on a non-array, which is why the type guard is a CASE, not an `and`).
+  for (const v of [null, undefined, {}, { a: 1 }, "str", "", 0, 2, 42, true, false, [], [1], [1, 2, 3], [{}, {}]]) {
+    let out;
+    try { out = simReceiptResultsValid(v); }
+    catch (e) { throw new Error(`the validator must not throw on ${safeStringify(v)} (it threw ${e.message})`); }
+    assert(out === false, `non-conforming JSON must return exactly false, not ${safeStringify(out)} (input ${safeStringify(v)})`);
+  }
+  // ...and a well-formed two-item array still returns exactly true.
+  assert(simReceiptResultsValid([
+    { scope: "marketing", outcome: "suppression_created", event_id: UUID, suppression_id: UUID },
+    { scope: "transactional", outcome: "no_reversible_user_stop", event_id: null, suppression_id: null },
+  ]) === true, "a well-formed receipt result still validates");
 });
 check("62. a corrupted receipt NEVER replays and NEVER re-applies the command (fail closed, no mutation)", async () => {
   const store = newStore(); const inp = input("stop");
@@ -841,10 +902,17 @@ check("64. SQL: stored scope_results are FULLY validated in SQL before replay (n
   const sql = sqlCode();
   has(/create or replace function public\.communication_consent_receipt_results_valid\(p_results jsonb\)/i, sql, "the results validator exists");
   has(/create or replace function public\.communication_consent_receipt_scope_result_valid\(/i, sql, "the per-item validator exists");
-  has(/jsonb_typeof\(p_results\)\s*=\s*'array'\s*and\s+jsonb_array_length\(p_results\)\s*=\s*2/i, sql, "JSON array with EXACTLY two items");
+  // FAIL-CLOSED TYPE GUARD: jsonb_array_length RAISES on a non-array, and SQL does not guarantee that
+  // `and` short-circuits — so the guard MUST be an explicit CASE, never boolean evaluation order.
+  has(/case jsonb_typeof\(p_results\)\s*when 'array' then/i, sql, "explicit CASE type guard on the results value");
+  hasNot(/jsonb_typeof\(p_results\)\s*=\s*'array'\s*and\s+jsonb_array_length/i, sql, "never relies on `and` short-circuiting to protect jsonb_array_length");
+  has(/case when jsonb_array_length\(p_results\) = 2/i, sql, "the length test lives INSIDE the array branch");
+  assert(sql.indexOf("when 'array' then") < sql.indexOf("jsonb_array_length("), "jsonb_array_length is reachable only from the 'array' branch");
+  assert((sql.match(/jsonb_array_length\(/g) || []).length === 1, "jsonb_array_length is called exactly once (only under the guard)");
+  has(/when 'array' then[\s\S]{0,320}?else false\s*end/i, sql, "a non-array JSON value (null/object/string/number/boolean) and SQL NULL → false");
   has(/communication_consent_receipt_scope_result_valid\(p_results\s*->\s*0,\s*'marketing'\)/i, sql, "item 0 scope = marketing");
   has(/communication_consent_receipt_scope_result_valid\(p_results\s*->\s*1,\s*'transactional'\)/i, sql, "item 1 scope = transactional");
-  has(/jsonb_typeof\(p_item\)\s*=\s*'object'/i, sql, "each item is an object");
+  has(/case jsonb_typeof\(p_item\)\s*when 'object' then/i, sql, "each item is guarded to a JSON object by an explicit CASE");
   has(/\(p_item\s*->>\s*'outcome'\)\s*in\s*\(\s*'suppression_created',\s*'user_stop_already_active',\s*'stronger_suppression_preserved',\s*'user_stop_reversed',\s*'no_reversible_user_stop'\)/i, sql,
     "closed outcome vocabulary");
   for (const f of ["event_id", "suppression_id"]) {
@@ -861,11 +929,13 @@ check("64. SQL: stored scope_results are FULLY validated in SQL before replay (n
     has(new RegExp(`when '${outcome}'\\s+then jsonb_typeof\\(p_item -> 'event_id'\\) = '${ev}'\\s+and jsonb_typeof\\(p_item -> 'suppression_id'\\) = '${su}'`, "i"), sql,
       `${outcome} → event_id ${ev}, suppression_id ${su}`);
   }
-  has(/else false\s*end/i, sql, "an unknown outcome is invalid (default-deny)");
+  // default-deny: the arm CLOSING the consistency CASE must be `else false` (pinned to the last WHEN arm,
+  // so the outer `else false` of the item guard cannot stand in for it)
+  has(/and jsonb_typeof\(p_item -> 'suppression_id'\) = 'null'\s*else false\s*end/i, sql, "an unknown outcome is invalid (default-deny)");
   // A NULL is NOT false: `if not NULL then` never fires, so a NULL-returning validator would let a
   // malformed receipt replay. Both validators must coalesce to false.
-  has(/select coalesce\(\s*jsonb_typeof\(p_results\)\s*=\s*'array'/i, sql, "the results validator returns false, never NULL");
-  has(/select coalesce\(\s*jsonb_typeof\(p_item\)\s*=\s*'object'/i, sql, "the item validator returns false, never NULL");
+  has(/select coalesce\(\s*case jsonb_typeof\(p_results\)/i, sql, "the results validator returns false, never NULL");
+  has(/select coalesce\(\s*case jsonb_typeof\(p_item\)/i, sql, "the item validator returns false, never NULL");
 });
 check("65. SQL: a malformed receipt row cannot be INSERTED (CHECK constraint), and the RPC still re-validates", () => {
   const sql = sqlCode();
@@ -900,16 +970,27 @@ check("36. D2-C stays read-only + unchanged; webhook does not import the writer"
 // ============================================================================
 // PHASE BOUNDARY (37) + WIRING/DOC (50)
 // ============================================================================
-check("37. two-mode phase boundary (pre-commit worktree | post-commit historical D2-D delta)", () => {
+check("37. two-mode phase boundary (pre-commit worktree | post-commit CUMULATIVE base..HEAD delta)", () => {
   if (headSha() === D2D_BASE) {
-    const problems = validateD2DHistoricalDelta(gitDirty(), D2D_BASE);
+    // PRE-COMMIT: no D2-D commit exists yet — the worktree IS the whole delta (base is trivially HEAD).
+    const problems = validateD2DScope(gitDirty(), true);
     assert(problems.length === 0, `pre-commit D2-D delta violation: ${problems.join(" | ")}`);
-  } else {
-    const { files, parent, message } = d2dHistoricalCommit();
-    assert(/^Phase 5F-D2-D:/.test(message), `first commit after base must be 'Phase 5F-D2-D:' (got '${message.slice(0, 60)}')`);
-    const problems = validateD2DHistoricalDelta(files, parent);
-    assert(problems.length === 0, `historical D2-D delta violation: ${problems.join(" | ")}`);
+    return;
   }
+  const { baseIsAncestor, commits, messages, cumulative, perCommit, union } = d2dCumulativeDelta();
+  assert(baseIsAncestor, `the D2-D base ${D2D_BASE} must be an ancestor of HEAD`);
+  assert(commits.length >= 1, "HEAD must be ahead of the D2-D base");
+  // EVERY commit in the cumulative range is D2-D work — no foreign commit rides along.
+  for (const m of messages) assert(/^Phase 5F-D2-D:/.test(m), `every commit after the base must be 'Phase 5F-D2-D:' (got '${m.slice(0, 60)}')`);
+  // The delta is CUMULATIVE, not first-commit-only: it must cover every file touched by EVERY commit in
+  // the range. (A seventh file added by a LATER correction commit is invisible to a first-commit check.)
+  const cum = new Set(cumulative);
+  for (const files of perCommit) {
+    for (const f of files) assert(cum.has(f), `the cumulative delta must cover every commit's files (missing ${f})`);
+  }
+  // ...and the uncommitted worktree is folded in, so an in-flight correction cannot escape the six either.
+  const problems = validateD2DScope(union, baseIsAncestor);
+  assert(problems.length === 0, `cumulative D2-D scope violation: ${problems.join(" | ")}`);
 });
 check("50. wiring: script + policy reuse + doc topics", () => {
   const pkg = JSON.parse(readF("package.json"));
@@ -924,7 +1005,20 @@ check("50. wiring: script + policy reuse + doc topics", () => {
     /migration.history|drift/i, /not auto-applied|do not apply/i, /privacy|hash/i, /authentication|OTP/i,
     /policy[_ ]version/i, /CHECK constraint/i, /outcome ⟷ id consistency|outcome.*id consistency/i,
     /validated \*\*in SQL\*\*|in SQL, not only in TypeScript/i, /IMMUTABLE/,
+    /fail-closed type guard/i, /jsonb_array_length/, /explicitly present|absent key is never/i,
   ]) has(topic, doc, `doc covers ${topic}`);
+  // The doc must describe the migration's ACTUAL contents: 1 receipt table + 2 validator functions +
+  // 1 SECURITY DEFINER RPC — and must NOT claim it adds only a function or changes no table.
+  has(/one new\*\* processing\/idempotency \*\*receipt table|\*\*one new\*\*.*receipt table/i, doc, "doc: one new receipt table");
+  has(/\*\*two new IMMUTABLE\*\*.*validator functions/i, doc, "doc: two new validator functions");
+  has(/\*\*one new SECURITY DEFINER\*\*.*writer RPC/i, doc, "doc: one new SECURITY DEFINER writer RPC");
+  has(/does not alter any pre-existing consent table, column, enum or index/i, doc, "doc: alters no pre-existing consent table/column/enum/index");
+  hasNot(/additive \(one\s*\n?`create or replace function` \+ grants; no table/i, doc, "doc no longer claims 'one function, no table change'");
+  // ...and the doc's claim is TRUE of the real migration source.
+  const sql = sqlCode();
+  assert((sql.match(/create table if not exists public\./gi) || []).length === 1, "the migration adds exactly one table");
+  assert((sql.match(/create or replace function public\./gi) || []).length === 3, "the migration adds exactly three functions (2 validators + 1 RPC)");
+  hasNot(/alter table public\.communication_(consent_events|suppressions|preferences)\b/i, sql, "no DDL against a pre-existing consent table");
 });
 
 // ============================================================================
@@ -1088,46 +1182,102 @@ srcMutation("MUT AE: the RPC defers scope_results validation to TypeScript (no S
   () => !/not\s+public\.communication_consent_receipt_results_valid\(v_r_scope\)/i.test(sqlCode()));
 
 srcMutation("MUT AF: the receipt SCOPE-ORDER validation is removed (duplicate / transactional-first passes)", MIGRATION_SRC,
-  "    and public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')\n    and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional'),",
-  "    and true,",
+  "               then public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')\n                and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional')",
+  "               then true",
   () => !/communication_consent_receipt_scope_result_valid\(p_results\s*->\s*1,\s*'transactional'\)/i.test(sqlCode()));
 
 srcMutation("MUT AG: the receipt UUID validation is removed (an arbitrary id string would replay)", MIGRATION_SRC,
-  "    and (jsonb_typeof(p_item -> 'event_id') = 'null'\n         or (p_item ->> 'event_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')\n    and (jsonb_typeof(p_item -> 'suppression_id') = 'null'\n         or (p_item ->> 'suppression_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')",
-  "    and true",
+  "        and (jsonb_typeof(p_item -> 'event_id') = 'null'\n             or (p_item ->> 'event_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')\n        and (jsonb_typeof(p_item -> 'suppression_id') = 'null'\n             or (p_item ->> 'suppression_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')",
+  "        and true",
   () => !/\(p_item ->> 'event_id'\) ~\*/i.test(sqlCode()) || !/\(p_item ->> 'suppression_id'\) ~\*/i.test(sqlCode()));
 
 srcMutation("MUT AH: the suppression_created outcome/ID consistency rule is removed", MIGRATION_SRC,
-  "          when 'suppression_created'            then jsonb_typeof(p_item -> 'event_id') = 'string'\n                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'",
-  "          when 'suppression_created'            then true",
+  "              when 'suppression_created'            then jsonb_typeof(p_item -> 'event_id') = 'string'\n                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'string'",
+  "              when 'suppression_created'            then true",
   () => !/when 'suppression_created'\s+then jsonb_typeof\(p_item -> 'event_id'\) = 'string'/i.test(sqlCode()));
 
 srcMutation("MUT AI: the user_stop_already_active outcome/ID consistency rule is removed", MIGRATION_SRC,
-  "          when 'user_stop_already_active'       then jsonb_typeof(p_item -> 'event_id') = 'null'\n                                                 and jsonb_typeof(p_item -> 'suppression_id') = 'string'",
-  "          when 'user_stop_already_active'       then true",
+  "              when 'user_stop_already_active'       then jsonb_typeof(p_item -> 'event_id') = 'null'\n                                                     and jsonb_typeof(p_item -> 'suppression_id') = 'string'",
+  "              when 'user_stop_already_active'       then true",
   () => !/when 'user_stop_already_active'\s+then jsonb_typeof\(p_item -> 'event_id'\) = 'null'/i.test(sqlCode()));
 
-srcMutation("MUT AJ: the closed outcome vocabulary is opened (an unknown outcome would replay)", MIGRATION_SRC,
-  "          else false\n        end,",
-  "          else true\n        end,",
-  () => !/else false\s*end/i.test(sqlCode()));
+srcMutation("MUT AJ: the outcome/ID consistency default-deny is opened (an unknown outcome would replay)", MIGRATION_SRC,
+  "              else false\n            end\n      else false",
+  "              else true\n            end\n      else false",
+  () => !/and jsonb_typeof\(p_item -> 'suppression_id'\) = 'null'\s*else false\s*end/i.test(sqlCode()));
 
 srcMutation("MUT AK: the receipt CHECK constraint no longer enforces the validator", MIGRATION_SRC,
   "  constraint ck_consent_command_receipt_scope_results check (\n    octet_length(scope_results::text) <= 4096\n    and public.communication_consent_receipt_results_valid(scope_results))",
   "  constraint ck_consent_command_receipt_scope_results check (\n    octet_length(scope_results::text) <= 4096)",
   () => (sqlCode().match(/communication_consent_receipt_results_valid\(scope_results\)/gi) || []).length !== 2);
 
-srcMutation("MUT AL: the validator can return NULL (a NULL is not false — `if not NULL` would fall through)", MIGRATION_SRC,
-  "  select coalesce(\n    jsonb_typeof(p_results) = 'array'",
-  "  select (\n    jsonb_typeof(p_results) = 'array'",
-  () => !/select coalesce\(\s*jsonb_typeof\(p_results\)\s*=\s*'array'/i.test(sqlCode()));
+// CORRECTION 1 — the fail-closed JSON type guard must NOT degrade to boolean evaluation order.
+srcMutation("MUT AL: the results type guard degrades to `and` (jsonb_array_length could RAISE on a non-array)", MIGRATION_SRC,
+  "  select coalesce(\n    case jsonb_typeof(p_results)\n      when 'array' then\n        case when jsonb_array_length(p_results) = 2\n               then public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')\n                and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional')\n             else false\n        end\n      else false\n    end,",
+  "  select coalesce(\n    jsonb_typeof(p_results) = 'array'\n    and jsonb_array_length(p_results) = 2\n    and public.communication_consent_receipt_scope_result_valid(p_results -> 0, 'marketing')\n    and public.communication_consent_receipt_scope_result_valid(p_results -> 1, 'transactional'),",
+  () => !/case jsonb_typeof\(p_results\)\s*when 'array' then/i.test(sqlCode())
+     || /jsonb_typeof\(p_results\)\s*=\s*'array'\s*and\s+jsonb_array_length/i.test(sqlCode()));
 
-fnMutation("MUT Y: a seventh unrelated file in the D2-D delta is rejected",
-  () => validateD2DHistoricalDelta([...D2D_EXPECTED_FILES, "services/somethingElse.ts"], D2D_BASE).length > 0);
-fnMutation("MUT Z: a D2-D delta modifying the D2-C service is rejected",
-  () => validateD2DHistoricalDelta([...D2D_EXPECTED_FILES, D2C_SVC_SRC], D2D_BASE).length > 0);
-fnMutation("MUT AA: an incorrect D2-D parent is rejected",
-  () => validateD2DHistoricalDelta(D2D_EXPECTED_FILES, "0000000000000000000000000000000000000000").length > 0);
+srcMutation("MUT AM: the item type guard no longer requires a JSON object (a non-object item would validate)", MIGRATION_SRC,
+  "    case jsonb_typeof(p_item)\n      when 'object' then",
+  "    case jsonb_typeof(p_item)\n      when 'array' then",
+  () => !/case jsonb_typeof\(p_item\)\s*when 'object' then/i.test(sqlCode()));
+
+// Both coalesce wrappers gone → a missing key inside the object branch yields NULL, and `if not NULL`
+// falls through, so a malformed receipt would REPLAY. Only removing BOTH breaks it — hence one mutation.
+mutationChecks.push({
+  name: "MUT AN: BOTH validator coalesce guards removed (the validator could return NULL, not false)",
+  kind: "src",
+  edits: [
+    { file: MIGRATION_SRC, from: "  select coalesce(\n    case jsonb_typeof(p_results)", to: "  select (\n    case jsonb_typeof(p_results)" },
+    { file: MIGRATION_SRC, from: "  select coalesce(\n    case jsonb_typeof(p_item)", to: "  select (\n    case jsonb_typeof(p_item)" },
+  ],
+  scenario: () => !/select coalesce\(\s*case jsonb_typeof\(p_results\)/i.test(sqlCode())
+              && !/select coalesce\(\s*case jsonb_typeof\(p_item\)/i.test(sqlCode()),
+});
+
+// CORRECTION 2 — the TypeScript boundary must independently require the id keys to be PRESENT.
+tsMutation("MUT AO: normalizeRpcResult coerces an ABSENT id key to null and ignores alias conflicts",
+  `function readIdField(s: Record<string, unknown>, snake: string, camel: string): string | null | typeof ID_INVALID {
+  const hasSnake = Object.prototype.hasOwnProperty.call(s, snake);
+  const hasCamel = Object.prototype.hasOwnProperty.call(s, camel);
+  if (!hasSnake && !hasCamel) return ID_INVALID;                            // absent → never becomes null
+  if (hasSnake && hasCamel && !Object.is(s[snake], s[camel])) return ID_INVALID; // aliases disagree
+  const v = hasSnake ? s[snake] : s[camel];
+  if (v === null) return null;                                              // explicit null stays null
+  if (typeof v !== "string" || !UUID_SHAPE.test(v)) return ID_INVALID;
+  return v;
+}`,
+  `function readIdField(s: Record<string, unknown>, snake: string, camel: string): string | null | typeof ID_INVALID {
+  const v = (s[camel] ?? s[snake]) ?? null;
+  if (v === null) return null;
+  if (typeof v !== "string" || !UUID_SHAPE.test(v)) return ID_INVALID;
+  return v;
+}`,
+  async (mm) => {
+    const N = mm.Service.normalizeRpcResult;
+    const T = { scope: "transactional", outcome: "no_reversible_user_stop", event_id: null, suppression_id: null };
+    // an ABSENT event_id key must NOT be read as an explicit null for a null-permitting outcome
+    const absent = N({ ok: true, replayed: false, scope_results: [{ scope: "marketing", outcome: "no_reversible_user_stop", suppression_id: null }, T] });
+    // contradictory aliases must NOT be silently resolved to one of them
+    const conflict = N({ ok: true, replayed: false, scope_results: [
+      { scope: "marketing", outcome: "suppression_created", event_id: UUID, eventId: UUID_B, suppression_id: UUID, suppressionId: UUID }, T] });
+    return absent.ok === true || conflict.ok === true;
+  });
+
+fnMutation("MUT Y: a seventh file added by ANY later cumulative correction commit is rejected",
+  () => {
+    // a 7th file anywhere in base..HEAD (env, route, webhook, unrelated service, second migration, other)
+    const smuggled = ["services/somethingElse.ts", ".env.local", "app/api/consent/route.ts",
+      "services/metaWhatsAppWebhookService.ts", "supabase/migrations/20260713000000_other.sql", "lib/random.ts"];
+    return smuggled.every((f) => validateD2DScope([...D2D_EXPECTED_FILES, f], true).length > 0);
+  });
+fnMutation("MUT Z: a cumulative delta modifying the D2-C service is rejected",
+  () => validateD2DScope([...D2D_EXPECTED_FILES, D2C_SVC_SRC], true).length > 0
+     && validateD2DScope(D2D_EXPECTED_FILES.filter((f) => f !== WRITER_SRC).concat(D2C_SVC_SRC), true).length > 0);
+fnMutation("MUT AA: a D2-D base that is NOT an ancestor of HEAD is rejected (the delta is unmeasurable)",
+  () => validateD2DScope(D2D_EXPECTED_FILES, false).length > 0
+     && validateD2DScope(D2D_EXPECTED_FILES, true).length === 0); // ...and the honest six still pass
 
 // ============================================================================
 // RUNNER

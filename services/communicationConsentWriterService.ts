@@ -299,12 +299,39 @@ const OUTCOMES: readonly ConsentScopeOutcome[] = [
 /** Deterministic scope order the RPC/receipt must always produce (one marketing, one transactional). */
 const SCOPE_ORDER: readonly ConsentScopeName[] = ["marketing", "transactional"];
 
+/** Sentinel for "this id field is NOT usable" — absent, aliased inconsistently, or malformed. */
+const ID_INVALID = Symbol("id_invalid");
+
+/**
+ * Read ONE id field from its snake_case/camelCase aliases WITHOUT inventing a value.
+ *
+ * The key must be explicitly PRESENT: an ABSENT key is NEVER silently coerced to `null` (that would let
+ * a truncated RPC row masquerade as a legitimate "no id for this outcome" result and pass the
+ * outcome⟷id consistency check below). An explicit `null` IS valid — the consistency check decides
+ * whether the outcome permits it. If BOTH aliases are present they must carry the SAME value; a row
+ * that disagrees with itself is not trustworthy evidence. A present non-null value must be a UUID.
+ *
+ * Returns `string | null` when usable, else ID_INVALID (→ WRITER_INTEGRITY_VIOLATION).
+ */
+function readIdField(s: Record<string, unknown>, snake: string, camel: string): string | null | typeof ID_INVALID {
+  const hasSnake = Object.prototype.hasOwnProperty.call(s, snake);
+  const hasCamel = Object.prototype.hasOwnProperty.call(s, camel);
+  if (!hasSnake && !hasCamel) return ID_INVALID;                            // absent → never becomes null
+  if (hasSnake && hasCamel && !Object.is(s[snake], s[camel])) return ID_INVALID; // aliases disagree
+  const v = hasSnake ? s[snake] : s[camel];
+  if (v === null) return null;                                              // explicit null stays null
+  if (typeof v !== "string" || !UUID_SHAPE.test(v)) return ID_INVALID;
+  return v;
+}
+
 /**
  * Normalize the RPC's JSON into the typed contract WITHOUT trusting arbitrary shapes. A success MUST be
  * a fully-formed, deterministic TWO-scope result — exactly one marketing + one transactional in that
- * order, valid UUIDs, and outcome⟷id consistency; anything empty / partial / duplicated / contradictory
- * (or a non-boolean `replayed`) is a WRITER_INTEGRITY_VIOLATION (never a success). Exported for direct
- * testing. It copies only allowlisted fields — no raw row / error / value passes through.
+ * order, both id keys explicitly PRESENT (absent ≠ null) and alias-consistent, valid UUIDs, and
+ * outcome⟷id consistency; anything empty / partial / duplicated / contradictory (or a non-boolean
+ * `replayed`) is a WRITER_INTEGRITY_VIOLATION (never a success). This is an INDEPENDENT fence: the SQL
+ * validator enforces the same contract on the stored receipt, and neither layer relies on the other.
+ * Exported for direct testing. It copies only allowlisted fields — no raw row / error / value passes through.
  */
 export function normalizeRpcResult(data: unknown): ConsentCommandRpcResult {
   if (!data || typeof data !== "object") return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
@@ -331,10 +358,10 @@ export function normalizeRpcResult(data: unknown): ConsentCommandRpcResult {
     // Deterministic order enforces one-marketing-one-transactional and rejects duplicates.
     if (scope !== SCOPE_ORDER[i]) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
     if (typeof outcome !== "string" || !OUTCOMES.includes(outcome as ConsentScopeOutcome)) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    const eventId = (s.eventId ?? s.event_id) ?? null;
-    const suppressionId = (s.suppressionId ?? s.suppression_id) ?? null;
-    if (eventId !== null && (typeof eventId !== "string" || !UUID_SHAPE.test(eventId))) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    if (suppressionId !== null && (typeof suppressionId !== "string" || !UUID_SHAPE.test(suppressionId))) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
+    // Both id keys must be explicitly PRESENT (absent is NOT null), alias-consistent, and UUID-shaped.
+    const eventId = readIdField(s, "event_id", "eventId");
+    const suppressionId = readIdField(s, "suppression_id", "suppressionId");
+    if (eventId === ID_INVALID || suppressionId === ID_INVALID) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
     // Outcome ⟷ id consistency:
     //   suppression_created / user_stop_reversed              → eventId + suppressionId
     //   user_stop_already_active / stronger_suppression_preserved → suppressionId, eventId null
@@ -343,7 +370,7 @@ export function normalizeRpcResult(data: unknown): ConsentCommandRpcResult {
     const needsSuppression = needsEvent || outcome === "user_stop_already_active" || outcome === "stronger_suppression_preserved";
     if (needsEvent ? eventId === null : eventId !== null) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
     if (needsSuppression ? suppressionId === null : suppressionId !== null) return { ok: false, code: "WRITER_INTEGRITY_VIOLATION" };
-    scopeResults.push({ scope: scope as ConsentScopeName, outcome: outcome as ConsentScopeOutcome, eventId: eventId as string | null, suppressionId: suppressionId as string | null });
+    scopeResults.push({ scope: scope as ConsentScopeName, outcome: outcome as ConsentScopeOutcome, eventId, suppressionId });
   }
   return { ok: true, replayed: d.replayed, scopeResults };
 }

@@ -124,26 +124,43 @@ function gitDirty() {
 const gitFiles = (args) => execFileSync("git", args, { encoding: "utf8" })
   .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"));
 function headSha() { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); }
+const subjectOf = (sha) => execFileSync("git", ["log", "-1", "--format=%s", sha], { encoding: "utf8" }).trim();
+function commitExists(sha) {
+  try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { stdio: "pipe" }); return true; } catch { return false; }
+}
 function isAncestor(a, b) {
+  if (!commitExists(a) || !commitExists(b)) return false;
   try { execFileSync("git", ["merge-base", "--is-ancestor", a, b], { stdio: "pipe" }); return true; } catch { return false; }
 }
 
 // ----------------------------------------------------------------------------
-// D2-E PHASE SCOPE — exactly seven files, measured from the approved base
+// D2-E PHASE BOUNDARY — FROZEN AUDITED HISTORICAL RANGE
 //
-// TODO — HISTORICAL RANGE IS NOT FROZEN YET (deliberately).
-// D2-E is still IN FLIGHT: the audited implementation SHA does not exist until this correction is
-// committed, so there is no honest `D2E_HEAD` to hardcode and none is guessed. The scope check therefore
-// measures the LIVE delta (base..HEAD ∪ worktree), which is correct for a phase still being built.
+// D2-E is implemented, corrected and AUDITED. Its phase scope is therefore a FIXED slice of history:
 //
-// AFTER the corrected implementation commit is pushed and independently audited, a SEPARATE
-// harness/docs-only commit will:
-//   1. freeze `D2E_BASE..CORRECTED_D2E_HEAD` as the audited historical range;
-//   2. separate that frozen historical scope from current-worktree protection — exactly as the D2-D
-//      post-merge stabilization did, so a later phase (and the PR merge commit) cannot re-open this audit.
-// Do NOT hardcode a head SHA before that audit exists.
+//     94b8c15 (D2-E base)  ..  56e8f51 (the audited FINAL, CORRECTED D2-E implementation commit)
+//
+// The historical audit inspects ONLY that range. It NEVER uses the current HEAD as the end of the file or
+// commit range, because a HEAD-relative boundary is self-invalidating the moment anything is appended:
+//   • THIS freeze commit is a harness/docs maintenance commit, not a D2-E implementation commit;
+//   • a future PR MERGE commit carries a merge subject;
+//   • every LATER phase legitimately adds its own commits and files.
+// None of those may re-open a frozen audit.
+//
+// WHAT IS PROVEN:
+//   1. the base is an ancestor of the audited head        → the audited range is real and measurable;
+//   2. the audited head is an ancestor of the current HEAD → this checkout CONTAINS the whole audited phase;
+//   3. the delta base..audited-head is EXACTLY the approved seven files;
+//   4. every NON-MERGE IMPLEMENTATION commit INSIDE the range carries a "Phase 5F-D2-E:" subject.
+// A failure of either ancestry proof is a SCOPE VIOLATION, not a warning.
+//
+// CURRENT-WORKTREE PROTECTION IS A SEPARATE CONCERN (`validateD2EWorktree` + its own check). Dirty files
+// are NEVER unioned into the frozen historical delta. See the protected/released lists below.
 // ----------------------------------------------------------------------------
 const D2E_BASE = "94b8c1522269635cdbbe53fb6d11ea2bf91b05a9"; // the merged D2-D post-merge harness stabilization
+const D2E_HEAD = "56e8f5193eb1be5d24ece3ec00822608b7f50057"; // the audited FINAL, CORRECTED D2-E implementation
+const D2E_SUBJECT = /^Phase 5F-D2-E:/;
+
 const D2E_EXPECTED_FILES = [
   "docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md",
   "lib/communication/inboundConsentCommandInput.ts",
@@ -162,14 +179,40 @@ const D2E_FORBIDDEN_FILES = [
   "scripts/phase5f-d2c-consent-decision-authority-harness.mjs",
 ];
 
-/** PURE. The D2-E delta must be EXACTLY the approved seven, and must touch nothing forbidden. */
-function validateD2EScope(files, baseIsAncestor) {
+/**
+ * The D2-E-OWNED consent-integration AUTHORITY files. An uncommitted edit to either must fail D2-E — they
+ * are the phase's own contract surface (the provider map, the SHA-256 event identity, the timestamp rules,
+ * the HELP/unsupported short-circuit, the retryable/deterministic split).
+ */
+const D2E_PROTECTED_FILES = [BUILDER_SRC, ORCH_SRC];
+
+/**
+ * DELIBERATELY RELEASED from worktree protection — a dirty one of these is NOT a D2-E violation:
+ *   • services/inboundWhatsAppMessageService.ts (D1-B)   — a shared FUTURE integration seam;
+ *   • services/metaWhatsAppWebhookService.ts             — a shared FUTURE integration seam;
+ *   • package.json                                        — future phases must be able to add their scripts;
+ *   • the D2-E harness + document                         — this maintenance surface itself;
+ *   • any new future-phase file                           — a later phase must not re-open this audit.
+ *
+ * Releasing them from DIRTY-FILE protection removes NO functional or boundary coverage: the D1-B and
+ * webhook behaviour is still fully asserted by this harness's functional checks (persist-before-command
+ * ordering, persisted-row authority, duplicate/replay, the webhook's import boundary, and D1-B's
+ * consent-agnosticism), and by their own phase harnesses.
+ */
+const D2E_RELEASED_SEAMS = [D1B_SRC, WEBHOOK_SVC_SRC, "package.json", HARNESS_SRC, DOC_SRC];
+
+/**
+ * PURE. The FROZEN historical delta must be EXACTLY the approved seven files, and must touch nothing
+ * forbidden. `anchorsProven` carries the ancestry result: without it the range is not measurable, so the
+ * whole scope claim is meaningless — a violation, not a warning.
+ */
+function validateD2EScope(files, anchorsProven) {
   const problems = [];
-  if (!baseIsAncestor) problems.push(`the D2-E base ${D2E_BASE} is not an ancestor of HEAD — the delta is not measurable`);
+  if (!anchorsProven) problems.push(`the frozen D2-E range ${D2E_BASE}..${D2E_HEAD} is not measurable (anchor ancestry unproven)`);
   const set = new Set(files);
   if (files.length !== D2E_EXPECTED_FILES.length) problems.push(`expected ${D2E_EXPECTED_FILES.length} files, got ${files.length} [${files.join(", ")}]`);
   for (const f of D2E_EXPECTED_FILES) if (!set.has(f)) problems.push(`missing approved D2-E file: ${f}`);
-  for (const f of files) if (!D2E_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the D2-E delta: ${f}`);
+  for (const f of files) if (!D2E_EXPECTED_FILES.includes(f)) problems.push(`unexpected file in the frozen D2-E delta: ${f}`);
   for (const f of files) {
     if (D2E_FORBIDDEN_FILES.includes(f)) problems.push(`D2-E must not modify the frozen file: ${f}`);
     if (/^supabase\/migrations\//.test(f)) problems.push(`D2-E must add no migration: ${f}`);
@@ -180,12 +223,57 @@ function validateD2EScope(files, baseIsAncestor) {
   return problems;
 }
 
-function d2eDelta() {
-  const baseIsAncestor = isAncestor(D2E_BASE, headSha());
-  const committed = baseIsAncestor && headSha() !== D2E_BASE ? gitFiles(["diff", "--name-only", `${D2E_BASE}..HEAD`]) : [];
-  const union = [...new Set([...committed, ...gitDirty()])];
-  return { baseIsAncestor, union };
+/**
+ * PURE. Subjects are validated ONLY for NON-MERGE IMPLEMENTATION commits INSIDE the frozen range. The
+ * freeze maintenance commit, future merge commits and future-phase commits lie outside it and are never
+ * passed here.
+ */
+function validateD2ESubjects(messages) {
+  const problems = [];
+  for (const m of messages) {
+    if (!D2E_SUBJECT.test(m)) problems.push(`a D2-E implementation commit carries a non-D2-E subject: '${String(m).slice(0, 60)}'`);
+  }
+  return problems;
 }
+
+/** PURE. The two ancestry proofs that make the frozen range meaningful (and prove HEAD contains it). */
+function validateD2EAnchors({ baseIsAncestorOfHead, headIsAncestorOfCurrent }) {
+  const problems = [];
+  if (!baseIsAncestorOfHead) problems.push(`the D2-E base ${D2E_BASE} is not an ancestor of the audited head ${D2E_HEAD} — the audited range is not real`);
+  if (!headIsAncestorOfCurrent) problems.push(`the audited D2-E head ${D2E_HEAD} is not an ancestor of the current HEAD — this checkout does not contain the complete audited D2-E phase`);
+  return problems;
+}
+
+/**
+ * PURE. Current-worktree safety, kept STRICTLY separate from the frozen historical scope: an uncommitted
+ * edit to a D2-E-owned AUTHORITY file is a violation; a released seam, the maintenance surface, and any
+ * future-phase file are not.
+ */
+function validateD2EWorktree(dirty) {
+  const problems = [];
+  for (const f of dirty) {
+    if (D2E_PROTECTED_FILES.includes(f)) problems.push(`a protected D2-E authority file has uncommitted changes: ${f}`);
+  }
+  return problems;
+}
+
+/**
+ * The FROZEN historical D2-E delta: base..auditedHead ONLY. NEVER HEAD-relative, NEVER unioned with the
+ * worktree. `--no-merges` makes the subject check what it claims to be: IMPLEMENTATION commits only.
+ */
+function d2eFrozenRange(base = D2E_BASE, head = D2E_HEAD) {
+  const baseIsAncestorOfHead = isAncestor(base, head);
+  const headIsAncestorOfCurrent = isAncestor(head, headSha());
+  const anchorsProven = baseIsAncestorOfHead && headIsAncestorOfCurrent;
+  const commits = anchorsProven ? gitFiles(["rev-list", "--no-merges", `${base}..${head}`]) : [];
+  const messages = commits.map(subjectOf);
+  const files = anchorsProven ? gitFiles(["diff", "--name-only", `${base}..${head}`]) : [];
+  const perCommit = commits.map((c) => gitFiles(["diff-tree", "--no-commit-id", "--name-only", "-r", c]));
+  return { baseIsAncestorOfHead, headIsAncestorOfCurrent, anchorsProven, commits, messages, files, perCommit };
+}
+
+/** Commits AFTER the audited head: this freeze commit, any PR merge, and every later phase. Out of scope. */
+const postAuditCommits = () => (isAncestor(D2E_HEAD, headSha()) ? gitFiles(["rev-list", `${D2E_HEAD}..HEAD`]) : []);
 
 const checks = [];
 function check(name, fn) { checks.push({ name, fn }); }
@@ -901,11 +989,73 @@ check("24. the existing D1-B / D2-C / D2-D boundaries stay green", () => {
 // ============================================================================
 // 1-2, 23. PHASE SCOPE + ANCESTRY
 // ============================================================================
-check("1-2, 23. exactly seven files, correct base ancestry, nothing forbidden touched", () => {
-  const { baseIsAncestor, union } = d2eDelta();
-  assert(baseIsAncestor, `the D2-E base ${D2E_BASE} must be an ancestor of HEAD`);
-  const problems = validateD2EScope(union, baseIsAncestor);
-  assert(problems.length === 0, `D2-E scope violation: ${problems.join(" | ")}`);
+check("F1-F6, 23. FROZEN audited range: exact anchors, both ancestry proofs, seven files, D2-E subjects", () => {
+  // F1-F2: the anchors are the EXACT approved base and audited corrected-implementation head.
+  assert(D2E_BASE === "94b8c1522269635cdbbe53fb6d11ea2bf91b05a9", "F1. the approved D2-E base");
+  assert(D2E_HEAD === "56e8f5193eb1be5d24ece3ec00822608b7f50057", "F2. the audited corrected D2-E head");
+
+  const fr = d2eFrozenRange();
+  // F3-F4: both ancestry proofs. A failure of either is a SCOPE VIOLATION, not a warning.
+  const anchorProblems = validateD2EAnchors(fr);
+  assert(anchorProblems.length === 0, anchorProblems.join(" | "));
+  assert(fr.baseIsAncestorOfHead === true, "F3. base is an ancestor of the audited head");
+  assert(fr.headIsAncestorOfCurrent === true, "F4. the audited head is an ancestor of the current HEAD");
+  assert(fr.commits.length >= 1, "the frozen range contains at least one implementation commit");
+
+  // F6: subjects are validated ONLY for the NON-MERGE implementation commits INSIDE the frozen range.
+  const subjectProblems = validateD2ESubjects(fr.messages);
+  assert(subjectProblems.length === 0, subjectProblems.join(" | "));
+
+  // The frozen delta is cumulative WITHIN the range: it must cover every file touched by EVERY commit in
+  // it (an eighth file added by a LATER correction commit inside the range must not be invisible).
+  const frozen = new Set(fr.files);
+  for (const files of fr.perCommit) {
+    for (const f of files) assert(frozen.has(f), `the frozen delta must cover every in-range commit's files (missing ${f})`);
+  }
+  // F5 + 23: EXACTLY the approved seven, nothing forbidden. The worktree is NOT unioned in.
+  const problems = validateD2EScope(fr.files, fr.anchorsProven);
+  assert(problems.length === 0, `frozen D2-E scope violation: ${problems.join(" | ")}`);
+});
+
+check("F13. the historical range is measured against D2E_HEAD, NEVER the current HEAD", () => {
+  const fr = d2eFrozenRange();
+  // Post-audit history (this freeze commit, a future PR merge, later phases) must be OUTSIDE the range.
+  for (const c of postAuditCommits()) {
+    assert(!fr.commits.includes(c), `a post-audit commit leaked into the frozen range: ${c.slice(0, 8)}`);
+  }
+  // The frozen file list must equal the real base..audited-head delta — never a base..HEAD delta.
+  const frozenDelta = gitFiles(["diff", "--name-only", `${D2E_BASE}..${D2E_HEAD}`]);
+  assert(JSON.stringify([...fr.files].sort()) === JSON.stringify([...frozenDelta].sort()), "the frozen delta IS base..audited-head");
+  // …and the harness source must not compute the historical range from HEAD.
+  const src = readF(HARNESS_SRC);
+  hasNot(/diff", "--name-only", `\$\{D2E_BASE\}\.\.HEAD`/, src, "the historical delta is never base..HEAD");
+  has(/rev-list", "--no-merges", `\$\{base\}\.\.\$\{head\}`/, src, "commits come from base..head with --no-merges");
+});
+
+check("F14-F21. current-worktree protection is SEPARATE: authorities protected, seams released", () => {
+  // The live worktree must not be editing a D2-E authority file.
+  const problems = validateD2EWorktree(gitDirty());
+  assert(problems.length === 0, `protected-file worktree violation: ${problems.join(" | ")}`);
+  // F14-F15: each D2-E-owned authority file trips it.
+  assert(validateD2EWorktree([BUILDER_SRC]).length > 0, "F14. a dirty input builder is caught");
+  assert(validateD2EWorktree([ORCH_SRC]).length > 0, "F15. a dirty orchestrator is caught");
+  assert(validateD2EWorktree([BUILDER_SRC, ORCH_SRC]).length === 2, "both authorities are caught together");
+  // F16-F19, F21: the released seams + the maintenance surface are ALLOWED, individually and together.
+  for (const f of D2E_RELEASED_SEAMS) assert(validateD2EWorktree([f]).length === 0, `a released file must be allowed: ${f}`);
+  assert(validateD2EWorktree([D1B_SRC, WEBHOOK_SVC_SRC]).length === 0, "F18. D1-B + the webhook dirty TOGETHER are allowed");
+  assert(validateD2EWorktree(["package.json"]).length === 0, "F19. a dirty package.json is allowed (future phase scripts)");
+  assert(validateD2EWorktree([HARNESS_SRC, DOC_SRC]).length === 0, "F21. harness/doc maintenance edits are allowed");
+  // F20: future-phase files are allowed — a later phase must never re-open the frozen D2-E audit.
+  assert(validateD2EWorktree([
+    "services/inboundConsentAcknowledgementService.ts",
+    "lib/communication/outboundConsentAck.ts",
+    "scripts/phase5f-d2f-consent-ack-harness.mjs",
+    "docs/QF-Consent-Ack-Phase-5F-D2-F.md",
+    "supabase/migrations/20260801000000_future.sql",
+  ]).length === 0, "F20. future-phase files are not D2-E worktree violations");
+  // A realistic future-phase pre-commit worktree must leave D2-E green.
+  assert(validateD2EWorktree([D1B_SRC, WEBHOOK_SVC_SRC, "package.json", "services/futureThing.ts"]).length === 0,
+    "a realistic future-phase worktree does not trip D2-E");
 });
 
 check("WIRING. the d2e script + doc exist and the doc covers the contract", () => {
@@ -919,7 +1069,13 @@ check("WIRING. the d2e script + doc exist and the doc covers the contract", () =
     /duplicate/i, /replay/i, /deterministic/i, /retryable/i, /HELP/, /no outbound|sends nothing/i,
     /D2-C/, /Meta remains disabled|no Meta activation/i, /no (new )?migration|no SQL/i, /n8n/i,
     /privacy/i, /rollback/i,
+    // ---- the post-audit historical freeze (tests + docs only) ----
+    /94b8c1522269635cdbbe53fb6d11ea2bf91b05a9/, /56e8f5193eb1be5d24ece3ec00822608b7f50057/,
+    /frozen/i, /ancestry|ancestor/i, /non-merge|--no-merges/i, /merge commit/i,
+    /worktree/i, /protected/i, /released/i, /tests-and-docs only|tests only|changes no production/i,
   ]) has(topic, doc, `doc covers ${topic}`);
+  // The doc must no longer claim the range is unfrozen.
+  hasNot(/not frozen yet|NOT FROZEN YET/i, doc, "the doc no longer claims the historical range is unfrozen");
 });
 
 // ============================================================================
@@ -1191,18 +1347,124 @@ srcMutation("MUT O: a retryable command failure no longer 500s the webhook", WEB
   "",
   () => !/if \(!commands\.ok\) return \{ status: 500/.test(readF(WEBHOOK_SVC_SRC)));
 
-fnMutation("MUT P: an eighth file in the D2-E delta is rejected",
+// ---- FROZEN-RANGE FREEZE mutations -----------------------------------------------------------
+fnMutation("MUT P: F11. an EIGHTH file inside the frozen historical range is rejected",
   () => ["services/other.ts", ".env.local", "app/api/consent/route.ts", "supabase/migrations/20260713000000_x.sql",
     "services/communicationConsentWriterService.ts", "lib/communication/consentCommand.ts",
     "services/communicationConsentDecisionService.ts", "package-lock.json"]
     .every((f) => validateD2EScope([...D2E_EXPECTED_FILES, f], true).length > 0));
 
-fnMutation("MUT Q: a missing approved D2-E file is rejected",
+fnMutation("MUT Q: F10. a MISSING approved file in the frozen range is rejected",
   () => D2E_EXPECTED_FILES.every((f) => validateD2EScope(D2E_EXPECTED_FILES.filter((x) => x !== f), true).length > 0)
-     && validateD2EScope(D2E_EXPECTED_FILES, true).length === 0);
+     && validateD2EScope(D2E_EXPECTED_FILES, true).length === 0); // …and the honest seven still pass
 
-fnMutation("MUT R: an unmeasurable base (not an ancestor of HEAD) is rejected",
-  () => validateD2EScope(D2E_EXPECTED_FILES, false).length > 0 && isAncestor(D2E_BASE, headSha()) === true);
+fnMutation("MUT R: an unmeasurable frozen range (anchor ancestry unproven) is rejected",
+  () => validateD2EScope(D2E_EXPECTED_FILES, false).length > 0
+     && validateD2EAnchors({ baseIsAncestorOfHead: false, headIsAncestorOfCurrent: true }).length > 0
+     && validateD2EAnchors({ baseIsAncestorOfHead: true, headIsAncestorOfCurrent: false }).length > 0
+     && validateD2EAnchors({ baseIsAncestorOfHead: true, headIsAncestorOfCurrent: true }).length === 0);
+
+fnMutation("MUT X: F7. a WRONG base fails (base not an ancestor of the audited head)",
+  () => {
+    // A real-but-wrong base: the audited head itself is not an ancestor of itself's parent chain start.
+    const swapped = d2eFrozenRange(D2E_HEAD, D2E_BASE); // 56e8f51 is NOT an ancestor of 94b8c15
+    if (swapped.baseIsAncestorOfHead !== false || swapped.anchorsProven !== false) return false;
+    if (validateD2EAnchors(swapped).length === 0) return false;
+    // A non-existent base must also fail closed rather than yield a vacuously-empty range.
+    const bogus = d2eFrozenRange("0".repeat(40), D2E_HEAD);
+    return bogus.anchorsProven === false && bogus.files.length === 0
+        && validateD2EScope(bogus.files, bogus.anchorsProven).length > 0;
+  });
+
+fnMutation("MUT Y: F8-F9. a WRONG audited head fails, and a head not contained by HEAD fails",
+  () => {
+    // A non-existent audited head must fail closed (never a silently-empty, vacuously-passing range).
+    const bogus = d2eFrozenRange(D2E_BASE, "0".repeat(40));
+    if (bogus.anchorsProven || bogus.commits.length !== 0 || bogus.files.length !== 0) return false;
+    if (validateD2EAnchors(bogus).length === 0) return false;
+    if (validateD2EScope(bogus.files, bogus.anchorsProven).length === 0) return false;
+    // A head NOT contained by the current HEAD is a scope violation…
+    if (validateD2EAnchors({ baseIsAncestorOfHead: true, headIsAncestorOfCurrent: false }).length === 0) return false;
+    // …and the REAL repository genuinely satisfies containment.
+    return isAncestor(D2E_HEAD, headSha()) === true;
+  });
+
+fnMutation("MUT Z: F12. a non-D2-E implementation subject INSIDE the frozen range is rejected",
+  () => validateD2ESubjects(["Phase 5F-D2-E: integrate inbound WhatsApp consent commands", "wip: tweak"]).length > 0
+     && validateD2ESubjects(["Phase 5F-D2-F: next phase"]).length > 0
+     && validateD2ESubjects(["Merge pull request #4 from quickfurno-maker/phase/x"]).length > 0
+     && validateD2ESubjects(["Phase 5F-D2-E: freeze the audited historical range"]).length === 0
+     // …and the REAL in-range subjects all pass.
+     && validateD2ESubjects(d2eFrozenRange().messages).length === 0);
+
+fnMutation("MUT AA: F6/F13. merge + post-audit commits are EXCLUDED from the frozen range",
+  () => {
+    const fr = d2eFrozenRange();
+    // Every in-range commit is a NON-MERGE implementation commit…
+    for (const c of fr.commits) {
+      const parents = execFileSync("git", ["rev-list", "--parents", "-n", "1", c], { encoding: "utf8" }).trim().split(/\s+/);
+      if (parents.length > 2) return false; // a merge commit slipped into the subject-checked set
+    }
+    // …and nothing after the audited head is inside it (this freeze commit, a future merge, later phases).
+    const post = postAuditCommits();
+    if (post.some((c) => fr.commits.includes(c))) return false;
+    // If the boundary regressed to base..HEAD, THIS maintenance commit would appear in-range once made.
+    return fr.commits.length >= 1 && validateD2ESubjects(fr.messages).length === 0;
+  });
+
+// ---- CURRENT-WORKTREE protection: REAL on-disk dirty-file proofs -------------------------------
+/** Genuinely edit files on disk, prove they are dirty, run the validation, and ALWAYS restore. */
+function withDirtyFiles(files, fn) {
+  const originals = new Map();
+  try {
+    for (const f of files) {
+      const p = resolve(f);
+      originals.set(p, readFileSync(p, "utf8"));
+      writeFileSync(p, `${readFileSync(p, "utf8")}\n// d2e-freeze-dirty-probe\n`);
+    }
+    const dirty = gitDirty();
+    if (!files.every((f) => dirty.includes(f))) return { dirty, proven: false };
+    return { dirty, proven: true, result: fn(dirty) };
+  } finally {
+    for (const [p, original] of originals) writeFileSync(p, original);
+  }
+}
+
+fnMutation("MUT AB: F14-F15. a REALLY dirty input builder / orchestrator FAILS worktree protection",
+  () => {
+    const builder = withDirtyFiles([BUILDER_SRC], (d) => validateD2EWorktree(d));
+    if (!builder.proven || builder.result.length === 0) return false;
+    const orch = withDirtyFiles([ORCH_SRC], (d) => validateD2EWorktree(d));
+    if (!orch.proven || orch.result.length === 0) return false;
+    const both = withDirtyFiles([BUILDER_SRC, ORCH_SRC], (d) => validateD2EWorktree(d));
+    if (!both.proven || both.result.length < 2) return false;
+    // …and the files are RESTORED (the worktree is clean of the probe afterwards).
+    return validateD2EWorktree(gitDirty()).length === 0;
+  });
+
+fnMutation("MUT AC: F16-F19. a REALLY dirty D1-B / webhook / package.json is ALLOWED",
+  () => {
+    const d1b = withDirtyFiles([D1B_SRC], (d) => validateD2EWorktree(d));
+    if (!d1b.proven || d1b.result.length !== 0) return false;                 // F16
+    const hook = withDirtyFiles([WEBHOOK_SVC_SRC], (d) => validateD2EWorktree(d));
+    if (!hook.proven || hook.result.length !== 0) return false;               // F17
+    const both = withDirtyFiles([D1B_SRC, WEBHOOK_SVC_SRC], (d) => validateD2EWorktree(d));
+    if (!both.proven || both.result.length !== 0) return false;               // F18
+    const pkg = withDirtyFiles(["package.json"], (d) => validateD2EWorktree(d));
+    if (!pkg.proven || pkg.result.length !== 0) return false;                 // F19
+    return validateD2EWorktree(gitDirty()).length === 0;                      // restored
+  });
+
+fnMutation("MUT AD: F20-F21. future-phase files + the maintenance surface are ALLOWED",
+  () => {
+    // The frozen historical scope is NEVER unioned with the worktree, so a future-phase file can never
+    // re-open it; and the maintenance surface (this harness + its doc) is explicitly releasable.
+    const future = ["services/futurePhaseService.ts", "scripts/phase5f-d2f-harness.mjs", "docs/QF-Future.md"];
+    if (validateD2EWorktree(future).length !== 0) return false;
+    if (validateD2EWorktree([HARNESS_SRC, DOC_SRC]).length !== 0) return false;
+    // …and a future-phase file is STILL rejected if smuggled INTO the frozen historical delta.
+    return future.every((f) => validateD2EScope([...D2E_EXPECTED_FILES, f], true).length > 0);
+  });
 
 // ============================================================================
 // RUNNER

@@ -343,20 +343,86 @@ The correctness corrections above are pinned by functional **and** load-bearing 
 - mutations removing **both** the explicit range check and the round-trip fail, *and* mutations removing
   either fence alone prove the other still holds.
 
-## Historical range — not frozen yet
+## Historical range — FROZEN (post-audit)
 
-The D2-E scope check deliberately measures the **live** delta (`D2E_BASE..HEAD` ∪ worktree), because D2-E
-is still in flight: **the audited implementation SHA does not exist until this correction is committed**,
-so no head SHA is hardcoded and none is guessed.
+> **This freeze step is tests-and-docs only.** It changes **no production code** — not the input builder,
+> not the orchestrator, not D1-B, not the webhook, not `package.json`, not any D2-D authority. It touches
+> **exactly two files**: this document and the D2-E harness. No SQL, no migration, no route, no environment,
+> no Meta, no provider and no n8n change.
 
-**After** the corrected implementation commit is pushed and independently audited, a **separate
-harness/docs-only commit** will:
+D2-E is implemented, corrected and audited, so its phase scope is now a **fixed slice of history**:
 
-1. freeze `D2E_BASE..CORRECTED_D2E_HEAD` as the audited historical range; and
-2. separate that frozen historical scope from current-worktree protection —
+| Anchor | Commit |
+|---|---|
+| **Audited base** (`D2E_BASE`) | `94b8c1522269635cdbbe53fb6d11ea2bf91b05a9` |
+| **Audited corrected implementation head** (`D2E_HEAD`) | `56e8f5193eb1be5d24ece3ec00822608b7f50057` |
+| **Frozen range** | `D2E_BASE..D2E_HEAD` |
 
-exactly as the D2-D post-merge stabilization did, so that a later phase (and the PR merge commit) cannot
-re-open this audit.
+The historical audit inspects **only** that range. It **never** uses the current `HEAD` as the end of the
+file or commit range.
+
+### The two ancestry proofs
+
+1. **`D2E_BASE` is an ancestor of `D2E_HEAD`** — the audited range is real and measurable.
+2. **`D2E_HEAD` is an ancestor of the current `HEAD`** — this checkout genuinely *contains* the complete
+   audited D2-E phase, so the audit cannot be quietly evaluated against a tree that lacks it.
+
+**A failure of either proof is a scope violation, not a warning.**
+
+### The frozen seven-file historical scope
+
+`D2E_BASE..D2E_HEAD` must be exactly:
+
+1. `docs/QF-Inbound-Consent-Integration-Phase-5F-D2-E.md`
+2. `lib/communication/inboundConsentCommandInput.ts`
+3. `package.json`
+4. `scripts/phase5f-d2e-inbound-consent-integration-harness.mjs`
+5. `services/inboundConsentCommandService.ts`
+6. `services/inboundWhatsAppMessageService.ts`
+7. `services/metaWhatsAppWebhookService.ts`
+
+### Implementation-only subject validation
+
+Every **non-merge implementation commit inside the frozen range** must carry a `Phase 5F-D2-E:` subject
+(enforced via `rev-list --no-merges`).
+
+**Why merge commits and future phases are excluded.** A HEAD-relative boundary is self-invalidating the
+moment anything is appended to history:
+
+- **this freeze commit** is a harness/docs maintenance commit, not a D2-E implementation commit;
+- a future **PR merge commit** carries a merge subject;
+- every **later phase** legitimately adds its own commits and files.
+
+None of those may re-open a frozen audit, so they lie outside the range by construction and are never
+subject-checked. (This is exactly the defect the D2-D post-merge stabilization fixed; D2-E is frozen the
+same way, deliberately.)
+
+## Current-worktree protection (separate from the frozen scope)
+
+Dirty files are **never** unioned into the frozen historical delta. Worktree safety is its own check.
+
+**Protected — an uncommitted edit to either FAILS D2-E.** These are D2-E's own consent-integration
+authority surface (the provider map, the SHA-256 event identity, the timestamp rules, the HELP/unsupported
+short-circuit, the retryable/deterministic split):
+
+- `lib/communication/inboundConsentCommandInput.ts`
+- `services/inboundConsentCommandService.ts`
+
+**Deliberately released — a dirty one of these is *not* a D2-E violation:**
+
+| Released | Why |
+|---|---|
+| `services/inboundWhatsAppMessageService.ts` (D1-B) | a shared **future integration seam** |
+| `services/metaWhatsAppWebhookService.ts` | a shared **future integration seam** |
+| `package.json` | future phases must be able to add their own scripts |
+| the D2-E harness + this document | this maintenance surface itself |
+| any new future-phase file | a later phase must not re-open the frozen D2-E audit |
+
+**Releasing these from dirty-file protection removes no functional or boundary coverage.** The D1-B and
+webhook behaviour is still fully asserted by this harness's functional checks — persistence-before-command
+ordering, persisted-row authority, duplicate/replay, the webhook's import boundary (it may import only the
+orchestrator, never the D2-D writer, never D2-C), and D1-B's consent-agnosticism — and by their own phase
+harnesses. Only the *dirty-file* rule was narrowed; every behavioural assertion stands.
 
 ## Phase scope (exactly seven files)
 

@@ -52,6 +52,12 @@ const HARNESS_SRC = "scripts/phase5f-d4c-consent-ack-async-harness.mjs";
 const D4B_HARNESS_SRC = "scripts/phase5f-d4b-consent-command-response-harness.mjs";
 const DOC_SRC = "docs/QF-Consent-Ack-Async-Phase-5F-D4-C.md";
 
+/**
+ * The Phase 7C AUTHORITY BASE. The branch's scope is measured against THIS commit, never against the
+ * worktree — so every scope guard holds identically whether a file is untracked, staged or committed.
+ */
+const D4C_BASE = "5c63ef296c3db8f06f70f11aa8134834f384ac35";
+
 /** Frozen authorities D4-C may call but must NEVER modify. */
 const FROZEN = [
   "services/communicationConsentDecisionService.ts",
@@ -1243,9 +1249,100 @@ check("G9. a STALE DISPATCHING row becomes terminal `uncertain` — never pendin
   hasNot(/= 'pending'|= 'claimed'/, fn, "it NEVER returns them to pending/claimed");
 });
 
-check("G10. no EXISTING migration changed; the new migration is the only one added", () => {
-  const dirty = gitDirty().filter((p) => p.startsWith("supabase/migrations/"));
-  assert(dirty.length === 1 && dirty[0] === MIGRATION_SRC, `only the new migration may appear (got ${safeStringify(dirty)})`);
+/**
+ * The COMPLETE migration delta of this branch versus the Phase 7C authority base — committed AND dirty.
+ *
+ * The original version of this check consulted `git status --porcelain` alone. That is only ever true while
+ * the migration is UNCOMMITTED: the moment it is committed the tree is clean, the porcelain list is empty,
+ * and the check collapses. The property being asserted ("this branch adds exactly one migration and touches
+ * no existing one") is a fact about the branch, not about the worktree — so it must be computed from the
+ * union of what is COMMITTED since the base and what is still DIRTY, deduplicated by path.
+ *
+ * Returns a Map of path → effective status ("A" added, "M" modified, "D" deleted, "R" renamed). A path that
+ * is both committed and dirty keeps the STRONGER signal: an added-then-edited migration is still an add, but
+ * a pre-existing migration that is modified anywhere is reported as modified.
+ */
+const MIGRATION_PREFIX = "supabase/migrations/";
+function branchMigrationDelta() {
+  const delta = new Map();
+
+  // 1) COMMITTED since the authority base.
+  const committed = execFileSync(
+    "git",
+    ["diff", "--name-status", `${D4C_BASE}..HEAD`, "--", MIGRATION_PREFIX],
+    { encoding: "utf8" }
+  ).split("\n").map((l) => l.trim()).filter(Boolean);
+  for (const line of committed) {
+    const [rawStatus, ...paths] = line.split(/\t+/);
+    const status = rawStatus[0];                       // R100 → R, A → A …
+    const path = (paths[paths.length - 1] ?? "").replace(/\\/g, "/");
+    if (path.startsWith(MIGRATION_PREFIX)) delta.set(path, status);
+  }
+
+  // 2) STILL DIRTY (staged, unstaged or untracked).
+  const dirty = execFileSync("git", ["status", "--porcelain", "-uall"], { encoding: "utf8" })
+    .split("\n").filter(Boolean);
+  for (const line of dirty) {
+    const code = line.slice(0, 2);
+    const path = line.slice(3).trim().replace(/\\/g, "/");
+    if (!path.startsWith(MIGRATION_PREFIX)) continue;
+    // "??" untracked, or an "A"/"M"/"D"/"R" in either the index or the worktree column.
+    let status;
+    if (code === "??") status = "A";
+    else if (code.includes("D")) status = "D";
+    else if (code.includes("R")) status = "R";
+    else if (code.includes("A")) status = "A";
+    else status = "M";
+    // A path already recorded as ADDED by a commit and now further edited is still an ADD overall.
+    const prior = delta.get(path);
+    if (prior === "A" && status === "M") continue;
+    delta.set(path, status);
+  }
+
+  return delta;
+}
+
+check("G10. this BRANCH adds exactly one migration and modifies no existing migration", () => {
+  // Computed from committed history UNION the dirty worktree, so it holds identically whether the migration
+  // is untracked, staged, committed-and-clean, or committed with an unrelated file still dirty.
+  const delta = branchMigrationDelta();
+  const paths = [...delta.keys()].sort();
+
+  assert(paths.length === 1,
+    `exactly ONE migration may differ from the authority base (got ${safeStringify(paths)})`);
+  assert(paths[0] === MIGRATION_SRC,
+    `the migration must be ${MIGRATION_SRC} (got ${paths[0]})`);
+  assert(delta.get(MIGRATION_SRC) === "A",
+    `it must be ADDED, never modified/renamed/deleted (status ${delta.get(MIGRATION_SRC)})`);
+
+  // …and therefore, explicitly: no pre-existing migration is modified, deleted or renamed, and no second
+  // migration is added. Any of those would have produced a second entry, or a non-"A" status.
+  for (const [path, status] of delta) {
+    assert(path === MIGRATION_SRC, `no other migration may change (${status} ${path})`);
+    assert(status !== "M" && status !== "D" && status !== "R",
+      `a pre-existing migration was ${status === "M" ? "modified" : status === "D" ? "deleted" : "renamed"}: ${path}`);
+  }
+
+  // ── SELF-PROOF: the assertion logic above is NOT vacuous. ────────────────────────────────────────────
+  // The three assertions are re-applied to modelled deltas covering every prohibited shape. (The live
+  // assertions above inspect the REAL repository; this only proves they would reject a bad delta.)
+  const evaluate = (entries) => {
+    const d = new Map(entries);
+    const ps = [...d.keys()];
+    if (ps.length !== 1) return "reject";                 // absent, or a second migration
+    if (ps[0] !== MIGRATION_SRC) return "reject";         // wrong path
+    if (d.get(MIGRATION_SRC) !== "A") return "reject";    // modified / deleted / renamed
+    return "accept";
+  };
+  const OTHER = "supabase/migrations/20260712000300_communication_consent_command_writer_rpc.sql";
+  assert(evaluate([[MIGRATION_SRC, "A"]]) === "accept", "the approved shape is accepted");
+  assert(evaluate([]) === "reject", "an ABSENT migration is rejected");
+  assert(evaluate([[MIGRATION_SRC, "A"], [OTHER, "M"]]) === "reject", "a MODIFIED existing migration is rejected");
+  assert(evaluate([[MIGRATION_SRC, "A"], [OTHER, "D"]]) === "reject", "a DELETED existing migration is rejected");
+  assert(evaluate([[MIGRATION_SRC, "A"], [OTHER, "A"]]) === "reject", "a SECOND added migration is rejected");
+  assert(evaluate([[MIGRATION_SRC, "M"]]) === "reject", "the expected migration MODIFIED is rejected");
+  assert(evaluate([[MIGRATION_SRC, "R"]]) === "reject", "a RENAMED migration is rejected");
+  assert(evaluate([[OTHER, "A"]]) === "reject", "the WRONG migration path is rejected");
 });
 
 // ============================================================================

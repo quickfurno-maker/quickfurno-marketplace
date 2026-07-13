@@ -37,6 +37,7 @@
     "test:phase5f:d2d": "node scripts/phase5f-d2d-consent-command-writer-harness.mjs",
     "test:phase5f:d2e": "node scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
     "test:phase5f:d3b": "node scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs",
+    "test:phase5f:d4b": "node scripts/phase5f-d4b-consent-command-response-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",

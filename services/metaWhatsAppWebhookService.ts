@@ -46,6 +46,7 @@ import {
 } from "../lib/communication/providers/metaWhatsAppWebhook";
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
 import { processInboundConsentCommands } from "./inboundConsentCommandService";
+import { processConsentCommandResponses } from "./consentCommandResponseService";
 
 const CHANNEL = "whatsapp";
 
@@ -172,6 +173,28 @@ export async function handleMetaWhatsAppWebhookPost(input: {
     // ACKNOWLEDGED below — the persisted row is their durable record, and retrying could never help.
     const commands = await processInboundConsentCommands(inbound.result.processed);
     if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };
+
+    // Phase 5F-D4-B — ACKNOWLEDGEMENT, strictly AFTER the authoritative command flow has COMPLETED.
+    //
+    // Order: verified webhook → D1-B persist → D2-E command (→ D2-D write for STOP/START) → THEN this.
+    // It is reached only once `commands.ok` is true, so for STOP/START the writer result already exists;
+    // an acknowledgement can never precede the authoritative write.
+    //
+    // It is BEST-EFFORT and NON-AUTHORITATIVE. A suppression, a rate limit, a missing template, an absent
+    // provider, a rejection, a timeout, an unknown outcome or a throw must NEVER turn a successful consent
+    // command into an error — so it is wrapped, its result is deliberately discarded, and the webhook
+    // returns exactly the outcome the inbound command flow produced. Nothing about the acknowledgement is
+    // exposed in the provider-facing response.
+    try {
+      await processConsentCommandResponses({
+        payload,
+        webhookReceiptId: inbound.result.receiptId,
+        persisted: inbound.result.processed,
+        commands: commands.result.items,
+      });
+    } catch {
+      /* acknowledgement is never authoritative — the consent command already stands */
+    }
 
     const r = inbound.result;
     if (r.messagesPersisted === 0 && r.messagesDuplicate === 0 && r.messagesRejected > 0) {

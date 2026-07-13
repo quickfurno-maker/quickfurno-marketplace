@@ -43,7 +43,8 @@
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",
     "test:phase2a": "node scripts/phase2a-lead-lifecycle-harness.mjs",
     "test:phase2b": "node scripts/phase2b-lead-orchestration-adapter-harness.mjs",
-    "grant:superadmin": "node scripts/grant-superadmin.mjs"
+    "grant:superadmin": "node scripts/grant-superadmin.mjs",
+    "test:phase5f:d4c": "node scripts/phase5f-d4c-consent-ack-async-harness.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -29,6 +29,10 @@ import { CommunicationService, getWhatsAppProviderOverride } from "./communicati
 import { getActiveRecipientResolver } from "./communicationRecipientResolver";
 import { selectWhatsAppProvider } from "./whatsAppProviderSelection";
 import { getMetaOutboundCoordinator } from "./metaWhatsAppOutboundService";
+import {
+  createOutboundConsentEnforcer,
+  type OutboundConsentEnforcer,
+} from "./outboundConsentEnforcementService";
 
 export const RUNTIME_PROVIDER_UNAVAILABLE = "WHATSAPP_PROVIDER_NOT_CONFIGURED";
 
@@ -61,9 +65,19 @@ export function resolveRuntimeWhatsAppProvider(env: EnvSource = process.env): Re
  */
 export function createRuntimeCommunicationService(
   env: EnvSource = process.env,
-  coordinator: ApprovedTemplateOutboundCoordinator = getMetaOutboundCoordinator(env)
+  coordinator: ApprovedTemplateOutboundCoordinator = getMetaOutboundCoordinator(env),
+  // Phase 5F-D3-B — the outbound CONSENT ENFORCER. Appended as an OPTIONAL last parameter so every
+  // existing call site stays source-compatible, and DEFAULTED to the real coordinator so production
+  // can never construct a service without consent enforcement.
+  consentEnforcer: OutboundConsentEnforcer = createOutboundConsentEnforcer()
 ): Result<CommunicationService> {
   const provider = resolveRuntimeWhatsAppProvider(env);
   if (!provider.ok) return provider;
-  return ok(new CommunicationService(provider.data, getActiveRecipientResolver(), coordinator));
+  // THE PRODUCTION CONSTRUCTION BOUNDARY. Every real send path builds its CommunicationService here,
+  // so the consent enforcer is ALWAYS bound. A direct `new CommunicationService(...)` in production
+  // would bypass the consent layer — the D3-B harness statically proves no production send path does
+  // that, and would catch a future one.
+  return ok(
+    new CommunicationService(provider.data, getActiveRecipientResolver(), coordinator, consentEnforcer)
+  );
 }

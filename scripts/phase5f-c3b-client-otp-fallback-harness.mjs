@@ -260,6 +260,9 @@ function makeDeps(over = {}) {
   const calls = {
     primaryClaims: [], fallbackClaims: [], finalizes: [], decisions: [], gates: [],
     sends: [], smsSends: [], smsFactoriesUsed: [], securityEvents: [], serverLogs: [],
+    // Phase 5F-D3-B: records the injected consent authorization + a step ORDER trace, so the
+    // consent → claim → provider ordering is PROVEN, not assumed.
+    consentChecks: [], order: [],
   };
   const smsProvider = {
     providerKey: SMS_PROVIDER,
@@ -268,6 +271,7 @@ function makeDeps(over = {}) {
     // never a bare template key. The fake records the resolved descriptor it was handed.
     async sendResolvedAuthenticationSms(to, resolved, options) {
       calls.smsSends.push({ to, resolved, options });
+      calls.order.push("smsSend");
       return over.smsResult ?? {
         accepted: true, provider: SMS_PROVIDER, channel: "sms",
         providerMessageId: "exotel-sid-1", normalizedStatus: "accepted",
@@ -288,6 +292,7 @@ function makeDeps(over = {}) {
     }),
     claimFallbackAttempt: over.claimFallbackAttempt ?? (async (i) => {
       calls.fallbackClaims.push(i);
+      calls.order.push("claim");
       fallbackClaimCount += 1;
       // The RPC caps a single fallback per action: a second claim is ATTEMPT_LIMIT_REACHED.
       if (fallbackClaimCount > 1) {
@@ -315,6 +320,16 @@ function makeDeps(over = {}) {
     // same-OTP-in-body invariant is exercised end to end; overridable to force a render failure.
     resolveAuthenticationSmsContent: over.resolveAuthenticationSmsContent ??
       ((input) => M.Renderer.resolveAuthenticationSmsContent(input)),
+    // Phase 5F-D3-B: the SMS fallback now requires its OWN `channel: "sms"` consent authorization, and
+    // ABSENCE OF THE DEPENDENCY IS NEVER AUTHORIZATION (the orchestrator would lazily load the real
+    // coordinator, which this isolated build does not contain). These SMS-fallback tests therefore inject
+    // a DETERMINISTIC TEST ENFORCER. The `allow` lives ONLY here, in the harness dependency object —
+    // never in production code. Its call is recorded so the ordering (consent → claim → provider) is proven.
+    authorizeOutboundConsent: over.authorizeOutboundConsent ?? (async (enforcementInput) => {
+      calls.consentChecks.push(enforcementInput);
+      calls.order.push("consent");
+      return over.consentOutcome ?? { kind: "allow", scope: "authentication" };
+    }),
     logLedgerUnavailable: over.logLedgerUnavailable ?? ((line) => {
       calls.serverLogs.push(line);
       if (over.serverLogThrows) throw new Error("simulated server-log failure");
@@ -437,6 +452,41 @@ check("5. definitive_failure + NO failure rule → blocked, no SMS (default deny
 // ============================================================================
 // 6-8. THE ALLOWED PATH — CLAIMED EXACTLY ONCE
 // ============================================================================
+// Phase 5F-D3-B: the SMS fallback carries its OWN consent authorization, which must run BEFORE the
+// attempt-2 claim and BEFORE the provider. The enforcer used here is an INJECTED TEST DOUBLE — the
+// orchestrator itself has NO implicit allow: absent the injection it loads the real coordinator.
+check("6d. the SMS consent authorization runs BEFORE the claim and the provider; a DENY blocks both", async () => {
+  const allowed = await run(definitiveFailureOver({ decision: ALLOWED_DECISION, gate: READY_GATE() }));
+  assert(allowed.deps.calls.consentChecks.length === 1, `consent authorized exactly once, got ${allowed.deps.calls.consentChecks.length}`);
+  const c = allowed.deps.calls.consentChecks[0];
+  assert(c.channel === "sms", "the SMS channel gets its OWN decision — a WhatsApp decision never authorizes SMS");
+  assert(c.destinationSource === "ephemeral_auth_destination" && c.recipientId === null, "ephemeral destination, no principal claimed");
+  assert(typeof c.destinationHash === "string" && /^[0-9a-f]{64}$/.test(c.destinationHash), "a sha256 hash, never a plaintext phone");
+  const order = allowed.deps.calls.order.filter((s) => s === "consent" || s === "claim" || s === "smsSend");
+  assert(order.join(",") === "consent,claim,smsSend", `order was ${order.join(",")}`);
+
+  // Every non-allow outcome blocks BEFORE the claim and BEFORE the provider — zero of each.
+  for (const [outcome, expected] of [
+    [{ kind: "deny", code: "CONSENT_SUPPRESSED", retryable: false }, "SMS_CONSENT_DENIED"],
+    [{ kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true }, "SMS_CONSENT_AUTHORITY_UNAVAILABLE"],
+    [{ kind: "invalid", code: "CONSENT_ENFORCEMENT_INVALID", retryable: false }, "SMS_CONSENT_ENFORCEMENT_INVALID"],
+  ]) {
+    const { r, deps } = await run(definitiveFailureOver({ decision: ALLOWED_DECISION, gate: READY_GATE(), consentOutcome: outcome }));
+    assert(deps.calls.consentChecks.length === 1, `${expected}: consent was consulted`);
+    assert(deps.calls.fallbackClaims.length === 0, `${expected}: ZERO fallback claims`);
+    assert(deps.calls.smsSends.length === 0, `${expected}: ZERO SMS provider calls`);
+    assert(r.smsSent !== true && r.fallbackClaimed !== true, `${expected}: nothing was claimed or sent`);
+  }
+
+  // A THROWING enforcer is an authority outage, never an allow: it also blocks before claim/provider.
+  const thrown = await run(definitiveFailureOver({
+    decision: ALLOWED_DECISION, gate: READY_GATE(),
+    authorizeOutboundConsent: async () => { throw new Error("coordinator exploded"); },
+  }));
+  assert(thrown.deps.calls.fallbackClaims.length === 0 && thrown.deps.calls.smsSends.length === 0,
+    "a throwing coordinator sends NOTHING and claims NOTHING");
+});
+
 check("6. definitive_failure + rule + ready gate → fallback claimed ONCE, SMS sent once", async () => {
   const { r, deps } = await run(definitiveFailureOver({ decision: ALLOWED_DECISION, gate: READY_GATE() }));
   assert(r.kind === "delivered", `got ${r.kind}`);

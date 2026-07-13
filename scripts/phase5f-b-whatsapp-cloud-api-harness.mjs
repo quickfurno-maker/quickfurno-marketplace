@@ -256,6 +256,10 @@ class QB {
   order() { return this; }
   limit(n) { this.limitVal = n; return this; }
   eq(col, val) { this.filters.push((r) => r[col] === val); return this; }
+  // Phase 5F-D3-B compatibility: the runtime factory now binds the outbound consent enforcer, so this
+  // fake builder must be able to answer the D2-C suppression read, which filters with `.in("scope", …)`.
+  // A pure ADDITION — no existing filter, assertion or behaviour is changed.
+  in(col, vals) { this.filters.push((row) => vals.includes(row[col])); return this; }
   insert(row) { this.action = "insert"; this.data = row; return this; }
   update(u) { this.action = "update"; this.data = u; return this; }
   maybeSingle() { return this.single(); }

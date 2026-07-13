@@ -74,6 +74,14 @@ import { runtimeSmsAdapterFactory } from "./runtimeSmsAdapterFactory";
 import { evaluateSmsRuntimeReadiness } from "./smsProviderRuntimeService";
 import { recordAuthSecurityEvent } from "./authSecurityEventService";
 import { AuthSecurityEventType } from "../lib/identity/authSecurityEvent";
+// TYPE-ONLY import: erased at compile time, so an isolated legacy harness build that does not include
+// the coordinator module never has to resolve it. The real coordinator is bound LAZILY in
+// `defaultClientOtpDeliveryDeps()` below (a dynamic import inside the closure), so it is required only
+// when actually invoked — i.e. only in production.
+import type {
+  OutboundConsentEnforcer,
+  OutboundConsentOutcome,
+} from "./outboundConsentEnforcementService";
 
 /** This orchestrator serves exactly ONE auth flow. The vendor flows never reach it. */
 export const ORCHESTRATED_AUTH_FLOW = "client_login_otp" as const;
@@ -138,6 +146,17 @@ export const OrchestratorFallbackBlockReason = {
    * and evaluated BEFORE any attempt-2 claim, so it never consumes the fallback budget.
    */
   RESOLVED_BODY_UNAVAILABLE: "RESOLVED_BODY_UNAVAILABLE",
+  /**
+   * Phase 5F-D3-B — the SMS channel's OWN consent decision denied this send. A WhatsApp consent
+   * decision NEVER authorizes SMS: the fallback asks `channel: "sms"` independently. Deny-only, and
+   * evaluated BEFORE any attempt-2 claim, so it never consumes the fallback budget and never sends.
+   * Carries NO phone, hash, OTP, D2-C reason, suppression id, preference id or raw error.
+   */
+  SMS_CONSENT_DENIED: "SMS_CONSENT_DENIED",
+  /** The consent authority could not be evaluated for the SMS channel. Fail closed; no SMS. */
+  SMS_CONSENT_AUTHORITY_UNAVAILABLE: "SMS_CONSENT_AUTHORITY_UNAVAILABLE",
+  /** The consent enforcement request/authority was not trustworthy. Fail closed; no SMS. */
+  SMS_CONSENT_ENFORCEMENT_INVALID: "SMS_CONSENT_ENFORCEMENT_INVALID",
   BUDGET_EXHAUSTED: AUTH_NETWORK_DEADLINE_EXHAUSTED,
   FALLBACK_CLAIM_REJECTED: "FALLBACK_CLAIM_REJECTED",
 } as const;
@@ -180,6 +199,17 @@ export interface ClientOtpDeliveryDeps {
    * failure without a real provider.
    */
   readonly resolveAuthenticationSmsContent: typeof resolveAuthenticationSmsContent;
+  /**
+   * Phase 5F-D3-B — the PROVIDER-NEUTRAL outbound consent enforcer, used to give the SMS fallback its
+   * OWN `channel: "sms"` decision. This is the gate that closes the one real direct-provider bypass:
+   * before D3-B this path reached the SMS provider with a plaintext phone and no consent check at all.
+   *
+   * OPTIONAL for dependency INJECTION only. Absence is NEVER authorization: when it is not injected the
+   * fallback LAZILY loads and calls the REAL coordinator. There is no implicit allow anywhere — a missing
+   * dependency, a failed import, a thrown coordinator, an authority outage, an invalid request or an
+   * integrity violation all BLOCK the SMS before any claim or provider call.
+   */
+  readonly authorizeOutboundConsent?: OutboundConsentEnforcer["authorize"];
   /**
    * Emits the DB-INDEPENDENT `ledger_unavailable` server log line. Runs BEFORE the security
    * event write, because it is the only signal that survives a full database outage.
@@ -228,6 +258,12 @@ export function defaultClientOtpDeliveryDeps(): ClientOtpDeliveryDeps {
     evaluateSmsRuntimeReadiness,
     createRuntimeSmsProvider: (factory, env) => createRuntimeSmsProvider(factory, env),
     resolveAuthenticationSmsContent,
+    // Phase 5F-D3-B — bind the REAL provider-neutral consent coordinator (which calls D2-C). The import
+    // is LAZY (inside the closure) so the module is required only when the SMS fallback actually runs.
+    authorizeOutboundConsent: async (enforcementInput) => {
+      const mod = await import("./outboundConsentEnforcementService");
+      return mod.authorizeOutboundConsent(enforcementInput);
+    },
     // A single structured, sanitized, DB-INDEPENDENT server log line under a fixed greppable
     // prefix. Deliberately not a database write: it must survive a total DB outage.
     logLedgerUnavailable: (line) => {
@@ -573,6 +609,62 @@ export async function deliverClientLoginOtp(
     },
   });
   if (!rendered.ok) return blocked(OrchestratorFallbackBlockReason.RESOLVED_BODY_UNAVAILABLE);
+
+  // ──────────────────────────────────────────────────────────────────────────────
+  // 13c — PHASE 5F-D3-B: THE SMS CHANNEL'S OWN CONSENT DECISION.
+  //
+  // This is the gate that closes the ONE real direct-provider bypass in the repository: before D3-B
+  // this path reached the SMS provider with a plaintext phone and NO consent check whatsoever.
+  //
+  // A WhatsApp consent decision NEVER authorizes SMS. The fallback asks for `channel: "sms"`
+  // INDEPENDENTLY, so an sms-scoped or global suppression blocks the OTP here even when WhatsApp
+  // would have been allowed.
+  //
+  // It runs BEFORE the deadline check and BEFORE the attempt-2 claim, so a non-allow costs nothing:
+  // NO claim, NO provider call, NO OTP regeneration, NO OTP persistence. The destination is passed as
+  // the ALREADY-COMPUTED sha256 — never the plaintext phone — and the identity is derived by the
+  // coordinator as unknown/null (an ephemeral auth destination is caller-supplied and can never be
+  // upgraded to `exact` by the presence of a recipient id).
+  // ABSENCE IS NEVER AUTHORIZATION. The enforcer stays INJECTABLE for tests, but when it is not injected
+  // we LAZILY load and call the REAL coordinator — we do NOT fabricate an allow. The import is lazy (a
+  // dynamic import inside the closure) purely so an isolated build that never runs this path does not
+  // have to resolve the module; when the path DOES run, the real coordinator decides.
+  const authorize: OutboundConsentEnforcer["authorize"] =
+    deps.authorizeOutboundConsent ??
+    (async (enforcementInput) => {
+      const mod = await import("./outboundConsentEnforcementService");
+      return mod.authorizeOutboundConsent(enforcementInput);
+    });
+
+  let smsConsent: OutboundConsentOutcome;
+  try {
+    smsConsent = await authorize({
+      channel: "sms",
+      messageType: ORCHESTRATED_AUTH_FLOW,
+      templateKey: ORCHESTRATED_AUTH_FLOW,
+      lane: "authentication",
+      destinationHash,
+      destinationSource: "ephemeral_auth_destination",
+      recipientType: "client",
+      recipientId: null,
+    });
+  } catch {
+    // NO DECISION COULD BE OBTAINED AT ALL — a dynamic-import failure, or a coordinator that threw.
+    // That is an authority OUTAGE, never an allow. Fail closed onto the existing safe outcome.
+    return blocked(OrchestratorFallbackBlockReason.SMS_CONSENT_AUTHORITY_UNAVAILABLE);
+  }
+
+  if (smsConsent.kind !== "allow") {
+    // Sanitized + closed. The result carries NO phone, hash, OTP, D2-C reason, suppression id,
+    // preference id or raw error — only which of the three closed block reasons applied. The
+    // orchestrator NEVER reinterprets a D2-C disposition: it consumes the coordinator's closed outcome.
+    if (smsConsent.kind === "deny") return blocked(OrchestratorFallbackBlockReason.SMS_CONSENT_DENIED);
+    if (smsConsent.kind === "unavailable") {
+      return blocked(OrchestratorFallbackBlockReason.SMS_CONSENT_AUTHORITY_UNAVAILABLE);
+    }
+    // `invalid` — an invalid enforcement request or an untrustworthy authority (integrity violation).
+    return blocked(OrchestratorFallbackBlockReason.SMS_CONSENT_ENFORCEMENT_INVALID);
+  }
 
   // 14a — the deadline covers BOTH attempts. Below the minimum viable network budget a
   // request is not worth starting: it would abort mid-flight and park as `outcome_unknown`,

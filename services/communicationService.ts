@@ -59,6 +59,10 @@ import type {
 } from "../lib/communication/providers/whatsappProvider";
 import { effectiveOutcomeCertainty } from "../lib/communication/providers/whatsappProvider";
 import { supportsResolvedTemplate } from "../lib/communication/whatsappTemplate";
+import type {
+  OutboundConsentEnforcer,
+  OutboundConsentOutcome,
+} from "./outboundConsentEnforcementService";
 import {
   OutboundPreparationReason,
   type ApprovedTemplateOutboundCoordinator,
@@ -162,6 +166,17 @@ const COMMUNICATION_ERROR_MESSAGES = {
   RECIPIENT_DESTINATION_CHANGED:
     "The recipient destination changed after this message was queued; the message was not re-routed.",
   INVALID_STATE_TRANSITION: "The requested communication status transition is not allowed.",
+  // Phase 5F-D3-B — outbound consent enforcement. Sanitized and closed: none of these carries a
+  // destination, a hash, a disposition, a matched row id, or a database error.
+  CONSENT_SUPPRESSED: "An active suppression prohibits this communication; nothing was sent.",
+  CONSENT_NOT_GRANTED: "Consent for this communication was not granted; nothing was sent.",
+  UNCLASSIFIED_MESSAGE_TYPE: "This message type is not classified for consent; nothing was sent.",
+  MESSAGE_TYPE_TEMPLATE_MISMATCH:
+    "The message type and template do not form an approved pair; nothing was sent.",
+  MESSAGE_LANE_SCOPE_MISMATCH: "The message lane does not match its approved consent scope; nothing was sent.",
+  CONSENT_AUTHORITY_UNAVAILABLE: "The consent authority could not be evaluated; nothing was sent.",
+  CONSENT_AUTHORITY_INTEGRITY: "The consent authority returned an untrustworthy result; nothing was sent.",
+  CONSENT_ENFORCEMENT_INVALID: "The consent enforcement request was invalid; nothing was sent.",
   INVALID_WEBHOOK_SIGNATURE: "Webhook signature verification failed.",
   WEBHOOK_PAYLOAD_UNPARSEABLE: "Webhook body is not a JSON object.",
   WEBHOOK_RECEIPT_INSERT_FAILED: "The webhook receipt could not be written.",
@@ -245,6 +260,20 @@ function readScalar(value: unknown): string | null {
   return null;
 }
 
+/**
+ * PHASE 5F-D3-B — the CLOSED ledger-channel → consent-channel map. PURE and total.
+ *
+ * `whatsapp` and `sms` are the only channels D3-B enforces consent for. Anything else — `rcs`, or any
+ * future channel added to the ledger vocabulary — returns `null`, and the caller FAILS CLOSED. It is
+ * never coerced to `whatsapp`: a channel we cannot ask D2-C about must not inherit another channel's
+ * consent decision. Exported so the harness can prove the coercion is impossible.
+ */
+export function toEnforcementChannel(channel: string | null | undefined): "whatsapp" | "sms" | null {
+  if (channel === "whatsapp") return "whatsapp";
+  if (channel === "sms") return "sms";
+  return null; // rcs / unknown / missing → NO consent channel → fail closed. Never WhatsApp.
+}
+
 /** Exponential backoff, capped, computed from the attempt just consumed. */
 export function nextRetryDelaySeconds(attemptCount: number): number {
   const exponent = Math.max(0, attemptCount - 1);
@@ -310,15 +339,27 @@ export class CommunicationService {
    * never touches it. Absent + approved-mapping adapter ⇒ fail closed.
    */
   private readonly approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null;
+  /**
+   * Phase 5F-D3-B — the outbound CONSENT ENFORCEMENT coordinator. OPTIONAL on the constructor purely
+   * so the many historical harnesses that construct this service directly stay source-compatible; the
+   * PRODUCTION construction boundary (`createRuntimeCommunicationService`) ALWAYS injects the real one,
+   * and the D3-B harness proves every production send path goes through that factory.
+   *
+   * This service NEVER interprets consent. It consumes only the coordinator's CLOSED outcome and never
+   * sees a disposition, a preference row or a suppression row.
+   */
+  private readonly consentEnforcer: OutboundConsentEnforcer | null;
 
   constructor(
     provider: WhatsAppProvider = getActiveWhatsAppProvider(),
     recipientResolver: CommunicationRecipientResolver = getActiveRecipientResolver(),
-    approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null = null
+    approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null = null,
+    consentEnforcer: OutboundConsentEnforcer | null = null
   ) {
     this.provider = provider;
     this.recipientResolver = recipientResolver;
     this.approvedTemplateCoordinator = approvedTemplateCoordinator;
+    this.consentEnforcer = consentEnforcer;
   }
 
   /** True when this adapter requires an approved provider mapping (capability, not a key). */
@@ -673,6 +714,27 @@ export class CommunicationService {
       }
       const destination = destinationResult.data;
 
+      // ────────────────────────────────────────────────────────────────────────
+      // PHASE 5F-D3-B — THE ONE AUTHORITATIVE CONSENT GATE
+      //
+      // Placed AFTER the destination is resolved (so the hash is verified against the row) and
+      // BEFORE the atomic claim (so a denial can still be terminalized from `queued` /
+      // `retry_scheduled`; `dispatching` has NO legal edge to `cancelled`). It runs EXACTLY ONCE
+      // per dispatch attempt, which is what makes an immediate send, a future scheduled send and
+      // every retry ALL re-evaluate consent — so a STOP created after enqueue but before dispatch
+      // IS observed.
+      //
+      // This service NEVER interprets consent: it consumes the coordinator's CLOSED outcome and
+      // never sees a disposition, a preference row or a suppression row.
+      //
+      // HONEST LIMIT: there is NO transaction spanning the Supabase consent read and the external
+      // provider request. A STOP committed inside that window can still be followed by one
+      // in-flight send. This gate makes that window as small as it can be (read → claim → send);
+      // it does not — and cannot — eliminate it.
+      // ────────────────────────────────────────────────────────────────────────
+      const consentDenial = await this.enforceOutboundConsent(message);
+      if (consentDenial) return consentDenial;
+
       // Atomic claim. A loser here has sent nothing and must send nothing.
       const claim = await this.claimMessageForDispatch(message);
       if (!claim.ok) return claim;
@@ -704,6 +766,135 @@ export class CommunicationService {
     } catch (e) {
       return fail(e);
     }
+  }
+
+  /**
+   * PHASE 5F-D3-B — enforce the outbound consent layer for ONE dispatch attempt.
+   *
+   * Returns `null` when the dispatch may CONTINUE, or a terminal `Result` (already reflected in the
+   * ledger) when it must STOP. In every stop case ZERO provider calls have occurred.
+   *
+   * A `null` enforcer means this service was constructed directly (a legacy/isolated harness path).
+   * The PRODUCTION construction boundary is `createRuntimeCommunicationService`, which ALWAYS injects
+   * the real enforcer; the D3-B harness statically proves every production send path uses that factory
+   * and would catch a future direct construction that omits it.
+   */
+  private async enforceOutboundConsent(
+    message: CommunicationMessage
+  ): Promise<Result<CommunicationMessage> | null> {
+    if (!this.consentEnforcer) return null;
+
+    // EXPLICIT, CLOSED channel mapping — never a coercion.
+    //
+    // `whatsapp` → `whatsapp` and `sms` → `sms`, and NOTHING else. An `rcs` row, or any future/unknown
+    // channel, is NOT silently treated as WhatsApp: it has no consent channel we are authorized to ask
+    // about, so it FAILS CLOSED here — before the consent authorization, before the claim, and before any
+    // provider invocation. There is deliberately no fallback-to-WhatsApp path. (The foreign-channel guard
+    // at the top of `dispatchMessage` already rejects such a row for this provider; this is the second,
+    // independent fence, so a future provider whose channel differs can never inherit WhatsApp's consent.)
+    const enforcementChannel = toEnforcementChannel(message.channel);
+    if (!enforcementChannel) {
+      return await this.terminalizeBeforeClaim(
+        message,
+        "failed",
+        "UNSUPPORTED_DISPATCH_CHANNEL",
+        COMMUNICATION_ERROR_MESSAGES.UNSUPPORTED_DISPATCH_CHANNEL
+      );
+    }
+
+    let outcome: OutboundConsentOutcome;
+    try {
+      outcome = await this.consentEnforcer.authorize({
+        channel: enforcementChannel,
+        messageType: message.message_type,
+        templateKey: message.template_key ?? "",
+        lane: message.lane,
+        destinationHash: message.destination_hash,
+        destinationSource: message.destination_source,
+        recipientType: message.recipient_type,
+        recipientId: message.recipient_id,
+      });
+    } catch {
+      // A thrown enforcer is INFRASTRUCTURE, never a decision. Treated exactly like `unavailable`.
+      outcome = { kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true };
+    }
+
+    if (outcome.kind === "allow") return null;
+
+    const code = outcome.code as CommunicationErrorCode;
+    const reason = COMMUNICATION_ERROR_MESSAGES[code];
+
+    // DENY — a definitive consent refusal. CANCEL it: `cancelled` is a legal edge from both `queued`
+    // and `retry_scheduled`, it is terminal, and it is NOT `failed` (nothing failed — we chose not to
+    // send). No `failed_at` is stamped.
+    if (outcome.kind === "deny") {
+      return await this.terminalizeBeforeClaim(message, "cancelled", code, reason);
+    }
+
+    // INVALID / INTEGRITY — the request or the authority is untrustworthy. Deterministic: retrying can
+    // never help, so it is a definitive `failed` (with `failed_at`), never a cancellation.
+    if (outcome.kind === "invalid") {
+      return await this.terminalizeBeforeClaim(message, "failed", code, reason);
+    }
+
+    // UNAVAILABLE — infrastructure, not a decision. The two lanes diverge, and deliberately so:
+    //
+    //   AUTHENTICATION: the OTP is NEVER persisted, so this row can never be re-dispatched by any
+    //   worker. Leaving it queued would leak a permanently undeliverable row. It becomes `failed`;
+    //   the user simply requests a fresh OTP, which re-evaluates consent from scratch.
+    //
+    //   BUSINESS: the row IS re-dispatchable. Do NOT cancel and do NOT fail it — a transient consent
+    //   authority blip must never destroy a legitimate message. Leave its status UNCHANGED and return
+    //   a retryable failure, so a future dispatch re-evaluates consent.
+    if (message.lane === "authentication") {
+      return await this.terminalizeBeforeClaim(message, "failed", code, reason);
+    }
+    return fail(commError(code));
+  }
+
+  /**
+   * PHASE 5F-D3-B — COMPARE-AND-SET terminalization, BEFORE any claim.
+   *
+   * Updates by `id` AND the EXACT status we read. If another worker claimed or moved the row in
+   * between, ZERO rows match: we return the existing safe concurrent-claim outcome and — critically —
+   * the provider is NEVER called on either side. An unconditional update would clobber a row another
+   * worker is already dispatching.
+   */
+  private async terminalizeBeforeClaim(
+    message: CommunicationMessage,
+    target: Extract<CommunicationMessageStatus, "cancelled" | "failed">,
+    failureCode: CommunicationErrorCode,
+    failureReason: string
+  ): Promise<Result<CommunicationMessage>> {
+    if (!isValidTransition(message.status, target)) {
+      return fail(commError("INVALID_STATE_TRANSITION"));
+    }
+
+    const nowIso = new Date().toISOString();
+    const updates: Record<string, unknown> = {
+      status: target,
+      next_retry_at: null,
+      failure_code: failureCode,
+      failure_reason_sanitized: sanitizeFailureReason(failureReason),
+      updated_at: nowIso,
+    };
+    // `cancelled` is not a failure: nothing broke, we declined to send. Only `failed` stamps failed_at.
+    if (target === "failed") updates.failed_at = nowIso;
+
+    const { data, error } = await adminClient()
+      .from("communication_messages")
+      .update(updates)
+      .eq("id", message.id)
+      .eq("status", message.status)
+      .select("*");
+
+    if (error) throw error;
+
+    const updated = (data ?? []) as CommunicationMessage[];
+    // Lost the race: another worker moved the row between our read and our write. Return the safe
+    // concurrent outcome and call NO provider. We never clobber their claim.
+    if (updated.length !== 1) return fail(commError("MESSAGE_ALREADY_CLAIMED"));
+    return ok(updated[0]);
   }
 
   /**

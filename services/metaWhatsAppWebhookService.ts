@@ -46,7 +46,7 @@ import {
 } from "../lib/communication/providers/metaWhatsAppWebhook";
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
 import { processInboundConsentCommands } from "./inboundConsentCommandService";
-import { processConsentCommandResponses } from "./consentCommandResponseService";
+import { enqueueConsentCommandResponses } from "./consentCommandResponseService";
 
 const CHANNEL = "whatsapp";
 
@@ -174,26 +174,30 @@ export async function handleMetaWhatsAppWebhookPost(input: {
     const commands = await processInboundConsentCommands(inbound.result.processed);
     if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };
 
-    // Phase 5F-D4-B — ACKNOWLEDGEMENT, strictly AFTER the authoritative command flow has COMPLETED.
+    // Phase 5F-D4-C — DURABLE ENQUEUE, strictly AFTER the authoritative command flow has COMPLETED.
     //
     // Order: verified webhook → D1-B persist → D2-E command (→ D2-D write for STOP/START) → THEN this.
     // It is reached only once `commands.ok` is true, so for STOP/START the writer result already exists;
-    // an acknowledgement can never precede the authoritative write.
+    // an acknowledgement intent can never precede the authoritative write.
     //
-    // It is BEST-EFFORT and NON-AUTHORITATIVE. A suppression, a rate limit, a missing template, an absent
-    // provider, a rejection, a timeout, an unknown outcome or a throw must NEVER turn a successful consent
-    // command into an error — so it is wrapped, its result is deliberately discarded, and the webhook
-    // returns exactly the outcome the inbound command flow produced. Nothing about the acknowledgement is
-    // exposed in the provider-facing response.
+    // THIS SENDS NOTHING. D4-B awaited the provider call here, which — once the templates are seeded — would
+    // put a real outbound HTTP call to Meta INSIDE the request Meta is waiting on, and a slow provider would
+    // push us past Meta's tolerance and trigger REDELIVERY. So the webhook now only persists ONE DURABLE
+    // INTENT and returns. A Core-owned worker claims it later, re-evaluates D2-C, and dispatches.
+    // No provider call, no CommunicationService, no worker invocation, no background promise, no n8n.
+    //
+    // It is BEST-EFFORT and NON-AUTHORITATIVE. A failed insert, an absent encryption key, a duplicate or a
+    // throw must NEVER turn a successful consent command into an error — so it is wrapped, its result is
+    // deliberately discarded, and the webhook returns exactly the outcome the inbound command flow produced.
     try {
-      await processConsentCommandResponses({
+      await enqueueConsentCommandResponses({
         payload,
         webhookReceiptId: inbound.result.receiptId,
         persisted: inbound.result.processed,
         commands: commands.result.items,
       });
     } catch {
-      /* acknowledgement is never authoritative — the consent command already stands */
+      /* the acknowledgement intent is never authoritative — the consent command already stands */
     }
 
     const r = inbound.result;

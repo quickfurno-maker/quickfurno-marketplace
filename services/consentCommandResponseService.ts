@@ -1,42 +1,61 @@
 // ============================================================================
-// QuickFurno — services/consentCommandResponseService.ts   (Phase 5F-D4-B, server-only)
+// QuickFurno — services/consentCommandResponseService.ts   (Phase 5F-D4-C, server-only)
 //
-// The EVIDENCE-BOUND acknowledgement path for inbound consent commands (STOP / START / HELP).
+// THE ENQUEUE PATH for consent-command acknowledgements (STOP / START / HELP).
 //
-// AUTHORITY. QuickFurno Core remains authoritative. This service DECIDES NOTHING about consent:
-//   • D2-D remains the sole STOP/START writer — this service never writes consent state;
-//   • D2-C remains the sole consent/suppression decision authority — this service asks it, and obeys;
-//   • D2-E remains the sole inbound command integrator — this service only READS its completed result.
-// It writes no consent row, reads no consent table, and never interprets a suppression or preference.
+// WHAT CHANGED IN D4-C. D4-B sent the acknowledgement INLINE, awaited inside the Meta webhook request. Once
+// the templates are seeded that becomes a real outbound HTTP call to Meta inside the request Meta is waiting
+// on — a slow provider then pushes the response past Meta's tolerance and Meta REDELIVERS. This service now
+// does exactly one thing: it persists ONE DURABLE INTENT and returns. It sends nothing.
 //
-// WHY A SEPARATE PATH. A STOP makes D2-D suppress `marketing` AND `transactional`, so an ordinary
-// transactional acknowledgement would be cancelled by the very STOP it confirms. The acknowledgement is a
-// one-shot, user-solicited response to the user's OWN explicit command, so it is authorized by PROOF OF
-// THAT COMMAND — never by a bypass flag. The three acknowledgement types are DELIBERATELY ABSENT from the
-// ordinary D3-B registry, so `authorizeOutboundConsent` denies them as UNCLASSIFIED_MESSAGE_TYPE. The only
-// authorizer that can pass one is the PRIVATE, ONE-SHOT, evidence-bound enforcer below. There is no
-// reusable suppression bypass: the bypass is bound 1:1 to a single validated inbound command.
+// WHAT THIS SERVICE NO LONGER DOES — and must never do again:
+//   • it does NOT call D2-C          (the worker re-evaluates consent immediately before dispatch);
+//   • it does NOT construct CommunicationService;
+//   • it does NOT call a provider;
+//   • it does NOT dispatch, schedule or invoke a worker;
+//   • it does NOT return plaintext, ciphertext, nonce, auth tag, key id or destination hash.
 //
-// ORDER (never violated). verified webhook → D1-B persist → D2-E command (→ D2-D write) → THEN this.
-// For STOP/START the writer result must already exist; this service only ever sees a COMPLETED D2-E result.
+// WHAT IT STILL GUARANTEES (the D4-B evidence contract, unchanged):
+//   • only a real STOP/START/HELP with an ELIGIBLE authoritative disposition is ever enqueued;
+//   • a REPLAYED command produces ZERO intents;
+//   • the acknowledgement type and template are DERIVED from the command, never supplied;
+//   • the plaintext destination is re-derived in REQUEST MEMORY from the already-verified payload, and its
+//     hash must EXACTLY equal the persisted hash, or nothing is enqueued;
+//   • the D4-B idempotency key is the fence: `idempotency_key UNIQUE` means a webhook REPLAY can never
+//     create a second intent.
 //
-// BEST-EFFORT, NON-AUTHORITATIVE. Acknowledgement delivery NEVER rolls back, repeats, weakens or alters the
-// consent command, and never changes the webhook's success/failure decision. A missing template, an absent
-// provider, a suppression, a rate limit, a rejection, a timeout or a throw all end in ZERO further effect.
+// AUTHORITY. D2-D remains the sole STOP/START writer; D2-C remains the sole consent decision authority; D2-E
+// remains the sole inbound command integrator. This service reads their COMPLETED results and writes one
+// delivery intent. It writes no consent state and interprets no suppression.
 //
-// PRIVACY. The plaintext destination is re-derived in REQUEST MEMORY only (from the already-verified,
-// already-parsed payload, via the same pure normalizer D1-B uses) and is never persisted, never logged and
-// never returned. No raw webhook body, OTP, consent row, provider secret or database error ever escapes.
+// BEST-EFFORT, NON-AUTHORITATIVE. Failure to enqueue NEVER rolls back, weakens or alters the completed
+// consent command, and never changes the webhook's response.
+//
+// PRIVACY. The plaintext exists only in request memory. It leaves this process ONLY as an AES-256-GCM
+// ciphertext, AAD-bound to the one intent it belongs to, expiring with it, purged on terminalization. No
+// plaintext phone, raw payload, message body, provider secret or database error ever escapes.
 // ============================================================================
 
+import { randomUUID } from "crypto";
+
+import { adminClient } from "../lib/supabase";
 import { hashPhoneE164 } from "../lib/communication/phone";
 import { normalizeMetaInboundWebhook } from "../lib/communication/providers/metaWhatsAppInbound";
-import { ephemeralAuthDestination, type CommunicationIntent } from "../lib/communication/types";
+import {
+  AAD_SCHEMA_VERSION,
+  canonicalAckAad,
+  deriveAckExpiry,
+  isValidAckAadFields,
+  type AckAadFields,
+} from "../lib/communication/consentAckIntent";
+import { sealAckDestination } from "../lib/communication/consentAckDestinationSeal";
+import {
+  deriveProviderEventId,
+  mapAdapterProviderToConsentProvider,
+} from "../lib/communication/inboundConsentCommandInput";
 import {
   ACK_CHANNEL,
   ACK_DESTINATION_SOURCE,
-  ACK_LANE,
-  ACK_RECIPIENT_TYPE,
   CONSENT_ACK_TYPES,
   deriveConsentAckPlan,
   type AckCommand,
@@ -44,13 +63,6 @@ import {
   type ConsentAckPlan,
   type ConsentCommandEvidence,
 } from "../lib/communication/consentCommandResponse";
-import { decideCommunicationConsent } from "./communicationConsentDecisionService";
-import type {
-  OutboundConsentEnforcementInput,
-  OutboundConsentEnforcer,
-  OutboundConsentOutcome,
-} from "./outboundConsentEnforcementService";
-import { createRuntimeCommunicationService } from "./runtimeCommunicationService";
 
 // ----------------------------------------------------------------------------
 // Public input — ONLY verified, already-processed facts
@@ -67,7 +79,7 @@ export interface AckPersistedItem {
   };
 }
 
-/** The minimal shape of one D2-E command result this service reads. */
+/** The minimal shape of one D2-E COMPLETED command result this service reads. */
 export interface AckCommandItem {
   readonly inboundMessageId: string;
   readonly command: string | null;
@@ -78,19 +90,19 @@ export interface AckCommandItem {
 export interface ConsentCommandResponseInput {
   /** The ALREADY-VERIFIED, ALREADY-PARSED Meta payload. This service verifies nothing. */
   readonly payload: Record<string, unknown>;
-  /** The whole-payload webhook receipt id D1-B obtained, when it did. */
   readonly webhookReceiptId: string | null;
   /** D1-B's durably-persisted items (the SUCCESSFUL persistence result). */
   readonly persisted: readonly AckPersistedItem[];
-  /** D2-E's COMPLETED per-item command results. For STOP/START the writer result already exists. */
+  /** D2-E's COMPLETED per-item command results. For STOP/START the D2-D writer result already exists. */
   readonly commands: readonly AckCommandItem[];
 }
 
 // ----------------------------------------------------------------------------
-// Public output — sanitized; never a phone, payload, provider error or consent row
+// Public output — sanitized. Never a phone, ciphertext, key id, hash, payload or DB error.
 // ----------------------------------------------------------------------------
-export type AckItemOutcome =
-  | "sent"
+export type AckEnqueueOutcome =
+  | "enqueued"
+  | "duplicate"                 // the idempotency key already exists → safe no-op (a replay, or a retry)
   | "not_a_command"
   | "ineligible_disposition"
   | "replayed"
@@ -98,128 +110,112 @@ export type AckItemOutcome =
   | "destination_mismatch"
   | "provider_message_mismatch"
   | "unsupported_channel"
-  | "suppressed"
-  | "authority_unavailable"
-  | "enforcement_invalid"
-  | "send_failed";
+  | "receipt_not_found"         // STOP/START with no authoritative D2-D receipt → never enqueued
+  | "seal_unavailable"          // encryption not configured / malformed → fail closed, consent untouched
+  | "enqueue_failed";
 
-export interface AckItemResult {
+export interface AckEnqueueItemResult {
   readonly inboundMessageId: string;
   readonly ackType: string | null;
-  readonly outcome: AckItemOutcome;
+  readonly outcome: AckEnqueueOutcome;
 }
 
 export interface ConsentCommandResponseResult {
   readonly candidates: number;
-  readonly attempted: number;
-  readonly sent: number;
+  readonly enqueued: number;
+  readonly duplicates: number;
   readonly skipped: number;
   readonly failed: number;
-  readonly items: readonly AckItemResult[];
+  readonly items: readonly AckEnqueueItemResult[];
 }
 
-/** ALWAYS `ok: true`. Acknowledgement is BEST-EFFORT: it can never fail the inbound command flow. */
+/** ALWAYS `ok: true`. Enqueue is BEST-EFFORT: it can never fail the inbound consent-command flow. */
 export interface ConsentCommandResponseOutcome {
   readonly ok: true;
   readonly result: ConsentCommandResponseResult;
 }
 
 // ----------------------------------------------------------------------------
-// Injectable collaborators — production binds D2-C and the runtime factory
+// Injectable collaborators
 // ----------------------------------------------------------------------------
+export interface AckIntentRow {
+  readonly id: string;
+  readonly idempotency_key: string;
+  readonly consent_command_receipt_id: string | null;
+  readonly inbound_message_id: string;
+  readonly ack_type: string;
+  readonly command: string;
+  readonly authoritative_disposition: string;
+  readonly provider: string;
+  readonly canonical_provider_message_hash: string;
+  readonly destination_hash: string;
+  readonly sealed_destination_ciphertext: string;
+  readonly sealed_destination_nonce: string;
+  readonly sealed_destination_auth_tag: string;
+  readonly encryption_key_id: string;
+  readonly aad_schema_version: number;
+  readonly received_at: string;
+  readonly expires_at: string;
+}
+
+export type InsertIntentResult = "inserted" | "duplicate" | "failed";
+
 export interface ConsentCommandResponseDeps {
-  /** The SOLE consent decision authority. Never bypassed, never re-implemented. */
-  readonly decide: typeof decideCommunicationConsent;
-  /** The PRODUCTION construction boundary. The one-shot enforcer is injected THROUGH it. */
-  readonly createService: (enforcer: OutboundConsentEnforcer) => ReturnType<typeof createRuntimeCommunicationService>;
+  /**
+   * Resolve the AUTHORITATIVE D2-D consent-command receipt for a STOP/START.
+   * HELP writes no consent state (D2-D policy P3) and therefore has NO receipt — the receipts table only
+   * accepts normalized_command in ('stop','start') — so HELP resolves to `null` WITHOUT a lookup.
+   * A STOP/START whose receipt cannot be found is NEVER enqueued: the intent must bind to a real result.
+   */
+  readonly resolveReceiptId: (q: {
+    readonly provider: string;
+    readonly providerMessageId: string;
+    readonly channel: string;
+    /** The command being enqueued. The receipt MUST have written this exact command. */
+    readonly normalizedCommand: string;
+  }) => Promise<string | null>;
+  /** Conflict-safe single-intent insert. A unique-key collision is a DUPLICATE, never an error. */
+  readonly insertIntent: (row: AckIntentRow) => Promise<InsertIntentResult>;
+  /** Seal the destination. Production binds AES-256-GCM with the environment key set. */
+  readonly seal: typeof sealAckDestination;
 }
 
 export function defaultConsentCommandResponseDeps(): ConsentCommandResponseDeps {
   return {
-    decide: (input, deps) => decideCommunicationConsent(input, deps),
-    // The existing runtime factory, with the ONE-SHOT enforcer substituted for the ordinary D3-B one.
-    // Every provider, runtime, approved-template, mapping and canary gate stays exactly as it is.
-    createService: (enforcer) => createRuntimeCommunicationService(process.env, undefined, enforcer),
-  };
-}
-
-// ----------------------------------------------------------------------------
-// THE ONE-SHOT, EVIDENCE-BOUND ENFORCER  (private to this module — never exported)
-// ----------------------------------------------------------------------------
-const invalid = (): OutboundConsentOutcome => ({ kind: "invalid", code: "CONSENT_ENFORCEMENT_INVALID", retryable: false });
-const denied = (): OutboundConsentOutcome => ({ kind: "deny", code: "CONSENT_SUPPRESSED", retryable: false });
-const unavailable = (): OutboundConsentOutcome => ({ kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true });
-
-/**
- * Authorizes EXACTLY ONE outbound message, and only the one the plan describes.
- *
- * It is ONE-USE: the second call fails closed, so a compromised or buggy caller cannot reuse a single
- * validated command to authorize a stream of sends. Every field of the enforcement input is compared to the
- * approved plan — channel, message type, template key, lane, destination hash, destination source and the
- * neutral recipient shape. Any mismatch is a closed `invalid`.
- *
- * Only AFTER that binding passes does it consult D2-C, with the fixed, non-negotiable identity:
- *   channel: whatsapp · scope: authentication · identityConfidence: unknown · principal: null
- * `authentication` is the ONLY scope D2-C evaluates against GLOBAL suppression alone — which is exactly the
- * rule a user-solicited command response needs. A global suppression (hard bounce, complaint, legal,
- * provider block) still BLOCKS the acknowledgement, as it must.
- */
-function createOneShotAckEnforcer(
-  plan: ConsentAckPlan,
-  deps: ConsentCommandResponseDeps
-): OutboundConsentEnforcer {
-  let used = false;
-
-  return {
-    async authorize(input: OutboundConsentEnforcementInput): Promise<OutboundConsentOutcome> {
-      // ONE-USE. A second authorization attempt can never succeed.
-      if (used) return invalid();
-      used = true;
-
-      if (!input) return invalid();
-      // EXACT binding to the approved plan. Nothing here is caller-selectable.
-      if (input.channel !== plan.channel) return invalid();
-      if (input.messageType !== plan.ackType) return invalid();
-      if (input.templateKey !== plan.templateKey) return invalid();
-      if (input.lane !== plan.lane) return invalid();
-      if (input.destinationHash !== plan.destinationHash) return invalid();
-      if (input.destinationSource !== plan.destinationSource) return invalid();
-      if (input.recipientType !== plan.recipientType) return invalid();
-      if (input.recipientId !== null) return invalid();     // never an exact principal
-
-      // D2-C — the sole authority. This module never reads a consent table and never interprets a row.
-      let decision;
-      try {
-        decision = await deps.decide({
-          channel: ACK_CHANNEL,
-          scope: "authentication",       // global-suppression-only semantics (see the header)
-          destinationHash: plan.destinationHash,
-          identityConfidence: "unknown", // NEVER upgraded from an inbound principal id
-          principal: null,
-        });
-      } catch {
-        return unavailable();            // infrastructure, never a decision
-      }
-
-      if (!decision.ok) {
-        // Fail closed. A lookup failure is retryable infrastructure; everything else is untrustworthy.
-        if (decision.code === "AUTHORITY_LOOKUP_FAILED") return unavailable();
-        return invalid();                // integrity violation / invalid input / anything unexpected
-      }
-
-      if (decision.disposition === "blocked") return denied();                 // global suppression
-      if (decision.disposition === "no_consent_objection") {
-        return { kind: "allow", scope: "authentication" };
-      }
-      return invalid();                  // unknown / marketing_opted_in / any future disposition
+    async resolveReceiptId({ provider, providerMessageId, channel, normalizedCommand }) {
+      const db = adminClient();
+      const { data, error } = await db
+        .from("communication_consent_command_receipts")
+        .select("id")
+        // The unique key is (provider, provider_message_id, channel) — an EXACT lookup, never an
+        // arbitrary first match. `normalized_command` is pinned too, so a STOP can never bind to a
+        // START's authoritative receipt (or vice versa): a mismatch simply resolves to null.
+        .eq("provider", provider)
+        .eq("provider_message_id", providerMessageId)
+        .eq("channel", channel)
+        .eq("normalized_command", normalizedCommand)
+        .maybeSingle();
+      if (error) throw error;                     // caller converts to a CLOSED outcome; nothing leaks
+      return (data?.id as string | undefined) ?? null;
     },
+
+    async insertIntent(row) {
+      const db = adminClient();
+      const { error } = await db.from("communication_consent_ack_intents").insert(row);
+      if (!error) return "inserted";
+      // 23505 = unique_violation on idempotency_key → a replay or a concurrent webhook. Safe no-op.
+      if ((error as { code?: string }).code === "23505") return "duplicate";
+      return "failed";                            // the raw error NEVER escapes this module
+    },
+
+    seal: sealAckDestination,
   };
 }
 
 // ----------------------------------------------------------------------------
-// The orchestration
+// Orchestration
 // ----------------------------------------------------------------------------
-const REJECT_TO_OUTCOME: Readonly<Record<AckRejectReasonValue, AckItemOutcome>> = Object.freeze({
+const REJECT_TO_OUTCOME: Readonly<Record<AckRejectReasonValue, AckEnqueueOutcome>> = Object.freeze({
   NOT_A_COMMAND: "not_a_command",
   INELIGIBLE_DISPOSITION: "ineligible_disposition",
   REPLAYED_COMMAND: "replayed",
@@ -232,24 +228,24 @@ const REJECT_TO_OUTCOME: Readonly<Record<AckRejectReasonValue, AckItemOutcome>> 
 const isAckCommand = (v: unknown): v is AckCommand => v === "stop" || v === "start" || v === "help";
 
 /**
- * Attempt at most ONE acknowledgement per inbound command. BEST-EFFORT: it always returns `ok: true`, so a
- * failure here can never turn a successful consent command into a webhook error.
+ * Persist AT MOST ONE durable acknowledgement intent per inbound command, then return. Sends NOTHING.
+ * ALWAYS `ok: true` — a failure here can never turn a successful consent command into a webhook error.
  */
-export async function processConsentCommandResponses(
+export async function enqueueConsentCommandResponses(
   input: ConsentCommandResponseInput,
   deps: ConsentCommandResponseDeps = defaultConsentCommandResponseDeps()
 ): Promise<ConsentCommandResponseOutcome> {
-  const items: AckItemResult[] = [];
-  let attempted = 0;
-  let sent = 0;
+  const items: AckEnqueueItemResult[] = [];
+  let enqueued = 0;
+  let duplicates = 0;
   let failed = 0;
 
   const commands = Array.isArray(input?.commands) ? input.commands : [];
   const persisted = Array.isArray(input?.persisted) ? input.persisted : [];
 
   // Re-derive the sender destination IN REQUEST MEMORY, from the already-verified payload, using the SAME
-  // pure normalizer D1-B used. `senderPhoneE164` is a request-memory-only sibling: it is never persisted,
-  // never logged and never returned. This is why D1-B's privacy contract needs no change.
+  // pure normalizer D1-B used. This is the ONLY moment the plaintext exists. It leaves this process only as
+  // an AAD-bound ciphertext — which is why D1-B's privacy contract needs no change.
   const normalized = normalizeMetaInboundWebhook(input?.payload ?? {});
   const plaintextByWamid = new Map<string, string>();
   for (const n of normalized) {
@@ -261,23 +257,32 @@ export async function processConsentCommandResponses(
   }
 
   for (const cmd of commands) {
-    // Only a real STOP/START/HELP is ever answered. Unsupported text and non-text never reach the plan.
-    if (!isAckCommand(cmd?.command)) continue;
+    if (!isAckCommand(cmd?.command)) continue;    // unsupported text / non-text is never answered
 
     const inboundMessageId = typeof cmd.inboundMessageId === "string" ? cmd.inboundMessageId : "";
     const item = persistedById.get(inboundMessageId);
-    const push = (ackType: string | null, outcome: AckItemOutcome): void => {
+    const push = (ackType: string | null, outcome: AckEnqueueOutcome): void => {
       items.push({ inboundMessageId, ackType, outcome });
     };
 
     if (!item) { push(null, "invalid_evidence"); failed++; continue; }
 
+    // ── THE PROVIDER VOCABULARY BRIDGE ──────────────────────────────────────────────────────────────────
+    // D1-B's receipt speaks the ADAPTER vocabulary: provider `meta_whatsapp_cloud`, and the RAW wamid.
+    // D2-D's authoritative receipt speaks the CONSENT vocabulary: provider `meta_whatsapp`, and the
+    // sha256 of that wamid (a raw wamid is base64 — it contains `+ / =` and cannot satisfy D2-D's
+    // `^[A-Za-z0-9._:-]{1,200}$` fence). We must translate BOTH, or the intent could never be bound to the
+    // authoritative receipt that D2-D actually wrote. The mapping is the existing CLOSED allowlist: an
+    // unmapped adapter provider is REJECTED, never passed through.
+    const consentProvider = mapAdapterProviderToConsentProvider(item.receipt.provider);
+    if (!consentProvider) { push(null, "invalid_evidence"); failed++; continue; }
+    const canonicalProviderMessageHash = deriveProviderEventId(item.receipt.providerMessageId);
+
     const evidence: ConsentCommandEvidence = {
       inboundMessageId,
       webhookReceiptId: input.webhookReceiptId ?? null,
-      provider: item.receipt.provider,
-      // The CANONICAL provider identity D2-E gave D2-D (the sha256 digest), not the raw wamid.
-      providerMessageId: item.receipt.providerMessageId,
+      provider: consentProvider,
+      providerMessageId: canonicalProviderMessageHash,   // the sha256 digest D2-E gave D2-D — never the wamid
       channel: ACK_CHANNEL,
       destinationHash: item.receipt.destinationHash,
       command: cmd.command,
@@ -286,113 +291,126 @@ export async function processConsentCommandResponses(
       receivedAt: item.receipt.receivedAt,
     };
 
-    // The plaintext is needed ONLY to address the send. Its hash MUST equal the persisted hash.
+    // The plaintext is needed ONLY to seal the destination. Its hash MUST equal the persisted hash.
     const plaintext = plaintextByWamid.get(item.message.providerMessageId);
     let observedHash = "";
     if (typeof plaintext === "string" && plaintext !== "") {
       try { observedHash = hashPhoneE164(plaintext); } catch { observedHash = ""; }
     }
 
+    // THE ONE GATE. Replay, ineligible disposition, evidence mismatch and channel are all rejected here.
     const planned = deriveConsentAckPlan(evidence, {
       destinationHash: observedHash,
-      providerMessageId: item.receipt.providerMessageId,
+      providerMessageId: canonicalProviderMessageHash,
     });
-    if (!planned.ok) {
-      push(null, REJECT_TO_OUTCOME[planned.reason]);
-      continue;
-    }
-    const plan = planned.plan;
+    if (!planned.ok) { push(null, REJECT_TO_OUTCOME[planned.reason]); continue; }
 
-    // ── AUTHORIZE + SEND ───────────────────────────────────────────────────────────────────────────
-    attempted++;
-    const outcome = await sendAcknowledgement(plan, plaintext as string, deps);
-    push(plan.ackType, outcome);
-    if (outcome === "sent") sent++;
+    const outcome = await enqueueOne(planned.plan, plaintext as string, deps);
+    push(planned.plan.ackType, outcome);
+    if (outcome === "enqueued") enqueued++;
+    else if (outcome === "duplicate") duplicates++;
     else failed++;
   }
 
-  const skipped = items.length - attempted;
+  const skipped = items.length - enqueued - duplicates - failed;
   return {
     ok: true,
-    result: { candidates: items.length, attempted, sent, skipped, failed, items },
+    result: { candidates: items.length, enqueued, duplicates, skipped, failed, items },
   };
 }
 
 /**
- * Build the ONE immediate acknowledgement intent and send it through the ORDINARY CommunicationService
- * path, with the one-shot enforcer substituted. Every provider, runtime, approved-template, mapping and
- * canary gate remains active. A missing template or absent provider fails closed WITHOUT touching consent.
+ * Build and insert ONE durable intent. Order matters:
+ *   1. resolve the AUTHORITATIVE receipt (STOP/START must have one; HELP has none by design);
+ *   2. GENERATE THE INTENT UUID — before sealing, because the AAD binds to it;
+ *   3. derive expiry from the PERSISTED received_at;
+ *   4. seal the destination under that exact AAD;
+ *   5. insert, conflict-safe.
  */
-async function sendAcknowledgement(
+async function enqueueOne(
   plan: ConsentAckPlan,
   plaintextDestination: string,
   deps: ConsentCommandResponseDeps
-): Promise<AckItemOutcome> {
-  const intent: CommunicationIntent = {
-    type: plan.ackType,
-    lane: ACK_LANE,
-    channel: ACK_CHANNEL,
-    // A NEUTRAL recipient. An inbound command sender is never claimed as a client/vendor/admin identity.
-    recipient_type: ACK_RECIPIENT_TYPE,
-    recipient_id: null,
-    // The plaintext lives in REQUEST MEMORY only. The ledger stores its hash + mask, never the number.
-    destination_source: ephemeralAuthDestination(plaintextDestination),
-    template_key: plan.templateKey,
-    variables: {},                 // no variables at all — the copy is fixed and reviewed
-    entity_type: null,
-    entity_id: null,
-    correlation_id: null,
-    idempotency_key: plan.idempotencyKey, // the rate-limit fence: the ledger's UNIQUE key enforces it
-    priority: "high",
-    scheduled_at: null,            // NEVER scheduled (an ephemeral destination cannot be, by construction)
-    policy_decision_id: null,      // Phase-4 policy engine field — never reused for consent
-    metadata: sanitizedAckMetadata(plan),
-  };
+): Promise<AckEnqueueOutcome> {
+  const ev = plan.evidence;
 
-  const service = deps.createService(createOneShotAckEnforcer(plan, deps));
-  if (!service.ok) return "send_failed";  // no provider configured → fail closed, consent untouched
-
-  let result;
-  try {
-    result = await service.data.send(intent);
-  } catch {
-    return "send_failed";                 // never rethrown: acknowledgement is non-authoritative
+  // 1) The authoritative D2-D receipt. HELP writes nothing, so it has no receipt and never looks one up.
+  let receiptId: string | null = null;
+  if (ev.command === "stop" || ev.command === "start") {
+    try {
+      receiptId = await deps.resolveReceiptId({
+        provider: ev.provider,
+        providerMessageId: ev.providerMessageId,
+        channel: ev.channel,
+        // EXACT COMMAND BINDING. A STOP acknowledgement may only bind to the receipt of a STOP.
+        normalizedCommand: ev.command,
+      });
+    } catch {
+      return "enqueue_failed";                 // DB error: closed outcome, nothing leaks, consent untouched
+    }
+    // An acknowledgement must bind to a REAL authoritative result for THIS command. A missing receipt — or
+    // one written for the OTHER command — yields no intent at all.
+    if (!receiptId) return "receipt_not_found";
   }
-  if (!result.ok) return mapSendFailure(result.code);
 
-  // `accepted`/`sent` — anything the provider did NOT definitively accept is simply not "sent". Either way
-  // the consent command is untouched.
-  const status = result.data.status;
-  return status === "accepted" || status === "sent" || status === "delivered" || status === "read"
-    ? "sent"
-    : "send_failed";
-}
+  // 2) The intent id is generated FIRST — the AAD binds the ciphertext to this exact row.
+  const intentId = randomUUID();
 
-/** Map the CommunicationService failure to a CLOSED outcome. No raw error, code detail or row leaks. */
-function mapSendFailure(code: string): AckItemOutcome {
-  if (code === "CONSENT_SUPPRESSED") return "suppressed";
-  if (code === "CONSENT_AUTHORITY_UNAVAILABLE") return "authority_unavailable";
-  if (code === "CONSENT_ENFORCEMENT_INVALID" || code === "CONSENT_AUTHORITY_INTEGRITY") return "enforcement_invalid";
-  return "send_failed";
-}
+  // 3) Expiry from the PERSISTED capture time: STOP/START +15 min, HELP +24 h.
+  const expiresAt = deriveAckExpiry(ev.command, ev.receivedAt);
+  if (!expiresAt) return "invalid_evidence";
 
-/**
- * The SANITIZED metadata persisted with the acknowledgement row. It records the exact provider-event
- * identity the acknowledgement answers — which the rate-limit key deliberately does not carry — plus the
- * durable inbound linkage. It contains NO plaintext destination, NO destination hash, NO raw payload, NO
- * consent row and NO provider secret.
- */
-function sanitizedAckMetadata(plan: ConsentAckPlan): Record<string, unknown> {
-  return {
-    consent_command_response: true,
-    ack_type: plan.ackType,
-    command: plan.evidence.command,
-    disposition: plan.evidence.disposition,
-    provider: plan.evidence.provider,
-    provider_message_id: plan.evidence.providerMessageId, // the sha256 digest — never the raw wamid
-    inbound_message_id: plan.evidence.inboundMessageId,
-    webhook_receipt_id: plan.evidence.webhookReceiptId,
+  // 4) Seal. The AAD makes the ciphertext non-transplantable to any other intent.
+  const aadFields: AckAadFields = {
+    schemaVersion: AAD_SCHEMA_VERSION,
+    intentId,
+    consentCommandReceiptId: receiptId,
+    inboundMessageId: ev.inboundMessageId,
+    canonicalProviderMessageHash: ev.providerMessageId,
+    destinationHash: plan.destinationHash,
+    ackType: plan.ackType,
+    expiresAt,
   };
+  if (!isValidAckAadFields(aadFields)) return "invalid_evidence";
+
+  // The AAD canonicalizes the expiry to an INSTANT, so the bytes are identical to the ones the WORKER will
+  // rebuild from Postgres's `timestamptz` rendering. An unparseable expiry fails closed.
+  const aad = canonicalAckAad(aadFields);
+  if (!aad) return "invalid_evidence";
+
+  const sealed = deps.seal(plaintextDestination, aad);
+  if (!sealed.ok) return "seal_unavailable";   // not configured / malformed → fail closed. Consent stands.
+
+  // 5) Insert. A unique collision on the idempotency key is a REPLAY — a safe no-op, never an error.
+  const row: AckIntentRow = {
+    id: intentId,
+    idempotency_key: plan.idempotencyKey,
+    consent_command_receipt_id: receiptId,
+    inbound_message_id: ev.inboundMessageId,
+    ack_type: plan.ackType,
+    command: ev.command,
+    authoritative_disposition: ev.disposition,
+    provider: ev.provider,
+    canonical_provider_message_hash: ev.providerMessageId,
+    destination_hash: plan.destinationHash,
+    sealed_destination_ciphertext: sealed.value.ciphertext,
+    sealed_destination_nonce: sealed.value.nonce,
+    sealed_destination_auth_tag: sealed.value.authTag,
+    encryption_key_id: sealed.value.keyId,
+    aad_schema_version: AAD_SCHEMA_VERSION,
+    received_at: ev.receivedAt,
+    expires_at: expiresAt,
+  };
+
+  let inserted: InsertIntentResult;
+  try {
+    inserted = await deps.insertIntent(row);
+  } catch {
+    return "enqueue_failed";
+  }
+  if (inserted === "duplicate") return "duplicate";
+  if (inserted === "failed") return "enqueue_failed";
+  return "enqueued";
 }
 
 /** The three acknowledgement types, re-exported for boundary tests. They are NOT in the D3-B registry. */

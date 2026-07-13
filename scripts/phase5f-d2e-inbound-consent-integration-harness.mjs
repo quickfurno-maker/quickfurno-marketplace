@@ -950,15 +950,28 @@ check("16. the webhook imports ONLY the D2-E orchestrator — never the D2-D wri
   const code = stripTs(readF(WEBHOOK_SVC_SRC));
   hasNot(/communicationConsentWriterService|writeConsentCommand/, code, "the webhook NEVER imports the D2-D writer");
   hasNot(/apply_communication_consent_command/, code, "the webhook never calls the RPC");
-  hasNot(/consentCommand|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");
+  // PRECISE: reject the actual forbidden NORMALIZER — its exact module path (static or dynamic) and its
+  // symbol — not any identifier that merely CONTAINS the substring "consentCommand". The broad matcher
+  // also rejected legitimate modules whose names begin with it (e.g. `./consentCommandResponseService`),
+  // which normalize nothing. The guarantee is unchanged and the failure message is unchanged.
+  hasNot(/["']\.\.\/lib\/communication\/consentCommand["']|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");
   hasNot(/communication_preferences|communication_suppressions/, code, "the webhook never touches consent tables");
   has(/import \{ processInboundConsentCommands \} from "\.\/inboundConsentCommandService"/, readF(WEBHOOK_SVC_SRC), "it imports the orchestrator only");
-  // The orchestrator is the ONLY consent-facing MODULE the webhook imports (checked on the module
+  // A CLOSED ALLOWLIST of the consent-facing MODULES the webhook may import (checked on the module
   // specifiers, not the binding names — `processInboundConsentCommands` legitimately contains "Consent").
+  //   • ./inboundConsentCommandService   — the D2-E inbound command orchestrator;
+  //   • ./consentCommandResponseService  — the D4-B evidence-bound acknowledgement orchestrator.
+  // Nothing else. The D2-D writer, the D2-C decision authority and the D2-D normalizer all remain
+  // rejected (by this allowlist AND by the explicit guards above), so no consent authority can be
+  // smuggled into the webhook under a new name.
+  const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService"];
   const specifiers = [...readF(WEBHOOK_SVC_SRC).matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
   const consentSpecifiers = specifiers.filter((s) => /consent/i.test(s));
-  assert(consentSpecifiers.length === 1 && consentSpecifiers[0] === "./inboundConsentCommandService",
-    `the orchestrator must be the ONLY consent-related module the webhook imports (got [${consentSpecifiers.join(", ")}])`);
+  const unapproved = consentSpecifiers.filter((s) => !ALLOWED_CONSENT_MODULES.includes(s));
+  assert(unapproved.length === 0,
+    `only the approved consent orchestrators may be imported by the webhook (got [${unapproved.join(", ")}])`);
+  assert(consentSpecifiers.includes("./inboundConsentCommandService"),
+    "the D2-E orchestrator must still be imported");
 });
 
 check("24. the existing D1-B / D2-C / D2-D boundaries stay green", () => {

@@ -20,6 +20,14 @@ import { resolve } from "node:path";
  *
  * No Supabase connection, no provider, no real key, no migration execution. Every mutation is restored
  * byte-identically in a `finally`.
+ *
+ * IMPORTANT:
+ * This harness mutates repository source files during mutation tests.
+ * It must be run sequentially and must never be executed concurrently with another D4-C harness process.
+ *
+ * (Two concurrent runs would interleave their source edits and their `finally` restores, so one process
+ * could restore a file the other had just mutated — producing failures that are artifacts of the race, not
+ * of the code under test. This note is DOCUMENTATION ONLY: it weakens no test and gates nothing.)
  */
 
 const tsc = resolve("node_modules/typescript/bin/tsc");
@@ -77,10 +85,55 @@ const D4C_EXPECTED_FILES = [
 ];
 
 // ============================================================================
+// TRANSIENT-LOCK-TOLERANT FILE I/O
+// ============================================================================
+/**
+ * Windows does not release a file handle the instant a process is done with it. A `tsc` child that has only
+ * just exited, or the on-access antivirus scanner opening a source file the moment we rewrite it, routinely
+ * makes `writeFileSync` / `rmSync` fail with a TRANSIENT EBUSY / EPERM / ENOTEMPTY.
+ *
+ * That matters here more than in most harnesses, because the mutation phase REWRITES REAL REPOSITORY FILES
+ * and must restore them byte-identically. An un-retried call has two bad outcomes:
+ *   • the mutation write fails ⇒ the mutation is reported FAILED — at random, with an arbitrary identity.
+ *     That is precisely the "131/132, one unexplained failure" signature, and it is why the failing check
+ *     could not be attributed to any particular test;
+ *   • far worse, the RESTORE fails ⇒ a mutated source file is left in the working tree.
+ *
+ * Every mutation-phase file operation therefore retries with a short backoff, and every restore is VERIFIED
+ * byte-for-byte afterwards. This is I/O robustness only: it weakens no test — a mutation must still prove
+ * itself load-bearing — and it changes no pass/fail semantics.
+ */
+const IO_MAX_RETRIES = 10;
+const IO_RETRY_DELAY_MS = 50;
+const TRANSIENT_IO_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EACCES", "EMFILE", "ENFILE"]);
+
+/** A SYNCHRONOUS sleep — the mutation restore runs in a `finally` that must not yield to other work. */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function withIoRetry(what, op) {
+  let last;
+  for (let attempt = 0; attempt <= IO_MAX_RETRIES; attempt++) {
+    try { return op(); }
+    catch (e) {
+      if (!TRANSIENT_IO_CODES.has(e?.code)) throw e;   // a REAL error is never retried away
+      last = e;
+      sleepSync(IO_RETRY_DELAY_MS);
+    }
+  }
+  throw new Error(`${what} failed after ${IO_MAX_RETRIES} retries: ${last?.code} ${last?.message}`);
+}
+
+const writeFileRetry = (p, content) => withIoRetry(`write ${p}`, () => writeFileSync(p, content));
+const rmTree = (p) => withIoRetry(`remove tree ${p}`, () => rmSync(p, { recursive: true, force: true, maxRetries: IO_MAX_RETRIES, retryDelay: IO_RETRY_DELAY_MS }));
+const rmFile = (p) => withIoRetry(`remove ${p}`, () => rmSync(p, { force: true, maxRetries: IO_MAX_RETRIES, retryDelay: IO_RETRY_DELAY_MS }));
+
+// ============================================================================
 // BUILD
 // ============================================================================
 function compileTo(outDir) {
-  rmSync(outDir, { recursive: true, force: true });
+  rmTree(outDir);
   const tsconfigPath = resolve(`${outDir}.tsconfig.json`);
   writeFileSync(tsconfigPath, JSON.stringify({
     compilerOptions: {
@@ -91,7 +144,7 @@ function compileTo(outDir) {
     files: TS_FILES,
   }, null, 2));
   try { execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" }); }
-  finally { rmSync(tsconfigPath, { force: true }); }
+  finally { rmFile(tsconfigPath); }
   return outDir;
 }
 
@@ -108,7 +161,7 @@ function transpileFiles(outDir, files, expectJs) {
   }, null, 2));
   try { execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" }); }
   catch { /* expected noResolve diagnostics */ }
-  finally { rmSync(tsconfigPath, { force: true }); }
+  finally { rmFile(tsconfigPath); }
   for (const js of expectJs) {
     if (!existsSync(resolve(outDir, js))) throw new Error(`did not transpile: ${js}`);
   }
@@ -183,8 +236,47 @@ const WEBHOOK_RECEIPT_ID = "11111111-2222-4333-8444-555555555555";
 const CMD_RECEIPT_ID = "99999999-8888-4777-8666-555555555555";
 const INTENT_ID = "12121212-3434-4565-8787-909090909090";
 const RECEIVED = "2026-07-13T10:00:00.000Z";
+
+// ── THE DETERMINISTIC FIXTURE CLOCK ──────────────────────────────────────────────────────────────────
+// The fixtures pin `received_at` to a FIXED instant, so a STOP intent expires at RECEIVED + 15 minutes
+// (2026-07-13T10:15:00.000Z). Every store/worker default previously fell back to the REAL wall clock, which
+// meant the whole suite silently stopped being claimable the moment the machine clock passed 10:15 UTC on
+// that date — a time bomb that made the suite green only inside a 15-minute window.
+//
+// The fixture clock is therefore derived from the fixture itself: one second AFTER receipt and well BEFORE
+// expiry. It never reads the system clock, so the suite is deterministic on any date, in any timezone.
+// An explicit `over.nowMs` still overrides it — that is how the expiry and recovery boundary tests work.
+const FIXTURE_NOW_MS = Date.parse(RECEIVED) + 1_000;                 // 2026-07-13T10:00:01.000Z
+const STOP_EXPIRY_MS = Date.parse(RECEIVED) + 15 * 60 * 1000;        // 2026-07-13T10:15:00.000Z
+// A SYNTHETIC far-future instant. It is a fixed constant, never the machine clock: K2 and MUT 40 stub
+// `Date.now` to return it, so the "what if the wall clock is far past expiry" proof is itself deterministic.
+const FAR_FUTURE_MS = Date.parse("2099-01-01T00:00:00.000Z");
 const ADAPTER_PROVIDER = "meta_whatsapp_cloud";
 const CONSENT_PROVIDER = "meta_whatsapp";
+
+// ── THE TEST PROVIDER-TIMEOUT CLASS ──────────────────────────────────────────────────────────────────
+// `deps.providerTimeoutMs` is a REQUIRED dependency of the production worker: it is what `withTimeout()`
+// hands to `setTimeout`. The fixture used to omit it entirely, so every send in this suite was raced
+// against `setTimeout(reject, undefined)` — which Node installs as a **1 ms** timer. The per-test
+// `providerTimeoutMs: 25 / 50` overrides never reached `deps` at all and were dead values.
+//
+// A 1 ms budget is exactly the "one narrow scheduling window" the audit warns about: any turn of the event
+// loop that the send's continuation has to wait for (GC, a `tsc` subprocess started by the mutation phase,
+// Windows' coarse timer granularity) can hand the race to the timer, flipping a `sent` outcome to
+// `uncertain` in whichever check happened to be running. That is a suite-wide flake, not an L1 flake.
+//
+// ONE timeout class is therefore used by every test — the default AND the timeout tests (O1/L1/L2). It is
+// short enough that a hanging provider is proven in 50 ms instead of 60 s, and long enough that a real send
+// (microtask-only in this fixture) wins by orders of magnitude. Production is always 60 s — O3 proves that.
+const TEST_PROVIDER_TIMEOUT_MS = 50;
+
+// ── THE SHARED PROVIDER-DRAIN BUDGET ─────────────────────────────────────────────────────────────────
+// `drainProviderSettlement()` below yields the event loop this many macrotask turns. The BOUNDED CEILING is
+// PROVIDER_DRAIN_TURNS × PROVIDER_DRAIN_TURN_MS = 300 ms of scheduling — six times the provider timeout —
+// and the drain is bounded by a TURN COUNT, never by a wall-clock deadline (the fixture region must never
+// read the machine clock; K4 enforces that).
+const PROVIDER_DRAIN_TURNS = 12;
+const PROVIDER_DRAIN_TURN_MS = 25;
 
 const KEY_ID = "ack-key-v1";
 const KEY_B64 = randomBytes(32).toString("base64url");
@@ -278,7 +370,7 @@ function makeStore(opts = {}) {
     },
 
     /** qf_expire_consent_ack_intents: EXPIRED pending/claimed → terminal `expired`, seals purged. */
-    expire(nowMs = Date.now()) {
+    expire(nowMs = FIXTURE_NOW_MS) {
       calls.expire++;
       let n = 0;
       for (const row of rows.values()) {
@@ -293,7 +385,7 @@ function makeStore(opts = {}) {
     },
 
     /** qf_recover_stale_dispatching…: stale dispatching WITH attempt=1 → terminal `uncertain`, purged. */
-    recoverStaleDispatching(staleAfterSeconds, nowMs = Date.now()) {
+    recoverStaleDispatching(staleAfterSeconds, nowMs = FIXTURE_NOW_MS) {
       calls.recover++;
       // STRICT: the invariant is recovery > timeout(60) + margin(60) = 120, so 120 itself is UNSAFE.
       // This must mirror the SQL floor (`p_stale_after <= interval '120 seconds'` raises) byte for byte.
@@ -312,7 +404,7 @@ function makeStore(opts = {}) {
       return n;                                                       // NEVER back to pending/claimed
     },
     /** qf_claim_consent_ack_intents: pending OR stale-claimed, unexpired, attempt=0. NEVER dispatching. */
-    claim(workerId, limit, nowMs = Date.now(), staleMs = 2 * 60 * 1000) {
+    claim(workerId, limit, nowMs = FIXTURE_NOW_MS, staleMs = 2 * 60 * 1000) {
       calls.claim++;
       const out = [];
       for (const row of rows.values()) {
@@ -331,7 +423,7 @@ function makeStore(opts = {}) {
       return out;
     },
     /** qf_reserve_consent_ack_provider_attempt: CAS claimed→dispatching AND 0→1, lease owner only. */
-    reserve(intentId, workerId, nowMs = Date.now()) {
+    reserve(intentId, workerId, nowMs = FIXTURE_NOW_MS) {
       calls.reserve++;
       const row = rows.get(intentId);
       if (!row) return false;
@@ -365,7 +457,7 @@ function purge(row) {
   row.encryption_key_id = null;
   row.locked_by = null;
   row.locked_at = null;
-  row.completed_at = new Date().toISOString();   // ck_ack_intent_completed_at_matches_status
+  row.completed_at = new Date(FIXTURE_NOW_MS).toISOString();   // ck_ack_intent_completed_at_matches_status
 }
 
 /** Assert the migration's completed_at / status invariant on every row of a store. */
@@ -428,14 +520,19 @@ function workerDeps(store, over = {}) {
   const sends = { count: 0, intents: [], enforcerCalls: 0, decideCalls: 0 };
   const decide = over.decide ?? (async () => ({ ok: true, disposition: "no_consent_objection" }));
 
+  // ONE resolved clock for the whole dependency set. Never `Date.now()` per-dependency: that is how the
+  // original defect crept in, and it would also let two deps disagree about "now" inside a single batch.
+  const nowMs = over.nowMs ?? FIXTURE_NOW_MS;
+
   return {
     sends,
+    nowMs,
     deps: {
-      expireIntents: over.expireIntents ?? (async () => store.expire(over.nowMs ?? Date.now())),
+      expireIntents: over.expireIntents ?? (async () => store.expire(nowMs)),
       recoverStaleDispatching: over.recoverStaleDispatching
-        ?? (async (secs) => store.recoverStaleDispatching(secs, over.nowMs ?? Date.now())),
-      claim: over.claim ?? (async (w, l) => store.claim(w, l, over.nowMs ?? Date.now())),
-      reserveAttempt: over.reserveAttempt ?? (async (id, w) => store.reserve(id, w, over.nowMs ?? Date.now())),
+        ?? (async (secs) => store.recoverStaleDispatching(secs, nowMs)),
+      claim: over.claim ?? (async (w, l) => store.claim(w, l, nowMs)),
+      reserveAttempt: over.reserveAttempt ?? (async (id, w) => store.reserve(id, w, nowMs)),
       terminalize: over.terminalize ?? (async (id, s, c) => store.terminalize(id, s, c)),
       decide: async (input) => { sends.decideCalls++; return decide(input); },
       createService: over.createService ?? ((enforcer) => ({
@@ -461,10 +558,77 @@ function workerDeps(store, over = {}) {
           },
         },
       })),
-      now: () => new Date(over.nowMs ?? Date.now()),
+      now: () => new Date(nowMs),
       env: over.env ?? ENV_OK,
+      // THE BOUNDED PROVIDER WAIT — a REQUIRED production dependency. It was previously never forwarded, so
+      // `withTimeout()` received `undefined` and installed a 1 ms timer for EVERY send in the suite. It is
+      // now always a real, documented value, and an override (O1/L1/L2) actually reaches the worker.
+      providerTimeoutMs: over.providerTimeoutMs ?? TEST_PROVIDER_TIMEOUT_MS,
     },
   };
+}
+
+// ----------------------------------------------------------------------------
+// THE SHARED PROVIDER-DRAIN HELPER  (test-only — nothing here is production code)
+// ----------------------------------------------------------------------------
+/**
+ * Yield the event loop a BOUNDED number of macrotask turns so that anything the provider path scheduled
+ * LATE — a rejection Node reports on a later `unhandledRejection` checkpoint, a resolution that lands after
+ * the timeout already terminalized the row — has certainly been delivered before we assert.
+ *
+ * WHY NOT ONE `setTimeout(…, 60)`. A single fixed sleep bets the whole test on one narrow 25–60 ms
+ * scheduling window: on a congested loop (the mutation phase spawns `tsc` repeatedly) the checkpoint can
+ * land after the sleep and the observation is simply missed. Draining SEVERAL turns — each one a timer turn
+ * AND a check/immediate turn AND a microtask checkpoint — makes the observation deterministic instead of
+ * lucky, because every phase of the loop is visited many times.
+ *
+ * BOUNDED: exactly PROVIDER_DRAIN_TURNS turns of PROVIDER_DRAIN_TURN_MS each (12 × 25 ms = 300 ms ceiling,
+ * six times the provider timeout). The bound is a TURN COUNT, never a wall-clock deadline — the fixture
+ * region may not read the machine clock (K4).
+ *
+ * The FULL budget is always spent, deliberately. Every caller (O1, L1, L2) asserts an ABSENCE — no unhandled
+ * rejection, no second terminalization, no post-timeout mutation — and an absence is only meaningful once the
+ * thing has been given every opportunity to appear. There is no early exit to shorten that.
+ *
+ * EVERY timer this helper creates is cleared in `finally`, on every path, including a throw. The helper leaks
+ * no timer and installs no listener.
+ */
+async function drainProviderSettlement() {
+  const timers = new Set();
+  const sleep = (ms) => new Promise((resolve) => {
+    const t = setTimeout(() => { timers.delete(t); resolve(); }, ms);
+    timers.add(t);
+  });
+  try {
+    for (let turn = 0; turn < PROVIDER_DRAIN_TURNS; turn++) {
+      await sleep(PROVIDER_DRAIN_TURN_MS);                     // timers phase
+      await new Promise((resolve) => setImmediate(resolve));   // check phase
+      await Promise.resolve();                                 // microtask checkpoint
+    }
+  } finally {
+    for (const t of timers) clearTimeout(t);      // no timer survives this helper, on ANY path
+    timers.clear();
+  }
+}
+
+/**
+ * Run `body` with an `unhandledRejection` listener installed that records ONLY rejections carrying `marker`.
+ *
+ * The marker is what makes the probe honest in BOTH directions: an unrelated rejection from anywhere else in
+ * the process can neither fail the test nor — more importantly — SATISFY it. The listener is removed in
+ * `finally` on every path, so no listener survives the check even if `body` throws.
+ */
+async function withUnhandledRejectionProbe(marker, body) {
+  const observed = [];
+  const onUnhandled = (reason) => {
+    if (String(reason?.message ?? reason).includes(marker)) observed.push(reason);
+  };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    return await body(observed);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);   // ALWAYS removed — never leaked into a later check
+  }
 }
 
 // ============================================================================
@@ -889,7 +1053,7 @@ check("C10. a STALE PRE-ATTEMPT claim is recoverable; a DISPATCHING intent is NE
   // (a) claimed, crashed BEFORE reserving → reclaimable after the lease lapses.
   store.claim("dead-worker", 25);
   assert(row.status === "claimed" && row.provider_attempt_count === 0, "claimed, no attempt");
-  const later = Date.now() + 3 * 60 * 1000;                       // lease is 2 minutes
+  const later = FIXTURE_NOW_MS + 3 * 60 * 1000;                   // lease is 2 minutes (still < expiry)
   const reclaimed = store.claim("w2", 25, later);
   assert(reclaimed.length === 1 && reclaimed[0].locked_by === "w2", "a stale PRE-ATTEMPT claim is reclaimed");
 
@@ -1497,7 +1661,7 @@ check("N3. stale DISPATCHING (attempt=1) becomes terminal `uncertain`, purged �
   store.reserve(row.id, "dead");
   assert(row.status === "dispatching" && row.provider_attempt_count === 1, "it is dispatching with the attempt reserved");
 
-  const later = Date.now() + 200 * 1000;                    // past the 180s recovery threshold
+  const later = FIXTURE_NOW_MS + 200 * 1000;                // past the 180s recovery threshold
   const w = workerDeps(store, { nowMs: later });
   const out = await M.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
   assert(row.status === "uncertain", `recovered to terminal uncertain (got ${row.status})`);
@@ -1514,15 +1678,15 @@ check("N4. a stale DISPATCHING row with attempt=0 is NOT recovered by that RPC",
   // Contrived: dispatching but with NO attempt reserved. It is not an ambiguous provider outcome.
   row.status = "dispatching";
   row.provider_attempt_count = 0;
-  row.locked_at = new Date(Date.now() - 300 * 1000).toISOString();
-  const n = store.recoverStaleDispatching(180, Date.now());
+  row.locked_at = new Date(FIXTURE_NOW_MS - 300 * 1000).toISOString();
+  const n = store.recoverStaleDispatching(180, FIXTURE_NOW_MS);
   assert(n === 0, "attempt=0 is NOT recovered as uncertain");
   assert(row.status === "dispatching", "…and is left alone");
 });
 
 check("N5. recovery is NOT eligible before the threshold, and the threshold is SAFE", () => {
   const store = makeStore();
-  const now = Date.now();
+  const now = FIXTURE_NOW_MS;
   // A dispatching row locked 100s ago is NOT yet recoverable (threshold is 180s).
   store.rows.set("x", { id: "x", status: "dispatching", provider_attempt_count: 1, locked_at: new Date(now - 100 * 1000).toISOString() });
   assert(store.recoverStaleDispatching(180, now) === 0, "not recovered before the threshold");
@@ -1565,19 +1729,31 @@ check("O1. a HANGING provider send TIMES OUT ⇒ terminal `uncertain`, called on
   const store = makeStore();
   await enqueueOne(store);
   let calls = 0;
-  // A send that NEVER resolves. Without the bounded timeout the worker would hang for ever.
-  // The timeout is injectable ONLY so this takes 25ms instead of 60s; production is always 60s (O3).
+  // A send that NEVER settles. Without the bounded timeout the worker would hang for ever.
+  // The timeout is injectable ONLY so this takes 50ms instead of 60s; production is always 60s (O3).
   const w = workerDeps(store, {
-    providerTimeoutMs: 25,
+    providerTimeoutMs: TEST_PROVIDER_TIMEOUT_MS,
     createService: () => ({ ok: true, data: { send: () => new Promise(() => { calls++; }) } }),
   });
   const out = await M.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
+
+  // 1) the hanging provider TIMED OUT, and a timeout is TERMINAL `uncertain`
   assert(out.result.uncertain === 1, `a timeout is TERMINAL uncertain (got ${safeStringify(out.result)})`);
+  // 2) exactly ONE provider invocation
   assert(calls === 1, `the provider was invoked exactly once (got ${calls})`);
+  // 3) correct terminal handling
   const row = [...store.rows.values()][0];
   assert(row.status === "uncertain", "terminal `uncertain`");
   assert(row.provider_attempt_count === 1, "the single attempt was consumed");
   assert(row.sealed_destination_ciphertext === null, "sealed fields purged");
+
+  // 4) NO DUPLICATE TERMINALIZATION. The provider promise is still pending and will never settle; drain the
+  //    loop and prove nothing further touched the row.
+  const terminalizeCallsBefore = store.calls.terminalize;
+  await drainProviderSettlement();
+  assert(store.calls.terminalize === terminalizeCallsBefore, "no second terminalization");
+  assert(row.status === "uncertain", "…the terminal row is untouched");
+  assert(calls === 1, `…and the provider was still invoked exactly once (got ${calls})`);
 
   // …and it is NEVER retried by a later batch.
   const w2 = workerDeps(store);
@@ -1715,7 +1891,7 @@ function sqlRejectsThreshold(seconds) {
 /** The model actually used by every worker/concurrency test in this suite. */
 function modelRejectsThreshold(seconds) {
   const store = makeStore();
-  try { store.recoverStaleDispatching(seconds, Date.now()); return false; }
+  try { store.recoverStaleDispatching(seconds, FIXTURE_NOW_MS); return false; }
   catch { return true; }
 }
 
@@ -1768,16 +1944,17 @@ check("P1. the store renders timestamptz the way Postgres does (the H-3 fidelity
 // L. LATE PROVIDER SETTLEMENT (the request may finish after we stopped waiting)
 // ============================================================================
 check("L1. a provider promise that REJECTS after the timeout causes no unhandled rejection", async () => {
-  const unhandled = [];
-  const onUnhandled = (reason) => unhandled.push(reason);
-  process.on("unhandledRejection", onUnhandled);
-  try {
+  // The probe is scoped to OUR OWN late rejection by a unique marker, so an unrelated rejection from anywhere
+  // else in the process can neither fail this test nor accidentally SATISFY it. The listener is installed and
+  // removed by the shared helper, which removes it in `finally` on every path.
+  const MARK = "qf-late-provider-rejection-probe";
+  await withUnhandledRejectionProbe(MARK, async (unhandled) => {
     const store = makeStore();
     await enqueueOne(store);
     let calls = 0;
     let rejectLate;
     const w = workerDeps(store, {
-      providerTimeoutMs: 25,               // shortened; production is 60s (O3)
+      providerTimeoutMs: TEST_PROVIDER_TIMEOUT_MS,   // shortened; production is 60s (O3)
       createService: () => ({
         ok: true,
         data: {
@@ -1793,12 +1970,17 @@ check("L1. a provider promise that REJECTS after the timeout causes no unhandled
     assert(row.status === "uncertain", "terminal `uncertain`");
     assert(row.provider_attempt_count === 1, "exactly one attempt");
     const terminalizeCallsBefore = store.calls.terminalize;
+    assert(typeof rejectLate === "function", "the provider promise was actually created (the probe is armed)");
 
     // 3) …and NOW the original provider request finally rejects.
-    rejectLate(new Error("meta 503: upstream connect error +919812345678"));
-    await new Promise((r) => setTimeout(r, 60));   // let the rejection propagate
+    rejectLate(new Error(`meta 503: upstream connect error +919812345678 ${MARK}`));
 
-    // 4) no unhandled rejection
+    // Node reports `unhandledRejection` on a LATER loop checkpoint, so burn the FULL drain budget rather
+    // than betting on one sleep landing in the right window. No early-exit predicate is passed: this test
+    // asserts an ABSENCE, and an absence is only meaningful once every turn of the budget has been spent.
+    await drainProviderSettlement();
+
+    // 4) no unhandled rejection — the production `withTimeout` observed the late rejection and discarded it
     assert(unhandled.length === 0, `no unhandledRejection (got ${unhandled.length}: ${unhandled.map(String).join("; ")})`);
     // 5) no SECOND terminalization
     assert(store.calls.terminalize === terminalizeCallsBefore, "no second terminalization");
@@ -1809,34 +1991,288 @@ check("L1. a provider promise that REJECTS after the timeout causes no unhandled
     // 7) no provider error detail escaped
     const rendered = safeStringify(out);
     hasNot(/503|upstream|\+9198/, rendered, "no provider error detail or phone leaks");
-  } finally {
-    process.off("unhandledRejection", onUnhandled);
-  }
+  });
 });
 
 check("L2. a provider promise that RESOLVES after the timeout is discarded, not acted upon", async () => {
   const store = makeStore();
   await enqueueOne(store);
+  let calls = 0;
   let resolveLate;
   const w = workerDeps(store, {
-    providerTimeoutMs: 25,
+    providerTimeoutMs: TEST_PROVIDER_TIMEOUT_MS,
     createService: () => ({
       ok: true,
-      data: { send: () => new Promise((resolve) => { resolveLate = resolve; }) },
+      data: { send: () => new Promise((resolve) => { calls++; resolveLate = resolve; }) },
     }),
   });
   const out = await M.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
-  assert(out.result.uncertain === 1, "timeout ⇒ uncertain");
+
+  // The TIMEOUT RESULT IS AUTHORITATIVE.
+  assert(out.result.uncertain === 1, `timeout ⇒ uncertain (got ${safeStringify(out.result)})`);
+  assert(out.result.sent === 0, "…and NOTHING is reported as sent");
+  assert(calls === 1, `exactly ONE provider attempt (got ${calls})`);
   const before = store.calls.terminalize;
+  const row = [...store.rows.values()][0];
+  assert(row.status === "uncertain", "terminal `uncertain` before the late success lands");
 
   // The provider actually SUCCEEDED — but far too late. It must not flip the terminal row to `sent`.
+  assert(typeof resolveLate === "function", "the provider promise was actually created");
   resolveLate({ ok: true, data: { status: "accepted" } });
-  await new Promise((r) => setTimeout(r, 60));
 
-  const row = [...store.rows.values()][0];
+  // Burn the FULL drain budget: give the late success every macrotask turn it could possibly need to
+  // (wrongly) perform a second terminal transition. Only then is "it never did" a real statement.
+  await drainProviderSettlement();
+
+  // NO POST-TIMEOUT SEND / SUCCESS MUTATION.
   assert(row.status === "uncertain", "the terminal row stays `uncertain` — a late success never becomes `sent`");
   assert(store.calls.terminalize === before, "no second terminal transition");
+  assert(row.provider_attempt_count === 1, "…still exactly one attempt");
+  assert(calls === 1, `…and the provider was never invoked again (got ${calls})`);
+  assert(w.sends.count === 0, "…no send was ever recorded through the counting service");
   assert(row.sealed_destination_ciphertext === null, "…and the seal stays purged");
+});
+
+// ============================================================================
+// K. DETERMINISTIC FIXTURE CLOCK  (the suite must not depend on the real calendar)
+// ============================================================================
+check("K1. the fixture clock relationships are DETERMINISTIC (no machine clock is ever consulted)", () => {
+  // Every assertion here is a fact about CONSTANTS. Nothing depends on today's date, the machine clock,
+  // the timezone or the CI clock — which is the whole point of this stabilization.
+  assert(FIXTURE_NOW_MS === Date.parse(RECEIVED) + 1000, "the fixture clock is RECEIVED + 1s");
+  assert(FIXTURE_NOW_MS > Date.parse(RECEIVED), "FIXTURE_NOW_MS is AFTER receipt");
+  assert(FIXTURE_NOW_MS < STOP_EXPIRY_MS, "FIXTURE_NOW_MS is BEFORE the STOP expiry");
+  assert(STOP_EXPIRY_MS === Date.parse(RECEIVED) + 15 * 60 * 1000, "a STOP intent expires at RECEIVED + 15m");
+  // The synthetic future used by K2/MUT 40 must genuinely be past expiry, or those proofs would be vacuous.
+  assert(FAR_FUTURE_MS > STOP_EXPIRY_MS, "the SYNTHETIC far-future instant is past the fixture expiry");
+});
+
+check("K2. the DEFAULT worker path works even when the real wall clock is in 2099", async () => {
+  const store = makeStore();
+  await enqueueOne(store);
+
+  const realDateNow = Date.now;
+  let sawFixtureClock = null;
+  try {
+    // Stub the clock to the SYNTHETIC far-future instant. Nothing in the default fixture path may consult
+    // it. (This is the test that fails against the merged pre-correction harness.)
+    Date.now = () => FAR_FUTURE_MS;
+
+    // NOTE: no `over.nowMs` is supplied — the DEFAULT path is exercised.
+    const w = workerDeps(store);
+    sawFixtureClock = w.nowMs;
+    const out = await M.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
+
+    assert(sawFixtureClock === FIXTURE_NOW_MS, `the deterministic fixture clock is used, NOT the stubbed one (got ${sawFixtureClock})`);
+    assert(out.maintenance.expired === 0, "the sweep does NOT expire the intent");
+    assert(out.result.claimed === 1, `the intent IS claimed (got ${safeStringify(out.result)})`);
+    assert(w.sends.count === 1, `exactly ONE provider invocation (got ${w.sends.count})`);
+    assert(out.result.sent === 1, `the outcome is SENT (got ${safeStringify(out.result)})`);
+    assert([...store.rows.values()][0].status === "sent", "terminal `sent`");
+  } finally {
+    Date.now = realDateNow;                       // restored EXACTLY
+  }
+  assert(Date.now === realDateNow, "Date.now is restored");
+});
+
+check("K3. expiry still WORKS — an explicit over.nowMs past expires_at still expires the intent", async () => {
+  // The fix must not disable expiry. An EXPLICIT clock beyond expiry must still sweep the intent.
+  const store = makeStore();
+  const row0 = await enqueueOne(store);
+  const w = workerDeps(store, { nowMs: Date.parse(row0.expires_at) + 1000 });
+  const out = await M.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
+  assert(out.maintenance.expired === 1, `the sweep expires it (got ${safeStringify(out.maintenance)})`);
+  assert(w.sends.count === 0, "ZERO provider sends");
+  assert([...store.rows.values()][0].status === "expired", "terminal `expired`");
+
+  // …and the store's own claim fence still refuses an expired row.
+  const store2 = makeStore();
+  const r2 = await enqueueOne(store2);
+  assert(store2.claim("w1", 25, Date.parse(r2.expires_at) + 1).length === 0, "an expired row is never claimable");
+  assert(store2.claim("w1", 25).length === 1, "…but at the fixture clock it IS claimable");
+});
+
+/**
+ * The FIXTURE-AUTHORITY region: every line of this harness BEFORE the mutation registrations.
+ *
+ * WHY A REGION AT ALL. Mutation blocks embed their anchor and replacement strings verbatim, so a whole-file
+ * scan would match those literals rather than live code and would be meaningless.
+ *
+ * WHY NOT A BANNER COMMENT. The previous boundary was `src.indexOf("// MUTATIONS")` — and that expression
+ * CONTAINED the very token it searched for, so `indexOf` found its own source line and the region ended
+ * early. It happened to still cover every fixture default, but it was an accident of ordering: any fixture
+ * code added below that point would have been silently unscanned.
+ *
+ * THE BOUNDARY IS NOW THE REAL MUTATION-SECTION SENTINEL — the `mutationChecks` registration statement.
+ * The token is ASSEMBLED FROM FRAGMENTS at runtime, so the complete literal never appears contiguously in
+ * this function and the search expression provably cannot match itself. It must occur EXACTLY once.
+ */
+const MUTATION_SENTINEL = ["const mutation", "Checks = [];"].join("");
+
+function fixtureRegion() {
+  const src = readF(HARNESS_SRC);
+  const occurrences = src.split(MUTATION_SENTINEL).length - 1;
+  assert(occurrences === 1, `the mutation-section sentinel must occur EXACTLY once (found ${occurrences})`);
+  const mutationStart = src.indexOf(MUTATION_SENTINEL);
+  assert(mutationStart >= 0, "mutation section sentinel must exist");
+  return src.slice(0, mutationStart);
+}
+
+/** The token at which the guard machinery begins. Assembled, so this expression cannot locate itself. */
+const GUARD_START_TOKEN = "const MUTATION_" + "SENTINEL";
+
+/**
+ * The LIVE FIXTURE CODE: the fixture region MINUS the guard machinery below.
+ *
+ * SCOPE — READ THIS BEFORE USING IT. This is a POSITIVE-SCAN source ONLY. It is the right source for
+ * "makeStore, workerDeps and the lifecycle defaults are PRESENT", because those things live above the guard
+ * and a presence assertion must not be satisfiable by the guard's own quoted needles.
+ *
+ * It is the WRONG source for a NEGATIVE scan, and using it as one was the K4 escape: the region does not end
+ * here, it ends at the mutation sentinel. Everything between this point and the sentinel — the guard helpers,
+ * K4 itself, and the whole tail where a future functional check would naturally be appended — is fixture code
+ * that `liveFixtureCode()` cannot see. A wall-clock call added there was executable, was inside the fixture
+ * region, and was scanned by nothing. Negative scans therefore run against the COMPLETE `fixtureRegion()`.
+ */
+function liveFixtureCode() {
+  const region = fixtureRegion();
+  const guardStart = region.indexOf(GUARD_START_TOKEN);
+  assert(guardStart > 0, "the guard machinery must be locatable inside the fixture region");
+  return region.slice(0, guardStart);
+}
+
+check("K4. STRUCTURAL GUARD: no fixture default may reach for the real wall clock again", () => {
+  const whole = readF(HARNESS_SRC);
+  const regionRaw = fixtureRegion();
+
+  // TWO SOURCES, TWO DIFFERENT JOBS.
+  //
+  //  • fullFixtureRegion — EVERY executable line of this harness before the mutation registrations, comments
+  //    stripped. This is what all NEGATIVE (absence) scans run against, because a wall-clock call is a defect
+  //    ANYWHERE in the fixture region, including the tail below K4 where a future check would be appended.
+  //
+  //  • liveFixture — the region MINUS the guard machinery. This is what all POSITIVE (presence) scans run
+  //    against, so that "makeStore / workerDeps / the lifecycle defaults are present" can only be satisfied by
+  //    the REAL definitions above, never by the guard's own quoted needles below.
+  //
+  // Comments are stripped from both: prose that merely NAMES a forbidden pattern is documentation, not a
+  // wall-clock default.
+  const fullFixtureRegion = stripTs(regionRaw);
+  const liveFixture = stripTs(liveFixtureCode());
+
+  // ── THE FORBIDDEN PATTERNS, ASSEMBLED SO THEY CANNOT SELF-TRIGGER ──────────────────────────────────
+  // The negative scan now covers K4's OWN source, so K4 must not contain a contiguous copy of anything it
+  // forbids. Both the literal token and the regex source are BUILT FROM FRAGMENTS at runtime: the complete
+  // string "Date" + "." + "now()" never appears contiguously anywhere in this file's guard code, so the scan
+  // provably cannot match itself and report a false positive.
+  const NOW_FN = ["Date", "now"].join(".");                 // the wall-clock function
+  const NOW_CALL = `${NOW_FN}()`;                           // the wall-clock CALL we forbid
+  const NOW_RE_SRC = `${NOW_FN.replace(".", "\\.")}\\(\\)`; // …as regex source
+  const NOW_CALL_RE = new RegExp(NOW_RE_SRC);
+
+  const forbidden = [
+    new RegExp(`expire\\(\\s*nowMs\\s*=\\s*${NOW_RE_SRC}`),
+    new RegExp(`recoverStaleDispatching\\([^)]*nowMs\\s*=\\s*${NOW_RE_SRC}`),
+    new RegExp(`claim\\([^)]*nowMs\\s*=\\s*${NOW_RE_SRC}`),
+    new RegExp(`reserve\\([^)]*nowMs\\s*=\\s*${NOW_RE_SRC}`),
+    new RegExp(`over\\.nowMs\\s*\\?\\?\\s*${NOW_RE_SRC}`),
+  ];
+  for (const re of forbidden) {
+    hasNot(re, fullFixtureRegion, `a fixture default reverted to the real wall clock: ${re}`);
+  }
+
+  // STRONGEST FORM: the fixture region must CALL the wall clock NOWHERE AT ALL. K2 and MUT 40 only
+  // reference/assign the function itself (to stub and restore it) — they never consume its returned value —
+  // so this rejects any assertion, eligibility, expiry, recovery, claim, reservation or terminalization
+  // anywhere in the region that could depend on the machine's actual time.
+  hasNot(NOW_CALL_RE, fullFixtureRegion,
+    "no fixture code may CALL the real clock — the suite must not read the machine time");
+
+  // ── POSITIVE SCANS — against the LIVE fixture code only ────────────────────────────────────────────
+  // The dependency set must resolve ONE clock, defaulting to the fixture.
+  has(/const nowMs = over\.nowMs \?\? FIXTURE_NOW_MS;/, liveFixture, "workerDeps resolves a single deterministic clock");
+  has(/expire\(nowMs = FIXTURE_NOW_MS\)/, liveFixture, "store.expire defaults to the fixture clock");
+  has(/claim\(workerId, limit, nowMs = FIXTURE_NOW_MS/, liveFixture, "store.claim defaults to the fixture clock");
+  has(/reserve\(intentId, workerId, nowMs = FIXTURE_NOW_MS\)/, liveFixture, "store.reserve defaults to the fixture clock");
+
+  // INTENTIONAL real timers remain allowed — they test the provider timeout and late settlement, and they
+  // never decide fixture eligibility. The timeout must be a REAL value that actually reaches the worker:
+  // omitting it made `withTimeout` install a 1ms timer for every send in the suite.
+  has(/const TEST_PROVIDER_TIMEOUT_MS = 50;/, liveFixture, "the tests use one stable provider-timeout class");
+  has(/providerTimeoutMs: over\.providerTimeoutMs \?\? TEST_PROVIDER_TIMEOUT_MS,/, liveFixture,
+    "…and workerDeps FORWARDS it into the deps the worker actually reads");
+  has(/async function drainProviderSettlement\(\)/, liveFixture, "the shared bounded provider drain exists");
+  has(/setTimeout/, liveFixture, "…and real setTimeout remains available to it");
+
+  // ── STRUCTURAL PROOF OF THE NEGATIVE-SCAN SOURCE ───────────────────────────────────────────────────
+  // The guard is only as good as the source it scans. Prove that source is the WHOLE fixture region.
+
+  // 1) it BEGINS AT THE FIRST BYTE OF THE FILE — nothing above it is skipped
+  assert(whole.startsWith(regionRaw), "the negative-scan source begins at the START of the file");
+
+  // 2) it EXTENDS TO THE REAL MUTATION SENTINEL, and stops exactly there
+  assert(whole.split(MUTATION_SENTINEL).length - 1 === 1, "the mutation-section sentinel is UNIQUE");
+  assert(whole.slice(regionRaw.length).startsWith(MUTATION_SENTINEL),
+    "…and the negative-scan source ends EXACTLY at that sentinel");
+
+  // 3) it is NON-EMPTY, and it is genuinely the region (not some other string)
+  assert(regionRaw.length > 0 && fullFixtureRegion.trim().length > 0, "the negative-scan source is non-empty");
+  assert(fullFixtureRegion === stripTs(regionRaw), "the scanned source IS the comment-stripped region");
+
+  // 4) it INCLUDES THE COMPLETE AREA AFTER K4 — the tail where a future functional check would be appended,
+  //    and precisely the tail that `liveFixtureCode()` cannot see. This is the escape being closed.
+  const K4_ANCHOR = "check(\"K4" + ".";
+  const k4At = regionRaw.indexOf(K4_ANCHOR);
+  const guardAt = regionRaw.indexOf(GUARD_START_TOKEN);
+  assert(guardAt > 0 && k4At > guardAt, "K4 is registered INSIDE the guard machinery, below the live code");
+  assert(regionRaw.slice(k4At).length > 0, "the region extends past the start of K4");
+  assert(regionRaw.includes("function fixtureRegion"), "the region covers the region helper itself");
+  assert(regionRaw.includes("function liveFixtureCode"), "…the live-code helper");
+  assert(regionRaw.includes("async function checkFails"), "…and the whole tail below K4, up to the sentinel");
+  assert(regionRaw.length > liveFixtureCode().length, "…so the region is STRICTLY larger than the live code");
+
+  // 5) it EXCLUDES the mutation registrations and MUT 40. Every needle is ASSEMBLED, so this can never match
+  //    its own source — the same self-reference trap that produced the original defective boundary.
+  const REGISTRAR = "function src" + "Mutation";
+  const CLOCK_MUTATION = "srcMutation(\"MUT " + "40";
+  assert(!fullFixtureRegion.includes(MUTATION_SENTINEL), "the mutation registration is OUTSIDE the scanned source");
+  assert(!fullFixtureRegion.includes(REGISTRAR), "the mutation registrars are OUTSIDE it");
+  assert(!fullFixtureRegion.includes(CLOCK_MUTATION), "MUT 40 is OUTSIDE it");
+  assert(stripTs(whole).includes(REGISTRAR) && stripTs(whole).includes(CLOCK_MUTATION),
+    "…though both certainly exist in the file");
+
+  // 6) it INCLUDES makeStore and workerDeps
+  assert(fullFixtureRegion.includes("function makeStore"), "the scanned source includes makeStore");
+  assert(fullFixtureRegion.includes("function workerDeps"), "…and workerDeps");
+  for (const needle of [
+    "expire(nowMs = FIXTURE_NOW_MS)",
+    "recoverStaleDispatching(staleAfterSeconds, nowMs = FIXTURE_NOW_MS)",
+    "claim(workerId, limit, nowMs = FIXTURE_NOW_MS",
+    "reserve(intentId, workerId, nowMs = FIXTURE_NOW_MS)",
+    "row.completed_at = new Date(FIXTURE_NOW_MS)",
+    "const nowMs = over.nowMs ?? FIXTURE_NOW_MS;",
+  ]) {
+    assert(liveFixture.includes(needle), `the live fixture code MUST contain: ${needle}`);
+    assert(fullFixtureRegion.includes(needle), `…and so must the scanned region: ${needle}`);
+  }
+
+  // ── HOSTILE-APPEND PROOF (in memory only — the repository is NEVER written) ────────────────────────
+  // Simulate exactly the escape this blocker names: a future functional check, appended immediately after
+  // K4, that CALLS the wall clock. The full-region scan must CATCH it, and the old live-only scan must be
+  // shown to have MISSED it. The hostile text is assembled from NOW_CALL, so this file still contains no
+  // contiguous forbidden token of its own.
+  const HOSTILE = `\ncheck("ZZ. hostile", async () => {\n  const w = workerDeps(makeStore(), { nowMs: ${NOW_CALL} });\n  return w;\n});\n`;
+  const hostileRegion = regionRaw + HOSTILE;              // appended AFTER K4, still inside the region
+
+  assert(NOW_CALL_RE.test(stripTs(hostileRegion)),
+    "a wall-clock call appended after K4 IS detected by the FULL-REGION negative scan");
+  assert(!NOW_CALL_RE.test(fullFixtureRegion),
+    "…while the REAL region is clean (so the proof above is not a false positive)");
+
+  // …and the OLD live-only scan is BLIND to it: the append lands past `guardAt`, so slicing the live code out
+  // discards it entirely. This is the exact K4 escape, demonstrated rather than asserted.
+  assert(!NOW_CALL_RE.test(stripTs(hostileRegion.slice(0, guardAt))),
+    "…and the OLD live-only scan would have MISSED it — that was the K4 escape");
 });
 
 // ============================================================================
@@ -1868,7 +2304,7 @@ async function withMutatedBuild(fn) {
       "services/consentAckWorkerService.js",
     ]);
     return await fn(wireBuild(dir));
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { rmTree(dir); }
 }
 
 // ---- Enqueue ordering + idempotency ------------------------------------------------------------
@@ -1911,7 +2347,7 @@ fnMutation("MUT 4: the claim is NON-ATOMIC ⇒ two workers both send", async () 
   const store = makeStore();
   await enqueueOne(store);
   const row = [...store.rows.values()][0];
-  const nonAtomic = async (wid) => { row.status = "claimed"; row.locked_by = wid; row.locked_at = new Date().toISOString(); return [{ ...row }]; };
+  const nonAtomic = async (wid) => { row.status = "claimed"; row.locked_by = wid; row.locked_at = new Date(FIXTURE_NOW_MS).toISOString(); return [{ ...row }]; };
   // …and the reservation stops being compare-and-set.
   const alwaysWins = async () => { row.provider_attempt_count = Math.min(row.provider_attempt_count + 1, 9); row.status = "dispatching"; return true; };
   const w1 = workerDeps(store, { claim: nonAtomic, reserveAttempt: alwaysWins });
@@ -2259,7 +2695,7 @@ srcMutation("MUT 28: the STALE-DISPATCH RECOVERY is removed from the worker batc
     let recovered = 0;
     const w = workerDeps(store, {
       recoverStaleDispatching: async (secs) => { recovered++; return store.recoverStaleDispatching(secs); },
-      nowMs: Date.now() + 200 * 1000,
+      nowMs: FIXTURE_NOW_MS + 200 * 1000,
     });
     await mm.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
     // Recovery never ran, so the stuck row keeps its SEALED DESTINATION for ever.
@@ -2373,48 +2809,158 @@ srcMutation("MUT 39: the HARNESS MODEL reverts to `>= 120` (it stops matching th
     return sqlRejects120 === true && modelRejects120 === false;        // SQL refuses it; the model allows it
   });
 
+srcMutation("MUT 40: the fixture clock reverts to the REAL wall clock (the time-bomb returns)",
+  HARNESS_SRC,
+  "  const nowMs = over.nowMs ?? FIXTURE_NOW_MS;",
+  "  const nowMs = over.nowMs ?? Date.now();",
+  // BEHAVIOURAL. A running harness cannot reload its own closures, so the mutated SEMANTICS are re-enacted
+  // against the REAL worker: a dependency set whose clock is `Date.now()` — exactly what the mutated source
+  // now produces — is driven with the wall clock stubbed far past the fixture expiry. K2's property then
+  // collapses: the intent is swept as expired, never claimed, never sent. That is the original defect.
+  async () => {
+    // 1) the mutation must actually have applied (checked in the LIVE fixture region, not in the mutation
+    //    definitions below — those embed the anchor strings verbatim).
+    const live = liveFixtureCode();
+    const at = live.indexOf("function workerDeps");
+    const workerDepsDef = live.slice(at, at + 1500);          // the ACTUAL definition, not a quoted needle
+    if (!/const nowMs = over\.nowMs \?\? Date\.now\(\);/.test(workerDepsDef)) return false;
+    if (/const nowMs = over\.nowMs \?\? FIXTURE_NOW_MS;/.test(workerDepsDef)) return false;
+
+    // 2) re-enact the mutated semantics against the REAL production worker
+    const realDateNow = Date.now;
+    try {
+      Date.now = () => FAR_FUTURE_MS;
+
+      const store = makeStore();
+      await enqueueOne(store);
+      // `nowMs: Date.now()` is precisely what the mutated default computes — a REAL wall-clock read.
+      const w = workerDeps(store, { nowMs: Date.now() });
+      const out = await M.Worker.processConsentAckIntents({ workerId: "w1" }, w.deps);
+
+      // 3) K2's guarantees are gone: swept expired, nothing claimed, nothing sent.
+      return out.result.claimed === 0 && out.result.sent === 0 && w.sends.count === 0
+        && [...store.rows.values()][0].status === "expired";
+    } finally {
+      Date.now = realDateNow;
+    }
+  });
+
 // ============================================================================
 // RUNNER
 // ============================================================================
+/**
+ * The IDENTIFIER of a check — the short code it is referred to by ("O1", "L2", "C6b", "MUT 40").
+ * A run that reports only a count ("131/132") is not actionable: the flake cannot be attributed, so the fix
+ * cannot be aimed. Every failure below prints its identifier, its full name, the thrown message and the
+ * stack. This is REPORTING ONLY — no check's pass/fail semantics change, and the exit code is unchanged.
+ */
+function checkId(name) {
+  const m = name.match(/^(MUT \d+|[A-Za-z]+\d+[a-z]?)/);
+  return m ? m[1] : name.split(/[.:]/)[0];
+}
+
+function describeFailure(name, e) {
+  return {
+    id: checkId(name),
+    name,
+    message: e instanceof Error ? e.message : String(e),
+    stack: e instanceof Error && e.stack ? e.stack : null,
+  };
+}
+
+function reportFailures(label, failures) {
+  if (failures.length === 0) return;
+  console.log(`\n──────── FAILED ${label} (${failures.length}) ────────`);
+  for (const f of failures) {
+    console.log(`\n[${f.id}] ${f.name}`);
+    console.log(`  message: ${f.message}`);
+    if (f.stack) {
+      console.log("  stack:");
+      for (const line of f.stack.split("\n")) console.log(`    ${line}`);
+    } else {
+      console.log("  stack:   (none — the value thrown was not an Error)");
+    }
+  }
+}
+
 async function runFunctional() {
-  let passed = 0, failed = 0;
+  let passed = 0;
+  const failures = [];
   console.log("Running Phase 5F-D4-C consent-ack async checks...\n");
   for (const c of checks) {
     try { await c.fn(); console.log(`PASS ${c.name}`); passed++; }
-    catch (e) { console.log(`FAIL ${c.name}`); console.error(e); failed++; }
+    catch (e) {
+      const f = describeFailure(c.name, e);
+      console.log(`FAIL [${f.id}] ${c.name}`);
+      console.error(e);
+      failures.push(f);
+    }
   }
-  return { passed, failed };
+  return { passed, failed: failures.length, failures };
 }
 
 async function runMutations() {
-  let passed = 0, failed = 0;
+  let passed = 0;
+  const failures = [];
   console.log("\nRunning Phase 5F-D4-C mutation tests...\n");
   for (const mut of mutationChecks) {
     const originals = new Map();
-    for (const edit of mut.edits) { const p = resolve(edit.file); if (!originals.has(p)) originals.set(p, readFileSync(p, "utf8")); }
+    for (const edit of mut.edits) {
+      const p = resolve(edit.file);
+      if (!originals.has(p)) originals.set(p, withIoRetry(`read ${p}`, () => readFileSync(p, "utf8")));
+    }
     try {
       for (const edit of mut.edits) {
         const p = resolve(edit.file);
-        const cur = readFileSync(p, "utf8");
+        const cur = withIoRetry(`read ${p}`, () => readFileSync(p, "utf8"));
         if (!cur.includes(edit.from)) throw new Error(`anchor not found in ${edit.file}`);
-        writeFileSync(p, cur.replace(edit.from, edit.to));
+        writeFileRetry(p, cur.replace(edit.from, edit.to));
       }
       let violation = false;
       try { violation = await mut.scenario(); }
       catch { violation = true; /* the mutation broke the build/behaviour → load-bearing */ }
       if (violation) { console.log(`PASS ${mut.name}`); passed++; }
-      else { console.log(`FAIL ${mut.name} (guard did not prove load-bearing)`); failed++; }
-    } catch (e) { console.log(`FAIL ${mut.name}`); console.error(e); failed++; }
-    finally { for (const [p, original] of originals) writeFileSync(p, original); }
+      else {
+        const f = describeFailure(mut.name, new Error("the guard did not prove load-bearing: the mutated source still satisfied every validator"));
+        console.log(`FAIL [${f.id}] ${mut.name} (guard did not prove load-bearing)`);
+        failures.push(f);
+      }
+    } catch (e) {
+      const f = describeFailure(mut.name, e);
+      console.log(`FAIL [${f.id}] ${mut.name}`);
+      console.error(e);
+      failures.push(f);
+    }
+    finally {
+      // THE RESTORE IS NOT ALLOWED TO FAIL SILENTLY. Every mutated file is rewritten with the retrying
+      // writer and then VERIFIED byte-for-byte. A harness that mutates repository source must leave the
+      // working tree byte-identical; a transient lock swallowing a restore would corrupt the branch and
+      // poison every later check (and the next run's scope guards).
+      for (const [p, original] of originals) {
+        writeFileRetry(p, original);
+        const restored = withIoRetry(`verify ${p}`, () => readFileSync(p, "utf8"));
+        if (restored !== original) {
+          console.error(`RESTORE FAILED — ${p} was NOT returned to its original bytes.`);
+          throw new Error(`mutation restore failed for ${p}`);   // abort: never continue on a dirty tree
+        }
+      }
+    }
   }
-  return { passed, failed };
+  return { passed, failed: failures.length, failures };
 }
 
 const functional = await runFunctional();
 const mutations = await runMutations();
-rmSync(MAIN_DIR, { recursive: true, force: true });
+rmTree(MAIN_DIR);
 
 const total = functional.passed + mutations.passed;
 const totalFailed = functional.failed + mutations.failed;
+
+reportFailures("FUNCTIONAL CHECKS", functional.failures);
+reportFailures("MUTATION TESTS", mutations.failures);
+
 console.log(`\nSummary: ${total} passed, ${totalFailed} failed (functional: ${functional.passed}/${checks.length}, mutation: ${mutations.passed}/${mutationChecks.length}).`);
+if (totalFailed > 0) {
+  console.log(`Failed: ${[...functional.failures, ...mutations.failures].map((f) => f.id).join(", ")}`);
+}
 process.exit(totalFailed === 0 ? 0 : 1);

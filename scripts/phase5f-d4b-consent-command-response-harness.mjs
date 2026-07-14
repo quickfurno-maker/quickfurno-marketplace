@@ -73,6 +73,89 @@ const FROZEN = [
   D2E_HARNESS_SRC,
 ];
 
+// ── PHASE 8A — AN AUTHORITY TRANSFER, BOUNDED TO A FIXED HISTORICAL RANGE ──────────────────────────
+//
+// Identical reasoning to D4-C's H1 (see that harness for the full note). Phase 8A legitimately changes two
+// files the Phase 7 freeze listed above; their AUTHORITY MOVES to the D3-B harness, which owns and proves
+// the fail-closed consent properties. D4-B keeps proving everything else.
+//
+// THE RANGE IS CLOSED AT BOTH ENDS. An earlier version compared the authority base against the MOVING HEAD,
+// which would have made every later phase's files fall inside the Phase 8A audit and fail D4-B forever.
+// Both endpoints are now immutable SHAs; later commits sit outside the range and are simply not D4-B's
+// business.
+const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36";
+const PHASE_8A_IMPLEMENTATION_HEAD = "c0fc5fb11ff1b0d228e8d58793bc4579a0c5d5e9";
+
+/** The EXACT seven files the Phase 8A implementation commit may contain. Fixed for all time. */
+const PHASE_8A_IMPLEMENTATION_FILES = [
+  "services/communicationService.ts",
+  "services/outboundConsentEnforcementService.ts",
+  "services/metaWhatsAppWebhookService.ts",
+  "scripts/phase5b-communication-core-harness.mjs",
+  "scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs",
+  "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+  "scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
+];
+
+const PHASE_8A_RELEASED_SHARED_AUTHORITIES = [
+  "services/communicationService.ts",
+  "services/outboundConsentEnforcementService.ts",
+];
+
+/**
+ * The D2-E harness is also released by Phase 8A — but NOT unguarded. It has always had a stronger guard
+ * than a byte-freeze: `validateD2EHarnessDelta()` bounds its delta line-by-line against D4B_BASE, forbids
+ * removing any check, and pins its check/assert counts. Phase 8A extends that validator (transformation C)
+ * rather than bypassing it, so this file remains the most tightly bounded of them all.
+ */
+const PHASE_8A_RELEASED_DELTA_BOUNDED = [D2E_HARNESS_SRC];
+
+/** Everything the Phase 7 freeze covered that Phase 8A did NOT release. Still byte-frozen in the worktree. */
+const STILL_FROZEN = FROZEN.filter(
+  (f) => !PHASE_8A_RELEASED_SHARED_AUTHORITIES.includes(f) && !PHASE_8A_RELEASED_DELTA_BOUNDED.includes(f)
+);
+
+/**
+ * D4-B's OWN authorities — the ONLY worktree files it polices. It deliberately does NOT gatekeep arbitrary
+ * future-phase files; that is each phase's own harness's job.
+ */
+const D4B_OWNED_AUTHORITIES = [SVC_SRC, PURE_SRC];
+
+const FORBIDDEN_IN_PHASE_8A = [
+  [/^supabase\/migrations\//, "a migration"],
+  [/^app\/api\//, "an API route"],
+  [/\.env/, "an environment file"],
+  [/^lib\/communication\/providers\//, "a provider adapter/configuration"],
+  [/package-lock\.json|yarn\.lock|pnpm-lock\.yaml/, "a lockfile"],
+  [/^package\.json$/, "package.json"],
+  [/^(Dockerfile|docker-compose|\.github\/|vercel\.json|ecosystem\.config)/, "a deployment file"],
+];
+
+/** The files changed in the FIXED Phase 8A range. Never reads HEAD, so later phases can never enter it. */
+function phase8aRangeFiles() {
+  return [...new Set(
+    execFileSync("git", ["diff", "--name-only", `${PHASE_8A_AUTHORITY_BASE}..${PHASE_8A_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
+      .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"))
+  )];
+}
+
+/** MEMBERSHIP FIRST, forbidden categories SECOND — so an approved file can never be pre-rejected. */
+function validatePhase8AHistoricalRange() {
+  const files = phase8aRangeFiles();
+  assert(files.length === 7, `the fixed Phase 8A range must contain EXACTLY 7 files (got ${files.length}: ${files.join(", ")})`);
+  for (const p of files) {
+    assert(PHASE_8A_IMPLEMENTATION_FILES.includes(p), `unexpected file in the fixed Phase 8A range: ${p}`);
+  }
+  for (const p of PHASE_8A_IMPLEMENTATION_FILES) {
+    assert(files.includes(p), `expected Phase 8A file missing from the fixed range: ${p}`);
+  }
+  for (const p of files) {
+    for (const [re, what] of FORBIDDEN_IN_PHASE_8A) {
+      assert(!re.test(p), `${what} may never be part of the Phase 8A range (${p})`);
+    }
+  }
+}
+
 /** The APPROVED D4-C scope — ELEVEN files. */
 const D4C_EXPECTED_FILES = [
   "supabase/migrations/20260713000100_communication_consent_ack_intents.sql",
@@ -164,15 +247,32 @@ function hasNot(re, s, msg) { assert(!re.test(s), msg); }
 //  validator still bounds exactly what may change.)
 // ----------------------------------------------------------------------------
 const D4B_BASE = "8749050fb45b500d196746d10315878eb60219c4";
-const D2E_EXPECTED_CHECKS = 31;
-const D2E_EXPECTED_ASSERTS = 158;
+const D2E_EXPECTED_CHECKS = 31;                 // UNCHANGED by Phase 8A — no D2-E check was added or removed
+const D2E_EXPECTED_ASSERTS = 159;               // Phase 8A adds exactly ONE assertion (the symbol-level guard)
 
 const A_OLD = 'hasNot(/consentCommand|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");';
 const A_NEW = 'hasNot(/["\']\\.\\.\\/lib\\/communication\\/consentCommand["\']|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");';
 const B_OLD_HEAD = 'assert(consentSpecifiers.length === 1 && consentSpecifiers[0] === "./inboundConsentCommandService",';
-const B_NEW_ALLOWLIST = 'const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService"];';
 const B_NEW_UNAPPROVED = 'const unapproved = consentSpecifiers.filter((s) => !ALLOWED_CONSENT_MODULES.includes(s));';
 const B_NEW_REQUIRE_D2E = 'assert(consentSpecifiers.includes("./inboundConsentCommandService"),';
+
+// ── PHASE 8A — transformation C: the webhook may import the FAIL-CLOSED enforcer, and NOTHING else ──
+// The allowlist gains ONE module. That alone would be a real widening, so the delta ALSO adds a
+// SYMBOL-LEVEL guard: the only symbol importable from that module is `createFailClosedOutboundConsentEnforcer`
+// (an enforcer with no code path that returns `allow`), and the REAL authority is explicitly forbidden.
+// Net effect: the webhook's authority NARROWS. The exact-line bounding below still admits nothing else.
+const B_NEW_ALLOWLIST = 'const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService", "./outboundConsentEnforcementService"];';
+const C_SYMBOLS_HEAD = 'const enforcementSymbols = [...readF(WEBHOOK_SVC_SRC).matchAll(/import\\s*\\{([^}]*)\\}\\s*from\\s*"\\.\\/outboundConsentEnforcementService"/g)]';
+const C_SYMBOLS_TAIL = '.flatMap((m) => m[1].split(",").map((s) => s.trim()).filter(Boolean));';
+const C_SYMBOLS_ASSERT = 'assert(enforcementSymbols.every((s) => s === "createFailClosedOutboundConsentEnforcer"),';
+const C_SYMBOLS_MSG = '`the webhook may import ONLY the fail-closed enforcer (got [${enforcementSymbols.join(", ")}])`);';
+const C_NO_REAL_AUTHORITY = 'hasNot(/createOutboundConsentEnforcer\\b/, code, "the webhook NEVER binds the REAL consent authority");';
+/** The consent modules the D2-E allowlist may contain after Phase 8A. Exactly these three, in this order. */
+const D2E_ALLOWED_MODULES_AFTER_8A = [
+  "./inboundConsentCommandService",
+  "./consentCommandResponseService",
+  "./outboundConsentEnforcementService",
+];
 
 const countOf = (s, re) => (s.match(re) || []).length;
 
@@ -192,16 +292,30 @@ function validateD2EHarnessDelta() {
   if (!allow) problems.push("the consent-module allowlist is not a literal array");
   else {
     const entries = allow[1].split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
-    const expected = ["./inboundConsentCommandService", "./consentCommandResponseService"];
+    const expected = D2E_ALLOWED_MODULES_AFTER_8A;
     if (JSON.stringify(entries) !== JSON.stringify(expected)) {
       problems.push(`the allowlist must be exactly [${expected.join(", ")}] (got [${entries.join(", ")}])`);
     }
     if (/\*|\.\+|RegExp|startsWith|includes\(.*\/\)/.test(allow[1])) problems.push("the allowlist must contain no wildcard/regex/prefix");
   }
 
+  // PHASE 8A — admitting the enforcement module is only safe BECAUSE the symbol-level guard is present.
+  // If someone widens the allowlist and drops the symbol guard, the D2-E boundary silently reopens.
+  for (const [name, needle] of [
+    ["symbol extraction", C_SYMBOLS_HEAD],
+    ["symbol assertion", C_SYMBOLS_ASSERT],
+    ["real-authority prohibition", C_NO_REAL_AUTHORITY],
+  ]) {
+    if (!after.includes(needle)) problems.push(`Phase 8A transformation C missing its ${name}`);
+  }
+
   const diff = execFileSync("git", ["diff", "--unified=0", D4B_BASE, "--", D2E_HARNESS_SRC], { encoding: "utf8" }).split("\n");
   const APPROVED_FRAGMENTS = [
     A_OLD, A_NEW, B_OLD_HEAD, B_NEW_ALLOWLIST, B_NEW_UNAPPROVED, B_NEW_REQUIRE_D2E,
+    // PHASE 8A — transformation C, line by line. EXACT equality only: nothing else may ride along.
+    C_SYMBOLS_HEAD, C_SYMBOLS_TAIL, C_SYMBOLS_ASSERT, C_SYMBOLS_MSG, C_NO_REAL_AUTHORITY,
+    // The pre-Phase-8A allowlist line, so REMOVING it is an approved deletion.
+    'const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService"];',
     'consentSpecifiers[0] === "./inboundConsentCommandService"',
     "`the orchestrator must be the ONLY consent-related module the webhook imports (got [${consentSpecifiers.join(\", \")}])`);",
     'assert(unapproved.length === 0,',
@@ -559,17 +673,57 @@ check("B4. the webhook ENQUEUES after D2-E, and never fails the command flow", (
   hasNot(/processConsentAckIntents|consentAckWorkerService/, stripTs(code), "the worker never runs inline");
 });
 
-check("B5. FROZEN authorities are unchanged; no SQL execution, no env, no provider, no template seed", () => {
-  const dirty = gitDirty();
-  for (const f of FROZEN) assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
-  for (const p of dirty) {
-    assert(!/\.env/.test(p), `no env file may change (${p})`);
-    assert(!/^lib\/communication\/providers\//.test(p), `no provider adapter may change (${p})`);
-    assert(!/package-lock\.json|yarn\.lock|pnpm-lock\.yaml/.test(p), `no lockfile may change (${p})`);
-    assert(D4C_EXPECTED_FILES.includes(p), `file outside the approved D4-C scope: ${p}`);
+check("B5. Phase 8A authority transfer is BOUNDED; D4-B's own authorities stay frozen; no SQL/env/provider", () => {
+  // 1) ANCESTRY. Both endpoints exist; base → implementation head → HEAD.
+  for (const [sha, what] of [[PHASE_8A_AUTHORITY_BASE, "Phase 7 authority base"], [PHASE_8A_IMPLEMENTATION_HEAD, "Phase 8A implementation head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
   }
-  // The D2-E harness is frozen in D4-C; if it is EVER touched again, the delta stays byte-bounded.
-  if (dirty.includes(D2E_HARNESS_SRC)) {
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8A_AUTHORITY_BASE, PHASE_8A_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8A_IMPLEMENTATION_HEAD, "HEAD"]);
+
+  // 2) THE FIXED HISTORICAL RANGE — membership first, forbidden categories second. Never reads HEAD.
+  validatePhase8AHistoricalRange();
+
+  // 3) The release is NARROW: exactly two shared authorities, each of which genuinely WAS frozen.
+  assert(PHASE_8A_RELEASED_SHARED_AUTHORITIES.length === 2, "exactly TWO shared authorities are released");
+  for (const f of PHASE_8A_RELEASED_SHARED_AUTHORITIES) {
+    assert(FROZEN.includes(f), `a released file must have genuinely BEEN frozen: ${f}`);
+  }
+
+  // 4) WORKTREE PROTECTION — narrow, and only over what D4-B owns. It does not police future-phase files.
+  const dirty = gitDirty();
+  for (const f of D4B_OWNED_AUTHORITIES) {
+    assert(!dirty.includes(f), `a D4-B-owned authority must not change: ${f}`);
+  }
+  for (const f of STILL_FROZEN) {
+    assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
+  }
+
+  // 5) AUTHORITY-TRANSFER WIRING CHECK — the transferred-to authority must exist AS EXECUTABLE CODE.
+  //    Line-oriented comment filtering: D3-B contains `/*` inside a string literal, so a block-comment regex
+  //    would swallow the very registrations being checked. A registration quoted in a comment sits on a line
+  //    starting with `//` or `*` and is dropped.
+  const d3bCode = readF("scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs")
+    .split("\n")
+    .filter((l) => {
+      const t = l.trim();
+      return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*") || t.startsWith("*/"));
+    })
+    .join("\n");
+  const registeredChecks = [...d3bCode.matchAll(/^\s*check\("P8A-(\d+[a-z]?)\./gm)].map((m) => m[1]);
+  assert(registeredChecks.length >= 17, `D3-B must REGISTER the Phase 8A checks as executable code (found ${registeredChecks.length})`);
+  for (const id of ["14", "15", "16", "17"]) {
+    assert(registeredChecks.includes(id), `D3-B must register the P8A-${id} structural check`);
+  }
+  const registeredMutations = [...d3bCode.matchAll(/^\s*srcMutationN?\("(MUT \d+[a-z]?) \(8A\)/gm)].map((m) => m[1]);
+  assert(registeredMutations.length >= 12, `D3-B must REGISTER the Phase 8A mutations as executable code (found ${registeredMutations.length})`);
+  const zeroCallAssertions = (d3bCode.match(/providerCalls === 0/g) ?? []).length;
+  assert(zeroCallAssertions >= 8, `the zero-provider-call invariant must be asserted in executable check bodies (found ${zeroCallAssertions})`);
+  has(/expectCompileFailure/, d3bCode, "D3-B's mutation runner enforces the strict compile contract");
+
+  // 6) The D2-E harness delta stays byte-bounded whenever it is touched.
+  if (dirty.includes(D2E_HARNESS_SRC) || phase8aRangeFiles().includes(D2E_HARNESS_SRC)) {
     const problems = validateD2EHarnessDelta();
     assert(problems.length === 0, `D2-E harness change is out of bounds: ${problems.join(" | ")}`);
   }
@@ -622,9 +776,27 @@ function buildWebhook(over = {}) {
     result: { candidates: 1, skippedNotEligible: 0, helpAcknowledged: 0, unsupported: 0, writerInvocations: 1, applied: 1, replayed: 0, deterministicFailures: 0, items: [commandItem()] },
   };
 
+  // PHASE 8A — the webhook now binds an explicit FAIL-CLOSED consent enforcer to the CommunicationService
+  // it builds for delivery receipts. This isolated build compiles the webhook ALONE (`noResolve`), so the
+  // enforcer module must be stubbed. The stub is deliberately minimal and SAFE BY CONSTRUCTION:
+  //   • it exposes exactly the one symbol the webhook imports;
+  //   • its enforcer can only ever answer `unavailable` — it has no branch that returns `allow`;
+  //   • it makes no provider call, touches no Supabase, and imports no production infrastructure;
+  //   • it COUNTS `authorize` calls, so "the webhook-only path never even consults consent" is PROVEN by a
+  //     counter rather than assumed. (The webhook processes delivery receipts; it must never send, so it
+  //     must never need an authorization either.)
+  const consent = { authorizeCalls: 0 };
   const STUBS = {
     "../lib/supabase": { adminClient: () => { throw new Error("db must not be touched on the inbound branch"); } },
     "./communicationService": { CommunicationService: class {} },
+    "./outboundConsentEnforcementService": {
+      createFailClosedOutboundConsentEnforcer: () => ({
+        authorize: async () => {
+          consent.authorizeCalls++;
+          return { kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true };
+        },
+      }),
+    },
     "./communicationProviderRuntimeService": { isWebhookProcessingEnabled: async () => true },
     "../lib/communication/providers/metaCloudWhatsAppConfig": {
       resolveWebhookSignatureConfig: () => ({ ok: true, config: { appSecret: "secret" } }),
@@ -677,7 +849,7 @@ function buildWebhook(over = {}) {
   };
   const mod = req("./services/metaWhatsAppWebhookService.js");
   Module._load = original;
-  return { mod, order, calls, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return { mod, order, calls, consent, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 const postWebhook = async (over = {}) => {
@@ -687,7 +859,7 @@ const postWebhook = async (over = {}) => {
       rawBody: JSON.stringify(envelope(textMsg())),
       signature: "sha256=deadbeef",
     });
-    return { res, order: w.order, calls: w.calls };
+    return { res, order: w.order, calls: w.calls, consent: w.consent };
   } finally { w.cleanup(); }
 };
 
@@ -696,6 +868,33 @@ check("W-CONTROL. the real webhook reaches the INBOUND branch and ENQUEUES exact
   assert(res.status === 200 && res.result === "inbound_processed", `200/inbound_processed (got ${safeStringify(res)})`);
   assert(calls.persist === 1 && calls.commands === 1 && calls.enqueue === 1, "persist, commands and enqueue each ran once");
   assert(order.join(",") === "persist,d2d_write,commands,enqueue", `order: ${order.join(",")}`);
+});
+
+check("W-8A. the webhook-only path NEVER consults consent and NEVER reaches a send path", async () => {
+  // PHASE 8A. The webhook binds a fail-closed enforcer defensively — but a webhook that PROCESSES DELIVERY
+  // RECEIPTS should never need an authorization at all. Prove the defence is dormant, not load-bearing:
+  // `authorize` is never invoked on any webhook execution, so binding it changed no behaviour whatsoever.
+  const inbound = await postWebhook();
+  assert(inbound.consent.authorizeCalls === 0,
+    `the inbound branch never consults consent (got ${inbound.consent.authorizeCalls})`);
+
+  // …and it holds on a FAILING enqueue too, where the error path could otherwise wander somewhere new.
+  const thrown = await postWebhook({ enqueueThrows: true });
+  assert(thrown.consent.authorizeCalls === 0,
+    `even a throwing enqueue never consults consent (got ${thrown.consent.authorizeCalls})`);
+
+  // The webhook still reaches NO send path in source: no send, no dispatch, no runtime factory.
+  const code = stripTs(readF(WEBHOOK_SRC));
+  hasNot(/\.send\(|dispatchMessage\(|dispatchPersistedMessage\(|createRuntimeCommunicationService/, code,
+    "the webhook never sends, dispatches, or builds a sending service");
+  // The ONLY CommunicationService operation it performs remains processWebhook.
+  const ops = [...code.matchAll(/service\.([A-Za-z]+)\(/g)].map((m) => m[1]);
+  assert(ops.length > 0 && ops.every((o) => o === "processWebhook"),
+    `processWebhook is the ONLY CommunicationService operation used (got [${ops.join(", ")}])`);
+  // …and it binds the FAIL-CLOSED enforcer, never the real one and never an allow-all.
+  has(/createFailClosedOutboundConsentEnforcer\(\)/, code, "it binds the FAIL-CLOSED enforcer");
+  hasNot(/createOutboundConsentEnforcer\(/, code, "it never binds the REAL consent authority");
+  hasNot(/allowAll|alwaysAllow|permitAll/i, code, "it never defines or imports an allow-all enforcer");
 });
 
 check("W-A. a THROWING enqueue leaves the HTTP status and body IDENTICAL to the control", async () => {
@@ -962,11 +1161,19 @@ srcMutation("MUT 16: an UNRELATED line in the D2-E harness is changed (wholesale
   'hasNot(/apply_communication_consent_command_MUTATED/, code, "the webhook never calls the RPC");',
   () => validateD2EHarnessDelta().some((p) => p.startsWith("unrelated D2-E harness line changed")));
 
-srcMutation("MUT 17: a THIRD consent-related module is admitted to the D2-E allowlist",
+srcMutation("MUT 17: a FOURTH consent-related module is admitted to the D2-E allowlist",
   D2E_HARNESS_SRC,
-  'const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService"];',
-  'const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService", "./communicationConsentWriterService"];',
+  B_NEW_ALLOWLIST,
+  'const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService", "./outboundConsentEnforcementService", "./communicationConsentWriterService"];',
   () => validateD2EHarnessDelta().some((p) => p.includes("the allowlist must be exactly")));
+
+srcMutation("MUT 17b (8A): the D2-E SYMBOL guard is dropped while the enforcement module stays allowlisted",
+  D2E_HARNESS_SRC,
+  C_SYMBOLS_ASSERT,
+  'assert(true,',
+  // Admitting the enforcement MODULE is only safe because the SYMBOL guard confines it to the fail-closed
+  // factory. Remove that guard and the webhook could import the REAL authority under an allowlisted module.
+  () => validateD2EHarnessDelta().some((p) => p.includes("transformation C missing its symbol assertion")));
 
 srcMutation("MUT 18: a D2-E check is REMOVED under cover of the approved correction",
   D2E_HARNESS_SRC,

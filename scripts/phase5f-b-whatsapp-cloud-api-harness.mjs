@@ -99,6 +99,11 @@ function wireBuild(outDir) {
     Selection: req("./services/whatsAppProviderSelection.js"),
     Comm: req("./services/communicationService.js"),
     Runtime: req("./services/runtimeCommunicationService.js"),
+    // PHASE 8B-0 — the closed outbound-consent SCOPE registry and the production consent-enforcer factory.
+    // Both are transitively compiled (communicationService.ts imports them), so they are emitted to the
+    // build and available to the TEST-ONLY consent posture below. The production enforcer is never stubbed.
+    Scope: req("./lib/communication/outboundConsentScope.js"),
+    Enforcement: req("./services/outboundConsentEnforcementService.js"),
     Outbound: req("./services/metaWhatsAppOutboundService.js"),
     WebhookSvc: req("./services/metaWhatsAppWebhookService.js"),
     Resolver: req("./lib/communication/recipientResolver.js"),
@@ -841,10 +846,16 @@ check("boundaries. WABA subscription + template governance boundaries documented
 const DEST = "+15550009999";
 const UNKNOWN_RESULT = { accepted: false, provider: "metafake", providerMessageId: null, normalizedStatus: "failed", errorCode: "META_TIMEOUT", errorMessage: "t", retryable: false, outcomeCertainty: "unknown_outcome" };
 function seedMessage(over = {}) {
+  // PHASE 8B-0: a queued message must be WELL-FORMED for the consent layer that now sits on the real dispatch
+  // path. Every scope-registry entry's approved templateKey equals its message-type key, so a seeded row's
+  // template_key defaults to its message_type — `resolveOutboundConsentScope` then classifies it exactly as a
+  // real production row (which always carries its template_key). An explicit `template_key` override still
+  // wins, so the template-mismatch and unclassified tests can still seed a deliberately malformed row.
+  const messageType = over.message_type ?? "vendor_new_lead";
   const row = {
-    id: crypto.randomUUID(), message_type: "vendor_new_lead", lane: "business", channel: "whatsapp",
+    id: crypto.randomUUID(), message_type: messageType, lane: "business", channel: "whatsapp",
     recipient_type: "vendor", recipient_id: "v1", destination_source: "recipient_reference",
-    destination_hash: M.Phone.hashPhoneE164(DEST), destination_masked: "masked", template_key: null,
+    destination_hash: M.Phone.hashPhoneE164(DEST), destination_masked: "masked", template_key: messageType,
     entity_type: null, entity_id: null, correlation_id: null, idempotency_key: crypto.randomUUID(),
     policy_decision_id: null, status: "queued", priority: "normal", scheduled_at: null,
     attempt_count: 0, max_attempts: 5, next_retry_at: null, provider: "metafake",
@@ -868,7 +879,7 @@ function stubDb(build) { build.Supabase.adminClient = () => ({ from: (t) => new 
 async function runUnknownDispatch(build) {
   resetDb();
   const msg = seedMessage();
-  const svc = new build.Comm.CommunicationService(fakeProvider(UNKNOWN_RESULT), new build.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+  const svc = new build.Comm.CommunicationService(fakeProvider(UNKNOWN_RESULT), new build.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(build));
   await svc.dispatchMessage(msg, { rawVariables: {} });
   return db.communication_messages.find((m) => m.id === msg.id);
 }
@@ -885,7 +896,7 @@ check("G1-8. unknown_outcome persists as outcome_unknown (no retry/dead_letter/f
 check("G9-10. outcome_unknown is not dispatchable by the retry worker; no SMS fallback path", async () => {
   resetDb();
   const msg = seedMessage({ status: "outcome_unknown" });
-  const svc = new M.Comm.CommunicationService(fakeProvider(UNKNOWN_RESULT), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+  const svc = new M.Comm.CommunicationService(fakeProvider(UNKNOWN_RESULT), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(M));
   const res = await svc.dispatchPersistedMessage(msg.id);
   assert(!res.ok, "outcome_unknown is not re-dispatchable by the retry worker"); // G9
   const commSrc = stripTs(readFileSync(COMM_SERVICE_SRC, "utf8"));
@@ -1047,7 +1058,7 @@ function countingProvider(result) {
 async function dispatchResult(result, over = {}) {
   resetDb(); providerCallCount = 0;
   const msg = seedMessage(over);
-  const svc = new M.Comm.CommunicationService(countingProvider(result), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+  const svc = new M.Comm.CommunicationService(countingProvider(result), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(M));
   await svc.dispatchMessage(msg, { rawVariables: {} });
   return db.communication_messages.find((m) => m.id === msg.id);
 }
@@ -1092,7 +1103,7 @@ function throwingProvider(err) {
 async function dispatchThrow(err, over = {}) {
   resetDb(); providerCallCount = 0;
   const msg = seedMessage(over);
-  const svc = new M.Comm.CommunicationService(throwingProvider(err), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+  const svc = new M.Comm.CommunicationService(throwingProvider(err), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(M));
   await svc.dispatchMessage(msg, { rawVariables: {} });
   return db.communication_messages.find((m) => m.id === msg.id);
 }
@@ -1203,10 +1214,52 @@ function spyMetaProvider(transport, build = M) {
   return { provider: p, spy };
 }
 const okMetaResponse = () => ({ kind: "response", status: 200, bodyText: META_ACCEPTED_BODY, truncated: false });
+
+// ----------------------------------------------------------------------------
+// PHASE 8B-0 — the TEST-ONLY consent posture for the Meta send-chain tests.
+//
+// Phase 8A made the consent enforcer a REQUIRED constructor argument and normalizes any missing/invalid
+// enforcer to a FAIL-CLOSED one — so every send in these tests was being blocked before it reached the Meta
+// adapter (a business-lane `unavailable` left the row `queued`, which is why the send tests read
+// "outcome_unknown, got queued"). This harness predates the consent layer and asserts adapter/gate/mapping
+// behaviour, assuming the send is permitted. So each send construction now states its consent posture
+// EXPLICITLY, with a loudly-named allow enforcer that exists ONLY here.
+//
+// It is NOT a blanket "everything allowed" stub. It derives the scope from the REAL closed scope registry
+// (`resolveOutboundConsentScope`), exactly as the production authority does. An unclassified message type, a
+// template/message-type mismatch, or a lane/scope mismatch therefore does NOT silently allow — it returns a
+// closed `invalid`, which BLOCKS the send and makes the offending test fail loudly. It performs no DB read
+// and no network call. There is deliberately NO production allow-all helper — the structural check proves it.
+function allowAllMetaHarnessConsentEnforcer(build = M) {
+  const resolveScope = build.Scope.resolveOutboundConsentScope;
+  return {
+    async authorize(input) {
+      const scoped = resolveScope({
+        messageType: input?.messageType,
+        templateKey: input?.templateKey,
+        lane: input?.lane,
+      });
+      if (!scoped.ok) {
+        // A classification / template / lane mismatch must BLOCK, never fabricate an allow — so a test that
+        // expected a successful Meta send fails here rather than passing on a lie.
+        return { kind: "invalid", code: "CONSENT_ENFORCEMENT_INVALID", retryable: false };
+      }
+      return { kind: "allow", scope: scoped.scope };
+    },
+  };
+}
+
 function metaService(transport, build = M, coordinator = null) {
   const { provider, spy } = spyMetaProvider(transport, build);
   const coord = coordinator ?? new build.Outbound.MetaWhatsAppOutboundCoordinator(completeMetaEnv());
-  const svc = new build.Comm.CommunicationService(provider, new build.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), coord);
+  // 4th argument (Phase 8B-0): the explicit test consent posture. The rest of the dispatch path — provider
+  // selection, gates, mapping, timeout, outcome certainty, identity fences — is the REAL CommunicationService.
+  const svc = new build.Comm.CommunicationService(
+    provider,
+    new build.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }),
+    coord,
+    allowAllMetaHarnessConsentEnforcer(build)
+  );
   return { svc, spy, provider };
 }
 /**
@@ -1482,7 +1535,8 @@ check("N37-40. provider identity fences hold across mock and Meta; no reroute, n
   // 38 — a Meta-owned message can never dispatch through mock.
   resetDb();
   const metaOwned = seedMessage({ provider: "meta_whatsapp_cloud", template_key: "vendor_new_lead" });
-  const mockSvc = new M.Comm.CommunicationService(new M.Mock.MockWhatsAppProvider(), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+  // Allow enforcer on purpose: the block here must be the PROVIDER-IDENTITY FENCE, not consent.
+  const mockSvc = new M.Comm.CommunicationService(new M.Mock.MockWhatsAppProvider(), new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(M));
   const r2 = await mockSvc.dispatchMessage(metaOwned, { rawVariables: {} });
   assert(!r2.ok && r2.code === "UNSUPPORTED_DISPATCH_PROVIDER", "38: Meta-owned message cannot mock dispatch");
   assert(db.communication_messages.find((m) => m.id === metaOwned.id).provider === "meta_whatsapp_cloud", "39-40: no reroute, no rewrite");
@@ -1917,18 +1971,51 @@ check("P35-38. no production send service default-constructs CommunicationServic
     assert(/createRuntimeCommunicationService\(/.test(src), `35: ${f} uses the runtime factory`);
     assert(!DEFAULT_CONSTRUCTED.test(stripTs(src)), `35: ${f} never default-constructs`);
   }
-  // 37 — webhook processing may construct with an EXPLICITLY injected webhook-only provider.
+  // 37 — PHASE 8A/8B-0: the webhook constructs with an EXPLICIT provider AND an EXPLICIT fail-closed consent
+  // enforcer (it processes delivery receipts and must be safe-by-construction, not safe-by-usage). The old
+  // `new CommunicationService(provider)` three-arg-omitted form no longer exists.
   const webhookSrc = readFileSync(WEBHOOK_SERVICE_SRC, "utf8");
-  assert(/new CommunicationService\(provider\)/.test(webhookSrc), "37: webhook constructs with an explicit provider");
+  assert(/new CommunicationService\(\s*provider\s*,/.test(webhookSrc), "37: webhook constructs with an explicit provider");
+  assert(/createFailClosedOutboundConsentEnforcer\(\)/.test(webhookSrc), "37: …and an explicit FAIL-CLOSED consent enforcer");
+  assert(!/new CommunicationService\(provider\)\s*;/.test(webhookSrc), "37: …never the old omitted-enforcer form");
   assert(!DEFAULT_CONSTRUCTED.test(stripTs(webhookSrc)), "37: …and never default-constructs");
-  // 38 — explicit dependency injection (used by every behavioral test) still works.
+  // 38 — explicit dependency injection (used by every behavioral test) still works. This is a non-dispatch
+  // smoke construction, so it states the FAIL-CLOSED posture explicitly (Phase 8B-0).
   const svc = new M.Comm.CommunicationService(
     new M.Mock.MockWhatsAppProvider(),
     new M.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }),
-    null
+    null,
+    M.Enforcement.createFailClosedOutboundConsentEnforcer()
   );
-  assert(svc instanceof M.Comm.CommunicationService, "38: 3-arg dependency injection preserved");
+  assert(svc instanceof M.Comm.CommunicationService, "38: 4-arg dependency injection preserved");
   assert(typeof M.Comm.setActiveWhatsAppProvider === "function" && typeof M.Comm.clearWhatsAppProviderOverride === "function", "38: test provider injection preserved");
+
+  // ── PHASE 8B-0 STRUCTURAL PROTECTION (folded here to keep the functional check count at 60). ──────────
+  // 39 — the harness allow enforcer is TEST-ONLY: defined here, and referenced by NO production file.
+  const harnessSrc = readFileSync("scripts/phase5f-b-whatsapp-cloud-api-harness.mjs", "utf8");
+  assert(/function allowAllMetaHarnessConsentEnforcer\(/.test(harnessSrc), "39: the test allow enforcer is defined in the harness");
+  const prodFiles = [
+    ...productionSourceFiles("services"),
+    ...productionSourceFiles("lib"),
+    ...productionSourceFiles("app"),
+  ];
+  for (const f of prodFiles) {
+    const s = readFileSync(f, "utf8");
+    assert(!/allowAllMetaHarnessConsentEnforcer/.test(s), `39: no production file references the test enforcer (${f})`);
+    // Exact-symbol allow-all detection — NOT a broad "allow" grep. A production enforcer whose authorize
+    // unconditionally returns an allow is forbidden; the fail-closed one and the real coordinator are fine.
+    assert(!/\b(allowAll|alwaysAllow|permitAll)\w*ConsentEnforcer\b/.test(s), `39: no production allow-all consent enforcer (${f})`);
+  }
+  // 40 — the runtime factory still defaults to the REAL authority; the webhook binds the fail-closed one.
+  const runtimeSrc = readFileSync(RUNTIME_SERVICE_FILE, "utf8");
+  assert(/consentEnforcer: OutboundConsentEnforcer = createOutboundConsentEnforcer\(\)/.test(runtimeSrc),
+    "40: runtime factory defaults to createOutboundConsentEnforcer()");
+  assert(!/createFailClosedOutboundConsentEnforcer/.test(runtimeSrc), "40: runtime factory never uses the fail-closed placeholder");
+  // 41 — every Meta send-chain / dispatch construction in THIS harness states a consent posture (no bare
+  // provider+resolver construction that would silently fail closed and mask a send test).
+  const dispatchCtors = [...harnessSrc.matchAll(/new (?:M|mm|build)\.Comm\.CommunicationService\(/g)].length;
+  const postured = [...harnessSrc.matchAll(/allowAllMetaHarnessConsentEnforcer\(|createFailClosedOutboundConsentEnforcer\(\)/g)].length;
+  assert(postured >= dispatchCtors, `41: every harness CommunicationService construction states a consent posture (ctors ${dispatchCtors}, postures ${postured})`);
 });
 
 // ============================================================================
@@ -2302,7 +2389,7 @@ tsMutation("MUT cB: require retryable=false before routing unknown_outcome to ou
   async (mm) => {
     stubDb(mm); resetDb();
     const msg = seedMessage();
-    const svc = new mm.Comm.CommunicationService(fakeProvider({ ...UNKNOWN_RESULT, retryable: true }), new mm.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+    const svc = new mm.Comm.CommunicationService(fakeProvider({ ...UNKNOWN_RESULT, retryable: true }), new mm.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(mm));
     await svc.dispatchMessage(msg, { rawVariables: {} });
     // With the retryable gate restored, an unknown+retryable result escapes outcome_unknown.
     return db.communication_messages.find((m) => m.id === msg.id).status !== "outcome_unknown";
@@ -2315,7 +2402,7 @@ tsMutation("MUT cC: allow unknown_outcome + retryable=true to schedule a retry",
   async (mm) => {
     stubDb(mm); resetDb();
     const msg = seedMessage();
-    const svc = new mm.Comm.CommunicationService(fakeProvider({ ...UNKNOWN_RESULT, retryable: true }), new mm.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+    const svc = new mm.Comm.CommunicationService(fakeProvider({ ...UNKNOWN_RESULT, retryable: true }), new mm.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(mm));
     await svc.dispatchMessage(msg, { rawVariables: {} });
     const row = db.communication_messages.find((m) => m.id === msg.id);
     return row.status === "retry_scheduled" || row.next_retry_at !== null; // unknown+retryable wrongly retried
@@ -2328,7 +2415,7 @@ tsMutation("MUT cD: allow unknown_outcome + accepted=true to enter success handl
   async (mm) => {
     stubDb(mm); resetDb();
     const msg = seedMessage();
-    const svc = new mm.Comm.CommunicationService(fakeProvider({ ...UNKNOWN_RESULT, accepted: true }), new mm.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }));
+    const svc = new mm.Comm.CommunicationService(fakeProvider({ ...UNKNOWN_RESULT, accepted: true }), new mm.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }), null, allowAllMetaHarnessConsentEnforcer(mm));
     await svc.dispatchMessage(msg, { rawVariables: {} });
     const row = db.communication_messages.find((m) => m.id === msg.id);
     return row.status === "accepted" || row.status === "sent"; // unknown+accepted wrongly succeeded

@@ -1537,13 +1537,34 @@ check("G9. a STALE DISPATCHING row becomes terminal `uncertain` — never pendin
  * a pre-existing migration that is modified anywhere is reported as modified.
  */
 const MIGRATION_PREFIX = "supabase/migrations/";
-function branchMigrationDelta() {
-  const delta = new Map();
+/**
+ * THE AUDITED D4-C HISTORY ENDS HERE.
+ *
+ * `D4C_AUDITED_HEAD` is the final clean Phase 7 authority head — PR #8 merged, and the D4-C clock/timeout
+ * stabilization independently re-audited on top of it. Everything D4-C is responsible for was introduced
+ * inside `D4C_BASE..D4C_AUDITED_HEAD`, and that range is now CLOSED.
+ *
+ * WHY THIS EXISTS. G10 used to compute its migration delta over `D4C_BASE..HEAD` — a fixed base against a
+ * MOVING head. That silently made D4-C the migration gatekeeper for the entire future of the repository:
+ * the moment any later phase committed a migration of its own, it fell inside `base..HEAD`, G10 counted TWO
+ * migrations, and D4-C failed — permanently, on work that has nothing to do with acknowledgement intents.
+ * (The Phase 8A future-phase simulation reproduced exactly that.)
+ *
+ * The historical audit is therefore pinned at BOTH ends. Later commits sit outside the range and cannot
+ * change the count. What D4-C still owns in the PRESENT — its migration must not be edited behind its back —
+ * is a separate concern, enforced by the worktree guard in H1, not by rewriting history into the count.
+ */
+const D4C_AUDITED_HEAD = "b0d40819c655df7e68135b52b5435941f793fc36";
 
-  // 1) COMMITTED since the authority base.
+/**
+ * The migrations introduced inside the FIXED audited range. Never reads HEAD, never unions the worktree —
+ * so a later phase's migration, committed or dirty, can never enter this count.
+ */
+function auditedMigrationDelta() {
+  const delta = new Map();
   const committed = execFileSync(
     "git",
-    ["diff", "--name-status", `${D4C_BASE}..HEAD`, "--", MIGRATION_PREFIX],
+    ["diff", "--name-status", `${D4C_BASE}..${D4C_AUDITED_HEAD}`, "--", MIGRATION_PREFIX],
     { encoding: "utf8" }
   ).split("\n").map((l) => l.trim()).filter(Boolean);
   for (const line of committed) {
@@ -1552,38 +1573,45 @@ function branchMigrationDelta() {
     const path = (paths[paths.length - 1] ?? "").replace(/\\/g, "/");
     if (path.startsWith(MIGRATION_PREFIX)) delta.set(path, status);
   }
-
-  // 2) STILL DIRTY (staged, unstaged or untracked).
-  const dirty = execFileSync("git", ["status", "--porcelain", "-uall"], { encoding: "utf8" })
-    .split("\n").filter(Boolean);
-  for (const line of dirty) {
-    const code = line.slice(0, 2);
-    const path = line.slice(3).trim().replace(/\\/g, "/");
-    if (!path.startsWith(MIGRATION_PREFIX)) continue;
-    // "??" untracked, or an "A"/"M"/"D"/"R" in either the index or the worktree column.
-    let status;
-    if (code === "??") status = "A";
-    else if (code.includes("D")) status = "D";
-    else if (code.includes("R")) status = "R";
-    else if (code.includes("A")) status = "A";
-    else status = "M";
-    // A path already recorded as ADDED by a commit and now further edited is still an ADD overall.
-    const prior = delta.get(path);
-    if (prior === "A" && status === "M") continue;
-    delta.set(path, status);
-  }
-
   return delta;
 }
 
-check("G10. this BRANCH adds exactly one migration and modifies no existing migration", () => {
-  // Computed from committed history UNION the dirty worktree, so it holds identically whether the migration
-  // is untracked, staged, committed-and-clean, or committed with an unrelated file still dirty.
-  const delta = branchMigrationDelta();
+/**
+ * The D4-C-owned migrations that are DIRTY right now. This is the present-tense guard: D4-C's own migration
+ * may never be edited in the worktree. It deliberately looks only at D4-C's OWN migration — a Phase 8B
+ * migration sitting dirty in the tree is that phase's business, not D4-C's.
+ */
+function dirtyOwnedMigrations() {
+  return execFileSync("git", ["status", "--porcelain", "-uall"], { encoding: "utf8" })
+    .split("\n").filter(Boolean)
+    .map((l) => l.slice(3).trim().replace(/\\/g, "/"))
+    .filter((p) => p === MIGRATION_SRC);
+}
+
+check("G10. the AUDITED D4-C history adds exactly one migration and modifies no existing migration", () => {
+  // ── ANCESTRY FIRST. The fixed range is only meaningful if both endpoints really exist and really sit in
+  //    this branch's history. Any failure here THROWS — the range is never silently treated as empty, which
+  //    would turn "exactly one migration" into "no migrations" and pass for the wrong reason.
+  for (const [sha, what] of [[D4C_BASE, "D4-C authority base"], [D4C_AUDITED_HEAD, "D4-C audited head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", D4C_BASE, D4C_AUDITED_HEAD]);   // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", D4C_AUDITED_HEAD, "HEAD"]);     // throws if not
+
+  // A NON-EXISTENT audited head must fail closed, not resolve to an empty range.
+  let bogusRejected = false;
+  try { execFileSync("git", ["cat-file", "-t", "0".repeat(40)], { stdio: "pipe" }); }
+  catch { bogusRejected = true; }
+  assert(bogusRejected, "a non-existent audited head must fail closed");
+
+  // ── THE HISTORICAL PROPERTY, over the FIXED range D4C_BASE..D4C_AUDITED_HEAD. It can never widen: a
+  //    migration committed by a LATER phase lands after the audited head and is simply not in the range.
+  const delta = auditedMigrationDelta();
   const paths = [...delta.keys()].sort();
 
   assert(paths.length === 1,
-    `exactly ONE migration may differ from the authority base (got ${safeStringify(paths)})`);
+    `exactly ONE migration may differ inside the audited D4-C range (got ${safeStringify(paths)})`);
   assert(paths[0] === MIGRATION_SRC,
     `the migration must be ${MIGRATION_SRC} (got ${paths[0]})`);
   assert(delta.get(MIGRATION_SRC) === "A",
@@ -1596,6 +1624,25 @@ check("G10. this BRANCH adds exactly one migration and modifies no existing migr
     assert(status !== "M" && status !== "D" && status !== "R",
       `a pre-existing migration was ${status === "M" ? "modified" : status === "D" ? "deleted" : "renamed"}: ${path}`);
   }
+
+  // ── THE PRESENT-TENSE PROPERTY. The historical count is now immutable, so it can no longer notice that
+  //    someone edited D4-C's migration behind its back. That guarantee moves here, explicitly: D4-C's OWN
+  //    migration must be byte-clean in the worktree. (H1 enforces the same thing across all D4-C-owned
+  //    authorities; this is the migration-specific statement, kept next to the property it protects.)
+  const dirtyOwned = dirtyOwnedMigrations();
+  assert(dirtyOwned.length === 0,
+    `D4-C's own migration must not be edited in the worktree (dirty: ${safeStringify(dirtyOwned)})`);
+  assert(D4C_OWNED_AUTHORITIES.includes(MIGRATION_SRC),
+    "…and the worktree guard in H1 also covers it, so the protection is not left to this check alone");
+
+  // ── STRUCTURAL: the range endpoint is a PINNED SHA, never the moving HEAD. This is the actual defect the
+  //    fix closes, so it is asserted on the harness's own source. The needle is assembled so this guard can
+  //    never match itself.
+  const selfSrc = readF(HARNESS_SRC);
+  const MOVING = "${D4C_BASE}.." + "HEAD";
+  const FIXED = "${D4C_BASE}.." + "${D4C_AUDITED_HEAD}";
+  assert(!selfSrc.includes(MOVING), "G10 must never compute its migration range against the moving HEAD");
+  assert(selfSrc.includes(FIXED), "G10's migration range must be the FIXED audited range");
 
   // ── SELF-PROOF: the assertion logic above is NOT vacuous. ────────────────────────────────────────────
   // The three assertions are re-applied to modelled deltas covering every prohibited shape. (The live
@@ -1617,6 +1664,19 @@ check("G10. this BRANCH adds exactly one migration and modifies no existing migr
   assert(evaluate([[MIGRATION_SRC, "M"]]) === "reject", "the expected migration MODIFIED is rejected");
   assert(evaluate([[MIGRATION_SRC, "R"]]) === "reject", "a RENAMED migration is rejected");
   assert(evaluate([[OTHER, "A"]]) === "reject", "the WRONG migration path is rejected");
+
+  // ── AND THE POINT OF THE FIX. The evaluator above is deliberately STRICT: a later phase's migration, had
+  //    it entered the delta, would be rejected outright — which is precisely what used to happen, and why
+  //    D4-C failed forever once any later phase shipped a migration.
+  const LATER = "supabase/migrations/20260801000001_phase_8b_dashboard.sql";
+  assert(evaluate([[MIGRATION_SRC, "A"], [LATER, "A"]]) === "reject",
+    "a later phase's migration WOULD be rejected if it could enter the delta");
+  // It can no longer enter it: the range is closed at the audited head, so a migration committed afterwards
+  // is not in `D4C_BASE..D4C_AUDITED_HEAD` at all. The real delta therefore contains ONLY the approved path.
+  assert(!paths.includes(LATER),
+    "…and the fixed audited range cannot contain a migration committed after the audited head");
+  assert(paths.length === 1 && paths[0] === MIGRATION_SRC,
+    "the audited range is exactly the one approved D4-C migration, regardless of what HEAD does next");
 });
 
 // ============================================================================

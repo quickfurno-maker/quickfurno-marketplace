@@ -78,6 +78,116 @@ const FROZEN = [
   "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
 ];
 
+// ── PHASE 8A — AN AUTHORITY TRANSFER, BOUNDED TO A FIXED HISTORICAL RANGE ──────────────────────────
+//
+// Phase 8A (fail-closed consent authority) legitimately changes two files that the Phase 7 freeze listed
+// above. They are NOT declared "historically mutable" — that would silently retire a real guard. Their
+// AUTHORITY MOVES to the D3-B harness, which now owns and proves the fail-closed properties (required
+// constructor posture, runtime normalization, malformed-outcome validation, zero provider calls on every
+// blocked path, production construction-site safety). D4-C stops asserting BYTE-IDENTITY on those two files
+// and instead pins the exact COMMIT RANGE in which they were allowed to change.
+//
+// WHY A FIXED RANGE, NOT `..HEAD`.  An earlier version of this guard compared the authority base against
+// the MOVING HEAD. That is a trap: once Phase 8A merges, every LATER commit — a Phase 8B service, a new
+// migration, a new route, a new harness — would fall inside `base..HEAD` and be judged against the Phase 8A
+// allowlist, so D4-C and D4-B would fail forever, on work that has nothing to do with them. The range is
+// therefore CLOSED AT BOTH ENDS:
+//
+//     PHASE_8A_AUTHORITY_BASE .. PHASE_8A_IMPLEMENTATION_HEAD
+//
+// Both endpoints are immutable SHAs. Later phases append commits AFTER the implementation head and are
+// simply not in the range — they cannot reopen the Phase 8A historical audit, and D4-C does not police them.
+// Conversely the pinned range cannot be altered without rewriting the recorded history, which would change
+// the SHAs and fail the ancestry proof below.
+const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36";
+const PHASE_8A_IMPLEMENTATION_HEAD = "c0fc5fb11ff1b0d228e8d58793bc4579a0c5d5e9";
+
+/** The EXACT seven files the Phase 8A implementation commit may contain. Fixed for all time. */
+const PHASE_8A_IMPLEMENTATION_FILES = [
+  "services/communicationService.ts",
+  "services/outboundConsentEnforcementService.ts",
+  "services/metaWhatsAppWebhookService.ts",
+  "scripts/phase5b-communication-core-harness.mjs",
+  "scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs",
+  "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+  "scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
+];
+
+const PHASE_8A_RELEASED_SHARED_AUTHORITIES = [
+  "services/communicationService.ts",
+  "services/outboundConsentEnforcementService.ts",
+];
+
+/**
+ * The D2-E harness is also released by Phase 8A (its webhook import-boundary property must admit the
+ * fail-closed enforcer). It is NOT unguarded: the D4-B harness bounds its delta LINE BY LINE against
+ * D4B_BASE, forbids removing any check, and pins its check/assert counts — a stronger guard than the
+ * byte-freeze this list provides. D4-C defers to that validator rather than duplicating it.
+ */
+const PHASE_8A_RELEASED_DELTA_BOUNDED = ["scripts/phase5f-d2e-inbound-consent-integration-harness.mjs"];
+
+/** Everything the Phase 7 freeze covered that Phase 8A did NOT release. Still byte-frozen in the worktree. */
+const STILL_FROZEN = FROZEN.filter(
+  (f) => !PHASE_8A_RELEASED_SHARED_AUTHORITIES.includes(f) && !PHASE_8A_RELEASED_DELTA_BOUNDED.includes(f)
+);
+
+/**
+ * D4-C's OWN authorities. These are what D4-C is responsible for, and the ONLY worktree files it polices.
+ * It deliberately does NOT police arbitrary future-phase files: a Phase 8B service or migration is Phase
+ * 8B's harness's business, and making D4-C the gatekeeper for the whole repository is exactly what made the
+ * previous moving-HEAD design fail on every later phase.
+ */
+const D4C_OWNED_AUTHORITIES = [
+  MIGRATION_SRC, INTENT_SRC, SEAL_SRC, ENQUEUE_SRC, WORKER_SRC, ROUTE_SRC,
+];
+
+const FORBIDDEN_IN_PHASE_8A = [
+  [/^supabase\/migrations\//, "a migration"],
+  [/^app\/api\//, "an API route"],
+  [/\.env/, "an environment file"],
+  [/^lib\/communication\/providers\//, "a provider adapter/configuration"],
+  [/package-lock\.json|yarn\.lock|pnpm-lock\.yaml/, "a lockfile"],
+  [/^package\.json$/, "package.json"],
+  [/^(Dockerfile|docker-compose|\.github\/|vercel\.json|ecosystem\.config)/, "a deployment file"],
+];
+
+/** The files changed in the FIXED Phase 8A range. Never reads HEAD, so later phases can never enter it. */
+function phase8aRangeFiles() {
+  return [...new Set(
+    execFileSync("git", ["diff", "--name-only", `${PHASE_8A_AUTHORITY_BASE}..${PHASE_8A_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
+      .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"))
+  )];
+}
+
+/**
+ * Validate the fixed historical Phase 8A range.
+ *
+ * ORDERING MATTERS. Membership in the exact seven-file set is checked FIRST; the forbidden-category regexes
+ * are applied afterwards, to the same set. The earlier version had it backwards — a broad `^app/api/` regex
+ * ran before membership, so an APPROVED file could be rejected by a category rule before anyone asked
+ * whether it was approved at all. Membership first, categories second, both enforced.
+ */
+function validatePhase8AHistoricalRange() {
+  const files = phase8aRangeFiles();
+
+  // 1) MEMBERSHIP FIRST — exactly the seven approved paths, no more, no fewer.
+  assert(files.length === 7, `the fixed Phase 8A range must contain EXACTLY 7 files (got ${files.length}: ${files.join(", ")})`);
+  for (const p of files) {
+    assert(PHASE_8A_IMPLEMENTATION_FILES.includes(p), `unexpected file in the fixed Phase 8A range: ${p}`);
+  }
+  for (const p of PHASE_8A_IMPLEMENTATION_FILES) {
+    assert(files.includes(p), `expected Phase 8A file missing from the fixed range: ${p}`);
+  }
+
+  // 2) CATEGORIES SECOND — defence in depth. Even if the approved list were tampered with, a migration,
+  //    route, env file, provider adapter, lockfile, package.json or deployment file can never ride in.
+  for (const p of files) {
+    for (const [re, what] of FORBIDDEN_IN_PHASE_8A) {
+      assert(!re.test(p), `${what} may never be part of the Phase 8A range (${p})`);
+    }
+  }
+}
+
 /** The APPROVED D4-C scope — ELEVEN files. Anything else is a scope violation. */
 const D4C_EXPECTED_FILES = [
   MIGRATION_SRC, INTENT_SRC, SEAL_SRC, WORKER_SRC, ROUTE_SRC, HARNESS_SRC, DOC_SRC,
@@ -1427,13 +1537,34 @@ check("G9. a STALE DISPATCHING row becomes terminal `uncertain` — never pendin
  * a pre-existing migration that is modified anywhere is reported as modified.
  */
 const MIGRATION_PREFIX = "supabase/migrations/";
-function branchMigrationDelta() {
-  const delta = new Map();
+/**
+ * THE AUDITED D4-C HISTORY ENDS HERE.
+ *
+ * `D4C_AUDITED_HEAD` is the final clean Phase 7 authority head — PR #8 merged, and the D4-C clock/timeout
+ * stabilization independently re-audited on top of it. Everything D4-C is responsible for was introduced
+ * inside `D4C_BASE..D4C_AUDITED_HEAD`, and that range is now CLOSED.
+ *
+ * WHY THIS EXISTS. G10 used to compute its migration delta over `D4C_BASE..HEAD` — a fixed base against a
+ * MOVING head. That silently made D4-C the migration gatekeeper for the entire future of the repository:
+ * the moment any later phase committed a migration of its own, it fell inside `base..HEAD`, G10 counted TWO
+ * migrations, and D4-C failed — permanently, on work that has nothing to do with acknowledgement intents.
+ * (The Phase 8A future-phase simulation reproduced exactly that.)
+ *
+ * The historical audit is therefore pinned at BOTH ends. Later commits sit outside the range and cannot
+ * change the count. What D4-C still owns in the PRESENT — its migration must not be edited behind its back —
+ * is a separate concern, enforced by the worktree guard in H1, not by rewriting history into the count.
+ */
+const D4C_AUDITED_HEAD = "b0d40819c655df7e68135b52b5435941f793fc36";
 
-  // 1) COMMITTED since the authority base.
+/**
+ * The migrations introduced inside the FIXED audited range. Never reads HEAD, never unions the worktree —
+ * so a later phase's migration, committed or dirty, can never enter this count.
+ */
+function auditedMigrationDelta() {
+  const delta = new Map();
   const committed = execFileSync(
     "git",
-    ["diff", "--name-status", `${D4C_BASE}..HEAD`, "--", MIGRATION_PREFIX],
+    ["diff", "--name-status", `${D4C_BASE}..${D4C_AUDITED_HEAD}`, "--", MIGRATION_PREFIX],
     { encoding: "utf8" }
   ).split("\n").map((l) => l.trim()).filter(Boolean);
   for (const line of committed) {
@@ -1442,38 +1573,45 @@ function branchMigrationDelta() {
     const path = (paths[paths.length - 1] ?? "").replace(/\\/g, "/");
     if (path.startsWith(MIGRATION_PREFIX)) delta.set(path, status);
   }
-
-  // 2) STILL DIRTY (staged, unstaged or untracked).
-  const dirty = execFileSync("git", ["status", "--porcelain", "-uall"], { encoding: "utf8" })
-    .split("\n").filter(Boolean);
-  for (const line of dirty) {
-    const code = line.slice(0, 2);
-    const path = line.slice(3).trim().replace(/\\/g, "/");
-    if (!path.startsWith(MIGRATION_PREFIX)) continue;
-    // "??" untracked, or an "A"/"M"/"D"/"R" in either the index or the worktree column.
-    let status;
-    if (code === "??") status = "A";
-    else if (code.includes("D")) status = "D";
-    else if (code.includes("R")) status = "R";
-    else if (code.includes("A")) status = "A";
-    else status = "M";
-    // A path already recorded as ADDED by a commit and now further edited is still an ADD overall.
-    const prior = delta.get(path);
-    if (prior === "A" && status === "M") continue;
-    delta.set(path, status);
-  }
-
   return delta;
 }
 
-check("G10. this BRANCH adds exactly one migration and modifies no existing migration", () => {
-  // Computed from committed history UNION the dirty worktree, so it holds identically whether the migration
-  // is untracked, staged, committed-and-clean, or committed with an unrelated file still dirty.
-  const delta = branchMigrationDelta();
+/**
+ * The D4-C-owned migrations that are DIRTY right now. This is the present-tense guard: D4-C's own migration
+ * may never be edited in the worktree. It deliberately looks only at D4-C's OWN migration — a Phase 8B
+ * migration sitting dirty in the tree is that phase's business, not D4-C's.
+ */
+function dirtyOwnedMigrations() {
+  return execFileSync("git", ["status", "--porcelain", "-uall"], { encoding: "utf8" })
+    .split("\n").filter(Boolean)
+    .map((l) => l.slice(3).trim().replace(/\\/g, "/"))
+    .filter((p) => p === MIGRATION_SRC);
+}
+
+check("G10. the AUDITED D4-C history adds exactly one migration and modifies no existing migration", () => {
+  // ── ANCESTRY FIRST. The fixed range is only meaningful if both endpoints really exist and really sit in
+  //    this branch's history. Any failure here THROWS — the range is never silently treated as empty, which
+  //    would turn "exactly one migration" into "no migrations" and pass for the wrong reason.
+  for (const [sha, what] of [[D4C_BASE, "D4-C authority base"], [D4C_AUDITED_HEAD, "D4-C audited head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", D4C_BASE, D4C_AUDITED_HEAD]);   // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", D4C_AUDITED_HEAD, "HEAD"]);     // throws if not
+
+  // A NON-EXISTENT audited head must fail closed, not resolve to an empty range.
+  let bogusRejected = false;
+  try { execFileSync("git", ["cat-file", "-t", "0".repeat(40)], { stdio: "pipe" }); }
+  catch { bogusRejected = true; }
+  assert(bogusRejected, "a non-existent audited head must fail closed");
+
+  // ── THE HISTORICAL PROPERTY, over the FIXED range D4C_BASE..D4C_AUDITED_HEAD. It can never widen: a
+  //    migration committed by a LATER phase lands after the audited head and is simply not in the range.
+  const delta = auditedMigrationDelta();
   const paths = [...delta.keys()].sort();
 
   assert(paths.length === 1,
-    `exactly ONE migration may differ from the authority base (got ${safeStringify(paths)})`);
+    `exactly ONE migration may differ inside the audited D4-C range (got ${safeStringify(paths)})`);
   assert(paths[0] === MIGRATION_SRC,
     `the migration must be ${MIGRATION_SRC} (got ${paths[0]})`);
   assert(delta.get(MIGRATION_SRC) === "A",
@@ -1486,6 +1624,25 @@ check("G10. this BRANCH adds exactly one migration and modifies no existing migr
     assert(status !== "M" && status !== "D" && status !== "R",
       `a pre-existing migration was ${status === "M" ? "modified" : status === "D" ? "deleted" : "renamed"}: ${path}`);
   }
+
+  // ── THE PRESENT-TENSE PROPERTY. The historical count is now immutable, so it can no longer notice that
+  //    someone edited D4-C's migration behind its back. That guarantee moves here, explicitly: D4-C's OWN
+  //    migration must be byte-clean in the worktree. (H1 enforces the same thing across all D4-C-owned
+  //    authorities; this is the migration-specific statement, kept next to the property it protects.)
+  const dirtyOwned = dirtyOwnedMigrations();
+  assert(dirtyOwned.length === 0,
+    `D4-C's own migration must not be edited in the worktree (dirty: ${safeStringify(dirtyOwned)})`);
+  assert(D4C_OWNED_AUTHORITIES.includes(MIGRATION_SRC),
+    "…and the worktree guard in H1 also covers it, so the protection is not left to this check alone");
+
+  // ── STRUCTURAL: the range endpoint is a PINNED SHA, never the moving HEAD. This is the actual defect the
+  //    fix closes, so it is asserted on the harness's own source. The needle is assembled so this guard can
+  //    never match itself.
+  const selfSrc = readF(HARNESS_SRC);
+  const MOVING = "${D4C_BASE}.." + "HEAD";
+  const FIXED = "${D4C_BASE}.." + "${D4C_AUDITED_HEAD}";
+  assert(!selfSrc.includes(MOVING), "G10 must never compute its migration range against the moving HEAD");
+  assert(selfSrc.includes(FIXED), "G10's migration range must be the FIXED audited range");
 
   // ── SELF-PROOF: the assertion logic above is NOT vacuous. ────────────────────────────────────────────
   // The three assertions are re-applied to modelled deltas covering every prohibited shape. (The live
@@ -1507,21 +1664,95 @@ check("G10. this BRANCH adds exactly one migration and modifies no existing migr
   assert(evaluate([[MIGRATION_SRC, "M"]]) === "reject", "the expected migration MODIFIED is rejected");
   assert(evaluate([[MIGRATION_SRC, "R"]]) === "reject", "a RENAMED migration is rejected");
   assert(evaluate([[OTHER, "A"]]) === "reject", "the WRONG migration path is rejected");
+
+  // ── AND THE POINT OF THE FIX. The evaluator above is deliberately STRICT: a later phase's migration, had
+  //    it entered the delta, would be rejected outright — which is precisely what used to happen, and why
+  //    D4-C failed forever once any later phase shipped a migration.
+  const LATER = "supabase/migrations/20260801000001_phase_8b_dashboard.sql";
+  assert(evaluate([[MIGRATION_SRC, "A"], [LATER, "A"]]) === "reject",
+    "a later phase's migration WOULD be rejected if it could enter the delta");
+  // It can no longer enter it: the range is closed at the audited head, so a migration committed afterwards
+  // is not in `D4C_BASE..D4C_AUDITED_HEAD` at all. The real delta therefore contains ONLY the approved path.
+  assert(!paths.includes(LATER),
+    "…and the fixed audited range cannot contain a migration committed after the audited head");
+  assert(paths.length === 1 && paths[0] === MIGRATION_SRC,
+    "the audited range is exactly the one approved D4-C migration, regardless of what HEAD does next");
 });
 
 // ============================================================================
 // H. SCOPE + FROZEN
 // ============================================================================
-check("H1. FROZEN authorities are byte-unchanged; the scope is exactly the approved 11 files", () => {
-  const dirty = gitDirty();
-  for (const f of FROZEN) assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
-  for (const p of dirty) {
-    assert(!/^app\/api\/(?!internal\/process-consent-ack-intents)/.test(p), `no other API route may change (${p})`);
-    assert(!/\.env/.test(p), `no env file may change (${p})`);
-    assert(!/^lib\/communication\/providers\//.test(p), `no provider adapter may change (${p})`);
-    assert(!/package-lock\.json|yarn\.lock|pnpm-lock\.yaml/.test(p), `no lockfile may change (${p})`);
-    assert(D4C_EXPECTED_FILES.includes(p), `file outside the approved D4-C scope: ${p}`);
+check("H1. Phase 8A authority transfer is BOUNDED; D4-C's own authorities stay frozen", () => {
+  // ── 1) ANCESTRY. Both endpoints must exist, and the range must sit inside this branch's real history.
+  for (const [sha, what] of [[PHASE_8A_AUTHORITY_BASE, "Phase 7 authority base"], [PHASE_8A_IMPLEMENTATION_HEAD, "Phase 8A implementation head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
   }
+  // base → implementation head → HEAD. The release cannot be claimed on an unrelated or rewritten history,
+  // and the pinned range cannot be edited without changing these SHAs and failing right here.
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8A_AUTHORITY_BASE, PHASE_8A_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8A_IMPLEMENTATION_HEAD, "HEAD"]);
+
+  // ── 2) THE FIXED HISTORICAL RANGE. Membership first, forbidden categories second. NEVER reads HEAD, so a
+  //      later Phase 8B commit can never enter this audit or reopen it.
+  validatePhase8AHistoricalRange();
+
+  // ── 3) THE RELEASE IS NARROW. Exactly two shared authorities, each of which genuinely WAS frozen.
+  assert(PHASE_8A_RELEASED_SHARED_AUTHORITIES.length === 2, "exactly TWO shared authorities are released");
+  for (const f of PHASE_8A_RELEASED_SHARED_AUTHORITIES) {
+    assert(FROZEN.includes(f), `a released file must have genuinely BEEN frozen: ${f}`);
+  }
+
+  // ── 4) WORKTREE PROTECTION — NARROW, AND ONLY OVER WHAT D4-C OWNS. ────────────────────────────────
+  // D4-C protects ITS OWN authorities and the Phase 7 authorities it did not release. It does NOT police
+  // arbitrary future-phase files: a Phase 8B service, migration, route or harness is that phase's business.
+  // (Policing everything is exactly what made the earlier moving-HEAD design fail on every later phase.)
+  const dirty = gitDirty();
+  for (const f of D4C_OWNED_AUTHORITIES) {
+    assert(!dirty.includes(f), `a D4-C-owned authority must not change: ${f}`);
+  }
+  for (const f of STILL_FROZEN) {
+    assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
+  }
+
+  // ── 5) AUTHORITY-TRANSFER WIRING CHECK (not a re-proof of D3-B). ──────────────────────────────────
+  // This does NOT independently re-prove the fail-closed semantics — D3-B owns those, and duplicating them
+  // here would create a second, drifting authority. What it proves is that the authority we transferred TO
+  // still EXISTS AS EXECUTABLE CODE, so the release is not left unbacked.
+  //
+  // Comments cannot satisfy it. The filter is LINE-ORIENTED on purpose: a block-comment regex is not safe
+  // here, because D3-B legitimately contains `/*` inside a STRING literal (a git-grep glob), and a naive
+  // `/\*[\s\S]*?\*\//` swallows 16 KB of real code from that point on — which would silently hide the very
+  // registrations we are checking for. Dropping comment LINES cannot be fooled that way, and a registration
+  // quoted inside a comment would sit on a line beginning with `//` or `*` and be dropped.
+  const d3bCode = readF("scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs")
+    .split("\n")
+    .filter((l) => {
+      const t = l.trim();
+      return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*") || t.startsWith("*/"));
+    })
+    .join("\n");
+
+  // Registrations must appear at the START of a line — an executable `check(...)` / `srcMutation(...)` call,
+  // not a name merely mentioned inside some other expression or string.
+  const registeredChecks = [...d3bCode.matchAll(/^\s*check\("P8A-(\d+[a-z]?)\./gm)].map((m) => m[1]);
+  assert(registeredChecks.length >= 17,
+    `D3-B must REGISTER the Phase 8A checks as executable code (found ${registeredChecks.length})`);
+  for (const id of ["14", "15", "16", "17"]) {
+    assert(registeredChecks.includes(id), `D3-B must register the P8A-${id} structural check`);
+  }
+
+  const registeredMutations = [...d3bCode.matchAll(/^\s*srcMutationN?\("(MUT \d+[a-z]?) \(8A\)/gm)].map((m) => m[1]);
+  assert(registeredMutations.length >= 12,
+    `D3-B must REGISTER the Phase 8A mutations as executable code (found ${registeredMutations.length})`);
+
+  // The zero-provider-call invariant must live in executable assertions, not in prose.
+  const zeroCallAssertions = (d3bCode.match(/providerCalls === 0/g) ?? []).length;
+  assert(zeroCallAssertions >= 8,
+    `the zero-provider-call invariant must be asserted in executable check bodies (found ${zeroCallAssertions})`);
+
+  // …and D3-B's mutation runner must still refuse to score an accidental exception as a proof.
+  has(/expectCompileFailure/, d3bCode, "D3-B's mutation runner enforces the strict compile contract");
 });
 
 check("H2. NO acknowledgement template row is seeded, and NO SQL is executed", () => {

@@ -26,6 +26,7 @@
 
 import { adminClient } from "../lib/supabase";
 import { CommunicationService } from "./communicationService";
+import { createFailClosedOutboundConsentEnforcer } from "./outboundConsentEnforcementService";
 import { isWebhookProcessingEnabled } from "./communicationProviderRuntimeService";
 import {
   resolveWebhookSignatureConfig,
@@ -138,7 +139,16 @@ export async function handleMetaWhatsAppWebhookPost(input: {
   if (classification === MetaWebhookClassification.DELIVERY_STATUS) {
     // A webhook-only provider carrying just the app secret — sending is impossible.
     const provider = new MetaCloudWhatsAppProvider(webhookSignatureToRuntime({ appSecret }), new FetchHttpTransport());
-    const service = new CommunicationService(provider);
+    // PHASE 8A — this service processes DELIVERY RECEIPTS and never sends, but it must be SAFE BY
+    // CONSTRUCTION rather than safe by usage: it is bound to the FAIL-CLOSED enforcer, so if a future edit
+    // ever called a send method on it, the send would be blocked instead of silently skipping consent.
+    // (The two `undefined`s keep the existing provider-resolver and coordinator defaults.)
+    const service = new CommunicationService(
+      provider,
+      undefined,
+      undefined,
+      createFailClosedOutboundConsentEnforcer()
+    );
     const res = await service.processWebhook(input.rawBody, input.signature, appSecret);
     if (!res.ok) return { status: 500, code: "processing_failed" };
     return { status: 200, result: res.data.duplicate ? "duplicate" : "delivery_processed" };

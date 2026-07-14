@@ -201,7 +201,20 @@ check("1-6. verified order preserved; INBOUND is the only newly wired branch", (
   assert(iGate < iParse && iGate < iClassify, "2. runtime gate precedes parse/classification");
   assert(iParse < iClassify, "parse precedes classify");
   // 3. delivery status still on CommunicationService.processWebhook.
-  assert(/DELIVERY_STATUS[\s\S]{0,400}service\.processWebhook\(/.test(src), "3. delivery-status path unchanged");
+  //
+  // PHASE 8A widened this window: the delivery branch now binds an explicit FAIL-CLOSED consent enforcer
+  // to the CommunicationService it constructs (defence in depth — the object can no longer send even if a
+  // future edit called a send method on it). The SEMANTIC property is unchanged and is what is asserted:
+  // DELIVERY_STATUS still constructs a CommunicationService and still hands the raw body to processWebhook,
+  // with nothing but that construction in between.
+  const iDelivery = src.indexOf("DELIVERY_STATUS");
+  const iConstruct = src.indexOf("new CommunicationService(", iDelivery);
+  const iProcess = src.indexOf("service.processWebhook(", iDelivery);
+  assert(iDelivery > 0 && iConstruct > iDelivery && iProcess > iConstruct,
+    "3. delivery-status path unchanged: DELIVERY_STATUS → construct CommunicationService → processWebhook");
+  const deliveryBranch = src.slice(iDelivery, iProcess);
+  assert(!/\.send\(|dispatchMessage\(|dispatchPersistedMessage\(/.test(deliveryBranch),
+    "3. the delivery branch still performs NO send or dispatch");
   // 4. unknown still ignored_unknown.
   assert(/UNKNOWN[\s\S]{0,300}recordIgnoredReceipt\(input\.rawBody, payload, "ignored_unknown"\)/.test(src), "4. unknown path unchanged");
   // 5. template/account still ignored_non_delivery (the trailing fallback).
@@ -520,7 +533,46 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   assert(pkg.scripts["test:phase5f:d1b"] === "node scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs", "d1b wired");
   const dirty = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).split("\n").map((l) => l.slice(3).trim()).filter(Boolean);
   assert(!dirty.includes(WEBHOOK_ROUTE_SRC), "24. the webhook route is unchanged");
-  assert(!dirty.includes(COMM_SERVICE_SRC), "CommunicationService is unchanged");
+
+  // ── PHASE 8A — the whole-file byte-identity guard on CommunicationService is REPLACED, not deleted ───
+  //
+  // `CommunicationService is unchanged` can no longer hold: Phase 8A makes the consent enforcer a REQUIRED
+  // constructor argument and deletes the fail-open "missing enforcer ⇒ continue" branch. That file's
+  // authority now belongs to the D3-B harness, which proves the fail-closed properties in full.
+  //
+  // D1-B's actual concern was never the whole file — it was that INBOUND PERSISTENCE is unaffected and that
+  // no send path can be reached from the webhook. So the guard becomes SEMANTIC and NARROW:
+  //   (a) the file may change ONLY in ways that keep the webhook's contract with it intact;
+  //   (b) the webhook itself, with ONLY the authorized Phase 8A delta reversed, must be BYTE-IDENTICAL to
+  //       the Phase 7 authority form — so nothing else was smuggled into the webhook alongside it.
+  const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36";
+  const norm = (s) => s.replace(/\r\n/g, "\n");
+  const authorityWebhook = norm(execFileSync("git", ["show", `${PHASE_8A_AUTHORITY_BASE}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }));
+
+  // Reverse EXACTLY the two authorized edits — the import, and the constructor argument — and nothing else.
+  let reverted = norm(readF(WEBHOOK_SVC_SRC));
+  reverted = reverted.replace(
+    'import { createFailClosedOutboundConsentEnforcer } from "./outboundConsentEnforcementService";\n',
+    ""
+  );
+  reverted = reverted.replace(
+    /\s*\/\/ PHASE 8A —[\s\S]*?const service = new CommunicationService\(\s*provider,\s*undefined,\s*undefined,\s*createFailClosedOutboundConsentEnforcer\(\)\s*\);/,
+    "\n    const service = new CommunicationService(provider);"
+  );
+  assert(reverted === authorityWebhook,
+    "the webhook, minus ONLY the authorized Phase 8A import + constructor delta, is BYTE-IDENTICAL to the " +
+    "Phase 7 authority form — no other change was smuggled in alongside it");
+
+  // The webhook's use of CommunicationService is still exactly one operation, and still no send.
+  const hook = readCode(WEBHOOK_SVC_SRC);
+  const ops = [...hook.matchAll(/service\.([A-Za-z]+)\(/g)].map((m) => m[1]);
+  assert(ops.length > 0 && ops.every((o) => o === "processWebhook"),
+    `processWebhook remains the ONLY CommunicationService operation (got [${ops.join(", ")}])`);
+  assert(!/\.send\(|dispatchMessage\(|dispatchPersistedMessage\(|createRuntimeCommunicationService/.test(hook),
+    "no outbound send call, dispatch, or sending-service factory was added to the webhook");
+  // No consent DECISION is made during webhook persistence — only a fail-closed enforcer is BOUND.
+  assert(!/decideCommunicationConsent|createOutboundConsentEnforcer\b/.test(hook),
+    "the webhook makes NO consent decision and never binds the real consent authority");
   // The pure normalizer is unchanged (reused). The identity RESOLVER is modified by this D1-B
   // reliability correction (operational IDENTITY_LOOKUP_FAILED ≠ durable UNKNOWN), so it is expected
   // in the delta and not asserted byte-unchanged here.

@@ -250,3 +250,148 @@ export function createOutboundConsentEnforcer(
 ): OutboundConsentEnforcer {
   return { authorize: (input) => authorizeOutboundConsent(input, deps) };
 }
+
+// ============================================================================
+// PHASE 8A — FAIL-CLOSED AUTHORITY
+//
+// THE SECURITY INVARIANT:
+//   a missing, null, undefined, malformed or throwing consent authority ⇒ ZERO provider calls.
+//
+// TypeScript alone cannot hold that line. `as any`, plain JavaScript (every harness is .mjs), reflection
+// and future unsafe code can all put a non-enforcer where an enforcer belongs. So the type system states
+// the requirement and the RUNTIME enforces it: anything that is not a structurally valid enforcer is
+// normalized to the fail-closed enforcer below, and anything that is not a structurally valid OUTCOME is
+// normalized to a deliberate integrity failure. Absence is never permission.
+// ============================================================================
+
+/**
+ * The FAIL-CLOSED outcome. Frozen, so a caller that receives it cannot mutate it into an allow.
+ *
+ * `unavailable` (not `deny`) is the honest classification: we did not decide that consent was refused, we
+ * were UNABLE TO EVALUATE the authority at all. That distinction is load-bearing downstream — it preserves
+ * the lane split (an authentication row fails; a business row stays retryable and is re-evaluated later),
+ * whereas a `deny` would permanently CANCEL a legitimate business message.
+ */
+export const FAIL_CLOSED_CONSENT_OUTCOME: OutboundConsentOutcome = Object.freeze({
+  kind: "unavailable",
+  code: "CONSENT_AUTHORITY_UNAVAILABLE",
+  retryable: true,
+} as const);
+
+/**
+ * The enforcer used when NO trustworthy authority is available. It never consults D2-C, never touches the
+ * database, and can never allow: every authorization is `unavailable`.
+ *
+ * PRODUCTION USES THIS ONLY WHERE SENDING IS NOT THE PURPOSE — the Meta webhook builds a
+ * CommunicationService to process DELIVERY RECEIPTS, and binding this enforcer means that even if a future
+ * edit accidentally called a send method on that object, it would send NOTHING. The real send paths bind
+ * `createOutboundConsentEnforcer()` through `createRuntimeCommunicationService`, never this.
+ */
+export function createFailClosedOutboundConsentEnforcer(): OutboundConsentEnforcer {
+  return { authorize: async () => FAIL_CLOSED_CONSENT_OUTCOME };
+}
+
+/**
+ * Is this value structurally usable as an enforcer? A missing fourth argument, `null`, `undefined`, a
+ * primitive, an array, or an object whose `authorize` is not callable all answer NO — and the caller then
+ * substitutes the fail-closed enforcer.
+ *
+ * This deliberately does NOT try to prove the enforcer is the RIGHT one — it cannot. It proves only that
+ * calling `authorize` will not throw a TypeError. Whatever it then returns is validated separately by
+ * `normalizeOutboundConsentOutcome`, so a hostile or broken enforcer still cannot produce an allow.
+ */
+export function isOutboundConsentEnforcer(value: unknown): value is OutboundConsentEnforcer {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return false;
+  const t = typeof value;
+  if (t !== "object" && t !== "function") return false;
+  return typeof (value as { authorize?: unknown }).authorize === "function";
+}
+
+// ---- the CLOSED outcome union, as runtime data -------------------------------------------------------
+//
+// Each `Record<Union, true>` below is a COMPILE-TIME EXHAUSTIVENESS FENCE: adding a member to the union
+// without adding it here is a TypeScript error, so the validator can never silently fall behind the type.
+const DENY_CODES: Record<OutboundConsentDenyCode, true> = {
+  CONSENT_SUPPRESSED: true,
+  CONSENT_NOT_GRANTED: true,
+  UNCLASSIFIED_MESSAGE_TYPE: true,
+  MESSAGE_TYPE_TEMPLATE_MISMATCH: true,
+  MESSAGE_LANE_SCOPE_MISMATCH: true,
+};
+const INVALID_CODES: Record<OutboundConsentInvalidCode, true> = {
+  CONSENT_ENFORCEMENT_INVALID: true,
+  CONSENT_AUTHORITY_INTEGRITY: true,
+};
+const UNAVAILABLE_CODES: Record<OutboundConsentUnavailableCode, true> = {
+  CONSENT_AUTHORITY_UNAVAILABLE: true,
+};
+const ALLOW_SCOPES: Record<OutboundConsentScope, true> = {
+  authentication: true,
+  transactional: true,
+  marketing: true,
+};
+
+const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
+
+/** The deliberate integrity failure. NOT an accident of an outer `catch`. */
+export const CONSENT_INTEGRITY_OUTCOME: OutboundConsentOutcome = Object.freeze({
+  kind: "invalid",
+  code: "CONSENT_AUTHORITY_INTEGRITY",
+  retryable: false,
+} as const);
+
+/**
+ * Validate an enforcer's return value against the COMPLETE closed union and re-mint it canonically.
+ *
+ * WHY NOT JUST `outcome.kind === "allow"`. That trusted a single field on an object of unknown provenance:
+ * a duck-typed `{ kind: "allow" }` — no scope, no authority, no decision — was indistinguishable from a
+ * real authorization and would have reached the provider. Every variant is therefore checked IN FULL:
+ * the discriminant, the required fields, the code's membership of that variant's closed code set, the
+ * `retryable` flag, and the ABSENCE of contradictory fields (an `allow` carrying a `code`, or a `deny`
+ * carrying a `scope`, is not a valid outcome of this contract — it is a sign of a confused authority).
+ *
+ * The returned object is a FRESH canonical value, never the caller's object, so no extra property can be
+ * smuggled through this boundary into the dispatch path.
+ *
+ * Anything malformed becomes `CONSENT_AUTHORITY_INTEGRITY` — an `invalid`, which is TERMINAL and never
+ * retried. That is the correct classification: an authority returning nonsense is untrustworthy, and
+ * retrying an untrustworthy authority cannot make it trustworthy.
+ */
+export function normalizeOutboundConsentOutcome(value: unknown): OutboundConsentOutcome {
+  if (value === null || value === undefined) return CONSENT_INTEGRITY_OUTCOME;
+  if (typeof value !== "object") return CONSENT_INTEGRITY_OUTCOME;   // primitives, functions
+  if (Array.isArray(value)) return CONSENT_INTEGRITY_OUTCOME;
+
+  const o = value as Record<string, unknown>;
+
+  switch (o.kind) {
+    case "allow": {
+      // An allow MUST carry a scope from the closed registry, and MUST NOT carry deny/failure fields.
+      if (typeof o.scope !== "string") return CONSENT_INTEGRITY_OUTCOME;
+      if (!hasOwn(ALLOW_SCOPES, o.scope)) return CONSENT_INTEGRITY_OUTCOME;
+      if (hasOwn(o, "code") || hasOwn(o, "retryable")) return CONSENT_INTEGRITY_OUTCOME;   // contradictory
+      return { kind: "allow", scope: o.scope as OutboundConsentScope };
+    }
+    case "deny": {
+      if (typeof o.code !== "string" || !hasOwn(DENY_CODES, o.code)) return CONSENT_INTEGRITY_OUTCOME;
+      if (o.retryable !== false) return CONSENT_INTEGRITY_OUTCOME;     // a retryable deny is a contradiction
+      if (hasOwn(o, "scope")) return CONSENT_INTEGRITY_OUTCOME;
+      return { kind: "deny", code: o.code as OutboundConsentDenyCode, retryable: false };
+    }
+    case "unavailable": {
+      if (typeof o.code !== "string" || !hasOwn(UNAVAILABLE_CODES, o.code)) return CONSENT_INTEGRITY_OUTCOME;
+      if (o.retryable !== true) return CONSENT_INTEGRITY_OUTCOME;
+      if (hasOwn(o, "scope")) return CONSENT_INTEGRITY_OUTCOME;
+      return { kind: "unavailable", code: o.code as OutboundConsentUnavailableCode, retryable: true };
+    }
+    case "invalid": {
+      if (typeof o.code !== "string" || !hasOwn(INVALID_CODES, o.code)) return CONSENT_INTEGRITY_OUTCOME;
+      if (o.retryable !== false) return CONSENT_INTEGRITY_OUTCOME;
+      if (hasOwn(o, "scope")) return CONSENT_INTEGRITY_OUTCOME;
+      return { kind: "invalid", code: o.code as OutboundConsentInvalidCode, retryable: false };
+    }
+    default:
+      return CONSENT_INTEGRITY_OUTCOME;                                // unknown / missing discriminant
+  }
+}

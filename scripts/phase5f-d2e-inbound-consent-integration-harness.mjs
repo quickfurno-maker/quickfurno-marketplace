@@ -964,7 +964,10 @@ check("16. the webhook imports ONLY the D2-E orchestrator — never the D2-D wri
   // Nothing else. The D2-D writer, the D2-C decision authority and the D2-D normalizer all remain
   // rejected (by this allowlist AND by the explicit guards above), so no consent authority can be
   // smuggled into the webhook under a new name.
-  const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService"];
+  //   • ./outboundConsentEnforcementService — PHASE 8A, and ONLY for the fail-closed factory (proven at
+  //     the SYMBOL level below). The webhook builds a CommunicationService for DELIVERY RECEIPTS; binding
+  //     an enforcer that can never allow NARROWS its blast radius rather than widening its authority.
+  const ALLOWED_CONSENT_MODULES = ["./inboundConsentCommandService", "./consentCommandResponseService", "./outboundConsentEnforcementService"];
   const specifiers = [...readF(WEBHOOK_SVC_SRC).matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
   const consentSpecifiers = specifiers.filter((s) => /consent/i.test(s));
   const unapproved = consentSpecifiers.filter((s) => !ALLOWED_CONSENT_MODULES.includes(s));
@@ -972,6 +975,11 @@ check("16. the webhook imports ONLY the D2-E orchestrator — never the D2-D wri
     `only the approved consent orchestrators may be imported by the webhook (got [${unapproved.join(", ")}])`);
   assert(consentSpecifiers.includes("./inboundConsentCommandService"),
     "the D2-E orchestrator must still be imported");
+  const enforcementSymbols = [...readF(WEBHOOK_SVC_SRC).matchAll(/import\s*\{([^}]*)\}\s*from\s*"\.\/outboundConsentEnforcementService"/g)]
+    .flatMap((m) => m[1].split(",").map((s) => s.trim()).filter(Boolean));
+  assert(enforcementSymbols.every((s) => s === "createFailClosedOutboundConsentEnforcer"),
+    `the webhook may import ONLY the fail-closed enforcer (got [${enforcementSymbols.join(", ")}])`);
+  hasNot(/createOutboundConsentEnforcer\b/, code, "the webhook NEVER binds the REAL consent authority");
 });
 
 check("24. the existing D1-B / D2-C / D2-D boundaries stay green", () => {

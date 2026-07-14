@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -85,6 +85,21 @@ const LEGACY_SMS_HARNESSES = [
   "scripts/phase5f-c3c1-client-otp-resolved-sms-harness.mjs",
 ];
 
+/** PHASE 8A — the webhook now states its consent posture, and 5B states its test posture. */
+const WEBHOOK_SRC = "services/metaWhatsAppWebhookService.ts";
+const PHASE5B_SRC = "scripts/phase5b-communication-core-harness.mjs";
+/**
+ * The historical harnesses whose freeze/scope guards Phase 8A legitimately updates. They are NOT being
+ * declared mutable: each one TRANSFERS the authority for the two released shared files to THIS harness,
+ * which now owns and proves the fail-closed consent properties (P8A-1..17). Each keeps every other guard.
+ */
+const PHASE_8A_UPDATED_HARNESSES = [
+  "scripts/phase5f-d4c-consent-ack-async-harness.mjs",
+  "scripts/phase5f-d4b-consent-command-response-harness.mjs",
+  "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+  "scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
+];
+
 const D3B_EXPECTED_FILES = [
   DOC_SRC,
   "lib/communication/outboundConsentScope.ts",
@@ -96,6 +111,10 @@ const D3B_EXPECTED_FILES = [
   "services/communicationService.ts",
   "services/outboundConsentEnforcementService.ts",
   "services/runtimeCommunicationService.ts",
+  // Phase 8A scope.
+  WEBHOOK_SRC,
+  PHASE5B_SRC,
+  ...PHASE_8A_UPDATED_HARNESSES,
 ];
 
 function compileTo(outDir) {
@@ -269,6 +288,33 @@ const authRow = (over = {}) => row({
   template_key: "client_login_otp", destination_source: "ephemeral_auth_destination",
   recipient_id: null, max_attempts: 1, ...over,
 });
+
+/**
+ * PHASE 8A — drive one dispatch attempt with a RAW, UNSANITIZED 4th constructor argument.
+ *
+ * `dispatch()` below always passes a well-formed enforcer. This helper passes whatever the caller gives it
+ * — no argument at all, `null`, `undefined`, a primitive, an array, an object with no callable `authorize`
+ * — which is EXACTLY what TypeScript cannot prevent from plain JavaScript, `as any`, or reflection. Every
+ * one of these must still reach ZERO provider calls, which is the Phase 8A security invariant.
+ *
+ * `omit: true` constructs with genuinely THREE arguments, so the parameter is absent rather than explicitly
+ * undefined — the closest reachable analogue of a pre-Phase-8A `new CommunicationService(provider)`.
+ */
+async function dispatchRawEnforcer(message, rawEnforcer, { omit = false } = {}) {
+  TABLE = [{ ...message }];
+  DB_THROWS = false;
+  const p = fakeProvider();
+  const svc = omit
+    ? new M.Comm.CommunicationService(p.provider, fakeResolver, null)
+    : new M.Comm.CommunicationService(p.provider, fakeResolver, null, rawEnforcer);
+  const res = await svc.dispatchMessage(message, {
+    rawVariables: message.lane === "authentication" ? { otp: "123456" } : undefined,
+    providerTemplateName: "tpl",
+    preResolvedDestination: DEST,
+    templateLanguage: "en",
+  });
+  return { res, providerCalls: p.calls.send, stored: TABLE[0] };
+}
 
 /** Build a service + drive one dispatch attempt against the fake ledger. */
 async function dispatch(message, outcome, over = {}) {
@@ -902,10 +948,13 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
     assert(!/\.env/.test(p), `no env file may change (${p})`);
     assert(!/^lib\/communication\/providers\//.test(p), `no provider adapter may change (${p})`);
     assert(!/package-lock\.json|yarn\.lock|pnpm-lock\.yaml/.test(p), `no lockfile may change (${p})`);
-    // NO existing harness may change — with EXACTLY ONE founder-approved exception, 5F-B, whose scope is
-    // then verified line-by-line below. Every other historical harness stays frozen.
+    // NO existing harness may change — with the founder-approved exceptions: 5F-B (verified line-by-line
+    // below), the legacy SMS harnesses, and — PHASE 8A — the 5B core harness, whose ~60 historical direct
+    // constructions must now state their consent posture explicitly because the enforcer became required.
+    // 5B's own assertions are unchanged and its count is unchanged; only the constructions gained a 4th
+    // argument. Every other historical harness stays frozen.
     assert(
-      !/^scripts\/phase5(b|c|d|e|f-(a|b|c|d1|d2))/.test(p) || p === HARNESS_SRC || p === PHASE5FB_SRC || LEGACY_SMS_HARNESSES.includes(p),
+      !/^scripts\/phase5(b|c|d|e|f-(a|b|c|d1|d2))/.test(p) || p === HARNESS_SRC || p === PHASE5FB_SRC || p === PHASE5B_SRC || PHASE_8A_UPDATED_HARNESSES.includes(p) || LEGACY_SMS_HARNESSES.includes(p),
       `no existing harness may change (${p})`
     );
   }
@@ -985,10 +1034,361 @@ check("B6. wiring: the d3b script + the doc exist and the doc covers the contrac
 });
 
 // ============================================================================
+// PHASE 8A — FAIL-CLOSED CONSENT AUTHORITY
+//
+// THE INVARIANT: a missing, null, undefined, malformed or throwing consent authority ⇒ ZERO provider calls.
+//
+// Every check below drives the REAL CommunicationService dispatch path against a provider that COUNTS its
+// calls, so "nothing was sent" is PROVEN by a counter, never asserted from a status string.
+// ============================================================================
+
+check("P8A-1. an OMITTED enforcer (3-arg construction) BLOCKS — zero provider calls", async () => {
+  // The pre-Phase-8A shape: `new CommunicationService(provider, resolver, null)`. TypeScript now rejects
+  // this, but plain JavaScript does not — so the RUNTIME must. It fails closed as `unavailable`.
+  const d = await dispatchRawEnforcer(row(), undefined, { omit: true });
+  assert(d.providerCalls === 0, `ZERO provider calls (got ${d.providerCalls})`);
+  assert(d.res.ok === false, "the dispatch is refused");
+  assert(d.res.code === "CONSENT_AUTHORITY_UNAVAILABLE", `unavailable (got ${d.res.code})`);
+  assert(d.stored.status === "queued", "a BUSINESS row stays re-dispatchable (not cancelled, not failed)");
+});
+
+check("P8A-2. an explicitly `undefined` enforcer BLOCKS — zero provider calls", async () => {
+  const d = await dispatchRawEnforcer(row(), undefined);
+  assert(d.providerCalls === 0, `ZERO provider calls (got ${d.providerCalls})`);
+  assert(d.res.ok === false && d.res.code === "CONSENT_AUTHORITY_UNAVAILABLE", "unavailable");
+});
+
+check("P8A-3. an explicitly `null` enforcer BLOCKS — zero provider calls (the old fail-open shape)", async () => {
+  // THIS is the exact value the deleted `if (!this.consentEnforcer) return null;` used to wave through.
+  const d = await dispatchRawEnforcer(row(), null);
+  assert(d.providerCalls === 0, `ZERO provider calls (got ${d.providerCalls})`);
+  assert(d.res.ok === false && d.res.code === "CONSENT_AUTHORITY_UNAVAILABLE", "unavailable");
+});
+
+check("P8A-4. STRUCTURALLY INVALID enforcers all BLOCK — zero provider calls", async () => {
+  for (const bogus of [
+    {},                                   // no authorize at all
+    { authorize: "not a function" },      // authorize is not callable
+    { authorize: null },
+    [],                                   // an array
+    42, "enforcer", true,                 // primitives
+    Object.create(null),                  // no prototype, no authorize
+  ]) {
+    const d = await dispatchRawEnforcer(row(), bogus);
+    assert(d.providerCalls === 0, `ZERO provider calls for ${safeStringify(bogus)} (got ${d.providerCalls})`);
+    assert(d.res.ok === false && d.res.code === "CONSENT_AUTHORITY_UNAVAILABLE",
+      `a structurally invalid enforcer is fail-closed, not trusted (${safeStringify(bogus)})`);
+  }
+});
+
+check("P8A-5. a THROWING enforcer is unavailable — zero provider calls", async () => {
+  const d = await dispatchRawEnforcer(row(), { authorize: async () => { throw new Error("authority exploded"); } });
+  assert(d.providerCalls === 0, `ZERO provider calls (got ${d.providerCalls})`);
+  assert(d.res.ok === false && d.res.code === "CONSENT_AUTHORITY_UNAVAILABLE", "a throw is infrastructure, never a decision");
+  assert(d.stored.status === "queued", "the business row stays retryable");
+});
+
+check("P8A-6. an enforcer RESOLVING `undefined` is a DELIBERATE integrity failure — zero provider calls", async () => {
+  // Before Phase 8A this made `outcome.kind` throw a TypeError, which only fail-closed by ACCIDENT of an
+  // outer catch — with no consent code and no consent ledger entry. It is now a real, classified outcome.
+  //
+  // NOTE the Result shape: a terminalization SUCCEEDS (`ok:true` carrying the now-terminal row). The
+  // security fact lives in the LEDGER — status + failure_code — not in the Result code. Only the business
+  // `unavailable` path returns `fail(code)`, because it deliberately leaves the row untouched.
+  const d = await dispatchRawEnforcer(row(), { authorize: async () => undefined });
+  assert(d.providerCalls === 0, `ZERO provider calls (got ${d.providerCalls})`);
+  assert(d.stored.status === "failed", `an untrustworthy authority is TERMINAL (got ${d.stored.status})`);
+  assert(d.stored.failure_code === "CONSENT_AUTHORITY_INTEGRITY",
+    `integrity, not an accidental exception (got ${d.stored.failure_code})`);
+});
+
+check("P8A-7. MALFORMED outcomes are rejected by the validator — zero provider calls, every time", async () => {
+  const MALFORMED = [
+    { kind: "allow" },                                                   // no scope — the duck-typed allow
+    { kind: "allow", scope: "not_a_scope" },                             // unknown scope
+    { kind: "allow", scope: null },
+    { kind: "allow", scope: "transactional", code: "CONSENT_SUPPRESSED" }, // contradictory fields
+    { kind: "allow", scope: "transactional", retryable: true },            // contradictory fields
+    { kind: "ALLOW", scope: "transactional" },                           // wrong case ⇒ unknown kind
+    { kind: "permit", scope: "transactional" },                          // unknown kind
+    { kind: "deny" },                                                    // no code
+    { kind: "deny", code: "NOT_A_REAL_CODE", retryable: false },         // code not in the deny set
+    { kind: "deny", code: "CONSENT_SUPPRESSED", retryable: true },       // a RETRYABLE deny is a contradiction
+    { kind: "deny", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: false }, // wrong variant's code
+    { kind: "unavailable", code: "CONSENT_SUPPRESSED", retryable: true },      // wrong variant's code
+    { kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: false }, // wrong retryable
+    { kind: "invalid", code: "CONSENT_SUPPRESSED", retryable: false },   // wrong variant's code
+    { kind: "invalid", code: "CONSENT_ENFORCEMENT_INVALID", retryable: true },  // wrong retryable
+    { kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true, scope: "marketing" }, // smuggled scope
+    {}, null, [], "allow", 1, true,                                      // not outcomes at all
+  ];
+  for (const outcome of MALFORMED) {
+    const d = await dispatchRawEnforcer(row(), { authorize: async () => outcome });
+    assert(d.providerCalls === 0, `ZERO provider calls for ${safeStringify(outcome)} (got ${d.providerCalls})`);
+    assert(d.stored.status === "failed", `terminal failed: ${safeStringify(outcome)} (got ${d.stored.status})`);
+    assert(d.stored.failure_code === "CONSENT_AUTHORITY_INTEGRITY",
+      `malformed ⇒ integrity, never allow: ${safeStringify(outcome)} (got ${d.stored.failure_code})`);
+  }
+});
+
+check("P8A-8. a fully VALID allow still sends — exactly ONE provider call (the fence is not a blanket block)", async () => {
+  // The whole design is worthless if it also blocks legitimate sends. Prove the validated allow path works.
+  const d = await dispatchRawEnforcer(row(), { authorize: async () => ({ kind: "allow", scope: "transactional" }) });
+  assert(d.providerCalls === 1, `EXACTLY one provider call (got ${d.providerCalls})`);
+  assert(d.res.ok === true, "the dispatch succeeded");
+});
+
+check("P8A-9. the fail-closed enforcer NEVER allows, whatever it is asked", async () => {
+  const e = M.Coord.createFailClosedOutboundConsentEnforcer();
+  for (const input of [undefined, null, {}, { lane: "authentication" }, { lane: "business" }]) {
+    const out = await e.authorize(input);
+    assert(out.kind === "unavailable" && out.code === "CONSENT_AUTHORITY_UNAVAILABLE" && out.retryable === true,
+      `always unavailable (got ${safeStringify(out)})`);
+  }
+  // …and its outcome is frozen, so a caller cannot mutate it into an allow.
+  const out = await e.authorize({});
+  try { out.kind = "allow"; } catch { /* frozen in strict mode */ }
+  assert(out.kind === "unavailable", "the fail-closed outcome cannot be mutated into an allow");
+});
+
+check("P8A-10. the LANE semantics are preserved exactly (auth fails, business stays retryable)", async () => {
+  // AUTHENTICATION + unavailable ⇒ terminal `failed` (the OTP is never persisted, so it can never be
+  // re-dispatched; leaving it queued would leak a permanently undeliverable row).
+  const a = await dispatchRawEnforcer(authRow(), null);
+  assert(a.providerCalls === 0, "ZERO provider calls (auth)");
+  assert(a.stored.status === "failed", `auth + unavailable ⇒ failed (got ${a.stored.status})`);
+
+  // BUSINESS + unavailable ⇒ retryable failure, row UNCHANGED, re-evaluated by a later dispatch.
+  const b = await dispatchRawEnforcer(row(), null);
+  assert(b.providerCalls === 0, "ZERO provider calls (business)");
+  assert(b.stored.status === "queued", `business + unavailable ⇒ unchanged (got ${b.stored.status})`);
+  assert(b.stored.failed_at === null, "…and no failed_at is stamped");
+});
+
+check("P8A-11. DIRECT construction cannot bypass consent even when TypeScript is circumvented", async () => {
+  // The Phase 8A threat model in one check: a future/legacy caller reaches straight for the constructor and
+  // forces past the type system. Every circumvention still reaches zero provider calls.
+  const circumventions = [
+    ["omitted argument", undefined, { omit: true }],
+    ["null as any", null, {}],
+    ["undefined as any", undefined, {}],
+    ["{} as any", {}, {}],
+    ["a lying enforcer that returns a bare allow", { authorize: async () => ({ kind: "allow" }) }, {}],
+  ];
+  for (const [label, enforcer, opts] of circumventions) {
+    const d = await dispatchRawEnforcer(row(), enforcer, opts);
+    // THE invariant. Everything else is commentary.
+    assert(d.providerCalls === 0, `ZERO provider calls — ${label} (got ${d.providerCalls})`);
+    // …and the row never reached a sent/in-flight state: it is either terminal, or left safely dispatchable.
+    assert(["queued", "failed", "cancelled"].includes(d.stored.status),
+      `never sent, never left dispatching — ${label} (got ${d.stored.status})`);
+    assert(d.stored.status !== "sent", `never sent — ${label}`);
+  }
+});
+
+check("P8A-12. RETRY and SCHEDULED dispatch each RE-EVALUATE consent at dispatch time", async () => {
+  // A retry attempt consults the authority again — a STOP created after the first attempt IS observed.
+  const retryRow = row({ status: "retry_scheduled", attempt_count: 2 });
+  const e1 = fakeEnforcer(DENY_SUPPRESSED);
+  TABLE = [{ ...retryRow }];
+  const p1 = fakeProvider();
+  const s1 = new M.Comm.CommunicationService(p1.provider, fakeResolver, null, e1.enforcer);
+  await s1.dispatchMessage(retryRow, { providerTemplateName: "tpl", preResolvedDestination: DEST, templateLanguage: "en" });
+  assert(e1.calls.length === 1, `the RETRY consulted consent (got ${e1.calls.length})`);
+  assert(p1.calls.send === 0, "ZERO provider calls on a suppressed retry");
+  assert(TABLE[0].status === "cancelled", "…and it is cancelled, not sent");
+
+  // A SCHEDULED row is evaluated when it actually dispatches, not when it was enqueued.
+  const schedRow = row({ status: "queued", scheduled_at: "2020-01-01T00:00:00.000Z" });
+  const e2 = fakeEnforcer(DENY_SUPPRESSED);
+  TABLE = [{ ...schedRow }];
+  const p2 = fakeProvider();
+  const s2 = new M.Comm.CommunicationService(p2.provider, fakeResolver, null, e2.enforcer);
+  await s2.dispatchMessage(schedRow, { providerTemplateName: "tpl", preResolvedDestination: DEST, templateLanguage: "en" });
+  assert(e2.calls.length === 1, `the SCHEDULED dispatch consulted consent (got ${e2.calls.length})`);
+  assert(p2.calls.send === 0, "ZERO provider calls on a suppressed scheduled send");
+
+  // Consent is consulted ONCE PER ATTEMPT — two attempts, two authorizations.
+  const e3 = fakeEnforcer(ALLOW);
+  const p3 = fakeProvider();
+  for (const st of ["queued", "retry_scheduled"]) {
+    const r = row({ status: st });
+    TABLE = [{ ...r }];
+    const s3 = new M.Comm.CommunicationService(p3.provider, fakeResolver, null, e3.enforcer);
+    await s3.dispatchMessage(r, { providerTemplateName: "tpl", preResolvedDestination: DEST, templateLanguage: "en" });
+  }
+  assert(e3.calls.length === 2, `consent is re-evaluated on EVERY attempt (got ${e3.calls.length})`);
+});
+
+check("P8A-13. AUTHENTICATION dispatch evaluates consent BEFORE the provider is invoked", async () => {
+  const order = [];
+  const p = fakeProvider();
+  const spyProvider = {
+    ...p.provider,
+    async sendAuthenticationMessage() { order.push("provider"); p.calls.send++; return { accepted: true, providerMessageId: "pm-1", outcomeCertainty: "accepted" }; },
+  };
+  const enforcer = { async authorize() { order.push("consent"); return { kind: "allow", scope: "authentication" }; } };
+  const a = authRow();
+  TABLE = [{ ...a }];
+  const svc = new M.Comm.CommunicationService(spyProvider, fakeResolver, null, enforcer);
+  await svc.dispatchMessage(a, { rawVariables: { otp: "123456" }, providerTemplateName: "tpl", preResolvedDestination: DEST, templateLanguage: "en" });
+  assert(order[0] === "consent", `consent runs FIRST (got ${safeStringify(order)})`);
+  assert(order[1] === "provider" && p.calls.send === 1, "…and exactly one provider call follows");
+});
+
+// ---- STRUCTURAL: the source itself must keep the guarantee -------------------------------------------
+check("P8A-14. STRUCTURAL: the constructor requires an enforcer and the property is non-nullable", () => {
+  const src = readF(COMM_SRC);
+  has(/private readonly consentEnforcer: OutboundConsentEnforcer;/, src, "the property is NON-NULLABLE");
+  hasNot(/private readonly consentEnforcer: OutboundConsentEnforcer \| null/, src, "…never nullable again");
+  has(/consentEnforcer: OutboundConsentEnforcer\s*\n\s*\)/, src, "the constructor parameter is REQUIRED (no default)");
+  hasNot(/consentEnforcer: OutboundConsentEnforcer \| null = null/, src, "…and never optional-nullable again");
+  // THE FAIL-OPEN BRANCH IS GONE.
+  hasNot(/if \(!this\.consentEnforcer\) return null;/, src, "the missing-enforcer fail-open return is DELETED");
+  // The constructor NORMALIZES anything invalid to fail-closed.
+  has(/isOutboundConsentEnforcer\(consentEnforcer\)\s*\n?\s*\?\s*consentEnforcer\s*\n?\s*:\s*createFailClosedOutboundConsentEnforcer\(\)/, src,
+    "the constructor normalizes an invalid enforcer to the FAIL-CLOSED one");
+  // The outcome is VALIDATED, never trusted.
+  has(/normalizeOutboundConsentOutcome\(/, src, "the enforcer's outcome is VALIDATED");
+  has(/outcome\.kind === "allow"/, src, "…and only a validated allow continues");
+});
+
+check("P8A-15. STRUCTURAL: the consent gate still precedes the claim and the provider", () => {
+  const src = stripTs(readF(COMM_SRC));
+  const gate = src.indexOf("await this.enforceOutboundConsent(message)");
+  const claim = src.indexOf("await this.claimMessageForDispatch(message)");
+  const invoke = src.indexOf("await this.invokeProvider(");
+  assert(gate > 0 && claim > 0 && invoke > 0, "all three stages exist");
+  assert(gate < claim, "the consent gate runs BEFORE the claim");
+  assert(claim < invoke, "…and the claim runs BEFORE the provider");
+  // The ONLY provider send calls live inside invokeProvider, and invokeProvider has ONE caller.
+  const invokeDef = src.indexOf("private async invokeProvider(");
+  for (const m of ["this.provider.sendResolvedTemplate(", "this.provider.sendAuthenticationMessage(", "this.provider.sendTemplateMessage("]) {
+    const at = src.indexOf(m);
+    assert(at > invokeDef, `${m} is inside invokeProvider, never before the gate`);
+  }
+  assert((src.match(/await this\.invokeProvider\(/g) ?? []).length === 1, "invokeProvider has exactly ONE call site");
+});
+
+check("P8A-16. STRUCTURAL: production states its consent posture everywhere, and has NO allow-all helper", () => {
+  // The runtime factory binds the REAL authority — never the fail-closed placeholder.
+  const runtime = readF(RUNTIME_SRC);
+  has(/consentEnforcer: OutboundConsentEnforcer = createOutboundConsentEnforcer\(\)/, runtime, "the factory defaults to the REAL enforcer");
+  hasNot(/createFailClosedOutboundConsentEnforcer/, runtime, "the factory NEVER uses the fail-closed placeholder");
+
+  // The webhook binds the FAIL-CLOSED enforcer explicitly — safe by construction, not by usage.
+  const hook = readF(WEBHOOK_SRC);
+  has(/createFailClosedOutboundConsentEnforcer\(\)/, hook, "the webhook explicitly binds the FAIL-CLOSED enforcer");
+  hasNot(/new CommunicationService\(provider\)\s*;/, hook, "…and no longer constructs with a bare provider");
+
+  // NO production allow-all enforcer may exist anywhere.
+  // `git grep` EXITS 1 WHEN THERE ARE NO MATCHES — and no matches is exactly the outcome we want, so an
+  // exit-1 throw must be read as "clean", not as an error. (Getting this backwards would make the check
+  // pass for the wrong reason the moment someone DID add an allow-all helper.)
+  let prodAllowAll = [];
+  try {
+    prodAllowAll = execFileSync("git", ["grep", "-lE", "allowAll|alwaysAllow|permitAll", "--", "services/", "app/", "lib/"], { encoding: "utf8" })
+      .split("\n").map((s) => s.trim()).filter(Boolean);
+  } catch (e) {
+    if (e.status !== 1) throw e;          // 1 = no matches (good). Anything else is a real failure.
+    prodAllowAll = [];
+  }
+  assert(prodAllowAll.length === 0, `NO production allow-all consent helper may exist (found: ${prodAllowAll.join(", ")})`);
+
+  // The test allow-all lives ONLY in the 5B harness.
+  has(/function allowAllTestConsentEnforcer\(\)/, readF(PHASE5B_SRC), "the allow-all enforcer is TEST-ONLY (Phase 5B)");
+});
+
+check("P8A-17. STRUCTURAL: omitting the enforcer FAILS TYPESCRIPT COMPILATION (a real tsc fixture)", () => {
+  // Not a grep — an ACTUAL compile. A fixture that omits the 4th argument must be rejected by tsc, and the
+  // same fixture WITH an enforcer must compile. That is the only honest proof that layer 1 exists.
+  const dir = resolve(`.phase5fd3b-tsfixture-${Math.random().toString(36).slice(2, 8)}`);
+  const badFile = resolve(dir, "omits-enforcer.ts");
+  const goodFile = resolve(dir, "states-posture.ts");
+  const tsconfigPath = resolve(`${dir}.tsconfig.json`);
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(badFile, [
+      `import { CommunicationService } from "../services/communicationService";`,
+      `import { getActiveWhatsAppProvider } from "../services/communicationService";`,
+      `export const bad = new CommunicationService(getActiveWhatsAppProvider());`,
+      ``,
+    ].join("\n"));
+    writeFileSync(goodFile, [
+      `import { CommunicationService, getActiveWhatsAppProvider } from "../services/communicationService";`,
+      `import { createFailClosedOutboundConsentEnforcer } from "../services/outboundConsentEnforcementService";`,
+      `export const good = new CommunicationService(`,
+      `  getActiveWhatsAppProvider(), undefined, undefined, createFailClosedOutboundConsentEnforcer());`,
+      ``,
+    ].join("\n"));
+
+    const compile = (file) => {
+      writeFileSync(tsconfigPath, JSON.stringify({
+        compilerOptions: {
+          module: "commonjs", target: "ES2020", moduleResolution: "node", skipLibCheck: true,
+          esModuleInterop: true, strict: true, noEmit: true, baseUrl: ".", paths: { "@/*": ["./*"] },
+          lib: ["ES2021", "DOM"],
+        },
+        files: [file],
+      }, null, 2));
+      try { execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" }); return { ok: true, out: "" }; }
+      catch (e) { return { ok: false, out: `${e.stdout ?? ""}${e.stderr ?? ""}` }; }
+    };
+
+    const bad = compile(badFile);
+    assert(bad.ok === false, "omitting the consent enforcer MUST fail TypeScript compilation");
+    assert(/Expected 4 arguments|expected 4 arguments|TS2554/i.test(bad.out),
+      `…and it must fail on the ARITY of the constructor, not something incidental (got: ${bad.out.slice(0, 300)})`);
+
+    const good = compile(goodFile);
+    assert(good.ok === true, `a construction that STATES its posture must still compile (got: ${good.out.slice(0, 300)})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(tsconfigPath, { force: true });
+  }
+});
+
+// ============================================================================
 // MUTATIONS
 // ============================================================================
+// ----------------------------------------------------------------------------
+// THE MUTATION CONTRACT
+//
+// A mutation is load-bearing ONLY when the mutated code still BUILDS and RUNS, and a real security property
+// then goes red. It is NOT load-bearing because the file stopped parsing, an import broke, an anchor moved,
+// or a scenario threw for some unrelated reason — those are accidents, and scoring them as proof is how a
+// broken mutation hides. (MUT 21 did exactly that: its replacement was unbalanced, tsc threw, and the old
+// `catch { violation = true }` recorded a PASS while proving nothing about outcome validation.)
+//
+// `expectCompileFailure` is the ONLY way a mutation may claim a build break as its intended result, and even
+// then the runner verifies the failure really is a COMPILE failure and not something else.
+// ----------------------------------------------------------------------------
 const mutationChecks = [];
-function srcMutation(name, file, from, to, scenario) { mutationChecks.push({ name, kind: "src", edits: [{ file, from, to }], scenario }); }
+function srcMutation(name, file, from, to, scenario, opts = {}) {
+  mutationChecks.push({ name, kind: "src", edits: [{ file, from, to }], scenario, expectCompileFailure: opts.expectCompileFailure === true });
+}
+/** A PAIRED mutation: some guards are defended in depth, so proving one load-bearing needs both removed. */
+function srcMutationN(name, edits, scenario, opts = {}) {
+  mutationChecks.push({ name, kind: "src", edits, scenario, expectCompileFailure: opts.expectCompileFailure === true });
+}
+
+/** The identifier a mutation is referred to by ("MUT 21"), so a failure is attributable at a glance. */
+function mutId(name) {
+  const m = name.match(/^(MUT \d+[a-z]?)/);
+  return m ? m[1] : name.split(":")[0];
+}
+
+/**
+ * Is this exception a TYPESCRIPT COMPILE failure (as opposed to any other throw)?
+ *
+ * `compileTo` shells out to tsc through execFileSync, so a compile failure arrives as a non-zero exit with
+ * `error TS####` on stdout/stderr. Anything else — a TypeError in a scenario, a missing module, a bad
+ * anchor — is NOT a compile failure and must never be mistaken for one.
+ */
+function isCompileFailure(e) {
+  const text = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
+  return /error TS\d+/.test(text) || /did not transpile/.test(text);
+}
 
 /** Rebuild from the mutated sources and re-drive the scenario. */
 async function withMutatedBuild(fn) {
@@ -1030,11 +1430,22 @@ srcMutation("MUT 2: the gate is MOVED AFTER the claim (cancellation becomes an i
 
 srcMutation("MUT 3: a DENY is converted to an ALLOW",
   COMM_SRC,
-  'if (outcome.kind === "allow") return null;',
-  'if (outcome.kind === "allow" || outcome.kind === "deny") return null;',
+  `    if (outcome.kind === "deny") {
+      return await this.terminalizeBeforeClaim(message, "cancelled", code, reason);
+    }`,
+  `    if (outcome.kind === "deny") {
+      return null;
+    }`,
+  // A COMPILING mutation. Returning `null` from the gate means CONTINUE, so a definitive consent refusal is
+  // waved through to the claim and the provider — precisely "a deny became an allow".
+  //
+  // (The previous form widened the allow test to `|| outcome.kind === "deny"`, which made the LATER
+  // `outcome.kind === "deny"` branch a no-overlap comparison — a TS2367 compile error. tsc threw, and the
+  // old runner scored the throw as a pass, so this mutation never actually proved anything either. The
+  // strict runner below caught it. The causal proof is unchanged: a denied send must call NO provider.)
   () => withMutatedBuild(async (mm) => {
     const d = await dispatchWith(mm, row(), DENY_SUPPRESSED);
-    return d.providerCalls > 0;
+    return d.providerCalls > 0;      // THE PROVIDER WAS CALLED on a suppressed destination
   }));
 
 srcMutation("MUT 4: MARKETING 'unknown' is converted to an ALLOW (default-deny broken)",
@@ -1275,6 +1686,161 @@ srcMutation("MUT 15: D2-C authority code is modified (the frozen authority must 
   });
 
 // ============================================================================
+// PHASE 8A MUTATIONS — each one must break a SPECIFIC fail-closed property
+//
+// A mutation is only load-bearing if it makes a REAL validator go red. `checkFails()` re-runs an actual
+// functional check by name against the MUTATED build and requires it to throw — so none of these can pass
+// merely because the source string changed or the build broke.
+// ============================================================================
+async function checkFails(namePrefix, mm) {
+  const c = checks.find((x) => x.name.startsWith(namePrefix));
+  if (!c) throw new Error(`no such check: ${namePrefix}`);
+  // Swap the ENTIRE module map, not just `Comm`. A check may reach for `M.Coord` (the enforcer factory) or
+  // `M.Scope`; leaving those pointing at the UNMUTATED build would silently run the check against the old
+  // code and report a real mutation as "not load-bearing".
+  const saved = { Comm: M.Comm, Coord: M.Coord, Scope: M.Scope };
+  try {
+    if (mm) { M.Comm = mm.Comm; M.Coord = mm.Coord; M.Scope = mm.Scope; }
+    await c.fn();
+    return false;
+  } catch { return true; }
+  finally { M.Comm = saved.Comm; M.Coord = saved.Coord; M.Scope = saved.Scope; }
+}
+
+srcMutation("MUT 16 (8A): the constructor parameter is made OPTIONAL and NULLABLE again",
+  COMM_SRC,
+  "    consentEnforcer: OutboundConsentEnforcer\n  ) {",
+  "    consentEnforcer: OutboundConsentEnforcer | null = null\n  ) {",
+  // The TypeScript compile fixture must go red: omitting the argument would compile again.
+  () => checkFails("P8A-17."));
+
+srcMutation("MUT 17 (8A): the constructor NORMALIZATION is removed (an invalid enforcer is trusted)",
+  COMM_SRC,
+  `    this.consentEnforcer = isOutboundConsentEnforcer(consentEnforcer)
+      ? consentEnforcer
+      : createFailClosedOutboundConsentEnforcer();`,
+  "    this.consentEnforcer = consentEnforcer;",
+  // A null/undefined/bogus enforcer now reaches the gate unnormalized. `authorize` is not callable, the
+  // TypeError escapes as an unclassified failure, and the fail-closed CODE guarantee is gone.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-4.", mm) && await checkFails("P8A-3.", mm)));
+
+srcMutation("MUT 18 (8A): the RUNTIME FALLBACK is changed from fail-closed to ALLOW",
+  COORD_SRC,
+  `export function createFailClosedOutboundConsentEnforcer(): OutboundConsentEnforcer {
+  return { authorize: async () => FAIL_CLOSED_CONSENT_OUTCOME };
+}`,
+  `export function createFailClosedOutboundConsentEnforcer(): OutboundConsentEnforcer {
+  return { authorize: async () => ({ kind: "allow", scope: "transactional" } as OutboundConsentOutcome) };
+}`,
+  // THE HEADLINE MUTATION. If the fallback allows, then a missing enforcer SENDS. Provider calls stop
+  // being zero, and the whole Phase 8A invariant collapses.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-3.", mm) && await checkFails("P8A-9.", mm)));
+
+srcMutation("MUT 19 (8A): the missing-enforcer FAIL-OPEN return is restored",
+  COMM_SRC,
+  "    // EXPLICIT, CLOSED channel mapping — never a coercion.",
+  "    if (!this.consentEnforcer) return null;\n\n    // EXPLICIT, CLOSED channel mapping — never a coercion.",
+  // With normalization still in place the field is never falsy, so this alone must NOT resurrect the hole —
+  // it is the STRUCTURAL guard that must catch the line's return.
+  () => checkFails("P8A-14."));
+
+srcMutationN("MUT 20 (8A): fail-open restored AND normalization removed (the full pre-8A hole returns)",
+  [
+    {
+      file: COMM_SRC,
+      from: `    this.consentEnforcer = isOutboundConsentEnforcer(consentEnforcer)
+      ? consentEnforcer
+      : createFailClosedOutboundConsentEnforcer();`,
+      to: "    this.consentEnforcer = consentEnforcer;",
+    },
+    {
+      file: COMM_SRC,
+      from: "    // EXPLICIT, CLOSED channel mapping — never a coercion.",
+      to: "    if (!this.consentEnforcer) return null;\n\n    // EXPLICIT, CLOSED channel mapping — never a coercion.",
+    },
+  ],
+  // BOTH removed = exactly the merged pre-Phase-8A code. A null enforcer now SENDS — the provider counter
+  // proves it, which is precisely the vulnerability this phase closes.
+  () => withMutatedBuild(async (mm) => {
+    TABLE = [{ ...row() }];
+    DB_THROWS = false;
+    const p = fakeProvider();
+    const svc = new mm.Comm.CommunicationService(p.provider, fakeResolver, null, null);
+    await svc.dispatchMessage(row(), { providerTemplateName: "tpl", preResolvedDestination: DEST, templateLanguage: "en" });
+    return p.calls.send === 1;      // THE BYPASS IS BACK — a null enforcer sent a real message
+  }));
+
+srcMutation("MUT 21 (8A): OUTCOME VALIDATION is removed (the raw outcome is trusted)",
+  COMM_SRC,
+  "      outcome = normalizeOutboundConsentOutcome(",
+  "      outcome = ((x: unknown) => x as OutboundConsentOutcome)(",
+  // A BALANCED, COMPILING bypass. The identity arrow takes the authority's raw return value and CASTS it
+  // straight to the outcome type — exactly what the code did before Phase 8A. Paren count is unchanged
+  // (`ident(` → `((…) => …)(`), so the file still parses and still type-checks; the ONLY thing that changes
+  // is that the closed-union validation no longer runs.
+  //
+  // (The previous version of this mutation was NOT balanced. It produced a syntax error, tsc threw, and the
+  // old runner scored the throw as "load-bearing" — so it proved nothing about validation. The runner below
+  // now refuses to score an exception as a pass, and this mutation is provably compilable.)
+  //
+  // WHAT KILLS IT: P8A-7. With validation gone, the duck-typed `{ kind: "allow" }` — no scope, no authority,
+  // no decision — satisfies `outcome.kind === "allow"`, the gate returns null, the row is claimed and the
+  // PROVIDER IS CALLED. P8A-7 asserts `providerCalls === 0` for that malformed outcome, so it goes red.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-7.", mm)));
+
+srcMutation("MUT 22 (8A): a MALFORMED allow is accepted by the validator",
+  COORD_SRC,
+  `    case "allow": {
+      // An allow MUST carry a scope from the closed registry, and MUST NOT carry deny/failure fields.
+      if (typeof o.scope !== "string") return CONSENT_INTEGRITY_OUTCOME;`,
+  `    case "allow": {
+      // An allow MUST carry a scope from the closed registry, and MUST NOT carry deny/failure fields.
+      if (typeof o.scope !== "string") return { kind: "allow", scope: "transactional" };`,
+  // A bare `{ kind: "allow" }` is now waved through as a real authorization.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-7.", mm)));
+
+srcMutation("MUT 23 (8A): the CONSENT GATE is removed from dispatchMessage",
+  COMM_SRC,
+  "      const consentDenial = await this.enforceOutboundConsent(message);\n      if (consentDenial) return consentDenial;",
+  "      const consentDenial = null;\n      if (consentDenial) return consentDenial;",
+  // No gate at all: a suppressed destination is sent.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-3.", mm) && await checkFails("P8A-12.", mm)));
+
+srcMutation("MUT 24 (8A): the provider is invoked BEFORE the consent gate",
+  COMM_SRC,
+  "      const consentDenial = await this.enforceOutboundConsent(message);",
+  "      await this.provider.sendTemplateMessage(destination, options.providerTemplateName || \"\", {});\n      const consentDenial = await this.enforceOutboundConsent(message);",
+  // Every blocked case now makes a provider call, so the zero-call invariant dies. The structural ordering
+  // guard must ALSO see the send escape invokeProvider.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-3.", mm) && await checkFails("P8A-15.", mm)));
+
+srcMutation("MUT 25 (8A): the WEBHOOK's fail-closed enforcer is omitted again",
+  WEBHOOK_SRC,
+  `    const service = new CommunicationService(
+      provider,
+      undefined,
+      undefined,
+      createFailClosedOutboundConsentEnforcer()
+    );`,
+  "    const service = new CommunicationService(provider, undefined, undefined, undefined as never);",
+  // The webhook stops stating a consent posture — the structural guard must catch it.
+  () => checkFails("P8A-16."));
+
+srcMutation("MUT 26 (8A): the RUNTIME FACTORY binds the fail-closed placeholder instead of the real authority",
+  RUNTIME_SRC,
+  "  consentEnforcer: OutboundConsentEnforcer = createOutboundConsentEnforcer()",
+  "  consentEnforcer: OutboundConsentEnforcer = createFailClosedOutboundConsentEnforcer()",
+  // Production would then NEVER send anything — a real outage. The factory guard must catch it.
+  () => checkFails("P8A-16."));
+
+srcMutation("MUT 27 (8A): a BLOCKED case is permitted exactly one provider call",
+  COMM_SRC,
+  "    // The ONLY path to the claim and the provider: a fully validated allow.\n    if (outcome.kind === \"allow\") return null;",
+  "    if (outcome.kind === \"allow\" || outcome.kind === \"unavailable\") return null;",
+  // `unavailable` now continues to the provider — the exact fail-open shape, one variant deeper.
+  () => withMutatedBuild(async (mm) => await checkFails("P8A-3.", mm) && await checkFails("P8A-5.", mm)));
+
+// ============================================================================
 // RUNNER
 // ============================================================================
 async function runFunctional() {
@@ -1288,29 +1854,101 @@ async function runFunctional() {
 }
 async function suiteGoesRed() { for (const c of checks) { try { await c.fn(); } catch { return true; } } return false; }
 
+/**
+ * STRICT MUTATION SEMANTICS. A mutation PASSES only when the mutated code still builds and runs, and a real
+ * security property then goes red. Every other outcome is a FAILURE OF THE MUTATION, reported with its id,
+ * name, cause, message and stack:
+ *
+ *   anchor missing                → FAIL (the mutation never applied; it proved nothing)
+ *   compile / import failure      → FAIL, unless the mutation DECLARED `expectCompileFailure` AND the
+ *                                    exception really is a compile failure
+ *   any other scenario exception  → FAIL (an accident is not a proof)
+ *   scenario returns false and the real suite stays green → FAIL (the guard was not load-bearing)
+ *   a real property goes red      → PASS
+ */
 async function runMutations() {
-  let passed = 0, failed = 0;
+  let passed = 0;
+  const failures = [];
   console.log("\nRunning Phase 5F-D3-B mutation tests...\n");
+
   for (const mut of mutationChecks) {
+    const id = mutId(mut.name);
     const originals = new Map();
     for (const edit of mut.edits) { const p = resolve(edit.file); if (!originals.has(p)) originals.set(p, readFileSync(p, "utf8")); }
+
+    let verdict = null;   // { pass, cause, error }
     try {
+      // 1) APPLY. A missing anchor is a mutation failure, never a pass.
       for (const edit of mut.edits) {
         const p = resolve(edit.file);
         const cur = readFileSync(p, "utf8");
-        if (!cur.includes(edit.from)) throw new Error(`anchor not found in ${edit.file}`);
+        if (!cur.includes(edit.from)) {
+          verdict = { pass: false, cause: "anchor not found", error: new Error(`anchor not found in ${edit.file}`) };
+          break;
+        }
         writeFileSync(p, cur.replace(edit.from, edit.to));
       }
-      let violation = false;
-      try { violation = await mut.scenario(); }
-      catch { violation = true; /* the mutation broke the build/behaviour → it was load-bearing */ }
-      if (!violation) violation = await suiteGoesRed();
-      if (violation) { console.log(`PASS ${mut.name}`); passed++; }
-      else { console.log(`FAIL ${mut.name} (guard did not prove load-bearing)`); failed++; }
-    } catch (e) { console.log(`FAIL ${mut.name}`); console.error(e); failed++; }
-    finally { for (const [p, original] of originals) writeFileSync(p, original); }
+
+      // 2) RUN THE SCENARIO. An exception is NOT proof.
+      if (!verdict) {
+        let violation = false;
+        try {
+          violation = await mut.scenario();
+        } catch (e) {
+          if (mut.expectCompileFailure && isCompileFailure(e)) {
+            violation = true;                 // the DECLARED, VERIFIED intended result
+          } else {
+            verdict = {
+              pass: false,
+              cause: isCompileFailure(e)
+                ? "compile failure (not declared via expectCompileFailure) — the mutation proved nothing"
+                : "scenario threw an unrelated exception — the mutation proved nothing",
+              error: e,
+            };
+          }
+        }
+
+        // 3) A mutation that declared a compile failure must ACTUALLY have produced one.
+        if (!verdict && mut.expectCompileFailure && !violation) {
+          verdict = { pass: false, cause: "expectCompileFailure was declared but the source still compiled", error: new Error("no compile failure observed") };
+        }
+
+        // 4) Last resort: the mutation may still have broken a REAL functional check.
+        if (!verdict && !violation) violation = await suiteGoesRed();
+        if (!verdict) {
+          verdict = violation
+            ? { pass: true }
+            : { pass: false, cause: "the guard did not prove load-bearing: the mutated source still satisfied every validator", error: null };
+        }
+      }
+    } catch (e) {
+      verdict = { pass: false, cause: "the mutation could not be applied", error: e };
+    } finally {
+      for (const [p, original] of originals) writeFileSync(p, original);
+    }
+
+    if (verdict.pass) { console.log(`PASS ${mut.name}`); passed++; }
+    else {
+      console.log(`FAIL [${id}] ${mut.name}`);
+      console.log(`     cause: ${verdict.cause}`);
+      if (verdict.error) console.error(verdict.error);
+      failures.push({ id, name: mut.name, cause: verdict.cause, error: verdict.error });
+    }
   }
-  return { passed, failed };
+
+  if (failures.length) {
+    console.log(`\n──────── FAILED MUTATIONS (${failures.length}) ────────`);
+    for (const f of failures) {
+      console.log(`\n[${f.id}] ${f.name}`);
+      console.log(`  cause  : ${f.cause}`);
+      console.log(`  message: ${f.error?.message ?? "(none)"}`);
+      if (f.error?.stack) {
+        console.log("  stack:");
+        for (const line of String(f.error.stack).split("\n")) console.log(`    ${line}`);
+      }
+    }
+  }
+  return { passed, failed: failures.length };
 }
 
 const functional = await runFunctional();

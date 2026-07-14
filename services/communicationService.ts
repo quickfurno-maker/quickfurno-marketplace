@@ -64,6 +64,12 @@ import type {
   OutboundConsentOutcome,
 } from "./outboundConsentEnforcementService";
 import {
+  createFailClosedOutboundConsentEnforcer,
+  isOutboundConsentEnforcer,
+  normalizeOutboundConsentOutcome,
+  FAIL_CLOSED_CONSENT_OUTCOME,
+} from "./outboundConsentEnforcementService";
+import {
   OutboundPreparationReason,
   type ApprovedTemplateOutboundCoordinator,
 } from "../lib/communication/approvedTemplateOutbound";
@@ -340,26 +346,40 @@ export class CommunicationService {
    */
   private readonly approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null;
   /**
-   * Phase 5F-D3-B — the outbound CONSENT ENFORCEMENT coordinator. OPTIONAL on the constructor purely
-   * so the many historical harnesses that construct this service directly stay source-compatible; the
-   * PRODUCTION construction boundary (`createRuntimeCommunicationService`) ALWAYS injects the real one,
-   * and the D3-B harness proves every production send path goes through that factory.
+   * PHASE 8A — the outbound CONSENT ENFORCEMENT coordinator. NON-NULLABLE, and REQUIRED on the constructor.
+   *
+   * It was previously `| null = null`, and `enforceOutboundConsent` treated absence as "continue" — so a
+   * direct construction that omitted it sent WITHOUT ANY CONSENT EVALUATION, silently and legally. That
+   * fail-open branch is gone: this field always holds an enforcer, and if the caller supplies anything that
+   * is not one, it holds the FAIL-CLOSED enforcer, which can only ever answer `unavailable`.
    *
    * This service NEVER interprets consent. It consumes only the coordinator's CLOSED outcome and never
    * sees a disposition, a preference row or a suppression row.
    */
-  private readonly consentEnforcer: OutboundConsentEnforcer | null;
+  private readonly consentEnforcer: OutboundConsentEnforcer;
 
+  /**
+   * `consentEnforcer` is REQUIRED (Phase 8A, layer 1 — TypeScript). Every construction must state its
+   * consent posture explicitly: `new CommunicationService(provider)` no longer compiles. The earlier
+   * parameters keep their defaults, so a caller that wants them passes `undefined` positionally.
+   *
+   * Layer 2 — RUNTIME — is the normalization below. TypeScript cannot reach plain JavaScript (every harness
+   * is `.mjs`), `as any`, reflection, or a future unsafe call site, so a structurally invalid enforcer
+   * (missing / null / undefined / primitive / array / no callable `authorize`) is replaced with the
+   * fail-closed enforcer rather than trusted. Absence is never permission.
+   */
   constructor(
     provider: WhatsAppProvider = getActiveWhatsAppProvider(),
     recipientResolver: CommunicationRecipientResolver = getActiveRecipientResolver(),
     approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null = null,
-    consentEnforcer: OutboundConsentEnforcer | null = null
+    consentEnforcer: OutboundConsentEnforcer
   ) {
     this.provider = provider;
     this.recipientResolver = recipientResolver;
     this.approvedTemplateCoordinator = approvedTemplateCoordinator;
-    this.consentEnforcer = consentEnforcer;
+    this.consentEnforcer = isOutboundConsentEnforcer(consentEnforcer)
+      ? consentEnforcer
+      : createFailClosedOutboundConsentEnforcer();
   }
 
   /** True when this adapter requires an approved provider mapping (capability, not a key). */
@@ -774,16 +794,14 @@ export class CommunicationService {
    * Returns `null` when the dispatch may CONTINUE, or a terminal `Result` (already reflected in the
    * ledger) when it must STOP. In every stop case ZERO provider calls have occurred.
    *
-   * A `null` enforcer means this service was constructed directly (a legacy/isolated harness path).
-   * The PRODUCTION construction boundary is `createRuntimeCommunicationService`, which ALWAYS injects
-   * the real enforcer; the D3-B harness statically proves every production send path uses that factory
-   * and would catch a future direct construction that omits it.
+   * PHASE 8A. There is NO LONGER a "missing enforcer ⇒ continue" branch. `this.consentEnforcer` is
+   * non-nullable and was normalized in the constructor, so the ONLY way out of this method towards the
+   * provider is a FULLY VALIDATED `allow`. A missing, null, undefined, malformed or throwing authority
+   * all converge here on a terminal or retryable STOP — never on a send.
    */
   private async enforceOutboundConsent(
     message: CommunicationMessage
   ): Promise<Result<CommunicationMessage> | null> {
-    if (!this.consentEnforcer) return null;
-
     // EXPLICIT, CLOSED channel mapping — never a coercion.
     //
     // `whatsapp` → `whatsapp` and `sms` → `sms`, and NOTHING else. An `rcs` row, or any future/unknown
@@ -804,21 +822,33 @@ export class CommunicationService {
 
     let outcome: OutboundConsentOutcome;
     try {
-      outcome = await this.consentEnforcer.authorize({
-        channel: enforcementChannel,
-        messageType: message.message_type,
-        templateKey: message.template_key ?? "",
-        lane: message.lane,
-        destinationHash: message.destination_hash,
-        destinationSource: message.destination_source,
-        recipientType: message.recipient_type,
-        recipientId: message.recipient_id,
-      });
+      // VALIDATE, never trust. The authorize() return value is an object of unknown provenance — a mock, a
+      // hostile stub, a future adapter, a half-migrated implementation. `normalizeOutboundConsentOutcome`
+      // checks the COMPLETE closed union (discriminant, required fields, code membership, `retryable`, and
+      // the absence of contradictory fields) and re-mints it canonically. A duck-typed `{ kind: "allow" }`
+      // carrying no scope is NOT an authorization and becomes CONSENT_AUTHORITY_INTEGRITY.
+      //
+      // The normalization is INSIDE the try on purpose: an enforcer that resolves `undefined` used to make
+      // `outcome.kind` throw a TypeError out of this method, so it fail-closed only by accident of an outer
+      // catch. Now it is a DELIBERATE integrity failure with a real code and a real ledger entry.
+      outcome = normalizeOutboundConsentOutcome(
+        await this.consentEnforcer.authorize({
+          channel: enforcementChannel,
+          messageType: message.message_type,
+          templateKey: message.template_key ?? "",
+          lane: message.lane,
+          destinationHash: message.destination_hash,
+          destinationSource: message.destination_source,
+          recipientType: message.recipient_type,
+          recipientId: message.recipient_id,
+        })
+      );
     } catch {
       // A thrown enforcer is INFRASTRUCTURE, never a decision. Treated exactly like `unavailable`.
-      outcome = { kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true };
+      outcome = FAIL_CLOSED_CONSENT_OUTCOME;
     }
 
+    // The ONLY path to the claim and the provider: a fully validated allow.
     if (outcome.kind === "allow") return null;
 
     const code = outcome.code as CommunicationErrorCode;

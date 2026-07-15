@@ -65,21 +65,30 @@ const D2E_ORCH_SRC = "services/inboundConsentCommandService.ts";
 const D2E_INPUT_SRC = "lib/communication/inboundConsentCommandInput.ts";
 
 /**
- * The 5F-B harness.
+ * The 5F-B harness — PINNED TO A FIXED AUTHORITY BASELINE (Phase 8B-0).
  *
- * PHASE 8B-0 — BASELINE TRANSFER, NOT A REMOVAL OF PROTECTION. During Phase 5F-D3-B this file was FROZEN to
- * a single approved compatibility line (its fake query builder's `.in()` method). Phase 8B-0 — reviewed and
- * passed — legitimately re-baselined it: Phase 8A made the outbound consent enforcer a REQUIRED, fail-closed
- * constructor argument, so 5F-B's ~10 Meta send-chain constructions had to state a test consent posture (a
- * test-only allow enforcer derived from the REAL closed scope registry). That is a multi-line change that
- * also legitimately reworded assertions, so the frozen one-line bound is RETIRED here and its protection is
- * TRANSFERRED to the same NO-TEST-WEAKENING guarantee the legacy SMS harnesses carry: 5F-B's `check(` and
- * `assert(` counts may only GROW versus the committed baseline (HEAD), never shrink. 5F-B is now an actively-
- * maintained Phase 8B harness; its own 60/60 functional + 63/63 mutation suite is its primary protection.
+ * During Phase 5F-D3-B this file was frozen to a single approved `.in()` line. Phase 8B-0 — reviewed and
+ * passed — legitimately re-baselined it (Phase 8A made the consent enforcer a REQUIRED, fail-closed
+ * constructor argument, so 5F-B's Meta send-chain constructions had to state a test consent posture).
  *
- * Phase 8B-0 5F-B implementation baseline commit: b6c288b232dc0ee0c19fa4f5d92a654ef0bc807c
+ * The AUTHORITY BOUNDARY is now a BYTE-FREEZE against a fixed commit, NOT a count heuristic. The on-disk
+ * 5F-B must be byte-identical to the blob committed at `PHASE_8B0_HARNESS_HEAD`. That runs even on a clean
+ * tree, so BOTH a dirty edit AND a later committed edit fail D3-B until an EXPLICIT authority transfer
+ * re-pins `PHASE_8B0_HARNESS_HEAD`. The check/assert count logic survives only as SUPPLEMENTAL defence in
+ * depth — it can never be the boundary, because an equal-count edit (swap one real assertion for a harmless
+ * one) still changes the bytes and still fails.
+ *
+ * The pinned range is CLOSED at both ends and never references the moving HEAD, so later phases cannot
+ * expand or reopen it.
  */
 const PHASE5FB_SRC = "scripts/phase5f-b-whatsapp-cloud-api-harness.mjs";
+
+/** The FIXED Phase 8B-0 authority range for the 5F-B harness. Both endpoints are immutable SHAs. */
+const PHASE_8B0_AUTHORITY_BASE = "832bacc29b3955f19ad80d09af06f317fa5b9f98";
+const PHASE_8B0_HARNESS_HEAD = "b6c288b232dc0ee0c19fa4f5d92a654ef0bc807c";
+/** The committed 5F-B baseline's EXECUTABLE-registration counts (supplemental; a re-pin updates them too). */
+const PHASE5FB_EXPECTED_CHECKS = 60;
+const PHASE5FB_EXPECTED_MUTATIONS = 63;
 
 /**
  * The two legacy SMS-fallback harnesses. FOUNDER-APPROVED to receive an INJECTED TEST CONSENT ENFORCER,
@@ -112,7 +121,9 @@ const D3B_EXPECTED_FILES = [
   "lib/communication/outboundConsentScope.ts",
   "package.json",
   HARNESS_SRC,
-  PHASE5FB_SRC,
+  // NOTE: PHASE5FB_SRC is DELIBERATELY NOT here. 5F-B is not a generally-allowed dirty file; it is pinned
+  // by the Phase 8B-0 BYTE-FREEZE (see provePhase8B0MetaHarnessAuthority), which fails any on-disk change
+  // with a clear authority-transfer error before the dirty-scope loop is ever reached.
   ...LEGACY_SMS_HARNESSES,
   "services/clientLoginOtpDeliveryOrchestrator.ts",
   "services/communicationService.ts",
@@ -944,7 +955,110 @@ check("B3. the ONLY direct provider call outside CommunicationService is the D3-
   has(/smsConsent = await authorize\(\{/, readF(ORCH_SRC), "…and it is now gated by D3-B");
 });
 
+// ============================================================================
+// PHASE 8B-0 — FIXED-BASELINE AUTHORITY FREEZE for the 5F-B Meta harness
+// ============================================================================
+/** Forbidden path categories that may never appear in the fixed Phase 8B-0 range. Defence in depth. */
+const PHASE_8B0_FORBIDDEN = [
+  [/^supabase\/migrations\//, "a migration"],
+  [/^app\/api\/.*route\.ts$|^pages\/api\//, "an API route"],
+  [/\.env/, "an environment file"],
+  [/^lib\/communication\/providers\//, "a provider adapter"],
+  [/package-lock\.json|yarn\.lock|pnpm-lock\.yaml/, "a lockfile"],
+  [/^package\.json$/, "package.json"],
+  [/^(Dockerfile|docker-compose|\.github\/|vercel\.json|ecosystem\.config)/, "a deployment file"],
+];
+
+/** The files changed in the FIXED Phase 8B-0 range. Never reads HEAD, so later commits cannot enter it. */
+function phase8b0RangeFiles() {
+  return [...new Set(
+    execFileSync("git", ["diff", "--name-only", `${PHASE_8B0_AUTHORITY_BASE}..${PHASE_8B0_HARNESS_HEAD}`], { encoding: "utf8" })
+      .split("\n").map((s) => s.trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"))
+  )];
+}
+
+/** MEMBERSHIP FIRST (exactly the one 5F-B file), forbidden categories SECOND. Plus modelled self-proofs. */
+function validatePhase8B0Range() {
+  const files = phase8b0RangeFiles();
+  assert(files.length === 1, `the fixed Phase 8B-0 range must contain EXACTLY 1 file (got ${files.length}: ${files.join(", ")})`);
+  assert(files[0] === PHASE5FB_SRC, `the only Phase 8B-0 range file must be the 5F-B harness (got ${files[0]})`);
+  for (const [re, what] of PHASE_8B0_FORBIDDEN) assert(!re.test(files[0]), `${what} may never be in the Phase 8B-0 range (${files[0]})`);
+  // Status must be an ORDINARY MODIFICATION — never add/delete/rename.
+  const status = execFileSync("git", ["diff", "--name-status", `${PHASE_8B0_AUTHORITY_BASE}..${PHASE_8B0_HARNESS_HEAD}`], { encoding: "utf8" }).trim();
+  assert(/^M\s/.test(status), `the 5F-B range change must be an ordinary modification (got: ${status})`);
+
+  // ── MODELLED SELF-PROOF: the membership+category logic rejects every prohibited shape. ──────────────
+  const evaluate = (fs) => {
+    const u = [...new Set(fs)];
+    if (u.length !== 1) return "reject";                         // zero files, or an extra file
+    if (u[0] !== PHASE5FB_SRC) return "reject";                  // the wrong file
+    for (const [re] of PHASE_8B0_FORBIDDEN) if (re.test(u[0])) return "reject";
+    return "accept";
+  };
+  assert(evaluate([PHASE5FB_SRC]) === "accept", "the one-file range is accepted");
+  assert(evaluate([]) === "reject", "ZERO files is rejected");
+  assert(evaluate([PHASE5FB_SRC, "services/whatsappDashboardService.ts"]) === "reject", "an ADDITIONAL file is rejected");
+  assert(evaluate(["scripts/phase5f-c3b-client-otp-fallback-harness.mjs"]) === "reject", "the WRONG file is rejected");
+  assert(evaluate(["supabase/migrations/20260801000001_x.sql"]) === "reject", "a MIGRATION is rejected");
+  assert(evaluate(["app/api/webhooks/whatsapp/meta/route.ts"]) === "reject", "a ROUTE is rejected");
+  assert(evaluate(["lib/communication/providers/metaCloudWhatsAppProvider.ts"]) === "reject", "a PROVIDER ADAPTER is rejected");
+  assert(evaluate(["package.json"]) === "reject", "package.json is rejected");
+}
+
+/**
+ * PHASE 8B-0 — the 5F-B AUTHORITY FREEZE. Ancestry + fixed one-file range + BYTE-FREEZE (the boundary) +
+ * supplemental semantic evidence. Runs UNCONDITIONALLY inside B4, before the dirty-scope loop, so a dirty
+ * OR a later-committed 5F-B change fails here with a clear authority-transfer error.
+ */
+function provePhase8B0MetaHarnessAuthority() {
+  // 1) ANCESTRY — fail closed. Both endpoints exist; base → harness head → HEAD.
+  for (const [sha, what] of [[PHASE_8B0_AUTHORITY_BASE, "Phase 8B-0 authority base"], [PHASE_8B0_HARNESS_HEAD, "Phase 8B-0 harness head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B0_AUTHORITY_BASE, PHASE_8B0_HARNESS_HEAD]);  // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B0_HARNESS_HEAD, "HEAD"]);                    // throws if not
+
+  // 2) THE FIXED ONE-FILE RANGE (never HEAD).
+  validatePhase8B0Range();
+
+  // 3) THE BYTE-FREEZE — THE AUTHORITY BOUNDARY. On-disk 5F-B must equal the blob pinned at the harness head.
+  //    Runs whether the tree is clean or dirty. An equal-count edit still changes the blob and still fails.
+  const pinnedBlob = execFileSync("git", ["rev-parse", `${PHASE_8B0_HARNESS_HEAD}:${PHASE5FB_SRC}`], { encoding: "utf8" }).trim();
+  const onDiskBlob = execFileSync("git", ["hash-object", PHASE5FB_SRC], { encoding: "utf8" }).trim();
+  assert(/^[0-9a-f]{40}$/.test(pinnedBlob), "the pinned 5F-B blob must resolve from the harness head");
+  assert(onDiskBlob === pinnedBlob,
+    `5F-B is not byte-identical to its pinned Phase 8B-0 authority baseline (commit ${PHASE_8B0_HARNESS_HEAD.slice(0, 12)}). ` +
+    `A 5F-B change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER that re-pins PHASE_8B0_HARNESS_HEAD ` +
+    `(on-disk ${onDiskBlob.slice(0, 12)} != pinned ${pinnedBlob.slice(0, 12)}).`);
+
+  // 4) SUPPLEMENTAL SEMANTIC EVIDENCE (defence in depth, NOT the boundary). Counts EXECUTABLE registrations,
+  //    line-anchored, so a commented-out or string-literal `check(`/`Mutation(` cannot satisfy it. These hold
+  //    by construction once the byte-freeze passes; they re-verify a FUTURE re-pinned baseline's security shape.
+  const src = readF(PHASE5FB_SRC);
+  const reg = (re) => (src.match(re) || []).length;
+  assert(reg(/^\s*check\("/gm) === PHASE5FB_EXPECTED_CHECKS,
+    `5F-B must register exactly ${PHASE5FB_EXPECTED_CHECKS} executable functional checks (got ${reg(/^\s*check\("/gm)})`);
+  assert(reg(/^\s*(sql|ts|src)Mutation\(/gm) === PHASE5FB_EXPECTED_MUTATIONS,
+    `5F-B must register exactly ${PHASE5FB_EXPECTED_MUTATIONS} executable mutations (got ${reg(/^\s*(sql|ts|src)Mutation\(/gm)})`);
+  has(/function allowAllMetaHarnessConsentEnforcer\(/, src, "the test-only consent-enforcer helper is present");
+  has(/kind: "invalid", code: "CONSENT_ENFORCEMENT_INVALID"/, src, "a FAILED scope resolution BLOCKS — it never returns allow");
+  has(/allowAllMetaHarnessConsentEnforcer\((?:build|M|mm)\)/, src, "Meta send-chain constructions state a consent posture explicitly");
+
+  // 5) STRUCTURAL SELF-PROOF: the range is built from the two FIXED endpoints and never a moving HEAD.
+  const selfSrc = readF(HARNESS_SRC);
+  assert(selfSrc.includes("`${PHASE_8B0_AUTHORITY_BASE}..${PHASE_8B0_HARNESS_HEAD}`"),
+    "the Phase 8B-0 range is built from the two FIXED endpoint constants");
+  assert(!/PHASE_8B0_(AUTHORITY_BASE|HARNESS_HEAD)\}\.\.\$\{?HEAD\b/.test(selfSrc),
+    "the Phase 8B-0 range never uses a moving HEAD endpoint");
+}
+
 check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/provider file is touched", () => {
+  // PHASE 8B-0 — the 5F-B AUTHORITY FREEZE runs FIRST and UNCONDITIONALLY, before the dirty-scope loop, so a
+  // dirty OR later-committed 5F-B change fails with a clear authority-transfer error rather than the generic
+  // "no existing harness may change".
+  provePhase8B0MetaHarnessAuthority();
+
   const dirty = gitDirty();
   for (const f of [D2C_SRC, D2D_WRITER_SRC, D2D_COMMAND_SRC, POLICY_SRC, D2E_ORCH_SRC, D2E_INPUT_SRC]) {
     assert(!dirty.includes(f), `a frozen consent authority must not change: ${f}`);
@@ -960,8 +1074,11 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
     // constructions must now state their consent posture explicitly because the enforcer became required.
     // 5B's own assertions are unchanged and its count is unchanged; only the constructions gained a 4th
     // argument. Every other historical harness stays frozen.
+    // NB: PHASE5FB_SRC is intentionally NOT an exception here — it is pinned by the Phase 8B-0 byte-freeze
+    // (proven earlier in this check), so a dirty 5F-B has already failed with a clear authority-transfer
+    // error before reaching this loop. It must never be a generally-allowed arbitrary dirty harness.
     assert(
-      !/^scripts\/phase5(b|c|d|e|f-(a|b|c|d1|d2))/.test(p) || p === HARNESS_SRC || p === PHASE5FB_SRC || p === PHASE5B_SRC || PHASE_8A_UPDATED_HARNESSES.includes(p) || LEGACY_SMS_HARNESSES.includes(p),
+      !/^scripts\/phase5(b|c|d|e|f-(a|b|c|d1|d2))/.test(p) || p === HARNESS_SRC || p === PHASE5B_SRC || PHASE_8A_UPDATED_HARNESSES.includes(p) || LEGACY_SMS_HARNESSES.includes(p),
       `no existing harness may change (${p})`
     );
   }
@@ -996,19 +1113,10 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
     has(/kind: "allow"/, added, `${h}: the allow lives in the HARNESS dependency object, not in production`);
   }
 
-  // PHASE 8B-0 — 5F-B is now an actively-maintained harness, bounded by the SAME no-test-weakening guarantee
-  // the legacy SMS harnesses carry (see the BASELINE-TRANSFER note at PHASE5FB_SRC). The frozen one-line
-  // `.in()` restriction is retired; a 5F-B edit may reword or add checks/assertions but its `check(` and
-  // `assert(` counts may only GROW versus the committed baseline — a test can never be silently deleted.
-  if (dirty.includes(PHASE5FB_SRC)) {
-    const before = execFileSync("git", ["show", `HEAD:${PHASE5FB_SRC}`], { encoding: "utf8" });
-    const after = readF(PHASE5FB_SRC);
-    const count = (s, re) => (s.match(re) || []).length;
-    assert(count(after, /\bcheck\(/g) >= count(before, /\bcheck\(/g),
-      `5F-B: the number of checks must not shrink (${count(before, /\bcheck\(/g)} → ${count(after, /\bcheck\(/g)})`);
-    assert(count(after, /\bassert\(/g) >= count(before, /\bassert\(/g),
-      `5F-B: the number of assertions must not shrink (${count(before, /\bassert\(/g)} → ${count(after, /\bassert\(/g)})`);
-  }
+  // PHASE 8B-0 — 5F-B is not validated HERE. Its authority boundary is the BYTE-FREEZE run at the top of this
+  // check (provePhase8B0MetaHarnessAuthority), which pins it to a fixed commit and fails any dirty or later
+  // committed change. The old count-only bound has been retired as the boundary and folded into that helper
+  // as supplemental defence in depth.
 });
 
 check("B5. no provider activation, no n8n, no RCS send, no migration, no durable consent storage", () => {

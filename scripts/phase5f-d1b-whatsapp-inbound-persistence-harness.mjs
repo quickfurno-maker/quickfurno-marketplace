@@ -534,34 +534,39 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   const dirty = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).split("\n").map((l) => l.slice(3).trim()).filter(Boolean);
   assert(!dirty.includes(WEBHOOK_ROUTE_SRC), "24. the webhook route is unchanged");
 
-  // ── PHASE 8A — the whole-file byte-identity guard on CommunicationService is REPLACED, not deleted ───
+  // ── PHASE 8A history (PRESERVED) → PHASE 8B-1A service AUTHORITY TRANSFER ────────────────────────────
   //
-  // `CommunicationService is unchanged` can no longer hold: Phase 8A makes the consent enforcer a REQUIRED
-  // constructor argument and deletes the fail-open "missing enforcer ⇒ continue" branch. That file's
-  // authority now belongs to the D3-B harness, which proves the fail-closed properties in full.
+  // HISTORY (kept as the pre-8B-1A record, not the active baseline): Phase 8A made the consent enforcer a
+  // REQUIRED constructor argument; the previous guard proved the webhook service, minus ONLY that authorized
+  // Phase 8A delta, was byte-identical to the Phase 7 authority form (b0d40819). D1-B's concern was — and
+  // remains — that INBOUND PERSISTENCE is unaffected and NO send path is reachable from the webhook.
   //
-  // D1-B's actual concern was never the whole file — it was that INBOUND PERSISTENCE is unaffected and that
-  // no send path can be reached from the webhook. So the guard becomes SEMANTIC and NARROW:
-  //   (a) the file may change ONLY in ways that keep the webhook's contract with it intact;
-  //   (b) the webhook itself, with ONLY the authorized Phase 8A delta reversed, must be BYTE-IDENTICAL to
-  //       the Phase 7 authority form — so nothing else was smuggled into the webhook alongside it.
-  const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36";
-  const norm = (s) => s.replace(/\r\n/g, "\n");
-  const authorityWebhook = norm(execFileSync("git", ["show", `${PHASE_8A_AUTHORITY_BASE}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }));
+  // Phase 8B-1A legitimately RESTRUCTURES the service (production byte entry + gated string wrapper +
+  // NON-exported downstream stage + callback-identity gate). That reverse-the-8A-delta byte-identity therefore
+  // no longer holds and is REPLACED — not deleted — by a fixed Phase 8B-1A service BYTE-FREEZE against Commit 1,
+  // plus the extended semantic proofs below. The Phase 7/8A authority commit is kept here as history.
+  const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36"; // pre-8B-1A history (recorded, not the active baseline)
+  const PHASE_8B1A_AUTHORITY_BASE = "95c5e969ce585fd435019fdb17265ece6fdb9c1d";
+  const PHASE_8B1A_IMPLEMENTATION_HEAD = "fe10c2c70691809952f53c7244b8d3b5cb1a150d";
+  const PHASE_8B1A_SERVICE_BLOB = "454bb9195e68e481c190f8aa12ef1c19a09b8936";
 
-  // Reverse EXACTLY the two authorized edits — the import, and the constructor argument — and nothing else.
-  let reverted = norm(readF(WEBHOOK_SVC_SRC));
-  reverted = reverted.replace(
-    'import { createFailClosedOutboundConsentEnforcer } from "./outboundConsentEnforcementService";\n',
-    ""
-  );
-  reverted = reverted.replace(
-    /\s*\/\/ PHASE 8A —[\s\S]*?const service = new CommunicationService\(\s*provider,\s*undefined,\s*undefined,\s*createFailClosedOutboundConsentEnforcer\(\)\s*\);/,
-    "\n    const service = new CommunicationService(provider);"
-  );
-  assert(reverted === authorityWebhook,
-    "the webhook, minus ONLY the authorized Phase 8A import + constructor delta, is BYTE-IDENTICAL to the " +
-    "Phase 7 authority form — no other change was smuggled in alongside it");
+  // The Phase 7/8A history commit still exists; the Phase 8B-1A commits exist; base → implementation head →
+  // HEAD ancestry (FIXED endpoints, never a moving HEAD).
+  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]) {
+    assert(execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim() === "commit", `the commit ${sha.slice(0, 12)} must exist`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, "HEAD"]);                   // throws if not
+
+  // THE ACTIVE SERVICE BYTE-FREEZE — Commit 1 resolves the service to its reviewed blob, and the on-disk service
+  // is byte-identical to it. A future dirty OR committed service edit fails until another EXPLICIT authority
+  // transfer. (This replaces the obsolete reverse-8A-delta byte-identity assertion.)
+  const commit1ServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1A_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(commit1ServiceBlob === PHASE_8B1A_SERVICE_BLOB, `Commit 1 must resolve the webhook service to its reviewed blob (got ${commit1ServiceBlob.slice(0, 12)})`);
+  const onDiskServiceBlob = execFileSync("git", ["hash-object", WEBHOOK_SVC_SRC], { encoding: "utf8" }).trim();
+  assert(onDiskServiceBlob === PHASE_8B1A_SERVICE_BLOB,
+    `the webhook service is not byte-identical to its Phase 8B-1A Commit 1 baseline (commit ${PHASE_8B1A_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${PHASE_8B1A_SERVICE_BLOB.slice(0, 12)}).`);
 
   // The webhook's use of CommunicationService is still exactly one operation, and still no send.
   const hook = readCode(WEBHOOK_SVC_SRC);
@@ -573,6 +578,39 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // No consent DECISION is made during webhook persistence — only a fail-closed enforcer is BOUND.
   assert(!/decideCommunicationConsent|createOutboundConsentEnforcer\b/.test(hook),
     "the webhook makes NO consent decision and never binds the real consent authority");
+
+  // ── PHASE 8B-1A — the webhook's identity-gated shape, proven from the (comment-stripped) service source ──
+  // The production byte entry is EXPORTED; the historical public symbol is a UTF-8 STRING WRAPPER delegating
+  // DIRECTLY to it, with NO independent (weaker) verification/parse/identity/downstream path.
+  assert(/export async function handleMetaWhatsAppWebhookPostBytes\(input:/.test(hook), "handleMetaWhatsAppWebhookPostBytes is exported (the production byte entry)");
+  const wrapper = (hook.match(/export function handleMetaWhatsAppWebhookPost\(input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
+  assert(wrapper, "the historical public handleMetaWhatsAppWebhookPost wrapper is present");
+  assert(/new TextEncoder\(\)\.encode\(input\.rawBody\)/.test(wrapper) && /handleMetaWhatsAppWebhookPostBytes\(\{/.test(wrapper), "the historical wrapper encodes UTF-8 bytes and delegates to the byte entry");
+  assert(!/verifyMetaWebhookSignature|safeParse|decideCallbackIdentity|isWebhookProcessingEnabled|processVerifiedExpectedMetaWebhook/.test(wrapper), "the historical wrapper has NO independent verification/parse/identity/downstream path");
+  // The downstream lifecycle stage is NON-exported (route-unreachable), with exactly one internal call site.
+  assert(/(^|\n)\s*async function processVerifiedExpectedMetaWebhook\(/.test(hook) && !/export\s+(async\s+)?function\s+processVerifiedExpectedMetaWebhook/.test(hook), "processVerifiedExpectedMetaWebhook is NON-exported");
+  assert((hook.match(/processVerifiedExpectedMetaWebhook\(/g) || []).length === 2, "processVerifiedExpectedMetaWebhook has exactly its definition + ONE internal call site (no bypass caller)");
+  // ORDER within the byte entry: strict byte-signature verification precedes UTF-8 decode; decode + parse
+  // precede identity; identity config + decision precede the downstream call; and a rejected / unsupported
+  // identity RETURNS before the downstream (before inbound persistence).
+  const be = (hook.match(/export async function handleMetaWhatsAppWebhookPostBytes\(input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
+  const at = (s) => { const i = be.indexOf(s); assert(i >= 0, `byte-entry anchor missing: ${s}`); return i; };
+  const iVerify = at("verifyMetaWebhookSignatureBytes(input.rawBytes");
+  const iDecode = at("META_UTF8_DECODER.decode(input.rawBytes)");
+  const iParse = at("safeParse(decoded)");
+  const iIdCfg = at("resolveWebhookIdentityConfig()");
+  const iDecide = at("decideCallbackIdentity(payload");
+  const iReject = at("rejected_foreign_identity");
+  const iUnsupported = at("acknowledged_unsupported_identity_shape");
+  const iDownstream = at("processVerifiedExpectedMetaWebhook({");
+  assert(iVerify < iDecode, "strict byte signature verification precedes UTF-8 decode");
+  assert(iDecode < iParse && iParse < iIdCfg, "decode + parse precede identity configuration");
+  assert(iIdCfg < iDecide && iDecide < iDownstream, "identity config + decision precede the downstream call (before the runtime DB gate)");
+  assert(iReject < iDownstream && iUnsupported < iDownstream, "rejected / unsupported identity returns BEFORE the downstream (before inbound persistence)");
+  // The runtime DB gate + inbound persistence live in the NON-exported downstream — reached ONLY after the
+  // identity gate. Neither appears in the byte entry, so there is no direct production identity bypass.
+  assert(!be.includes("isWebhookProcessingEnabled") && !be.includes("handleInboundWhatsAppMessages"), "the runtime DB gate + handleInboundWhatsAppMessages are NOT in the byte entry — reached only via the downstream, after authorized identity");
+  assert(/isWebhookProcessingEnabled\(/.test(hook) && /handleInboundWhatsAppMessages\(/.test(hook), "the runtime DB gate + handleInboundWhatsAppMessages exist in the downstream stage");
   // The pure normalizer is unchanged (reused). The identity RESOLVER is modified by this D1-B
   // reliability correction (operational IDENTITY_LOOKUP_FAILED ≠ durable UNKNOWN), so it is expected
   // in the delta and not asserted byte-unchanged here.

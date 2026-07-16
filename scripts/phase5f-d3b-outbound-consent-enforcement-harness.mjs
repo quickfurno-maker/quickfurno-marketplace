@@ -135,6 +135,38 @@ const D3B_EXPECTED_FILES = [
   ...PHASE_8A_UPDATED_HARNESSES,
 ];
 
+// ── PHASE 8B-1A AUTHORITY TRANSFER ──────────────────────────────────────────────────────────────────
+// Phase 8B-1A binds Meta callbacks to expected identity. It legitimately re-writes the 5F-B harness and the
+// D4-B harness (and the webhook service, whose freeze the D1-B harness owns). Their ACTIVE on-disk byte-freeze
+// TRANSFERS from the Phase 8B-0 head to the FIXED Phase 8B-1A implementation head (Commit 1). The Phase 8B-0
+// layer keeps proving its immutable history and NEVER moves.
+const PHASE_8B0_5FB_HISTORICAL_BLOB = "1338002f9a30dd6205fcbc78ef59213407f1d8e5";
+const PHASE_8B1A_AUTHORITY_BASE = "95c5e969ce585fd435019fdb17265ece6fdb9c1d";
+const PHASE_8B1A_IMPLEMENTATION_HEAD = "fe10c2c70691809952f53c7244b8d3b5cb1a150d";
+const PHASE5FD4B_SRC = "scripts/phase5f-d4b-consent-command-response-harness.mjs";
+const PHASE8B1A_HARNESS_SRC = "scripts/phase8b1-meta-callback-identity-harness.mjs";
+const PHASE8B1A_HARNESS_CHECKS = 16;
+const PHASE8B1A_HARNESS_MUTATIONS = 16;
+const PHASE_8B1A_APPROVED_ROUTE = "app/api/webhooks/whatsapp/meta/route.ts";
+/** The EXACT ten files the fixed Phase 8B-1A range (base..head) may contain — nothing more, nothing less. */
+const PHASE_8B1A_EXPECTED_FILES = [
+  PHASE_8B1A_APPROVED_ROUTE,
+  "docs/QF-Meta-Callback-Identity-Phase-8B-1A.md",
+  "lib/communication/providers/metaCallbackIdentity.ts",
+  "lib/communication/providers/metaCloudWhatsAppConfig.ts",
+  "lib/communication/providers/metaWebhookRawBody.ts",
+  "lib/communication/providers/metaWhatsAppWebhook.ts",
+  PHASE5FB_SRC,
+  PHASE5FD4B_SRC,
+  PHASE8B1A_HARNESS_SRC,
+  WEBHOOK_SRC,
+];
+/** The Commit-1 blobs the ACTIVE on-disk byte-freeze pins (5F-B + D4-B are D3-B's; the service is D1-B's). */
+const PHASE_8B1A_FROZEN_BLOBS = [
+  [PHASE5FB_SRC, "0af67dd47d380f9c09698fbc4f8fc983974c125c"],
+  [PHASE5FD4B_SRC, "5cf652122fa0c12f5137c8d9b157b4156ce56abd"],
+];
+
 function compileTo(outDir) {
   rmSync(outDir, { recursive: true, force: true });
   const tsconfigPath = resolve(`${outDir}.tsconfig.json`);
@@ -1022,15 +1054,13 @@ function provePhase8B0MetaHarnessAuthority() {
   // 2) THE FIXED ONE-FILE RANGE (never HEAD).
   validatePhase8B0Range();
 
-  // 3) THE BYTE-FREEZE — THE AUTHORITY BOUNDARY. On-disk 5F-B must equal the blob pinned at the harness head.
-  //    Runs whether the tree is clean or dirty. An equal-count edit still changes the blob and still fails.
-  const pinnedBlob = execFileSync("git", ["rev-parse", `${PHASE_8B0_HARNESS_HEAD}:${PHASE5FB_SRC}`], { encoding: "utf8" }).trim();
-  const onDiskBlob = execFileSync("git", ["hash-object", PHASE5FB_SRC], { encoding: "utf8" }).trim();
-  assert(/^[0-9a-f]{40}$/.test(pinnedBlob), "the pinned 5F-B blob must resolve from the harness head");
-  assert(onDiskBlob === pinnedBlob,
-    `5F-B is not byte-identical to its pinned Phase 8B-0 authority baseline (commit ${PHASE_8B0_HARNESS_HEAD.slice(0, 12)}). ` +
-    `A 5F-B change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER that re-pins PHASE_8B0_HARNESS_HEAD ` +
-    `(on-disk ${onDiskBlob.slice(0, 12)} != pinned ${pinnedBlob.slice(0, 12)}).`);
+  // 3) THE PHASE 8B-0 HISTORICAL BLOB — an immutable git fact. The 5F-B harness as committed at the 8B-0 head
+  //    is permanently unchanged. The ACTIVE on-disk byte-freeze has been TRANSFERRED (Phase 8B-1A) to
+  //    provePhase8B1AMetaAuthority, which now pins on-disk 5F-B against Commit 1. Phase 8B-0 history never moves.
+  const historicalBlob = execFileSync("git", ["rev-parse", `${PHASE_8B0_HARNESS_HEAD}:${PHASE5FB_SRC}`], { encoding: "utf8" }).trim();
+  assert(/^[0-9a-f]{40}$/.test(historicalBlob), "the historical 5F-B blob must resolve from the 8B-0 harness head");
+  assert(historicalBlob === PHASE_8B0_5FB_HISTORICAL_BLOB,
+    `the Phase 8B-0 historical 5F-B blob must be permanently unchanged (got ${historicalBlob.slice(0, 12)}, expected ${PHASE_8B0_5FB_HISTORICAL_BLOB.slice(0, 12)}).`);
 
   // 4) SUPPLEMENTAL SEMANTIC EVIDENCE (defence in depth, NOT the boundary). Counts EXECUTABLE registrations,
   //    line-anchored, so a commented-out or string-literal `check(`/`Mutation(` cannot satisfy it. These hold
@@ -1053,11 +1083,123 @@ function provePhase8B0MetaHarnessAuthority() {
     "the Phase 8B-0 range never uses a moving HEAD endpoint");
 }
 
+/**
+ * PHASE 8B-1A — the ACTIVE authority freeze. The Phase 8B-1A implementation range is FIXED
+ * (95c5e96..fe10c2c) and contains EXACTLY the ten approved files; the on-disk 5F-B and D4-B harnesses are
+ * byte-frozen against Commit 1; the dedicated Phase 8B-1A harness proves its executable security shape. Both
+ * endpoints are immutable SHAs — never a moving HEAD — so future commits cannot expand the range.
+ */
+function provePhase8B1AMetaAuthority() {
+  // 1) BOTH commits exist; ancestry base → implementation head → HEAD (fixed endpoints, never moving HEAD).
+  for (const [sha, what] of [[PHASE_8B1A_AUTHORITY_BASE, "Phase 8B-1A authority base"], [PHASE_8B1A_IMPLEMENTATION_HEAD, "Phase 8B-1A implementation head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]);  // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, "HEAD"]);                    // throws if not
+
+  // 2) THE FIXED TEN-FILE RANGE — name-status so a deletion / rename / copy / type-change cannot masquerade as
+  //    valid membership. Exactly four Additions + six Modifications, exactly the approved set.
+  const nameStatus = execFileSync("git", ["diff", "--name-status", "-M", "-C", `${PHASE_8B1A_AUTHORITY_BASE}..${PHASE_8B1A_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
+    .split("\n").map((l) => l.trim()).filter(Boolean);
+  const added = [], modified = [], rangeFiles = [];
+  for (const line of nameStatus) {
+    const parts = line.split(/\t+|\s{2,}|\s+/);
+    const status = parts[0];
+    const path = (parts[1] || "").replace(/\\/g, "/");
+    assert(/^[AM]$/.test(status), `the Phase 8B-1A range allows ONLY A/M status — no deletion, rename, copy or type change (got '${line}')`);
+    if (status === "A") added.push(path);
+    else modified.push(path);
+    rangeFiles.push(path);
+  }
+  const approved = new Set(PHASE_8B1A_EXPECTED_FILES);
+  assert(rangeFiles.length === approved.size, `the fixed Phase 8B-1A range must contain EXACTLY ${approved.size} files (got ${rangeFiles.length}: ${rangeFiles.join(", ")})`);
+  for (const f of PHASE_8B1A_EXPECTED_FILES) assert(rangeFiles.includes(f), `an approved Phase 8B-1A file is missing from the range: ${f}`);
+  for (const f of rangeFiles) assert(approved.has(f), `an unexpected file is in the Phase 8B-1A range: ${f}`);
+  assert(added.length === 4 && modified.length === 6, `the Phase 8B-1A range must be EXACTLY 4 additions + 6 modifications (got ${added.length}A / ${modified.length}M)`);
+
+  // 3) FORBIDDEN CATEGORIES (defence in depth) + MODELLED SELF-PROOF. The approved Meta webhook route and the
+  //    four approved provider files are accepted; every other route/provider, and any migration / package /
+  //    lockfile / env / deployment file, is rejected.
+  const forbidden = (p) =>
+    /^supabase\/migrations\//.test(p) ||
+    /(^|\/)\.env(\.|$)/.test(p) ||
+    /package-lock\.json|yarn\.lock|pnpm-lock\.yaml/.test(p) ||
+    /^package\.json$/.test(p) ||
+    /^(Dockerfile|docker-compose|\.github\/|vercel\.json|ecosystem\.config)/.test(p) ||
+    ((/^app\/api\/.*route\.ts$|^pages\/api\//.test(p)) && p !== PHASE_8B1A_APPROVED_ROUTE);
+  for (const f of rangeFiles) assert(!forbidden(f), `a forbidden path is in the Phase 8B-1A range: ${f}`);
+  const evaluate = (fs) => {
+    const u = [...new Set(fs)];
+    if (u.length !== approved.size) return "reject";
+    for (const f of u) { if (!approved.has(f)) return "reject"; if (forbidden(f)) return "reject"; }
+    return "accept";
+  };
+  const nine = PHASE_8B1A_EXPECTED_FILES.slice(0, 9);
+  assert(evaluate(PHASE_8B1A_EXPECTED_FILES) === "accept", "the exact ten-file range is accepted");
+  assert(evaluate(nine) === "reject", "a MISSING approved file is rejected");
+  assert(evaluate([...PHASE_8B1A_EXPECTED_FILES, "services/whatsappDashboardService.ts"]) === "reject", "an ADDITIONAL file is rejected");
+  assert(evaluate([...nine, "supabase/migrations/20260901000001_x.sql"]) === "reject", "a MIGRATION is rejected");
+  assert(evaluate([...nine, "package.json"]) === "reject", "package.json is rejected");
+  assert(evaluate([...nine, "package-lock.json"]) === "reject", "a lockfile is rejected");
+  assert(evaluate([...nine, ".env.local"]) === "reject", "an environment file is rejected");
+  assert(evaluate([...nine, "vercel.json"]) === "reject", "a deployment file is rejected");
+  assert(evaluate([...nine, "app/api/other/route.ts"]) === "reject", "an API route other than the approved Meta webhook route is rejected");
+  assert(evaluate([...nine, "lib/communication/providers/metaCloudWhatsAppProvider.ts"]) === "reject", "an unrelated provider file is rejected");
+  assert(evaluate([...nine, "scripts/phase5f-d2e-inbound-consent-integration-harness.mjs"]) === "reject", "an unrelated harness is rejected");
+  assert(approved.has(PHASE_8B1A_APPROVED_ROUTE) && !forbidden(PHASE_8B1A_APPROVED_ROUTE), "the approved Meta webhook route is accepted (not treated as a forbidden route)");
+  assert(approved.has("lib/communication/providers/metaCallbackIdentity.ts"), "the approved provider files are in the approved set");
+
+  // 4) THE ACTIVE BYTE-FREEZE — on-disk 5F-B + D4-B must equal their Commit 1 blobs. A change — dirty OR later
+  //    committed — fails here until another EXPLICIT authority transfer. (The service is frozen by D1-B.)
+  for (const [path, expectedBlob] of PHASE_8B1A_FROZEN_BLOBS) {
+    const commit1Blob = execFileSync("git", ["rev-parse", `${PHASE_8B1A_IMPLEMENTATION_HEAD}:${path}`], { encoding: "utf8" }).trim();
+    assert(commit1Blob === expectedBlob, `Commit 1 must resolve ${path} to its reviewed blob (got ${commit1Blob.slice(0, 12)}, expected ${expectedBlob.slice(0, 12)})`);
+    const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
+    assert(onDisk === expectedBlob,
+      `${path} is not byte-identical to its Phase 8B-1A Commit 1 baseline (commit ${PHASE_8B1A_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+      `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDisk.slice(0, 12)} != pinned ${expectedBlob.slice(0, 12)}).`);
+  }
+
+  // 5) DEDICATED 8B-1A HARNESS EVIDENCE — EXECUTABLE (line-anchored registrations + comment-stripped anchors),
+  //    never comment-only. Counts are supplemental; the security anchors are the substance.
+  const h = readF(PHASE8B1A_HARNESS_SRC);
+  const hStripped = stripTs(h);
+  const hReg = (re) => (h.match(re) || []).length;
+  assert(hReg(/^\s*check\("/gm) === PHASE8B1A_HARNESS_CHECKS, `the 8B-1A harness must register EXACTLY ${PHASE8B1A_HARNESS_CHECKS} functional checks (got ${hReg(/^\s*check\("/gm)})`);
+  assert(hReg(/^\s*mutate\("/gm) === PHASE8B1A_HARNESS_MUTATIONS, `the 8B-1A harness must register EXACTLY ${PHASE8B1A_HARNESS_MUTATIONS} mutations (got ${hReg(/^\s*mutate\("/gm)})`);
+  for (const [anchor, what] of [
+    ["verifyMetaWebhookSignatureBytes(", "exact raw-byte signature verification"],
+    ["^sha256=[0-9a-f]{64}$", "strict sha256=<64 lowercase hex> grammar"],
+    ["fatal: true", "fatal UTF-8 decode"],
+    ["handleMetaWhatsAppWebhookPostBytes", "historical public wrapper delegation to the byte entry"],
+    ["processVerifiedExpectedMetaWebhook", "non-exported downstream stage"],
+    ["foreign_waba", "WABA comparison"],
+    ["foreign_phone_number", "phone-number comparison"],
+    ["mixedEnvelope", "whole-payload mixed rejection"],
+    ["rejected_foreign_identity", "zero-effect foreign identity rejection"],
+    ["communication_webhook_receipts", "zero receipt writes for foreign identity"],
+    ["16 * 1024", "exact 16 KiB body ceiling"],
+    ["anchor not found", "mutation runner rejects a missing anchor"],
+    ["compileTo(mutDir)", "mutation runner compiles each mutation (rejects compile/import failure)"],
+  ]) assert(hStripped.includes(anchor), `the 8B-1A harness must EXECUTABLY prove: ${what}`);
+
+  // 6) SELF-PROOF — the fixed endpoints are literals, and the range never uses a moving HEAD.
+  const selfSrc = readF(HARNESS_SRC);
+  assert(selfSrc.includes('"95c5e969ce585fd435019fdb17265ece6fdb9c1d"'), "the Phase 8B-1A base is the exact fixed literal");
+  assert(selfSrc.includes('"fe10c2c70691809952f53c7244b8d3b5cb1a150d"'), "the Phase 8B-1A head is the exact fixed literal");
+  assert(selfSrc.includes("`${PHASE_8B1A_AUTHORITY_BASE}..${PHASE_8B1A_IMPLEMENTATION_HEAD}`"), "the Phase 8B-1A range is built from the two FIXED endpoint constants");
+  assert(!/PHASE_8B1A_(AUTHORITY_BASE|IMPLEMENTATION_HEAD)\}\.\.\$\{?HEAD\b/.test(selfSrc), "the Phase 8B-1A range never uses a moving HEAD endpoint");
+}
+
 check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/provider file is touched", () => {
   // PHASE 8B-0 — the 5F-B AUTHORITY FREEZE runs FIRST and UNCONDITIONALLY, before the dirty-scope loop, so a
   // dirty OR later-committed 5F-B change fails with a clear authority-transfer error rather than the generic
   // "no existing harness may change".
   provePhase8B0MetaHarnessAuthority();
+  // PHASE 8B-1A — the ACTIVE 5F-B + D4-B byte-freeze against Commit 1, the fixed ten-file range, and the
+  // dedicated Phase 8B-1A harness's executable security shape. Runs whether the tree is clean or dirty.
+  provePhase8B1AMetaAuthority();
 
   const dirty = gitDirty();
   for (const f of [D2C_SRC, D2D_WRITER_SRC, D2D_COMMAND_SRC, POLICY_SRC, D2E_ORCH_SRC, D2E_INPUT_SRC]) {

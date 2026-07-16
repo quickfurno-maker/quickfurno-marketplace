@@ -373,15 +373,54 @@ const ENV_OK = {
   QF_CONSENT_ACK_DESTINATION_KEYS: JSON.stringify({ [KEY_ID]: randomBytes(32).toString("base64url") }),
 };
 
+// Phase 8B-1A — DETERMINISTIC, grammar-valid (`^[0-9]{1,64}$`) callback identity for the identity gate the
+// gated `handleMetaWhatsAppWebhookPost` now enters. Fixed numeric TEST-ONLY constants; no real WABA/phone id
+// and no access token. `display_phone_number` is deliberately NOT used as identity.
+const WEBHOOK_WABA_ID = "123456789012345";
+const WEBHOOK_PHONE_NUMBER_ID = "111222333";
 const envelope = (...messages) => ({
   object: "whatsapp_business_account",
-  entry: [{ id: "WABA", changes: [{ field: "messages", value: {
+  entry: [{ id: WEBHOOK_WABA_ID, changes: [{ field: "messages", value: {
     messaging_product: "whatsapp",
-    metadata: { phone_number_id: "111222333" },
+    metadata: { phone_number_id: WEBHOOK_PHONE_NUMBER_ID },
     messages,
   } }] }],
 });
 const textMsg = (over = {}) => ({ from: WA_ID, id: WAMID, timestamp: "1752400000", type: "text", text: { body: "STOP" }, ...over });
+
+// A NARROW, LOCAL mirror of the real closed-union `decideCallbackIdentity` — enough for D4-B's `messages`
+// class only. It is NOT unconditional: it returns the real `authorized` shape ONLY for a whatsapp_business_account
+// `messages` change whose entry.id === WEBHOOK_WABA_ID AND value.metadata.phone_number_id === WEBHOOK_PHONE_NUMBER_ID,
+// and otherwise returns the real `rejected` / `unsupported` shapes. It reads no env, clock, network or DB.
+// It never trusts `display_phone_number`. It exists only inside this harness so D4-B stays focused on its own
+// persist → command → enqueue contract while still honouring the new identity precondition.
+const asObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+const idStr = (o, k) => (o && typeof o[k] === "string" && o[k].length > 0 ? o[k] : null);
+function stubDecideCallbackIdentity(payload) {
+  const root = asObj(payload);
+  if (!root || root.object !== "whatsapp_business_account") return { kind: "unsupported" };
+  const entries = Array.isArray(root.entry) ? root.entry : [];
+  let sawSupported = false;
+  let firstReject = null;
+  for (const entryRaw of entries) {
+    const entry = asObj(entryRaw);
+    const entryId = entry ? idStr(entry, "id") : null;
+    const changes = entry && Array.isArray(entry.changes) ? entry.changes : [];
+    for (const changeRaw of changes) {
+      const change = asObj(changeRaw);
+      if (!change || change.field !== "messages") continue; // D4-B only exercises the messages class
+      sawSupported = true;
+      if (entryId !== WEBHOOK_WABA_ID) { firstReject = firstReject ?? { kind: "rejected", reason: entryId === null ? "unprovable_waba" : "foreign_waba" }; continue; }
+      const value = change ? asObj(change.value) : null;
+      const metadata = value ? asObj(value.metadata) : null;
+      const phoneId = metadata ? idStr(metadata, "phone_number_id") : null;
+      if (phoneId !== WEBHOOK_PHONE_NUMBER_ID) { firstReject = firstReject ?? { kind: "rejected", reason: phoneId === null ? "unprovable_phone_number" : "foreign_phone_number" }; continue; }
+    }
+  }
+  if (firstReject) return firstReject;
+  if (!sawSupported) return { kind: "unsupported" };
+  return { kind: "authorized", classes: ["messages"] };
+}
 
 const persistedItem = (over = {}) => ({
   message: { providerMessageId: WAMID, messageType: "text", ...(over.message ?? {}) },
@@ -802,6 +841,9 @@ function buildWebhook(over = {}) {
       resolveWebhookSignatureConfig: () => ({ ok: true, config: { appSecret: "secret" } }),
       resolveWebhookVerifyConfig: () => ({ ok: true, config: { webhookVerifyToken: "t" } }),
       webhookSignatureToRuntime: () => ({}),
+      // Phase 8B-1A — the identity gate resolves the expected identity here. TEST-ONLY: no env read, no
+      // access token, no network/DB, no production secret; returns exactly the deterministic fixture ids.
+      resolveWebhookIdentityConfig: () => ({ ok: true, config: { wabaId: WEBHOOK_WABA_ID, phoneNumberId: WEBHOOK_PHONE_NUMBER_ID } }),
     },
     "../lib/communication/providers/metaCloudWhatsAppProvider": {
       MetaCloudWhatsAppProvider: class {}, META_WHATSAPP_CLOUD_PROVIDER_KEY: "meta_whatsapp_cloud",
@@ -809,7 +851,14 @@ function buildWebhook(over = {}) {
     "../lib/communication/httpTransport": { FetchHttpTransport: class {} },
     "../lib/communication/providers/metaWhatsAppWebhook": {
       META_SIGNATURE_HEADER: "x-hub-signature-256",
+      // The existing string verifier stub stays: the internal downstream defence-in-depth path still calls it.
       verifyMetaWebhookSignature: () => true,
+      // Phase 8B-1A — the production service imports the byte verifier + identity authority via THIS re-export
+      // module. D4-B is NOT the signature-authority harness, so the byte verifier deterministically accepts
+      // its test invocation (the dedicated Phase 8B-1A harness owns strict grammar). The identity authority is
+      // the NARROW, conditional local mirror — NOT an unconditional allow-all.
+      verifyMetaWebhookSignatureBytes: () => true,
+      decideCallbackIdentity: (payload) => stubDecideCallbackIdentity(payload),
       classifyMetaWebhook: () => "inbound_message",
       MetaWebhookClassification: {
         DELIVERY_STATUS: "delivery_status", INBOUND_MESSAGE: "inbound_message",
@@ -865,9 +914,26 @@ const postWebhook = async (over = {}) => {
 
 check("W-CONTROL. the real webhook reaches the INBOUND branch and ENQUEUES exactly once", async () => {
   const { res, calls, order } = await postWebhook();
+  // The historical public symbol `handleMetaWhatsAppWebhookPost` (driven by postWebhook) now enters the GATED
+  // pipeline: byte signature → decode → parse → identity gate → runtime gate → INBOUND persist/command/enqueue.
   assert(res.status === 200 && res.result === "inbound_processed", `200/inbound_processed (got ${safeStringify(res)})`);
   assert(calls.persist === 1 && calls.commands === 1 && calls.enqueue === 1, "persist, commands and enqueue each ran once");
   assert(order.join(",") === "persist,d2d_write,commands,enqueue", `order: ${order.join(",")}`);
+
+  // ── Phase 8B-1A identity-precondition structural proof (D4-B does NOT own the identity implementation) ──
+  // 1. the isolated identity stub is NOT unconditional — the EXACT fixture identity authorizes …
+  const authorized = stubDecideCallbackIdentity(envelope(textMsg()));
+  assert(authorized.kind === "authorized", `the fixture WABA+phone identity authorizes (got ${JSON.stringify(authorized)})`);
+  // … a FOREIGN WABA does NOT return authorized …
+  const foreignWaba = stubDecideCallbackIdentity({ object: "whatsapp_business_account", entry: [{ id: "999999999999999", changes: [{ field: "messages", value: { metadata: { phone_number_id: WEBHOOK_PHONE_NUMBER_ID } } }] }] });
+  assert(foreignWaba.kind === "rejected" && foreignWaba.reason === "foreign_waba", `a foreign WABA is rejected, never authorized (got ${JSON.stringify(foreignWaba)})`);
+  // … and a FOREIGN phone-number id does NOT return authorized (display_phone_number is never identity).
+  const foreignPhone = stubDecideCallbackIdentity({ object: "whatsapp_business_account", entry: [{ id: WEBHOOK_WABA_ID, changes: [{ field: "messages", value: { metadata: { display_phone_number: WEBHOOK_PHONE_NUMBER_ID, phone_number_id: "999888777" } } }] }] });
+  assert(foreignPhone.kind === "rejected" && foreignPhone.reason === "foreign_phone_number", `a foreign phone id is rejected, never authorized (got ${JSON.stringify(foreignPhone)})`);
+  // 2. the PRODUCTION downstream stage remains NON-EXPORTED, and the historical public handler is the GATED wrapper.
+  const svc = readF(WEBHOOK_SRC);
+  assert(/async function processVerifiedExpectedMetaWebhook\(/.test(svc) && !/export\s+(async\s+)?function\s+processVerifiedExpectedMetaWebhook/.test(svc), "the production downstream stage is non-exported");
+  assert(/export function handleMetaWhatsAppWebhookPost\(input:[\s\S]{0,260}return handleMetaWhatsAppWebhookPostBytes\(\{/.test(svc), "the historical public handler is the gated compatibility wrapper");
 });
 
 check("W-8A. the webhook-only path NEVER consults consent and NEVER reaches a send path", async () => {

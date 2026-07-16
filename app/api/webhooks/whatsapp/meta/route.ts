@@ -8,22 +8,27 @@
 //        (constant-time). Independent of outbound sending. Never logs/returns the
 //        token. Invalid → 403 generic.
 //
-// POST — delivery/status webhooks. Fail-closed order: bounded raw-body read →
-//        signature header → server config → raw-body signature verification →
-//        runtime webhook-processing gate → JSON parse → classification → lifecycle
-//        (delivery) or safe acknowledge (known non-delivery). Never logs the raw
-//        body, phone, WhatsApp id, token, signature, App Secret, or message content.
+// POST — delivery/status webhooks. Phase 8B-1A fail-closed order: bounded raw-BYTE read
+//        → signature header → signature config → exact byte grammar + HMAC over the
+//        exact bytes → fatal UTF-8 decode → JSON parse → identity config → callback-
+//        identity gate → runtime webhook-processing gate → classification → lifecycle
+//        (delivery) or safe acknowledge. A foreign/mixed/malformed/unprovable callback
+//        stops before any DB call with a generic 200. Never logs the raw body, phone,
+//        WhatsApp id, token, signature, App Secret, or message content.
 // ============================================================================
 
 import { NextResponse } from "next/server";
-import { MAX_HOOK_BODY_BYTES, readBoundedRawBody } from "@/lib/auth/supabaseSendSmsHook";
+import {
+  META_MAX_WEBHOOK_BODY_BYTES,
+  readMetaWebhookRawBytes,
+} from "@/lib/communication/providers/metaWebhookRawBody";
 import {
   META_SIGNATURE_HEADER,
   verifyMetaWebhookGetChallenge,
 } from "@/lib/communication/providers/metaWhatsAppWebhook";
 import {
   getWebhookVerifyToken,
-  handleMetaWhatsAppWebhookPost,
+  handleMetaWhatsAppWebhookPostBytes,
 } from "@/services/metaWhatsAppWebhookService";
 
 export const runtime = "nodejs";
@@ -58,14 +63,16 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    // Step 1 — bounded raw-body read (never buffers past the cap).
-    const bounded = await readBoundedRawBody(request, MAX_HOOK_BODY_BYTES);
+    // Step 1 — bounded raw-BYTE read (never buffers past the cap, never decodes).
+    const bounded = await readMetaWebhookRawBytes(request, META_MAX_WEBHOOK_BODY_BYTES);
     if (!bounded.ok) {
       return NextResponse.json({ ok: false, code: "bad_request" }, { status: 400 });
     }
 
-    const outcome = await handleMetaWhatsAppWebhookPost({
-      rawBody: bounded.rawBody,
+    // The identity-gated byte pipeline: signature over the exact bytes → decode → parse
+    // → identity gate → runtime gate → downstream. The route stays generic on the way out.
+    const outcome = await handleMetaWhatsAppWebhookPostBytes({
+      rawBytes: bounded.rawBytes,
       signature: request.headers.get(META_SIGNATURE_HEADER),
     });
 

@@ -1,11 +1,19 @@
 // ============================================================================
-// QuickFurno — services/metaWhatsAppWebhookService.ts  (Phase 5F-B, server-only)
+// QuickFurno — services/metaWhatsAppWebhookService.ts  (Phase 5F-B → 8B-1A, server-only)
 //
-// Orchestrates the Meta WhatsApp Cloud webhook in a strict FAIL-CLOSED order:
-//   signature header → server config → raw-body signature verification →
-//   runtime webhook-processing gate → JSON parse → classification →
-//   (delivery) CommunicationService lifecycle | (inbound) persist then process |
-//   (known non-delivery) safe ack.
+// Orchestrates the Meta WhatsApp Cloud webhook in a strict FAIL-CLOSED order.
+//
+// PHASE 8B-1A — the PRODUCTION entry point is `handleMetaWhatsAppWebhookPostBytes`, and the
+// HISTORICAL public symbol `handleMetaWhatsAppWebhookPost` is now the GATED compatibility
+// string wrapper that delegates directly to it. Their order is:
+//   signature header → signature config → exact byte grammar + HMAC over the EXACT bytes →
+//   fatal UTF-8 decode → JSON parse → identity config → CALLBACK-IDENTITY GATE →
+//   runtime webhook-processing DB gate → downstream classification / processing.
+// The identity gate runs BEFORE the runtime DB gate and before every downstream effect: a
+// foreign / mixed / malformed / unprovable callback terminates with ZERO effects and creates
+// NO rejection receipt. The classification / lifecycle work lives in the NON-EXPORTED
+// `processVerifiedExpectedMetaWebhook`, reached ONLY after the identity authority authorizes,
+// so no exported or route-reachable function can process a callback without the identity gate.
 //
 // INBOUND MESSAGES (Phase 5F-D1-B → 5F-D2-E). An inbound payload is no longer merely
 // acknowledged. It is:
@@ -29,6 +37,7 @@ import { CommunicationService } from "./communicationService";
 import { createFailClosedOutboundConsentEnforcer } from "./outboundConsentEnforcementService";
 import { isWebhookProcessingEnabled } from "./communicationProviderRuntimeService";
 import {
+  resolveWebhookIdentityConfig,
   resolveWebhookSignatureConfig,
   resolveWebhookVerifyConfig,
   webhookSignatureToRuntime,
@@ -40,9 +49,11 @@ import {
 import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import {
   classifyMetaWebhook,
+  decideCallbackIdentity,
   deriveMetaWebhookEventId,
   metaWebhookPayloadHash,
   verifyMetaWebhookSignature,
+  verifyMetaWebhookSignatureBytes,
   MetaWebhookClassification,
 } from "../lib/communication/providers/metaWhatsAppWebhook";
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
@@ -62,7 +73,10 @@ export type MetaWebhookPostOutcome =
         // Phase 5F-D1-B — verified INBOUND_MESSAGE capture outcomes.
         | "inbound_processed"
         | "inbound_duplicate"
-        | "inbound_acknowledged_rejected";
+        | "inbound_acknowledged_rejected"
+        // Phase 8B-1A — callback-identity gate terminal outcomes (both ZERO-effect).
+        | "rejected_foreign_identity"
+        | "acknowledged_unsupported_identity_shape";
     }
   | { readonly status: 400 | 401 | 403 | 500 | 503; readonly code: string };
 
@@ -103,36 +117,33 @@ async function recordIgnoredReceipt(
 }
 
 /**
- * Handle a verified Meta webhook POST. `signature` is the raw `X-Hub-Signature-256`
- * header value. Fails closed at every step. POST needs ONLY the app secret for
- * signature verification — never the access token or `outbound_enabled`.
+ * Phase 8B-1A — the NON-EXPORTED downstream stage: the runtime webhook-processing DB gate
+ * (step 9) and the existing classification / lifecycle work (step 10). It is reached ONLY
+ * from `handleMetaWhatsAppWebhookPostBytes`, and ONLY after the callback-identity authority
+ * has AUTHORIZED the callback. It is not exported and is not route-reachable, so no caller
+ * can process a callback without the identity gate. The signature has already been verified
+ * over the exact bytes and the payload has already been parsed by the byte entry point.
  */
-export async function handleMetaWhatsAppWebhookPost(input: {
+async function processVerifiedExpectedMetaWebhook(input: {
   readonly rawBody: string;
-  readonly signature: string | null;
+  readonly signature: string;
+  readonly appSecret: string;
 }): Promise<MetaWebhookPostOutcome> {
-  // Step 2 — a signature header is required.
-  if (!input.signature) return { status: 401, code: "missing_signature" };
+  const appSecret = input.appSecret;
 
-  // Step 3 — server POST-signature config (app secret ONLY; no access token needed).
-  const sigConfig = resolveWebhookSignatureConfig();
-  if (!sigConfig.ok) return { status: 503, code: "provider_not_configured" };
-  const appSecret = sigConfig.config.appSecret;
-
-  // Step 4 — verify the signature against the EXACT raw body, before any JSON parse.
+  // Defence-in-depth re-verification: the byte entry already proved the signature over the EXACT bytes;
+  // this re-checks it over the decoded string through the SAME single authority before any lifecycle work.
   if (!verifyMetaWebhookSignature(input.rawBody, input.signature, appSecret)) {
     return { status: 401, code: "invalid_signature" };
   }
 
-  // Step 5 — runtime webhook-processing gate (independent of outbound_enabled).
+  // Step 9 — runtime webhook-processing gate (AFTER identity authorization; independent of outbound_enabled).
   const enabled = await isWebhookProcessingEnabled(META_WHATSAPP_CLOUD_PROVIDER_KEY, CHANNEL);
   if (!enabled) return { status: 503, code: "webhook_processing_disabled" };
 
-  // Step 6 — parse (now safe: signature verified).
+  // Step 10 — parse + classify.
   const payload = safeParse(input.rawBody);
   if (!payload) return { status: 400, code: "unparseable" };
-
-  // Step 7 — classify.
   const classification = classifyMetaWebhook(payload);
 
   // Step 8 — delivery status is processed; everything else is safely acknowledged.
@@ -224,6 +235,110 @@ export async function handleMetaWhatsAppWebhookPost(input: {
   // mutation, NO outbound send, NO n8n, NO Jarvis.
   await recordIgnoredReceipt(input.rawBody, payload, "ignored_non_delivery");
   return { status: 200, result: "acknowledged_ignored" };
+}
+
+// Fatal UTF-8 decoder — throws on ANY invalid byte sequence. Applied ONLY after the
+// signature has been proven over the exact bytes (Phase 8B-1A, step 4).
+const META_UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+
+/**
+ * Phase 8B-1A — the PRODUCTION byte entry point and the SINGLE authoritative pipeline.
+ * The Next route reads the exact request bytes and enters HERE; the callback-identity
+ * gate runs BEFORE the runtime DB gate and before ANY database call, receipt write,
+ * message mutation, inbound persistence, consent processing, response-intent enqueue,
+ * provider-state effect, or provider/network call.
+ *
+ * Order (the shared authoritative pipeline):
+ *   1. signature header presence
+ *   2. signature configuration (app secret only)
+ *   3. exact byte grammar + HMAC over the EXACT bytes
+ *   4. fatal UTF-8 decode (only after the signature is proven)
+ *   5. JSON parse
+ *   6. identity configuration (WABA id + phone-number id only)
+ *   7. pure identity authority (closed union)
+ *   8. identity rejection OR unsupported acknowledgement — both terminal, ZERO effects
+ *   9. runtime webhook-processing DB gate + 10. existing downstream classification /
+ *      processing — reached ONLY for an authorized callback, via the proven downstream.
+ *
+ * A foreign / mixed / malformed / unprovable identity terminates at step 8 with zero
+ * effects. There is NO identity-exempt path to the downstream in production: the route
+ * only ever calls this function, and this function only calls the downstream after the
+ * identity gate has authorized the callback.
+ */
+export async function handleMetaWhatsAppWebhookPostBytes(input: {
+  readonly rawBytes: Uint8Array;
+  readonly signature: string | null;
+}): Promise<MetaWebhookPostOutcome> {
+  // Step 1 — a signature header is required.
+  if (!input.signature) return { status: 401, code: "missing_signature" };
+
+  // Step 2 — server POST-signature config (app secret ONLY).
+  const sigConfig = resolveWebhookSignatureConfig();
+  if (!sigConfig.ok) return { status: 503, code: "provider_not_configured" };
+
+  // Step 3 — exact grammar + HMAC over the EXACT bytes, before any decode or parse.
+  if (!verifyMetaWebhookSignatureBytes(input.rawBytes, input.signature, sigConfig.config.appSecret)) {
+    return { status: 401, code: "invalid_signature" };
+  }
+
+  // Step 4 — fatal UTF-8 decode (safe now: the bytes are proven). Invalid UTF-8 → 400.
+  let decoded: string;
+  try {
+    decoded = META_UTF8_DECODER.decode(input.rawBytes);
+  } catch {
+    return { status: 400, code: "bad_request" };
+  }
+
+  // Step 5 — parse (safe now: signature verified).
+  const payload = safeParse(decoded);
+  if (!payload) return { status: 400, code: "unparseable" };
+
+  // Step 6 — callback-identity config (WABA id + phone-number id ONLY).
+  const idConfig = resolveWebhookIdentityConfig();
+  if (!idConfig.ok) return { status: 503, code: "provider_not_configured" };
+
+  // Step 7 — pure identity authority.
+  const identity = decideCallbackIdentity(payload, idConfig.config);
+
+  // Step 8 — identity rejection OR unsupported acknowledgement. BOTH terminate here,
+  // BEFORE the runtime DB gate and before any downstream effect: ZERO database calls,
+  // ZERO receipt writes, ZERO message mutations, ZERO inbound persistence, ZERO consent
+  // processing, ZERO response-intent enqueue, ZERO provider-state effects, ZERO network.
+  // Phase 8B-1A creates NO rejection receipt. The public response stays generic (200).
+  if (identity.kind === "rejected") {
+    return { status: 200, result: "rejected_foreign_identity" };
+  }
+  if (identity.kind === "unsupported") {
+    return { status: 200, result: "acknowledged_unsupported_identity_shape" };
+  }
+
+  // Steps 9 + 10 — authorized: enter the NON-EXPORTED downstream (runtime DB gate + existing
+  // classification / processing) with the already-verified signature and already-parsed
+  // payload. `identity.classes` is intentionally not narrowed here — Phase 8B-1A does not
+  // bind provider-account (deferred to Phase 8B-1B).
+  return processVerifiedExpectedMetaWebhook({
+    rawBody: decoded,
+    signature: input.signature,
+    appSecret: sigConfig.config.appSecret,
+  });
+}
+
+/**
+ * Phase 8B-1A — the COMPATIBILITY string wrapper, kept under the HISTORICAL public name so
+ * every existing importer/caller of `handleMetaWhatsAppWebhookPost` is now GATED. It encodes
+ * the raw STRING to its EXACT UTF-8 bytes and delegates DIRECTLY to the production byte entry
+ * point — it holds no separate verification, decode, parse, identity, or downstream path. For
+ * equivalent valid UTF-8 input it produces the same decision as the byte entry point. This is
+ * NOT an identity-exempt legacy path: the only path to the downstream is through the gate.
+ */
+export function handleMetaWhatsAppWebhookPost(input: {
+  readonly rawBody: string;
+  readonly signature: string | null;
+}): Promise<MetaWebhookPostOutcome> {
+  return handleMetaWhatsAppWebhookPostBytes({
+    rawBytes: new TextEncoder().encode(input.rawBody),
+    signature: input.signature,
+  });
 }
 
 /** Resolve the server-only webhook verify token — needs ONLY the verify token. */

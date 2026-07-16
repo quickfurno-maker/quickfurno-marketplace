@@ -676,16 +676,21 @@ check("85-92. POST fail-closed order; signature before parse; app secret never l
   assert(W.verifyMetaWebhookSignature(body, "sha256=deadbeef", "APP_SECRET_VALUE") === false, "invalid signature rejected");
   assert(W.verifyMetaWebhookSignature(body, sig, "WRONG_SECRET") === false, "wrong secret rejected");
   assert(W.verifyMetaWebhookSignature(body, "", "APP_SECRET_VALUE") === false, "missing signature rejected");
-  // Service enforces order: config → verify → gate → parse → classify. Verify precedes parse.
+  // Phase 8B-1A byte-entry order: verify(bytes) → decode → parse → identity authority → downstream.
+  // The runtime DB gate lives in the NON-EXPORTED downstream, reached ONLY after identity authorization.
   const svc = readFileSync(WEBHOOK_SERVICE_SRC, "utf8");
-  const verifyIdx = svc.indexOf("verifyMetaWebhookSignature(input.rawBody");
-  const gateIdx = svc.indexOf("isWebhookProcessingEnabled(");
-  const parseIdx = svc.indexOf("safeParse(input.rawBody)");
-  assert(verifyIdx > 0 && parseIdx > 0 && verifyIdx < parseIdx, "signature verified before JSON parse");
-  assert(gateIdx > verifyIdx && gateIdx < parseIdx, "runtime gate after verify, before parse");
+  const verifyIdx = svc.indexOf("verifyMetaWebhookSignatureBytes(input.rawBytes");
+  const decodeIdx = svc.indexOf("META_UTF8_DECODER.decode(input.rawBytes)");
+  const parseIdx = svc.indexOf("safeParse(decoded)");
+  const decideIdx = svc.indexOf("decideCallbackIdentity(payload");
+  const downstreamIdx = svc.indexOf("processVerifiedExpectedMetaWebhook({");
+  assert(verifyIdx > 0 && parseIdx > 0 && verifyIdx < decodeIdx && decodeIdx < parseIdx, "signature verified over bytes before decode/parse");
+  assert(parseIdx < decideIdx && decideIdx < downstreamIdx, "parse + identity authority precede the downstream");
+  assert(/async function processVerifiedExpectedMetaWebhook/.test(svc) && !/export (async )?function processVerifiedExpectedMetaWebhook/.test(svc), "downstream stage is NON-EXPORTED (no identity-exempt export)");
+  assert(svc.indexOf("isWebhookProcessingEnabled(") > 0, "runtime gate present, inside the downstream (after identity)");
   assert(/missing_signature/.test(svc), "missing signature header rejected");
-  // exact raw body used for HMAC (no re-serialize before verify)
-  assert(!/JSON\.stringify[\s\S]{0,40}verifyMetaWebhookSignature/.test(svc), "raw body used, not re-serialized");
+  // exact raw bytes used for HMAC (no re-serialize before verify)
+  assert(!/JSON\.stringify[\s\S]{0,40}verifyMetaWebhookSignature/.test(svc), "raw bytes used, not re-serialized");
   // app secret never logged
   const svcStripped = stripTs(svc);
   assert(!/console\./.test(svcStripped), "webhook service does not log");
@@ -980,41 +985,62 @@ check("30-39. purpose-specific loaders require only their own vars; errors are n
 function seedWebhookPolicy(over = {}) {
   db.communication_provider_runtime_policies.push({ provider_key: "meta_whatsapp_cloud", channel: "whatsapp", activation_status: "canary", outbound_enabled: false, webhook_processing_enabled: true, health_check_enabled: false, ...over });
 }
+// Phase 8B-1A — deterministic, grammar-valid (`^[0-9]{1,64}$`) callback identity for the identity gate.
+// These are fixed numeric TEST-ONLY ids; no real WABA/phone id and no access token is set.
+const WABA_TEST_ID = "102290129340398";
+const PN_TEST_ID = "106540352242922";
 function setMetaEnv() {
   process.env.WHATSAPP_PROVIDER_MODE = "meta_cloud";
   process.env.WHATSAPP_APP_SECRET = "APP_SECRET_VALUE";
   process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = "V";
+  // Phase 8B-1A — the callback-identity gate needs the WABA id + phone-number id (only).
+  process.env.WHATSAPP_WABA_ID = WABA_TEST_ID;
+  process.env.WHATSAPP_PHONE_NUMBER_ID = PN_TEST_ID;
 }
+// Phase 8B-1A CONTROLLED FIXTURE TRANSFER. Each callback now carries its REAL Meta callback identity so the
+// identity gate is the true subject: `messages` carry the expected entry.id (WABA) AND
+// value.metadata.phone_number_id; template/account carry the expected entry.id (WABA) ONLY; the unknown
+// fixture stays UNSUPPORTED (no actionable identity-bearing class — its identity shape is not fabricated).
 const NON_DELIVERY = {
-  inbound: JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: { messages: [{ id: "x" }] } }] }] }),
-  template: JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "message_template_status_update", value: { event: "APPROVED" } }] }] }),
-  account: JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "account_update", value: {} }] }] }),
+  inbound: JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: WABA_TEST_ID, changes: [{ field: "messages", value: { metadata: { phone_number_id: PN_TEST_ID }, messages: [{ id: "x" }] } }] }] }),
+  template: JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: WABA_TEST_ID, changes: [{ field: "message_template_status_update", value: { event: "APPROVED" } }] }] }),
+  account: JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: WABA_TEST_ID, changes: [{ field: "account_update", value: {} }] }] }),
   unknown: JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "weird", value: {} }] }] }),
 };
-check("40-49. verified non-delivery + unknown → 200 ack (no mutation/send/n8n/jarvis); malformed 400; bad sig 401", async () => {
+// A callback with VALID callback identity but no actionable message content (no statuses, no messages).
+// It is AUTHORIZED by the identity gate and then classified UNKNOWN by the downstream, so — unlike the
+// unsupported-identity fixture — it genuinely reaches the downstream `acknowledged_unknown` branch.
+const AUTHORIZED_EMPTY = JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: WABA_TEST_ID, changes: [{ field: "messages", value: { metadata: { phone_number_id: PN_TEST_ID } } }] }] });
+check("40-49. identity-valid callbacks reach downstream (200 ack); unsupported-identity shape stopped before the DB gate (zero receipts); malformed 400; bad sig 401", async () => {
   const W = M.Webhook, WS = M.WebhookSvc;
   resetDb(); seedWebhookPolicy(); setMetaEnv();
   const sign = (b) => W.computeMetaWebhookSignature(b, "APP_SECRET_VALUE");
-  // Phase 5F-D1-B COMPATIBILITY: INBOUND_MESSAGE is now CAPTURED (verified → deterministically
-  // rejected here, since this fixture message carries no sender), NOT ignored. It is still a 200
-  // ACK with no send/lifecycle mutation — only the receipt vocabulary changed (verified→rejected
-  // instead of ignored). Template/account remain acknowledged_ignored.
-  const inb = await WS.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.inbound, signature: sign(NON_DELIVERY.inbound) });
-  assert(inb.status === 200 && inb.result === "inbound_acknowledged_rejected", `inbound → 200 ack (captured, no sender → rejected), got ${JSON.stringify(inb)}`); // 40
+  // Drive the HISTORICAL public symbol `handleMetaWhatsAppWebhookPost` — now the GATED compatibility string
+  // wrapper that enters the SAME identity-gated pipeline the production byte entry uses.
+  const post = (b, sig) => WS.handleMetaWhatsAppWebhookPost({ rawBody: b, signature: sig ?? sign(b) });
+  // Callback identity is VALID (WABA + phone match), so an identity-valid INBOUND callback reaches the
+  // EXISTING downstream: the fixture message carries no sender, so D1-B deterministically rejects it. This
+  // is still a 200 ACK with no send/lifecycle mutation — the receipt vocabulary is verified→rejected.
+  const inb = await post(NON_DELIVERY.inbound);
+  assert(inb.status === 200 && inb.result === "inbound_acknowledged_rejected", `inbound (valid identity, incomplete message) → 200 ack, got ${JSON.stringify(inb)}`); // 40
   for (const [k, body] of [["template", NON_DELIVERY.template], ["account", NON_DELIVERY.account]]) {
-    const res = await WS.handleMetaWhatsAppWebhookPost({ rawBody: body, signature: sign(body) });
-    assert(res.status === 200 && res.result === "acknowledged_ignored", `${k} → 200 ack, got ${JSON.stringify(res)}`); // 41-42
+    const res = await post(body); // valid WABA identity (WABA-only classes) → reach downstream ack
+    assert(res.status === 200 && res.result === "acknowledged_ignored", `${k} (valid WABA identity) → 200 ack, got ${JSON.stringify(res)}`); // 41-42
   }
-  const ures = await WS.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.unknown, signature: sign(NON_DELIVERY.unknown) });
-  assert(ures.status === 200 && ures.result === "acknowledged_unknown", "unknown → 200 ack"); // 43
-  assert(db.communication_messages.length === 0, "no message lifecycle mutation from these classes"); // 44-45
-  // No DELIVERY lifecycle receipt is produced by these non-delivery classes: template/account/
-  // unknown record 'ignored'; the D1-B inbound capture records 'verified'→'rejected'. None is a
-  // delivery 'processed'/'failed'.
+  // Unsupported-only callback identity shape — STOPPED at the identity gate, BEFORE the runtime DB gate.
+  // Prove it writes ZERO receipts by comparing the receipt count immediately before and after.
+  const receiptsBefore = db.communication_webhook_receipts.length;
+  const ures = await post(NON_DELIVERY.unknown);
+  const receiptsAfter = db.communication_webhook_receipts.length;
+  assert(ures.status === 200 && ures.result === "acknowledged_unsupported_identity_shape", `unsupported identity shape → 200 ack, got ${JSON.stringify(ures)}`); // 43
+  assert(receiptsAfter === receiptsBefore, `unsupported identity shape wrote ZERO receipts (before ${receiptsBefore}, after ${receiptsAfter})`); // 44
+  assert(db.communication_messages.length === 0, "no message lifecycle mutation from these classes"); // 45
+  // No DELIVERY lifecycle receipt is produced: template/account record 'ignored'; the D1-B inbound capture
+  // records 'verified'→'rejected'; the unsupported shape records nothing. None is a delivery processed/failed.
   assert(db.communication_webhook_receipts.length > 0 && db.communication_webhook_receipts.every((r) => ["ignored", "verified", "rejected"].includes(r.processing_status)), "only non-delivery receipts recorded");
-  const mres = await WS.handleMetaWhatsAppWebhookPost({ rawBody: "{not json", signature: sign("{not json") });
+  const mres = await post("{not json"); // valid signature, valid UTF-8, unparseable JSON
   assert(mres.status === 400, "malformed JSON → 400"); // 48
-  const badSig = await WS.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.inbound, signature: "sha256=deadbeef" });
+  const badSig = await post(NON_DELIVERY.inbound, "sha256=deadbeef"); // fails the exact signature grammar
   assert(badSig.status === 401, "invalid signature → 401"); // 49
   const svc = stripTs(readFileSync(WEBHOOK_SERVICE_SRC, "utf8"));
   assert(!/n8n/i.test(svc) && !/jarvis/i.test(svc), "no n8n / Jarvis"); // 46-47
@@ -2301,11 +2327,14 @@ srcMutation("MUT: remove AbortSignal from the transport",
   () => !/signal: controller\.signal/.test(readF(TRANSPORT_SRC)));
 
 // --- webhook mutations ---
-tsMutation("MUT: skip signature verification",
+tsMutation("MUT: skip signature verification (the ONE byte authority)",
   [[WEBHOOK_LIB_SRC,
-    "  const expected = \"sha256=\" + crypto.createHmac(\"sha256\", appSecret).update(rawBody).digest(\"hex\");\n  return secureEquals(signature, expected);",
+    "  return crypto.timingSafeEqual(providedDigest, expectedDigest);",
     "  return true;"]],
-  (mm) => mm.Webhook.verifyMetaWebhookSignature("body", "sha256=deadbeef", "APP_SECRET_VALUE") === true);
+  // Both verifiers share one authority: a grammar-valid but wrong signature must be rejected by BOTH.
+  (mm) =>
+    mm.Webhook.verifyMetaWebhookSignatureBytes(new TextEncoder().encode("body"), "sha256=" + "0".repeat(64), "APP_SECRET_VALUE") === true &&
+    mm.Webhook.verifyMetaWebhookSignature("body", "sha256=" + "0".repeat(64), "APP_SECRET_VALUE") === true);
 tsMutation("MUT: allow an unknown webhook status through",
   [[WEBHOOK_LIB_SRC, "      if (!normalized) continue;", "      if (!normalized) { /* allow */ }"]],
   (mm) => {
@@ -2319,12 +2348,12 @@ tsMutation("MUT: allow an unknown webhook status through",
   });
 srcMutation("MUT: parse before signature verification (webhook service)",
   WEBHOOK_SERVICE_SRC,
-  "  // Step 4 — verify the signature against the EXACT raw body, before any JSON parse.\n  if (!verifyMetaWebhookSignature(input.rawBody, input.signature, appSecret)) {\n    return { status: 401, code: \"invalid_signature\" };\n  }\n",
+  "  // Step 3 — exact grammar + HMAC over the EXACT bytes, before any decode or parse.\n  if (!verifyMetaWebhookSignatureBytes(input.rawBytes, input.signature, sigConfig.config.appSecret)) {\n    return { status: 401, code: \"invalid_signature\" };\n  }\n",
   "",
   () => {
     const svc = readF(WEBHOOK_SERVICE_SRC);
-    const v = svc.indexOf("verifyMetaWebhookSignature(input.rawBody");
-    const parse = svc.indexOf("safeParse(input.rawBody)");
+    const v = svc.indexOf("verifyMetaWebhookSignatureBytes(input.rawBytes");
+    const parse = svc.indexOf("safeParse(decoded)");
     return v === -1 || (parse !== -1 && v > parse); // verification no longer precedes parse
   });
 srcMutation("MUT: make inbound webhook trigger delivery processing",
@@ -2447,14 +2476,16 @@ tsMutation("MUT I: POST signature verification requires the access token",
     '  const v = readTrimmed(env, "WHATSAPP_APP_SECRET");\n  const a = readTrimmed(env, "WHATSAPP_ACCESS_TOKEN");\n  if (v === null || a === null) return { ok: false, missing: ["WHATSAPP_APP_SECRET"], invalid: [] };\n  return { ok: true, config: { appSecret: v } };']],
   (mm) => mm.Config.resolveWebhookSignatureConfig({ WHATSAPP_APP_SECRET: "S" }).ok === false);
 
-tsMutation("MUT J: verified unknown event returns 400 instead of acknowledging",
+tsMutation("MUT J: verified authorized-but-unclassifiable event returns 400 instead of acknowledging",
   [[WEBHOOK_SERVICE_SRC,
     'await recordIgnoredReceipt(input.rawBody, payload, "ignored_unknown");\n    return { status: 200, result: "acknowledged_unknown" };',
     'return { status: 400, code: "unclassified_payload" };']],
   async (mm) => {
+    // AUTHORIZED_EMPTY has VALID callback identity, so it PASSES the identity gate and reaches the downstream
+    // 'acknowledged_unknown' branch (the unsupported-identity fixture would stop at the gate instead).
     stubDb(mm); resetDb(); seedWebhookPolicy(); setMetaEnv();
-    const sig = M.Webhook.computeMetaWebhookSignature(NON_DELIVERY.unknown, "APP_SECRET_VALUE");
-    const res = await mm.WebhookSvc.handleMetaWhatsAppWebhookPost({ rawBody: NON_DELIVERY.unknown, signature: sig });
+    const sig = M.Webhook.computeMetaWebhookSignature(AUTHORIZED_EMPTY, "APP_SECRET_VALUE");
+    const res = await mm.WebhookSvc.handleMetaWhatsAppWebhookPost({ rawBody: AUTHORIZED_EMPTY, signature: sig });
     return res.status === 400;
   });
 

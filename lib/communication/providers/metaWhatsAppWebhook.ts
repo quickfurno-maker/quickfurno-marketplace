@@ -15,8 +15,23 @@
 import crypto from "crypto";
 import type { WhatsAppNormalizedEventType, WhatsAppWebhookEvent } from "./whatsappProvider";
 
+// Phase 8B-1A — the PURE callback-identity authority is re-exported from this module
+// so downstream services import identity + classification from ONE provider-webhook
+// surface (keeping the webhook service's import set stable). This module never imports
+// FROM the service, so there is no cycle.
+export { decideCallbackIdentity, META_CALLBACK_ID_GRAMMAR } from "./metaCallbackIdentity";
+export type {
+  CallbackIdentityDecision,
+  CallbackIdentityRejectReason,
+  ExpectedCallbackIdentity,
+  MetaCallbackClass,
+} from "./metaCallbackIdentity";
+
 /** The Meta webhook signature header (lower-cased). */
 export const META_SIGNATURE_HEADER = "x-hub-signature-256";
+
+/** Exact Meta signature grammar: the `sha256=` prefix + EXACTLY 64 lowercase hex. */
+export const META_SIGNATURE_PATTERN = /^sha256=[0-9a-f]{64}$/;
 
 export const MetaWebhookClassification = {
   DELIVERY_STATUS: "delivery_status",
@@ -67,19 +82,43 @@ function secureEquals(a: string, b: string): boolean {
 }
 
 /**
- * Verify the Meta `X-Hub-Signature-256` header against the RAW body using the app
- * secret. Expects `sha256=<hex>`; compares in constant time. Never logs either value.
+ * Verify the Meta `X-Hub-Signature-256` header against the RAW body STRING. Phase 8B-1A —
+ * this is a THIN compatibility wrapper: it encodes the string to its exact UTF-8 bytes and
+ * delegates to `verifyMetaWebhookSignatureBytes`, the ONE signature grammar + cryptographic
+ * comparison authority. It holds NO independent grammar and NO independent comparison, so it
+ * can never accept a signature the byte verifier would reject.
  */
 export function verifyMetaWebhookSignature(rawBody: string, signature: string, appSecret: string): boolean {
-  if (typeof rawBody !== "string" || !signature || !appSecret) return false;
-  if (!signature.startsWith("sha256=")) return false;
-  const expected = "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
-  return secureEquals(signature, expected);
+  if (typeof rawBody !== "string") return false;
+  return verifyMetaWebhookSignatureBytes(Buffer.from(rawBody, "utf8"), signature, appSecret);
 }
 
 /** Build the header value a valid Meta signature would carry (test helper). */
 export function computeMetaWebhookSignature(rawBody: string, appSecret: string): string {
   return "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
+}
+
+/**
+ * Phase 8B-1A — verify the Meta `X-Hub-Signature-256` header against the EXACT raw
+ * request BYTES (never a decoded string). This is the production authority:
+ *   • the header must match the exact grammar `^sha256=[0-9a-f]{64}$` (uppercase hex,
+ *     wrong length, or a missing prefix are rejected BEFORE any crypto);
+ *   • the HMAC-SHA256 is computed over the exact `Uint8Array`;
+ *   • the comparison is a constant-time compare of the two RAW 32-byte digests.
+ * Never logs either value. A non-`Uint8Array` body or an empty secret fails closed.
+ */
+export function verifyMetaWebhookSignatureBytes(
+  rawBytes: Uint8Array,
+  signature: string,
+  appSecret: string
+): boolean {
+  if (!(rawBytes instanceof Uint8Array)) return false;
+  if (typeof signature !== "string" || typeof appSecret !== "string" || appSecret === "") return false;
+  if (!META_SIGNATURE_PATTERN.test(signature)) return false;
+  const providedDigest = Buffer.from(signature.slice("sha256=".length), "hex"); // exactly 32 bytes
+  const expectedDigest = crypto.createHmac("sha256", appSecret).update(rawBytes).digest(); // 32-byte Buffer
+  if (providedDigest.length !== 32 || expectedDigest.length !== 32) return false;
+  return crypto.timingSafeEqual(providedDigest, expectedDigest);
 }
 
 export type MetaWebhookGetResult =

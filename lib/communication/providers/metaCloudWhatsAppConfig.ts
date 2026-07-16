@@ -17,6 +17,8 @@
 // never breaks the Next.js build.
 // ============================================================================
 
+import { META_CALLBACK_ID_GRAMMAR } from "./metaCallbackIdentity";
+
 export const WHATSAPP_PROVIDER_MODE_ENV = "WHATSAPP_PROVIDER_MODE";
 
 export type WhatsAppProviderMode = "mock" | "meta_cloud";
@@ -170,6 +172,35 @@ export function resolveWebhookSignatureConfig(env: EnvSource = process.env): Con
   const v = readTrimmed(env, "WHATSAPP_APP_SECRET");
   if (v === null) return { ok: false, missing: ["WHATSAPP_APP_SECRET"], invalid: [] };
   return { ok: true, config: { appSecret: v } };
+}
+
+// ----------------------------------------------------------------------------
+// 4b. Webhook CALLBACK-IDENTITY config (Phase 8B-1A) — WABA id + phone-number id ONLY
+//
+// The callback-identity gate needs to prove an inbound webhook belongs to THIS tenant.
+// It requires ONLY the two opaque numeric ids (never the access token, app secret or
+// verify token), each validated against the exact id grammar `^[0-9]{1,64}$`. Reports
+// missing/invalid VARIABLE NAMES only — never a value.
+// ----------------------------------------------------------------------------
+export interface MetaWebhookIdentityConfig {
+  readonly wabaId: string;
+  readonly phoneNumberId: string;
+}
+
+function readIdVar(env: EnvSource, name: string, missing: string[], invalid: string[]): string | null {
+  const v = readTrimmed(env, name);
+  if (v === null) { missing.push(name); return null; }
+  if (!META_CALLBACK_ID_GRAMMAR.test(v)) { invalid.push(name); return null; }
+  return v;
+}
+
+export function resolveWebhookIdentityConfig(env: EnvSource = process.env): ConfigResult<{ config: MetaWebhookIdentityConfig }> {
+  const missing: string[] = [];
+  const invalid: string[] = [];
+  const wabaId = readIdVar(env, "WHATSAPP_WABA_ID", missing, invalid);
+  const phoneNumberId = readIdVar(env, "WHATSAPP_PHONE_NUMBER_ID", missing, invalid);
+  if (missing.length || invalid.length) return { ok: false, missing, invalid };
+  return { ok: true, config: { wabaId: wabaId as string, phoneNumberId: phoneNumberId as string } };
 }
 
 // ----------------------------------------------------------------------------

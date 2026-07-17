@@ -167,6 +167,42 @@ const PHASE_8B1A_FROZEN_BLOBS = [
   [PHASE5FD4B_SRC, "5cf652122fa0c12f5137c8d9b157b4156ce56abd"],
 ];
 
+// ============================================================================
+// PHASE 8B-1B-A — PROVIDER-ACCOUNT BINDING AUTHORITY.
+// The reviewed implementation commit is FROZEN here: its exact four-file range, its exact 3A/1M status
+// composition, and the byte-identity of all four reviewed files. This CLOSES a real gap: before this
+// transfer the implementation was protected only while DIRTY (by the generic scope loop in B4). Once
+// committed it became invisible — the migration could have been rewritten and re-committed with nothing
+// detecting it. The Phase 8A / 8B-0 / 8B-1A authorities above are untouched and never move.
+// ============================================================================
+const PHASE_8B1BA_AUTHORITY_BASE = "1fd6e99d7f2ab65d7bc66908dea20a8d258318fa";
+const PHASE_8B1BA_IMPLEMENTATION_HEAD = "73201296ef4206e8d505f7a94cfbfcfb68edf9ec";
+const PHASE_8B1BA_OWNERSHIP_SRC = "lib/communication/providers/providerAccountOwnership.ts";
+const PHASE_8B1BA_HARNESS_SRC = "scripts/phase8b1ba-provider-account-binding-harness.mjs";
+const PHASE_8B1BA_RUNTIME_SRC = "services/communicationProviderRuntimeService.ts";
+const PHASE_8B1BA_MIGRATION_SRC = "supabase/migrations/20260716000100_communication_provider_account_binding.sql";
+/** The EXACT four files the fixed Phase 8B-1B-A range (base..head) may contain — nothing more, nothing less. */
+const PHASE_8B1BA_EXPECTED_FILES = [
+  PHASE_8B1BA_OWNERSHIP_SRC,
+  PHASE_8B1BA_HARNESS_SRC,
+  PHASE_8B1BA_RUNTIME_SRC,
+  PHASE_8B1BA_MIGRATION_SRC,
+];
+/** The reviewed blobs at the implementation head. A change — dirty OR later COMMITTED — fails here until
+ *  an EXPLICIT authority transfer re-pins them. This is the primary authority. */
+const PHASE_8B1BA_FROZEN_BLOBS = [
+  [PHASE_8B1BA_OWNERSHIP_SRC, "5197d132b8a7f33061590c282693a70fe1bae13e"],
+  [PHASE_8B1BA_HARNESS_SRC, "14b5ecdefe16b32fe613d27f6acc2eae10b6b398"],
+  [PHASE_8B1BA_RUNTIME_SRC, "0c8874692b0a4072eb04ba10b935fb0d2e2bcc82"],
+  [PHASE_8B1BA_MIGRATION_SRC, "aa5d5a1f0f8883de744531cdb358d72d8b598375"],
+];
+/** The dedicated harness's executable shape — defence in depth for any future EXPLICIT re-pin, so a
+ *  re-pinned harness can never quietly drop its evidence. Counts are supplemental to the anchors. */
+const PHASE8B1BA_HARNESS_CHECKS = 16;
+const PHASE8B1BA_HARNESS_MUTATIONS = 48;
+const PHASE8B1BA_INFRA_SELF_TESTS = 4;
+const PHASE8B1BA_MUTATION_FAMILIES = [["OWN-", 2], ["DBR-", 3], ["RES-", 4], ["QRY-", 8], ["PRJ-", 5], ["GRM-", 6], ["SQL-", 20]];
+
 function compileTo(outDir) {
   rmSync(outDir, { recursive: true, force: true });
   const tsconfigPath = resolve(`${outDir}.tsconfig.json`);
@@ -1192,6 +1228,186 @@ function provePhase8B1AMetaAuthority() {
   assert(!/PHASE_8B1A_(AUTHORITY_BASE|IMPLEMENTATION_HEAD)\}\.\.\$\{?HEAD\b/.test(selfSrc), "the Phase 8B-1A range never uses a moving HEAD endpoint");
 }
 
+/**
+ * PHASE 8B-1B-A — the PROVIDER-ACCOUNT BINDING authority. Runs on a CLEAN or DIRTY worktree.
+ *
+ * The approved migration and the approved provider ownership module are legitimate ONLY inside this
+ * fixed four-file range: every other migration, provider module, service, harness, route, package,
+ * lockfile, env and deployment file stays rejected. The byte-freeze is the primary authority — the
+ * range and the harness-shape evidence are defence in depth.
+ */
+function provePhase8B1BAProviderAccountAuthority() {
+  // 1) BOTH commits exist; ancestry base → implementation head → HEAD (FIXED endpoints, never a moving HEAD).
+  for (const [sha, what] of [[PHASE_8B1BA_AUTHORITY_BASE, "Phase 8B-1B-A authority base"], [PHASE_8B1BA_IMPLEMENTATION_HEAD, "Phase 8B-1B-A implementation head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BA_AUTHORITY_BASE, PHASE_8B1BA_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BA_IMPLEMENTATION_HEAD, "HEAD"]);                     // throws if not
+
+  // 2) THE FIXED FOUR-FILE RANGE — name-status -M -C so a deletion / rename / copy / type-change can never
+  //    masquerade as valid membership. EXACTLY three Additions + one Modification.
+  const nameStatus = execFileSync("git", ["diff", "--name-status", "-M", "-C", `${PHASE_8B1BA_AUTHORITY_BASE}..${PHASE_8B1BA_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
+    .split("\n").map((l) => l.trim()).filter(Boolean);
+  const added = [], modified = [], rangeFiles = [];
+  for (const line of nameStatus) {
+    const parts = line.split(/\t+|\s{2,}|\s+/);
+    const status = parts[0];
+    const path = (parts[1] || "").replace(/\\/g, "/");
+    assert(/^[AM]$/.test(status), `the Phase 8B-1B-A range allows ONLY A/M status — no deletion, rename, copy or type change (got '${line}')`);
+    if (status === "A") added.push(path); else modified.push(path);
+    rangeFiles.push(path);
+  }
+  const approved = new Set(PHASE_8B1BA_EXPECTED_FILES);
+  assert(rangeFiles.length === approved.size, `the fixed Phase 8B-1B-A range must contain EXACTLY ${approved.size} files (got ${rangeFiles.length}: ${rangeFiles.join(", ")})`);
+  for (const f of PHASE_8B1BA_EXPECTED_FILES) assert(rangeFiles.includes(f), `an approved Phase 8B-1B-A file is missing from the range: ${f}`);
+  for (const f of rangeFiles) assert(approved.has(f), `an unexpected file is in the Phase 8B-1B-A range: ${f}`);
+  assert(added.length === 3 && modified.length === 1, `the Phase 8B-1B-A range must be EXACTLY 3 additions + 1 modification (got ${added.length}A / ${modified.length}M)`);
+  for (const f of [PHASE_8B1BA_OWNERSHIP_SRC, PHASE_8B1BA_HARNESS_SRC, PHASE_8B1BA_MIGRATION_SRC]) {
+    assert(added.includes(f), `${f} must be an ADDITION in the fixed Phase 8B-1B-A range`);
+  }
+  assert(modified[0] === PHASE_8B1BA_RUNTIME_SRC, `${PHASE_8B1BA_RUNTIME_SRC} must be the SINGLE modification in the fixed Phase 8B-1B-A range (got ${modified.join(", ")})`);
+
+  // 3) FORBIDDEN CATEGORIES (defence in depth) + MODELLED SELF-PROOF. The four reviewed files are accepted;
+  //    every OTHER migration / provider module / service / harness / route, and any package / lockfile / env /
+  //    deployment file, is rejected — no general permission is granted to any of those categories.
+  const forbidden = (p) =>
+    (/^supabase\/migrations\//.test(p) && p !== PHASE_8B1BA_MIGRATION_SRC) ||
+    /(^|\/)\.env(\.|$)/.test(p) ||
+    /package-lock\.json|yarn\.lock|pnpm-lock\.yaml/.test(p) ||
+    /^package\.json$/.test(p) ||
+    /^(Dockerfile|docker-compose|\.github\/|vercel\.json|ecosystem\.config)/.test(p) ||
+    /^app\/api\/.*route\.ts$|^pages\/api\//.test(p) ||
+    (/^lib\/communication\/providers\//.test(p) && p !== PHASE_8B1BA_OWNERSHIP_SRC) ||
+    (/^services\//.test(p) && p !== PHASE_8B1BA_RUNTIME_SRC) ||
+    (/^scripts\//.test(p) && p !== PHASE_8B1BA_HARNESS_SRC);
+  for (const f of rangeFiles) assert(!forbidden(f), `a forbidden path is in the Phase 8B-1B-A range: ${f}`);
+  const evaluate = (fs) => {
+    const u = [...new Set(fs)];
+    if (u.length !== approved.size) return "reject";
+    for (const f of u) { if (!approved.has(f)) return "reject"; if (forbidden(f)) return "reject"; }
+    return "accept";
+  };
+  const three = PHASE_8B1BA_EXPECTED_FILES.slice(0, 3);
+  assert(evaluate(PHASE_8B1BA_EXPECTED_FILES) === "accept", "the exact four-file range is accepted");
+  assert(evaluate(three) === "reject", "a MISSING approved file is rejected");
+  assert(evaluate([...PHASE_8B1BA_EXPECTED_FILES, "services/whatsappDashboardService.ts"]) === "reject", "an ADDITIONAL file is rejected");
+  assert(evaluate([...three, "supabase/migrations/20260901000001_x.sql"]) === "reject", "another MIGRATION is rejected");
+  assert(evaluate([...three, "package.json"]) === "reject", "package.json is rejected");
+  assert(evaluate([...three, "package-lock.json"]) === "reject", "a lockfile is rejected");
+  assert(evaluate([...three, ".env.local"]) === "reject", "an environment file is rejected");
+  assert(evaluate([...three, "Dockerfile"]) === "reject", "a Dockerfile is rejected");
+  assert(evaluate([...three, "docker-compose.yml"]) === "reject", "a docker-compose file is rejected");
+  assert(evaluate([...three, "vercel.json"]) === "reject", "a deployment file is rejected");
+  assert(evaluate([...three, "ecosystem.config.js"]) === "reject", "an ecosystem deployment file is rejected");
+  assert(evaluate([...three, ".github/workflows/deploy.yml"]) === "reject", "a .github workflow/deployment path is rejected");
+  assert(evaluate([...three, PHASE_8B1A_APPROVED_ROUTE]) === "reject", "an API route is rejected");
+  assert(evaluate([...three, "lib/communication/providers/metaCallbackIdentity.ts"]) === "reject", "another provider adapter/module is rejected");
+  assert(evaluate([...three, WEBHOOK_SRC]) === "reject", "another service is rejected");
+  assert(evaluate([...three, PHASE8B1A_HARNESS_SRC]) === "reject", "another harness is rejected");
+  // The four reviewed files must NOT be pre-rejected by their own categories.
+  for (const f of PHASE_8B1BA_EXPECTED_FILES) assert(approved.has(f) && !forbidden(f), `the approved Phase 8B-1B-A file must be accepted inside this fixed range: ${f}`);
+  // MODELLED status/composition proof — a rename / deletion / copy / type-change can never claim membership,
+  // and only the exact 3A/1M composition is accepted.
+  const statusOk = (st) => /^[AM]$/.test(st);
+  assert(statusOk("A") && statusOk("M"), "A and M statuses are accepted");
+  for (const bad of ["D", "R100", "C100", "T"]) assert(!statusOk(bad), `a '${bad}' status is rejected by the Phase 8B-1B-A range status rule`);
+  const composition = (a, m) => (a === 3 && m === 1 ? "accept" : "reject");
+  assert(composition(3, 1) === "accept", "the exact 3A/1M composition is accepted");
+  for (const [a, m] of [[4, 0], [2, 2], [3, 0], [3, 2], [0, 4]]) {
+    assert(composition(a, m) === "reject", `a ${a}A/${m}M composition is rejected`);
+  }
+
+  // 4) THE ACTIVE BYTE-FREEZE — the implementation commit AND the on-disk file must equal the reviewed blob.
+  //    Detects a dirty modification, a later COMMITTED modification, a deletion, a replacement, a migration
+  //    rewrite and a harness weakening. A legitimate change requires an EXPLICIT authority transfer + re-pin.
+  const blobMatches = (onDisk, pinned) => onDisk === pinned;
+  for (const [path, expectedBlob] of PHASE_8B1BA_FROZEN_BLOBS) {
+    const headBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1BA_IMPLEMENTATION_HEAD}:${path}`], { encoding: "utf8" }).trim();
+    assert(blobMatches(headBlob, expectedBlob), `the Phase 8B-1B-A implementation commit must resolve ${path} to its reviewed blob (got ${headBlob.slice(0, 12)}, expected ${expectedBlob.slice(0, 12)})`);
+    assert(existsSync(path), `${path} must exist — a DELETION requires an EXPLICIT AUTHORITY TRANSFER`);
+    const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
+    assert(blobMatches(onDisk, expectedBlob),
+      `${path} is not byte-identical to its Phase 8B-1B-A reviewed baseline (commit ${PHASE_8B1BA_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+      `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDisk.slice(0, 12)} != pinned ${expectedBlob.slice(0, 12)}).`);
+  }
+  // MODELLED: a CHANGED reviewed blob is rejected by the very comparator used above.
+  assert(blobMatches("aa5d5a1f0f8883de744531cdb358d72d8b598375", "aa5d5a1f0f8883de744531cdb358d72d8b598375") === true, "an identical reviewed blob is accepted");
+  assert(blobMatches("0000000000000000000000000000000000000000", "aa5d5a1f0f8883de744531cdb358d72d8b598375") === false, "a CHANGED reviewed blob is rejected");
+
+  // 5) DEDICATED 8B-1B-A HARNESS EVIDENCE — EXECUTABLE registrations (comment-stripped anchors), never
+  //    comment-only. The families defeat an equal-count substitution: swapping a real mutation for a
+  //    harmless one changes a family name or count even when the total still reads 48.
+  const h = readF(PHASE_8B1BA_HARNESS_SRC);
+  const hStripped = stripTs(h);
+  const hReg = (re) => (h.match(re) || []).length;
+  assert(hReg(/^\s*check\("/gm) === PHASE8B1BA_HARNESS_CHECKS, `the 8B-1B-A harness must register EXACTLY ${PHASE8B1BA_HARNESS_CHECKS} functional checks (got ${hReg(/^\s*check\("/gm)})`);
+  assert(hReg(/^\s*mutate\("/gm) === PHASE8B1BA_HARNESS_MUTATIONS, `the 8B-1B-A harness must register EXACTLY ${PHASE8B1BA_HARNESS_MUTATIONS} mutations (got ${hReg(/^\s*mutate\("/gm)})`);
+  let familySum = 0;
+  for (const [prefix, n] of PHASE8B1BA_MUTATION_FAMILIES) {
+    const got = hReg(new RegExp(`^\\s*mutate\\("${prefix}`, "gm"));
+    assert(got === n, `the 8B-1B-A mutation family ${prefix} must register EXACTLY ${n} mutations (got ${got})`);
+    familySum += n;
+  }
+  assert(familySum === PHASE8B1BA_HARNESS_MUTATIONS, `the registered mutation families must account for ALL ${PHASE8B1BA_HARNESS_MUTATIONS} mutations (got ${familySum})`);
+  assert(hReg(/"INFRA-[A-D] /g) === PHASE8B1BA_INFRA_SELF_TESTS, `the 8B-1B-A harness must keep its ${PHASE8B1BA_INFRA_SELF_TESTS} INFRA self-tests (got ${hReg(/"INFRA-[A-D] /g)})`);
+  // Every infrastructure classification must remain EXECUTABLE, and infra must NEVER be counted as a kill.
+  for (const [anchor, what] of [
+    ['return "infra_fail:anchor"', "a missing anchor is an infrastructure failure"],
+    ['return "infra_fail:compile"', "a compile failure is an infrastructure failure"],
+    ['return "infra_fail:import"', "an import/load failure is an infrastructure failure"],
+    ['return "infra_fail:scenario_threw"', "an unrelated scenario exception is an infrastructure failure"],
+    ['return "infra_fail:non_boolean"', "a non-boolean mutation result is an infrastructure failure"],
+    ['if (detected) return "killed";', "ONLY a detected mutation is a kill"],
+    ["const mutationFail = mutants.survived + mutants.infra;", "a survived OR infrastructure mutation FAILS the harness and is never a kill"],
+  ]) assert(hStripped.includes(anchor), `the 8B-1B-A harness must EXECUTABLY prove: ${what}`);
+  // Exact load-bearing registrations, derived from the reviewed harness — never invented.
+  for (const [anchor, what] of [
+    ['check("DBR1-6.', "malformed null/non-array DB response → query_error"],
+    ['mutate("DBR-1.', "restoring the (data ?? []) coalescing form is killed"],
+    ['mutate("DBR-2.', "treating null data as an empty result is killed"],
+    ['mutate("DBR-3.', "treating malformed data as not_found is killed"],
+    ['check("PRJ1-8.', "the exact identity-only projection"],
+    ['mutate("PRJ-1.', "adding readiness_status to the projection is killed"],
+    ['mutate("PRJ-2.', "adding health_status to the projection is killed"],
+    ['mutate("PRJ-3.', "a select('*') projection is killed"],
+    ['check("RB1-18.', "the exact recorded query semantics"],
+    ['mutate("QRY-1.', "dropping the provider_key predicate is killed"],
+    ['mutate("QRY-2.', "dropping the channel predicate is killed"],
+    ['mutate("QRY-3.', "dropping the phone_number_reference predicate is killed"],
+    ['mutate("QRY-5.', "narrowing limit(2) to limit(1) is killed"],
+    ['check("M9.', "the delivery-event provider-account supporting index"],
+    ['mutate("SQL-16.', "removing the delivery-event account index is killed"],
+    ['check("M10.', "the absence of schema-drift masking"],
+    ['mutate("SQL-17.', "reintroducing ADD COLUMN IF NOT EXISTS is killed"],
+    ['mutate("SQL-18.', "reintroducing CREATE INDEX IF NOT EXISTS is killed"],
+    ['mutate("SQL-19.', "reintroducing CREATE UNIQUE INDEX IF NOT EXISTS is killed"],
+    ['mutate("SQL-20.', "reintroducing DROP INDEX IF EXISTS is killed"],
+    ['check("MAL1-16.', "malformed identifier fail-closed behaviour"],
+    ['mutate("GRM-4.', "bypassing the Phase 8B-1A Meta id grammar is killed"],
+    ["OWNING_PROVIDER_ACCOUNT_COLUMNS", "the projection constant is the executable authority"],
+    ["communication_provider_accounts", "ownership resolves against the provider-account table"],
+  ]) assert(hStripped.includes(anchor), `the 8B-1B-A harness must EXECUTABLY retain: ${what}`);
+
+  // 6) SELF-PROOF — the endpoints are exact fixed literals and the range never uses a moving HEAD.
+  //    Tested against COMMENT-STRIPPED source: this file's own prose names the very forms it forbids, and
+  //    prose must never satisfy — or defeat — an executable guard.
+  const selfSrc = stripTs(readF(HARNESS_SRC));
+  assert(selfSrc.includes('"1fd6e99d7f2ab65d7bc66908dea20a8d258318fa"'), "the Phase 8B-1B-A base is the exact fixed literal");
+  assert(selfSrc.includes('"73201296ef4206e8d505f7a94cfbfcfb68edf9ec"'), "the Phase 8B-1B-A implementation head is the exact fixed literal");
+  // NB: these two guards are deliberately REGEX-based, never `includes("<the literal template>")`. A quoted
+  // template inside an assertion would satisfy that assertion by its own presence — the guard would prove
+  // nothing. A regex literal carries backslashes (\$\{ …), so its own source can never match it.
+  const rangeTemplateUses = (selfSrc.match(/\$\{PHASE_8B1BA_AUTHORITY_BASE\}\.\.\$\{PHASE_8B1BA_IMPLEMENTATION_HEAD\}/g) || []).length;
+  assert(rangeTemplateUses === 1, `the Phase 8B-1B-A range must be built EXACTLY ONCE from the two FIXED endpoint constants (got ${rangeTemplateUses} uses)`);
+  // EVERY `${PHASE_8B1BA_AUTHORITY_BASE}..` must be followed IMMEDIATELY by the fixed head constant, so
+  // `..HEAD`, `..main` or any other moving endpoint is rejected.
+  assert(!/PHASE_8B1BA_AUTHORITY_BASE\}\.\.(?!\$\{PHASE_8B1BA_IMPLEMENTATION_HEAD\})/.test(selfSrc), "the Phase 8B-1B-A range never uses a moving endpoint — the base is always paired with the FIXED implementation head");
+  for (const [, blob] of PHASE_8B1BA_FROZEN_BLOBS) assert(selfSrc.includes(`"${blob}"`), `the Phase 8B-1B-A reviewed blob ${blob.slice(0, 12)} is an exact fixed literal`);
+  // The permitted LOCAL TOOLING is never granted production governance scope.
+  for (const t of [".mcp.json", ".claude/"]) assert(!D3B_EXPECTED_FILES.includes(t), `local tooling must never enter the D3-B governance allowlist: ${t}`);
+}
+
 check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/provider file is touched", () => {
   // PHASE 8B-0 — the 5F-B AUTHORITY FREEZE runs FIRST and UNCONDITIONALLY, before the dirty-scope loop, so a
   // dirty OR later-committed 5F-B change fails with a clear authority-transfer error rather than the generic
@@ -1200,6 +1416,12 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
   // PHASE 8B-1A — the ACTIVE 5F-B + D4-B byte-freeze against Commit 1, the fixed ten-file range, and the
   // dedicated Phase 8B-1A harness's executable security shape. Runs whether the tree is clean or dirty.
   provePhase8B1AMetaAuthority();
+  // PHASE 8B-1B-A — the fixed four-file range (3A/1M), the reviewed byte-freeze of all four implementation
+  // files, and the dedicated harness's executable evidence. Runs BEFORE the generic dirty-scope loop, so a
+  // dirty OR later-committed change to the ownership module, the runtime service, the dedicated harness or
+  // the migration fails with a clear authority-transfer error instead of a generic scope message — or, once
+  // committed, instead of passing silently.
+  provePhase8B1BAProviderAccountAuthority();
 
   const dirty = gitDirty();
   for (const f of [D2C_SRC, D2D_WRITER_SRC, D2D_COMMAND_SRC, POLICY_SRC, D2E_ORCH_SRC, D2E_INPUT_SRC]) {

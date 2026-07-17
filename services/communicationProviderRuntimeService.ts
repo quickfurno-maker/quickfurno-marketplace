@@ -17,6 +17,14 @@ import {
   type ProviderRuntimePolicyRow,
 } from "../lib/communication/providers/metaRuntimeGate";
 import { META_WHATSAPP_CLOUD_PROVIDER_KEY } from "../lib/communication/providers/metaCloudWhatsAppProvider";
+import {
+  classifyOwnership,
+  isValidOwnershipInput,
+  OWNING_PROVIDER_ACCOUNT_COLUMNS,
+  type OwningProviderAccountRow,
+  type OwnershipResolutionInput,
+  type ProviderAccountOwnership,
+} from "../lib/communication/providers/providerAccountOwnership";
 
 const CHANNEL = "whatsapp";
 
@@ -93,4 +101,51 @@ export async function evaluateMetaOutboundGateForMessage(input: {
     expected: { phoneNumberId: input.config.phoneNumberId, wabaId: input.config.wabaId },
     now: input.now,
   });
+}
+
+// ----------------------------------------------------------------------------
+// OWNERSHIP RESOLUTION (Phase 8B-1B-A)
+//
+// Deliberately SEPARATE from every send-eligibility path above. It answers ONLY
+// "which durable communication_provider_accounts row OWNS this identity" — never
+// "may we send". It is READINESS-AGNOSTIC: a disabled / unhealthy / historical
+// account still owns its own identity, so this NEVER consults readiness/health.
+//
+// Unlike fetchProviderAccount() (which uses .maybeSingle() and collapses zero / many
+// / error into a single null for the send gate), the resolver fails closed with a
+// DISTINCT typed outcome for each case: >1 rows → ambiguous (never a silent first-row
+// pick), a DB error or thrown exception → query_error (never not_found / owned), and
+// blank/malformed input → invalid_input. It projects only NON-SECRET columns and never
+// falls back to environment configuration to invent an owner.
+// ----------------------------------------------------------------------------
+export async function resolveOwningProviderAccount(
+  input: OwnershipResolutionInput
+): Promise<ProviderAccountOwnership> {
+  if (!isValidOwnershipInput(input)) return { kind: "invalid_input" };
+  try {
+    // `.limit(2)` is a deliberate defence-in-depth: the (provider_key, channel,
+    // phone_number_reference) unique index makes >1 impossible in a healthy schema,
+    // but the resolver still detects and rejects a second row as ambiguous rather
+    // than trusting the constraint and selecting a first row.
+    const { data, error } = await adminClient()
+      .from("communication_provider_accounts")
+      .select(OWNING_PROVIDER_ACCOUNT_COLUMNS)
+      .eq("provider_key", input.providerKey)
+      .eq("channel", input.channel)
+      .eq("phone_number_reference", input.phoneNumberReference)
+      .limit(2);
+    if (error) return { kind: "query_error" };
+    // A MALFORMED result is not an empty result. `data` that is not an array — including null with
+    // no reported error — means the query did not return a result set we can reason about, so it
+    // fails closed as query_error. Coalescing it (e.g. `data ?? []`) would silently forge a
+    // confident "not_found" out of a broken response.
+    if (!Array.isArray(data)) return { kind: "query_error" };
+
+    return classifyOwnership(
+      data as OwningProviderAccountRow[],
+      input.expectedWabaId
+    );
+  } catch {
+    return { kind: "query_error" };
+  }
 }

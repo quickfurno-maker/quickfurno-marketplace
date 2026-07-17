@@ -276,6 +276,15 @@ export interface CommunicationMessage {
   readonly provider: string;
   readonly provider_message_id: string | null;
   /**
+   * Phase 8B-1B-B: the EXACT `communication_provider_accounts` row that owns the runtime
+   * identity used for this dispatch. Bound durably BEFORE the provider request, so a sent
+   * message is always attributable to the account that actually sent it. NULL while the
+   * message is `queued` / `retry_scheduled` (no dispatch identity exists yet). OPTIONAL
+   * because the Phase 8B-1B-A column is nullable and rows read before that migration is
+   * applied simply do not project it — it is never inferred, defaulted or back-filled here.
+   */
+  readonly provider_account_id?: string | null;
+  /**
    * Phase 5F-B: the approved provider template mapping used for this dispatch — its
    * id, the version pinned at initial send, and a SHA-256 (lowercase hex) fingerprint
    * of its exact dispatch-critical content. All NON-SECRET; null for the mock

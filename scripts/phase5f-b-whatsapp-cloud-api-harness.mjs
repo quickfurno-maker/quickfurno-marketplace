@@ -99,6 +99,9 @@ function wireBuild(outDir) {
     Selection: req("./services/whatsAppProviderSelection.js"),
     Comm: req("./services/communicationService.js"),
     Runtime: req("./services/runtimeCommunicationService.js"),
+    // Phase 8B-1B-B — the FROZEN Phase 8B-1B-A ownership runtime service (already in the compiled
+    // graph). The test-only attribution helper injects its EXACT resolver, never an always-owned fake.
+    AccountRuntime: req("./services/communicationProviderRuntimeService.js"),
     // PHASE 8B-0 — the closed outbound-consent SCOPE registry and the production consent-enforcer factory.
     // Both are transitively compiled (communicationService.ts imports them), so they are emitted to the
     // build and available to the TEST-ONLY consent posture below. The production enforcer is never stubbed.
@@ -200,7 +203,7 @@ function assertNoForbidden(body, patterns, label) {
 
 // A fully-populated MetaProviderRuntime (send + webhook-verify + health capable).
 const META_CONFIG = {
-  accessToken: "SUPER_SECRET_TOKEN_VALUE", phoneNumberId: "PN_123", wabaId: "WABA_456",
+  accessToken: "SUPER_SECRET_TOKEN_VALUE", phoneNumberId: "15550000123", wabaId: "22220000456",
   graphApiVersion: "v19.0", appSecret: "APP_SECRET_VALUE",
   authHttpTimeoutMs: 3000, businessHttpTimeoutMs: 5000, healthHttpTimeoutMs: 5000,
 };
@@ -208,8 +211,8 @@ function completeMetaEnv(overrides = {}) {
   return {
     WHATSAPP_PROVIDER_MODE: "meta_cloud",
     WHATSAPP_ACCESS_TOKEN: "SUPER_SECRET_TOKEN_VALUE",
-    WHATSAPP_PHONE_NUMBER_ID: "PN_123",
-    WHATSAPP_WABA_ID: "WABA_456",
+    WHATSAPP_PHONE_NUMBER_ID: "15550000123",
+    WHATSAPP_WABA_ID: "22220000456",
     WHATSAPP_APP_SECRET: "APP_SECRET_VALUE",
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: "VERIFY_TOKEN_VALUE",
     WHATSAPP_GRAPH_API_VERSION: "v19.0",
@@ -224,8 +227,10 @@ function fakeTransport(responder) {
 }
 function okAccount(overrides = {}) {
   return {
+    // Phase 8B-1B-B — a stable id so the pre-network binding CAS records a concrete owning account.
+    id: "acct-meta-5fb",
     provider_key: "meta_whatsapp_cloud", channel: "whatsapp",
-    phone_number_reference: "PN_123", business_account_reference: "WABA_456",
+    phone_number_reference: "15550000123", business_account_reference: "22220000456",
     readiness_status: "provider_ready", configuration_status: "complete",
     business_verification_status: "verified", phone_number_status: "connected",
     webhook_status: "verified", health_status: "healthy", ...overrides,
@@ -265,6 +270,10 @@ class QB {
   // fake builder must be able to answer the D2-C suppression read, which filters with `.in("scope", …)`.
   // A pure ADDITION — no existing filter, assertion or behaviour is changed.
   in(col, vals) { this.filters.push((row) => vals.includes(row[col])); return this; }
+  // Phase 8B-1B-B compatibility: the pre-network account-binding CAS filters with
+  // `.is("provider_account_id", null)`. Model Postgres IS NULL faithfully — a null/undefined column
+  // matches `null`, and a present value never does. A pure ADDITION; no existing filter changes.
+  is(col, val) { this.filters.push((row) => (row[col] ?? null) === val); return this; }
   insert(row) { this.action = "insert"; this.data = row; return this; }
   update(u) { this.action = "update"; this.data = u; return this; }
   maybeSingle() { return this.single(); }
@@ -302,7 +311,7 @@ check("1-3. default mode mock (non-prod); outbound needs complete config; missin
   const C = M.Config;
   assert(C.resolveWhatsAppProviderMode({}) === "mock", "absent mode → mock");
   const r1 = C.resolveOutboundMetaConfig(completeMetaEnv());
-  assert(r1.ok && r1.config.phoneNumberId === "PN_123", "complete outbound config resolves");
+  assert(r1.ok && r1.config.phoneNumberId === "15550000123", "complete outbound config resolves");
   const missing = C.resolveOutboundMetaConfig({});
   assert(!missing.ok && missing.missing.length >= 5, "outbound with no vars fails closed with names");
 });
@@ -429,7 +438,7 @@ check("26. canary table stores destination HASH only — no plaintext phone", ()
 // ============================================================================
 check("27-34. provider-account readiness gate is exact and fails closed on any field", () => {
   const G = M.Gate;
-  const expected = { phoneNumberId: "PN_123", wabaId: "WABA_456" };
+  const expected = { phoneNumberId: "15550000123", wabaId: "22220000456" };
   assert(!G.evaluateProviderAccountReadiness(null, expected).ok, "missing account fails closed");
   assert(G.evaluateProviderAccountReadiness(okAccount(), expected).ok, "fully ready account passes");
   const mismatchPhone = G.evaluateProviderAccountReadiness(okAccount({ phone_number_reference: "PN_OTHER" }), expected);
@@ -451,7 +460,7 @@ check("composed gate fails closed end to end", () => {
   const hash = "h1";
   const base = {
     account: okAccount(), canaryRows: [], destinationHash: hash,
-    expected: { phoneNumberId: "PN_123", wabaId: "WABA_456" },
+    expected: { phoneNumberId: "15550000123", wabaId: "22220000456" },
   };
   assert(!G.evaluateMetaOutboundGate({ policy: okPolicy({ activation_status: "disabled", outbound_enabled: false }), ...base }).ok, "disabled blocked");
   // active + ready + no canary needed → ok
@@ -587,7 +596,7 @@ check("62-65. correct endpoint + Bearer header + content-type + template payload
   const provider = new M.Provider.MetaCloudWhatsAppProvider(META_CONFIG, transport);
   await provider.sendResolvedTemplate("+15550001111", RESOLVED_OTP, { otp: "483920" });
   const req = transport.calls[0];
-  assert(req.url === "https://graph.facebook.com/v19.0/PN_123/messages", `endpoint correct, got ${req.url}`);
+  assert(req.url === "https://graph.facebook.com/v19.0/15550000123/messages", `endpoint correct, got ${req.url}`);
   assert(req.headers.Authorization === "Bearer SUPER_SECRET_TOKEN_VALUE", "Bearer header present");
   assert(req.headers["Content-Type"] === "application/json", "content type json");
   const body = JSON.parse(req.body);
@@ -704,7 +713,7 @@ check("85-92. POST fail-closed order; signature before parse; app secret never l
 // NORMALIZATION (93–100)
 // ============================================================================
 function deliveryPayload(statuses) {
-  return { object: "whatsapp_business_account", entry: [{ id: "WABA_456", changes: [{ field: "messages", value: { statuses } }] }] };
+  return { object: "whatsapp_business_account", entry: [{ id: "22220000456", changes: [{ field: "messages", value: { statuses } }] }] };
 }
 check("93-100. Meta status normalization conservative; drop unknown/incomplete; multi-status", () => {
   const W = M.Webhook;
@@ -772,14 +781,14 @@ check("112-114. webhook service: inbound classified but NOT processed; no n8n/Ja
 // HEALTH (115–120)
 // ============================================================================
 check("115-118. health check uses injected transport, abortable, sanitized, no plaintext phone", async () => {
-  const transport = fakeTransport(() => ({ kind: "response", status: 200, bodyText: '{"id":"PN_123","quality_rating":"GREEN","display_phone_number":"+15550001111"}', truncated: false }));
+  const transport = fakeTransport(() => ({ kind: "response", status: 200, bodyText: '{"id":"15550000123","quality_rating":"GREEN","display_phone_number":"+15550001111"}', truncated: false }));
   const provider = new M.Provider.MetaCloudWhatsAppProvider(META_CONFIG, transport);
   const health = await provider.healthCheck();
   assert(health.provider === "meta_whatsapp_cloud" && health.configured === true, "health identity");
   assert(health.detailsSanitized.phoneNumberIdMatches === true, "phone number id match reported");
   assert(!JSON.stringify(health).includes("15550001111"), "no display phone in health result");
   assert(!JSON.stringify(health).includes("SUPER_SECRET_TOKEN_VALUE"), "no token in health result");
-  assert(transport.calls[0].url === "https://graph.facebook.com/v19.0/PN_123?fields=id,quality_rating,name_status,code_verification_status", "read-only lookup url");
+  assert(transport.calls[0].url === "https://graph.facebook.com/v19.0/15550000123?fields=id,quality_rating,name_status,code_verification_status", "read-only lookup url");
   // timeout abortable
   const aborter = fakeTransport(() => ({ kind: "aborted" }));
   const h2 = await new M.Provider.MetaCloudWhatsAppProvider(META_CONFIG, aborter).healthCheck();
@@ -1275,16 +1284,39 @@ function allowAllMetaHarnessConsentEnforcer(build = M) {
   };
 }
 
+/**
+ * Phase 8B-1B-B — the TEST-ONLY provider-account attribution dependency for a directly-constructed
+ * Meta CommunicationService. It is NOT an allow-all: it carries only the four NON-SECRET identity
+ * fields (sourced from the SAME META_CONFIG that built the provider) and the ACTUAL frozen
+ * `resolveOwningProviderAccount`, which runs against this harness's fake communication_provider_accounts
+ * model. So a send still requires a real owning account row and a real durable binding. It contains no
+ * accessToken/appSecret/verifyToken/authorization/headers/full-config/destination.
+ */
+function metaHarnessProviderAccountAttribution(provider, build = M) {
+  return {
+    identity: {
+      providerKey: provider.providerKey,
+      channel: provider.channel,
+      phoneNumberReference: META_CONFIG.phoneNumberId,
+      expectedWabaId: META_CONFIG.wabaId,
+    },
+    resolveOwnership: build.AccountRuntime.resolveOwningProviderAccount,
+  };
+}
+
 function metaService(transport, build = M, coordinator = null) {
   const { provider, spy } = spyMetaProvider(transport, build);
   const coord = coordinator ?? new build.Outbound.MetaWhatsAppOutboundCoordinator(completeMetaEnv());
-  // 4th argument (Phase 8B-0): the explicit test consent posture. The rest of the dispatch path — provider
-  // selection, gates, mapping, timeout, outcome certainty, identity fences — is the REAL CommunicationService.
+  // 4th argument (Phase 8B-0): the explicit test consent posture. 5th argument (Phase 8B-1B-B): the
+  // strict test-only provider-account attribution dependency, so the REAL pre-network ownership fence
+  // runs. The rest of the dispatch path — provider selection, gates, mapping, timeout, outcome
+  // certainty, identity fences — is the REAL CommunicationService.
   const svc = new build.Comm.CommunicationService(
     provider,
     new build.Resolver.StaticCommunicationRecipientResolver({ "vendor:v1": DEST }),
     coord,
-    allowAllMetaHarnessConsentEnforcer(build)
+    allowAllMetaHarnessConsentEnforcer(build),
+    metaHarnessProviderAccountAttribution(provider, build)
   );
   return { svc, spy, provider };
 }
@@ -1371,7 +1403,24 @@ check("N7-15. Meta send chain: gate + mapping run, resolved dispatch only, zero 
   assert(spy.bare === 0, "7-8: bare sendAuthenticationMessage/sendTemplateMessage never used for Meta");
   assert(spy.resolved === 1, "11: sendResolvedTemplate called exactly once");
   assert(spy.lastResolved.providerTemplateName === "qf_vendor_new_lead" && spy.lastResolved.mappingId === "map-1", "9: approved mapping resolved");
-  assert(t.calls.length === 1 && t.calls[0].url.endsWith("/PN_123/messages"), "10-11: Meta network call only after gate + mapping pass");
+  assert(t.calls.length === 1 && t.calls[0].url.endsWith("/15550000123/messages"), "10-11: Meta network call only after gate + mapping pass");
+  // Phase 8B-1B-B — the happy-path send DURABLY BOUND the exact owning account BEFORE the network call.
+  const sentRow = db.communication_messages.find((m) => m.id === res.data.id);
+  assert(sentRow && sentRow.provider_account_id === "acct-meta-5fb", `11b: the sent message is bound to the exact seeded provider account (got ${sentRow && sentRow.provider_account_id})`);
+  // The TEST-ONLY attribution dependency uses the ACTUAL frozen resolver + the exact safe identity, and
+  // carries NO secret — proven structurally against the helper the direct Meta constructions inject.
+  const attr = metaHarnessProviderAccountAttribution({ providerKey: "meta_whatsapp_cloud", channel: "whatsapp" }, M);
+  assert(attr.resolveOwnership === M.AccountRuntime.resolveOwningProviderAccount, "11c: the helper injects the ACTUAL frozen resolveOwningProviderAccount (never an always-owned fake)");
+  assert(attr.identity.providerKey === "meta_whatsapp_cloud", "11d: helper supplies the exact provider key");
+  assert(attr.identity.channel === "whatsapp", "11e: helper supplies the exact channel");
+  assert(attr.identity.phoneNumberReference === META_CONFIG.phoneNumberId, "11f: helper supplies the exact phone-number reference");
+  assert(attr.identity.expectedWabaId === META_CONFIG.wabaId, "11g: helper supplies the exact expected WABA");
+  for (const secret of ["accessToken", "appSecret", "verifyToken", "authorization", "Authorization", "headers"]) {
+    assert(!(secret in attr.identity) && JSON.stringify(attr).indexOf(secret) === -1, `11h: the attribution dependency carries no ${secret}`);
+  }
+  const selfSrc = readFileSync("scripts/phase5f-b-whatsapp-cloud-api-harness.mjs", "utf8");
+  assert(/metaHarnessProviderAccountAttribution\(provider, build\)\n\s*\);\n\s*return \{ svc, spy, provider \};/.test(selfSrc), "11i: metaService passes the attribution helper to EVERY direct Meta CommunicationService construction");
+  assert(/resolveOwnership: build\.AccountRuntime\.resolveOwningProviderAccount/.test(selfSrc), "11j: the helper is wired to the real frozen resolver, not a fabricated one");
   const row = db.communication_messages[0];
   assert(row.provider === "meta_whatsapp_cloud", "persisted provider is the runtime-selected one");
   assert(row.provider_template_mapping_id === "map-1" && row.provider_template_version === "1.0", "mapping identity pinned for restart-safe retry");
@@ -2264,8 +2313,8 @@ tsMutation("MUT: remove provider-account readiness check",
     "  if (\n    account.readiness_status !== REQUIRED_ACCOUNT_READINESS.readiness_status ||\n    account.configuration_status !== REQUIRED_ACCOUNT_READINESS.configuration_status ||\n    account.business_verification_status !== REQUIRED_ACCOUNT_READINESS.business_verification_status ||\n    account.phone_number_status !== REQUIRED_ACCOUNT_READINESS.phone_number_status ||\n    account.webhook_status !== REQUIRED_ACCOUNT_READINESS.webhook_status ||\n    account.health_status !== REQUIRED_ACCOUNT_READINESS.health_status\n  ) {\n    return { ok: false, reason: OutboundGateReason.PROVIDER_ACCOUNT_NOT_READY };\n  }",
     "  // readiness check removed by mutation"]],
   (mm) => mm.Gate.evaluateProviderAccountReadiness(
-    { provider_key: "meta_whatsapp_cloud", channel: "whatsapp", phone_number_reference: "PN_123", business_account_reference: "WABA_456", readiness_status: "not_configured", configuration_status: "pending", business_verification_status: "unknown", phone_number_status: "unknown", webhook_status: "unknown", health_status: "unknown" },
-    { phoneNumberId: "PN_123", wabaId: "WABA_456" }).ok === true);
+    { provider_key: "meta_whatsapp_cloud", channel: "whatsapp", phone_number_reference: "15550000123", business_account_reference: "22220000456", readiness_status: "not_configured", configuration_status: "pending", business_verification_status: "unknown", phone_number_status: "unknown", webhook_status: "unknown", health_status: "unknown" },
+    { phoneNumberId: "15550000123", wabaId: "22220000456" }).ok === true);
 tsMutation("MUT: remove canary allowlist check",
   [[GATE_SRC,
     "  const allowed = canaryRows.some(\n    (r) => r.destination_hash === destinationHash && isCanaryRowUsable(r, nowMs)\n  );",

@@ -161,11 +161,24 @@ const PHASE_8B1A_EXPECTED_FILES = [
   PHASE8B1A_HARNESS_SRC,
   WEBHOOK_SRC,
 ];
-/** The Commit-1 blobs the ACTIVE on-disk byte-freeze pins (5F-B + D4-B are D3-B's; the service is D1-B's). */
+/**
+ * The Commit-1 blobs the Phase 8B-1A implementation head resolves each frozen file to. IMMUTABLE HISTORY
+ * (both 5F-B and D4-B): these commit-blob facts NEVER move, whatever later phases do. The ACTIVE on-disk
+ * 5F-B freeze has TRANSFERRED to the Phase 8B-1B-B authority (provePhase8B1BBOutboundAccountAttributionAuthority);
+ * D4-B's active on-disk freeze STAYS with Phase 8B-1A. See PHASE_8B1A_ONDISK_TRANSFERRED below.
+ */
 const PHASE_8B1A_FROZEN_BLOBS = [
   [PHASE5FB_SRC, "0af67dd47d380f9c09698fbc4f8fc983974c125c"],
   [PHASE5FD4B_SRC, "5cf652122fa0c12f5137c8d9b157b4156ce56abd"],
 ];
+/** Phase 8B-1B-B TRANSFERRED the ACTIVE on-disk 5F-B freeze out of Phase 8B-1A — exactly ONE path (5F-B).
+ *  D4-B does NOT transfer; no other Phase 8B-1A file transfers. */
+const PHASE_8B1A_ONDISK_TRANSFERRED = [PHASE5FB_SRC];
+/** What Phase 8B-1A STILL freezes on-disk: the historical set MINUS the transferred paths (⇒ D4-B only).
+ *  The historical commit-blob facts above continue to cover BOTH files unconditionally. */
+const PHASE_8B1A_ACTIVE_ONDISK_BLOBS = PHASE_8B1A_FROZEN_BLOBS.filter(
+  ([p]) => !PHASE_8B1A_ONDISK_TRANSFERRED.includes(p)
+);
 
 // ============================================================================
 // PHASE 8B-1B-A — PROVIDER-ACCOUNT BINDING AUTHORITY.
@@ -202,6 +215,56 @@ const PHASE8B1BA_HARNESS_CHECKS = 16;
 const PHASE8B1BA_HARNESS_MUTATIONS = 48;
 const PHASE8B1BA_INFRA_SELF_TESTS = 4;
 const PHASE8B1BA_MUTATION_FAMILIES = [["OWN-", 2], ["DBR-", 3], ["RES-", 4], ["QRY-", 8], ["PRJ-", 5], ["GRM-", 6], ["SQL-", 20]];
+
+// ============================================================================
+// PHASE 8B-1B-B — OUTBOUND PROVIDER-ACCOUNT ATTRIBUTION AUTHORITY.
+// The reviewed implementation commit (51b251d) is FROZEN here: its exact six-file range, its exact 2A/4M
+// composition, and the byte-identity of all six reviewed files — AND it RECEIVES the transferred active
+// on-disk 5F-B freeze. Every prior authority (8A / 8B-0 / 8B-1A / 8B-1B-A) is untouched and never moves.
+// ============================================================================
+const PHASE_8B1BB_AUTHORITY_BASE = "bef87673ad6b867f200d27d2fa79dd7f1fd595bd";
+const PHASE_8B1BB_IMPLEMENTATION_HEAD = "51b251d3dc790494c33028827a9aaec1bd9418dc";
+const PHASE_8B1BB_TYPES_SRC = "lib/communication/types.ts";
+const PHASE_8B1BB_ATTRIBUTION_SRC = "lib/communication/outboundProviderAccountAttribution.ts";
+const PHASE_8B1BB_PHASE5FB_SRC = "scripts/phase5f-b-whatsapp-cloud-api-harness.mjs";
+const PHASE_8B1BB_HARNESS_SRC = "scripts/phase8b1bb-outbound-account-attribution-harness.mjs";
+const PHASE_8B1BB_COMM_SRC = "services/communicationService.ts";
+const PHASE_8B1BB_RUNTIME_SRC = "services/runtimeCommunicationService.ts";
+/** The EXACT six files the fixed Phase 8B-1B-B range (base..head) may contain — nothing more, nothing less. */
+const PHASE_8B1BB_EXPECTED_FILES = [
+  PHASE_8B1BB_ATTRIBUTION_SRC,   // A
+  PHASE_8B1BB_HARNESS_SRC,       // A
+  PHASE_8B1BB_TYPES_SRC,         // M
+  PHASE_8B1BB_PHASE5FB_SRC,      // M
+  PHASE_8B1BB_COMM_SRC,          // M
+  PHASE_8B1BB_RUNTIME_SRC,       // M
+];
+/** The exact composition: two ADDITIONS, four MODIFICATIONS. */
+const PHASE_8B1BB_ADDED_FILES = [PHASE_8B1BB_ATTRIBUTION_SRC, PHASE_8B1BB_HARNESS_SRC];
+const PHASE_8B1BB_MODIFIED_FILES = [PHASE_8B1BB_TYPES_SRC, PHASE_8B1BB_PHASE5FB_SRC, PHASE_8B1BB_COMM_SRC, PHASE_8B1BB_RUNTIME_SRC];
+/** The reviewed implementation-head blobs — derived via `git rev-parse 51b251d:<path>`. A change — dirty OR
+ *  later COMMITTED — fails until another EXPLICIT authority transfer re-pins them. This is the primary authority. */
+const PHASE_8B1BB_FROZEN_BLOBS = [
+  [PHASE_8B1BB_ATTRIBUTION_SRC, "09b8e68d665224b544cc005044c0b79cdc7892bc"],
+  [PHASE_8B1BB_TYPES_SRC, "47e0637980395c0f39ccceebb66914ab5d9998ee"],
+  [PHASE_8B1BB_PHASE5FB_SRC, "811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4"],
+  [PHASE_8B1BB_HARNESS_SRC, "8634bbe267c05c681c0186f59edf9675eeec0bc9"],
+  [PHASE_8B1BB_COMM_SRC, "8d24e0a1a6430b2bde1957af641232e3522b5d15"],
+  [PHASE_8B1BB_RUNTIME_SRC, "af5f19f4877f56822ccae8f996e425491f91152b"],
+];
+/** The NEW ACTIVE Phase 5F-B blob — the byte the TRANSFERRED on-disk freeze now pins (== the 8B-1B-B 5F-B pin). */
+const PHASE_8B1BB_ACTIVE_5FB_BLOB = "811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4";
+/** The dedicated harness's executable shape (defence in depth for a future EXPLICIT re-pin). Counts are the
+ *  ACTUAL reviewed registrations: 16 functional check() + 4 INFRA self-tests = 20 functional; 31 mutations. */
+const PHASE8B1BB_HARNESS_CHECKS = 16;
+const PHASE8B1BB_INFRA_SELF_TESTS = 4;
+const PHASE8B1BB_FUNCTIONAL_TOTAL = 20;
+const PHASE8B1BB_HARNESS_MUTATIONS = 31;
+/** Every ACTUAL mutation-family prefix and count from the committed harness. The family sum MUST equal 31. */
+const PHASE8B1BB_MUTATION_FAMILIES = [["CAS", 5], ["DEP", 4], ["FIL", 4], ["MAP", 5], ["ORD", 3], ["RTE", 1], ["RUN", 6], ["VAL", 3]];
+/** Phase 5F-B totals — the updated test-only wiring leaves both totals unchanged. */
+const PHASE_8B1BB_5FB_CHECKS = 60;
+const PHASE_8B1BB_5FB_MUTATIONS = 63;
 
 function compileTo(outDir) {
   rmSync(outDir, { recursive: true, force: true });
@@ -276,10 +339,31 @@ function wireBuild(outDir) {
 const readF = (f) => readFileSync(f, "utf8");
 const stripTs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/[^\n]*/gm, "");
 function safeStringify(v) { try { return JSON.stringify(v); } catch { return String(v); } }
+/**
+ * Decide whether a `git status --porcelain=v1` line describes a PERMITTED, genuinely UNTRACKED artifact that
+ * is out of governance scope. STATUS-AWARE by construction: the first two characters are the porcelain status,
+ * and ONLY an untracked ('??') entry may ever be ignored. A TRACKED change — staged OR unstaged, M/A/D/R —
+ * under these very paths is NEVER ignored; it stays dirty and is caught by the B4 scope loop. The permitted
+ * set is this harness's own temp build artifacts, the founder-permitted .mcp.json, and the founder-permitted
+ * .claude/skills tooling — nothing else. The whole .claude tree is deliberately NOT ignored (an untracked
+ * .claude/settings.json stays dirty), and no path is ever added to the D3B_EXPECTED_FILES allowlist.
+ */
+function shouldIgnoreDirtyLine(line) {
+  const status = line.slice(0, 2);
+  const path = line.slice(3).trim().replace(/\\/g, "/");
+  if (status !== "??") return false;                                   // a TRACKED status is never ignored
+  if (path.startsWith(".phase5fd3b")) return true;                     // this harness's own temp build artifacts
+  if (path === ".mcp.json") return true;                               // the founder-permitted MCP config
+  if (path === ".claude/skills" || path.startsWith(".claude/skills/")) return true; // founder-permitted skills tooling
+  return false;
+}
+
 function gitDirty() {
-  return execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
-    .split("\n").map((l) => l.slice(3).trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"))
-    .filter((p) => !p.startsWith(".phase5fd3b"));
+  return execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], { encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean)
+    .filter((line) => !shouldIgnoreDirtyLine(line))
+    .map((line) => line.slice(3).trim().replace(/\\/g, "/"));
 }
 
 const checks = [];
@@ -981,7 +1065,11 @@ check("F4. the REAL coordinator is bound by default (lazily); DI stays available
 check("B1. the runtime factory ALWAYS injects the real enforcer (the production construction boundary)", () => {
   const src = readF(RUNTIME_SRC);
   has(/consentEnforcer: OutboundConsentEnforcer = createOutboundConsentEnforcer\(\)/, src, "defaulted to the REAL enforcer");
-  has(/new CommunicationService\(provider\.data, getActiveRecipientResolver\(\), coordinator, consentEnforcer\)/, src, "it is passed to the service");
+  // PHASE 8B-1B-B — the EXACT five-argument production construction. The consent enforcer is STILL passed
+  // (the 4th argument); the account-attribution dependency is appended as the 5th. This anchor names every
+  // argument exactly, so it can never be satisfied by a broad `new CommunicationService(...)` shape.
+  has(/new CommunicationService\(\s*context\.data\.provider,\s*getActiveRecipientResolver\(\),\s*resolvedCoordinator,\s*consentEnforcer,\s*context\.data\.attribution\s*\)/, src,
+    "the consent enforcer is passed as the 4th argument of the exact five-argument construction (provider, recipient resolver, coordinator, consent enforcer, account attribution)");
   hasNot(/process\.env\.[A-Z_]*CONSENT/, src, "no new environment variable");
 });
 
@@ -1186,16 +1274,37 @@ function provePhase8B1AMetaAuthority() {
   assert(approved.has(PHASE_8B1A_APPROVED_ROUTE) && !forbidden(PHASE_8B1A_APPROVED_ROUTE), "the approved Meta webhook route is accepted (not treated as a forbidden route)");
   assert(approved.has("lib/communication/providers/metaCallbackIdentity.ts"), "the approved provider files are in the approved set");
 
-  // 4) THE ACTIVE BYTE-FREEZE — on-disk 5F-B + D4-B must equal their Commit 1 blobs. A change — dirty OR later
-  //    committed — fails here until another EXPLICIT authority transfer. (The service is frozen by D1-B.)
+  // 4) HISTORICAL COMMIT-BLOB FACTS (IMMUTABLE) — the Phase 8B-1A implementation head resolves BOTH the 5F-B
+  //    and D4-B harnesses to their reviewed Commit-1 blobs. A permanent git fact; it NEVER moves, whatever
+  //    later phases do. (The service is frozen by D1-B.)
   for (const [path, expectedBlob] of PHASE_8B1A_FROZEN_BLOBS) {
     const commit1Blob = execFileSync("git", ["rev-parse", `${PHASE_8B1A_IMPLEMENTATION_HEAD}:${path}`], { encoding: "utf8" }).trim();
     assert(commit1Blob === expectedBlob, `Commit 1 must resolve ${path} to its reviewed blob (got ${commit1Blob.slice(0, 12)}, expected ${expectedBlob.slice(0, 12)})`);
+  }
+  //    THE ACTIVE ON-DISK FREEZE — Phase 8B-1A STILL pins D4-B byte-for-byte. The 5F-B on-disk freeze has been
+  //    TRANSFERRED to Phase 8B-1B-B (proven in provePhase8B1BBOutboundAccountAttributionAuthority), so it is
+  //    deliberately NOT re-checked here; D4-B does NOT transfer.
+  for (const [path, expectedBlob] of PHASE_8B1A_ACTIVE_ONDISK_BLOBS) {
     const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
     assert(onDisk === expectedBlob,
       `${path} is not byte-identical to its Phase 8B-1A Commit 1 baseline (commit ${PHASE_8B1A_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
       `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDisk.slice(0, 12)} != pinned ${expectedBlob.slice(0, 12)}).`);
   }
+  //    MODELLED TRANSFER EVIDENCE — exactly ONE path (5F-B) left the active on-disk freeze; D4-B stays; an
+  //    unlisted transfer is rejected; and the historical 5F-B commit blob is a fixed immutable literal.
+  assert(PHASE_8B1A_ONDISK_TRANSFERRED.length === 1 && PHASE_8B1A_ONDISK_TRANSFERRED[0] === PHASE5FB_SRC,
+    "the ONLY Phase 8B-1A on-disk freeze that transfers is 5F-B");
+  assert(PHASE_8B1A_ACTIVE_ONDISK_BLOBS.some(([p]) => p === PHASE5FD4B_SRC),
+    "D4-B remains actively pinned on-disk by Phase 8B-1A (it does NOT transfer)");
+  assert(!PHASE_8B1A_ACTIVE_ONDISK_BLOBS.some(([p]) => p === PHASE5FB_SRC),
+    "5F-B on-disk is no longer pinned by Phase 8B-1A — its authority transferred to Phase 8B-1B-B");
+  for (const [p] of PHASE_8B1A_FROZEN_BLOBS) {
+    const stillActive = PHASE_8B1A_ACTIVE_ONDISK_BLOBS.some(([q]) => q === p);
+    assert(stillActive || p === PHASE5FB_SRC, `only 5F-B may leave the Phase 8B-1A active on-disk freeze — an unlisted transfer is rejected: ${p}`);
+  }
+  const historical5fb = PHASE_8B1A_FROZEN_BLOBS.find(([p]) => p === PHASE5FB_SRC);
+  assert(historical5fb && historical5fb[1] === "0af67dd47d380f9c09698fbc4f8fc983974c125c",
+    "the Phase 8B-1A historical 5F-B commit blob is the fixed immutable literal and cannot change");
 
   // 5) DEDICATED 8B-1A HARNESS EVIDENCE — EXECUTABLE (line-anchored registrations + comment-stripped anchors),
   //    never comment-only. Counts are supplemental; the security anchors are the substance.
@@ -1408,6 +1517,210 @@ function provePhase8B1BAProviderAccountAuthority() {
   for (const t of [".mcp.json", ".claude/"]) assert(!D3B_EXPECTED_FILES.includes(t), `local tooling must never enter the D3-B governance allowlist: ${t}`);
 }
 
+/**
+ * PHASE 8B-1B-B — the OUTBOUND PROVIDER-ACCOUNT ATTRIBUTION authority. Runs on a CLEAN or DIRTY worktree.
+ *
+ * A Meta provider request may occur ONLY AFTER the message is durably bound to the exact
+ * `communication_provider_accounts.id` that owns the runtime identity used for that request —
+ * UNPROVEN OR UNBOUND PROVIDER ACCOUNT = ZERO PROVIDER CALLS. The six-file range is fixed, its 2A/4M
+ * composition is fixed, every reviewed blob is pinned, and this authority RECEIVES the transferred active
+ * on-disk 5F-B freeze. The byte-freeze is the primary authority; the range, harness-shape, load-bearing,
+ * production-wiring and 5F-B-wiring evidence are defence in depth.
+ */
+function provePhase8B1BBOutboundAccountAttributionAuthority() {
+  // ── A. COMMIT AUTHORITY ── both commits exist; ancestry base → implementation head → HEAD (FIXED
+  //    endpoints, never a moving HEAD).
+  for (const [sha, what] of [[PHASE_8B1BB_AUTHORITY_BASE, "Phase 8B-1B-B authority base"], [PHASE_8B1BB_IMPLEMENTATION_HEAD, "Phase 8B-1B-B implementation head"]]) {
+    const t = execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim();
+    assert(t === "commit", `the ${what} commit must exist (got ${t})`);
+  }
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BB_AUTHORITY_BASE, PHASE_8B1BB_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BB_IMPLEMENTATION_HEAD, "HEAD"]);                     // throws if not
+  assert(PHASE_8B1BB_AUTHORITY_BASE === "bef87673ad6b867f200d27d2fa79dd7f1fd595bd", "the Phase 8B-1B-B base is the fixed implementation-parent literal");
+
+  // ── B. THE FIXED SIX-FILE RANGE ── name-status -M -C so a deletion / rename / copy / type-change can never
+  //    masquerade as valid membership. EXACTLY two Additions + four Modifications, exactly the approved set.
+  const nameStatus = execFileSync("git", ["diff", "--name-status", "-M", "-C", `${PHASE_8B1BB_AUTHORITY_BASE}..${PHASE_8B1BB_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
+    .split("\n").map((l) => l.trim()).filter(Boolean);
+  const added = [], modified = [], rangeFiles = [];
+  for (const line of nameStatus) {
+    const parts = line.split(/\t+|\s{2,}|\s+/);
+    const status = parts[0];
+    const path = (parts[1] || "").replace(/\\/g, "/");
+    assert(/^[AM]$/.test(status), `the Phase 8B-1B-B range allows ONLY A/M status — no deletion, rename, copy or type change (got '${line}')`);
+    if (status === "A") added.push(path); else modified.push(path);
+    rangeFiles.push(path);
+  }
+  const approved = new Set(PHASE_8B1BB_EXPECTED_FILES);
+  assert(rangeFiles.length === approved.size, `the fixed Phase 8B-1B-B range must contain EXACTLY ${approved.size} files (got ${rangeFiles.length}: ${rangeFiles.join(", ")})`);
+  for (const f of PHASE_8B1BB_EXPECTED_FILES) assert(rangeFiles.includes(f), `an approved Phase 8B-1B-B file is missing from the range: ${f}`);
+  for (const f of rangeFiles) assert(approved.has(f), `an unexpected file is in the Phase 8B-1B-B range: ${f}`);
+  assert(added.length === 2 && modified.length === 4, `the Phase 8B-1B-B range must be EXACTLY 2 additions + 4 modifications (got ${added.length}A / ${modified.length}M)`);
+
+  // ── C. EXACT STATUS BY FILE ── the two additions and the four modifications are pinned individually.
+  for (const f of PHASE_8B1BB_ADDED_FILES) assert(added.includes(f), `${f} must be an ADDITION in the fixed Phase 8B-1B-B range`);
+  for (const f of PHASE_8B1BB_MODIFIED_FILES) assert(modified.includes(f), `${f} must be a MODIFICATION in the fixed Phase 8B-1B-B range`);
+  assert(added.length === PHASE_8B1BB_ADDED_FILES.length && modified.length === PHASE_8B1BB_MODIFIED_FILES.length,
+    "the exact 2A/4M file assignment is pinned");
+
+  // ── D. FORBIDDEN CATEGORIES (defence in depth) + MODELLED SELF-PROOF ── the six reviewed files are accepted;
+  //    every OTHER migration / provider adapter / webhook route / webhook service / consent authority / service /
+  //    harness / lib file, and any package / lockfile / env / deployment / tooling file, is rejected.
+  const forbidden = (p) =>
+    /^supabase\/migrations\//.test(p) ||
+    /(^|\/)\.env(\.|$)/.test(p) ||
+    /package-lock\.json|yarn\.lock|pnpm-lock\.yaml/.test(p) ||
+    /^package\.json$/.test(p) ||
+    /^(Dockerfile|docker-compose|\.github\/|vercel\.json|ecosystem\.config)/.test(p) ||
+    /^app\/api\/.*route\.ts$|^pages\/api\//.test(p) ||
+    /^\.mcp\.json$|^\.claude\//.test(p) ||
+    /^lib\/communication\/providers\//.test(p) ||
+    (/^services\//.test(p) && p !== PHASE_8B1BB_COMM_SRC && p !== PHASE_8B1BB_RUNTIME_SRC) ||
+    (/^scripts\//.test(p) && p !== PHASE_8B1BB_HARNESS_SRC && p !== PHASE_8B1BB_PHASE5FB_SRC) ||
+    (/^lib\//.test(p) && p !== PHASE_8B1BB_ATTRIBUTION_SRC && p !== PHASE_8B1BB_TYPES_SRC);
+  for (const f of rangeFiles) assert(!forbidden(f), `a forbidden path is in the Phase 8B-1B-B range: ${f}`);
+  const evaluate = (fs) => {
+    const u = [...new Set(fs)];
+    if (u.length !== approved.size) return "reject";
+    for (const f of u) { if (!approved.has(f)) return "reject"; if (forbidden(f)) return "reject"; }
+    return "accept";
+  };
+  const five = PHASE_8B1BB_EXPECTED_FILES.slice(0, 5);
+  assert(evaluate(PHASE_8B1BB_EXPECTED_FILES) === "accept", "the exact six-file range is accepted");
+  assert(evaluate(five) === "reject", "a MISSING approved file is rejected");
+  assert(evaluate([...PHASE_8B1BB_EXPECTED_FILES, "services/whatsappDashboardService.ts"]) === "reject", "an ADDITIONAL file is rejected");
+  assert(evaluate([...five, "supabase/migrations/20260901000001_x.sql"]) === "reject", "a MIGRATION is rejected");
+  assert(evaluate([...five, "lib/communication/providers/metaCloudWhatsAppProvider.ts"]) === "reject", "a PROVIDER ADAPTER is rejected");
+  assert(evaluate([...five, PHASE_8B1A_APPROVED_ROUTE]) === "reject", "a WEBHOOK ROUTE is rejected");
+  assert(evaluate([...five, WEBHOOK_SRC]) === "reject", "the WEBHOOK SERVICE is rejected");
+  assert(evaluate([...five, D2C_SRC]) === "reject", "a CONSENT AUTHORITY is rejected");
+  assert(evaluate([...five, "package.json"]) === "reject", "package.json is rejected");
+  assert(evaluate([...five, "package-lock.json"]) === "reject", "a lockfile is rejected");
+  assert(evaluate([...five, ".env.local"]) === "reject", "an environment file is rejected");
+  assert(evaluate([...five, "vercel.json"]) === "reject", "a deployment file is rejected");
+  assert(evaluate([...five, ".mcp.json"]) === "reject", "a tooling file is rejected");
+  assert(evaluate([...five, ".claude/skills/x/SKILL.md"]) === "reject", "a tooling skill file is rejected");
+  assert(evaluate([...five, PHASE8B1A_HARNESS_SRC]) === "reject", "an UNRELATED harness is rejected");
+  assert(evaluate([...five, "services/whatsappDashboardService.ts"]) === "reject", "an UNRELATED service is rejected");
+  assert(evaluate([...five, "lib/communication/phone.ts"]) === "reject", "an UNRELATED lib file is rejected");
+  for (const f of PHASE_8B1BB_EXPECTED_FILES) assert(approved.has(f) && !forbidden(f), `the approved Phase 8B-1B-B file must be accepted inside this fixed range: ${f}`);
+  const statusOk = (st) => /^[AM]$/.test(st);
+  for (const bad of ["D", "R100", "C100", "T"]) assert(!statusOk(bad), `a '${bad}' status is rejected by the Phase 8B-1B-B range status rule`);
+  const composition = (a, m) => (a === 2 && m === 4 ? "accept" : "reject");
+  assert(composition(2, 4) === "accept", "the exact 2A/4M composition is accepted");
+  for (const [a, m] of [[3, 3], [1, 5], [2, 3], [2, 5], [6, 0], [0, 6]]) assert(composition(a, m) === "reject", `a ${a}A/${m}M composition is rejected`);
+
+  // ── E. THE ACTIVE BYTE-FREEZE ── for all six files the implementation-head blob AND the on-disk file must
+  //    equal the reviewed pinned blob. Detects a dirty edit, a later COMMITTED edit, a deletion or a
+  //    replacement. This is where the TRANSFERRED active 5F-B freeze now lives (pinned to the new blob).
+  const blobMatches = (onDisk, pinned) => onDisk === pinned;
+  for (const [path, expectedBlob] of PHASE_8B1BB_FROZEN_BLOBS) {
+    const headBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1BB_IMPLEMENTATION_HEAD}:${path}`], { encoding: "utf8" }).trim();
+    assert(blobMatches(headBlob, expectedBlob), `the Phase 8B-1B-B implementation commit must resolve ${path} to its reviewed blob (got ${headBlob.slice(0, 12)}, expected ${expectedBlob.slice(0, 12)})`);
+    assert(existsSync(path), `${path} must exist — a DELETION requires an EXPLICIT AUTHORITY TRANSFER`);
+    const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
+    assert(blobMatches(onDisk, expectedBlob),
+      `${path} is not byte-identical to its Phase 8B-1B-B reviewed baseline (commit ${PHASE_8B1BB_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+      `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDisk.slice(0, 12)} != pinned ${expectedBlob.slice(0, 12)}).`);
+  }
+  assert(blobMatches("811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4", PHASE_8B1BB_ACTIVE_5FB_BLOB) === true, "the transferred active 5F-B blob is the reviewed 8B-1B-B pin");
+  assert(blobMatches("0000000000000000000000000000000000000000", PHASE_8B1BB_ACTIVE_5FB_BLOB) === false, "a CHANGED reviewed blob is rejected");
+  assert(PHASE_8B1BB_FROZEN_BLOBS.find(([p]) => p === PHASE_8B1BB_PHASE5FB_SRC)[1] === PHASE_8B1BB_ACTIVE_5FB_BLOB, "the 5F-B active freeze is pinned to the new reviewed blob (transfer received)");
+
+  // ── F. DEDICATED HARNESS EVIDENCE ── EXECUTABLE registrations (comment-stripped anchors), never comment-only.
+  //    20 functional = 16 check() + 4 INFRA self-tests; 31 mutations across the exact reviewed families.
+  const h = readF(PHASE_8B1BB_HARNESS_SRC);
+  const hStripped = stripTs(h);
+  const hReg = (re) => (h.match(re) || []).length;
+  assert(hReg(/^\s*check\("/gm) === PHASE8B1BB_HARNESS_CHECKS, `the 8B-1B-B harness must register EXACTLY ${PHASE8B1BB_HARNESS_CHECKS} functional checks (got ${hReg(/^\s*check\("/gm)})`);
+  assert(hReg(/"INFRA-[A-D] /g) === PHASE8B1BB_INFRA_SELF_TESTS, `the 8B-1B-B harness must keep its ${PHASE8B1BB_INFRA_SELF_TESTS} INFRA self-tests (got ${hReg(/"INFRA-[A-D] /g)})`);
+  assert(PHASE8B1BB_HARNESS_CHECKS + PHASE8B1BB_INFRA_SELF_TESTS === PHASE8B1BB_FUNCTIONAL_TOTAL, `functional total must be ${PHASE8B1BB_FUNCTIONAL_TOTAL} (16 check + 4 infra)`);
+  let familySum = 0;
+  for (const [prefix, n] of PHASE8B1BB_MUTATION_FAMILIES) {
+    const got = hReg(new RegExp(`"${prefix}-[0-9]`, "g"));
+    assert(got === n, `the 8B-1B-B mutation family ${prefix} must register EXACTLY ${n} mutations (got ${got})`);
+    familySum += n;
+  }
+  assert(familySum === PHASE8B1BB_HARNESS_MUTATIONS, `the registered mutation families must account for ALL ${PHASE8B1BB_HARNESS_MUTATIONS} mutations (got ${familySum})`);
+  // No OTHER 3-letter mutation family may exist: every family tag belongs to a pinned family.
+  assert(hReg(/"[A-Z]{3}-[0-9]/g) === PHASE8B1BB_HARNESS_MUTATIONS, `every mutation family tag must belong to a pinned family (got ${hReg(/"[A-Z]{3}-[0-9]/g)} vs ${PHASE8B1BB_HARNESS_MUTATIONS})`);
+  // Infrastructure classifications remain EXECUTABLE, and infra is NEVER counted as a kill.
+  for (const [anchor, what] of [
+    ['return "infra_fail:anchor"', "a missing anchor is an infrastructure failure"],
+    ['return "infra_fail:compile"', "a compile failure is an infrastructure failure"],
+    ['return "infra_fail:import"', "an import/load failure is an infrastructure failure"],
+    ['return "infra_fail:scenario_threw"', "an unrelated scenario exception is an infrastructure failure"],
+    ['return "infra_fail:non_boolean"', "a non-boolean mutation result is an infrastructure failure"],
+    ['if (s === "killed")', "ONLY a detected mutation is a kill"],
+    ["const mFail = mutants.survived + mutants.infra;", "a survived OR infrastructure mutation FAILS the harness and is never a kill"],
+  ]) assert(hStripped.includes(anchor), `the 8B-1B-B harness must EXECUTABLY prove: ${what}`);
+
+  // ── G. LOAD-BEARING BEHAVIOR EVIDENCE ── comment-stripped exact anchors: the harness retains executable
+  //    proof for every security property of the pre-network ownership fence and the guarded binding CAS.
+  for (const [anchor, what] of [
+    ["ORD-1. the provider is called BEFORE the binding fence", "ownership is proven BEFORE the provider call"],
+    ["providerCalls===0", "provider call count is ZERO at the moment of binding"],
+    ["BEFORE sendResolvedTemplate", "durable binding precedes the send"],
+    ["VAL-1. the resolved account id is replaced with a constant", "the EXACT resolved account id is bound"],
+    ["missing dependency / missing resolver / malformed identity", "missing attribution fails closed (zero calls)"],
+    ["resolver throw ⇒ infrastructure failure", "a resolver throw fails closed"],
+    ["MAP-1. query_error is collapsed into not_found", "query_error stays DISTINCT from not_found"],
+    ["MAP-2. ambiguous is promoted to owned (first row)", "ambiguous NEVER chooses a row"],
+    ["same-account idempotent retry proceeds without rewrite", "same-account continuation is idempotent"],
+    ["CAS-5. a cross-account row is no longer identified as a MISMATCH", "a cross-account row is REFUSED"],
+    ["CAS-3. the provider_account_id IS NULL guard is dropped (permits reassignment)", "no reassignment of an owned row"],
+    ["CAS-1. the id predicate is dropped", "the binding CAS pins the id predicate"],
+    ["CAS-2. the status=dispatching predicate is dropped", "the binding CAS pins the status=dispatching predicate"],
+    ['["is","provider_account_id",null]', "the binding CAS pins the provider_account_id IS NULL predicate"],
+    ["CAS-4. a zero-row CAS is treated as success", "a zero-row CAS is a CONFLICT, never success"],
+    ["RTE-1. a bind conflict is routed through the id-only recordDispatchFailure", "a conflict never falls back to the id-only overwrite"],
+    ["RUN-4. a secret is leaked into the attribution identity", "a secret field in the identity is rejected"],
+    ["accessToken: selection.config.accessToken", "the accessToken-leak mutation is executable (and killed)"],
+    ["idempotency untouched", "global message idempotency is unchanged"],
+  ]) assert(hStripped.includes(anchor), `the 8B-1B-B harness must EXECUTABLY retain: ${what}`);
+
+  // ── H. PRODUCTION WIRING EVIDENCE ── the runtime factory injects the coherent attribution dependency from
+  //    the SAME immutable env snapshot, using the frozen resolver and a NON-SECRET four-field identity.
+  const runtimeSrc = stripTs(readF(PHASE_8B1BB_RUNTIME_SRC));
+  has(/new CommunicationService\(\s*context\.data\.provider,\s*getActiveRecipientResolver\(\),\s*resolvedCoordinator,\s*consentEnforcer,\s*context\.data\.attribution\s*\)/, runtimeSrc,
+    "the runtime factory injects provider + recipient resolver + coordinator + consent enforcer + account attribution (exact 5-argument shape)");
+  has(/resolveOwnership: resolveOwningProviderAccount/, runtimeSrc, "account attribution uses the FROZEN resolveOwningProviderAccount");
+  has(/identity: \{\s*providerKey: selection\.provider\.providerKey,\s*channel: selection\.provider\.channel,\s*phoneNumberReference: selection\.config\.phoneNumberId,\s*expectedWabaId: selection\.config\.wabaId,\s*\}/, runtimeSrc,
+    "the safe identity is EXACTLY providerKey + channel + phoneNumberReference + expectedWabaId — nothing else");
+  hasNot(/accessToken|appSecret|verifyToken|Authorization|\bheaders\b|\.\.\.selection\.config|\.\.\.config|destination/, runtimeSrc,
+    "the runtime factory NEVER copies a secret, an authorization header, a full-config spread or a plaintext destination into the attribution");
+  has(/const envSnapshot = Object\.freeze\(\{ \.\.\.env \}\)/, runtimeSrc, "one immutable env snapshot feeds selection, coordinator and identity");
+  has(/resolveRuntimeWhatsAppContext\(envSnapshot\)/, runtimeSrc, "the explicit env argument is propagated (snapshot), not re-read from process.env");
+  has(/getMetaOutboundCoordinator\(envSnapshot\)/, runtimeSrc, "the coordinator is built from the SAME snapshot");
+  hasNot(/resolveRuntimeWhatsAppContext\(process\.env\)|getMetaOutboundCoordinator\(process\.env\)/, runtimeSrc, "no post-snapshot fall back to real process.env");
+  has(/return fail\(new AppError\(RUNTIME_PROVIDER_UNAVAILABLE/, runtimeSrc, "a production missing/invalid provider mode remains FAIL-CLOSED");
+
+  // ── I. UPDATED 5F-B TEST WIRING ── the new test-only helper injects the ACTUAL frozen resolver with the
+  //    exact safe identity, is used by the direct Meta construction, carries no secret, is NOT exported and
+  //    is NOT an allow-all. The 5F-B totals are unchanged.
+  const fbSrc = stripTs(readF(PHASE_8B1BB_PHASE5FB_SRC));
+  has(/function metaHarnessProviderAccountAttribution\(/, fbSrc, "the test-only attribution helper exists");
+  hasNot(/export function metaHarnessProviderAccountAttribution\b/, fbSrc, "the helper is NOT exported for production use");
+  has(/metaHarnessProviderAccountAttribution\(provider, build\)/, fbSrc, "the helper is passed to the direct approved-mapping Meta CommunicationService construction");
+  has(/resolveOwnership: build\.AccountRuntime\.resolveOwningProviderAccount/, fbSrc, "the helper injects the ACTUAL frozen resolveOwningProviderAccount");
+  has(/providerKey: provider\.providerKey,\s*channel: provider\.channel,\s*phoneNumberReference: META_CONFIG\.phoneNumberId,\s*expectedWabaId: META_CONFIG\.wabaId,/, fbSrc, "the helper carries the exact four safe identity fields");
+  const helperBody = (fbSrc.match(/function metaHarnessProviderAccountAttribution\([\s\S]*?\n\}/) || [""])[0];
+  hasNot(/accessToken|appSecret|verifyToken|Authorization|\bheaders\b/, helperBody, "the helper carries NO secret field");
+  hasNot(/kind: "owned"/, helperBody, "the helper is NOT an unconditional always-owned double — a real owning row + a real durable binding are still required");
+  assert(PHASE5FB_EXPECTED_CHECKS === PHASE_8B1BB_5FB_CHECKS && PHASE_8B1BB_5FB_CHECKS === 60, "the Phase 5F-B functional total stays 60");
+  assert(PHASE5FB_EXPECTED_MUTATIONS === PHASE_8B1BB_5FB_MUTATIONS && PHASE_8B1BB_5FB_MUTATIONS === 63, "the Phase 5F-B mutation total stays 63");
+
+  // ── SELF-PROOF ── the endpoints are exact fixed literals and the range never uses a moving HEAD. Tested on
+  //    COMMENT-STRIPPED source so this file's own prose can neither satisfy nor defeat an executable guard.
+  const selfSrc = stripTs(readF(HARNESS_SRC));
+  assert(selfSrc.includes('"bef87673ad6b867f200d27d2fa79dd7f1fd595bd"'), "the Phase 8B-1B-B base is the exact fixed literal");
+  assert(selfSrc.includes('"51b251d3dc790494c33028827a9aaec1bd9418dc"'), "the Phase 8B-1B-B implementation head is the exact fixed literal");
+  const rangeTemplateUses = (selfSrc.match(/\$\{PHASE_8B1BB_AUTHORITY_BASE\}\.\.\$\{PHASE_8B1BB_IMPLEMENTATION_HEAD\}/g) || []).length;
+  assert(rangeTemplateUses === 1, `the Phase 8B-1B-B range must be built EXACTLY ONCE from the two FIXED endpoint constants (got ${rangeTemplateUses} uses)`);
+  assert(!/PHASE_8B1BB_AUTHORITY_BASE\}\.\.(?!\$\{PHASE_8B1BB_IMPLEMENTATION_HEAD\})/.test(selfSrc), "the Phase 8B-1B-B range never uses a moving endpoint — the base is always paired with the FIXED implementation head");
+  for (const [, blob] of PHASE_8B1BB_FROZEN_BLOBS) assert(selfSrc.includes(`"${blob}"`), `the Phase 8B-1B-B reviewed blob ${blob.slice(0, 12)} is an exact fixed literal`);
+}
+
 check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/provider file is touched", () => {
   // PHASE 8B-0 — the 5F-B AUTHORITY FREEZE runs FIRST and UNCONDITIONALLY, before the dirty-scope loop, so a
   // dirty OR later-committed 5F-B change fails with a clear authority-transfer error rather than the generic
@@ -1422,6 +1735,29 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
   // the migration fails with a clear authority-transfer error instead of a generic scope message — or, once
   // committed, instead of passing silently.
   provePhase8B1BAProviderAccountAuthority();
+  // PHASE 8B-1B-B — the fixed six-file range (2A/4M), the reviewed byte-freeze of all six implementation
+  // files (INCLUDING the transferred active on-disk 5F-B freeze), the dedicated harness's executable
+  // evidence, the production wiring and the updated 5F-B test wiring. Runs BEFORE the generic dirty-scope
+  // loop, so a dirty OR later-committed change to any of the six fails with a clear authority-transfer error.
+  provePhase8B1BBOutboundAccountAttributionAuthority();
+
+  // PHASE 8B-1B-B (dirty-filter hardening) — EXECUTABLE self-proof that gitDirty's suppression is STATUS-AWARE.
+  // Only a genuinely UNTRACKED ('??') permitted artifact may be ignored; every tracked status (staged OR
+  // unstaged M/A/D/R) under those same paths, and every non-permitted untracked path, STAYS dirty. Modelled on
+  // synthetic porcelain lines, so a future weakening — dropping the status test, or broadening to the whole
+  // .claude tree — is caught right here, before the scope loop ever consumes the filtered list.
+  for (const line of ["?? .mcp.json", "?? .claude/skills/example.md", "?? .phase5fd3b-temp.tsconfig.json"]) {
+    assert(shouldIgnoreDirtyLine(line), `an untracked permitted artifact must be ignored: "${line}"`);
+  }
+  for (const line of [
+    " M .mcp.json", "M  .mcp.json", "A  .mcp.json", "D  .mcp.json", "R  old -> .mcp.json",
+    " M .claude/skills/example.md", "M  .claude/skills/example.md", "A  .claude/skills/example.md",
+    "D  .claude/skills/example.md", "R  old -> .claude/skills/example.md",
+    "?? .claude/settings.json", "?? unrelated.txt",
+    " M .phase5fd3b-temp.tsconfig.json", "A  .phase5fd3b-temp.tsconfig.json",
+  ]) {
+    assert(!shouldIgnoreDirtyLine(line), `a tracked change or a non-permitted path must STAY dirty: "${line}"`);
+  }
 
   const dirty = gitDirty();
   for (const f of [D2C_SRC, D2D_WRITER_SRC, D2D_COMMAND_SRC, POLICY_SRC, D2E_ORCH_SRC, D2E_INPUT_SRC]) {
@@ -1719,7 +2055,11 @@ check("P8A-14. STRUCTURAL: the constructor requires an enforcer and the property
   const src = readF(COMM_SRC);
   has(/private readonly consentEnforcer: OutboundConsentEnforcer;/, src, "the property is NON-NULLABLE");
   hasNot(/private readonly consentEnforcer: OutboundConsentEnforcer \| null/, src, "…never nullable again");
-  has(/consentEnforcer: OutboundConsentEnforcer\s*\n\s*\)/, src, "the constructor parameter is REQUIRED (no default)");
+  // PHASE 8B-1B-B — consentEnforcer is STILL required (no default). The 5th constructor argument added by
+  // 8B-1B-B is the account-attribution dependency; this anchor pins that the ONLY parameter after the
+  // required enforcer is that optional dependency, so nothing was inserted that could bypass consent.
+  has(/consentEnforcer: OutboundConsentEnforcer,\n(?:\s*\/\/.*\n)*\s*accountAttribution: OutboundAccountAttributionDependency \| null = null\n\s*\)/, src,
+    "consentEnforcer is REQUIRED (no default) and is followed ONLY by the optional accountAttribution parameter");
   hasNot(/consentEnforcer: OutboundConsentEnforcer \| null = null/, src, "…and never optional-nullable again");
   // THE FAIL-OPEN BRANCH IS GONE.
   hasNot(/if \(!this\.consentEnforcer\) return null;/, src, "the missing-enforcer fail-open return is DELETED");
@@ -2080,13 +2420,17 @@ srcMutation("MUT 10: a MESSAGE/TEMPLATE MISMATCH is allowed",
     return r.ok === true; // a swapped template inherited another type's consent scope
   }));
 
+// PHASE 8B-1B-B — the runtime factory now builds the EXACT five-argument construction. Omitting the enforcer
+// means removing its (4th) argument line; the guard is pinned to the exact 5-argument shape, so a dropped
+// enforcer (or any reshaping of the frozen construction) is killed. The mutation's security purpose — proving
+// production can never construct the service without the consent enforcer — is unchanged.
 srcMutation("MUT 11: the runtime factory OMITS the enforcer (production sends without consent)",
   RUNTIME_SRC,
-  "  return ok(\n    new CommunicationService(provider.data, getActiveRecipientResolver(), coordinator, consentEnforcer)\n  );",
-  "  return ok(new CommunicationService(provider.data, getActiveRecipientResolver(), coordinator));",
+  "      resolvedCoordinator,\n      consentEnforcer,\n      context.data.attribution",
+  "      resolvedCoordinator,\n      context.data.attribution",
   () => {
     const src = readF(RUNTIME_SRC);
-    return !/new CommunicationService\(provider\.data, getActiveRecipientResolver\(\), coordinator, consentEnforcer\)/.test(src);
+    return !/new CommunicationService\(\s*context\.data\.provider,\s*getActiveRecipientResolver\(\),\s*resolvedCoordinator,\s*consentEnforcer,\s*context\.data\.attribution\s*\)/.test(src);
   });
 
 srcMutation("MUT 12: cancellation becomes an UNCONDITIONAL update (it clobbers another worker's claim)",
@@ -2187,9 +2531,11 @@ async function checkFails(namePrefix, mm) {
 
 srcMutation("MUT 16 (8A): the constructor parameter is made OPTIONAL and NULLABLE again",
   COMM_SRC,
-  "    consentEnforcer: OutboundConsentEnforcer\n  ) {",
-  "    consentEnforcer: OutboundConsentEnforcer | null = null\n  ) {",
-  // The TypeScript compile fixture must go red: omitting the argument would compile again.
+  "    consentEnforcer: OutboundConsentEnforcer,",
+  "    consentEnforcer: OutboundConsentEnforcer | null = null,",
+  // The TypeScript compile fixture must go red: omitting the argument would compile again. (PHASE 8B-1B-B:
+  // the enforcer is now followed by the optional accountAttribution parameter, so its parameter line ends in
+  // a comma; giving it a `| null = null` default still makes an omitting construction compile — P8A-17 fails.)
   () => checkFails("P8A-17."));
 
 srcMutation("MUT 17 (8A): the constructor NORMALIZATION is removed (an invalid enforcer is trusted)",

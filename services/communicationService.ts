@@ -80,6 +80,20 @@ import {
   type AuthNetworkDeadline,
 } from "../lib/auth/hookDeadline";
 import { normalizeProviderException } from "../lib/communication/providers/providerError";
+// Phase 8B-1B-B — the outbound provider-account attribution vocabulary. CommunicationService does NOT
+// import the runtime service: the FROZEN Phase 8B-1B-A resolver arrives ONLY through the injected
+// dependency (`resolveOwnership`), so this service never learns where ownership resolution lives.
+import {
+  ATTRIBUTION_FAILURE,
+  attributionUnavailable,
+  decideFromBinding,
+  decideFromOwnership,
+  isUsableAttributionDependency,
+  type BindingOutcome,
+  type OutboundAccountAttributionDependency,
+  type OutboundAttributionDecision,
+} from "../lib/communication/outboundProviderAccountAttribution";
+import type { ProviderAccountOwnership } from "../lib/communication/providers/providerAccountOwnership";
 import { MockWhatsAppProvider } from "../lib/communication/providers/mockWhatsAppProvider";
 
 // The canonical destination helpers live in lib/communication/phone.ts; these
@@ -186,6 +200,10 @@ const COMMUNICATION_ERROR_MESSAGES = {
   INVALID_WEBHOOK_SIGNATURE: "Webhook signature verification failed.",
   WEBHOOK_PAYLOAD_UNPARSEABLE: "Webhook body is not a JSON object.",
   WEBHOOK_RECEIPT_INSERT_FAILED: "The webhook receipt could not be written.",
+  // Phase 8B-1B-B — a concurrent ownership/status change detected by the pre-network binding CAS.
+  // No provider request occurred and the conflicting row is preserved untouched.
+  PROVIDER_ACCOUNT_BIND_CONFLICT: "The message ownership state changed concurrently; nothing was dispatched.",
+  PROVIDER_ACCOUNT_MISMATCH: "The message is already bound to a different provider account; nothing was dispatched.",
 } as const;
 
 type CommunicationErrorCode = keyof typeof COMMUNICATION_ERROR_MESSAGES;
@@ -359,6 +377,14 @@ export class CommunicationService {
   private readonly consentEnforcer: OutboundConsentEnforcer;
 
   /**
+   * Phase 8B-1B-B — the coherent, NON-SECRET identity of the selected provider runtime, injected by
+   * the production runtime factory from the SAME snapshot that built the adapter. `null` for mock
+   * adapters (no attribution needed) and for explicit overrides (no coherent identity exists), in
+   * which case an `approved_provider_mapping` dispatch fails closed before any provider call.
+   */
+  private readonly accountAttribution: OutboundAccountAttributionDependency | null;
+
+  /**
    * `consentEnforcer` is REQUIRED (Phase 8A, layer 1 — TypeScript). Every construction must state its
    * consent posture explicitly: `new CommunicationService(provider)` no longer compiles. The earlier
    * parameters keep their defaults, so a caller that wants them passes `undefined` positionally.
@@ -372,7 +398,12 @@ export class CommunicationService {
     provider: WhatsAppProvider = getActiveWhatsAppProvider(),
     recipientResolver: CommunicationRecipientResolver = getActiveRecipientResolver(),
     approvedTemplateCoordinator: ApprovedTemplateOutboundCoordinator | null = null,
-    consentEnforcer: OutboundConsentEnforcer
+    consentEnforcer: OutboundConsentEnforcer,
+    // Phase 8B-1B-B — the outbound provider-account ATTRIBUTION dependency. Optional at the
+    // constructor so every historical mock construction stays source-compatible, but the RUNTIME
+    // is closed: an `approved_provider_mapping` adapter with a missing/malformed dependency fails
+    // closed at the network boundary with ZERO provider calls. Absence is never permission.
+    accountAttribution: OutboundAccountAttributionDependency | null = null
   ) {
     this.provider = provider;
     this.recipientResolver = recipientResolver;
@@ -380,11 +411,111 @@ export class CommunicationService {
     this.consentEnforcer = isOutboundConsentEnforcer(consentEnforcer)
       ? consentEnforcer
       : createFailClosedOutboundConsentEnforcer();
+    this.accountAttribution = isUsableAttributionDependency(accountAttribution) ? accountAttribution : null;
   }
 
   /** True when this adapter requires an approved provider mapping (capability, not a key). */
   private requiresApprovedMapping(): boolean {
     return this.provider.templateResolutionMode === "approved_provider_mapping";
+  }
+
+  /**
+   * PHASE 8B-1B-B — a PRE-NETWORK attribution failure. No provider request occurred, so the outcome
+   * is always `definitive_failure` (never `unknown_outcome`). `retryable` distinguishes an
+   * INFRASTRUCTURE failure — the lookup or the binding write broke — which the EXISTING closed retry
+   * authority in `recordDispatchFailure` may safely re-run (business lane, attempts remaining), from
+   * a DEFINITIVE configuration/security failure. Authentication stays single-shot either way.
+   * The message is a sanitized, closed constant: it never carries an id, secret or raw driver error.
+   */
+  private attributionFailure(
+    decision: Extract<OutboundAttributionDecision, { kind: "blocked" }>
+  ): WhatsAppSendResult {
+    return {
+      accepted: false,
+      provider: this.provider.providerKey,
+      providerMessageId: null,
+      normalizedStatus: "failed",
+      errorCode: decision.code,
+      errorMessage: decision.message,
+      retryable: decision.retryable,
+      outcomeCertainty: "definitive_failure",
+    };
+  }
+
+  /**
+   * PHASE 8B-1B-B — prove ownership of the sending identity and DURABLY BIND the exact account to
+   * the claimed row. Returns `proceed` ONLY after the account is committed to the database.
+   *
+   * The identity is the injected, coherent runtime identity — never a fresh environment read, never
+   * a default, never a readiness inference, never a positional row pick.
+   */
+  private async bindOutboundProviderAccount(
+    message: CommunicationMessage
+  ): Promise<OutboundAttributionDecision> {
+    const dep = this.accountAttribution;
+    // Absence is never permission: no coherent identity ⇒ no proof ⇒ no request.
+    if (!isUsableAttributionDependency(dep)) return attributionUnavailable();
+
+    // The resolver is fail-closed by construction, but an escaping exception here would strand the
+    // claim and — worse — must never be mistaken for permission. Treat a throw as an INFRASTRUCTURE
+    // lookup failure: zero provider calls, safe retry for the business lane.
+    let ownership: ProviderAccountOwnership;
+    try {
+      ownership = await dep.resolveOwnership({
+        providerKey: dep.identity.providerKey,
+        channel: dep.identity.channel,
+        phoneNumberReference: dep.identity.phoneNumberReference,
+        expectedWabaId: dep.identity.expectedWabaId,
+      });
+    } catch {
+      return decideFromOwnership({ kind: "query_error" });
+    }
+    const decided = decideFromOwnership(ownership);
+    if (decided.kind === "blocked") return decided;
+
+    const outcome = await this.applyProviderAccountBinding(message.id, decided.accountId);
+    return decideFromBinding(outcome, decided.accountId);
+  }
+
+  /**
+   * The GUARDED binding compare-and-set. Constrained by all three of `id`, `status = 'dispatching'`
+   * and `provider_account_id IS NULL`, so it can bind ONLY the row we still hold the claim on and
+   * ONLY while it is still unbound. Exactly one row must match.
+   *
+   * A zero-row result is NEVER assumed to be success and NEVER repaired by an unconstrained update:
+   * we re-read the row to classify it. A row already bound to the SAME account is an idempotent
+   * same-account retry (a concurrent worker or an earlier attempt bound it); a DIFFERENT account is
+   * a mismatch that is never reassigned; anything else is a genuine concurrent conflict whose row we
+   * preserve untouched.
+   */
+  private async applyProviderAccountBinding(messageId: string, accountId: string): Promise<BindingOutcome> {
+    try {
+      const { data, error } = await adminClient()
+        .from("communication_messages")
+        .update({ provider_account_id: accountId, updated_at: new Date().toISOString() })
+        .eq("id", messageId)
+        .eq("status", "dispatching")
+        .is("provider_account_id", null)
+        .select("id");
+      if (error) return { kind: "error" };
+      if ((data ?? []).length === 1) return { kind: "bound" };
+
+      // Zero rows matched — classify, never guess.
+      const { data: current, error: readError } = await adminClient()
+        .from("communication_messages")
+        .select("status, provider_account_id")
+        .eq("id", messageId)
+        .limit(2);
+      if (readError) return { kind: "error" };
+      const rows = (current ?? []) as { status: string; provider_account_id: string | null }[];
+      if (rows.length !== 1) return { kind: "conflict" };
+      const row = rows[0];
+      if (row.provider_account_id === accountId && row.status === "dispatching") return { kind: "same_account" };
+      if (row.provider_account_id != null && row.provider_account_id !== accountId) return { kind: "mismatch" };
+      return { kind: "conflict" };
+    } catch {
+      return { kind: "error" };
+    }
   }
 
   /** A preflight failure that never reached the provider — definitive, never retried. */
@@ -774,6 +905,18 @@ export class CommunicationService {
         //      contradictory result — goes to the failure path, where unknown_outcome
         //      is parked in outcome_unknown and a valid definitive_failure follows the
         //      existing lane retry rules.
+        // PHASE 8B-1B-B — a binding CONFLICT/MISMATCH means the row's status or ownership moved
+        // concurrently, so the row we hold is no longer the row we believe. `recordDispatchFailure`
+        // ultimately writes through the ID-ONLY `applyMessageUpdate`, which would CLOBBER that
+        // concurrent state. No provider request occurred and nothing is stranded (the conflicting
+        // writer owns the row), so return a safe closed error and preserve the row untouched.
+        if (
+          !result.accepted &&
+          (result.errorCode === ATTRIBUTION_FAILURE.BIND_CONFLICT ||
+            result.errorCode === ATTRIBUTION_FAILURE.MISMATCH)
+        ) {
+          return fail(commError(result.errorCode));
+        }
         return effectiveOutcomeCertainty(result) === "accepted"
           ? await this.recordDispatchSuccess(claimed, currentAttempt, result)
           : await this.recordDispatchFailure(claimed, currentAttempt, result);
@@ -1063,6 +1206,19 @@ export class CommunicationService {
           return this.preflightFailure(AUTH_NETWORK_DEADLINE_EXHAUSTED, AUTH_NETWORK_DEADLINE_MESSAGE);
         }
         maxNetworkTimeoutMs = remainingMs;
+      }
+
+      // PHASE 8B-1B-B — THE PRE-NETWORK OWNERSHIP FENCE. The LAST thing before the request.
+      //
+      //     UNPROVEN OR UNBOUND PROVIDER ACCOUNT = ZERO PROVIDER CALLS.
+      //
+      // Ownership is PROVEN from the identity the adapter will actually send with, and the exact
+      // account is DURABLY BOUND to the claimed row, BEFORE any network call. A message that
+      // reaches Meta is therefore always attributable to the account that sent it — attribution
+      // can never be reconstructed after the fact, and a send can never precede its proof.
+      const attribution = await this.bindOutboundProviderAccount(message);
+      if (attribution.kind === "blocked") {
+        return this.attributionFailure(attribution);
       }
 
       try {

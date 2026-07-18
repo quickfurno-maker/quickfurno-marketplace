@@ -88,6 +88,8 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 const DB_TABLES = [
   "communication_messages", "communication_webhook_receipts", "communication_delivery_events",
   "communication_provider_runtime_policies", "communication_inbound_messages",
+  // Phase 8B-1B-C: ownership is proven against this table before any effect-bearing write.
+  "communication_provider_accounts",
 ];
 const db = {};
 const counters = { dbCalls: 0, network: 0 };
@@ -124,6 +126,19 @@ class QB {
 }
 function installDb(build) {
   build.Supabase.adminClient = () => ({ from: (t) => { counters.dbCalls++; return new QB(t); } });
+}
+// Phase 8B-1B-C: seed EXACTLY ONE owned account whose identity matches the PAYLOAD (entry.id +
+// metadata.phone_number_id), so an authorized callback can prove ownership. Deliberately NOT seeded
+// globally: every negative/foreign-identity test must keep resolving to a zero-row `not_found`.
+const OWNED_ACCOUNT_ID = "cccccccc-3333-4333-8333-cccccccccccc";
+function seedOwnedProviderAccount(over = {}) {
+  db.communication_provider_accounts.push({
+    id: over.id ?? OWNED_ACCOUNT_ID,
+    provider_key: "meta_whatsapp_cloud",
+    channel: "whatsapp",
+    phone_number_reference: over.phoneNumberReference ?? PHONE,
+    business_account_reference: over.businessAccountReference ?? WABA,
+  });
 }
 function seedWebhookEnabled() {
   db.communication_provider_runtime_policies.push({
@@ -331,13 +346,33 @@ check("P1-8. byte pipeline order: header/config/grammar/decode/parse/identity-co
 });
 
 check("D1-4. AUTHORIZED identity reaches the downstream (DB IS touched) — expected-identity proof", async () => {
-  resetDb(); seedWebhookEnabled(); setIdentityEnv();
+  // Phase 8B-1B-C: passing the identity gate is necessary but no longer sufficient — an effect-bearing
+  // callback must also PROVE exact provider-account ownership. Seed the one account that owns this exact
+  // payload identity (entry.id + metadata.phone_number_id); the ownership decision is still made by the
+  // real resolver against the real query semantics, never short-circuited here.
+  resetDb(); seedWebhookEnabled(); seedOwnedProviderAccount(); setIdentityEnv();
   const dbBefore = counters.dbCalls;
+  // A WABA-only template callback carries no phone identity, so it stays on the unbound ignored path.
   const t = await bytesEntry(templateEnvelope());
   assert(t.status === 200 && t.result === "acknowledged_ignored", `authorized template → downstream ack, got ${JSON.stringify(t)}`);
   assert(counters.dbCalls > dbBefore, "authorized callback DOES reach the downstream DB gate + receipt");
   const inb = await bytesEntry(messagesEnvelope());
   assert(inb.status === 200 && inb.result === "inbound_acknowledged_rejected", `authorized inbound (incomplete msg) → downstream reject, got ${JSON.stringify(inb)}`);
+  // The inbound row that DID land is bound to the owning account — never left unbound, never invented.
+  for (const row of db.communication_inbound_messages) {
+    assert(row.provider_account_id === OWNED_ACCOUNT_ID, "a persisted inbound row is BOUND to the owning account");
+  }
+});
+
+check("D5. an authorized identity whose account is NOT owned produces ZERO effects (no env fallback)", async () => {
+  // The identity gate passes (env matches the payload) but NO account row owns it. Environment identity
+  // must never stand in for ownership: the callback is acknowledged generically with nothing persisted.
+  resetDb(); seedWebhookEnabled(); setIdentityEnv();          // deliberately NO provider-account row
+  const res = await bytesEntry(messagesEnvelope());
+  assert(res.status === 200 && res.result === "acknowledged_unowned_provider_account",
+    `unowned → generic 200, got ${JSON.stringify(res)}`);
+  assert(db.communication_inbound_messages.length === 0, "ZERO inbound rows for an unowned callback");
+  assert(db.communication_webhook_receipts.length === 0, "ZERO receipts for an unowned callback");
 });
 
 check("Z1-8. CHOKEPOINT: foreign/mixed/missing/malformed identity → ZERO db/receipt/downstream/network (both entries)", async () => {
@@ -401,7 +436,7 @@ check("X1-3. NO compatibility bypass: the string wrapper enters the identity gat
     assert(counters.dbCalls === dbAfterSeed && counters.network === 0, "historical symbol foreign identity → zero db + zero network");
     // The HISTORICAL public symbol delegates directly to the gated byte entry (source proof).
     const svc = readFileSync(WEBHOOK_SERVICE_SRC, "utf8");
-    assert(/export function handleMetaWhatsAppWebhookPost\(input:[\s\S]{0,260}return handleMetaWhatsAppWebhookPostBytes\(\{/.test(svc), "the historical symbol IS the gated wrapper delegating to the byte entry");
+    assert(/export function handleMetaWhatsAppWebhookPost\(\s*input:[\s\S]{0,600}return handleMetaWhatsAppWebhookPostBytes\(/.test(svc), "the historical symbol IS the gated wrapper delegating to the byte entry");
   } finally { restoreFetch(); }
 });
 
@@ -412,7 +447,7 @@ check("O1-4. chokepoint ORDER: identity gate precedes the runtime DB gate; parse
   const parseIdx = svc.indexOf("safeParse(decoded)");
   const idCfgIdx = svc.indexOf("resolveWebhookIdentityConfig()");
   const decideIdx = svc.indexOf("decideCallbackIdentity(payload");
-  const downstreamIdx = svc.indexOf("return processVerifiedExpectedMetaWebhook({");
+  const downstreamIdx = svc.indexOf("return processVerifiedExpectedMetaWebhook(");
   for (const [n, v] of Object.entries({ verifyIdx, decodeIdx, parseIdx, idCfgIdx, decideIdx, downstreamIdx })) assert(v > 0, `${n} present`);
   assert(verifyIdx < decodeIdx, "signature verified before the fatal decode");
   assert(decodeIdx < parseIdx, "decode before parse");
@@ -430,7 +465,16 @@ check("N1-2. no rejection receipt created in 8B-1A; no plaintext identity/secret
   const gate = readFileSync(CALLBACK_IDENTITY_SRC, "utf8");
   // Phase 8B-1A creates NO rejection receipt: the reject/unsupported returns are not paired with an insert.
   assert(!/rejected_foreign_identity"[\s\S]{0,80}recordIgnoredReceipt|recordIgnoredReceipt[\s\S]{0,80}rejected_foreign_identity/.test(svc), "no rejection receipt on the foreign path");
-  assert(!/console\.(log|error|warn|info)/.test(gate) && !/console\.(log|error|warn|info)/.test(svc), "identity units never log");
+  assert(!/console\.(log|error|warn|info)/.test(gate), "the identity gate unit never logs at all");
+  {
+    const svcLogs = svc.match(/console\.\w+\([^;]*\)/g) || [];
+    for (const l of svcLogs) {
+      assert(!/\$\{|\+\s*\w+(Id|Hash|Reference|Secret|Token)/.test(l),
+        `webhook log must be a sanitized literal (no interpolation): ${l.slice(0, 70)}`);
+      assert(!/wabaId|phone_number_id|phoneNumberId|accountId|provider_account_id|appSecret|verifyToken/.test(l),
+        `webhook log must never name an identity/secret value: ${l.slice(0, 70)}`);
+    }
+  }
 });
 
 check("G1-3. the HISTORICAL symbol is the gated wrapper; the downstream stage is NON-EXPORTED; no exported downstream-only handler", () => {
@@ -553,7 +597,10 @@ mutate("MUT: unsupported shape treated as authorized (reaches the downstream)",
 mutate("MUT: identity gate moved AFTER the runtime DB gate (downstream runs first)",
   [[WEBHOOK_SERVICE_SRC,
     "  const identity = decideCallbackIdentity(payload, idConfig.config);",
-    "  const identity = decideCallbackIdentity(payload, idConfig.config);\n  await processVerifiedExpectedMetaWebhook({ rawBody: decoded, signature: input.signature, appSecret: sigConfig.config.appSecret });"]],
+    // Stage 2C gave the downstream a required second parameter (`deps`). The injected call must pass it or
+    // the mutation dies as a COMPILE error instead of proving its fence — the mutation still runs the
+    // downstream BEFORE the identity gate, which is its original security intent.
+    "  const identity = decideCallbackIdentity(payload, idConfig.config);\n  await processVerifiedExpectedMetaWebhook({ rawBody: decoded, signature: input.signature, appSecret: sigConfig.config.appSecret }, deps);"]],
   async (mm) => {
     installDb(mm); resetDb(); seedWebhookEnabled(); setIdentityEnv();
     const dbAfterSeed = counters.dbCalls;
@@ -626,8 +673,8 @@ mutate("MUT: identity config drops the phone-number requirement",
 // --- CORRECTION mutations (Phase 8B-1A correction review) -----------------------------------
 mutate("MUT: the downstream stage is EXPORTED (an identity-exempt handler becomes reachable)",
   [[WEBHOOK_SERVICE_SRC,
-    "async function processVerifiedExpectedMetaWebhook(input: {",
-    "export async function processVerifiedExpectedMetaWebhook(input: {"]],
+    "async function processVerifiedExpectedMetaWebhook(",
+    "export async function processVerifiedExpectedMetaWebhook("]],
   (mm) => typeof mm.Service.processVerifiedExpectedMetaWebhook === "function");
 
 mutate("MUT: the legacy startsWith string verifier is restored (a SECOND accepted grammar)",
@@ -677,8 +724,17 @@ async function runMutations() {
       for (const edit of mut.edits) {
         const p = resolve(edit[0]);
         const cur = readFileSync(p, "utf8");
-        if (!cur.includes(edit[1])) throw new Error(`anchor not found in ${edit[0]}`);
-        writeFileSync(p, cur.replace(edit[1], edit[2]));
+        // EOL-TOLERANT ANCHORING. Anchors are authored with "\n", but a source file may be stored with
+        // CRLF endings; a byte-literal match would then miss and the mutation would silently degrade into
+        // an "anchor not found" failure instead of testing its fence. Re-express the anchor (and its
+        // replacement) in the file's OWN dominant EOL so the mutation still targets the real code, and the
+        // rewritten bytes keep the file's existing line-ending convention for a byte-exact restore.
+        const fileEol = cur.includes("\r\n") ? "\r\n" : "\n";
+        const toEol = (t) => (fileEol === "\n" ? t.replace(/\r\n/g, "\n") : t.replace(/\r?\n/g, "\r\n"));
+        const from = toEol(edit[1]);
+        const to = toEol(edit[2]);
+        if (!cur.includes(from)) throw new Error(`anchor not found in ${edit[0]}`);
+        writeFileSync(p, cur.replace(from, to));
       }
       // A syntax/compile/import failure is a MUTATION FAILURE (never a pass).
       compileTo(mutDir);

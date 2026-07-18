@@ -724,7 +724,7 @@ function d1bDeps(over = {}) {
     deps: {
       normalize: (payload) => M.Inbound.normalizeMetaInboundWebhook(payload),
       resolveIdentity: over.resolveIdentity ?? (async () => ({ ok: true, identity: { confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 } })),
-      createOrResolveReceipt: async () => ({ ok: true, receiptId: "receipt-1", duplicate: false }),
+      createOrResolveReceipt: async (_raw, _payload, providerAccountId) => ({ ok: true, receiptId: "receipt-1", duplicate: false, providerAccountId }),
       persistInboundRow: over.persistInboundRow ?? (async (row) => {
         calls.persists.push(row);
         if (over.failPersist) return "failed";
@@ -745,21 +745,34 @@ function d1bDeps(over = {}) {
         persisted.add(row.provider_message_id);
         return "created";
       }),
-      resolvePersistedInboundContext: over.resolvePersistedInboundContext ?? (async (row) => {
+      // Phase 8B-1B-C renamed this authority to `readStoredInbound` and made it a DISCRIMINATED UNION so a
+      // genuinely ABSENT row (safe to insert) is distinguishable from a malformed / errored read (retryable,
+      // never "not there"). The mapping preserves every original meaning:
+      //   no row            → absent  (before persist: insert; after persist: unresolved → retryable)
+      //   row + validator ok→ present (the durable row is the authority)
+      //   row + validator ✗ → error   (malformed is NOT absence — it must stay retryable)
+      // A legacy override of `resolvePersistedInboundContext` returning null keeps its "unresolvable"
+      // meaning, because an absent read after a successful persist still fails closed as retryable.
+      readStoredInbound: over.readStoredInbound ?? (async (row) => {
         calls.resolves.push(row);
         const key = `${row.provider}|${row.provider_message_id}`;
         const raw = store.get(key);
-        if (!raw) return null;
+        if (!raw) return { kind: "absent" };
         // Go through the REAL validator, exactly as the production adapter does.
-        return M.D1B.validatePersistedInboundRow(raw, { provider: row.provider, providerMessageId: row.provider_message_id });
+        const context = M.D1B.validatePersistedInboundRow(raw, { provider: row.provider, providerMessageId: row.provider_message_id });
+        return context ? { kind: "present", context } : { kind: "error" };
       }),
       finalizeReceipt: async (id, status, reason) => { calls.finalizes.push({ id, status, reason }); },
     },
   };
 }
+// Phase 8B-1B-C: the OWNING provider account an effect-bearing inbound callback has already been
+// proven to belong to. Ownership is resolved by the WEBHOOK layer and threaded in; this harness
+// supplies it rather than imitating a second resolver.
+const D2E_ACCOUNT_ID = "dddddddd-4444-4444-8444-dddddddddddd";
 const runD1B = (payload, over = {}) => {
   const d = d1bDeps(over);
-  return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, d.deps)
+  return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload, providerAccountId: D2E_ACCOUNT_ID }, d.deps)
     .then((r) => ({ r, calls: d.calls, store: d.store }));
 };
 
@@ -775,28 +788,43 @@ check("17. B1-B2. context comes FROM THE PERSISTED ROW; a duplicate returns the 
   assert(a.inboundMessageId === b.inboundMessageId, "the SAME row id on the insert and the duplicate path");
   assert(a.duplicate === false && b.duplicate === true, "insert vs duplicate is reported honestly");
   // B1: even the INSERT path reads its context back from the stored row (not from the in-flight object).
-  assert(first.calls.resolves.length === 1, "the insert path also resolves the persisted row");
+  // Phase 8B-1B-C made this STRONGER, not weaker: the bind is READ-FIRST, so the insert path reads twice —
+  // once BEFORE inserting (to prove no row exists under any account, since the account-scoped uniques do
+  // not by themselves prevent a second row) and once AFTER, to take the durable row as the authority.
+  assert(first.calls.resolves.length === 2, "the insert path reads first AND reads its context back (read-first bind)");
+  assert(second.calls.resolves.length === 1, "the duplicate path resolves the stored row without inserting");
+  // The account on the surfaced context comes from the STORED row — never reassigned, never invented.
+  assert(a.providerAccountId === b.providerAccountId, "insert and duplicate surface the SAME stored account");
   assert(a.receivedAt === RECEIVED && a.providerOccurredAt === OCCURRED, "the PERSISTED timestamps are used");
 
-  // The REAL adapter: exactly one VALID row → its projection; anything else → null (never invented).
+  // The REAL adapter (Stage 2A: renamed to readStoredInboundViaDb, returning a DISCRIMINATED result so a
+  // genuinely ABSENT row is distinguishable from a malformed/errored read — the distinction the read-first
+  // bind depends on). Exactly one VALID row → present; zero → absent; anything else → error, never invented.
   const fence = { provider: "meta_whatsapp_cloud", provider_message_id: WAMID_PLAIN };
-  const one = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [storedRow()], error: null })));
-  assert(one && one.id === ROW_UUID && one.contentMinimized.text === "STOP", "exactly one row → its validated projection");
-  const none = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [], error: null })));
-  assert(none === null, "zero rows → null, NEVER a fabricated row");
-  const many = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));
-  assert(many === null, "a violated fence (multi-row) → null, NEVER a guess — and never .single()/.limit()");
-  const err = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: null, error: { code: "08006" } })));
-  assert(err === null, "a db error → null (the caller fails closed)");
+  const one = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [storedRow()], error: null })));
+  assert(one.kind === "present" && one.context.id === ROW_UUID && one.context.contentMinimized.text === "STOP", "exactly one row → its validated projection");
+  const none = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [], error: null })));
+  assert(none.kind === "absent", "zero rows → absent, NEVER a fabricated row");
+  const many = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));
+  assert(many.kind === "error", "a violated fence (multi-row) → error, NEVER a guess — and never .single()/.limit()");
+  const err = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: null, error: { code: "08006" } })));
+  assert(err.kind === "error", "a db error → error (the caller fails closed), never absence");
+  const malformed = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [storedRow({ id: "not-a-uuid" })], error: null })));
+  assert(malformed.kind === "error", "a MALFORMED durable row → error, never absence");
   // Equality filters only, and no cardinality-concealing modifiers — asserted on the RESOLVER ITSELF
   // (the pre-existing receipt adapter legitimately uses .single()/.limit(); this is not about that).
   const src = readF(D1B_SRC);
-  const start = src.indexOf("export async function resolvePersistedInboundContextViaDb");
+  const start = src.indexOf("export async function readStoredInboundViaDb");
   assert(start > 0, "the resolver exists");
   const body = src.slice(start, src.indexOf("\n}", start));
   hasNot(/\.single\(|\.maybeSingle\(|\.limit\(/, body, "the resolver never conceals cardinality (no single/maybeSingle/limit)");
   has(/\.eq\("provider", row\.provider\)[\s\S]{0,120}\.eq\("provider_message_id", row\.provider_message_id\)/, body, "equality filters on the unique fence only");
-  has(/rows\.length !== 1/, body, "exactly one row is required");
+  // Stage 2A expresses the SAME cardinality rule as an explicit discriminated split instead of one
+  // `!== 1` guard: zero rows is `absent` (safe to insert), more than one is `error` (a violated fence is
+  // never resolvable). Both halves are asserted, so "exactly one row" remains load-bearing.
+  has(/data\.length === 0\) return \{ kind: "absent" \}/, body, "zero rows → absent, never a fabricated row");
+  has(/data\.length > 1\) return \{ kind: "error" \}/, body, "more than one row → error, never a first-row guess");
+  has(/context \? \{ kind: "present", context \} : \{ kind: "error" \}/, body, "a malformed row → error, never absence");
   has(/validatePersistedInboundRow/, body, "the row is validated before it is trusted");
 });
 
@@ -841,10 +869,20 @@ check("19. persistence failure (and an unresolvable persisted row) is RETRYABLE"
   const fail = await runD1B(envelope(textMsg()), { failPersist: true });
   assert(fail.r.ok === false && fail.r.code === "inbound_persist_failed", "a real persistence failure → retryable");
   assert(fail.r.result.processed.length === 0, "nothing is handed downstream from a failed persistence");
-  const unresolved = await runD1B(envelope(textMsg()), { resolvePersistedInboundContext: async () => null });
+  // Phase 8B-1B-C: classify through the CURRENT discriminated read result, never through a shim.
+  // An `absent` read AFTER a successful persist still means the durable row is unresolvable → retryable.
+  const unresolved = await runD1B(envelope(textMsg()), { readStoredInbound: async () => ({ kind: "absent" }) });
   assert(unresolved.r.ok === false && unresolved.r.code === "inbound_persisted_row_unresolved", "an unresolvable durable row → retryable");
-  const threw = await runD1B(envelope(textMsg()), { resolvePersistedInboundContext: async () => { throw new Error("db down: SQLSTATE 08006"); } });
-  assert(threw.r.ok === false && threw.r.code === "inbound_persisted_row_unresolved", "a THROWN resolver error → retryable, sanitized");
+  assert(unresolved.r.result.processed.length === 0, "nothing is handed downstream from an unresolvable row");
+  // An `error` read is a DB/read-back failure: retryable under its own distinct code, never collapsed into
+  // absence, duplicate, rejection or success.
+  const readFailed = await runD1B(envelope(textMsg()), { readStoredInbound: async () => ({ kind: "error" }) });
+  assert(readFailed.r.ok === false && readFailed.r.code === "inbound_read_failed", "a read-back FAILURE → retryable, distinct from absence");
+  assert(readFailed.r.result.processed.length === 0, "nothing is handed downstream from a failed read-back");
+  // A THROWN read is infrastructure: it must be caught and classified as the same retryable read failure,
+  // and the raw driver error must never escape.
+  const threw = await runD1B(envelope(textMsg()), { readStoredInbound: async () => { throw new Error("db down: SQLSTATE 08006"); } });
+  assert(threw.r.ok === false && threw.r.code === "inbound_read_failed", "a THROWN read error → retryable, sanitized");
   assert(!safeStringify(threw.r).includes("SQLSTATE"), "no raw db error leaks");
 });
 
@@ -897,14 +935,18 @@ check("ORDER. persistence STRICTLY precedes command processing (D1-B context fee
   assert(store.calls[0].providerMessageId === sha256hex(WAMID_PLAIN), "the hashed identity of the persisted wamid reaches D2-D");
   // The webhook seam: persistence, then the ok-gate, then commands — in that SOURCE order.
   const src = readF(WEBHOOK_SVC_SRC);
-  const iPersist = src.indexOf("handleInboundWhatsAppMessages(");
+  const iPersist = src.indexOf("deps.handleInbound(");
   const iOkGate = src.indexOf('if (!inbound.ok) return { status: 500');
-  const iCommand = src.indexOf("processInboundConsentCommands(");
+  const iCommand = src.indexOf("deps.processCommands(");
   assert(iPersist > 0 && iOkGate > 0 && iCommand > 0, "all three steps are present");
   assert(iPersist < iOkGate, "the persistence call precedes its ok-gate");
   assert(iOkGate < iCommand, "commands run ONLY after persistence returned ok (the gate is between them)");
   // …and nothing re-enters the command path before the gate.
-  assert(src.slice(iPersist, iOkGate).indexOf("processInboundConsentCommands(") === -1, "no command processing before the ok-gate");
+  assert(src.slice(iPersist, iOkGate).indexOf("deps.processCommands(") === -1, "no command processing before the ok-gate");
+  // Phase 8B-1B-C: ownership must be PROVEN before persistence even begins — the full required order is
+  // ownership → receipt/inbound persistence → durable read-back → consent commands.
+  const iOwnership = src.indexOf("resolveEnvelopeProviderAccount(");
+  assert(iOwnership > 0 && iOwnership < iPersist, "provider-account ownership is resolved BEFORE inbound persistence");
 });
 
 // ============================================================================
@@ -1214,69 +1256,35 @@ srcMutation("MUT K: the writer is called for a non-exact identity carrying a pri
   }));
 
 srcMutation("MUT L: D1-B GUESSES a row when the unique fence resolves to multiple rows", D1B_SRC,
-  "    const rows = (data ?? []) as unknown[];\n    if (rows.length !== 1) return null;",
-  "    const rows = (data ?? []) as unknown[];\n    if (rows.length === 0) return null;",
+  // Stage 2A moved this fence into readStoredInboundViaDb's discriminated result: >1 row is `error`
+  // (a violated unique fence is never resolvable), never a first-row pick. Same security intent.
+  '    if (data.length > 1) return { kind: "error" };',
+  '    if (data.length > 99) return { kind: "error" };',
   () => withMutatedBuild(async (mm) => {
-    const many = await mm.D1B.resolvePersistedInboundContextViaDb(
+    const many = await mm.D1B.readStoredInboundViaDb(
       { provider: "meta_whatsapp_cloud", provider_message_id: WAMID_PLAIN },
       fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));
-    return many !== null; // it guessed a row instead of failing closed on a violated fence
+    return many.kind === "present"; // it guessed a row instead of failing closed on a violated fence
   }));
 
 srcMutation("MUT M: an unresolvable durable row is SWALLOWED instead of failing closed", D1B_SRC,
-  '    if (!persistedRow) { failureReason = failureReason ?? "inbound_persisted_row_unresolved"; continue; }',
-  "    if (!persistedRow) { continue; }",
+  '  if (after.kind !== "present") return { kind: "error", reason: "inbound_persisted_row_unresolved" };',
+  '  if (after.kind !== "present") return { kind: "duplicate", context: read as never };',
   () => withMutatedBuild(async (mm) => {
-    const { deps } = d1bDeps({ resolvePersistedInboundContext: async () => null });
+    const { deps } = d1bDeps({ readStoredInbound: async () => ({ kind: "absent" }) });
     const payload = envelope(textMsg());
-    const r = await mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);
+    const r = await mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload, providerAccountId: D2E_ACCOUNT_ID }, deps);
     return r.ok === true; // acknowledged with no downstream context → the command is silently lost
   }));
 
 // ---- CORRECTION B: the persisted row must OUTRANK the in-flight redelivery -------------------
 srcMutation("MUT S: duplicate context is rebuilt from the TRANSIENT redelivery (the pre-correction defect)", D1B_SRC,
-  `    processed.push({
-      message: {
-        provider: persistedRow.provider,
-        providerMessageId: persistedRow.providerMessageId,
-        messageType: persistedRow.messageType,
-        contentMinimized: persistedRow.contentMinimized,
-        providerOccurredAt: persistedRow.providerOccurredAt,
-      },
-      receipt: {
-        inboundMessageId: persistedRow.id,
-        provider: persistedRow.provider,
-        providerMessageId: persistedRow.providerMessageId,
-        duplicate: outcome === "duplicate",
-        destinationHash: persistedRow.senderHash,
-        identityConfidence: persistedRow.identityConfidence,
-        principalType: persistedRow.principalType,
-        principalId: persistedRow.principalId,
-        receivedAt: persistedRow.receivedAt,
-        providerOccurredAt: persistedRow.providerOccurredAt,
-      },
-    });`,
-  `    processed.push({
-      message: {
-        provider: row.provider,
-        providerMessageId: row.provider_message_id,
-        messageType: row.message_type,
-        contentMinimized: row.content_minimized,
-        providerOccurredAt: row.provider_occurred_at,
-      },
-      receipt: {
-        inboundMessageId: persistedRow.id,
-        provider: row.provider,
-        providerMessageId: row.provider_message_id,
-        duplicate: outcome === "duplicate",
-        destinationHash: row.sender_hash,
-        identityConfidence: row.identity_confidence,
-        principalType: row.resolved_principal_type,
-        principalId: row.resolved_principal_id,
-        receivedAt: persistedRow.receivedAt,
-        providerOccurredAt: row.provider_occurred_at,
-      },
-    });`,
+  // Stage 2A reshaped the surfaced context (read-first `bound.context`, plus the bound account), so the old
+  // whole-block anchor no longer exists. The SECURITY FENCE is the single line that chooses the DURABLE row
+  // over this request's in-flight envelope — mutate exactly that, so the defect is reintroduced for real
+  // rather than approximated by a string check.
+  "    const persistedRow = bound.context; // the DURABLE row — never this request's in-flight envelope",
+  "    const persistedRow = { ...bound.context, providerMessageId: row.provider_message_id, messageType: row.message_type, contentMinimized: row.content_minimized as Record<string, unknown>, providerOccurredAt: row.provider_occurred_at, senderHash: row.sender_hash, identityConfidence: row.identity_confidence, principalType: row.resolved_principal_type, principalId: row.resolved_principal_id };",
   () => withMutatedBuild(async (mm) => {
     const store = new Map();
     const idA = { ok: true, identity: { confidence: "exact", principalType: "client", principalId: UUID, candidateCount: 1 } };
@@ -1284,7 +1292,7 @@ srcMutation("MUT S: duplicate context is rebuilt from the TRANSIENT redelivery (
     const run = async (body, resolveIdentity) => {
       const { deps } = d1bDeps({ store, resolveIdentity: async () => resolveIdentity });
       const payload = envelope(textMsg({ text: { body } }));
-      return mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);
+      return mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload, providerAccountId: D2E_ACCOUNT_ID }, deps);
     };
     await run("STOP", idA);
     const dup = await run("START", idB);
@@ -1358,7 +1366,7 @@ srcMutation("MUT N: the webhook processes commands BEFORE persistence is confirm
   () => {
     const src = readF(WEBHOOK_SVC_SRC);
     const iOkGate = src.indexOf('if (!inbound.ok) return { status: 500');
-    const iCommand = src.indexOf("processInboundConsentCommands(");
+    const iCommand = src.indexOf("deps.processCommands(");
     // With the gate gone, commands would run on an UNCONFIRMED persistence result.
     return iOkGate === -1 || iOkGate > iCommand;
   });

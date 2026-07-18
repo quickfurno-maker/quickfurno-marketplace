@@ -76,6 +76,20 @@ export interface AckPersistedItem {
     readonly providerMessageId: string;
     readonly destinationHash: string;
     readonly receivedAt: string;
+    /**
+     * Phase 8B-1B-C — THE SOLE ACCOUNT AUTHORITY for the acknowledgement intent.
+     *
+     * This is `PersistedInboundContext.providerAccountId`: the account STORED on the durable
+     * `communication_inbound_messages` row, read back after persistence. The acknowledgement INHERITS it.
+     * It is never the webhook envelope's decision, never an env WABA/phone value, never a fresh
+     * `resolveOwningProviderAccount` result, never a `communication_provider_accounts` query, and never a
+     * redelivery's proposed account. This service resolves ownership ZERO times.
+     *
+     * `null` means the stored row is a historical LEGACY (pre-binding) row — a real, inherited value.
+     * An OMITTED/undefined value is NOT legacy null: it is an integrity failure and fails closed before any
+     * intent is written (see `inheritPersistedAccount`).
+     */
+    readonly providerAccountId: string | null;
   };
 }
 
@@ -112,6 +126,13 @@ export type AckEnqueueOutcome =
   | "unsupported_channel"
   | "receipt_not_found"         // STOP/START with no authoritative D2-D receipt → never enqueued
   | "seal_unavailable"          // encryption not configured / malformed → fail closed, consent untouched
+  // Phase 8B-1B-C. The persisted inbound row carried no usable account context (omitted/malformed — NOT a
+  // legacy null). An integrity failure: ZERO intents are written and ownership is never re-resolved.
+  | "provider_account_context_missing"
+  // Phase 8B-1B-C. An intent already exists under this idempotency key but is bound to a DIFFERENT account
+  // than the stored inbound row. The existing row is authoritative: never updated, never reassigned, and no
+  // second intent is inserted or acknowledged.
+  | "provider_account_conflict"
   | "enqueue_failed";
 
 export interface AckEnqueueItemResult {
@@ -156,9 +177,20 @@ export interface AckIntentRow {
   readonly aad_schema_version: number;
   readonly received_at: string;
   readonly expires_at: string;
+  /** Phase 8B-1B-C: INHERITED verbatim from the persisted inbound row. Bound at INSERT, never UPDATEd. */
+  readonly provider_account_id: string | null;
 }
 
 export type InsertIntentResult = "inserted" | "duplicate" | "failed";
+
+/**
+ * Phase 8B-1B-C — the read-back of an ALREADY-EXISTING intent under a given idempotency key.
+ * `providerAccountId` is that row's STORED binding; `null` is a real legacy value, not an absence.
+ */
+export type StoredIntentRead =
+  | { readonly kind: "absent" }
+  | { readonly kind: "present"; readonly providerAccountId: string | null }
+  | { readonly kind: "error" };
 
 export interface ConsentCommandResponseDeps {
   /**
@@ -176,6 +208,14 @@ export interface ConsentCommandResponseDeps {
   }) => Promise<string | null>;
   /** Conflict-safe single-intent insert. A unique-key collision is a DUPLICATE, never an error. */
   readonly insertIntent: (row: AckIntentRow) => Promise<InsertIntentResult>;
+  /**
+   * Phase 8B-1B-C — read back an existing intent by its GLOBAL idempotency key.
+   *
+   * The idempotency key and its UNIQUE constraint are UNCHANGED: they remain the replay fence. This read
+   * exists only to CLASSIFY an already-existing row's account binding so a cross-account redelivery yields a
+   * deterministic conflict instead of silently reusing another account's acknowledgement. It never writes.
+   */
+  readonly readStoredIntent: (idempotencyKey: string) => Promise<StoredIntentRead>;
   /** Seal the destination. Production binds AES-256-GCM with the environment key set. */
   readonly seal: typeof sealAckDestination;
 }
@@ -208,6 +248,20 @@ export function defaultConsentCommandResponseDeps(): ConsentCommandResponseDeps 
       return "failed";                            // the raw error NEVER escapes this module
     },
 
+    async readStoredIntent(idempotencyKey) {
+      const db = adminClient();
+      const { data, error } = await db
+        .from("communication_consent_ack_intents")
+        .select("provider_account_id")
+        // EXACT lookup on the unique idempotency key — never a first-row / limit(1) selection.
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+      if (error) return { kind: "error" };         // the raw error NEVER escapes this module
+      if (!data) return { kind: "absent" };
+      const raw = (data as { provider_account_id?: string | null }).provider_account_id ?? null;
+      return { kind: "present", providerAccountId: raw };
+    },
+
     seal: sealAckDestination,
   };
 }
@@ -226,6 +280,28 @@ const REJECT_TO_OUTCOME: Readonly<Record<AckRejectReasonValue, AckEnqueueOutcome
 });
 
 const isAckCommand = (v: unknown): v is AckCommand => v === "stop" || v === "start" || v === "help";
+
+/** Phase 8B-1B-C. The stored-account shape. Used to reject a malformed inherited value, never to derive one. */
+const ACCOUNT_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Phase 8B-1B-C — INHERIT the account from the persisted inbound row. This is a READ, not a resolution.
+ *
+ * The distinction this function exists to enforce: `null` is a REAL stored value (a legacy pre-binding row)
+ * and is inherited as-is; `undefined`/absent/malformed is an INTEGRITY FAILURE and is never collapsed into
+ * legacy null. Collapsing the two would let a row with no proven owner acquire an acknowledgement.
+ */
+type InheritedAccount =
+  | { readonly kind: "inherited"; readonly value: string | null }
+  | { readonly kind: "missing" };
+
+function inheritPersistedAccount(receipt: AckPersistedItem["receipt"]): InheritedAccount {
+  // Read through a widened view: a runtime caller can omit the field even though the contract requires it.
+  const raw = (receipt as { providerAccountId?: string | null } | undefined)?.providerAccountId;
+  if (raw === null) return { kind: "inherited", value: null };          // legacy row — the ACTUAL stored value
+  if (typeof raw === "string" && ACCOUNT_ID_SHAPE.test(raw)) return { kind: "inherited", value: raw };
+  return { kind: "missing" };                                            // undefined / malformed → fail closed
+}
 
 /**
  * Persist AT MOST ONE durable acknowledgement intent per inbound command, then return. Sends NOTHING.
@@ -267,6 +343,21 @@ export async function enqueueConsentCommandResponses(
 
     if (!item) { push(null, "invalid_evidence"); failed++; continue; }
 
+    // ── THE ACCOUNT-INHERITANCE FENCE (Phase 8B-1B-C) ──────────────────────────────────────────────────
+    // Read the STORED account off the persisted inbound row BEFORE any acknowledgement work. A missing or
+    // malformed value is an integrity failure, not a legacy null: no receipt lookup, no seal, no insert.
+    // Ownership is NEVER resolved here — this service holds no resolver and queries no accounts table.
+    const inherited = inheritPersistedAccount(item.receipt);
+    if (inherited.kind === "missing") {
+      console.warn(
+        "[consent_ack.provider_account_context_missing] a persisted inbound row carried no usable stored " +
+        "account context; no acknowledgement intent was written."
+      );
+      push(null, "provider_account_context_missing");
+      failed++;
+      continue;
+    }
+
     // ── THE PROVIDER VOCABULARY BRIDGE ──────────────────────────────────────────────────────────────────
     // D1-B's receipt speaks the ADAPTER vocabulary: provider `meta_whatsapp_cloud`, and the RAW wamid.
     // D2-D's authoritative receipt speaks the CONSENT vocabulary: provider `meta_whatsapp`, and the
@@ -305,7 +396,7 @@ export async function enqueueConsentCommandResponses(
     });
     if (!planned.ok) { push(null, REJECT_TO_OUTCOME[planned.reason]); continue; }
 
-    const outcome = await enqueueOne(planned.plan, plaintext as string, deps);
+    const outcome = await enqueueOne(planned.plan, plaintext as string, inherited.value, deps);
     push(planned.plan.ackType, outcome);
     if (outcome === "enqueued") enqueued++;
     else if (outcome === "duplicate") duplicates++;
@@ -330,6 +421,8 @@ export async function enqueueConsentCommandResponses(
 async function enqueueOne(
   plan: ConsentAckPlan,
   plaintextDestination: string,
+  /** Phase 8B-1B-C: the INHERITED stored account (`null` = legacy inbound row). Never re-derived here. */
+  providerAccountId: string | null,
   deps: ConsentCommandResponseDeps
 ): Promise<AckEnqueueOutcome> {
   const ev = plan.evidence;
@@ -400,7 +493,16 @@ async function enqueueOne(
     aad_schema_version: AAD_SCHEMA_VERSION,
     received_at: ev.receivedAt,
     expires_at: expiresAt,
+    // BOUND AT INSERT to the stored inbound account. There is no UPDATE path for this column anywhere.
+    provider_account_id: providerAccountId,
   };
+
+  // READ-FIRST (Phase 8B-1B-C). The idempotency key is still the fence, but a bare insert can only tell us
+  // "a row exists" — not WHICH account owns it. A redelivery attributed to a different account must not
+  // silently count as this account's acknowledgement, so we classify the existing row first.
+  const existing = await readStoredIntent(deps, plan.idempotencyKey);
+  if (existing.kind === "error") return "enqueue_failed";
+  if (existing.kind === "present") return classifyStoredIntent(existing.providerAccountId, providerAccountId);
 
   let inserted: InsertIntentResult;
   try {
@@ -408,9 +510,45 @@ async function enqueueOne(
   } catch {
     return "enqueue_failed";
   }
-  if (inserted === "duplicate") return "duplicate";
   if (inserted === "failed") return "enqueue_failed";
+  if (inserted === "duplicate") {
+    // A concurrent webhook won the unique key between our read and our insert. Re-read and classify the row
+    // that actually landed — the winner is authoritative and is never updated or reassigned.
+    const raced = await readStoredIntent(deps, plan.idempotencyKey);
+    if (raced.kind === "error") return "enqueue_failed";
+    if (raced.kind === "present") return classifyStoredIntent(raced.providerAccountId, providerAccountId);
+    return "duplicate";
+  }
   return "enqueued";
+}
+
+/** Never throws: a read failure is a CLOSED outcome, never an unbound continue. */
+async function readStoredIntent(
+  deps: ConsentCommandResponseDeps,
+  idempotencyKey: string
+): Promise<StoredIntentRead> {
+  try {
+    return await deps.readStoredIntent(idempotencyKey);
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+/**
+ * The EXISTING row wins, always. Same account (including legacy null on both sides) is an idempotent
+ * duplicate — no second intent, no second acknowledgement. A different account is a deterministic conflict:
+ * the stored binding is preserved exactly as-is, never upgraded from legacy null, never reassigned.
+ */
+function classifyStoredIntent(
+  storedAccountId: string | null,
+  inheritedAccountId: string | null
+): AckEnqueueOutcome {
+  if (storedAccountId === inheritedAccountId) return "duplicate";
+  console.warn(
+    "[consent_ack.provider_account_conflict] an existing acknowledgement intent is bound to a different " +
+    "provider account than the stored inbound row; it was left unchanged and nothing was enqueued."
+  );
+  return "provider_account_conflict";
 }
 
 /** The three acknowledgement types, re-exported for boundary tests. They are NOT in the D3-B registry. */

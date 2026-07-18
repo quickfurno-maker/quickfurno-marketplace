@@ -322,6 +322,11 @@ export interface CommunicationDeliveryEvent {
   readonly occurred_at: string;
   readonly sanitized_metadata: Record<string, unknown>;
   readonly created_at: string;
+  /**
+   * Phase 8B-1B-C: the owning `communication_provider_accounts` row, bound at INSERT to the SAME account
+   * the valid webhook receipt carries. `null` for a legacy (pre-binding) row. Never reassigned.
+   */
+  readonly provider_account_id?: string | null;
 }
 
 /**
@@ -346,6 +351,14 @@ export interface CommunicationWebhookReceipt {
   readonly processed_at: string | null;
   readonly failure_reason_sanitized: string | null;
   readonly created_at: string;
+  /**
+   * Phase 8B-1B-C: the `communication_provider_accounts` row that owns the runtime identity the
+   * callback arrived through. Bound at INSERT for a VALID-signature receipt whose ownership resolved
+   * `owned`; `null` for a legacy (pre-binding) row or an invalid-signature receipt. Never reassigned:
+   * a duplicate/redelivery preserves the stored account (a legacy NULL stays NULL). OPTIONAL because
+   * the Phase 8B-1B-A column is nullable and rows read before the binding runtime simply do not carry it.
+   */
+  readonly provider_account_id?: string | null;
 }
 
 /**

@@ -692,7 +692,7 @@ check("85-92. POST fail-closed order; signature before parse; app secret never l
   const decodeIdx = svc.indexOf("META_UTF8_DECODER.decode(input.rawBytes)");
   const parseIdx = svc.indexOf("safeParse(decoded)");
   const decideIdx = svc.indexOf("decideCallbackIdentity(payload");
-  const downstreamIdx = svc.indexOf("processVerifiedExpectedMetaWebhook({");
+  const downstreamIdx = svc.indexOf("return processVerifiedExpectedMetaWebhook(");
   assert(verifyIdx > 0 && parseIdx > 0 && verifyIdx < decodeIdx && decodeIdx < parseIdx, "signature verified over bytes before decode/parse");
   assert(parseIdx < decideIdx && decideIdx < downstreamIdx, "parse + identity authority precede the downstream");
   assert(/async function processVerifiedExpectedMetaWebhook/.test(svc) && !/export (async )?function processVerifiedExpectedMetaWebhook/.test(svc), "downstream stage is NON-EXPORTED (no identity-exempt export)");
@@ -702,7 +702,15 @@ check("85-92. POST fail-closed order; signature before parse; app secret never l
   assert(!/JSON\.stringify[\s\S]{0,40}verifyMetaWebhookSignature/.test(svc), "raw bytes used, not re-serialized");
   // app secret never logged
   const svcStripped = stripTs(svc);
-  assert(!/console\./.test(svcStripped), "webhook service does not log");
+  // Phase 8B-1B-C: the webhook now emits SANITIZED provider-account diagnostics (identity unresolvable,
+  // lookup failed, not owned). The property under test — the app secret and every other identity/secret
+  // value never reaching a log — is preserved and TIGHTENED: each log must be a bare literal with no
+  // interpolation or concatenation, and must name no secret/identity value.
+  for (const l of svcStripped.match(/console\.\w+\([^;]*\)/g) || []) {
+    assert(!/\$\{|`|\+\s*\w/.test(l), `webhook log must be a bare literal (no interpolation): ${l.slice(0, 70)}`);
+    assert(!/appSecret|APP_SECRET|accessToken|verifyToken|signature|rawBody|payload|wabaId|phone_number_id|phoneNumberId|provider_account_id|accountId/i.test(l),
+      `webhook log must never name a secret or identity value: ${l.slice(0, 70)}`);
+  }
   // 92 outbound flag independent from webhook-processing flag: gate reads webhook_processing_enabled only.
   const runtimeSvc = readFileSync(RUNTIME_SERVICE_SRC, "utf8");
   assert(/webhook_processing_enabled === true/.test(runtimeSvc), "webhook gate reads webhook_processing_enabled");
@@ -998,6 +1006,23 @@ function seedWebhookPolicy(over = {}) {
 // These are fixed numeric TEST-ONLY ids; no real WABA/phone id and no access token is set.
 const WABA_TEST_ID = "102290129340398";
 const PN_TEST_ID = "106540352242922";
+
+// Phase 8B-1B-C — the account that OWNS the inbound/delivery callback identity used by the webhook tests.
+// DELIBERATELY DISTINCT from the outbound fixture `okAccount()` (id "acct-meta-5fb", phone 15550000123,
+// WABA 22220000456): the outbound attribution fixtures must never accidentally satisfy inbound ownership.
+// This row matches the callback payload EXACTLY — phone_number_reference === metadata.phone_number_id and
+// business_account_reference === entry.id — so ownership is proven by identity, never by first-row luck.
+const INBOUND_OWNER_ACCOUNT_ID = "e1e1e1e1-2020-4020-8020-e1e1e1e1e1e1";
+function seedInboundOwnerAccount(over = {}) {
+  db.communication_provider_accounts.push({
+    id: INBOUND_OWNER_ACCOUNT_ID,
+    provider_key: "meta_whatsapp_cloud", channel: "whatsapp",
+    phone_number_reference: PN_TEST_ID, business_account_reference: WABA_TEST_ID,
+    readiness_status: "provider_ready", configuration_status: "complete",
+    business_verification_status: "verified", phone_number_status: "connected",
+    webhook_status: "verified", health_status: "healthy", ...over,
+  });
+}
 function setMetaEnv() {
   process.env.WHATSAPP_PROVIDER_MODE = "meta_cloud";
   process.env.WHATSAPP_APP_SECRET = "APP_SECRET_VALUE";
@@ -1022,7 +1047,7 @@ const NON_DELIVERY = {
 const AUTHORIZED_EMPTY = JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: WABA_TEST_ID, changes: [{ field: "messages", value: { metadata: { phone_number_id: PN_TEST_ID } } }] }] });
 check("40-49. identity-valid callbacks reach downstream (200 ack); unsupported-identity shape stopped before the DB gate (zero receipts); malformed 400; bad sig 401", async () => {
   const W = M.Webhook, WS = M.WebhookSvc;
-  resetDb(); seedWebhookPolicy(); setMetaEnv();
+  resetDb(); seedWebhookPolicy(); seedInboundOwnerAccount(); setMetaEnv();
   const sign = (b) => W.computeMetaWebhookSignature(b, "APP_SECRET_VALUE");
   // Drive the HISTORICAL public symbol `handleMetaWhatsAppWebhookPost` — now the GATED compatibility string
   // wrapper that enters the SAME identity-gated pipeline the production byte entry uses.
@@ -2409,7 +2434,11 @@ srcMutation("MUT: make inbound webhook trigger delivery processing",
   WEBHOOK_SERVICE_SRC,
   "if (classification === MetaWebhookClassification.DELIVERY_STATUS) {",
   "if (classification !== MetaWebhookClassification.UNKNOWN) {",
-  () => !/classification === MetaWebhookClassification\.DELIVERY_STATUS/.test(readF(WEBHOOK_SERVICE_SRC)));
+  // Phase 8B-1B-C added a SECOND occurrence of this comparison in the ownership fence
+  // (`classification === …DELIVERY_STATUS || classification === …INBOUND_MESSAGE`), so the old bare regex
+  // matched the fence even after the routing guard was mutated away — the mutation looked "survived".
+  // Anchor the detection on the ROUTING GUARD specifically; original intent unchanged.
+  () => !/if \(classification === MetaWebhookClassification\.DELIVERY_STATUS\) \{/.test(readF(WEBHOOK_SERVICE_SRC)));
 
 // --- communicationService provider/webhook fence mutations ---
 srcMutation("MUT: remove the provider identity fence (final dispatch boundary)",
@@ -2527,12 +2556,14 @@ tsMutation("MUT I: POST signature verification requires the access token",
 
 tsMutation("MUT J: verified authorized-but-unclassifiable event returns 400 instead of acknowledging",
   [[WEBHOOK_SERVICE_SRC,
-    'await recordIgnoredReceipt(input.rawBody, payload, "ignored_unknown");\n    return { status: 200, result: "acknowledged_unknown" };',
+    // Stage 2C routes the ignored-receipt writer through the injected collaborator. Same fence, still an
+    // EXECUTABLE mutation of the real acknowledge-unknown branch.
+    'await deps.recordIgnored(input.rawBody, payload, "ignored_unknown");\n    return { status: 200, result: "acknowledged_unknown" };',
     'return { status: 400, code: "unclassified_payload" };']],
   async (mm) => {
     // AUTHORIZED_EMPTY has VALID callback identity, so it PASSES the identity gate and reaches the downstream
     // 'acknowledged_unknown' branch (the unsupported-identity fixture would stop at the gate instead).
-    stubDb(mm); resetDb(); seedWebhookPolicy(); setMetaEnv();
+    stubDb(mm); resetDb(); seedWebhookPolicy(); seedInboundOwnerAccount(); setMetaEnv();
     const sig = M.Webhook.computeMetaWebhookSignature(AUTHORIZED_EMPTY, "APP_SECRET_VALUE");
     const res = await mm.WebhookSvc.handleMetaWhatsAppWebhookPost({ rawBody: AUTHORIZED_EMPTY, signature: sig });
     return res.status === 400;

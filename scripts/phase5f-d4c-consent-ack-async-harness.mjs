@@ -407,6 +407,13 @@ const envelope = (...messages) => ({
 });
 const textMsg = (over = {}) => ({ from: WA_ID, id: WAMID, timestamp: "1752400000", type: "text", text: { body: "STOP" }, ...over });
 
+// Phase 8B-1B-C — the OWNING provider account, proven by the webhook BEFORE any effect-bearing write and
+// carried on the DURABLE inbound row. The acknowledgement intent INHERITS it; neither the enqueue path nor
+// the async dispatcher ever re-resolves ownership, queries communication_provider_accounts, or falls back
+// to environment identity. `D4C_ACCOUNT_B` models a DIFFERENT owner for conflict fixtures.
+const D4C_ACCOUNT_ID = "a1a1a1a1-7777-4777-8777-a1a1a1a1a1a1";
+const D4C_ACCOUNT_B = "b2b2b2b2-8888-4888-8888-b2b2b2b2b2b2";
+
 const persistedItem = (over = {}) => ({
   message: { providerMessageId: WAMID, messageType: "text", ...(over.message ?? {}) },
   receipt: {
@@ -415,6 +422,9 @@ const persistedItem = (over = {}) => ({
     providerMessageId: WAMID,            // …and stores the RAW wamid
     destinationHash: DEST_HASH,
     receivedAt: RECEIVED,
+    // The STORED account of the durable inbound row. `null` models a historical legacy (pre-binding) row;
+    // OMITTING it via `omitProviderAccount` models an integrity gap — which is NOT legacy null.
+    ...(over.omitProviderAccount ? {} : { providerAccountId: D4C_ACCOUNT_ID }),
     ...(over.receipt ?? {}),
   },
 });
@@ -477,6 +487,24 @@ function makeStore(opts = {}) {
       rows.set(row.id, stored);
       byKey.set(row.idempotency_key, row.id);
       return "inserted";
+    },
+
+    /** Phase 8B-1B-C read-first: the stored intent's account binding, by the GLOBAL idempotency key. */
+    readIntent(idempotencyKey) {
+      calls.readIntent = (calls.readIntent ?? 0) + 1;
+      const id = byKey.get(idempotencyKey);
+      if (id === undefined) return { kind: "absent" };
+      return { kind: "present", providerAccountId: rows.get(id).provider_account_id ?? null };
+    },
+    /** Pre-seed an intent that already exists under a given account (or legacy NULL), without the service. */
+    seedIntent(idempotencyKey, providerAccountId) {
+      const id = `seeded-${byKey.size}`;
+      rows.set(id, {
+        id, idempotency_key: idempotencyKey, provider_account_id: providerAccountId,
+        status: "pending", locked_by: null, locked_at: null, claim_count: 0,
+        provider_attempt_count: 0, terminal_code: null, completed_at: null,
+      });
+      byKey.set(idempotencyKey, id);
     },
 
     /** qf_expire_consent_ack_intents: EXPIRED pending/claimed → terminal `expired`, seals purged. */
@@ -612,6 +640,10 @@ function enqueueDeps(store, over = {}) {
   return {
     resolveReceiptId: over.resolveReceiptId ?? receiptTableForAnyCommand(),
     insertIntent: over.insertIntent ?? (async (row) => store.insert(row)),
+    // Phase 8B-1B-C read-first: classify an ALREADY-EXISTING intent's account binding by the GLOBAL
+    // idempotency key (unchanged as the unique fence). Read-only — this fake exposes NO update path for
+    // provider_account_id anywhere, so a reassignment could not even be simulated.
+    readStoredIntent: over.readStoredIntent ?? (async (key) => store.readIntent(key)),
     seal: over.seal ?? ((pt, aad) => M.Seal.sealAckDestination(pt, aad, ENV_OK)),
   };
 }
@@ -1325,19 +1357,19 @@ check("D1. the webhook ENQUEUES and never sends, dispatches, or runs the worker"
 
 check("D2. the enqueue is AFTER the completed command result, and a command failure prevents it", () => {
   const code = readF(WEBHOOK_SRC);
-  const iCommands = code.indexOf("processInboundConsentCommands");
+  const iCommands = code.indexOf("deps.processCommands(");
   const iGuard = code.indexOf("inbound_command_processing_failed");
-  const iEnqueue = code.indexOf("await enqueueConsentCommandResponses(");
+  const iEnqueue = code.indexOf("await deps.enqueueAcks(");
   assert(iCommands > 0 && iGuard > 0 && iEnqueue > 0, "all three exist");
   assert(iCommands < iGuard, "the command result is checked…");
   assert(iGuard < iEnqueue, "…and a FAILED command returns BEFORE the enqueue is reached");
-  const iPersist = code.indexOf("handleInboundWhatsAppMessages");
+  const iPersist = code.indexOf("deps.handleInbound(");
   assert(iPersist > 0 && iPersist < iCommands, "persistence precedes command processing");
 });
 
 check("D3. the enqueue is wrapped — a throw can never change the webhook response", () => {
   const code = readF(WEBHOOK_SRC);
-  const i = code.indexOf("await enqueueConsentCommandResponses(");
+  const i = code.indexOf("await deps.enqueueAcks(");
   const before = code.slice(Math.max(0, i - 400), i);
   has(/try\s*\{/, before, "the enqueue sits inside a try");
   const after = code.slice(i, i + 600);
@@ -1385,6 +1417,18 @@ check("E4. the worker never imports a provider adapter directly", () => {
 check("E5. NO plaintext phone is ever logged", () => {
   for (const f of [ENQUEUE_SRC, WORKER_SRC, ROUTE_SRC, SEAL_SRC]) {
     const code = stripTs(readF(f));
+    // Phase 8B-1B-C: the ENQUEUE path now emits two SANITIZED provider-account diagnostics (missing context,
+    // cross-account conflict). The property under test — no plaintext/identity leakage — is preserved and
+    // TIGHTENED: every log it emits must be a bare literal with no interpolation, no concatenation and no
+    // identity/secret token. Every other file in the D4-C path must still log nothing at all.
+    if (f === ENQUEUE_SRC) {
+      for (const l of code.match(/console\.\w+\([^;]*\)/g) || []) {
+        assert(!/\$\{|`|\+\s*\w/.test(l), `${f}: log must be a bare literal (no interpolation/concatenation): ${l.slice(0, 70)}`);
+        assert(!/phone|destination|E164|wamid|provider_account_id|accountId|wabaId|ciphertext|nonce|authTag|idempotencyKey/i.test(l),
+          `${f}: log must never name a phone/destination/account/secret value: ${l.slice(0, 70)}`);
+      }
+      continue;
+    }
     hasNot(/console\.(log|info|warn|error|debug)/, code, `${f} logs nothing at all`);
   }
 });
@@ -2541,9 +2585,9 @@ async function withMutatedBuild(fn) {
 // ---- Enqueue ordering + idempotency ------------------------------------------------------------
 srcMutation("MUT 1: the webhook ENQUEUES BEFORE the command result is checked",
   WEBHOOK_SRC,
-  `const commands = await processInboundConsentCommands(inbound.result.processed);
+  `const commands = await deps.processCommands(inbound.result.processed);
     if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };`,
-  `const commands = await processInboundConsentCommands(inbound.result.processed);`,
+  `const commands = await deps.processCommands(inbound.result.processed);`,
   // BEHAVIOURAL: rerun the REAL webhook-ordering validator against the MUTATED source. With the guard
   // gone, a FAILED consent command no longer returns before the enqueue — so ordering is violated.
   () => checkFails("D2."));
@@ -2796,7 +2840,7 @@ srcMutation("MUT 15: the EXPIRY check is removed ⇒ a stale acknowledgement is 
 // ---- Webhook boundary ------------------------------------------------------------------------
 srcMutation("MUT 17: the worker is invoked INLINE from the webhook (the latency blocker returns)",
   WEBHOOK_SRC,
-  "      await enqueueConsentCommandResponses({",
+  "      await deps.enqueueAcks({",
   '      await (await import("./consentAckWorkerService")).processConsentAckIntents({});\n      await enqueueConsentCommandResponses({',
   () => checkFails("D1."));          // the REAL webhook-separation check must go red
 

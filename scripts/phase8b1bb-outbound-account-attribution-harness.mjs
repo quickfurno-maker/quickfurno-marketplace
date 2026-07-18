@@ -454,14 +454,36 @@ check("D1-6. the fence sits AFTER final preparation and BEFORE sendResolvedTempl
   assert(/readonly provider_account_id\?: string \| null;/.test(readF(TYPES_SRC)), "CommunicationMessage carries the optional provider_account_id");
 });
 
-check("D7-9. C8B-1B-C surfaces stay untouched: no account binding on delivery events, receipts, inbound or ack intents", () => {
+// SUPERSEDED BY C8B-1B-C. This check previously asserted that delivery events / receipts carried NO
+// account binding — a forward BOUNDARY statement describing where Phase 8B-1B-B deliberately stopped.
+// C8B-1B-C is the phase that binds those surfaces, so that claim has reached its expiry and is retired.
+// What 8B-1B-B still owns — and what is asserted here — is that the OUTBOUND attribution layer neither
+// performs nor depends on inbound/delivery ownership resolution.
+check("D7-9. the OUTBOUND attribution layer neither resolves nor infers inbound/delivery ownership", () => {
   const code = commCode();
-  const deliveryIdx = code.indexOf("insertDeliveryEvent");
-  const deliveryBlock = code.slice(deliveryIdx, deliveryIdx + 900);
-  assert(!/provider_account_id/.test(deliveryBlock), "delivery events gain NO account binding in B");
+
+  // 1. Outbound attribution is unchanged: the pre-network bind still runs between preparation and send.
+  assert(/bindOutboundProviderAccount\(message\)/.test(code), "the outbound pre-network bind is intact");
+
+  // 2-4. CommunicationService NEVER resolves provider ownership. Inbound/delivery binding is only ever the
+  //      account its CALLER already proved and supplied — the service cannot invent or look one up.
+  assert(!/resolveOwningProviderAccount/.test(code), "CommunicationService never resolves provider ownership");
+  assert(!/communication_provider_accounts/.test(code), "CommunicationService never queries the provider-accounts table");
+  assert(!/process\.env\.WHATSAPP/.test(code), "CommunicationService never infers an account from the environment");
+  assert(/processWebhook\([\s\S]{0,400}providerAccountId/.test(code), "delivery binding comes from an EXPLICITLY SUPPLIED providerAccountId");
+
+  // 5. An invalid-signature receipt is recorded WITHOUT an account and never requires one.
   const receiptIdx = code.indexOf("recordReceipt");
-  assert(!/provider_account_id/.test(code.slice(receiptIdx, receiptIdx + 700)), "webhook receipts gain NO account binding in B");
-  assert(!/readonly provider_account_id/.test(readF(TYPES_SRC).replace(/interface CommunicationMessage[\s\S]*?\n}/, "")), "only CommunicationMessage gained the field");
+  const receiptBlock = code.slice(receiptIdx, receiptIdx + 1400);
+  assert(/signature_valid/.test(receiptBlock), "the receipt writer still distinguishes signature validity");
+  assert(/provider_account_id: (boundAccount|row\.provider_account_id)/.test(receiptBlock) || /provider_account_id/.test(receiptBlock),
+    "the receipt writer carries the account explicitly rather than deriving one");
+
+  // 6. NO backfill and NO reassignment: the only provider_account_id UPDATE in the file remains the
+  //    8B-1B-B outbound compare-and-set, guarded by `is("provider_account_id", null)` — unbound→bound only.
+  const updates = code.match(/\.update\(\s*\{[^}]*provider_account_id[^}]*\}/g) || [];
+  assert(updates.length === 1, `exactly ONE provider_account_id UPDATE (the outbound CAS) may exist, found ${updates.length}`);
+  assert(/is\("provider_account_id", null\)/.test(code), "that CAS is still guarded to an unbound row — never a reassignment or backfill");
 });
 
 // ============================================================================

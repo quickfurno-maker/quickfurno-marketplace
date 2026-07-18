@@ -339,16 +339,31 @@ function wireBuild(outDir) {
 const readF = (f) => readFileSync(f, "utf8");
 const stripTs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/[^\n]*/gm, "");
 function safeStringify(v) { try { return JSON.stringify(v); } catch { return String(v); } }
+/**
+ * Decide whether a `git status --porcelain=v1` line describes a PERMITTED, genuinely UNTRACKED artifact that
+ * is out of governance scope. STATUS-AWARE by construction: the first two characters are the porcelain status,
+ * and ONLY an untracked ('??') entry may ever be ignored. A TRACKED change — staged OR unstaged, M/A/D/R —
+ * under these very paths is NEVER ignored; it stays dirty and is caught by the B4 scope loop. The permitted
+ * set is this harness's own temp build artifacts, the founder-permitted .mcp.json, and the founder-permitted
+ * .claude/skills tooling — nothing else. The whole .claude tree is deliberately NOT ignored (an untracked
+ * .claude/settings.json stays dirty), and no path is ever added to the D3B_EXPECTED_FILES allowlist.
+ */
+function shouldIgnoreDirtyLine(line) {
+  const status = line.slice(0, 2);
+  const path = line.slice(3).trim().replace(/\\/g, "/");
+  if (status !== "??") return false;                                   // a TRACKED status is never ignored
+  if (path.startsWith(".phase5fd3b")) return true;                     // this harness's own temp build artifacts
+  if (path === ".mcp.json") return true;                               // the founder-permitted MCP config
+  if (path === ".claude/skills" || path.startsWith(".claude/skills/")) return true; // founder-permitted skills tooling
+  return false;
+}
+
 function gitDirty() {
-  return execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
-    .split("\n").map((l) => l.slice(3).trim()).filter(Boolean).map((p) => p.replace(/\\/g, "/"))
-    // Exclude this harness's own temporary build artifacts, and the PERMITTED LOCAL TOOLING (.mcp.json and
-    // .claude/**). That tooling is founder-permitted untracked, is never project source, and is OUT OF
-    // GOVERNANCE SCOPE ENTIRELY — it is filtered from the scan, never granted a D3B_EXPECTED_FILES allowlist
-    // entry (B3 continues to prove it is absent from that allowlist). `git status --porcelain` collapses the
-    // untracked tooling directory to a single `.claude/` entry; the prefix test also covers a `-uall` expansion.
-    .filter((p) => !p.startsWith(".phase5fd3b"))
-    .filter((p) => p !== ".mcp.json" && p !== ".claude" && !p.startsWith(".claude/"));
+  return execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], { encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean)
+    .filter((line) => !shouldIgnoreDirtyLine(line))
+    .map((line) => line.slice(3).trim().replace(/\\/g, "/"));
 }
 
 const checks = [];
@@ -1725,6 +1740,24 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
   // evidence, the production wiring and the updated 5F-B test wiring. Runs BEFORE the generic dirty-scope
   // loop, so a dirty OR later-committed change to any of the six fails with a clear authority-transfer error.
   provePhase8B1BBOutboundAccountAttributionAuthority();
+
+  // PHASE 8B-1B-B (dirty-filter hardening) — EXECUTABLE self-proof that gitDirty's suppression is STATUS-AWARE.
+  // Only a genuinely UNTRACKED ('??') permitted artifact may be ignored; every tracked status (staged OR
+  // unstaged M/A/D/R) under those same paths, and every non-permitted untracked path, STAYS dirty. Modelled on
+  // synthetic porcelain lines, so a future weakening — dropping the status test, or broadening to the whole
+  // .claude tree — is caught right here, before the scope loop ever consumes the filtered list.
+  for (const line of ["?? .mcp.json", "?? .claude/skills/example.md", "?? .phase5fd3b-temp.tsconfig.json"]) {
+    assert(shouldIgnoreDirtyLine(line), `an untracked permitted artifact must be ignored: "${line}"`);
+  }
+  for (const line of [
+    " M .mcp.json", "M  .mcp.json", "A  .mcp.json", "D  .mcp.json", "R  old -> .mcp.json",
+    " M .claude/skills/example.md", "M  .claude/skills/example.md", "A  .claude/skills/example.md",
+    "D  .claude/skills/example.md", "R  old -> .claude/skills/example.md",
+    "?? .claude/settings.json", "?? unrelated.txt",
+    " M .phase5fd3b-temp.tsconfig.json", "A  .phase5fd3b-temp.tsconfig.json",
+  ]) {
+    assert(!shouldIgnoreDirtyLine(line), `a tracked change or a non-permitted path must STAY dirty: "${line}"`);
+  }
 
   const dirty = gitDirty();
   for (const f of [D2C_SRC, D2D_WRITER_SRC, D2D_COMMAND_SRC, POLICY_SRC, D2E_ORCH_SRC, D2E_INPUT_SRC]) {

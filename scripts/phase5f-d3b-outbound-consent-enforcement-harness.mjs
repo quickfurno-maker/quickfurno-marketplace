@@ -145,7 +145,16 @@ const PHASE_8B1A_AUTHORITY_BASE = "95c5e969ce585fd435019fdb17265ece6fdb9c1d";
 const PHASE_8B1A_IMPLEMENTATION_HEAD = "fe10c2c70691809952f53c7244b8d3b5cb1a150d";
 const PHASE5FD4B_SRC = "scripts/phase5f-d4b-consent-command-response-harness.mjs";
 const PHASE8B1A_HARNESS_SRC = "scripts/phase8b1-meta-callback-identity-harness.mjs";
-const PHASE8B1A_HARNESS_CHECKS = 16;
+/**
+ * EXACT count pin (never a lower bound). Transferred 16 → 17 for exactly ONE reviewed Stage 2E addition:
+ * the 8B-1A harness's `D5` check, which proves that passing the callback-identity gate is NOT sufficient on
+ * its own — an authorized identity whose provider account is UNOWNED yields ZERO receipt, inbound, delivery,
+ * consent-command and acknowledgement effects. The count therefore rose because the harness got STRICTER.
+ *
+ * This is not a general allowance for future test additions: any further change to this number requires its
+ * own explicit authority transfer, exactly as this one did.
+ */
+const PHASE8B1A_HARNESS_CHECKS = 17;
 const PHASE8B1A_HARNESS_MUTATIONS = 16;
 const PHASE_8B1A_APPROVED_ROUTE = "app/api/webhooks/whatsapp/meta/route.ts";
 /** The EXACT ten files the fixed Phase 8B-1A range (base..head) may contain — nothing more, nothing less. */
@@ -179,6 +188,71 @@ const PHASE_8B1A_ONDISK_TRANSFERRED = [PHASE5FB_SRC];
 const PHASE_8B1A_ACTIVE_ONDISK_BLOBS = PHASE_8B1A_FROZEN_BLOBS.filter(
   ([p]) => !PHASE_8B1A_ONDISK_TRANSFERRED.includes(p)
 );
+
+// ============================================================================
+// PHASE 8B-1B-C — D4-B GOVERNANCE-HARNESS AUTHORITY (a PARALLEL layer, Item 3).
+// Phase 8B-1B-C re-aligned the D4-B harness (D2-E delta authority 159->166 exact-line fragments + an added
+// byte freeze for services/consentCommandResponseService.ts). Its on-disk pin is DELEGATED to this layer.
+//
+// This deliberately does NOT route through PHASE_8B1A_ONDISK_TRANSFERRED. That list, its exact length/order
+// pin, the "D4-B stays active" assertion, the 5F-B absence assertion and the unlisted-transfer sweep are all
+// left literally untouched — emptying the 8B-1A active set would make the sweep vacuously true and silently
+// retire the model. Instead the historical 8B-1A record STANDS, and this layer supersedes only the on-disk
+// comparison for exactly ONE named path, and only after proving itself.
+// ============================================================================
+const PHASE_8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
+/** The historical D4-B blob 8B-1A recorded. Re-stated here so a silent rewrite of history is detectable. */
+const PHASE_8B1BC_D4B_HISTORICAL_BLOB = "5cf652122fa0c12f5137c8d9b157b4156ce56abd";
+/** The finalized, reviewed C8B-1B-C D4-B governance harness blob. */
+const PHASE_8B1BC_D4B_HARNESS_BLOB = "d7e54e4d0f830858fbe2d56d36131bc2f7fdaee9";
+/** EXACTLY the paths whose 8B-1A on-disk comparison is delegated to this layer. Exactly one, by identity. */
+const PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES = [PHASE5FD4B_SRC];
+
+/**
+ * The PROOF TOKEN. Null until the prover has passed EVERY assertion below. The delegated branch of the
+ * 8B-1A active loop requires it to equal the reviewed blob, so deleting, bypassing or short-circuiting the
+ * prover makes that loop FAIL rather than silently skip — the delegation is load-bearing, not a hole.
+ */
+let phase8B1BCD4BAuthorityToken = null;
+
+function provePhase8B1BCD4BGovernanceAuthority() {
+  phase8B1BCD4BAuthorityToken = null;   // never inherit a token from a previous call
+
+  // Structural validity of the delegation set — exactly one path, no duplicates, no substitution.
+  assert(Array.isArray(PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES), "the delegated-authority set is an array");
+  assert(PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES.length === 1, "exactly ONE on-disk authority is delegated to Phase 8B-1B-C");
+  assert(PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES[0] === PHASE5FD4B_SRC, "the sole delegated path is the D4-B governance harness");
+  assert(new Set(PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES).size === PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES.length, "the delegated set contains no duplicates");
+
+  // Provenance: the implementation commit exists, is forward-only from the 8B-1A head, and precedes HEAD.
+  assert(execFileSync("git", ["cat-file", "-t", PHASE_8B1BC_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit",
+    "the C8B-1B-C implementation commit " + PHASE_8B1BC_IMPLEMENTATION_HEAD.slice(0, 12) + " must exist");
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);                          // throws if not
+
+  // HISTORY IS PRESERVED, NOT REWRITTEN: the 8B-1A record for D4-B must still hold its original blob.
+  const historical = PHASE_8B1A_FROZEN_BLOBS.find(([p]) => p === PHASE5FD4B_SRC);
+  assert(historical && historical[1] === PHASE_8B1BC_D4B_HISTORICAL_BLOB,
+    "the historical Phase 8B-1A D4-B blob must remain recorded and unrewritten");
+  assert(PHASE_8B1BC_D4B_HISTORICAL_BLOB !== PHASE_8B1BC_D4B_HARNESS_BLOB,
+    "the transfer genuinely moves the on-disk pin to a NEW reviewed blob");
+
+  // Fixed-literal self-proof, following the 8B-1B-A / 8B-1B-B convention.
+  const selfSrc = readF(HARNESS_SRC);
+  for (const blob of [PHASE_8B1BC_D4B_HISTORICAL_BLOB, PHASE_8B1BC_D4B_HARNESS_BLOB]) {
+    assert(selfSrc.includes('"' + blob + '"'), "the Phase 8B-1B-C blob " + blob.slice(0, 12) + " is an exact fixed literal");
+  }
+
+  // THE ACTIVE ON-DISK FREEZE for the delegated path — exact blob equality, same strength as 8B-1A.
+  const onDisk = execFileSync("git", ["hash-object", PHASE5FD4B_SRC], { encoding: "utf8" }).trim();
+  assert(onDisk === PHASE_8B1BC_D4B_HARNESS_BLOB,
+    PHASE5FD4B_SRC + " is not byte-identical to its reviewed C8B-1B-C governance blob. " +
+    "A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER " +
+    "(on-disk " + onDisk.slice(0, 12) + " != pinned " + PHASE_8B1BC_D4B_HARNESS_BLOB.slice(0, 12) + ").");
+
+  phase8B1BCD4BAuthorityToken = PHASE_8B1BC_D4B_HARNESS_BLOB;   // set ONLY after every assertion passed
+  return phase8B1BCD4BAuthorityToken;
+}
 
 // ============================================================================
 // PHASE 8B-1B-A — PROVIDER-ACCOUNT BINDING AUTHORITY.
@@ -1284,7 +1358,16 @@ function provePhase8B1AMetaAuthority() {
   //    THE ACTIVE ON-DISK FREEZE — Phase 8B-1A STILL pins D4-B byte-for-byte. The 5F-B on-disk freeze has been
   //    TRANSFERRED to Phase 8B-1B-B (proven in provePhase8B1BBOutboundAccountAttributionAuthority), so it is
   //    deliberately NOT re-checked here; D4-B does NOT transfer.
+  //    PHASE 8B-1B-C DELEGATION — prove the parallel D4-B authority FIRST, so its token exists below.
+  provePhase8B1BCD4BGovernanceAuthority();
   for (const [path, expectedBlob] of PHASE_8B1A_ACTIVE_ONDISK_BLOBS) {
+    //  Exactly-one delegated path, compared by IDENTITY (no prefix/regex/directory matching). The skip is
+    //  load-bearing: it requires the C8B-1B-C prover to have already PASSED and published its token.
+    if (PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES.length === 1 && path === PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES[0]) {
+      assert(phase8B1BCD4BAuthorityToken === PHASE_8B1BC_D4B_HARNESS_BLOB,
+        path + " is delegated to Phase 8B-1B-C, but that authority did not prove itself — the delegation is void");
+      continue;
+    }
     const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
     assert(onDisk === expectedBlob,
       `${path} is not byte-identical to its Phase 8B-1A Commit 1 baseline (commit ${PHASE_8B1A_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
@@ -1527,6 +1610,94 @@ function provePhase8B1BAProviderAccountAuthority() {
  * on-disk 5F-B freeze. The byte-freeze is the primary authority; the range, harness-shape, load-bearing,
  * production-wiring and 5F-B-wiring evidence are defence in depth.
  */
+// ============================================================================
+// PHASE 8B-1B-C — PHASE 8B-1B-B SUCCESSOR AUTHORITY (a SECOND parallel layer, separately auditable).
+// Four of the six Phase 8B-1B-B governed files were legitimately changed by the reviewed C8B-1B-C
+// implementation commit. Their ACTIVE on-disk proof moves here. PHASE_8B1BB_FROZEN_BLOBS is NOT rewritten:
+// all six historical values stand, and the two UNCHANGED files stay wholly on the original authority.
+//
+// 5F-B PREDECESSOR/SUCCESSOR MODEL. 5F-B has now transferred twice (8B-1A → 8B-1B-B → 8B-1B-C).
+// PHASE_8B1BB_ACTIVE_5FB_BLOB keeps its exact value: it is the blob Phase 8B-1B-B RECEIVED from the earlier
+// transfer, and after this succession it is a PERMANENT HISTORICAL PREDECESSOR record — no longer the
+// currently-active pin. PHASE_8B1BC_ACTIVE_5FB_BLOB is the active one, and names its predecessor explicitly
+// so the chain stays auditable rather than silently re-pointed.
+// ============================================================================
+const PHASE_8B1BC_ACTIVE_5FB_BLOB = "8fa2ca2cd87b36fa6a3ce9499085073a386fbcfc";
+/** The blob PHASE_8B1BC_ACTIVE_5FB_BLOB supersedes — must remain exactly the 8B-1B-B received value. */
+const PHASE_8B1BC_5FB_PREDECESSOR_BLOB = "811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4";
+
+/** EXACT ordered succession table: [path, historical 8B-1B-B blob, reviewed C8B-1B-C successor blob]. */
+const PHASE_8B1BC_PHASE8B1BB_DELEGATED_ONDISK_AUTHORITIES = [
+  [PHASE_8B1BB_TYPES_SRC,    "47e0637980395c0f39ccceebb66914ab5d9998ee", "f61e099d4c3d72f013ea11cd6003389141a8992f"],
+  [PHASE_8B1BB_COMM_SRC,     "8d24e0a1a6430b2bde1957af641232e3522b5d15", "892e6b507cf20ab4692bb1d3232a556970bc89e2"],
+  [PHASE_8B1BB_PHASE5FB_SRC, "811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4", "8fa2ca2cd87b36fa6a3ce9499085073a386fbcfc"],
+  [PHASE_8B1BB_HARNESS_SRC,  "8634bbe267c05c681c0186f59edf9675eeec0bc9", "b1837d14fdd016228882303200dc41dd06fa911c"],
+];
+/** The two Phase 8B-1B-B files that did NOT change and therefore stay on the ORIGINAL on-disk authority. */
+const PHASE_8B1BC_PHASE8B1BB_NOT_DELEGATED = [PHASE_8B1BB_ATTRIBUTION_SRC, PHASE_8B1BB_RUNTIME_SRC];
+
+/** Load-bearing proof map: path -> reviewed successor blob. Empty until the prover passes every assertion. */
+let phase8B1BCPhase8B1BBAuthorityMap = new Map();
+
+function provePhase8B1BCPhase8B1BBGovernanceAuthority() {
+  phase8B1BCPhase8B1BBAuthorityMap = new Map();   // never inherit a map from a previous call
+
+  const rows = PHASE_8B1BC_PHASE8B1BB_DELEGATED_ONDISK_AUTHORITIES;
+  assert(Array.isArray(rows), "the 8B-1B-B succession table is an array");
+  assert(rows.length === 4, "EXACTLY four Phase 8B-1B-B paths are delegated to Phase 8B-1B-C");
+  const paths = rows.map(([p]) => p);
+  assert(new Set(paths).size === 4, "the delegated succession table contains no duplicates");
+  // Fixed ORDER, by identity — not membership, not pattern.
+  assert(paths[0] === PHASE_8B1BB_TYPES_SRC && paths[1] === PHASE_8B1BB_COMM_SRC &&
+         paths[2] === PHASE_8B1BB_PHASE5FB_SRC && paths[3] === PHASE_8B1BB_HARNESS_SRC,
+    "the delegated paths are exactly types, communicationService, 5F-B and the 8B-1B-B harness, in that order");
+  // The two unchanged files must NEVER be delegated.
+  for (const p of PHASE_8B1BC_PHASE8B1BB_NOT_DELEGATED) {
+    assert(!paths.includes(p), p + " did not change and must stay on the ORIGINAL Phase 8B-1B-B authority");
+  }
+  assert(paths.length + PHASE_8B1BC_PHASE8B1BB_NOT_DELEGATED.length === PHASE_8B1BB_FROZEN_BLOBS.length,
+    "delegated + non-delegated must account for EVERY Phase 8B-1B-B governed file — no path may be dropped");
+
+  // Provenance and forward-only ancestry.
+  assert(execFileSync("git", ["cat-file", "-t", PHASE_8B1BC_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit",
+    "the C8B-1B-C implementation commit must exist");
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BB_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);                          // throws if not
+
+  const selfSrc = readF(HARNESS_SRC);
+  for (const [path, historicalBlob, successorBlob] of rows) {
+    // HISTORY PRESERVED: the 8B-1B-B record for this path must still hold its original blob.
+    const recorded = PHASE_8B1BB_FROZEN_BLOBS.find(([p]) => p === path);
+    assert(recorded, path + " must exist in the historical Phase 8B-1B-B frozen map");
+    assert(recorded[1] === historicalBlob, "the historical Phase 8B-1B-B blob for " + path + " must remain unrewritten");
+    assert(historicalBlob !== successorBlob, "a real change must separate the historical and successor blobs for " + path);
+    // Fixed-literal self-proof (8B-1B-A / 8B-1B-B convention).
+    assert(selfSrc.includes('"' + successorBlob + '"'), "the C8B-1B-C successor blob for " + path + " is an exact fixed literal");
+    // The reviewed commit must resolve the path to its successor blob.
+    const headBlob = execFileSync("git", ["rev-parse", PHASE_8B1BC_IMPLEMENTATION_HEAD + ":" + path], { encoding: "utf8" }).trim();
+    assert(headBlob === successorBlob,
+      "the C8B-1B-C implementation commit must resolve " + path + " to its reviewed blob (got " + headBlob.slice(0, 12) + ")");
+    // ACTIVE ON-DISK FREEZE — same strength as the authority it succeeds.
+    assert(existsSync(path), path + " must exist — a DELETION requires an EXPLICIT AUTHORITY TRANSFER");
+    const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
+    assert(onDisk === successorBlob,
+      path + " is not byte-identical to its reviewed C8B-1B-C baseline. " +
+      "A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk " +
+      onDisk.slice(0, 12) + " != pinned " + successorBlob.slice(0, 12) + ").");
+    phase8B1BCPhase8B1BBAuthorityMap.set(path, successorBlob);
+  }
+
+  // 5F-B SUCCESSION CHAIN — explicit, auditable, and unequal.
+  assert(PHASE_8B1BC_5FB_PREDECESSOR_BLOB === PHASE_8B1BB_ACTIVE_5FB_BLOB,
+    "the C8B-1B-C 5F-B successor must name the exact blob Phase 8B-1B-B received as its predecessor");
+  assert(PHASE_8B1BC_ACTIVE_5FB_BLOB !== PHASE_8B1BC_5FB_PREDECESSOR_BLOB, "the 5F-B succession moves to a genuinely new blob");
+  assert(phase8B1BCPhase8B1BBAuthorityMap.get(PHASE_8B1BB_PHASE5FB_SRC) === PHASE_8B1BC_ACTIVE_5FB_BLOB,
+    "Phase 8B-1B-C now owns the ACTIVE on-disk proof for 5F-B");
+
+  assert(phase8B1BCPhase8B1BBAuthorityMap.size === 4, "the returned authority map covers exactly the four delegated paths");
+  return phase8B1BCPhase8B1BBAuthorityMap;
+}
+
 function provePhase8B1BBOutboundAccountAttributionAuthority() {
   // ── A. COMMIT AUTHORITY ── both commits exist; ancestry base → implementation head → HEAD (FIXED
   //    endpoints, never a moving HEAD).
@@ -1614,7 +1785,21 @@ function provePhase8B1BBOutboundAccountAttributionAuthority() {
   //    equal the reviewed pinned blob. Detects a dirty edit, a later COMMITTED edit, a deletion or a
   //    replacement. This is where the TRANSFERRED active 5F-B freeze now lives (pinned to the new blob).
   const blobMatches = (onDisk, pinned) => onDisk === pinned;
+  //    PHASE 8B-1B-C SUCCESSION — prove the four-path successor authority FIRST; its Map gates delegation.
+  const c8b1bcSuccessors = provePhase8B1BCPhase8B1BBGovernanceAuthority();
   for (const [path, expectedBlob] of PHASE_8B1BB_FROZEN_BLOBS) {
+    //  Delegate ONLY on an exact key hit in the proved Map, whose value must equal the fixed successor
+    //  blob AND the current on-disk bytes. No prefix/regex/directory matching, and never a bare continue:
+    //  if the prover is removed, bypassed or returns an empty/short Map, this branch is not taken and the
+    //  historical comparison below runs — and fails — for every changed file.
+    if (c8b1bcSuccessors.has(path)) {
+      const successor = c8b1bcSuccessors.get(path);
+      const delegatedOnDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
+      assert(blobMatches(delegatedOnDisk, successor),
+        path + " is delegated to Phase 8B-1B-C but does not match its reviewed successor blob (on-disk " +
+        delegatedOnDisk.slice(0, 12) + " != " + successor.slice(0, 12) + ")");
+      continue;
+    }
     const headBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1BB_IMPLEMENTATION_HEAD}:${path}`], { encoding: "utf8" }).trim();
     assert(blobMatches(headBlob, expectedBlob), `the Phase 8B-1B-B implementation commit must resolve ${path} to its reviewed blob (got ${headBlob.slice(0, 12)}, expected ${expectedBlob.slice(0, 12)})`);
     assert(existsSync(path), `${path} must exist — a DELETION requires an EXPLICIT AUTHORITY TRANSFER`);
@@ -1625,7 +1810,8 @@ function provePhase8B1BBOutboundAccountAttributionAuthority() {
   }
   assert(blobMatches("811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4", PHASE_8B1BB_ACTIVE_5FB_BLOB) === true, "the transferred active 5F-B blob is the reviewed 8B-1B-B pin");
   assert(blobMatches("0000000000000000000000000000000000000000", PHASE_8B1BB_ACTIVE_5FB_BLOB) === false, "a CHANGED reviewed blob is rejected");
-  assert(PHASE_8B1BB_FROZEN_BLOBS.find(([p]) => p === PHASE_8B1BB_PHASE5FB_SRC)[1] === PHASE_8B1BB_ACTIVE_5FB_BLOB, "the 5F-B active freeze is pinned to the new reviewed blob (transfer received)");
+  assert(PHASE_8B1BB_FROZEN_BLOBS.find(([p]) => p === PHASE_8B1BB_PHASE5FB_SRC)[1] === PHASE_8B1BB_ACTIVE_5FB_BLOB,
+    "the 5F-B blob Phase 8B-1B-B RECEIVED is recorded exactly (a permanent historical transfer receipt; the ACTIVE on-disk proof has since succeeded to Phase 8B-1B-C)");
 
   // ── F. DEDICATED HARNESS EVIDENCE ── EXECUTABLE registrations (comment-stripped anchors), never comment-only.
   //    20 functional = 16 check() + 4 INFRA self-tests; 31 mutations across the exact reviewed families.
@@ -2638,15 +2824,22 @@ srcMutation("MUT 24 (8A): the provider is invoked BEFORE the consent gate",
   // guard must ALSO see the send escape invokeProvider.
   () => withMutatedBuild(async (mm) => await checkFails("P8A-3.", mm) && await checkFails("P8A-15.", mm)));
 
+// MUT 25 — RE-ANCHORED (Stage 2G-D). The previous anchor was the pre-Stage-2C MULTILINE construction; the
+// live code is now a single line, so the anchor stopped matching and the mutation silently stopped running.
+// The replacement anchor is a REGEXP so formatting can never break it again:
+//   • it is scoped to the ENCLOSING defaultMetaWebhookDeps() — not any CommunicationService construction;
+//   • `[\s\S]*?` is NON-GREEDY, so it binds to the FIRST construction inside that function;
+//   • `\s*` between arguments tolerates LF/CRLF, spaces and line breaks — but NOTHING else;
+//   • the argument SEQUENCE is exact (provider, undefined, undefined, enforcer), so a different provider or
+//     any reordering does NOT match;
+//   • capture group 1 is everything up to the enforcer argument, so the replacement rewrites ONLY the 4th
+//     argument and leaves every other argument byte-identical;
+//   • the runner requires a regexp anchor to match EXACTLY ONCE, so a second construction is rejected
+//     rather than mutated.
 srcMutation("MUT 25 (8A): the WEBHOOK's fail-closed enforcer is omitted again",
   WEBHOOK_SRC,
-  `    const service = new CommunicationService(
-      provider,
-      undefined,
-      undefined,
-      createFailClosedOutboundConsentEnforcer()
-    );`,
-  "    const service = new CommunicationService(provider, undefined, undefined, undefined as never);",
+  /(export function defaultMetaWebhookDeps\(\)[\s\S]*?new CommunicationService\(\s*provider\s*,\s*undefined\s*,\s*undefined\s*,\s*)createFailClosedOutboundConsentEnforcer\(\)/,
+  "$1undefined as never",
   // The webhook stops stating a consent posture — the structural guard must catch it.
   () => checkFails("P8A-16."));
 
@@ -2706,8 +2899,19 @@ async function runMutations() {
       for (const edit of mut.edits) {
         const p = resolve(edit.file);
         const cur = readFileSync(p, "utf8");
-        if (!cur.includes(edit.from)) {
+        // A STRING anchor keeps its historical semantics (first occurrence). A REGEXP anchor is the
+        // formatting-tolerant form: it must match EXACTLY ONCE, so a reformatting that duplicates the
+        // shape can never silently mutate the wrong construction.
+        const isRe = edit.from instanceof RegExp;
+        const hits = isRe
+          ? (cur.match(new RegExp(edit.from.source, "g" + edit.from.flags.replace(/g/g, ""))) || []).length
+          : (cur.includes(edit.from) ? 1 : 0);
+        if (hits === 0) {
           verdict = { pass: false, cause: "anchor not found", error: new Error(`anchor not found in ${edit.file}`) };
+          break;
+        }
+        if (isRe && hits > 1) {
+          verdict = { pass: false, cause: "anchor ambiguous", error: new Error(`anchor matched ${hits}x in ${edit.file} — it must be unique`) };
           break;
         }
         writeFileSync(p, cur.replace(edit.from, edit.to));

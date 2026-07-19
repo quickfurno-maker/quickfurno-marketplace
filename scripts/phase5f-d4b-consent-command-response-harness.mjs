@@ -248,7 +248,7 @@ function hasNot(re, s, msg) { assert(!re.test(s), msg); }
 // ----------------------------------------------------------------------------
 const D4B_BASE = "8749050fb45b500d196746d10315878eb60219c4";
 const D2E_EXPECTED_CHECKS = 31;                 // UNCHANGED by Phase 8A — no D2-E check was added or removed
-const D2E_EXPECTED_ASSERTS = 159;               // Phase 8A adds exactly ONE assertion (the symbol-level guard)
+const D2E_EXPECTED_ASSERTS = 166;               // 8A symbol guard + C8B-1B-C Stage 2E provider-account proofs (EXACT count, never a lower bound)
 
 const A_OLD = 'hasNot(/consentCommand|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");';
 const A_NEW = 'hasNot(/["\']\\.\\.\\/lib\\/communication\\/consentCommand["\']|normalizeConsentCommand/, code, "the webhook never normalizes a command itself");';
@@ -272,6 +272,139 @@ const D2E_ALLOWED_MODULES_AFTER_8A = [
   "./inboundConsentCommandService",
   "./consentCommandResponseService",
   "./outboundConsentEnforcementService",
+];
+
+
+// ── C8B-1B-C — D2-E HARNESS DELTA AUTHORITY TRANSFER (reviewed at implementation commit e742bb14) ──
+// Stage 2E aligned the D2-E harness to the provider-account ownership prerequisite. The transfer is
+// EXACT-LINE, exactly like Phase 8A above: every admitted line is listed verbatim, so an unrelated edit
+// — even one mentioning providerAccountId or readStoredInbound — still fails as an unapproved line.
+// Scope: D2E provider-account UUID fixtures; persisted inbound providerAccountId context; the
+// readStoredInbound dependency and durable read-back; the discriminated read outcomes (present/absent/
+// error, incl. thrown reads); read-before-insert and read-after-insert; the durable stored account
+// remaining authoritative; the deps.handleInbound and deps.processCommands seams; the
+// ownership-before-persistence-before-command ordering proof; the inbound_persisted_row_unresolved vs
+// inbound_read_failed retry distinction; and the MUT L / MUT M / MUT S re-anchors.
+const C8B1BC_D2E_APPROVED_FRAGMENTS = [
+  "createOrResolveReceipt: async () => ({ ok: true, receiptId: \"receipt-1\", duplicate: false }),",
+  "createOrResolveReceipt: async (_raw, _payload, providerAccountId) => ({ ok: true, receiptId: \"receipt-1\", duplicate: false, providerAccountId }),",
+  "resolvePersistedInboundContext: over.resolvePersistedInboundContext ?? (async (row) => {",
+  "readStoredInbound: over.readStoredInbound ?? (async (row) => {",
+  "if (!raw) return null;",
+  "if (!raw) return { kind: \"absent\" };",
+  "return M.D1B.validatePersistedInboundRow(raw, { provider: row.provider, providerMessageId: row.provider_message_id });",
+  "const context = M.D1B.validatePersistedInboundRow(raw, { provider: row.provider, providerMessageId: row.provider_message_id });",
+  "return context ? { kind: \"present\", context } : { kind: \"error\" };",
+  "const D2E_ACCOUNT_ID = \"dddddddd-4444-4444-8444-dddddddddddd\";",
+  "return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, d.deps)",
+  "return M.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload, providerAccountId: D2E_ACCOUNT_ID }, d.deps)",
+  "assert(first.calls.resolves.length === 1, \"the insert path also resolves the persisted row\");",
+  "assert(first.calls.resolves.length === 2, \"the insert path reads first AND reads its context back (read-first bind)\");",
+  "assert(second.calls.resolves.length === 1, \"the duplicate path resolves the stored row without inserting\");",
+  "assert(a.providerAccountId === b.providerAccountId, \"insert and duplicate surface the SAME stored account\");",
+  "const one = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [storedRow()], error: null })));",
+  "assert(one && one.id === ROW_UUID && one.contentMinimized.text === \"STOP\", \"exactly one row → its validated projection\");",
+  "const none = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [], error: null })));",
+  "assert(none === null, \"zero rows → null, NEVER a fabricated row\");",
+  "const many = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));",
+  "assert(many === null, \"a violated fence (multi-row) → null, NEVER a guess — and never .single()/.limit()\");",
+  "const err = await M.D1B.resolvePersistedInboundContextViaDb(fence, fakeClient(() => ({ data: null, error: { code: \"08006\" } })));",
+  "assert(err === null, \"a db error → null (the caller fails closed)\");",
+  "const one = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [storedRow()], error: null })));",
+  "assert(one.kind === \"present\" && one.context.id === ROW_UUID && one.context.contentMinimized.text === \"STOP\", \"exactly one row → its validated projection\");",
+  "const none = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [], error: null })));",
+  "assert(none.kind === \"absent\", \"zero rows → absent, NEVER a fabricated row\");",
+  "const many = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [storedRow(), storedRow({ id: ROW_UUID_2 })], error: null })));",
+  "assert(many.kind === \"error\", \"a violated fence (multi-row) → error, NEVER a guess — and never .single()/.limit()\");",
+  "const err = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: null, error: { code: \"08006\" } })));",
+  "assert(err.kind === \"error\", \"a db error → error (the caller fails closed), never absence\");",
+  "const malformed = await M.D1B.readStoredInboundViaDb(fence, fakeClient(() => ({ data: [storedRow({ id: \"not-a-uuid\" })], error: null })));",
+  "assert(malformed.kind === \"error\", \"a MALFORMED durable row → error, never absence\");",
+  "const start = src.indexOf(\"export async function resolvePersistedInboundContextViaDb\");",
+  "const start = src.indexOf(\"export async function readStoredInboundViaDb\");",
+  "has(/rows\\.length !== 1/, body, \"exactly one row is required\");",
+  "has(/data\\.length === 0\\) return \\{ kind: \"absent\" \\}/, body, \"zero rows → absent, never a fabricated row\");",
+  "has(/data\\.length > 1\\) return \\{ kind: \"error\" \\}/, body, \"more than one row → error, never a first-row guess\");",
+  "has(/context \\? \\{ kind: \"present\", context \\} : \\{ kind: \"error\" \\}/, body, \"a malformed row → error, never absence\");",
+  "const unresolved = await runD1B(envelope(textMsg()), { resolvePersistedInboundContext: async () => null });",
+  "const unresolved = await runD1B(envelope(textMsg()), { readStoredInbound: async () => ({ kind: \"absent\" }) });",
+  "const threw = await runD1B(envelope(textMsg()), { resolvePersistedInboundContext: async () => { throw new Error(\"db down: SQLSTATE 08006\"); } });",
+  "assert(threw.r.ok === false && threw.r.code === \"inbound_persisted_row_unresolved\", \"a THROWN resolver error → retryable, sanitized\");",
+  "assert(unresolved.r.result.processed.length === 0, \"nothing is handed downstream from an unresolvable row\");",
+  "const readFailed = await runD1B(envelope(textMsg()), { readStoredInbound: async () => ({ kind: \"error\" }) });",
+  "assert(readFailed.r.ok === false && readFailed.r.code === \"inbound_read_failed\", \"a read-back FAILURE → retryable, distinct from absence\");",
+  "assert(readFailed.r.result.processed.length === 0, \"nothing is handed downstream from a failed read-back\");",
+  "const threw = await runD1B(envelope(textMsg()), { readStoredInbound: async () => { throw new Error(\"db down: SQLSTATE 08006\"); } });",
+  "assert(threw.r.ok === false && threw.r.code === \"inbound_read_failed\", \"a THROWN read error → retryable, sanitized\");",
+  "const iPersist = src.indexOf(\"handleInboundWhatsAppMessages(\");",
+  "const iPersist = src.indexOf(\"deps.handleInbound(\");",
+  "const iCommand = src.indexOf(\"processInboundConsentCommands(\");",
+  "const iCommand = src.indexOf(\"deps.processCommands(\");",
+  "assert(src.slice(iPersist, iOkGate).indexOf(\"processInboundConsentCommands(\") === -1, \"no command processing before the ok-gate\");",
+  "assert(src.slice(iPersist, iOkGate).indexOf(\"deps.processCommands(\") === -1, \"no command processing before the ok-gate\");",
+  "const iOwnership = src.indexOf(\"resolveEnvelopeProviderAccount(\");",
+  "assert(iOwnership > 0 && iOwnership < iPersist, \"provider-account ownership is resolved BEFORE inbound persistence\");",
+  "hasNot(/consentCommand|normalizeConsentCommand/, code, \"the webhook never normalizes a command itself\");",
+  "hasNot(/[\"']\\.\\.\\/lib\\/communication\\/consentCommand[\"']|normalizeConsentCommand/, code, \"the webhook never normalizes a command itself\");",
+  "const ALLOWED_CONSENT_MODULES = [\"./inboundConsentCommandService\", \"./consentCommandResponseService\", \"./outboundConsentEnforcementService\"];",
+  "assert(consentSpecifiers.length === 1 && consentSpecifiers[0] === \"./inboundConsentCommandService\",",
+  "`the orchestrator must be the ONLY consent-related module the webhook imports (got [${consentSpecifiers.join(\", \")}])`);",
+  "const unapproved = consentSpecifiers.filter((s) => !ALLOWED_CONSENT_MODULES.includes(s));",
+  "assert(unapproved.length === 0,",
+  "`only the approved consent orchestrators may be imported by the webhook (got [${unapproved.join(\", \")}])`);",
+  "assert(consentSpecifiers.includes(\"./inboundConsentCommandService\"),",
+  "\"the D2-E orchestrator must still be imported\");",
+  "const enforcementSymbols = [...readF(WEBHOOK_SVC_SRC).matchAll(/import\\s*\\{([^}]*)\\}\\s*from\\s*\"\\.\\/outboundConsentEnforcementService\"/g)]",
+  ".flatMap((m) => m[1].split(\",\").map((s) => s.trim()).filter(Boolean));",
+  "assert(enforcementSymbols.every((s) => s === \"createFailClosedOutboundConsentEnforcer\"),",
+  "`the webhook may import ONLY the fail-closed enforcer (got [${enforcementSymbols.join(\", \")}])`);",
+  "hasNot(/createOutboundConsentEnforcer\\b/, code, \"the webhook NEVER binds the REAL consent authority\");",
+  "\"    const rows = (data ?? []) as unknown[];\\n    if (rows.length !== 1) return null;\",",
+  "\"    const rows = (data ?? []) as unknown[];\\n    if (rows.length === 0) return null;\",",
+  "'    if (data.length > 1) return { kind: \"error\" };',",
+  "'    if (data.length > 99) return { kind: \"error\" };',",
+  "const many = await mm.D1B.resolvePersistedInboundContextViaDb(",
+  "const many = await mm.D1B.readStoredInboundViaDb(",
+  "return many !== null; // it guessed a row instead of failing closed on a violated fence",
+  "return many.kind === \"present\"; // it guessed a row instead of failing closed on a violated fence",
+  "'    if (!persistedRow) { failureReason = failureReason ?? \"inbound_persisted_row_unresolved\"; continue; }',",
+  "\"    if (!persistedRow) { continue; }\",",
+  "'  if (after.kind !== \"present\") return { kind: \"error\", reason: \"inbound_persisted_row_unresolved\" };',",
+  "'  if (after.kind !== \"present\") return { kind: \"duplicate\", context: read as never };',",
+  "const { deps } = d1bDeps({ resolvePersistedInboundContext: async () => null });",
+  "const { deps } = d1bDeps({ readStoredInbound: async () => ({ kind: \"absent\" }) });",
+  "const r = await mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);",
+  "const r = await mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload, providerAccountId: D2E_ACCOUNT_ID }, deps);",
+  "`    processed.push({",
+  "message: {",
+  "provider: persistedRow.provider,",
+  "providerMessageId: persistedRow.providerMessageId,",
+  "messageType: persistedRow.messageType,",
+  "contentMinimized: persistedRow.contentMinimized,",
+  "providerOccurredAt: persistedRow.providerOccurredAt,",
+  "},",
+  "receipt: {",
+  "inboundMessageId: persistedRow.id,",
+  "duplicate: outcome === \"duplicate\",",
+  "destinationHash: persistedRow.senderHash,",
+  "identityConfidence: persistedRow.identityConfidence,",
+  "principalType: persistedRow.principalType,",
+  "principalId: persistedRow.principalId,",
+  "receivedAt: persistedRow.receivedAt,",
+  "});`,",
+  "provider: row.provider,",
+  "providerMessageId: row.provider_message_id,",
+  "messageType: row.message_type,",
+  "contentMinimized: row.content_minimized,",
+  "providerOccurredAt: row.provider_occurred_at,",
+  "destinationHash: row.sender_hash,",
+  "identityConfidence: row.identity_confidence,",
+  "principalType: row.resolved_principal_type,",
+  "principalId: row.resolved_principal_id,",
+  "\"    const persistedRow = bound.context; // the DURABLE row — never this request's in-flight envelope\",",
+  "\"    const persistedRow = { ...bound.context, providerMessageId: row.provider_message_id, messageType: row.message_type, contentMinimized: row.content_minimized as Record<string, unknown>, providerOccurredAt: row.provider_occurred_at, senderHash: row.sender_hash, identityConfidence: row.identity_confidence, principalType: row.resolved_principal_type, principalId: row.resolved_principal_id };\",",
+  "return mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload }, deps);",
+  "return mm.D1B.handleInboundWhatsAppMessages({ rawBody: JSON.stringify(payload), payload, providerAccountId: D2E_ACCOUNT_ID }, deps);",
 ];
 
 const countOf = (s, re) => (s.match(re) || []).length;
@@ -321,6 +454,7 @@ function validateD2EHarnessDelta() {
     'assert(unapproved.length === 0,',
     "`only the approved consent orchestrators may be imported by the webhook (got [${unapproved.join(\", \")}])`);",
     '"the D2-E orchestrator must still be imported");',
+    ...C8B1BC_D2E_APPROVED_FRAGMENTS,
   ];
   for (const line of diff) {
     if (!/^[+-]/.test(line) || /^(\+\+\+|---)/.test(line)) continue;
@@ -854,6 +988,27 @@ check("B5. Phase 8A authority transfer is BOUNDED; D4-B's own authorities stay f
   for (const f of D4B_OWNED_AUTHORITIES) {
     assert(!dirty.includes(f), `a D4-B-owned authority must not change: ${f}`);
   }
+  // ── C8B-1B-C RUNTIME BYTE-FREEZE (Part B hardening) ────────────────────────────────────────────────
+  // The dirty-file authority above still applies. This ADDS an exact byte freeze so a COMMITTED edit is
+  // caught too, not just an uncommitted one. Fixed literals throughout — never a moving HEAD.
+  //
+  // AUTHORITY SCOPE — this transfer covers ONLY: provider_account_id inheritance from the durable inbound
+  // context; read-first duplicate/conflict handling; missing-context fail-closed behaviour; explicit legacy
+  // NULL preservation; the 23505 stored-winner re-read; no reassignment or provider_account_id UPDATE; and
+  // no second ownership resolution. Nothing else about the service is authorised by this record.
+  const C8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
+  const C8B1BC_ACK_SERVICE_BLOB = "13d79a44ae10708f42c3afffbe8695d9418e61f0";
+  assert(execFileSync("git", ["cat-file", "-t", C8B1BC_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit",
+    `the C8B-1B-C implementation commit ${C8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)} must exist`);
+  execFileSync("git", ["merge-base", "--is-ancestor", D4B_BASE, C8B1BC_IMPLEMENTATION_HEAD]); // forward-only; throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", C8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);   // throws if not
+  const reviewedAckBlob = execFileSync("git", ["rev-parse", `${C8B1BC_IMPLEMENTATION_HEAD}:${SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(reviewedAckBlob === C8B1BC_ACK_SERVICE_BLOB,
+    `the reviewed commit must resolve ${SVC_SRC} to its approved blob (got ${reviewedAckBlob.slice(0, 12)})`);
+  const onDiskAckBlob = execFileSync("git", ["hash-object", SVC_SRC], { encoding: "utf8" }).trim();
+  assert(onDiskAckBlob === C8B1BC_ACK_SERVICE_BLOB,
+    `${SVC_SRC} is not byte-identical to its C8B-1B-C baseline (commit ${C8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskAckBlob.slice(0, 12)} != pinned ${C8B1BC_ACK_SERVICE_BLOB.slice(0, 12)}).`);
   for (const f of STILL_FROZEN) {
     assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
   }

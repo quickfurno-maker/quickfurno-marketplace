@@ -613,28 +613,56 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // NON-exported downstream stage + callback-identity gate). That reverse-the-8A-delta byte-identity therefore
   // no longer holds and is REPLACED — not deleted — by a fixed Phase 8B-1A service BYTE-FREEZE against Commit 1,
   // plus the extended semantic proofs below. The Phase 7/8A authority commit is kept here as history.
+  //
+  // PHASE 8B-1A → PHASE 8B-1B-C AUTHORITY TRANSFER (this record REPLACES the active baseline; the 8B-1A
+  // record below is PRESERVED as history and still asserted against its own commit).
+  //
+  // Phase 8B-1B-C legitimately restructures the webhook service again: an effect-bearing INBOUND_MESSAGE or
+  // DELIVERY_STATUS callback must now PROVE exact provider-account ownership before any receipt, inbound,
+  // delivery, consent-command or acknowledgement effect. The service gained dependency-injected collaborators
+  // (`MetaWebhookDeps` / `defaultMetaWebhookDeps()`), a resolve-ONCE-per-envelope ownership fence
+  // (`resolveEnvelopeProviderAccount`) placed AFTER the signature/identity/runtime gates and BEFORE every
+  // write, and threading of the proven account into inbound persistence and delivery processing.
+  //
+  // D1-B's concern is unchanged and still proven below: inbound persistence is unaffected in kind, and NO
+  // send path is reachable from the webhook. Reviewed and committed as e742bb14 (Stage 2F).
   const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36"; // pre-8B-1A history (recorded, not the active baseline)
   const PHASE_8B1A_AUTHORITY_BASE = "95c5e969ce585fd435019fdb17265ece6fdb9c1d";
   const PHASE_8B1A_IMPLEMENTATION_HEAD = "fe10c2c70691809952f53c7244b8d3b5cb1a150d";
-  const PHASE_8B1A_SERVICE_BLOB = "454bb9195e68e481c190f8aa12ef1c19a09b8936";
+  const PHASE_8B1A_SERVICE_BLOB = "454bb9195e68e481c190f8aa12ef1c19a09b8936"; // 8B-1A history (recorded, not the active baseline)
+  const PHASE_8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
+  const PHASE_8B1BC_SERVICE_BLOB = "58250b722b147f3673dedf37e5f3346dad17b03d";
 
   // The Phase 7/8A history commit still exists; the Phase 8B-1A commits exist; base → implementation head →
   // HEAD ancestry (FIXED endpoints, never a moving HEAD).
-  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]) {
+  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]) {
     assert(execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim() === "commit", `the commit ${sha.slice(0, 12)} must exist`);
   }
   execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]); // throws if not
   execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, "HEAD"]);                   // throws if not
+  // The transfer is FORWARD-ONLY: the 8B-1A implementation head must be an ancestor of the 8B-1B-C one, and
+  // that one an ancestor of HEAD. FIXED endpoints throughout — never a moving HEAD as a baseline.
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);                        // throws if not
 
   // THE ACTIVE SERVICE BYTE-FREEZE — Commit 1 resolves the service to its reviewed blob, and the on-disk service
   // is byte-identical to it. A future dirty OR committed service edit fails until another EXPLICIT authority
   // transfer. (This replaces the obsolete reverse-8A-delta byte-identity assertion.)
+  // HISTORY (preserved, still enforced against its OWN commit): Phase 8B-1A Commit 1 resolves the webhook
+  // service to the blob that was reviewed at that time. This record is never rewritten by a later transfer.
   const commit1ServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1A_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
   assert(commit1ServiceBlob === PHASE_8B1A_SERVICE_BLOB, `Commit 1 must resolve the webhook service to its reviewed blob (got ${commit1ServiceBlob.slice(0, 12)})`);
+
+  // THE ACTIVE SERVICE BYTE-FREEZE (Phase 8B-1B-C). The reviewed implementation commit resolves the service
+  // to its approved blob, and the on-disk service is byte-identical to it. Enforcement is UNWEAKENED: any
+  // later edit — dirty OR committed — fails until the next EXPLICIT authority transfer.
+  const c8b1bcServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1BC_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(c8b1bcServiceBlob === PHASE_8B1BC_SERVICE_BLOB,
+    `the C8B-1B-C implementation commit must resolve the webhook service to its reviewed blob (got ${c8b1bcServiceBlob.slice(0, 12)})`);
   const onDiskServiceBlob = execFileSync("git", ["hash-object", WEBHOOK_SVC_SRC], { encoding: "utf8" }).trim();
-  assert(onDiskServiceBlob === PHASE_8B1A_SERVICE_BLOB,
-    `the webhook service is not byte-identical to its Phase 8B-1A Commit 1 baseline (commit ${PHASE_8B1A_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
-    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${PHASE_8B1A_SERVICE_BLOB.slice(0, 12)}).`);
+  assert(onDiskServiceBlob === PHASE_8B1BC_SERVICE_BLOB,
+    `the webhook service is not byte-identical to its Phase 8B-1B-C baseline (commit ${PHASE_8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${PHASE_8B1BC_SERVICE_BLOB.slice(0, 12)}).`);
 
   // The webhook's use of CommunicationService is still exactly one operation, and still no send.
   const hook = readCode(WEBHOOK_SVC_SRC);
@@ -650,10 +678,10 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // ── PHASE 8B-1A — the webhook's identity-gated shape, proven from the (comment-stripped) service source ──
   // The production byte entry is EXPORTED; the historical public symbol is a UTF-8 STRING WRAPPER delegating
   // DIRECTLY to it, with NO independent (weaker) verification/parse/identity/downstream path.
-  assert(/export async function handleMetaWhatsAppWebhookPostBytes\(input:/.test(hook), "handleMetaWhatsAppWebhookPostBytes is exported (the production byte entry)");
-  const wrapper = (hook.match(/export function handleMetaWhatsAppWebhookPost\(input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
+  assert(/export async function handleMetaWhatsAppWebhookPostBytes\(\s*input:/.test(hook), "handleMetaWhatsAppWebhookPostBytes is exported (the production byte entry)");
+  const wrapper = (hook.match(/export function handleMetaWhatsAppWebhookPost\(\s*input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
   assert(wrapper, "the historical public handleMetaWhatsAppWebhookPost wrapper is present");
-  assert(/new TextEncoder\(\)\.encode\(input\.rawBody\)/.test(wrapper) && /handleMetaWhatsAppWebhookPostBytes\(\{/.test(wrapper), "the historical wrapper encodes UTF-8 bytes and delegates to the byte entry");
+  assert(/new TextEncoder\(\)\.encode\(input\.rawBody\)/.test(wrapper) && /handleMetaWhatsAppWebhookPostBytes\(\s*\{/.test(wrapper), "the historical wrapper encodes UTF-8 bytes and delegates to the byte entry");
   assert(!/verifyMetaWebhookSignature|safeParse|decideCallbackIdentity|isWebhookProcessingEnabled|processVerifiedExpectedMetaWebhook/.test(wrapper), "the historical wrapper has NO independent verification/parse/identity/downstream path");
   // The downstream lifecycle stage is NON-exported (route-unreachable), with exactly one internal call site.
   assert(/(^|\n)\s*async function processVerifiedExpectedMetaWebhook\(/.test(hook) && !/export\s+(async\s+)?function\s+processVerifiedExpectedMetaWebhook/.test(hook), "processVerifiedExpectedMetaWebhook is NON-exported");
@@ -661,7 +689,7 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // ORDER within the byte entry: strict byte-signature verification precedes UTF-8 decode; decode + parse
   // precede identity; identity config + decision precede the downstream call; and a rejected / unsupported
   // identity RETURNS before the downstream (before inbound persistence).
-  const be = (hook.match(/export async function handleMetaWhatsAppWebhookPostBytes\(input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
+  const be = (hook.match(/export async function handleMetaWhatsAppWebhookPostBytes\(\s*input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
   const at = (s) => { const i = be.indexOf(s); assert(i >= 0, `byte-entry anchor missing: ${s}`); return i; };
   const iVerify = at("verifyMetaWebhookSignatureBytes(input.rawBytes");
   const iDecode = at("META_UTF8_DECODER.decode(input.rawBytes)");
@@ -670,7 +698,7 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   const iDecide = at("decideCallbackIdentity(payload");
   const iReject = at("rejected_foreign_identity");
   const iUnsupported = at("acknowledged_unsupported_identity_shape");
-  const iDownstream = at("processVerifiedExpectedMetaWebhook({");
+  const iDownstream = at("return processVerifiedExpectedMetaWebhook(");
   assert(iVerify < iDecode, "strict byte signature verification precedes UTF-8 decode");
   assert(iDecode < iParse && iParse < iIdCfg, "decode + parse precede identity configuration");
   assert(iIdCfg < iDecide && iDecide < iDownstream, "identity config + decision precede the downstream call (before the runtime DB gate)");

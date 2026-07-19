@@ -445,7 +445,14 @@ check("55-64. no wiring, no activation, no env, no new route (D1-A boundaries; w
   // the identity RESOLVER to distinguish an operational IDENTITY_LOOKUP_FAILED from a durable
   // UNKNOWN — so neither the webhook service nor the resolver is asserted byte-unchanged here. The
   // pure normalizer — the other D1-A deliverable — remains byte-unchanged, reused by D1-B.)
+  // Phase 8B-1B-C carve-out, in the SAME narrow style as the D1-B carve-out described above:
+  // `services/communicationService.ts` is an EXPLICITLY AUTHORIZED C8B-1B-C file — that phase binds the
+  // verified webhook receipt and every delivery event to the already-proven owning provider account. It is
+  // named INDIVIDUALLY, not by pattern: the webhook route and the pure normalizer (D1-A's own deliverable)
+  // stay byte-frozen below, and every unrelated or unauthorized dirty file still fails checks 62-64.
+  const C8B1BC_AUTHORIZED_DIRTY = new Set([COMM_SERVICE_SRC]);
   for (const f of [WEBHOOK_ROUTE_SRC, COMM_SERVICE_SRC, NORMALIZER_SRC]) {
+    if (C8B1BC_AUTHORIZED_DIRTY.has(f)) continue;
     assert(!dirty.includes(f), `${f} must be unchanged`);
   }
   // 58-61: consent/suppression/event tables untouched (no migration references them; none dirty).

@@ -427,10 +427,18 @@ function authIntent(overrides = {}) {
   };
 }
 
-function postWebhook(service, payload, { secret = WEBHOOK_SECRET, signature } = {}) {
+// Phase 8B-1B-C — the OWNING provider account. The WEBHOOK layer proves ownership before any effect-bearing
+// write and threads the proven account into CommunicationService.processWebhook; Phase 5B drives that
+// service directly, so it supplies the already-proven account rather than imitating a second resolver.
+// A VALID delivery callback with no account FAILS CLOSED — tests that prove that posture pass `null`.
+const PROVIDER_ACCOUNT_ID = "c0c0c0c0-9999-4999-8999-c0c0c0c0c0c0";
+const PROVIDER_ACCOUNT_B = "d0d0d0d0-1010-4010-8010-d0d0d0d0d0d0";
+
+function postWebhook(service, payload, { secret = WEBHOOK_SECRET, signature, providerAccountId } = {}) {
   const rawBody = JSON.stringify(payload);
   const sig = signature ?? computeMockWebhookSignature(rawBody, secret);
-  return service.processWebhook(rawBody, sig, secret);
+  const account = providerAccountId === undefined ? PROVIDER_ACCOUNT_ID : providerAccountId;
+  return service.processWebhook(rawBody, sig, secret, account);
 }
 
 /** Minimal second provider proving providerKey drives every persisted value. */
@@ -639,6 +647,98 @@ check("FIX4-b. unknown status never mutates a message and never becomes delivere
 // ============================================================================
 // FIX 3 — WEBHOOK DUPLICATE STORAGE
 // ============================================================================
+// ============================================================================
+// Phase 8B-1B-C — DELIVERY PROVIDER-ACCOUNT BINDING (communication-core boundary)
+// ============================================================================
+const deliveryFixture = (messageId = "p-acct") => {
+  resetDb();
+  db.communication_messages = [{
+    id: "msg-acct", provider: "mock", provider_message_id: messageId, status: "accepted",
+    lane: "business", attempt_count: 1, max_attempts: 5, created_at: new Date().toISOString(),
+    accepted_at: "2026-07-08T00:00:00Z", sent_at: null, delivered_at: null,
+  }];
+  return new CommunicationService(new MockWhatsAppProvider(), resolverFor(), null, allowAllTestConsentEnforcer());
+};
+
+check("PA1. a valid delivery binds the receipt AND every delivery event to the owning account", async () => {
+  const s = deliveryFixture();
+  const r = await postWebhook(s, { event_id: "evt-pa-1", message_id: "p-acct", status: "delivered", timestamp: "2026-07-08T02:00:00Z" });
+  assert(r.ok === true, `webhook ok: ${r.ok ? "" : r.error}`);
+  assert(db.communication_webhook_receipts.length === 1, "exactly one receipt");
+  assert(db.communication_webhook_receipts[0].provider_account_id === PROVIDER_ACCOUNT_ID, "receipt BOUND at insert");
+  assert(db.communication_delivery_events.length === 1, "exactly one delivery event");
+  assert(db.communication_delivery_events[0].provider_account_id === PROVIDER_ACCOUNT_ID, "delivery event BOUND at insert");
+});
+
+check("PA2. a VALID delivery with NO proven account FAILS CLOSED — zero receipts, zero events", async () => {
+  const s = deliveryFixture();
+  const r = await postWebhook(s, { event_id: "evt-pa-2", message_id: "p-acct", status: "delivered", timestamp: "2026-07-08T02:00:00Z" }, { providerAccountId: null });
+  assert(r.ok === false, "an unattributed valid delivery is refused");
+  assert(db.communication_webhook_receipts.length === 0, "ZERO receipts written");
+  assert(db.communication_delivery_events.length === 0, "ZERO delivery events written");
+  assert(db.communication_messages[0].status === "accepted", "ZERO message lifecycle mutation");
+});
+
+check("PA3. an INVALID signature records a receipt with provider_account_id NULL and needs no account", async () => {
+  const s = deliveryFixture();
+  const r = await postWebhook(s, { event_id: "evt-pa-3", message_id: "p-acct", status: "delivered", timestamp: "2026-07-08T02:00:00Z" }, { signature: "mock:deadbeef" });
+  assert(r.ok === false, "an invalid signature is rejected");
+  assert(db.communication_webhook_receipts.length === 1 && db.communication_webhook_receipts[0].signature_valid === false, "a rejection receipt is still recorded");
+  assert(db.communication_webhook_receipts[0].provider_account_id == null, "an invalid-signature receipt is NEVER bound to an account");
+  assert(db.communication_delivery_events.length === 0, "ZERO delivery events from an invalid signature");
+});
+
+check("PA4. a same-account redelivery is idempotent — no second receipt, no second event", async () => {
+  const s = deliveryFixture();
+  const payload = { event_id: "evt-pa-4", message_id: "p-acct", status: "delivered", timestamp: "2026-07-08T02:00:00Z" };
+  const first = await postWebhook(s, payload);
+  const second = await postWebhook(s, payload);
+  assert(first.ok === true && second.ok === true, "both calls succeed idempotently");
+  assert(db.communication_webhook_receipts.length === 1, "still exactly ONE receipt");
+  assert(db.communication_delivery_events.length === 1, "still exactly ONE delivery event");
+  assert(db.communication_webhook_receipts[0].provider_account_id === PROVIDER_ACCOUNT_ID, "the STORED account is preserved");
+});
+
+check("PA5. a CROSS-ACCOUNT redelivery writes nothing new and never reassigns the stored account", async () => {
+  const s = deliveryFixture();
+  const payload = { event_id: "evt-pa-5", message_id: "p-acct", status: "delivered", timestamp: "2026-07-08T02:00:00Z" };
+  await postWebhook(s, payload);
+  const receiptsBefore = db.communication_webhook_receipts.length;
+  const eventsBefore = db.communication_delivery_events.length;
+  const statusBefore = db.communication_messages[0].status;
+  // The SAME callback re-delivered, but attributed to a DIFFERENT account.
+  const conflict = await postWebhook(s, payload, { providerAccountId: PROVIDER_ACCOUNT_B });
+  assert(db.communication_webhook_receipts.length === receiptsBefore, "ZERO second receipt row");
+  assert(db.communication_delivery_events.length === eventsBefore, "ZERO second delivery event");
+  assert(db.communication_webhook_receipts[0].provider_account_id === PROVIDER_ACCOUNT_ID, "the ORIGINAL binding stands — never reassigned");
+  assert(db.communication_messages[0].status === statusBefore, "ZERO message lifecycle mutation on conflict");
+  // Stated STRICTLY so it cannot be satisfied vacuously by an unrelated failure: the cross-account
+  // redelivery is acknowledged (a retry could never help) but explicitly REJECTED, with zeroed counters.
+  assert(conflict.ok === true, `a cross-account redelivery is acknowledged, not errored (got ${JSON.stringify(conflict)})`);
+  assert(conflict.data.processingStatus === "rejected", `it is surfaced as REJECTED, never a silent success (got ${JSON.stringify(conflict.data)})`);
+});
+
+check("PA6. a legacy-NULL stored receipt is preserved, never upgraded by a later bound redelivery", async () => {
+  const s = deliveryFixture();
+  const payload = { event_id: "evt-pa-6", message_id: "p-acct", status: "delivered", timestamp: "2026-07-08T02:00:00Z" };
+  // Model a historical pre-binding receipt by clearing the stored account after the first write.
+  await postWebhook(s, payload);
+  db.communication_webhook_receipts[0].provider_account_id = null;
+  await postWebhook(s, payload);
+  assert(db.communication_webhook_receipts.length === 1, "no second receipt for a legacy row");
+  assert(db.communication_webhook_receipts[0].provider_account_id == null, "the legacy NULL is NEVER upgraded");
+});
+
+check("PA7. CommunicationService resolves ownership ZERO times and never queries provider accounts", () => {
+  const code = SERVICE_SOURCE;   // already comment-stripped: assertions inspect CODE, never prose
+  assert(!/resolveOwningProviderAccount/.test(code), "the communication core NEVER resolves ownership itself");
+  assert(!/communication_provider_accounts/.test(code), "the communication core NEVER queries communication_provider_accounts");
+  // The ONLY provider_account_id UPDATE permitted anywhere in this file is the pre-existing 8B-1B-B outbound
+  // compare-and-set, which is guarded by `is("provider_account_id", null)` — an unbound→bound transition only.
+  const updates = code.match(/\.update\(\s*\{[^}]*provider_account_id[^}]*\}/g) || [];
+  assert(updates.length <= 1, `at most the one guarded outbound CAS may set provider_account_id (found ${updates.length})`);
+});
+
 check("FIX3-a. duplicate webhook does not insert a conflicting receipt", async () => {
   resetDb();
   db.communication_messages = [{
@@ -1110,11 +1210,14 @@ check("FIX2-a. providerKey propagates to messages, receipts and delivery events"
 
   const rawBody = JSON.stringify({ event_id: "acme-evt-1", message_id: "acme-wa-msg-1", status: "delivered", timestamp: "2026-07-08T08:00:00Z" });
   const signature = `acme-wa:${crypto.createHmac("sha256", WEBHOOK_SECRET).update(rawBody).digest("hex")}`;
-  const hook = await s.processWebhook(rawBody, signature, WEBHOOK_SECRET);
+  const hook = await s.processWebhook(rawBody, signature, WEBHOOK_SECRET, PROVIDER_ACCOUNT_ID);
 
   assert(hook.ok === true, `webhook: ${hook.ok ? "" : hook.error}`);
   assert(db.communication_webhook_receipts[0].provider === "acme-wa", "receipt.provider");
   assert(db.communication_delivery_events[0].provider === "acme-wa", "delivery_event.provider");
+  // Phase 8B-1B-C: the verified receipt and EVERY delivery event are BOUND at insert to the owning account.
+  assert(db.communication_webhook_receipts[0].provider_account_id === PROVIDER_ACCOUNT_ID, "receipt bound to the owning account");
+  assert(db.communication_delivery_events[0].provider_account_id === PROVIDER_ACCOUNT_ID, "delivery event bound to the owning account");
   assert(db.communication_messages[0].status === "delivered", "state applied under the named provider");
 });
 

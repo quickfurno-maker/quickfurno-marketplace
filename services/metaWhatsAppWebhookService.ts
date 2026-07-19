@@ -35,7 +35,15 @@
 import { adminClient } from "../lib/supabase";
 import { CommunicationService } from "./communicationService";
 import { createFailClosedOutboundConsentEnforcer } from "./outboundConsentEnforcementService";
-import { isWebhookProcessingEnabled } from "./communicationProviderRuntimeService";
+import { isWebhookProcessingEnabled, resolveOwningProviderAccount } from "./communicationProviderRuntimeService";
+// Phase 8B-1B-C — the PURE payload identity extractor + the PURE closed attribution decision. The frozen
+// `decideCallbackIdentity` authority is untouched; the extractor reuses its grammar and is proven equivalent.
+import { extractMetaWebhookAccountIdentity } from "../lib/communication/providers/metaWebhookAccountIdentity";
+import { decideInboundAttribution } from "../lib/communication/inboundProviderAccountAttribution";
+import type {
+  OwnershipResolutionInput,
+  ProviderAccountOwnership,
+} from "../lib/communication/providers/providerAccountOwnership";
 import {
   resolveWebhookIdentityConfig,
   resolveWebhookSignatureConfig,
@@ -76,7 +84,11 @@ export type MetaWebhookPostOutcome =
         | "inbound_acknowledged_rejected"
         // Phase 8B-1A — callback-identity gate terminal outcomes (both ZERO-effect).
         | "rejected_foreign_identity"
-        | "acknowledged_unsupported_identity_shape";
+        | "acknowledged_unsupported_identity_shape"
+        // Phase 8B-1B-C — a DETERMINISTIC non-owned provider account on an effect-bearing callback
+        // (not_found / ambiguous / waba_mismatch / invalid_input, or no single usable phone identity).
+        // Generic 200 posture with ZERO receipt / inbound / delivery / consent / ack effects.
+        | "acknowledged_unowned_provider_account";
     }
   | { readonly status: 400 | 401 | 403 | 500 | 503; readonly code: string };
 
@@ -117,6 +129,99 @@ async function recordIgnoredReceipt(
 }
 
 /**
+ * Phase 8B-1B-C — the SMALLEST injectable seam the orchestration needs, so the dedicated harness can prove
+ * the resolver CALL COUNT, its exact PAYLOAD-DERIVED input, and its ORDERING relative to every effect-bearing
+ * write. Production binds the real collaborators; no unrelated webhook API is redesigned.
+ */
+export interface MetaWebhookDeps {
+  readonly isWebhookProcessingEnabled: (providerKey: string, channel: string) => Promise<boolean>;
+  /** The FROZEN Phase 8B-1B-A ownership authority. Called EXACTLY ONCE per effect-bearing envelope. */
+  readonly resolveOwnership: (input: OwnershipResolutionInput) => Promise<ProviderAccountOwnership>;
+  readonly handleInbound: typeof handleInboundWhatsAppMessages;
+  readonly processDelivery: (args: {
+    readonly rawBody: string;
+    readonly signature: string;
+    readonly appSecret: string;
+    readonly providerAccountId: string;
+  }) => Promise<{ readonly ok: boolean; readonly data?: { readonly duplicate: boolean } }>;
+  readonly recordIgnored: (
+    rawBody: string,
+    payload: Record<string, unknown>,
+    reason: "ignored_non_delivery" | "ignored_unknown"
+  ) => Promise<void>;
+  readonly processCommands: typeof processInboundConsentCommands;
+  readonly enqueueAcks: typeof enqueueConsentCommandResponses;
+}
+
+export function defaultMetaWebhookDeps(): MetaWebhookDeps {
+  return {
+    isWebhookProcessingEnabled: (p, c) => isWebhookProcessingEnabled(p, c),
+    resolveOwnership: (input) => resolveOwningProviderAccount(input),
+    handleInbound: (input, deps) => handleInboundWhatsAppMessages(input, deps),
+    processDelivery: async ({ rawBody, signature, appSecret, providerAccountId }) => {
+      // A webhook-only provider carrying just the app secret — sending is impossible. PHASE 8A: it is bound
+      // to the FAIL-CLOSED enforcer, so a future edit that called a send method would be blocked rather than
+      // silently skipping consent. Phase 8B-1B-C threads the already-resolved owning account.
+      const provider = new MetaCloudWhatsAppProvider(webhookSignatureToRuntime({ appSecret }), new FetchHttpTransport());
+      const service = new CommunicationService(provider, undefined, undefined, createFailClosedOutboundConsentEnforcer());
+      const res = await service.processWebhook(rawBody, signature, appSecret, providerAccountId);
+      return res.ok ? { ok: true, data: { duplicate: res.data.duplicate } } : { ok: false };
+    },
+    recordIgnored: (rawBody, payload, reason) => recordIgnoredReceipt(rawBody, payload, reason),
+    processCommands: (processed) => processInboundConsentCommands(processed),
+    enqueueAcks: (input) => enqueueConsentCommandResponses(input),
+  };
+}
+
+/** The closed envelope-binding outcome: an owning account, or a terminal ZERO-EFFECT webhook outcome. */
+type EnvelopeBinding =
+  | { readonly kind: "owned"; readonly accountId: string }
+  | { readonly kind: "blocked"; readonly outcome: MetaWebhookPostOutcome };
+
+/**
+ * PHASE 8B-1B-C — resolve the owning provider account for ONE effect-bearing envelope, EXACTLY ONCE, BEFORE
+ * any receipt / inbound / delivery / consent / acknowledgement write.
+ *
+ * The identity comes from the ALREADY-AUTHORIZED PAYLOAD (entry.id + value.metadata.phone_number_id) — never
+ * from the environment, never from a database first row. A payload whose `messages` changes carry CONFLICTING
+ * or malformed identities yields NO identity (never a first-row pick) and is a deterministic zero-effect
+ * rejection. A resolver THROW is treated as infrastructure (retryable), never as permission to continue unbound.
+ * Every log is a fixed sanitized string: no WABA id, phone_number_id, account id, destination, payload or secret.
+ */
+async function resolveEnvelopeProviderAccount(
+  payload: Record<string, unknown>,
+  deps: MetaWebhookDeps
+): Promise<EnvelopeBinding> {
+  const identity = extractMetaWebhookAccountIdentity(payload);
+  if (identity.kind !== "phone_identity") {
+    console.warn("[webhook.provider_account_identity_unresolvable] an effect-bearing callback carried no single usable phone identity; nothing was persisted.");
+    return { kind: "blocked", outcome: { status: 200, result: "acknowledged_unowned_provider_account" } };
+  }
+
+  let ownership: ProviderAccountOwnership;
+  try {
+    ownership = await deps.resolveOwnership({
+      providerKey: META_WHATSAPP_CLOUD_PROVIDER_KEY,
+      channel: CHANNEL,
+      phoneNumberReference: identity.phoneNumberId,
+      expectedWabaId: identity.wabaId,
+    });
+  } catch {
+    // A THROWN resolver is INFRASTRUCTURE — never "catch and continue unbound".
+    ownership = { kind: "query_error" };
+  }
+
+  const decision = decideInboundAttribution(ownership);
+  if (decision.kind === "owned") return { kind: "owned", accountId: decision.accountId };
+  if (decision.kind === "retry") {
+    console.warn("[webhook.provider_account_lookup_failed] the owning provider account could not be resolved; nothing was persisted (retryable).");
+    return { kind: "blocked", outcome: { status: 503, code: "provider_account_lookup_failed" } };
+  }
+  console.warn("[webhook.provider_account_not_owned] no single provider account owns this callback identity; nothing was persisted.");
+  return { kind: "blocked", outcome: { status: 200, result: "acknowledged_unowned_provider_account" } };
+}
+
+/**
  * Phase 8B-1A — the NON-EXPORTED downstream stage: the runtime webhook-processing DB gate
  * (step 9) and the existing classification / lifecycle work (step 10). It is reached ONLY
  * from `handleMetaWhatsAppWebhookPostBytes`, and ONLY after the callback-identity authority
@@ -124,51 +229,71 @@ async function recordIgnoredReceipt(
  * can process a callback without the identity gate. The signature has already been verified
  * over the exact bytes and the payload has already been parsed by the byte entry point.
  */
-async function processVerifiedExpectedMetaWebhook(input: {
-  readonly rawBody: string;
-  readonly signature: string;
-  readonly appSecret: string;
-}): Promise<MetaWebhookPostOutcome> {
+async function processVerifiedExpectedMetaWebhook(
+  input: {
+    readonly rawBody: string;
+    readonly signature: string;
+    readonly appSecret: string;
+  },
+  deps: MetaWebhookDeps
+): Promise<MetaWebhookPostOutcome> {
   const appSecret = input.appSecret;
 
   // Defence-in-depth re-verification: the byte entry already proved the signature over the EXACT bytes;
   // this re-checks it over the decoded string through the SAME single authority before any lifecycle work.
+  // An INVALID signature terminates HERE — before any extraction, any ownership resolution and any write.
   if (!verifyMetaWebhookSignature(input.rawBody, input.signature, appSecret)) {
     return { status: 401, code: "invalid_signature" };
   }
 
   // Step 9 — runtime webhook-processing gate (AFTER identity authorization; independent of outbound_enabled).
-  const enabled = await isWebhookProcessingEnabled(META_WHATSAPP_CLOUD_PROVIDER_KEY, CHANNEL);
+  // It runs BEFORE ownership resolution and before every write, so a disabled runtime resolves nothing.
+  const enabled = await deps.isWebhookProcessingEnabled(META_WHATSAPP_CLOUD_PROVIDER_KEY, CHANNEL);
   if (!enabled) return { status: 503, code: "webhook_processing_disabled" };
 
-  // Step 10 — parse + classify.
+  // Step 10 — parse + classify. NOTHING is written in this step.
   const payload = safeParse(input.rawBody);
   if (!payload) return { status: 400, code: "unparseable" };
   const classification = classifyMetaWebhook(payload);
 
-  // Step 8 — delivery status is processed; everything else is safely acknowledged.
+  // Step 11 — PHASE 8B-1B-C OWNERSHIP FENCE, for EFFECT-BEARING classes ONLY.
+  //
+  //     A new INBOUND_MESSAGE or DELIVERY_STATUS callback may produce receipt, inbound, delivery,
+  //     consent-command or acknowledgement effects ONLY after exact provider-account ownership is proven.
+  //
+  // Ownership is resolved ONCE PER ENVELOPE — never once per message and never once per status item — from
+  // the ALREADY-AUTHORIZED PAYLOAD identity, strictly BEFORE the first effect-bearing write. WABA-only
+  // (template/account) and UNKNOWN callbacks are NOT effect-bearing: they resolve nothing, infer nothing,
+  // and keep their existing ignored-receipt posture with provider_account_id left NULL.
+  let providerAccountId: string | null = null;
+  if (
+    classification === MetaWebhookClassification.DELIVERY_STATUS ||
+    classification === MetaWebhookClassification.INBOUND_MESSAGE
+  ) {
+    const bound = await resolveEnvelopeProviderAccount(payload, deps);
+    if (bound.kind !== "owned") return bound.outcome; // 503 (retryable) or generic 200 — ZERO effects either way
+    providerAccountId = bound.accountId;
+  }
+
+  // Step 12 — delivery status is processed (BOUND to the resolved account); everything else is acknowledged.
   if (classification === MetaWebhookClassification.DELIVERY_STATUS) {
-    // A webhook-only provider carrying just the app secret — sending is impossible.
-    const provider = new MetaCloudWhatsAppProvider(webhookSignatureToRuntime({ appSecret }), new FetchHttpTransport());
-    // PHASE 8A — this service processes DELIVERY RECEIPTS and never sends, but it must be SAFE BY
-    // CONSTRUCTION rather than safe by usage: it is bound to the FAIL-CLOSED enforcer, so if a future edit
-    // ever called a send method on it, the send would be blocked instead of silently skipping consent.
-    // (The two `undefined`s keep the existing provider-resolver and coordinator defaults.)
-    const service = new CommunicationService(
-      provider,
-      undefined,
-      undefined,
-      createFailClosedOutboundConsentEnforcer()
-    );
-    const res = await service.processWebhook(input.rawBody, input.signature, appSecret);
+    // The webhook-only provider + FAIL-CLOSED-enforcer construction lives in the injected dependency (PHASE
+    // 8A safety preserved by construction). The ALREADY-RESOLVED owning account is threaded into the valid
+    // receipt and every delivery event.
+    const res = await deps.processDelivery({
+      rawBody: input.rawBody,
+      signature: input.signature,
+      appSecret,
+      providerAccountId: providerAccountId as string,
+    });
     if (!res.ok) return { status: 500, code: "processing_failed" };
-    return { status: 200, result: res.data.duplicate ? "duplicate" : "delivery_processed" };
+    return { status: 200, result: res.data?.duplicate ? "duplicate" : "delivery_processed" };
   }
 
   if (classification === MetaWebhookClassification.UNKNOWN) {
-    // Verified but unrecognised structure — NEVER guess a lifecycle effect. Record an
-    // ignored-unknown receipt and ACKNOWLEDGE (200); no mutation, no send, no n8n.
-    await recordIgnoredReceipt(input.rawBody, payload, "ignored_unknown");
+    // Verified but unrecognised structure — NEVER guess a lifecycle effect, and NEVER resolve ownership for
+    // it. Record an ignored-unknown receipt (provider_account_id stays NULL) and ACKNOWLEDGE (200).
+    await deps.recordIgnored(input.rawBody, payload, "ignored_unknown");
     return { status: 200, result: "acknowledged_unknown" };
   }
 
@@ -177,7 +302,12 @@ async function processVerifiedExpectedMetaWebhook(input: {
     // resolve identity → persist minimized rows, idempotent on the provider message id). A real
     // persistence failure returns 500 so Meta retries (the per-message unique fence makes a retry make
     // progress); a deterministic all-rejected batch is acknowledged so Meta does not retry forever.
-    const inbound = await handleInboundWhatsAppMessages({ rawBody: input.rawBody, payload });
+    const inbound = await deps.handleInbound({
+      rawBody: input.rawBody,
+      payload,
+      // Phase 8B-1B-C — the already-resolved owning account. Persistence fails closed without it.
+      providerAccountId: providerAccountId as string,
+    });
     if (!inbound.ok) return { status: 500, code: "inbound_processing_failed" };
 
     // Phase 5F-D2-E — THEN INTERPRET. Persistence has already succeeded, so a durable row exists for
@@ -192,7 +322,7 @@ async function processVerifiedExpectedMetaWebhook(input: {
     // D1-B's unique fence makes re-persistence idempotent and D2-D's receipt makes the re-write a replay.
     // DETERMINISTIC outcomes (HELP / unsupported / non-text / a rejected or conflicting command) are
     // ACKNOWLEDGED below — the persisted row is their durable record, and retrying could never help.
-    const commands = await processInboundConsentCommands(inbound.result.processed);
+    const commands = await deps.processCommands(inbound.result.processed);
     if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };
 
     // Phase 5F-D4-C — DURABLE ENQUEUE, strictly AFTER the authoritative command flow has COMPLETED.
@@ -211,7 +341,7 @@ async function processVerifiedExpectedMetaWebhook(input: {
     // throw must NEVER turn a successful consent command into an error — so it is wrapped, its result is
     // deliberately discarded, and the webhook returns exactly the outcome the inbound command flow produced.
     try {
-      await enqueueConsentCommandResponses({
+      await deps.enqueueAcks({
         payload,
         webhookReceiptId: inbound.result.receiptId,
         persisted: inbound.result.processed,
@@ -233,7 +363,7 @@ async function processVerifiedExpectedMetaWebhook(input: {
 
   // template_status / account_status — later phases own these. Acknowledge safely: NO lifecycle
   // mutation, NO outbound send, NO n8n, NO Jarvis.
-  await recordIgnoredReceipt(input.rawBody, payload, "ignored_non_delivery");
+  await deps.recordIgnored(input.rawBody, payload, "ignored_non_delivery");
   return { status: 200, result: "acknowledged_ignored" };
 }
 
@@ -265,10 +395,13 @@ const META_UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
  * only ever calls this function, and this function only calls the downstream after the
  * identity gate has authorized the callback.
  */
-export async function handleMetaWhatsAppWebhookPostBytes(input: {
-  readonly rawBytes: Uint8Array;
-  readonly signature: string | null;
-}): Promise<MetaWebhookPostOutcome> {
+export async function handleMetaWhatsAppWebhookPostBytes(
+  input: {
+    readonly rawBytes: Uint8Array;
+    readonly signature: string | null;
+  },
+  deps: MetaWebhookDeps = defaultMetaWebhookDeps()
+): Promise<MetaWebhookPostOutcome> {
   // Step 1 — a signature header is required.
   if (!input.signature) return { status: 401, code: "missing_signature" };
 
@@ -316,11 +449,14 @@ export async function handleMetaWhatsAppWebhookPostBytes(input: {
   // classification / processing) with the already-verified signature and already-parsed
   // payload. `identity.classes` is intentionally not narrowed here — Phase 8B-1A does not
   // bind provider-account (deferred to Phase 8B-1B).
-  return processVerifiedExpectedMetaWebhook({
-    rawBody: decoded,
-    signature: input.signature,
-    appSecret: sigConfig.config.appSecret,
-  });
+  return processVerifiedExpectedMetaWebhook(
+    {
+      rawBody: decoded,
+      signature: input.signature,
+      appSecret: sigConfig.config.appSecret,
+    },
+    deps
+  );
 }
 
 /**
@@ -331,14 +467,20 @@ export async function handleMetaWhatsAppWebhookPostBytes(input: {
  * equivalent valid UTF-8 input it produces the same decision as the byte entry point. This is
  * NOT an identity-exempt legacy path: the only path to the downstream is through the gate.
  */
-export function handleMetaWhatsAppWebhookPost(input: {
-  readonly rawBody: string;
-  readonly signature: string | null;
-}): Promise<MetaWebhookPostOutcome> {
-  return handleMetaWhatsAppWebhookPostBytes({
-    rawBytes: new TextEncoder().encode(input.rawBody),
-    signature: input.signature,
-  });
+export function handleMetaWhatsAppWebhookPost(
+  input: {
+    readonly rawBody: string;
+    readonly signature: string | null;
+  },
+  deps: MetaWebhookDeps = defaultMetaWebhookDeps()
+): Promise<MetaWebhookPostOutcome> {
+  return handleMetaWhatsAppWebhookPostBytes(
+    {
+      rawBytes: new TextEncoder().encode(input.rawBody),
+      signature: input.signature,
+    },
+    deps
+  );
 }
 
 /** Resolve the server-only webhook verify token — needs ONLY the verify token. */

@@ -204,6 +204,9 @@ const COMMUNICATION_ERROR_MESSAGES = {
   // No provider request occurred and the conflicting row is preserved untouched.
   PROVIDER_ACCOUNT_BIND_CONFLICT: "The message ownership state changed concurrently; nothing was dispatched.",
   PROVIDER_ACCOUNT_MISMATCH: "The message is already bound to a different provider account; nothing was dispatched.",
+  // Phase 8B-1B-C — inbound/delivery binding. Sanitized: never an account id / phone / WABA / payload.
+  PROVIDER_ACCOUNT_ATTRIBUTION_REQUIRED: "The provider account was not attributed to this callback; nothing was persisted.",
+  WEBHOOK_PROVIDER_ACCOUNT_CONFLICT: "The webhook event is already bound to a different provider account; nothing was persisted.",
 } as const;
 
 type CommunicationErrorCode = keyof typeof COMMUNICATION_ERROR_MESSAGES;
@@ -211,6 +214,9 @@ type CommunicationErrorCode = keyof typeof COMMUNICATION_ERROR_MESSAGES;
 function commError(code: CommunicationErrorCode): AppError {
   return new AppError(code, COMMUNICATION_ERROR_MESSAGES[code]);
 }
+
+/** Phase 8B-1B-C — a `communication_provider_accounts.id` shape (a plain UUID). No env, no lookup here. */
+const PROVIDER_ACCOUNT_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ----------------------------------------------------------------------------
 // Status state machine
@@ -1459,7 +1465,11 @@ export class CommunicationService {
   async processWebhook(
     rawBody: string,
     signature: string,
-    secret: string
+    secret: string,
+    // Phase 8B-1B-C — the ALREADY-RESOLVED owning account from the webhook orchestration layer. Optional at
+    // the TS boundary so the not-yet-wired caller still compiles; a VALID delivery callback fails CLOSED at
+    // runtime when it is missing/malformed. This method NEVER resolves ownership and never reads env.
+    providerAccountId?: string | null
   ): Promise<Result<WebhookProcessingOutcome>> {
     try {
       const providerKey = this.provider.providerKey;
@@ -1467,9 +1477,10 @@ export class CommunicationService {
 
       const signatureValid = this.provider.verifyWebhookSignature(rawBody, signature, secret);
       if (!signatureValid) {
-        // Recorded for admin monitoring. Rejected receipts occupy a SEPARATE
-        // partial unique index, so a forged body can never poison the payload
-        // hash slot of a legitimate one.
+        // Recorded for admin monitoring. Rejected receipts occupy a SEPARATE partial unique index, so a
+        // forged body can never poison the payload hash slot of a legitimate one. Phase 8B-1B-C: an
+        // invalid-signature receipt is ALWAYS provider_account_id = NULL — it never requires and is never
+        // bound to an account, and it creates no delivery events. (No provider_account_id is passed below.)
         await this.recordReceipt({
           provider: providerKey,
           provider_event_id: null,
@@ -1481,6 +1492,12 @@ export class CommunicationService {
         return fail(commError("INVALID_WEBHOOK_SIGNATURE"));
       }
 
+      // Phase 8B-1B-C — the signature is VALID, so every receipt/event from here is an OWNED effect. A
+      // missing/malformed provider account FAILS CLOSED: zero valid-receipt writes, zero delivery events.
+      if (typeof providerAccountId !== "string" || !PROVIDER_ACCOUNT_ID_SHAPE.test(providerAccountId)) {
+        return fail(commError("PROVIDER_ACCOUNT_ATTRIBUTION_REQUIRED"));
+      }
+
       const payload = parseWebhookBody(rawBody);
       if (!payload) {
         await this.recordReceipt({
@@ -1490,19 +1507,37 @@ export class CommunicationService {
           signature_valid: true,
           processing_status: "failed",
           failure_reason_sanitized: "WEBHOOK_PAYLOAD_UNPARSEABLE",
+          provider_account_id: providerAccountId,
         });
         return fail(commError("WEBHOOK_PAYLOAD_UNPARSEABLE"));
       }
 
       const providerEventId = this.provider.deriveWebhookEventId(payload);
 
-      const { receipt, duplicate } = await this.recordReceipt({
+      const { receipt, duplicate, conflict } = await this.recordReceipt({
         provider: providerKey,
         provider_event_id: providerEventId,
         payload_hash: payloadHash,
         signature_valid: true,
         processing_status: "verified",
+        provider_account_id: providerAccountId,
       });
+
+      if (conflict) {
+        // CROSS-ACCOUNT REDELIVERY: the stored receipt for this global provider event is bound to a
+        // DIFFERENT account. Preserve the original stored row as authority; make ZERO new receipt/event
+        // writes and ZERO message-lifecycle mutations; never reassign. Sanitized — no id/phone/WABA/payload.
+        console.warn("[webhook.provider_account_conflict] a stored webhook receipt is bound to a different provider account; preserved unchanged.");
+        return ok({
+          receiptId: receipt?.id ?? null,
+          processingStatus: "rejected",
+          duplicate: false,
+          eventsNormalized: 0,
+          messagesUpdated: 0,
+          deliveryEventsRecorded: 0,
+          unmatchedEvents: 0,
+        });
+      }
 
       if (duplicate) {
         // Idempotent success: the provider stops redelivering, and nothing in the
@@ -1544,7 +1579,7 @@ export class CommunicationService {
 
       try {
         for (const event of events) {
-          const { application, deliveryEventRecorded } = await this.applyWebhookEvent(event);
+          const { application, deliveryEventRecorded } = await this.applyWebhookEvent(event, providerAccountId);
           if (application === "applied") messagesUpdated += 1;
           if (application === "unmatched") unmatchedEvents += 1;
           if (deliveryEventRecorded) deliveryEventsRecorded += 1;
@@ -1586,7 +1621,8 @@ export class CommunicationService {
    * transition is a legal forward step, then appends the immutable trace row.
    */
   private async applyWebhookEvent(
-    event: WhatsAppWebhookEvent
+    event: WhatsAppWebhookEvent,
+    providerAccountId: string
   ): Promise<{ application: EventApplication; deliveryEventRecorded: boolean }> {
     const message = await this.getMessageByProviderMessageId(event.providerMessageId);
     if (!message) return { application: "unmatched", deliveryEventRecorded: false };
@@ -1632,14 +1668,16 @@ export class CommunicationService {
       application = "applied";
     }
 
-    const deliveryEventRecorded = await this.insertDeliveryEvent(message.id, event);
+    const deliveryEventRecorded = await this.insertDeliveryEvent(message.id, event, providerAccountId);
     return { application, deliveryEventRecorded };
   }
 
-  /** Append-only trace. A unique conflict means it was already recorded. */
+  /** Append-only trace. A unique conflict means it was already recorded. Phase 8B-1B-C: BIND the owning
+   *  account at INSERT (the SAME account the valid receipt carries). Never UPDATEd, never reassigned. */
   private async insertDeliveryEvent(
     messageId: string,
-    event: WhatsAppWebhookEvent
+    event: WhatsAppWebhookEvent,
+    providerAccountId: string
   ): Promise<boolean> {
     const { error } = await adminClient()
       .from("communication_delivery_events")
@@ -1651,6 +1689,7 @@ export class CommunicationService {
         provider_message_id: event.providerMessageId,
         occurred_at: event.occurredAt,
         sanitized_metadata: event.sanitizedMetadata,
+        provider_account_id: providerAccountId,
       });
 
     if (!error) return true;
@@ -1670,7 +1709,25 @@ export class CommunicationService {
     signature_valid: boolean;
     processing_status: CommunicationWebhookProcessingStatus;
     failure_reason_sanitized?: string;
-  }): Promise<{ receipt: CommunicationWebhookReceipt | null; duplicate: boolean }> {
+    provider_account_id?: string | null;
+  }): Promise<{ receipt: CommunicationWebhookReceipt | null; duplicate: boolean; conflict: boolean }> {
+    const boundAccount = row.provider_account_id ?? null;
+
+    // Phase 8B-1B-C — READ-FIRST for a VALID-signature BOUND receipt. The account-scoped uniques do not, by
+    // themselves, stop a SECOND row for the same global event under a different account, so the stored row
+    // is the authority: never a second row, never a reassignment, a legacy NULL preserved, a DIFFERENT
+    // stored account a deterministic conflict. Invalid-signature / NULL-account receipts skip this and keep
+    // their original insert-then-resolve behaviour (they are never bound).
+    if (row.signature_valid && boundAccount !== null) {
+      const existing = await this.findExistingReceipt(row);
+      if (existing) {
+        const stored = existing.provider_account_id ?? null;
+        if (stored !== null && stored !== boundAccount) return { receipt: existing, duplicate: false, conflict: true };
+        await this.incrementReceiptDuplicateCount(existing); // same account, or legacy NULL (preserved)
+        return { receipt: existing, duplicate: true, conflict: false };
+      }
+    }
+
     const { data, error } = await adminClient()
       .from("communication_webhook_receipts")
       .insert(row)
@@ -1678,13 +1735,19 @@ export class CommunicationService {
       .single();
 
     if (!error && data) {
-      return { receipt: data as CommunicationWebhookReceipt, duplicate: false };
+      return { receipt: data as CommunicationWebhookReceipt, duplicate: false, conflict: false };
     }
 
     if (error && isUniqueViolationError(error)) {
       const existing = await this.findExistingReceipt(row);
-      if (existing) await this.incrementReceiptDuplicateCount(existing);
-      return { receipt: existing, duplicate: true };
+      if (existing) {
+        const stored = existing.provider_account_id ?? null;
+        if (row.signature_valid && boundAccount !== null && stored !== null && stored !== boundAccount) {
+          return { receipt: existing, duplicate: false, conflict: true };
+        }
+        await this.incrementReceiptDuplicateCount(existing);
+      }
+      return { receipt: existing, duplicate: true, conflict: false };
     }
 
     throw error ?? commError("WEBHOOK_RECEIPT_INSERT_FAILED");

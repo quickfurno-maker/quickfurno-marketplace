@@ -130,32 +130,85 @@ const idExact = (type = "client", id = "prin-1") => ({ confidence: "exact", prin
 const idAmbiguous = () => ({ confidence: "ambiguous", principalType: null, principalId: null, candidateCount: 2 });
 const idUnknown = () => ({ confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 });
 
+// ── Phase 8B-1B-C: the OWNED provider account these positive fixtures prove ownership against ──────────
+// A real UUID: the service fails closed on anything that is not one. Ownership is an INPUT to this service
+// (the webhook resolves it); this harness therefore supplies it rather than imitating a second resolver.
+const ACCOUNT_ID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+const OTHER_ACCOUNT_ID = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+
+/** Project an INSERT row into the VALIDATED durable projection the read-first bind reads back. */
+const storedContextFrom = (row, providerAccountId) => ({
+  id: `11111111-0000-4000-8000-${String(row.provider_message_id).replace(/\W/g, "").slice(-12).padStart(12, "0")}`,
+  provider: row.provider,
+  providerMessageId: row.provider_message_id,
+  senderHash: row.sender_hash,
+  identityConfidence: row.identity_confidence,
+  principalType: row.resolved_principal_type,
+  principalId: row.resolved_principal_id,
+  messageType: row.message_type,
+  contentMinimized: row.content_minimized,
+  providerOccurredAt: row.provider_occurred_at,
+  receivedAt: "2026-07-18T00:00:00.000Z",
+  providerAccountId,
+});
+
 function makeDeps(over = {}) {
-  const calls = { normalizes: [], identities: [], receipts: [], persists: [], finalizes: [] };
+  const calls = { normalizes: [], identities: [], receipts: [], persists: [], finalizes: [], reads: [] };
   const persisted = over.persistedWamids ?? new Set();
   const failOnce = new Set(over.failWamids ?? []);
+  // The DURABLE row model the read-first bind consults. Pre-seed it to model an already-stored row
+  // (`over.storedRows`: wamid → provider_account_id, where NULL models a legacy pre-binding row).
+  const stored = new Map();
+  // An ALREADY-PERSISTED wamid is, by definition, an already-stored durable row: it must be visible to the
+  // read-first authority, or a redelivery would look "absent" and the bind could never classify it.
+  for (const w of persisted) stored.set(w, { wamid: w, providerAccountId: ACCOUNT_ID });
+  for (const [wamid, acct] of Object.entries(over.storedRows ?? {})) {
+    stored.set(wamid, { wamid, providerAccountId: acct === undefined ? ACCOUNT_ID : acct });
+  }
   return {
     calls,
     persisted,
+    stored,
     normalize: over.normalize ?? ((payload) => { calls.normalizes.push(payload); return M.Inbound.normalizeMetaInboundWebhook(payload); }),
     // Phase 5F-D1-B reliability: the resolver returns a discriminated OUTCOME. `over.resolution`
     // injects a raw outcome (e.g. an operational failure); `over.identity` is wrapped ok:true.
     resolveIdentity: over.resolveIdentity ?? (async ({ senderPhoneE164 }) => { calls.identities.push(senderPhoneE164); return over.resolution ?? { ok: true, identity: over.identity ?? idUnknown() }; }),
-    createOrResolveReceipt: over.createOrResolveReceipt ?? (async (rawBody, payload) => { calls.receipts.push({ rawBody, payload }); return over.receipt ?? { ok: true, receiptId: "receipt-1", duplicate: false }; }),
+    // Phase 8B-1B-C: the receipt is BOUND at insert. The fake echoes the account it was asked to bind, so a
+    // test that omits/changes it is visible rather than silently absorbed.
+    createOrResolveReceipt: over.createOrResolveReceipt ?? (async (rawBody, payload, providerAccountId) => {
+      calls.receipts.push({ rawBody, payload, providerAccountId });
+      return over.receipt ?? { ok: true, receiptId: "receipt-1", duplicate: false, providerAccountId };
+    }),
     persistInboundRow: over.persistInboundRow ?? (async (row) => {
       calls.persists.push(row);
       const w = row.provider_message_id;
       if (failOnce.has(w)) { failOnce.delete(w); return "failed"; }
-      if (persisted.has(w)) return "duplicate";
+      // Either way the row now EXISTS durably, so the read-first authority must be able to see it. A row that
+      // already existed keeps its STORED account; a new row lands bound to the account the service asked for.
+      const dup = persisted.has(w);
       persisted.add(w);
-      return "created";
+      if (!stored.has(w)) stored.set(w, { wamid: w, providerAccountId: row.provider_account_id ?? null });
+      return dup ? "duplicate" : "created";
+    }),
+    // Phase 8B-1B-C READ-FIRST authority. Account-agnostic lookup by (provider, provider_message_id),
+    // returning the VALIDATED durable projection — never the in-flight row.
+    readStoredInbound: over.readStoredInbound ?? (async (row) => {
+      calls.reads.push(row);
+      if (over.readError) return { kind: "error" };
+      const hit = stored.get(row.provider_message_id);
+      if (!hit) return { kind: "absent" };
+      return { kind: "present", context: storedContextFrom(row, hit.providerAccountId) };
     }),
     finalizeReceipt: over.finalizeReceipt ?? (async (receiptId, status, reason) => { calls.finalizes.push({ receiptId, status, reason }); }),
   };
 }
 const runInbound = (payload, over = {}) => {
   const deps = makeDeps(over);
-  return M.Service.handleInboundWhatsAppMessages({ rawBody: RAW(payload), payload }, deps).then((r) => ({ r, deps }));
+  // Phase 8B-1B-C: an effect-bearing inbound callback carries its ALREADY-PROVEN owning account. Tests that
+  // prove the fail-closed posture pass `providerAccountId: null/undefined/<malformed>` explicitly.
+  const providerAccountId = "providerAccountId" in over ? over.providerAccountId : ACCOUNT_ID;
+  return M.Service.handleInboundWhatsAppMessages({ rawBody: RAW(payload), payload, providerAccountId }, deps)
+    .then((r) => ({ r, deps }));
 };
 
 /** A minimal chainable fake PostgREST client for the REAL DB adapters. `behavior(state)` returns {data,error}. */
@@ -207,21 +260,36 @@ check("1-6. verified order preserved; INBOUND is the only newly wired branch", (
   // future edit called a send method on it). The SEMANTIC property is unchanged and is what is asserted:
   // DELIVERY_STATUS still constructs a CommunicationService and still hands the raw body to processWebhook,
   // with nothing but that construction in between.
+  //
+  // PHASE 8B-1B-C moved the CommunicationService construction behind dependency injection: the classified
+  // branch now calls `deps.processDelivery(...)`, and `defaultMetaWebhookDeps()` is what constructs the
+  // service and hands the raw body to processWebhook. The SEMANTIC property under test is unchanged and is
+  // still asserted end to end: DELIVERY_STATUS reaches processWebhook via a CommunicationService that is
+  // constructed with the fail-closed enforcer, with nothing but that construction in between, and neither
+  // hop sends or dispatches anything.
   const iDelivery = src.indexOf("DELIVERY_STATUS");
-  const iConstruct = src.indexOf("new CommunicationService(", iDelivery);
-  const iProcess = src.indexOf("service.processWebhook(", iDelivery);
-  assert(iDelivery > 0 && iConstruct > iDelivery && iProcess > iConstruct,
+  const iRoute = src.indexOf("deps.processDelivery(", iDelivery);
+  assert(iDelivery > 0 && iRoute > iDelivery, "3a. DELIVERY_STATUS still routes to the delivery processor");
+  const iConstruct = src.indexOf("new CommunicationService(");
+  const iProcess = src.indexOf("service.processWebhook(", iConstruct);
+  assert(iConstruct > 0 && iProcess > iConstruct,
     "3. delivery-status path unchanged: DELIVERY_STATUS → construct CommunicationService → processWebhook");
-  const deliveryBranch = src.slice(iDelivery, iProcess);
+  // The construction still binds the Phase 8A fail-closed outbound consent enforcer (defence in depth).
+  assert(/new CommunicationService\([^)]*createFailClosedOutboundConsentEnforcer\(\)/.test(src),
+    "3. the constructed CommunicationService still binds the FAIL-CLOSED consent enforcer");
+  // Nothing between the classified delivery branch and the processWebhook hand-off may send or dispatch.
+  const deliveryBranch = src.slice(iDelivery, iRoute) + src.slice(iConstruct, iProcess);
   assert(!/\.send\(|dispatchMessage\(|dispatchPersistedMessage\(/.test(deliveryBranch),
     "3. the delivery branch still performs NO send or dispatch");
   // 4. unknown still ignored_unknown.
-  assert(/UNKNOWN[\s\S]{0,300}recordIgnoredReceipt\(input\.rawBody, payload, "ignored_unknown"\)/.test(src), "4. unknown path unchanged");
+  // 8B-1B-C: the ignored-receipt writer is now reached through the injected `recordIgnored` collaborator.
+  // The property is unchanged: UNKNOWN still records an `ignored_unknown` receipt and nothing else.
+  assert(/UNKNOWN[\s\S]{0,300}deps\.recordIgnored\(input\.rawBody, payload, "ignored_unknown"\)/.test(src), "4. unknown path unchanged");
   // 5. template/account still ignored_non_delivery (the trailing fallback).
-  assert(/recordIgnoredReceipt\(input\.rawBody, payload, "ignored_non_delivery"\)/.test(src), "5. template/account ignored path unchanged");
+  assert(/deps\.recordIgnored\(input\.rawBody, payload, "ignored_non_delivery"\)/.test(src), "5. template/account ignored path unchanged");
   // 6. INBOUND_MESSAGE is the ONLY newly wired classification → the D1-B service, NOT ignored.
-  assert(/INBOUND_MESSAGE\)\s*\{[\s\S]{0,600}handleInboundWhatsAppMessages\(/.test(src), "6. INBOUND_MESSAGE routes to the D1-B service");
-  assert(!/INBOUND_MESSAGE[\s\S]{0,300}recordIgnoredReceipt/.test(src), "INBOUND_MESSAGE no longer falls through to ignored_non_delivery");
+  assert(/INBOUND_MESSAGE\)\s*\{[\s\S]{0,900}deps\.handleInbound\(/.test(src), "6. INBOUND_MESSAGE routes to the D1-B service");
+  assert(!/INBOUND_MESSAGE[\s\S]{0,300}deps\.recordIgnored/.test(src), "INBOUND_MESSAGE no longer falls through to ignored_non_delivery");
   // The comment listing the ignored fallback no longer names inbound_message.
   assert(/template_status \/ account_status/.test(src), "the ignored fallback comment names only template/account");
 });
@@ -319,7 +387,7 @@ check("26-27. first wamid inserts; a redelivery of the same wamid creates no sec
 check("28-29. the REAL adapter: fence conflict → duplicate; unrelated error → failed (not swallowed)", async () => {
   const created = await M.Service.persistInboundRowViaDb({ provider: "meta_whatsapp_cloud", provider_message_id: "w1" }, fakeClient(() => ({ error: null })));
   assert(created === "created", "success → created");
-  const dup = await M.Service.persistInboundRowViaDb({ provider_message_id: "w1" }, fakeClient(() => ({ error: { code: "23505", constraint: "uq_comm_inbound_provider_message" } })));
+  const dup = await M.Service.persistInboundRowViaDb({ provider_message_id: "w1" }, fakeClient(() => ({ error: { code: "23505", constraint: "uq_comm_inbound_account_message" } })));
   assert(dup === "duplicate", "our fence conflict → duplicate");
   const other = await M.Service.persistInboundRowViaDb({ provider_message_id: "w1" }, fakeClient(() => ({ error: { code: "23505", constraint: "some_other_unique" } })));
   assert(other === "failed", "29. an UNRELATED unique violation is NOT swallowed");
@@ -399,7 +467,7 @@ check("58. two workers on the same wamid → one row (adapter conflict is idempo
   let inserted = false;
   const client = fakeClient((state) => {
     if (state.op === "insert" && state.table === "communication_inbound_messages") {
-      if (inserted) return { error: { code: "23505", constraint: "uq_comm_inbound_provider_message" } };
+      if (inserted) return { error: { code: "23505", constraint: "uq_comm_inbound_account_message" } };
       inserted = true; return { error: null };
     }
     return { data: null, error: null };
@@ -417,7 +485,7 @@ check("59. a duplicate_count update failure does not corrupt the correctness pat
     if (state.op === "update") throw new Error("diagnostic update failed");
     return { data: null, error: null };
   });
-  const res = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), client);
+  const res = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), ACCOUNT_ID, client);
   assert(res.ok === true && res.receiptId === "rid-x" && res.duplicate === true, "still resolves the receipt despite the count failure");
 });
 
@@ -428,10 +496,10 @@ check("60. receipt resolution failure fails closed (ok:false → 500)", async ()
     if (state.op === "select") return { data: [] };
     return { data: null, error: null };
   });
-  const r1 = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), noExisting);
+  const r1 = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), ACCOUNT_ID, noExisting);
   assert(r1.ok === false, "no existing receipt → ok:false");
   const nonUnique = fakeClient((state) => (state.op === "insert" ? { error: { code: "08006" } } : { data: null, error: null }));
-  const r2 = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), nonUnique);
+  const r2 = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), ACCOUNT_ID, nonUnique);
   assert(r2.ok === false, "a non-unique DB error → ok:false");
   // The orchestrator turns an unusable receipt into ok:false without persisting.
   const orch = await runInbound(envelope(textMsg({ id: "wamid.x" })), { createOrResolveReceipt: async () => ({ ok: false }) });
@@ -450,7 +518,7 @@ check("61. the receipt lookup uses ONLY equality filters — no interpolated Pos
     }
     return { data: null, error: null };
   });
-  const res = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), client);
+  const res = await M.Service.createOrResolveReceiptViaDb("raw", envelope(textMsg()), ACCOUNT_ID, client);
   assert(res.ok && res.receiptId === "rid-eq" && sawEventFilter, "resolved via equality filters incl. provider_event_id");
   const src = readCode(SERVICE_SRC);
   assert(!/\.or\(/.test(src), "the service never uses a PostgREST .or() filter");
@@ -545,28 +613,56 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // NON-exported downstream stage + callback-identity gate). That reverse-the-8A-delta byte-identity therefore
   // no longer holds and is REPLACED — not deleted — by a fixed Phase 8B-1A service BYTE-FREEZE against Commit 1,
   // plus the extended semantic proofs below. The Phase 7/8A authority commit is kept here as history.
+  //
+  // PHASE 8B-1A → PHASE 8B-1B-C AUTHORITY TRANSFER (this record REPLACES the active baseline; the 8B-1A
+  // record below is PRESERVED as history and still asserted against its own commit).
+  //
+  // Phase 8B-1B-C legitimately restructures the webhook service again: an effect-bearing INBOUND_MESSAGE or
+  // DELIVERY_STATUS callback must now PROVE exact provider-account ownership before any receipt, inbound,
+  // delivery, consent-command or acknowledgement effect. The service gained dependency-injected collaborators
+  // (`MetaWebhookDeps` / `defaultMetaWebhookDeps()`), a resolve-ONCE-per-envelope ownership fence
+  // (`resolveEnvelopeProviderAccount`) placed AFTER the signature/identity/runtime gates and BEFORE every
+  // write, and threading of the proven account into inbound persistence and delivery processing.
+  //
+  // D1-B's concern is unchanged and still proven below: inbound persistence is unaffected in kind, and NO
+  // send path is reachable from the webhook. Reviewed and committed as e742bb14 (Stage 2F).
   const PHASE_8A_AUTHORITY_BASE = "b0d40819c655df7e68135b52b5435941f793fc36"; // pre-8B-1A history (recorded, not the active baseline)
   const PHASE_8B1A_AUTHORITY_BASE = "95c5e969ce585fd435019fdb17265ece6fdb9c1d";
   const PHASE_8B1A_IMPLEMENTATION_HEAD = "fe10c2c70691809952f53c7244b8d3b5cb1a150d";
-  const PHASE_8B1A_SERVICE_BLOB = "454bb9195e68e481c190f8aa12ef1c19a09b8936";
+  const PHASE_8B1A_SERVICE_BLOB = "454bb9195e68e481c190f8aa12ef1c19a09b8936"; // 8B-1A history (recorded, not the active baseline)
+  const PHASE_8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
+  const PHASE_8B1BC_SERVICE_BLOB = "58250b722b147f3673dedf37e5f3346dad17b03d";
 
   // The Phase 7/8A history commit still exists; the Phase 8B-1A commits exist; base → implementation head →
   // HEAD ancestry (FIXED endpoints, never a moving HEAD).
-  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]) {
+  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]) {
     assert(execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim() === "commit", `the commit ${sha.slice(0, 12)} must exist`);
   }
   execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]); // throws if not
   execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, "HEAD"]);                   // throws if not
+  // The transfer is FORWARD-ONLY: the 8B-1A implementation head must be an ancestor of the 8B-1B-C one, and
+  // that one an ancestor of HEAD. FIXED endpoints throughout — never a moving HEAD as a baseline.
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);                        // throws if not
 
   // THE ACTIVE SERVICE BYTE-FREEZE — Commit 1 resolves the service to its reviewed blob, and the on-disk service
   // is byte-identical to it. A future dirty OR committed service edit fails until another EXPLICIT authority
   // transfer. (This replaces the obsolete reverse-8A-delta byte-identity assertion.)
+  // HISTORY (preserved, still enforced against its OWN commit): Phase 8B-1A Commit 1 resolves the webhook
+  // service to the blob that was reviewed at that time. This record is never rewritten by a later transfer.
   const commit1ServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1A_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
   assert(commit1ServiceBlob === PHASE_8B1A_SERVICE_BLOB, `Commit 1 must resolve the webhook service to its reviewed blob (got ${commit1ServiceBlob.slice(0, 12)})`);
+
+  // THE ACTIVE SERVICE BYTE-FREEZE (Phase 8B-1B-C). The reviewed implementation commit resolves the service
+  // to its approved blob, and the on-disk service is byte-identical to it. Enforcement is UNWEAKENED: any
+  // later edit — dirty OR committed — fails until the next EXPLICIT authority transfer.
+  const c8b1bcServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1BC_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(c8b1bcServiceBlob === PHASE_8B1BC_SERVICE_BLOB,
+    `the C8B-1B-C implementation commit must resolve the webhook service to its reviewed blob (got ${c8b1bcServiceBlob.slice(0, 12)})`);
   const onDiskServiceBlob = execFileSync("git", ["hash-object", WEBHOOK_SVC_SRC], { encoding: "utf8" }).trim();
-  assert(onDiskServiceBlob === PHASE_8B1A_SERVICE_BLOB,
-    `the webhook service is not byte-identical to its Phase 8B-1A Commit 1 baseline (commit ${PHASE_8B1A_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
-    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${PHASE_8B1A_SERVICE_BLOB.slice(0, 12)}).`);
+  assert(onDiskServiceBlob === PHASE_8B1BC_SERVICE_BLOB,
+    `the webhook service is not byte-identical to its Phase 8B-1B-C baseline (commit ${PHASE_8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${PHASE_8B1BC_SERVICE_BLOB.slice(0, 12)}).`);
 
   // The webhook's use of CommunicationService is still exactly one operation, and still no send.
   const hook = readCode(WEBHOOK_SVC_SRC);
@@ -582,10 +678,10 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // ── PHASE 8B-1A — the webhook's identity-gated shape, proven from the (comment-stripped) service source ──
   // The production byte entry is EXPORTED; the historical public symbol is a UTF-8 STRING WRAPPER delegating
   // DIRECTLY to it, with NO independent (weaker) verification/parse/identity/downstream path.
-  assert(/export async function handleMetaWhatsAppWebhookPostBytes\(input:/.test(hook), "handleMetaWhatsAppWebhookPostBytes is exported (the production byte entry)");
-  const wrapper = (hook.match(/export function handleMetaWhatsAppWebhookPost\(input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
+  assert(/export async function handleMetaWhatsAppWebhookPostBytes\(\s*input:/.test(hook), "handleMetaWhatsAppWebhookPostBytes is exported (the production byte entry)");
+  const wrapper = (hook.match(/export function handleMetaWhatsAppWebhookPost\(\s*input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
   assert(wrapper, "the historical public handleMetaWhatsAppWebhookPost wrapper is present");
-  assert(/new TextEncoder\(\)\.encode\(input\.rawBody\)/.test(wrapper) && /handleMetaWhatsAppWebhookPostBytes\(\{/.test(wrapper), "the historical wrapper encodes UTF-8 bytes and delegates to the byte entry");
+  assert(/new TextEncoder\(\)\.encode\(input\.rawBody\)/.test(wrapper) && /handleMetaWhatsAppWebhookPostBytes\(\s*\{/.test(wrapper), "the historical wrapper encodes UTF-8 bytes and delegates to the byte entry");
   assert(!/verifyMetaWebhookSignature|safeParse|decideCallbackIdentity|isWebhookProcessingEnabled|processVerifiedExpectedMetaWebhook/.test(wrapper), "the historical wrapper has NO independent verification/parse/identity/downstream path");
   // The downstream lifecycle stage is NON-exported (route-unreachable), with exactly one internal call site.
   assert(/(^|\n)\s*async function processVerifiedExpectedMetaWebhook\(/.test(hook) && !/export\s+(async\s+)?function\s+processVerifiedExpectedMetaWebhook/.test(hook), "processVerifiedExpectedMetaWebhook is NON-exported");
@@ -593,7 +689,7 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   // ORDER within the byte entry: strict byte-signature verification precedes UTF-8 decode; decode + parse
   // precede identity; identity config + decision precede the downstream call; and a rejected / unsupported
   // identity RETURNS before the downstream (before inbound persistence).
-  const be = (hook.match(/export async function handleMetaWhatsAppWebhookPostBytes\(input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
+  const be = (hook.match(/export async function handleMetaWhatsAppWebhookPostBytes\(\s*input:[\s\S]*?\): Promise<[^>]*> \{[\s\S]*?\n\}/) || [""])[0];
   const at = (s) => { const i = be.indexOf(s); assert(i >= 0, `byte-entry anchor missing: ${s}`); return i; };
   const iVerify = at("verifyMetaWebhookSignatureBytes(input.rawBytes");
   const iDecode = at("META_UTF8_DECODER.decode(input.rawBytes)");
@@ -602,7 +698,7 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   const iDecide = at("decideCallbackIdentity(payload");
   const iReject = at("rejected_foreign_identity");
   const iUnsupported = at("acknowledged_unsupported_identity_shape");
-  const iDownstream = at("processVerifiedExpectedMetaWebhook({");
+  const iDownstream = at("return processVerifiedExpectedMetaWebhook(");
   assert(iVerify < iDecode, "strict byte signature verification precedes UTF-8 decode");
   assert(iDecode < iParse && iParse < iIdCfg, "decode + parse precede identity configuration");
   assert(iIdCfg < iDecide && iDecide < iDownstream, "identity config + decision precede the downstream call (before the runtime DB gate)");
@@ -638,19 +734,19 @@ tsMutation("MUT A: a duplicate receipt short-circuits the whole payload",
     // Partial-progress: receipt duplicate but B not yet durable → the skip loses B forever.
     const persisted = new Set();
     const deps = makeDeps({ receipt: { ok: true, receiptId: "r", duplicate: true }, persistedWamids: persisted });
-    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.B" })) }, deps);
+    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.B" })), providerAccountId: ACCOUNT_ID }, deps);
     return deps.calls.persists.length === 0; // the message was skipped
   });
 
 tsMutation("MUT B: a per-message unique conflict is treated as fatal",
-  [[SERVICE_SRC, 'if (isUniqueViolationOn(error, INBOUND_UNIQUE_FENCE)) return "duplicate";', 'if (isUniqueViolationOn(error, INBOUND_UNIQUE_FENCE)) return "failed";']],
+  [[SERVICE_SRC, '    if (isInboundDuplicateViolation(error)) return "duplicate";', '    if (isInboundDuplicateViolation(error)) return "failed";']],
   async (mm) => {
-    const out = await mm.Service.persistInboundRowViaDb({ provider_message_id: "w" }, fakeClient(() => ({ error: { code: "23505", constraint: "uq_comm_inbound_provider_message" } })));
+    const out = await mm.Service.persistInboundRowViaDb({ provider_message_id: "w" }, fakeClient(() => ({ error: { code: "23505", constraint: "uq_comm_inbound_account_message" } })));
     return out === "failed"; // an idempotent duplicate was wrongly treated as a failure
   });
 
 tsMutation("MUT C: all DB errors are swallowed as duplicates",
-  [[SERVICE_SRC, '    if (isUniqueViolationOn(error, INBOUND_UNIQUE_FENCE)) return "duplicate";\n    return "failed";', '    return "duplicate";']],
+  [[SERVICE_SRC, '    if (isInboundDuplicateViolation(error)) return "duplicate";\n    return "failed";', '    return "duplicate";']],
   async (mm) => {
     const out = await mm.Service.persistInboundRowViaDb({ provider_message_id: "w" }, fakeClient(() => ({ error: { code: "23503" } })));
     return out === "duplicate"; // an unrelated error was swallowed as a duplicate success
@@ -685,9 +781,9 @@ tsMutation("MUT F: an unknown identity is allowed to carry a principal",
 
 srcMutation("MUT G: INBOUND_MESSAGE still falls through to ignored_non_delivery",
   WEBHOOK_SVC_SRC,
-  "    const inbound = await handleInboundWhatsAppMessages({ rawBody: input.rawBody, payload });",
+  "    const inbound = await deps.handleInbound({",
   '    await recordIgnoredReceipt(input.rawBody, payload, "ignored_non_delivery");\n    return { status: 200, result: "acknowledged_ignored" };',
-  () => !/INBOUND_MESSAGE\)\s*\{[\s\S]{0,600}handleInboundWhatsAppMessages\(/.test(readF(WEBHOOK_SVC_SRC)));
+  () => !/INBOUND_MESSAGE\)\s*\{[\s\S]{0,900}deps\.handleInbound\(/.test(readF(WEBHOOK_SVC_SRC)));
 
 srcMutation("MUT H: a send call is introduced into the inbound service",
   SERVICE_SRC,
@@ -712,7 +808,7 @@ tsMutation("MUT K: a duplicate receipt causes the message loop to be skipped (ea
   async (mm) => {
     const persisted = new Set();
     const deps = makeDeps({ receipt: { ok: true, receiptId: "r", duplicate: true }, persistedWamids: persisted });
-    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.B" })) }, deps);
+    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.B" })), providerAccountId: ACCOUNT_ID }, deps);
     return deps.calls.persists.length === 0;
   });
 
@@ -724,7 +820,7 @@ tsMutation("MUT L: a message id is fabricated when the wamid is missing",
     // The D1-B service, fed a fabricated-id normalizer, would persist a row for an id-less message.
     const persisted = new Set();
     const deps = makeDeps({ persistedWamids: persisted });
-    await M.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: undefined })) }, deps);
+    await M.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: undefined })), providerAccountId: ACCOUNT_ID }, deps);
     // With the REAL (unmutated) build here, this stays rejected; the mutation is proven load-bearing
     // via suiteGoesRed (the normalizer's own d1a guard) — but assert the fabrication marker if present.
     return deps.calls.persists.some((r) => typeof r.provider_message_id === "string" && r.provider_message_id.startsWith("fab-"));
@@ -735,7 +831,7 @@ tsMutation("MUT M: the identity-failure catch is downgraded to a durable UNKNOWN
   [[SERVICE_SRC, "      resolution = { ok: false, code: IDENTITY_LOOKUP_FAILED };", '      resolution = { ok: true, identity: { confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 } };']],
   async (mm) => {
     const deps = makeDeps({ resolveIdentity: async () => { throw new Error("db down"); } });
-    const r = await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.M" })) }, deps);
+    const r = await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.M" })), providerAccountId: ACCOUNT_ID }, deps);
     return r.ok === true && deps.calls.persists.length > 0; // a thrown lookup became a persisted UNKNOWN
   });
 
@@ -745,7 +841,7 @@ tsMutation("MUT N: a failed resolution is persisted as identity_unknown instead 
     '      result = { ...result, identityUnknown: result.identityUnknown + 1 };\n      await deps.persistInboundRow(buildInboundRow(item.message, { confidence: "unknown", principalType: null, principalId: null, candidateCount: 0 }, receiptId));\n      continue;']],
   async (mm) => {
     const deps = makeDeps({ resolution: { ok: false, code: "IDENTITY_LOOKUP_FAILED" } });
-    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.N" })) }, deps);
+    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.N" })), providerAccountId: ACCOUNT_ID }, deps);
     return deps.calls.persists.length > 0 && deps.calls.persists[0].identity_confidence === "unknown"; // infra failure persisted as unknown
   });
 
@@ -753,7 +849,7 @@ tsMutation("MUT O: an identity-lookup failure is acknowledged with ok:true (HTTP
   [[SERVICE_SRC, "    return { ok: false, code: failureReason, result };", "    return { ok: true, result };"]],
   async (mm) => {
     const deps = makeDeps({ resolution: { ok: false, code: "IDENTITY_LOOKUP_FAILED" } });
-    const r = await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.O" })) }, deps);
+    const r = await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.O" })), providerAccountId: ACCOUNT_ID }, deps);
     return r.ok === true; // a retryable failure was wrongly acked
   });
 
@@ -761,7 +857,7 @@ tsMutation("MUT P: a raw error field is exposed as the sanitized failure reason"
   [[SERVICE_SRC, '      failureReason = failureReason ?? "identity_lookup_failed";', "      failureReason = failureReason ?? resolution.detail;"]],
   async (mm) => {
     const deps = makeDeps({ resolution: { ok: false, code: "IDENTITY_LOOKUP_FAILED", detail: "SQLSTATE 08006 connection reset by peer" } });
-    const r = await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.P" })) }, deps);
+    const r = await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.P" })), providerAccountId: ACCOUNT_ID }, deps);
     const fin = deps.calls.finalizes.find((f) => f.status === "failed");
     return /SQLSTATE|connection reset/i.test(String(fin && fin.reason)) || /SQLSTATE|connection reset/i.test(String(r.code)); // raw error leaked
   });
@@ -772,7 +868,7 @@ tsMutation("MUT Q: a duplicate receipt skips per-message processing on retry (lo
     // Retry of a batch whose B previously failed identity lookup: the duplicate receipt must STILL
     // process B. With the per-message skip, B is never persisted.
     const deps = makeDeps({ receipt: { ok: true, receiptId: "r", duplicate: true }, persistedWamids: new Set() });
-    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.B" })) }, deps);
+    await mm.Service.handleInboundWhatsAppMessages({ rawBody: "x", payload: envelope(textMsg({ id: "wamid.B" })), providerAccountId: ACCOUNT_ID }, deps);
     return deps.calls.persists.length === 0; // the message was skipped on the duplicate receipt
   });
 

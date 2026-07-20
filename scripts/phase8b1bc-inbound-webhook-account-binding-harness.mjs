@@ -765,16 +765,31 @@ check("78. a SAME-ACCOUNT duplicate uses the stored account and stays idempotent
   assert(item.outcome === "duplicate", `duplicate (got ${item.outcome})`);
   assert(inserted.length === 0, "NO second intent inserted");
 });
-check("79-80. a legacy-NULL inbound row inherits NULL and is never upgraded", async () => {
+// C8B-1B-D6 Wave 2A-R1 REPLACED checks 79-81. They previously asserted that an UNBOUND (legacy-NULL)
+// inbound row inherited NULL and was ENQUEUED — the Class L runtime gap (readiness verdict
+// RUNTIME_GAP_FOUND). Binding is now mandatory: an unbound parent fails closed before any acknowledgement
+// work, so no unbound intent can be created. The "never upgraded" guarantee is preserved and in fact
+// strengthened — the path no longer even reaches the stored-row read.
+check("79-80. an UNBOUND (legacy-NULL) inbound row fails closed and inserts NOTHING", async () => {
   const fresh = await runAck({ storedAccount: null });
-  assert(fresh.item.outcome === "enqueued" && fresh.inserted[0].provider_account_id === null,
-    "a legacy inbound row yields a legacy-NULL intent");
+  assert(fresh.item.outcome === "provider_account_context_missing",
+    `an unbound parent fails closed (got ${fresh.item.outcome})`);
+  assert(fresh.inserted.length === 0, "ZERO intents inserted for an unbound parent");
   const dup = await runAck({ storedAccount: null }, { stored: { kind: "present", providerAccountId: null } });
-  assert(dup.item.outcome === "duplicate" && dup.inserted.length === 0, "legacy-NULL duplicate stays NULL, no insert");
+  assert(dup.item.outcome === "provider_account_context_missing", "a redelivery is refused identically");
+  assert(dup.inserted.length === 0, "still no insert");
 });
-check("81. a redelivery may NEVER upgrade a stored legacy-NULL intent to its own account", async () => {
-  // The inbound row is legacy NULL but an intent already exists bound to ACC_A → deterministic conflict.
-  const { item, inserted } = await runAck({ storedAccount: null }, { stored: { kind: "present", providerAccountId: ACC_A } });
+check("81. an unbound redelivery can NEVER upgrade a stored intent — it never reaches the read", async () => {
+  // The inbound row is unbound but an intent already exists bound to ACC_A. Pre-Wave-2A-R1 this produced a
+  // provider_account_conflict; now the account fence fires FIRST, so the stored row is never even consulted.
+  const { item, inserted, calls } = await runAck({ storedAccount: null }, { stored: { kind: "present", providerAccountId: ACC_A } });
+  assert(item.outcome === "provider_account_context_missing", `fail-closed (got ${item.outcome})`);
+  assert(inserted.length === 0, "no upgrade, no reassignment, no second row");
+  assert(!calls.includes("read") && !calls.includes("receipt"), "the stored row is never read and no receipt is looked up");
+});
+check("81b. a BOUND parent whose stored intent belongs to another account is still a conflict", async () => {
+  // The conflict path itself is unchanged — it is now reached only with a genuinely bound parent.
+  const { item, inserted } = await runAck({ storedAccount: ACC_B }, { stored: { kind: "present", providerAccountId: ACC_A } });
   assert(item.outcome === "provider_account_conflict", `conflict (got ${item.outcome})`);
   assert(inserted.length === 0, "no upgrade, no reassignment, no second row");
 });

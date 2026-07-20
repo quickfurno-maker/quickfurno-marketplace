@@ -35,6 +35,7 @@ import { resolve } from "node:path";
  */
 
 const SVC_SRC = "services/consentCommandResponseService.ts";
+const HARNESS_SELF = "scripts/phase8b1bd6w2ar1-consent-ack-null-parent-account-guard-harness.mjs";
 const MIGRATIONS_DIR = "supabase/migrations";
 const EXPECTED_BASE = "fc639cf5b86f10b3fa3c814684b97c42b578322a";
 const MISSING_OUTCOME = "provider_account_context_missing";
@@ -107,6 +108,52 @@ function stripComments(src) {
   }
   return out;
 }
+
+// ----------------------------------------------------------------------------
+// STRING-CARRIED EVIDENCE DETECTORS (C8B-1B-D6 Wave 2A-R1 evidence repair)
+//
+// WHY THESE EXIST. The independent audit of PR #16 found that two static checks could not fail:
+// they searched `stripNonCode(src)` — which collapses every string literal to `""` — for evidence
+// that ONLY EVER APPEARS INSIDE A STRING LITERAL (a Supabase table name, a module specifier). The
+// text was erased before the test, so both assertions were constant-true. An injected
+// `.from("communication_provider_accounts")` and an injected resolver `import` were both accepted.
+//
+// THE RULE THAT PREVENTS A REPEAT: when the evidence for a check is carried by a STRING LITERAL,
+// the check MUST read `stripComments()` (comments removed, string literals PRESERVED) and MUST NOT
+// read `stripNonCode()`. Use `stripNonCode()` only for evidence carried by identifiers/syntax.
+// ----------------------------------------------------------------------------
+
+const ACCOUNTS_TABLE = "communication_provider_accounts";
+const RESOLVER_MODULE = "communicationProviderRuntimeService";
+
+/**
+ * INVARIANT A (deliberately, not B): no direct QUERY CALL targeting the provider-accounts table.
+ *
+ * A is what the ownership rule actually forbids — re-resolving an account by querying the table.
+ * B ("no executable reference to the table string anywhere") would be broader than the governance
+ * record requires and would fire on a harmless log string, so it is NOT adopted. The rule is not
+ * silently broadened; see the negative controls in `stringEvidenceChecks()`.
+ *
+ * Matches `.from("…")` with any quote style, arbitrary whitespace/newlines, optional chaining in
+ * either position (`?.from(`, `.from?.(`), and any preceding chain such as `.schema("public")`.
+ */
+const ACCOUNTS_TABLE_QUERY_RE = new RegExp(
+  String.raw`\??\.\s*from\s*(?:\?\.)?\s*\(\s*(["'\`])\s*` + ACCOUNTS_TABLE + String.raw`\s*\1\s*\)`
+);
+
+/**
+ * The prohibited resolver module reached through ANY specifier-bearing form:
+ *   import x from "…";  import "…";  require("…");  import("…")
+ * A bare local identifier that merely resembles the name is NOT a module import and must not fire.
+ */
+const RESOLVER_IMPORT_RE = new RegExp(
+  String.raw`(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bimport\s+)(["'\`])[^"'\`]*` +
+  RESOLVER_MODULE + String.raw`[^"'\`]*\1`
+);
+
+/** The two repaired predicates, exported as pure functions so self-tests can prove they can FAIL. */
+const queriesAccountsTable = (src) => ACCOUNTS_TABLE_QUERY_RE.test(stripComments(src));
+const importsResolverModule = (src) => RESOLVER_IMPORT_RE.test(stripComments(src));
 
 /** The executable body of `inheritPersistedAccount`, brace-matched. Comments removed, strings kept. */
 function inheritBody(src) {
@@ -454,9 +501,9 @@ function staticChecks(src) {
     /function\s+inheritPersistedAccount/.test(code) && /inheritPersistedAccount\s*\(/.test(code));
 
   // 4 — NO re-resolution of ownership, in executable code.
+  // These are IDENTIFIER/SYNTAX-carried, so `code` (stripNonCode) is the correct view for them.
   const forbidden = [
     ["resolveOwningProviderAccount", /resolveOwningProviderAccount\s*\(/],
-    ["communication_provider_accounts query", /from\s*\(\s*""\s*\)/.test(flat) && /provider_accounts/.test(code) ? /provider_accounts/ : /$^/],
     ["process.env access", /process\s*\.\s*env/],
     ["fetchProviderAccount", /fetchProviderAccount\s*\(/],
     ["a DEFAULT_/FALLBACK_ account constant", /(DEFAULT|FALLBACK)_[A-Z_]*ACCOUNT/],
@@ -464,10 +511,14 @@ function staticChecks(src) {
     ["an OR account fallback", /providerAccountId\s*\|\|/],
   ];
   for (const [label, re] of forbidden) {
-    add(`S4 no ${label} in executable source`, !(re instanceof RegExp ? re.test(code) : false));
+    add(`S4 no ${label} in executable source`, !re.test(code));
   }
-  add("S4.8 the service imports no provider-account resolver module",
-    !/from\s+""\s*;?\s*$/m.test("") && !/communicationProviderRuntimeService/.test(stripNonCode(src)));
+
+  // ── STRING-CARRIED EVIDENCE (repaired: reads stripComments, NOT stripNonCode) ──────────────────
+  // The two checks below replace the vacuous ones the independent audit found. Their evidence lives
+  // inside string literals, so they must never read `code`/`flat`.
+  add(`S4.7 the service issues no direct ${ACCOUNTS_TABLE} query`, !queriesAccountsTable(src));
+  add("S4.8 the service imports no provider-account resolver module", !importsResolverModule(src));
 
   // 5 — the five RPC lifecycle paths are untouched by this change.
   const RPCS = [
@@ -489,6 +540,86 @@ function staticChecks(src) {
   // 6 — no generic update of the column was introduced in the service either.
   add("S6.1 the service issues no .update() on the ack-intents table",
     !/\.update\s*\(/.test(code));
+}
+
+// ============================================================================
+// SELF-TESTS FOR THE STRING-CARRIED CHECKS (C8B-1B-D6 Wave 2A-R1 evidence repair)
+//
+// A check may not claim load-bearing status unless an executable self-test proves it REJECTS a
+// violating sample. These feed each repaired predicate synthetic sources and require the exact
+// verdict — positives must fail, negative controls must pass. If a predicate is ever replaced with
+// a constant-pass implementation, every POSITIVE row below flips and this section goes red.
+// ============================================================================
+function stringEvidenceSelfTests() {
+  // ---- POSITIVES: each MUST be detected ------------------------------------------------------
+  const queryPositives = {
+    "double quote": `const { data } = await adminClient().from("${ACCOUNTS_TABLE}").select("id");`,
+    "single quote": `const { data } = await adminClient().from('${ACCOUNTS_TABLE}').select('id');`,
+    "template literal": "const { data } = await adminClient().from(`" + ACCOUNTS_TABLE + "`).select(`id`);",
+    "multiline formatting": `const { data } = await adminClient()\n  .from(\n    "${ACCOUNTS_TABLE}"\n  )\n  .select("id");`,
+    "schema().from() chain": `await adminClient().schema("public").from("${ACCOUNTS_TABLE}").select("id");`,
+    "optional chaining": `await adminClient()?.from?.("${ACCOUNTS_TABLE}")?.select("id");`,
+    "extra inner whitespace": `await adminClient().from(  "${ACCOUNTS_TABLE}"  ).select("id");`,
+  };
+  for (const [label, sample] of Object.entries(queryPositives)) {
+    add(`ST1 direct accounts-table query is DETECTED — ${label}`, queriesAccountsTable(sample) === true);
+  }
+
+  const importPositives = {
+    "static named import": `import { resolveOwningProviderAccount } from "./${RESOLVER_MODULE}";`,
+    "side-effect import": `import "./${RESOLVER_MODULE}";`,
+    "require()": `const r = require("./${RESOLVER_MODULE}");`,
+    "dynamic import()": `const r = await import("./${RESOLVER_MODULE}");`,
+    "single-quoted specifier": `import { x } from './${RESOLVER_MODULE}';`,
+    "multiline import": `import {\n  resolveOwningProviderAccount,\n} from "../services/${RESOLVER_MODULE}";`,
+  };
+  for (const [label, sample] of Object.entries(importPositives)) {
+    add(`ST2 prohibited resolver import is DETECTED — ${label}`, importsResolverModule(sample) === true);
+  }
+
+  // ---- NEGATIVE CONTROLS: each MUST NOT be detected -------------------------------------------
+  // These encode INVARIANT A: a direct QUERY CALL is forbidden; a mere mention is not.
+  const queryNegatives = {
+    "table name only in a line comment": `// never query ${ACCOUNTS_TABLE} here\nconst x = 1;`,
+    "table name only in a block comment": `/* ${ACCOUNTS_TABLE} is owned elsewhere */\nconst x = 1;`,
+    "table name only in a test description": `check("must not touch ${ACCOUNTS_TABLE}", () => {});`,
+    "table name in a harmless log string": `console.warn("ownership lives in ${ACCOUNTS_TABLE}");`,
+    "an unrelated table is queried": `await adminClient().from("communication_inbound_messages").select("id");`,
+    "a similarly-prefixed table is queried": `await adminClient().from("${ACCOUNTS_TABLE}_audit").select("id");`,
+  };
+  for (const [label, sample] of Object.entries(queryNegatives)) {
+    add(`ST3 no false positive — ${label}`, queriesAccountsTable(sample) === false);
+  }
+
+  const importNegatives = {
+    "resolver name only in a comment": `// we never import ${RESOLVER_MODULE}\nconst x = 1;`,
+    "resolver name only in a test label": `check("does not import ${RESOLVER_MODULE}", () => {});`,
+    "an unrelated module is imported": `import { adminClient } from "../lib/supabase";`,
+    "a local identifier of a similar name": `const ${RESOLVER_MODULE}Stub = { resolve: () => null };`,
+  };
+  for (const [label, sample] of Object.entries(importNegatives)) {
+    add(`ST4 no false positive — ${label}`, importsResolverModule(sample) === false);
+  }
+
+  // ---- ANTI-VACUITY: the predicates must not be constant in EITHER direction -------------------
+  // A constant-pass implementation makes every ST1/ST2 row fail; a constant-fail one makes every
+  // ST3/ST4 row fail. These two rows additionally assert non-constancy directly, so the property is
+  // stated as evidence rather than only implied by the rows above.
+  add("ST5 the accounts-query predicate is non-constant (rejects and accepts)",
+    queriesAccountsTable(`await x.from("${ACCOUNTS_TABLE}")`) === true
+    && queriesAccountsTable("const x = 1;") === false);
+  add("ST6 the resolver-import predicate is non-constant (rejects and accepts)",
+    importsResolverModule(`import "./${RESOLVER_MODULE}";`) === true
+    && importsResolverModule("const x = 1;") === false);
+
+  // ---- REGRESSION GUARD: neither check may read the string-erasing view ------------------------
+  // This is the defect class itself, asserted directly against this harness's own source.
+  const selfSrc = readFileSync(resolve(HARNESS_SELF), "utf8");
+  const detectorBlock = selfSrc.slice(
+    selfSrc.indexOf("const queriesAccountsTable"),
+    selfSrc.indexOf("/** The executable body of `inheritPersistedAccount`"));
+  add("ST7 the repaired predicates read stripComments, never stripNonCode",
+    detectorBlock.includes("stripComments(src)") && !detectorBlock.includes("stripNonCode"));
 }
 
 // ============================================================================
@@ -585,6 +716,31 @@ const MUTATIONS = [
       "    provider_account_id: providerAccountId,",
       "    provider_account_id: providerAccountId ?? null,") },
 
+  // ── M13 family (C8B-1B-D6 Wave 2A-R1 evidence repair) ────────────────────────────────────────
+  // The independent audit's finding F3: M10 covers only a NAMED resolver. Querying the accounts
+  // table DIRECTLY was an uncovered bypass, and the check nominally guarding it was vacuous.
+  //
+  // Each variant substitutes an account for an unbound parent — production-reachable, semantically
+  // capable of account substitution, NOT dead code and NOT a comment. Quote-format variants exist
+  // so the repaired detector cannot be gamed by changing quoting or line breaks.
+  ...[
+    ["a", "double quote", `adminClient().from("communication_provider_accounts").select("id")`],
+    ["b", "single quote", `adminClient().from('communication_provider_accounts').select('id')`],
+    ["c", "template literal", "adminClient().from(`communication_provider_accounts`).select(`id`)"],
+    ["d", "multiline", `adminClient()\n      .from(\n        "communication_provider_accounts"\n      )\n      .select("id")`],
+    ["e", "schema().from() chain", `adminClient().schema("public").from("communication_provider_accounts").select("id")`],
+  ].map(([id, label, query]) => ({
+    name: `M13${id} direct provider-accounts query substitutes an account (${label})`,
+    expect: "killed",
+    mutate: (s) => s.replace(
+      '  if (typeof raw === "string" && ACCOUNT_ID_SHAPE.test(raw)) return { kind: "inherited", value: raw };',
+      `  if (raw === undefined || raw === null) {\n` +
+      `    const { data } = await ${query};\n` +
+      `    if (data && data[0]) return { kind: "inherited", value: data[0].id as string };\n` +
+      `  }\n` +
+      '  if (typeof raw === "string" && ACCOUNT_ID_SHAPE.test(raw)) return { kind: "inherited", value: raw };'),
+  })),
+
   { name: "M12 permit a generic provider_account_id update in the service", expect: "killed",
     mutate: (s) => s.replace(
       "    async insertIntent(row) {",
@@ -622,6 +778,7 @@ try {
 
 await behaviouralChecks(Svc);
 staticChecks(raw);
+stringEvidenceSelfTests();
 scopeChecks();
 
 let passed = 0, failed = 0;

@@ -340,6 +340,171 @@ const PHASE8B1BB_MUTATION_FAMILIES = [["CAS", 5], ["DEP", 4], ["FIL", 4], ["MAP"
 const PHASE_8B1BB_5FB_CHECKS = 60;
 const PHASE_8B1BB_5FB_MUTATIONS = 63;
 
+// ----------------------------------------------------------------------------
+// PHASE 8B-1B-D6 WAVE 1 — DELIVERY-EVENT PROVIDER-ACCOUNT CONSTRAINT AUTHORITY.
+//
+// Wave 1 adds a database-level guarantee that every communication_delivery_events row carries a
+// non-NULL provider_account_id. It introduces exactly TWO NEW files and modifies NO existing
+// runtime or harness file, so it takes a NARROW, INDIVIDUALLY-NAMED carve-out in the dirty-scope
+// loop below rather than any category-level widening.
+//
+// The carve-out is deliberately per-path, not `^supabase/migrations/`: a blanket migration
+// allowance would let ANY future migration through the D3-B gate, which is precisely the property
+// this harness exists to deny. Both paths are additionally BYTE-FROZEN, so the carve-out admits
+// exactly the reviewed bytes and nothing else.
+// ----------------------------------------------------------------------------
+/** The reviewed C8B-1B-D6 Wave 1 IMPLEMENTATION commit (migration + dedicated harness). */
+/** The C8B-1B-C INTEGRATION merge Wave 1 branched from. This — not the C8B-1B-C implementation
+ *  head — is the correct range base: the 8B-1B-C governance commit sits between them, and using the
+ *  implementation head would fold its three files into the Wave 1 range. */
+const PHASE_8B1BD6W1_BASE = "503c00ecf8e82cf24a6dc13d60d5ff6b21439d1c";
+/** Wave 1 landed in TWO implementation commits: 1b8cd90 (migration + harness) and f7b973f
+ *  (the mandatory database proofs A-H). The authority pins the LATTER, because the freeze must
+ *  match the bytes on disk. The 503c00e..f7b973f range is still exactly the same two files. */
+const PHASE_8B1BD6W1_IMPLEMENTATION_HEAD = "f7b973fa651ae70f1bd8083e2055ed885d594d02";
+const PHASE_8B1BD6W1_MIGRATION_SRC = "supabase/migrations/20260720000100_communication_delivery_event_provider_account_required.sql";
+const PHASE_8B1BD6W1_HARNESS_SRC = "scripts/phase8b1bd6w1-delivery-event-account-constraint-harness.mjs";
+/** The exact two paths Wave 1 is authorised to introduce. Any third path is unauthorised. */
+const PHASE_8B1BD6W1_EXPECTED_FILES = [PHASE_8B1BD6W1_MIGRATION_SRC, PHASE_8B1BD6W1_HARNESS_SRC];
+/** Reviewed implementation-head blobs — `git rev-parse 1b8cd90:<path>`. A change (dirty OR later
+ *  COMMITTED) fails until another EXPLICIT authority transfer re-pins them. */
+const PHASE_8B1BD6W1_FROZEN_BLOBS = [
+  [PHASE_8B1BD6W1_MIGRATION_SRC, "f2b4b8c9620e1805760c8bf45fb4bafa138df201"],
+  [PHASE_8B1BD6W1_HARNESS_SRC, "414295cd787157a8d656f8edc4d95fc1122a7e30"],
+];
+/** The EXACT enforced object. A rename, a re-table or a re-predicate is an authority change. */
+const PHASE_8B1BD6W1_TARGET_TABLE = "communication_delivery_events";
+const PHASE_8B1BD6W1_CONSTRAINT_NAME = "communication_delivery_events_provider_account_required_check";
+const PHASE_8B1BD6W1_PREDICATE = "check (provider_account_id is not null)";
+/** Published ONLY after every Wave 1 assertion passes. The dirty-scope carve-out below requires it. */
+let phase8B1BD6W1AuthorityToken = null;
+
+/**
+ * PHASE 8B-1B-D6 WAVE 1 AUTHORITY. Ancestry + the fixed two-file range + the byte-freeze of both
+ * files + the EXECUTABLE shape of the enforced DDL. Runs BEFORE the generic dirty-scope loop, so a
+ * dirty OR later-committed change to the migration or the dedicated harness fails with a clear
+ * authority-transfer error instead of a generic scope message — or, once committed, instead of
+ * passing silently.
+ */
+function provePhase8B1BD6W1DeliveryEventConstraintAuthority() {
+  // 1) THE RANGE IS FIXED AND MINIMAL.
+  assert(Array.isArray(PHASE_8B1BD6W1_EXPECTED_FILES), "the Wave 1 range is an array");
+  assert(PHASE_8B1BD6W1_EXPECTED_FILES.length === 2, "Wave 1 introduces EXACTLY two files");
+  assert(new Set(PHASE_8B1BD6W1_EXPECTED_FILES).size === 2, "the Wave 1 range contains no duplicates");
+  assert(PHASE_8B1BD6W1_FROZEN_BLOBS.length === PHASE_8B1BD6W1_EXPECTED_FILES.length,
+    "every Wave 1 range file is byte-frozen (no unfrozen member)");
+  for (const [path] of PHASE_8B1BD6W1_FROZEN_BLOBS) {
+    assert(PHASE_8B1BD6W1_EXPECTED_FILES.includes(path), `a frozen Wave 1 blob is outside the range: ${path}`);
+  }
+
+  // 2) ANCESTRY — Wave 1 descends from the C8B-1B-C implementation head and is reachable from HEAD.
+  assert(execFileSync("git", ["cat-file", "-t", PHASE_8B1BD6W1_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit",
+    "the C8B-1B-D6 Wave 1 implementation commit " + PHASE_8B1BD6W1_IMPLEMENTATION_HEAD.slice(0, 12) + " must exist");
+  assert(execFileSync("git", ["cat-file", "-t", PHASE_8B1BD6W1_BASE], { encoding: "utf8" }).trim() === "commit",
+    "the C8B-1B-C integration base " + PHASE_8B1BD6W1_BASE.slice(0, 12) + " must exist");
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, PHASE_8B1BD6W1_BASE]);            // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BD6W1_BASE, PHASE_8B1BD6W1_IMPLEMENTATION_HEAD]);         // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BD6W1_IMPLEMENTATION_HEAD, "HEAD"]);                          // throws if not
+
+  // 3) THE COMMITTED RANGE IS EXACTLY THOSE TWO FILES — no unauthorized extra file rode along.
+  const ranged = execFileSync("git", ["diff", "--name-only", PHASE_8B1BD6W1_BASE + "..." + PHASE_8B1BD6W1_IMPLEMENTATION_HEAD],
+    { encoding: "utf8" }).split("\n").map((x) => x.trim()).filter(Boolean);
+  assert(ranged.length === 2, `the Wave 1 commit range must contain exactly two files (found ${ranged.length})`);
+  for (const f of ranged) assert(PHASE_8B1BD6W1_EXPECTED_FILES.includes(f), `unauthorized file in the Wave 1 range: ${f}`);
+
+  // 4) BYTE-FREEZE — historical commit blobs AND the active on-disk bytes. Fixed literals, so a
+  //    STALE or SUCCESSOR-MISMATCHED pin cannot be smuggled in by computing it at runtime.
+  const selfSrc = readFileSync(resolve(HARNESS_SRC), "utf8");
+  for (const [path, expected] of PHASE_8B1BD6W1_FROZEN_BLOBS) {
+    assert(selfSrc.includes('"' + expected + '"'), "the Wave 1 blob " + expected.slice(0, 12) + " is an exact fixed literal");
+    const historical = execFileSync("git", ["rev-parse", PHASE_8B1BD6W1_IMPLEMENTATION_HEAD + ":" + path], { encoding: "utf8" }).trim();
+    assert(historical === expected,
+      `the Wave 1 historical blob for ${path} must be permanently unchanged (got ${historical.slice(0, 12)}, expected ${expected.slice(0, 12)}).`);
+    const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
+    assert(onDisk === expected,
+      `${path} is not byte-identical to its reviewed C8B-1B-D6 Wave 1 blob. This is an AUTHORITY TRANSFER, ` +
+      `not a routine edit (on-disk ${onDisk.slice(0, 12)} != pinned ${expected.slice(0, 12)}).`);
+  }
+  assert(PHASE_8B1BD6W1_FROZEN_BLOBS[0][1] !== PHASE_8B1BD6W1_FROZEN_BLOBS[1][1],
+    "the migration and the harness must not share a blob (a duplicate pin is a stale-authority smell)");
+
+  // 4b) RAW-BYTE LINE-ENDING FREEZE. `git hash-object` NORMALISES CRLF to LF, so a CRLF-only
+  //     rewrite of a Wave 1 file yields an IDENTICAL blob and slips past the freeze above. Read the
+  //     raw bytes and require LF-only, so a line-ending rewrite is caught as the working-tree
+  //     contamination it is rather than being laundered by git normalisation.
+  for (const [path] of PHASE_8B1BD6W1_FROZEN_BLOBS) {
+    const rawBytes = readFileSync(resolve(path));
+    assert(!rawBytes.includes(0x0d),
+      `${path} contains CR bytes. Wave 1 files are LF-only; a CRLF rewrite is an authority change ` +
+      `even though git hash-object would normalise it to the same blob.`);
+  }
+
+  // 5) THE ENFORCED DDL — executable shape, read from the frozen migration itself. A wrong table, a
+  //    wrong predicate, a missing constraint, a silent-skip guard or NOT VALID staging fails HERE.
+  const sql = readFileSync(resolve(PHASE_8B1BD6W1_MIGRATION_SRC), "utf8");
+  const code = sql.split("\n").map((l) => l.split("--")[0]).join(" ").replace(/\s+/g, " ").trim().toLowerCase();
+  assert(code.includes("alter table public." + PHASE_8B1BD6W1_TARGET_TABLE + " "),
+    "the Wave 1 migration must target " + PHASE_8B1BD6W1_TARGET_TABLE);
+  assert(code.includes("add constraint " + PHASE_8B1BD6W1_CONSTRAINT_NAME + " "),
+    "the Wave 1 constraint must carry its exact reviewed name");
+  assert(code.includes(PHASE_8B1BD6W1_PREDICATE), "the Wave 1 predicate must be exactly `provider_account_id is not null`");
+  assert(!/if\s+not\s+exists|if\s+exists/.test(code), "the Wave 1 migration must not silently skip");
+  assert(!/not\s+valid/.test(code), "the Wave 1 constraint must be added VALIDATED");
+  assert(!/created_at|readiness_status|\bor\b/.test(code),
+    "the Wave 1 predicate must carry no timestamp exemption, no readiness condition and no OR-widening");
+  assert(!/\binsert\b|\bupdate\b|\bdelete\b|set\s+not\s+null/.test(code),
+    "the Wave 1 migration must perform no DML and must not set the column NOT NULL");
+  // ONE executable statement only — a second statement is an unauthorized scope expansion.
+  assert(code.split(";").filter((x) => x.trim().length > 0).length === 1,
+    "the Wave 1 migration must contain exactly ONE executable statement");
+  // NO OTHER communication table may appear in the executable DDL.
+  for (const other of ["communication_messages", "communication_webhook_receipts",
+                       "communication_inbound_messages", "communication_consent_ack_intents"]) {
+    assert(!code.includes(other), `Wave 1 must not touch ${other} (that is Wave 2 / Wave 3)`);
+  }
+
+  // 6) MODELLED SELF-PROOF of the carve-out decision. Synthetic inputs, so a future weakening —
+  //    broadening to all migrations, dropping the token gate, admitting a third path — is caught here.
+  const admits = (path, token) =>
+    token === PHASE_8B1BD6W1_FROZEN_BLOBS[0][1] && PHASE_8B1BD6W1_EXPECTED_FILES.includes(path);
+  const goodToken = PHASE_8B1BD6W1_FROZEN_BLOBS[0][1];
+  assert(admits(PHASE_8B1BD6W1_MIGRATION_SRC, goodToken) === true, "the reviewed migration path is admitted");
+  assert(admits(PHASE_8B1BD6W1_HARNESS_SRC, goodToken) === true, "the reviewed harness path is admitted");
+  assert(admits("supabase/migrations/20260901000001_other.sql", goodToken) === false,
+    "a DIFFERENT migration is rejected (the carve-out is per-path, never category-wide)");
+  assert(admits("supabase/migrations/20260720000100_communication_delivery_event_provider_account_required.sql.bak", goodToken) === false,
+    "a near-miss migration path is rejected");
+  assert(admits("scripts/phase8b1bd6w2-ack-intent-constraint-harness.mjs", goodToken) === false,
+    "a Wave 2 harness is rejected (Wave 1 authority does not extend to it)");
+  assert(admits(PHASE_8B1BD6W1_MIGRATION_SRC, null) === false, "a MISSING token rejects the migration (no proof-map bypass)");
+  assert(admits(PHASE_8B1BD6W1_MIGRATION_SRC, "0000000000000000000000000000000000000000") === false,
+    "a WRONG token rejects the migration (successor blob mismatch)");
+
+  // 6b) THE MODEL MUST MATCH THE REAL CODE. The `admits` model above proves the DECISION SHAPE, but
+  //     it is a local function — deleting the real token gate in the dirty-scope loop would not move
+  //     it. Assert the gate literally exists in BOTH carve-outs in this harness's own source, so a
+  //     proof-map bypass (dropping the gate and admitting the paths unconditionally) fails HERE.
+  const GATE = "phase8B1BD6W1AuthorityToken === PHASE_8B1BD6W1_FROZEN_BLOBS[0][1]";
+  const gateCount = selfSrc.split(GATE).length - 1;
+  assert(gateCount >= 3,
+    `the Wave 1 token gate must appear in the model AND in BOTH dirty-scope carve-outs ` +
+    `(found ${gateCount} occurrences, expected at least 3). A missing gate is a proof-map bypass.`);
+  assert(selfSrc.includes("p === PHASE_8B1BD6W1_MIGRATION_SRC && " + GATE),
+    "the migration carve-out must be per-path AND token-gated (never a bare path match)");
+  assert(selfSrc.includes(GATE + " && PHASE_8B1BD6W1_EXPECTED_FILES.includes(p)"),
+    "the D3-B scope carve-out must be token-gated before it consults the Wave 1 path set");
+  // A category-wide widening would replace the exact path comparison with a regex test. Plain
+  // substring, not a regex literal, so this proof cannot itself be broken by escaping subtleties.
+  // The needle is ASSEMBLED FROM FRAGMENTS: written as one literal it would appear verbatim in this
+  // very file, and selfSrc reads this file — the proof would then always fire on itself.
+  const WIDENED_GATE = ".test(p)" + " && " + "phase8B1BD6W1AuthorityToken";
+  assert(!selfSrc.includes(WIDENED_GATE),
+    "the carve-out must never be widened from a single path to a pattern over the migrations directory");
+
+  phase8B1BD6W1AuthorityToken = PHASE_8B1BD6W1_FROZEN_BLOBS[0][1];   // set ONLY after every assertion passed
+}
+
+
 function compileTo(outDir) {
   rmSync(outDir, { recursive: true, force: true });
   const tsconfigPath = resolve(`${outDir}.tsconfig.json`);
@@ -1926,6 +2091,11 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
   // evidence, the production wiring and the updated 5F-B test wiring. Runs BEFORE the generic dirty-scope
   // loop, so a dirty OR later-committed change to any of the six fails with a clear authority-transfer error.
   provePhase8B1BBOutboundAccountAttributionAuthority();
+  // PHASE 8B-1B-D6 WAVE 1 — the fixed two-file range (2 ADDED, 0 MODIFIED), the byte-freeze of the
+  // migration and the dedicated harness, and the EXECUTABLE shape of the enforced DDL. Runs BEFORE the
+  // generic dirty-scope loop so its narrow per-path carve-out below is gated on a token this prover
+  // publishes only after every assertion passes.
+  provePhase8B1BD6W1DeliveryEventConstraintAuthority();
 
   // PHASE 8B-1B-B (dirty-filter hardening) — EXECUTABLE self-proof that gitDirty's suppression is STATUS-AWARE.
   // Only a genuinely UNTRACKED ('??') permitted artifact may be ignored; every tracked status (staged OR
@@ -1950,7 +2120,14 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
     assert(!dirty.includes(f), `a frozen consent authority must not change: ${f}`);
   }
   for (const p of dirty) {
-    assert(!/^supabase\/migrations\//.test(p), `no migration may change (${p})`);
+    // PHASE 8B-1B-D6 WAVE 1 — a NARROW, INDIVIDUALLY-NAMED carve-out for the single reviewed Wave 1
+    // migration, gated on the authority token published above. Every OTHER migration stays forbidden:
+    // this is a per-path exception, never a `^supabase/migrations/` category allowance.
+    assert(
+      !/^supabase\/migrations\//.test(p) ||
+        (p === PHASE_8B1BD6W1_MIGRATION_SRC && phase8B1BD6W1AuthorityToken === PHASE_8B1BD6W1_FROZEN_BLOBS[0][1]),
+      `no migration may change (${p})`
+    );
     assert(!/^app\/api\/.*route\.ts$|^pages\/api\//.test(p), `no API route may change (${p})`);
     assert(!/\.env/.test(p), `no env file may change (${p})`);
     assert(!/^lib\/communication\/providers\//.test(p), `no provider adapter may change (${p})`);
@@ -1969,7 +2146,19 @@ check("B4. the frozen consent authorities are UNCHANGED, and no SQL/route/env/pr
     );
   }
   // The D3-B delta is within the approved scope.
-  for (const p of dirty) assert(D3B_EXPECTED_FILES.includes(p), `file outside the approved D3-B scope: ${p}`);
+  // The D3-B delta is within the approved scope. PHASE 8B-1B-D6 WAVE 1 adds its two reviewed paths as an
+  // individually-named extension gated on the published authority token — NOT by inserting them into
+  // D3B_EXPECTED_FILES, which stays the untouched historical D3-B allowlist.
+  const d6w1Admitted = (p) =>
+    phase8B1BD6W1AuthorityToken === PHASE_8B1BD6W1_FROZEN_BLOBS[0][1] && PHASE_8B1BD6W1_EXPECTED_FILES.includes(p);
+  for (const p of dirty) {
+    assert(D3B_EXPECTED_FILES.includes(p) || d6w1Admitted(p), `file outside the approved D3-B scope: ${p}`);
+  }
+  // The historical allowlist itself must NOT have absorbed the Wave 1 paths — predecessor evidence is
+  // preserved, and the two authorities stay separately auditable.
+  for (const p of PHASE_8B1BD6W1_EXPECTED_FILES) {
+    assert(!D3B_EXPECTED_FILES.includes(p), `Wave 1 must not be absorbed into the D3-B allowlist: ${p}`);
+  }
 
   // The legacy SMS harnesses are approved to INJECT a test enforcer — never to weaken a test.
   // "Removes nothing" is too blunt (instrumenting an existing line legitimately rewrites it), so the

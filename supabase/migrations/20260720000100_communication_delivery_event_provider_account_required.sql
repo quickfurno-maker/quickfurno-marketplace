@@ -1,0 +1,80 @@
+-- ============================================================================
+-- QuickFurno — Phase 8B-1B-D6 WAVE 1: delivery-event provider-account enforcement.
+--
+-- Adds ONE named, VALIDATED CHECK constraint to public.communication_delivery_events:
+--
+--     provider_account_id IS NOT NULL
+--
+-- WHY THIS TABLE, AND WHY FIRST
+--   Phase 8B-1B-A added `provider_account_id` as a NULLABLE column across five communication
+--   tables, deliberately expand-only. Phase 8B-1B-C then bound it at runtime. D1 measured
+--   production and found ZERO rows in all five tables, so there is no historical population to
+--   protect and no backfill to perform (D2-D5 closed as evidenced no-ops).
+--
+--   `communication_delivery_events` is the first table to receive a database-level guarantee
+--   because it is the only one where ALL THREE of the following hold at 503c00e:
+--
+--     1. Binding is UNCONDITIONAL at INSERT. The single production insert site
+--        (services/communicationService.ts insertDeliveryEvent) takes `providerAccountId: string`
+--        — a required, non-nullable parameter — and its caller chain is fail-closed: processWebhook
+--        rejects a missing/malformed account with PROVIDER_ACCOUNT_ATTRIBUTION_REQUIRED BEFORE any
+--        receipt or delivery-event write occurs.
+--     2. There is NO UPDATE path that could later trip the constraint. The table is
+--        application-enforced append-only at 503c00e: no discovered runtime UPDATE path and no
+--        direct application-role UPDATE privilege (20260708000170 grants service_role only
+--        SELECT, INSERT). This is a statement about one commit under one role — it is NOT a claim
+--        of absolute immutability. A superuser, a future migration, or a role outside the reviewed
+--        set could still update these rows, which is precisely why the invariant is now expressed
+--        in the schema instead of relying on rows never being touched.
+--     3. It inherits from a parent that must itself have been bound: `communication_message_id` is
+--        NOT NULL with ON DELETE RESTRICT, and a message that never dispatched produces no
+--        delivery event.
+--
+--   No legitimate delivery-event class can be unbound. Every row describes a provider callback
+--   about a message that was actually dispatched, so an owning account always exists.
+--
+-- WHAT THIS MIGRATION DELIBERATELY DOES NOT DO
+--   • It does NOT set the column itself to NOT NULL. The CHECK is the controlled first enforcement
+--     step; converting to a column NOT NULL constraint may be evaluated only after runtime evidence
+--     and production canary observation exist. A CHECK is droppable instantly and non-destructively;
+--     a column NOT NULL is a heavier, less reversible commitment.
+--   • It does NOT touch communication_messages, communication_webhook_receipts,
+--     communication_inbound_messages or communication_consent_ack_intents. Those are Wave 2 / Wave 3
+--     and each carries an unresolved question of its own.
+--   • It adds NO timestamp exemption, NO created_at legacy carve-out, NO status or type condition,
+--     NO provider-readiness condition, NO default provider account, NO trigger, NO function, NO
+--     backfill and NO data statement of any kind.
+--
+--     On the created_at exemption specifically: with zero production rows there is no legacy
+--     population to exempt, and such a predicate would create a PERMANENT hole — any row later
+--     acquiring a created_at before the cutoff (clock skew, an explicit backdated insert, a restore)
+--     would be exempt forever. The plain predicate is both simpler and strictly safer.
+--
+--     On provider readiness specifically: readiness is NOT part of this predicate and must never be
+--     added to it. The deployed ownership authority is readiness-agnostic by design — a disabled or
+--     historical account still OWNS its own callbacks — so a readiness condition would reject
+--     legitimate rows. Readiness gates SENDING, not attribution.
+--
+-- FAIL CLOSED ON DRIFT — deliberately NO `IF NOT EXISTS` / `IF EXISTS`, and no DO-block guard that
+-- could silently skip. Postgres does not compare constraint definitions when a name already exists,
+-- so `ADD CONSTRAINT IF NOT EXISTS` (or an existence-guarded DO block) would ACCEPT a pre-existing
+-- constraint of the same name with a DIFFERENT and possibly weaker predicate. Bare DDL makes the
+-- whole transaction ABORT and roll back instead — the correct outcome for an enforcement stage whose
+-- entire value depends on the predicate being exactly what this file says.
+--
+-- The constraint is added VALIDATED (no NOT VALID staging). D1 measured the table as empty, so
+-- validation scans nothing and costs nothing; NOT VALID would buy no time and would leave the
+-- constraint permanently unvalidated. Validation is ALSO the fail-closed behaviour required here:
+-- if production is NOT empty and any row holds a NULL provider_account_id, this ALTER TABLE FAILS
+-- and the whole migration rolls back, rather than admitting an unenforced constraint. That is the
+-- intended outcome — an unexpected NULL row is a finding to investigate, never a row to tolerate.
+--
+-- ROLLBACK: `alter table public.communication_delivery_events
+--            drop constraint communication_delivery_events_provider_account_required_check;`
+-- Instant, non-destructive, reads no row, changes no data, and returns the table to
+-- application-only enforcement — which is the current, correct, already-deployed state.
+-- ============================================================================
+
+alter table public.communication_delivery_events
+  add constraint communication_delivery_events_provider_account_required_check
+  check (provider_account_id is not null);

@@ -1054,6 +1054,48 @@ check("B5. Phase 8A authority transfer is BOUNDED; D4-B's own authorities stay f
   // Deleting any one of them drops below this floor and fails here — which is the point.
   assert((w2ar1Code.match(/calls\.insert\.length === 0/g) ?? []).length >= 5,
     "the zero-insert invariant must be asserted in executable successor check bodies");
+
+  // ── C8B-1B-D6 WAVE 2A-R1 EVIDENCE-REPAIR FREEZE ────────────────────────────────────────────────
+  // The independent audit of PR #16 found that the successor harness carried TWO checks that could
+  // not fail: both searched a string-ERASING view for evidence that only exists inside string
+  // literals, so an injected `.from("communication_provider_accounts")` and an injected resolver
+  // import were accepted. Content assertions alone did not catch that — the checks were present,
+  // they simply did nothing. So the successor is now pinned by EXACT BLOB as well as by content,
+  // and the specific properties that were vacuous are asserted directly.
+  const W2AR1_HARNESS_BLOB = "2ab3a76ea8e9a42f25b55f72990b33575e618859";
+  const onDiskW2AR1 = execFileSync("git", ["hash-object", w2ar1Harness], { encoding: "utf8" }).trim();
+  assert(onDiskW2AR1 === W2AR1_HARNESS_BLOB,
+    `${w2ar1Harness} is not byte-identical to its reviewed Wave 2A-R1 evidence-repair blob. ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER ` +
+    `(on-disk ${onDiskW2AR1.slice(0, 12)} != pinned ${W2AR1_HARNESS_BLOB.slice(0, 12)}).`);
+
+  // THE ANTI-VACUITY RULE ITSELF. The two repaired predicates must read the string-PRESERVING view.
+  // Reverting either to `stripNonCode` reintroduces the exact audited defect and fails here.
+  const detectorBlock = readF(w2ar1Harness).slice(
+    readF(w2ar1Harness).indexOf("const queriesAccountsTable"),
+    readF(w2ar1Harness).indexOf("/** The executable body of `inheritPersistedAccount`"));
+  assert(detectorBlock.length > 0, "the successor must define the string-carried evidence predicates");
+  assert(detectorBlock.includes("stripComments(src)"),
+    "the repaired predicates must read stripComments (string-preserving)");
+  assert(!detectorBlock.includes("stripNonCode"),
+    "the repaired predicates must NOT read stripNonCode — that is the audited vacuity defect");
+
+  // The repaired checks and their self-tests must be present AS EXECUTABLE CODE.
+  has(/S4\.7 the service issues no direct/, w2ar1Code, "the successor must assert the direct-query invariant");
+  has(/S4\.8 the service imports no provider-account resolver module/, w2ar1Code, "the successor must assert the import invariant");
+  // Each ST family must be registered as executable code. ST1/ST2 are POSITIVE self-tests (a
+  // violating sample must be DETECTED), ST3/ST4 are negative controls, ST5/ST6 assert the predicates
+  // are non-constant, ST7 is the anti-vacuity regression guard. Several are emitted from loops, so
+  // the source registration count is smaller than the runtime check count — assert the families.
+  for (const fam of ["ST1", "ST2", "ST3", "ST4", "ST5", "ST6", "ST7"]) {
+    assert(new RegExp(`add\\(\`?"?${fam} `).test(w2ar1Code),
+      `the successor must register the ${fam} string-evidence self-test`);
+  }
+  // The direct-query mutation family (audit finding F3) must exist and must be expected to be KILLED.
+  const m13 = [...w2ar1Code.matchAll(/M13\$\{id\}|M13[a-e]/g)].length;
+  assert(m13 > 0, "the successor must register the direct provider-accounts-query mutation (F3)");
+  has(/ACCOUNTS_TABLE_QUERY_RE/, w2ar1Code, "the successor must define the direct-query detector");
+  has(/RESOLVER_IMPORT_RE/, w2ar1Code, "the successor must define the resolver-import detector");
   for (const f of STILL_FROZEN) {
     assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
   }

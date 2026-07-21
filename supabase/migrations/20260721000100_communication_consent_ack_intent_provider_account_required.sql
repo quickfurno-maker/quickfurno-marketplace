@@ -1,0 +1,54 @@
+-- ============================================================================
+-- QuickFurno — Phase 8B-1B-D6 WAVE 2A-R2
+-- Consent-acknowledgement intent provider-account enforcement.
+--
+-- Adds ONE named, VALIDATED CHECK constraint to:
+--
+--     public.communication_consent_ack_intents
+--
+-- with the exact predicate:
+--
+--     provider_account_id IS NOT NULL
+--
+-- ENTRY EVIDENCE
+--   • Wave 2A-R1 is deployed at 86255583798fc25c58468fdf6ba657243e37d5be.
+--   • R1 rejects a missing, NULL or malformed inherited parent account before receipt lookup,
+--     destination sealing or acknowledgement-intent INSERT.
+--   • The production table was re-measured after deployment: zero total rows and zero NULL-owned rows.
+--   • The five acknowledgement lifecycle RPCs never write, clear, replace or re-resolve
+--     provider_account_id. They update only lifecycle, lease, provider-attempt, completion and purge fields.
+--
+-- WHY A CHECK, NOT COLUMN NOT NULL
+--   This is the controlled first database-enforcement step. A named CHECK is instantly and
+--   non-destructively reversible while preserving the existing nullable column definition and foreign key.
+--   A later column-NOT-NULL conversion, if ever justified, requires live provider traffic and separate review.
+--
+-- DELIBERATE NON-CHANGES
+--   • NO backfill and NO data statement.
+--   • NO default, fallback, environment lookup, provider-name lookup or "current active account".
+--   • NO trigger, function, resolver or account reassignment.
+--   • NO created_at, status, command, acknowledgement-type or legacy exemption.
+--   • NO change to uq_consent_ack_intent_idempotency. Account-scoping that business replay key is a
+--     separate decision and is not part of this nullability enforcement.
+--   • NO change to communication_messages, communication_delivery_events,
+--     communication_inbound_messages or communication_webhook_receipts.
+--   • NO provider activation, template seed, cron change, n8n change or Jarvis change.
+--
+-- FAIL CLOSED ON DRIFT
+--   Deliberately NO IF NOT EXISTS / IF EXISTS and NO exception-swallowing DO block. A same-named
+--   pre-existing object with a weaker definition must abort the transaction, never be silently accepted.
+--
+-- VALIDATED IMMEDIATELY
+--   Deliberately NO NOT VALID. Production contains no historical rows to stage, and an unexpected NULL
+--   row is a finding that must abort this migration rather than be admitted behind an unvalidated fence.
+--
+-- ROLLBACK
+--   alter table public.communication_consent_ack_intents
+--     drop constraint communication_consent_ack_intents_provider_account_required_check;
+--
+-- This rollback changes no row and restores application-only enforcement.
+-- ============================================================================
+
+alter table public.communication_consent_ack_intents
+  add constraint communication_consent_ack_intents_provider_account_required_check
+  check (provider_account_id is not null);

@@ -623,24 +623,29 @@ function stringEvidenceSelfTests() {
 }
 
 // ============================================================================
-// SCOPE PROOFS — R1 is runtime-only
+// SCOPE PROOFS — R1 runtime invariant + the reviewed R2 schema successor
 // ============================================================================
 function scopeChecks() {
-  // The Wave 2A-R2 migration must NOT exist yet.
+  // Wave 2A-R2 is now the approved schema successor. R1 remains the runtime guard; this proof
+  // requires exactly one named R2 migration rather than silently deleting the predecessor check.
   const migrations = execFileSync("git", ["ls-files", MIGRATIONS_DIR], { encoding: "utf8" })
     .split("\n").map((s) => s.trim()).filter(Boolean);
   const w1 = "supabase/migrations/20260720000100_communication_delivery_event_provider_account_required.sql";
+  const r2 = "supabase/migrations/20260721000100_communication_consent_ack_intent_provider_account_required.sql";
   add("SC1.1 the Wave 1 migration is still present and untouched", migrations.includes(w1));
   const ackConstraintMigrations = migrations.filter((m) =>
     /consent_ack_intent.*provider_account|provider_account.*consent_ack_intent/i.test(m));
-  add("SC1.2 NO Wave 2A-R2 ack-intent constraint migration exists yet",
-    ackConstraintMigrations.length === 0, ackConstraintMigrations.join(", "));
+  add("SC1.2 exactly one approved Wave 2A-R2 ack-intent constraint migration exists",
+    ackConstraintMigrations.length === 1 && ackConstraintMigrations[0] === r2,
+    ackConstraintMigrations.join(", "));
 
-  // Nothing in this branch adds a CHECK/trigger on the ack-intents table.
+  // The only schema delta after the R1 base is the exact reviewed R2 migration.
   const changed = execFileSync("git", ["diff", "--name-only", `${EXPECTED_BASE}..HEAD`], { encoding: "utf8" })
     .split("\n").map((s) => s.trim()).filter(Boolean);
-  add("SC2.1 no migration file changed in this branch",
-    !changed.some((f) => f.startsWith(MIGRATIONS_DIR)), changed.join(", "));
+  const changedMigrations = changed.filter((f) => f.startsWith(MIGRATIONS_DIR));
+  add("SC2.1 the only migration changed since the R1 base is the approved Wave 2A-R2 migration",
+    changedMigrations.length === 1 && changedMigrations[0] === r2,
+    changedMigrations.join(", "));
   add("SC2.2 the only runtime file changed is the consent-command response service",
     changed.filter((f) => f.startsWith("services/")).every((f) => f === SVC_SRC),
     changed.filter((f) => f.startsWith("services/")).join(", "));

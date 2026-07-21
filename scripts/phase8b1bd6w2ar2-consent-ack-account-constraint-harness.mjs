@@ -38,7 +38,7 @@ const WAVE1_MIGRATION =
 
 const TARGET_TABLE = "communication_consent_ack_intents";
 const CONSTRAINT_NAME =
-  "communication_consent_ack_intents_provider_account_required_check";
+  "communication_consent_ack_intents_provider_account_req_check";
 const COLUMN = "provider_account_id";
 const EXPECTED_BASE = "86255583798fc25c58468fdf6ba657243e37d5be";
 
@@ -745,7 +745,7 @@ select
 
 const DDL_ANCHOR =
   "alter table public.communication_consent_ack_intents\n" +
-  "  add constraint communication_consent_ack_intents_provider_account_required_check\n" +
+  "  add constraint communication_consent_ack_intents_provider_account_req_check\n" +
   "  check (provider_account_id is not null);";
 
 const MUTATIONS = [

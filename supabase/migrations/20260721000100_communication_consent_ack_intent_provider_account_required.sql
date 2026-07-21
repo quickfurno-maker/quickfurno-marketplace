@@ -44,11 +44,11 @@
 --
 -- ROLLBACK
 --   alter table public.communication_consent_ack_intents
---     drop constraint communication_consent_ack_intents_provider_account_required_check;
+--     drop constraint communication_consent_ack_intents_provider_account_req_check;
 --
 -- This rollback changes no row and restores application-only enforcement.
 -- ============================================================================
 
 alter table public.communication_consent_ack_intents
-  add constraint communication_consent_ack_intents_provider_account_required_check
+  add constraint communication_consent_ack_intents_provider_account_req_check
   check (provider_account_id is not null);

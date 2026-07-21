@@ -8,8 +8,8 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 
 ## 1. Program status
 - **Roadmap:** LOCKED
-- **Active implementation:** IN_PROGRESS — QF-MVP-00
-- **Active phase after documentation:** QF-MVP-00
+- **Active implementation:** QF-MVP-00 — **COMPLETE**
+- **Next active phase:** QF-MVP-10 — Core Architecture & Data Truth (`NOT_STARTED`)
 - **Launch market:** Pune
 - **Meta voice:** excluded
 - **AI scoring / ranking:** excluded
@@ -19,25 +19,26 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-00 — Program Lock and Clean Baseline** — `IN_PROGRESS`. Engineering baseline established; full details in [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md). Not `COMPLETE` — one pre-existing exit gate (`lint`) is red (see open gaps below).
+**QF-MVP-00 — Program Lock and Clean Baseline** — **`COMPLETE`**. All exit gates green; full details in [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md).
 
 **Subphase status:**
-- **QF-MVP-00.1 Baseline verification + test-command inventory** — `COMPLETE`. Branch/HEAD/parent/ancestry/tracking verified; all `test:*` commands classified from **behavioral** inspection (not names). Finding: the 38 `scripts/phase*` harnesses vendor/inline logic or static-source-match, embed a Git working-tree/commit attestation, and several perform **real write-then-revert source mutation** (`phase5d`, `phase5f:d2c`) or shell out to **`psql`** (`phase1b:runtime`) — all `LEGACY_NON_BLOCKING`, kept on disk.
+- **QF-MVP-00.1 Baseline verification + test-command inventory** — `COMPLETE`. Branch/HEAD/parent/ancestry/tracking verified; all `test:*` commands classified from **behavioral** inspection (not names). Finding: the 38 `scripts/phase*` harnesses vendor/inline logic or static-source-match, embed a Git working-tree/commit attestation, and several perform **real write-then-revert source mutation** (`phase5d`, `phase5f:d2c`) or shell out to **`psql`** (`phase1b:runtime`) — all `LEGACY_NON_BLOCKING`, kept on disk. `test:phase*` totals: **35** (34 `LEGACY_NON_BLOCKING` + 1 `DATABASE_INTEGRATION`).
 - **QF-MVP-00.2 Focused MVP runner** — `COMPLETE`. New `scripts/mvp/**` runs offline against **real** production modules (no Git/mutation/DB/network/secrets); `marketplace` (16) + `communication` (24) = **40 checks passing**.
 - **QF-MVP-00.3 Package commands** — `COMPLETE`. Added `test:mvp`, `test:mvp:marketplace`, `test:mvp:communication`, `verify:mvp`; all historical commands preserved; `test:supabase:lead` and all mutation/governance harnesses excluded from the MVP gate.
-- **QF-MVP-00.4 Execution board update** — `COMPLETE` (this update).
+- **QF-MVP-00.4 Execution board update** — `COMPLETE`.
+- **QF-MVP-00.5 Configure & close the lint gate** — `COMPLETE`. Installed `eslint@8.57.0` + `eslint-config-next@14.2.15` (exact, dev); added `.eslintrc.json` (`next/core-web-vitals`); `next lint` runs non-interactively and passes (exit 0). Two pre-existing `react/no-unescaped-entities` **errors** were surfaced and fixed with authorization (single-character apostrophe escapes in `VendorNoProfileFallback.tsx`, `LeadFunnel.tsx`); 5 non-blocking warnings remain. No Next/React/TS upgrade; `core-web-vitals` not weakened; no suppressions/ignores.
 
-**Completed deliverables:** clean-baseline verification record; full test-command inventory + classification; `scripts/mvp/` runner + two suites + minimal `.ts` resolver + README; four MVP package scripts; `docs/QF-MVP-00-BASELINE.md`. Governance is de-blocked: **no MVP gate invokes any legacy governance harness**, and no production code was changed to satisfy a stale pin. `typecheck` ✅, `build` ✅, `test:mvp` ✅ (40/40), `git diff --check` ✅.
+**Completed deliverables:** clean-baseline verification record; full test-command inventory + classification; `scripts/mvp/` runner + two suites + minimal `.ts` resolver + README; four MVP package scripts; ESLint toolchain + `.eslintrc.json`; `docs/QF-MVP-00-BASELINE.md`. Governance is de-blocked: **no MVP gate invokes any legacy governance harness**, and no production code was changed to satisfy a stale pin.
 
-**Open validation gaps (block COMPLETE):**
-- `lint` — **pre-existing** config problem: ESLint is not set up (no `.eslintrc*`, no `eslintConfig`, no `eslint`/`eslint-config-next` dep), so `next lint` prompts interactively and exits non-zero. Recorded, not bypassed; no config added (out of QF-MVP-00 permitted-files scope). Consequently `verify:mvp` stops at `lint` before `build`. Closing QF-MVP-00 requires resolving this so `verify:mvp` is green end-to-end.
-- Launch-critical behaviour with no safe pure seam is logged `FOCUSED_TEST_REQUIRED` in the baseline doc (assignment/credit-deduction idempotency, 6-vendor lifetime cap, replacement concurrency, stateful consent decision/writer, outbound enforcement, async ack persistence) → owned by QF-MVP-20 / QF-MVP-40.
+**Final gate results:** `test:mvp` ✅ (40/40) · `typecheck` ✅ · `lint` ✅ (non-interactive) · `build` ✅ · `verify:mvp` ✅ end-to-end · `git diff --check` ✅ · legacy governance non-blocking ✅.
+
+**Deferred coverage (not a QF-MVP-00 blocker):** launch-critical behaviour with no safe pure seam is logged `FOCUSED_TEST_REQUIRED` in the baseline doc (assignment/credit-deduction idempotency, 6-vendor lifetime cap, replacement concurrency, stateful consent decision/writer, outbound enforcement, async ack persistence) → owned by QF-MVP-20 / QF-MVP-40.
 
 ## 3. Phase table
 
 | Phase | Status | Depends on | Est. effort | Primary deliverable | Exit gate |
 |---|---|---|---|---|---|
-| QF-MVP-00 Program Lock & Clean Baseline | IN_PROGRESS | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | Focused MVP tests ✅ + typecheck ✅ + build ✅ + governance non-blocking ✅; **lint ❌ pre-existing** (blocks COMPLETE) |
+| QF-MVP-00 Program Lock & Clean Baseline | **COMPLETE** | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | ✅ Focused MVP tests (40/40) + typecheck + **lint** + build + `verify:mvp` end-to-end; governance non-blocking |
 | QF-MVP-10 Core Architecture & Data Truth | NOT_STARTED | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | Every route/service classified; every migration ledgered; ownership unambiguous |
 | QF-MVP-20 Marketplace Transaction Engine | NOT_STARTED | 10 | 3–5 d | Lead→qualify→eligible→assign→replace→close, deterministic + audited | Limits unbypassable; credit deduction idempotent; replacement concurrency-safe; no AI scoring |
 | QF-MVP-30 Vendor CRM & Campaign Readiness | NOT_STARTED | 10, 20 | 4–6 d | CRM directory/profile/tasks/segments + consent-safe campaigns | Segments deterministic; campaigns cannot bypass consent; snapshots auditable |
@@ -105,4 +106,4 @@ AI lead scoring · AI vendor ranking · predictive conversion scoring · Jarvis-
 
 ---
 
-**Reminder:** QF-MVP-00 is **IN_PROGRESS / not COMPLETE** — the focused MVP baseline is built and green (40/40 tests, typecheck, build), but the pre-existing `lint` config gap keeps `verify:mvp` from being end-to-end green. See [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md). This board and the three companion documents (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`) remain the authoritative inputs. Next phase after QF-MVP-00 closes: **QF-MVP-10**.
+**Reminder:** QF-MVP-00 is **COMPLETE** — focused MVP baseline built and green end-to-end (40/40 tests, `typecheck`, `lint`, `build`, `verify:mvp`), governance de-blocked, lint gate configured and closed (QF-MVP-00.5). See [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md). This board and the three companion documents (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`) remain the authoritative inputs. **Next active phase: QF-MVP-10 — Core Architecture and Data Truth** (`NOT_STARTED`; do not begin until scoped).

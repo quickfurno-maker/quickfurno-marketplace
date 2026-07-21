@@ -176,7 +176,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
           <button onClick={onSubmitForm} disabled={busy} className="btn-gold mt-6 w-full sm:w-auto">
             {busy ? "Finding studios..." : "Find matching studios"}
           </button>
-          <p className="mt-3 font-sans text-xs text-muted/70">Your number is shared only with the studios you're matched to. Never sold.</p>
+          <p className="mt-3 font-sans text-xs text-muted/70">Your number is shared only with the studios you&apos;re matched to. Never sold.</p>
         </div>
       )}
 

@@ -1,8 +1,8 @@
 # QF-MVP-00 — Program Lock & Clean Baseline
 
 **Branch:** `mvp/qf-mvp-00-core-cleanup-v1` · **Base commit:** `a4d289a` · **Starting HEAD:** `b046cf76b317b43c2376495ab4bec8b0e2cde419`
-**Status:** `IN_PROGRESS` (see §7 — one pre-existing exit gate, `lint`, is not green)
-**Scope of edits:** `package.json`, `scripts/mvp/**`, `docs/QF-MVP-00-BASELINE.md`, `docs/QF-MVP-EXECUTION-BOARD.md`. No production runtime, migration, Supabase, env, lockfile, or legacy-harness file was changed. No DB/network/provider access. No feature implementation.
+**Status:** `COMPLETE` (all exit gates green — see §6–§7; `lint` closed in QF-MVP-00.5)
+**Scope of edits:** QF-MVP-00 — `package.json`, `scripts/mvp/**`, this doc, `docs/QF-MVP-EXECUTION-BOARD.md`. QF-MVP-00.5 — `package.json`, `package-lock.json`, `.eslintrc.json`, this doc, the execution board, plus **two authorized one-character apostrophe-escape fixes** (`app/vendor/dashboard/_components/VendorNoProfileFallback.tsx`, `components/LeadFunnel.tsx`) to clear pre-existing `react/no-unescaped-entities` errors surfaced by the new ESLint config. No migration, Supabase, env, deployment, or legacy-harness file changed; no DB/network/provider access; no feature implementation.
 
 This document records (1) baseline verification, (2) the full test-command inventory from **behavioral** inspection, (3) the new focused MVP runner, (4) the reorganized package commands, (5) launch-critical coverage and gaps, and (6) validation results.
 
@@ -127,10 +127,10 @@ On-disk harnesses/utilities **not** wired into `package.json` (present but not r
 
 ### 2.6 Classification summary
 
-- `MVP_SAFE_FUNCTIONAL`: `test:mvp`, `test:mvp:marketplace`, `test:mvp:communication`, `verify:mvp`, plus `build` + `typecheck`.
-- `LEGACY_NON_BLOCKING`: all 33 `test:phase*` commands (Git/mutation/freeze/static-source coupled; kept on disk, not a gate).
+- `MVP_SAFE_FUNCTIONAL`: `test:mvp`, `test:mvp:marketplace`, `test:mvp:communication`, `verify:mvp`, plus `build` + `typecheck` + `lint` (configured in QF-MVP-00.5).
+- **`test:phase*` totals: 35 commands** — **34 `LEGACY_NON_BLOCKING`** (Git/mutation/freeze/static-source coupled; the 34 rows in §2.4.1) **+ 1 `DATABASE_INTEGRATION`** (`test:phase1b:runtime`, shells to `psql`, §2.5). All kept on disk; none deleted; none part of any MVP gate. (An earlier draft of this summary mis-stated "33" while §2.4.1 already listed 34 — corrected here.)
 - `DATABASE_INTEGRATION`: `test:supabase:lead`, `test:phase1b:runtime`, `grant:superadmin` (+ off-disk psql/utility scripts).
-- `UNKNOWN_REQUIRES_AUDIT`: `lint` (pre-existing ESLint config gap — §7).
+- `lint`: **resolved in QF-MVP-00.5** — ESLint configured (`next/core-web-vitals`), runs non-interactively and passes (exit 0). No longer `UNKNOWN_REQUIRES_AUDIT`. See §7–§8.
 
 ---
 
@@ -194,7 +194,7 @@ verify:mvp               npm run test:mvp && npm run typecheck && npm run lint &
 
 ---
 
-## 6. Validation results (this run)
+## 6. Validation results (final, post QF-MVP-00.5)
 
 | Command | Result | Evidence |
 |---|---|---|
@@ -202,23 +202,33 @@ verify:mvp               npm run test:mvp && npm run typecheck && npm run lint &
 | `npm run test:mvp:communication` | ✅ PASS | 24 passed, 0 failed, exit 0 |
 | `npm run test:mvp` | ✅ PASS | 2 suites, 40 passed, 0 failed, exit 0 |
 | `npm run typecheck` | ✅ PASS | `tsc --noEmit` exit 0 |
-| `npm run lint` | ❌ FAIL | Pre-existing: `next lint` drops into interactive ESLint setup (no config) — §7 |
+| `npm run lint` | ✅ PASS | `next lint` exit 0, **non-interactive** (uses `.eslintrc.json`); 0 errors, 5 non-blocking warnings |
 | `npm run build` | ✅ PASS | `next build` exit 0, all routes generated |
-| `npm run verify:mvp` | ❌ FAIL | test:mvp ✅ → typecheck ✅ → **lint ❌** (chain stops; build not reached) — honest |
+| `npm run verify:mvp` | ✅ PASS | test:mvp ✅ → typecheck ✅ → lint ✅ → build ✅ — **green end-to-end** |
 | `git diff --check` | ✅ PASS | no whitespace/conflict-marker errors |
 
-Post-validation checks: no production runtime / migration / lockfile / env / legacy-harness file changed; no temporary test residue (the aborted `next lint` created no config file); no DB/network/provider call occurred; `.next` build output is git-ignored.
+Non-blocking `lint` warnings (do not affect exit 0, left as-is — out of scope): `app/page.tsx:67`, `components/home/HomeSections.tsx:227,263` (`@next/next/no-img-element`); `components/admin/ManualLeadAssignmentPanel.tsx:186` ×2 (`react-hooks/exhaustive-deps`); `components/home/TestimonialsCarousel.tsx:58` (`jsx-a11y/role-supports-aria-props`).
+
+Post-validation checks: no migration / env / deployment / legacy-harness / `scripts/mvp/**` file changed; the only production edits are the two authorized apostrophe escapes (§7); no temporary test residue; no DB/network/provider call occurred; `.next` build output is git-ignored.
 
 ---
 
-## 7. Open exit gate & QF-MVP-00 status
+## 7. Lint gate resolution (QF-MVP-00.5) & final status
 
-**`lint` is broken by a pre-existing configuration problem, not by this phase.** ESLint is not set up: no `.eslintrc*` / `eslint.config.*` file, no `eslintConfig` key in `package.json`, and no `eslint` / `eslint-config-next` dependency declared. `next lint` therefore prompts interactively ("How would you like to configure ESLint?") and exits non-zero in any non-interactive context. Per the QF-MVP-00 rule, this is **recorded, not bypassed or hidden**, and no ESLint config was added (out of the permitted-files scope; fixing it is a separate, explicitly-scoped decision).
+The pre-existing ESLint configuration gap is **resolved**. ESLint was configured for the pinned Next.js 14.2.15 toolchain — `next lint` now runs **non-interactively** with a committed config and passes (exit 0).
 
-**Consequence:** `verify:mvp` cannot be fully green until `lint` is resolved. Therefore **QF-MVP-00 stays `IN_PROGRESS` (not `COMPLETE`)**.
+**Installed (exact, dev):** `eslint@8.57.0`, `eslint-config-next@14.2.15` (matched to `next@14.2.15`; `package-lock.json` updated by npm). No upgrade to Next.js / React / TypeScript or any unrelated dependency — `next 14.2.15`, `react 18.3.1`, `react-dom 18.3.1`, `typescript 5.9.3` unchanged in the lock.
 
-Remaining exit gates to close QF-MVP-00:
-1. Resolve the ESLint configuration gap (install/configure `eslint` + `eslint-config-next`, or make an explicit decision to redefine the `lint` gate) so `verify:mvp` runs `lint` → `build` green end-to-end.
-2. Re-run `verify:mvp` and confirm all four steps pass.
+**Configuration:** `.eslintrc.json` (repo root):
+```json
+{ "extends": ["next/core-web-vitals"] }
+```
+No rule suppressions, no `.eslintignore`, no excluded application directories, and **`core-web-vitals` was not weakened**. The repo stays on the classic `next lint` / `.eslintrc.json` path (not flat config), consistent with the pinned Next.js version.
 
-Everything else for QF-MVP-00 is complete and green: baseline verified, inventory recorded, focused MVP runner built and passing (40/40), package commands organized, governance de-blocked (no MVP gate invokes a legacy governance harness; legacy scripts remain on disk and runnable diagnostically), and no production code changed to satisfy any stale pin.
+**Production errors surfaced & fixed (authorized, minimal):** the correct config surfaced two pre-existing `react/no-unescaped-entities` **errors** (literal apostrophes in JSX). With explicit authorization, they were fixed by escaping `'` → `&apos;` — the only production edits in this phase, each a single character with no behavioural change:
+- `app/vendor/dashboard/_components/VendorNoProfileFallback.tsx:8` ("isn't" → "isn&apos;t")
+- `components/LeadFunnel.tsx:179` ("you're" → "you&apos;re")
+
+Five `core-web-vitals` **warnings** remain (listed in §6); they do not affect exit 0 and were left untouched (out of scope).
+
+**Final status: `QF-MVP-00` is `COMPLETE`.** All exit gates green: baseline verified; inventory recorded; focused MVP runner passing (40/40); package commands organized; governance de-blocked (no MVP gate invokes a legacy governance harness; legacy scripts remain on disk, runnable diagnostically); `typecheck` ✅, `lint` ✅, `build` ✅, `verify:mvp` ✅ end-to-end; and no production code changed to satisfy any stale governance pin. **Next active phase: QF-MVP-10 — Core Architecture and Data Truth.**

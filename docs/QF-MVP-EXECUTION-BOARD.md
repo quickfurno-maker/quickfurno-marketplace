@@ -8,7 +8,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 
 ## 1. Program status
 - **Roadmap:** LOCKED
-- **Active implementation:** NOT STARTED
+- **Active implementation:** IN_PROGRESS — QF-MVP-00
 - **Active phase after documentation:** QF-MVP-00
 - **Launch market:** Pune
 - **Meta voice:** excluded
@@ -19,13 +19,25 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-00 — Program Lock and Clean Baseline** — `NOT_STARTED`. (This documentation task locks the roadmap and creates the branch; it does **not** perform QF-MVP-00's engineering subphases 00.2–00.4, so QF-MVP-00 is not COMPLETE.)
+**QF-MVP-00 — Program Lock and Clean Baseline** — `IN_PROGRESS`. Engineering baseline established; full details in [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md). Not `COMPLETE` — one pre-existing exit gate (`lint`) is red (see open gaps below).
+
+**Subphase status:**
+- **QF-MVP-00.1 Baseline verification + test-command inventory** — `COMPLETE`. Branch/HEAD/parent/ancestry/tracking verified; all `test:*` commands classified from **behavioral** inspection (not names). Finding: the 38 `scripts/phase*` harnesses vendor/inline logic or static-source-match, embed a Git working-tree/commit attestation, and several perform **real write-then-revert source mutation** (`phase5d`, `phase5f:d2c`) or shell out to **`psql`** (`phase1b:runtime`) — all `LEGACY_NON_BLOCKING`, kept on disk.
+- **QF-MVP-00.2 Focused MVP runner** — `COMPLETE`. New `scripts/mvp/**` runs offline against **real** production modules (no Git/mutation/DB/network/secrets); `marketplace` (16) + `communication` (24) = **40 checks passing**.
+- **QF-MVP-00.3 Package commands** — `COMPLETE`. Added `test:mvp`, `test:mvp:marketplace`, `test:mvp:communication`, `verify:mvp`; all historical commands preserved; `test:supabase:lead` and all mutation/governance harnesses excluded from the MVP gate.
+- **QF-MVP-00.4 Execution board update** — `COMPLETE` (this update).
+
+**Completed deliverables:** clean-baseline verification record; full test-command inventory + classification; `scripts/mvp/` runner + two suites + minimal `.ts` resolver + README; four MVP package scripts; `docs/QF-MVP-00-BASELINE.md`. Governance is de-blocked: **no MVP gate invokes any legacy governance harness**, and no production code was changed to satisfy a stale pin. `typecheck` ✅, `build` ✅, `test:mvp` ✅ (40/40), `git diff --check` ✅.
+
+**Open validation gaps (block COMPLETE):**
+- `lint` — **pre-existing** config problem: ESLint is not set up (no `.eslintrc*`, no `eslintConfig`, no `eslint`/`eslint-config-next` dep), so `next lint` prompts interactively and exits non-zero. Recorded, not bypassed; no config added (out of QF-MVP-00 permitted-files scope). Consequently `verify:mvp` stops at `lint` before `build`. Closing QF-MVP-00 requires resolving this so `verify:mvp` is green end-to-end.
+- Launch-critical behaviour with no safe pure seam is logged `FOCUSED_TEST_REQUIRED` in the baseline doc (assignment/credit-deduction idempotency, 6-vendor lifetime cap, replacement concurrency, stateful consent decision/writer, outbound enforcement, async ack persistence) → owned by QF-MVP-20 / QF-MVP-40.
 
 ## 3. Phase table
 
 | Phase | Status | Depends on | Est. effort | Primary deliverable | Exit gate |
 |---|---|---|---|---|---|
-| QF-MVP-00 Program Lock & Clean Baseline | NOT_STARTED | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | Focused MVP tests + typecheck + lint + build green; governance non-blocking |
+| QF-MVP-00 Program Lock & Clean Baseline | IN_PROGRESS | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | Focused MVP tests ✅ + typecheck ✅ + build ✅ + governance non-blocking ✅; **lint ❌ pre-existing** (blocks COMPLETE) |
 | QF-MVP-10 Core Architecture & Data Truth | NOT_STARTED | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | Every route/service classified; every migration ledgered; ownership unambiguous |
 | QF-MVP-20 Marketplace Transaction Engine | NOT_STARTED | 10 | 3–5 d | Lead→qualify→eligible→assign→replace→close, deterministic + audited | Limits unbypassable; credit deduction idempotent; replacement concurrency-safe; no AI scoring |
 | QF-MVP-30 Vendor CRM & Campaign Readiness | NOT_STARTED | 10, 20 | 4–6 d | CRM directory/profile/tasks/segments + consent-safe campaigns | Segments deterministic; campaigns cannot bypass consent; snapshots auditable |
@@ -93,4 +105,4 @@ AI lead scoring · AI vendor ranking · predictive conversion scoring · Jarvis-
 
 ---
 
-**Reminder:** QF-MVP-00 is **NOT_STARTED / not COMPLETE**. This board and the three companion documents (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`) are the authoritative inputs to begin QF-MVP-00.
+**Reminder:** QF-MVP-00 is **IN_PROGRESS / not COMPLETE** — the focused MVP baseline is built and green (40/40 tests, typecheck, build), but the pre-existing `lint` config gap keeps `verify:mvp` from being end-to-end green. See [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md). This board and the three companion documents (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`) remain the authoritative inputs. Next phase after QF-MVP-00 closes: **QF-MVP-10**.

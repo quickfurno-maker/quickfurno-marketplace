@@ -203,8 +203,41 @@ const PHASE_8B1A_ACTIVE_ONDISK_BLOBS = PHASE_8B1A_FROZEN_BLOBS.filter(
 const PHASE_8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
 /** The historical D4-B blob 8B-1A recorded. Re-stated here so a silent rewrite of history is detectable. */
 const PHASE_8B1BC_D4B_HISTORICAL_BLOB = "5cf652122fa0c12f5137c8d9b157b4156ce56abd";
-/** The finalized, reviewed C8B-1B-C D4-B governance harness blob. */
+/** The finalized, reviewed C8B-1B-C D4-B governance harness blob. PRESERVED as the predecessor record. */
 const PHASE_8B1BC_D4B_HARNESS_BLOB = "d7e54e4d0f830858fbe2d56d36131bc2f7fdaee9";
+/**
+ * C8B-1B-D6 WAVE 2A-R1 — the successor D4-B governance-harness blob, and the CURRENT on-disk authority.
+ *
+ * WHY IT MOVED. Wave 2A-R1 closed the Class L runtime gap in services/consentCommandResponseService.ts:
+ * an UNBOUND (legacy-NULL) parent inbound row used to be inherited as null and enqueued, producing an
+ * acknowledgement intent with provider_account_id = NULL. Binding is now mandatory and such a parent
+ * fails closed. Two things in the D4-B harness therefore had to change: its ACC9 check (which asserted
+ * the OLD legacy-NULL-enqueues contract) and its byte freeze for the runtime file (re-pinned from the
+ * C8B-1B-C blob to the Wave 2A-R1 blob).
+ *
+ * The C8B-1B-C and 8B-1A records above are UNCHANGED and still verified — history is preserved, not
+ * rewritten. This layer supersedes only the ON-DISK comparison, and only after proving itself.
+ */
+const PHASE_8B1BD6W2AR1_IMPLEMENTATION_HEAD = "8a81dcd37e406f39c070a95c0c326732e5550cd2";
+/** The Wave 2A-R1 D4-B blob as first reviewed. PRESERVED as the predecessor of the evidence repair. */
+const PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB = "81175f6e19af1d09f1485ad9762626323e28efb3";
+/**
+ * C8B-1B-D6 WAVE 2A-R1 EVIDENCE REPAIR - the CURRENT on-disk D4-B authority.
+ *
+ * WHY IT MOVED AGAIN. The independent audit of PR #16 found two checks in the dedicated Wave 2A-R1
+ * harness that could not fail: both searched a string-ERASING view for evidence carried by string
+ * literals (a Supabase table name, a module specifier), so an injected
+ * `.from("communication_provider_accounts")` and an injected resolver import were both accepted.
+ * The repair rewrote those predicates to read a string-PRESERVING view, added self-tests proving
+ * they can fail, and added the missing direct-query mutation family (M13a-e).
+ *
+ * D4-B consequently gained an EXACT BLOB PIN for the successor harness plus anti-vacuity assertions
+ * - content checks alone had not caught it, because the checks were present and simply did nothing.
+ * That changed D4-B's own bytes, so this delegated pin advances with it.
+ *
+ * Both earlier blobs above remain recorded and asserted: history is preserved, never rewritten.
+ */
+const PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB = "8c514f7a19403272ee9c87b4b64439a99e64ab35";
 /** EXACTLY the paths whose 8B-1A on-disk comparison is delegated to this layer. Exactly one, by identity. */
 const PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES = [PHASE5FD4B_SRC];
 
@@ -237,20 +270,49 @@ function provePhase8B1BCD4BGovernanceAuthority() {
   assert(PHASE_8B1BC_D4B_HISTORICAL_BLOB !== PHASE_8B1BC_D4B_HARNESS_BLOB,
     "the transfer genuinely moves the on-disk pin to a NEW reviewed blob");
 
-  // Fixed-literal self-proof, following the 8B-1B-A / 8B-1B-B convention.
+  // ── C8B-1B-D6 WAVE 2A-R1 SUCCESSOR PROVENANCE ────────────────────────────────────────────────────
+  // Forward-only: 8B-1A head → C8B-1B-C head → Wave 2A-R1 head → HEAD. Each throws if violated.
+  assert(execFileSync("git", ["cat-file", "-t", PHASE_8B1BD6W2AR1_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit",
+    "the C8B-1B-D6 Wave 2A-R1 implementation commit " + PHASE_8B1BD6W2AR1_IMPLEMENTATION_HEAD.slice(0, 12) + " must exist");
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, PHASE_8B1BD6W2AR1_IMPLEMENTATION_HEAD]); // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BD6W2AR1_IMPLEMENTATION_HEAD, "HEAD"]);                          // throws if not
+  assert(PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB !== PHASE_8B1BC_D4B_HARNESS_BLOB,
+    "the Wave 2A-R1 transfer genuinely moves the on-disk pin to a NEW reviewed blob");
+  assert(PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB !== PHASE_8B1BC_D4B_HISTORICAL_BLOB,
+    "the Wave 2A-R1 pin is not a silent revert to the 8B-1A historical blob");
+
+  // EVIDENCE-REPAIR SUCCESSOR - must differ from EVERY predecessor, so no pin is a silent revert.
+  for (const [prior, label] of [
+    [PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB, "the Wave 2A-R1 reviewed blob"],
+    [PHASE_8B1BC_D4B_HARNESS_BLOB, "the C8B-1B-C reviewed blob"],
+    [PHASE_8B1BC_D4B_HISTORICAL_BLOB, "the 8B-1A historical blob"],
+  ]) {
+    assert(PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB !== prior,
+      "the evidence-repair pin is not a silent revert to " + label);
+  }
+
+  // Fixed-literal self-proof, following the 8B-1B-A / 8B-1B-B convention. EVERY generation of the
+  // pin - historical, C8B-1B-C, Wave 2A-R1 and the evidence repair - stays an exact fixed literal.
   const selfSrc = readF(HARNESS_SRC);
-  for (const blob of [PHASE_8B1BC_D4B_HISTORICAL_BLOB, PHASE_8B1BC_D4B_HARNESS_BLOB]) {
-    assert(selfSrc.includes('"' + blob + '"'), "the Phase 8B-1B-C blob " + blob.slice(0, 12) + " is an exact fixed literal");
+  for (const blob of [
+    PHASE_8B1BC_D4B_HISTORICAL_BLOB,
+    PHASE_8B1BC_D4B_HARNESS_BLOB,
+    PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB,
+    PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB,
+  ]) {
+    assert(selfSrc.includes('"' + blob + '"'), "the pinned blob " + blob.slice(0, 12) + " is an exact fixed literal");
   }
 
   // THE ACTIVE ON-DISK FREEZE for the delegated path — exact blob equality, same strength as 8B-1A.
+  // The CURRENT authority is the Wave 2A-R1 successor; the C8B-1B-C blob above remains the verified
+  // predecessor record.
   const onDisk = execFileSync("git", ["hash-object", PHASE5FD4B_SRC], { encoding: "utf8" }).trim();
-  assert(onDisk === PHASE_8B1BC_D4B_HARNESS_BLOB,
-    PHASE5FD4B_SRC + " is not byte-identical to its reviewed C8B-1B-C governance blob. " +
+  assert(onDisk === PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB,
+    PHASE5FD4B_SRC + " is not byte-identical to its reviewed C8B-1B-D6 Wave 2A-R1 EVIDENCE-REPAIR blob. " +
     "A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER " +
-    "(on-disk " + onDisk.slice(0, 12) + " != pinned " + PHASE_8B1BC_D4B_HARNESS_BLOB.slice(0, 12) + ").");
+    "(on-disk " + onDisk.slice(0, 12) + " != pinned " + PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB.slice(0, 12) + ").");
 
-  phase8B1BCD4BAuthorityToken = PHASE_8B1BC_D4B_HARNESS_BLOB;   // set ONLY after every assertion passed
+  phase8B1BCD4BAuthorityToken = PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB;   // set ONLY after every assertion passed
   return phase8B1BCD4BAuthorityToken;
 }
 
@@ -1529,8 +1591,10 @@ function provePhase8B1AMetaAuthority() {
     //  Exactly-one delegated path, compared by IDENTITY (no prefix/regex/directory matching). The skip is
     //  load-bearing: it requires the C8B-1B-C prover to have already PASSED and published its token.
     if (PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES.length === 1 && path === PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES[0]) {
-      assert(phase8B1BCD4BAuthorityToken === PHASE_8B1BC_D4B_HARNESS_BLOB,
-        path + " is delegated to Phase 8B-1B-C, but that authority did not prove itself — the delegation is void");
+      // The token now carries the C8B-1B-D6 Wave 2A-R1 successor blob (the C8B-1B-C record above is still
+      // verified as the predecessor). Comparing against the superseded blob would void a valid delegation.
+      assert(phase8B1BCD4BAuthorityToken === PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB,
+        path + " is delegated to Phase 8B-1B-C/D6-W2A-R1, but that authority did not prove itself — the delegation is void");
       continue;
     }
     const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();

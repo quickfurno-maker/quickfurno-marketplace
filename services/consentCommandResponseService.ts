@@ -85,9 +85,12 @@ export interface AckPersistedItem {
      * `resolveOwningProviderAccount` result, never a `communication_provider_accounts` query, and never a
      * redelivery's proposed account. This service resolves ownership ZERO times.
      *
-     * `null` means the stored row is a historical LEGACY (pre-binding) row — a real, inherited value.
-     * An OMITTED/undefined value is NOT legacy null: it is an integrity failure and fails closed before any
-     * intent is written (see `inheritPersistedAccount`).
+     * The type stays `string | null` because a historical LEGACY (pre-binding) inbound row can still be
+     * read back carrying null — the database column is nullable and no backfill was performed.
+     *
+     * Phase 8B-1B-D6 Wave 2A-R1: a null is NO LONGER inherited. It is treated exactly like an omitted or
+     * malformed value — an integrity failure that fails closed before any intent is written, yielding
+     * `provider_account_context_missing`. See `inheritPersistedAccount`.
      */
     readonly providerAccountId: string | null;
   };
@@ -126,8 +129,10 @@ export type AckEnqueueOutcome =
   | "unsupported_channel"
   | "receipt_not_found"         // STOP/START with no authoritative D2-D receipt → never enqueued
   | "seal_unavailable"          // encryption not configured / malformed → fail closed, consent untouched
-  // Phase 8B-1B-C. The persisted inbound row carried no usable account context (omitted/malformed — NOT a
-  // legacy null). An integrity failure: ZERO intents are written and ownership is never re-resolved.
+  // Phase 8B-1B-C. The persisted inbound row carried no usable account context.
+  // Phase 8B-1B-D6 Wave 2A-R1 WIDENED this outcome to cover an UNBOUND (null) parent as well as an omitted
+  // or malformed one. In every case it is an integrity failure: ZERO intents are written and ownership is
+  // never re-resolved.
   | "provider_account_context_missing"
   // Phase 8B-1B-C. An intent already exists under this idempotency key but is bound to a DIFFERENT account
   // than the stored inbound row. The existing row is authoritative: never updated, never reassigned, and no
@@ -177,8 +182,13 @@ export interface AckIntentRow {
   readonly aad_schema_version: number;
   readonly received_at: string;
   readonly expires_at: string;
-  /** Phase 8B-1B-C: INHERITED verbatim from the persisted inbound row. Bound at INSERT, never UPDATEd. */
-  readonly provider_account_id: string | null;
+  /**
+   * Phase 8B-1B-C: INHERITED verbatim from the persisted inbound row. Bound at INSERT, never UPDATEd.
+   * Phase 8B-1B-D6 Wave 2A-R1: NON-NULLABLE — an insert row carrying a null account is now
+   * unconstructable. This is the type-level form of the future
+   * `communication_consent_ack_intents_provider_account_required_check`.
+   */
+  readonly provider_account_id: string;
 }
 
 export type InsertIntentResult = "inserted" | "duplicate" | "failed";
@@ -287,20 +297,37 @@ const ACCOUNT_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 /**
  * Phase 8B-1B-C — INHERIT the account from the persisted inbound row. This is a READ, not a resolution.
  *
- * The distinction this function exists to enforce: `null` is a REAL stored value (a legacy pre-binding row)
- * and is inherited as-is; `undefined`/absent/malformed is an INTEGRITY FAILURE and is never collapsed into
- * legacy null. Collapsing the two would let a row with no proven owner acquire an acknowledgement.
+ * Phase 8B-1B-D6 Wave 2A-R1 — BINDING IS NOW MANDATORY (Class L closed).
+ *
+ * This function previously treated a stored `null` as a legitimate inheritance ("legacy pre-binding row")
+ * and returned it as a SUCCESS, which let `enqueueOne` insert an acknowledgement intent with
+ * `provider_account_id = NULL`. That is the Class L runtime gap. An acknowledgement intent must never be
+ * written unless its persisted parent inbound message carries a proven owner, so a stored `null` is now
+ * treated exactly like an absent or malformed value: an INTEGRITY FAILURE that fails closed.
+ *
+ * The three inputs and their single outcome each:
+ *   • a valid UUID  → inherited VERBATIM (never re-derived, never substituted);
+ *   • `null`        → missing (Wave 2A-R1: no longer a success);
+ *   • absent / undefined / malformed → missing (unchanged).
+ *
+ * `value` is `string`, NOT `string | null`. The invariant is carried by the type system: it is not
+ * possible to construct an `inherited` result — and therefore not possible to build an insert row —
+ * carrying a null account. Re-widening this type is a compile-time-visible regression.
+ *
+ * Ownership is NEVER resolved here. This function performs no query, reads no environment value, and has
+ * no default or fallback account. Its only input is the persisted row it is handed.
  */
 type InheritedAccount =
-  | { readonly kind: "inherited"; readonly value: string | null }
+  | { readonly kind: "inherited"; readonly value: string }
   | { readonly kind: "missing" };
 
 function inheritPersistedAccount(receipt: AckPersistedItem["receipt"]): InheritedAccount {
   // Read through a widened view: a runtime caller can omit the field even though the contract requires it.
   const raw = (receipt as { providerAccountId?: string | null } | undefined)?.providerAccountId;
-  if (raw === null) return { kind: "inherited", value: null };          // legacy row — the ACTUAL stored value
   if (typeof raw === "string" && ACCOUNT_ID_SHAPE.test(raw)) return { kind: "inherited", value: raw };
-  return { kind: "missing" };                                            // undefined / malformed → fail closed
+  // null (unbound parent) / undefined / absent / malformed → fail closed. There is NO success branch for a
+  // parent that carries no proven owner.
+  return { kind: "missing" };
 }
 
 /**
@@ -343,9 +370,10 @@ export async function enqueueConsentCommandResponses(
 
     if (!item) { push(null, "invalid_evidence"); failed++; continue; }
 
-    // ── THE ACCOUNT-INHERITANCE FENCE (Phase 8B-1B-C) ──────────────────────────────────────────────────
-    // Read the STORED account off the persisted inbound row BEFORE any acknowledgement work. A missing or
-    // malformed value is an integrity failure, not a legacy null: no receipt lookup, no seal, no insert.
+    // ── THE ACCOUNT-INHERITANCE FENCE (Phase 8B-1B-C; tightened by 8B-1B-D6 Wave 2A-R1) ────────────────
+    // Read the STORED account off the persisted inbound row BEFORE any acknowledgement work. An unbound
+    // (null), missing or malformed value is an integrity failure: no receipt lookup, no seal, no insert.
+    // Wave 2A-R1 closed the former "legacy null is inherited" success branch — binding is now MANDATORY.
     // Ownership is NEVER resolved here — this service holds no resolver and queries no accounts table.
     const inherited = inheritPersistedAccount(item.receipt);
     if (inherited.kind === "missing") {
@@ -421,8 +449,13 @@ export async function enqueueConsentCommandResponses(
 async function enqueueOne(
   plan: ConsentAckPlan,
   plaintextDestination: string,
-  /** Phase 8B-1B-C: the INHERITED stored account (`null` = legacy inbound row). Never re-derived here. */
-  providerAccountId: string | null,
+  /**
+   * Phase 8B-1B-C: the INHERITED stored account, read verbatim off the persisted inbound row. Never
+   * re-derived here.
+   * Phase 8B-1B-D6 Wave 2A-R1: NON-NULLABLE. An unbound parent fails closed upstream in
+   * `inheritPersistedAccount` and never reaches this function, so no unbound intent can be built.
+   */
+  providerAccountId: string,
   deps: ConsentCommandResponseDeps
 ): Promise<AckEnqueueOutcome> {
   const ev = plan.evidence;
@@ -535,13 +568,19 @@ async function readStoredIntent(
 }
 
 /**
- * The EXISTING row wins, always. Same account (including legacy null on both sides) is an idempotent
- * duplicate — no second intent, no second acknowledgement. A different account is a deterministic conflict:
- * the stored binding is preserved exactly as-is, never upgraded from legacy null, never reassigned.
+ * The EXISTING row wins, always. The same account is an idempotent duplicate — no second intent, no second
+ * acknowledgement. A different account is a deterministic conflict: the stored binding is preserved exactly
+ * as-is, never upgraded, never reassigned.
+ *
+ * `storedAccountId` REMAINS nullable and must stay so: the database column is still nullable, and a row
+ * written before Wave 2A-R1 may legitimately be read back carrying null. `inheritedAccountId` is now always
+ * a real account, so a stored null can no longer compare equal to it — such a row is reported as a conflict
+ * and left untouched. That is the intended outcome: an unbound historical intent is never "upgraded" into a
+ * bound one, and no second intent is inserted alongside it.
  */
 function classifyStoredIntent(
   storedAccountId: string | null,
-  inheritedAccountId: string | null
+  inheritedAccountId: string
 ): AckEnqueueOutcome {
   if (storedAccountId === inheritedAccountId) return "duplicate";
   console.warn(

@@ -841,15 +841,21 @@ check("ACC6-ACC8. duplicate preserves the original account; no second row; never
   assert(store.read(key).providerAccountId === ACK_ACCOUNT_ID, "the ORIGINAL account is preserved, never reassigned");
 });
 
-check("ACC9. a legacy-NULL inbound row yields a legacy-NULL intent and is never upgraded", async () => {
+// C8B-1B-D6 Wave 2A-R1 REPLACED this check. It previously asserted the OPPOSITE — that a legacy-NULL
+// inbound row still enqueued, yielding an intent with provider_account_id = NULL. That behaviour was the
+// Class L runtime gap (readiness verdict RUNTIME_GAP_FOUND): an acknowledgement was written for a parent
+// with no proven owner. Binding is now MANDATORY, so an unbound parent fails closed instead.
+check("ACC9. an UNBOUND (legacy-NULL) inbound row fails closed and writes NO intent", async () => {
   const store = makeStore();
   const r = await runEnqueue(store, { persistedOver: { receipt: { providerAccountId: null } } });
-  assert(r.result.enqueued === 1, "a legacy inbound row still enqueues");
-  assert(onlyRow(store).provider_account_id === null, "the intent inherits legacy NULL");
-  // A later delivery whose inbound row is STILL legacy NULL must not upgrade the stored intent.
+  assert(r.result.items[0].outcome === "provider_account_context_missing",
+    `an unbound parent fails closed (got ${JSON.stringify(r.result.items)})`);
+  assert(r.result.enqueued === 0 && r.result.failed === 1, "counted as a failure, never as a success");
+  assert(store.rows.size === 0, "ZERO intents written for an unbound parent");
+  // A redelivery is equally refused — and still writes nothing.
   const again = await runEnqueue(store, { persistedOver: { receipt: { providerAccountId: null } } });
-  assert(again.result.duplicates === 1, "legacy-NULL redelivery is an idempotent duplicate");
-  assert(onlyRow(store).provider_account_id === null, "the stored legacy NULL is NEVER upgraded");
+  assert(again.result.items[0].outcome === "provider_account_context_missing", "the redelivery is refused too");
+  assert(store.rows.size === 0, "still ZERO intents after redelivery");
 });
 
 check("ACC10. MISSING/undefined account context fails closed — not treated as legacy NULL", async () => {
@@ -993,22 +999,103 @@ check("B5. Phase 8A authority transfer is BOUNDED; D4-B's own authorities stay f
   // caught too, not just an uncommitted one. Fixed literals throughout — never a moving HEAD.
   //
   // AUTHORITY SCOPE — this transfer covers ONLY: provider_account_id inheritance from the durable inbound
-  // context; read-first duplicate/conflict handling; missing-context fail-closed behaviour; explicit legacy
-  // NULL preservation; the 23505 stored-winner re-read; no reassignment or provider_account_id UPDATE; and
-  // no second ownership resolution. Nothing else about the service is authorised by this record.
+  // context; read-first duplicate/conflict handling; missing-context fail-closed behaviour; the 23505
+  // stored-winner re-read; no reassignment or provider_account_id UPDATE; and no second ownership
+  // resolution. Nothing else about the service is authorised by this record.
+  //
+  // ── C8B-1B-D6 WAVE 2A-R1 AUTHORITY TRANSFER ────────────────────────────────────────────────────────
+  // The C8B-1B-C pin below is PRESERVED as the historical predecessor and is still verified against
+  // history — its blob authority is never rewritten. What MOVED is the ON-DISK pin, which now points at
+  // the Wave 2A-R1 successor.
+  //
+  // WHAT CHANGED, AND WHY THE PREDECESSOR PIN COULD NOT SIMPLY BE KEPT: C8B-1B-C's scope included
+  // "explicit legacy NULL preservation" — a persisted parent inbound row with a NULL provider_account_id
+  // was INHERITED as null and the acknowledgement intent was enqueued UNBOUND. The Wave 2A readiness audit
+  // classified that as the Class L runtime gap (RUNTIME_GAP_FOUND). Wave 2A-R1 removes it: a stored NULL
+  // now fails closed as `provider_account_context_missing`, exactly like an absent or malformed value.
+  // Legacy-NULL preservation is therefore NO LONGER part of the authorised scope; the successor scope
+  // REPLACES it with mandatory binding.
   const C8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
   const C8B1BC_ACK_SERVICE_BLOB = "13d79a44ae10708f42c3afffbe8695d9418e61f0";
-  assert(execFileSync("git", ["cat-file", "-t", C8B1BC_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit",
-    `the C8B-1B-C implementation commit ${C8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)} must exist`);
-  execFileSync("git", ["merge-base", "--is-ancestor", D4B_BASE, C8B1BC_IMPLEMENTATION_HEAD]); // forward-only; throws if not
-  execFileSync("git", ["merge-base", "--is-ancestor", C8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);   // throws if not
-  const reviewedAckBlob = execFileSync("git", ["rev-parse", `${C8B1BC_IMPLEMENTATION_HEAD}:${SVC_SRC}`], { encoding: "utf8" }).trim();
-  assert(reviewedAckBlob === C8B1BC_ACK_SERVICE_BLOB,
+  const W2AR1_IMPLEMENTATION_HEAD = "8a81dcd37e406f39c070a95c0c326732e5550cd2";
+  const W2AR1_ACK_SERVICE_BLOB = "2cfe25f7a149d024cf42f761df30388b8b4d9528";
+  for (const [sha, what] of [[C8B1BC_IMPLEMENTATION_HEAD, "C8B-1B-C"], [W2AR1_IMPLEMENTATION_HEAD, "C8B-1B-D6 Wave 2A-R1"]]) {
+    assert(execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim() === "commit",
+      `the ${what} implementation commit ${sha.slice(0, 12)} must exist`);
+  }
+  // FORWARD-ONLY LINEAGE: base → predecessor → successor → HEAD. Each throws if violated.
+  execFileSync("git", ["merge-base", "--is-ancestor", D4B_BASE, C8B1BC_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", C8B1BC_IMPLEMENTATION_HEAD, W2AR1_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", W2AR1_IMPLEMENTATION_HEAD, "HEAD"]);
+  // HISTORICAL BLOB AUTHORITY — the predecessor's reviewed content is still pinned and must never drift.
+  const predecessorAckBlob = execFileSync("git", ["rev-parse", `${C8B1BC_IMPLEMENTATION_HEAD}:${SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(predecessorAckBlob === C8B1BC_ACK_SERVICE_BLOB,
+    `the C8B-1B-C commit must still resolve ${SVC_SRC} to its historical blob (got ${predecessorAckBlob.slice(0, 12)})`);
+  // SUCCESSOR BLOB AUTHORITY — the reviewed Wave 2A-R1 content.
+  const reviewedAckBlob = execFileSync("git", ["rev-parse", `${W2AR1_IMPLEMENTATION_HEAD}:${SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(reviewedAckBlob === W2AR1_ACK_SERVICE_BLOB,
     `the reviewed commit must resolve ${SVC_SRC} to its approved blob (got ${reviewedAckBlob.slice(0, 12)})`);
+  // THE SUCCESSOR MUST GENUINELY DIFFER — a "transfer" onto an identical blob would be a no-op record.
+  assert(W2AR1_ACK_SERVICE_BLOB !== C8B1BC_ACK_SERVICE_BLOB,
+    "an authority transfer must move to a DIFFERENT reviewed blob");
   const onDiskAckBlob = execFileSync("git", ["hash-object", SVC_SRC], { encoding: "utf8" }).trim();
-  assert(onDiskAckBlob === C8B1BC_ACK_SERVICE_BLOB,
-    `${SVC_SRC} is not byte-identical to its C8B-1B-C baseline (commit ${C8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
-    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskAckBlob.slice(0, 12)} != pinned ${C8B1BC_ACK_SERVICE_BLOB.slice(0, 12)}).`);
+  assert(onDiskAckBlob === W2AR1_ACK_SERVICE_BLOB,
+    `${SVC_SRC} is not byte-identical to its C8B-1B-D6 Wave 2A-R1 baseline (commit ${W2AR1_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskAckBlob.slice(0, 12)} != pinned ${W2AR1_ACK_SERVICE_BLOB.slice(0, 12)}).`);
+  // THE SUCCESSOR AUTHORITY MUST EXIST AS EXECUTABLE CODE — a transfer may not be left unbacked.
+  const w2ar1Harness = "scripts/phase8b1bd6w2ar1-consent-ack-null-parent-account-guard-harness.mjs";
+  assert(existsSync(w2ar1Harness), `the Wave 2A-R1 harness must exist: ${w2ar1Harness}`);
+  const w2ar1Code = readF(w2ar1Harness)
+    .split("\n").filter((l) => { const t = l.trim(); return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")); }).join("\n");
+  has(/B2\.2 NULL parent account → ZERO insert attempts/, w2ar1Code, "the successor must assert the zero-insert proof");
+  has(/S1\.9 the function body performs no/, w2ar1Code, "the successor must assert no raw-null comparison survives");
+  // EXACT lower bound, measured against the reviewed successor (5 distinct zero-insert assertion sites:
+  // the NULL-parent proof, the absent/undefined/malformed loop, and the three duplicate/conflict proofs).
+  // Deleting any one of them drops below this floor and fails here — which is the point.
+  assert((w2ar1Code.match(/calls\.insert\.length === 0/g) ?? []).length >= 5,
+    "the zero-insert invariant must be asserted in executable successor check bodies");
+
+  // ── C8B-1B-D6 WAVE 2A-R1 EVIDENCE-REPAIR FREEZE ────────────────────────────────────────────────
+  // The independent audit of PR #16 found that the successor harness carried TWO checks that could
+  // not fail: both searched a string-ERASING view for evidence that only exists inside string
+  // literals, so an injected `.from("communication_provider_accounts")` and an injected resolver
+  // import were accepted. Content assertions alone did not catch that — the checks were present,
+  // they simply did nothing. So the successor is now pinned by EXACT BLOB as well as by content,
+  // and the specific properties that were vacuous are asserted directly.
+  const W2AR1_HARNESS_BLOB = "2ab3a76ea8e9a42f25b55f72990b33575e618859";
+  const onDiskW2AR1 = execFileSync("git", ["hash-object", w2ar1Harness], { encoding: "utf8" }).trim();
+  assert(onDiskW2AR1 === W2AR1_HARNESS_BLOB,
+    `${w2ar1Harness} is not byte-identical to its reviewed Wave 2A-R1 evidence-repair blob. ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER ` +
+    `(on-disk ${onDiskW2AR1.slice(0, 12)} != pinned ${W2AR1_HARNESS_BLOB.slice(0, 12)}).`);
+
+  // THE ANTI-VACUITY RULE ITSELF. The two repaired predicates must read the string-PRESERVING view.
+  // Reverting either to `stripNonCode` reintroduces the exact audited defect and fails here.
+  const detectorBlock = readF(w2ar1Harness).slice(
+    readF(w2ar1Harness).indexOf("const queriesAccountsTable"),
+    readF(w2ar1Harness).indexOf("/** The executable body of `inheritPersistedAccount`"));
+  assert(detectorBlock.length > 0, "the successor must define the string-carried evidence predicates");
+  assert(detectorBlock.includes("stripComments(src)"),
+    "the repaired predicates must read stripComments (string-preserving)");
+  assert(!detectorBlock.includes("stripNonCode"),
+    "the repaired predicates must NOT read stripNonCode — that is the audited vacuity defect");
+
+  // The repaired checks and their self-tests must be present AS EXECUTABLE CODE.
+  has(/S4\.7 the service issues no direct/, w2ar1Code, "the successor must assert the direct-query invariant");
+  has(/S4\.8 the service imports no provider-account resolver module/, w2ar1Code, "the successor must assert the import invariant");
+  // Each ST family must be registered as executable code. ST1/ST2 are POSITIVE self-tests (a
+  // violating sample must be DETECTED), ST3/ST4 are negative controls, ST5/ST6 assert the predicates
+  // are non-constant, ST7 is the anti-vacuity regression guard. Several are emitted from loops, so
+  // the source registration count is smaller than the runtime check count — assert the families.
+  for (const fam of ["ST1", "ST2", "ST3", "ST4", "ST5", "ST6", "ST7"]) {
+    assert(new RegExp(`add\\(\`?"?${fam} `).test(w2ar1Code),
+      `the successor must register the ${fam} string-evidence self-test`);
+  }
+  // The direct-query mutation family (audit finding F3) must exist and must be expected to be KILLED.
+  const m13 = [...w2ar1Code.matchAll(/M13\$\{id\}|M13[a-e]/g)].length;
+  assert(m13 > 0, "the successor must register the direct provider-accounts-query mutation (F3)");
+  has(/ACCOUNTS_TABLE_QUERY_RE/, w2ar1Code, "the successor must define the direct-query detector");
+  has(/RESOLVER_IMPORT_RE/, w2ar1Code, "the successor must define the resolver-import detector");
   for (const f of STILL_FROZEN) {
     assert(!dirty.includes(f), `a FROZEN authority must not change: ${f}`);
   }

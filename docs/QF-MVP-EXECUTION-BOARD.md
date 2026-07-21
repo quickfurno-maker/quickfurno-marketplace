@@ -8,8 +8,8 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 
 ## 1. Program status
 - **Roadmap:** LOCKED
-- **Active implementation:** QF-MVP-00 — **COMPLETE**
-- **Next active phase:** QF-MVP-10 — Core Architecture & Data Truth (`NOT_STARTED`)
+- **Active implementation:** QF-MVP-10 — Core Architecture & Data Truth — **IN_PROGRESS** (QF-MVP-00 COMPLETE)
+- **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine (`NOT_STARTED`, after 10.7 DB reconciliation)
 - **Launch market:** Pune
 - **Meta voice:** excluded
 - **AI scoring / ranking:** excluded
@@ -19,6 +19,23 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
+**QF-MVP-10 — Core Architecture and Data Truth** — **`IN_PROGRESS`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON). **Remains `IN_PROGRESS` until the read-only staging/production DB reconciliation (QF-MVP-10.7) is completed or formally waived by an explicit founder decision** — no live database was accessed in this phase.
+
+**QF-MVP-10 subphase status:**
+- **10.1 Read-only inventory tooling** — `COMPLETE`. `scripts/mvp/inventory/**` + `npm run inventory:mvp` → byte-stable `docs/generated/qf-mvp-runtime-inventory.json` + `qf-mvp-migration-ledger.json` (no DB/network/secrets; repo-relative; identical across runs).
+- **10.2 Runtime inventory** — `COMPLETE`. 31 API routes · 23 pages · 64 services · 19 provider adapters · 283 lib modules · workers/cron · 51 scripts, each with activation status (EXISTS/WIRED/CONFIGURED/DEPLOYED/ACTIVE).
+- **10.3 Migration ledger** — `COMPLETE`. 68 migrations; 100 tables / 50 functions / 2 triggers / 0 enums / 77 policies / 89 RLS tables; **12 `DO-NOT-AUTO-APPLY` migrations** flagged; every `staging`/`production` = `UNKNOWN_UNVERIFIED`; verification SQL recorded.
+- **10.4 Core domain map** — `COMPLETE`. 14 domains + AOS; dependency direction; 8 evidence-backed boundary violations (no active bypass).
+- **10.5 Authority audit** — `COMPLETE`. 16 authorities. **No BLOCKER**; 4 HIGH (eligibility duplication · no 6-lifetime cap · live credit-RPC body unverified · un-ledgered `admin_smart_assign` debit).
+- **10.6 Cleanup plan** — `COMPLETE`. A–E buckets; deletion is not an MVP blocker; nothing deleted; DB-proof prerequisites recorded.
+- **10.7 Database reconciliation** — `COMPLETE (plan only)` / **execution PENDING**. Read-only procedure + drift vocabulary + no-automatic-writes. **Its execution is the pre-QF-MVP-20 gate and keeps QF-MVP-10 `IN_PROGRESS`.**
+- **10.8 Execution order** — `COMPLETE`. Order 20→40→(30)→50→70→(60)→80; pre-20 gate = 10.7 + founder decisions (6-vs-9 cap, credit-restore, package coupling).
+
+**Key facts established:** AOS holds no authority + **no AI active** + **no Jarvis in-repo**; **Meta non-voice only + gated OFF by DB seed**; consent has a single decision/writer/enforcer; all authoritative writes go through SECURITY DEFINER RPCs (no TS/UI bypass). **Open (blocks COMPLETE):** live-DB reconciliation of the 12 DO-NOT-AUTO-APPLY migrations + the live assign/credit RPC bodies.
+
+---
+
+### Previous phase (COMPLETE)
 **QF-MVP-00 — Program Lock and Clean Baseline** — **`COMPLETE`**. All exit gates green; full details in [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md).
 
 **Subphase status:**
@@ -39,7 +56,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 | Phase | Status | Depends on | Est. effort | Primary deliverable | Exit gate |
 |---|---|---|---|---|---|
 | QF-MVP-00 Program Lock & Clean Baseline | **COMPLETE** | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | ✅ Focused MVP tests (40/40) + typecheck + **lint** + build + `verify:mvp` end-to-end; governance non-blocking |
-| QF-MVP-10 Core Architecture & Data Truth | NOT_STARTED | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | Every route/service classified; every migration ledgered; ownership unambiguous |
+| QF-MVP-10 Core Architecture & Data Truth | **IN_PROGRESS** | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | ✅ Every route/service/migration classified + ownership map + authority audit; **⏳ live-DB reconciliation (10.7) pending → stays IN_PROGRESS** |
 | QF-MVP-20 Marketplace Transaction Engine | NOT_STARTED | 10 | 3–5 d | Lead→qualify→eligible→assign→replace→close, deterministic + audited | Limits unbypassable; credit deduction idempotent; replacement concurrency-safe; no AI scoring |
 | QF-MVP-30 Vendor CRM & Campaign Readiness | NOT_STARTED | 10, 20 | 4–6 d | CRM directory/profile/tasks/segments + consent-safe campaigns | Segments deterministic; campaigns cannot bypass consent; snapshots auditable |
 | QF-MVP-40 Meta WhatsApp Production Readiness | NOT_STARTED | 10 (20 for content) | 4–6 d | Non-voice Meta inbound/outbound/delivery/consent activated on staging | Staging webhook verified; foreign callback zero-effect; STOP/START/HELP correct; no voice path |
@@ -106,4 +123,4 @@ AI lead scoring · AI vendor ranking · predictive conversion scoring · Jarvis-
 
 ---
 
-**Reminder:** QF-MVP-00 is **COMPLETE** — focused MVP baseline built and green end-to-end (40/40 tests, `typecheck`, `lint`, `build`, `verify:mvp`), governance de-blocked, lint gate configured and closed (QF-MVP-00.5). See [`QF-MVP-00-BASELINE.md`](QF-MVP-00-BASELINE.md). This board and the three companion documents (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`) remain the authoritative inputs. **Next active phase: QF-MVP-10 — Core Architecture and Data Truth** (`NOT_STARTED`; do not begin until scoped).
+**Reminder:** QF-MVP-00 is **COMPLETE**. QF-MVP-10 is **IN_PROGRESS** — the evidence-based Core map, runtime inventory, migration ledger, authority audit, cleanup plan, and DB-reconciliation *plan* are done, but QF-MVP-10 **stays IN_PROGRESS until the read-only live-DB reconciliation (10.7) is executed or waived by an explicit founder decision**. No live DB was accessed. Six QF-MVP-10 docs + `docs/generated/*.json` are the authoritative map; the four locked docs (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`, this board) remain the governing inputs. **Do not begin QF-MVP-20 until 10.7 reconciliation + the founder decisions (6-vs-9 lifetime cap, credit-restore, package coupling) are resolved.**

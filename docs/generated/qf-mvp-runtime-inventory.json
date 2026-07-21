@@ -1,0 +1,5169 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/mvp/inventory/run.mjs",
+  "note": "Repository-derived, read-only. Presence of code proves EXISTENCE, not that it is wired/configured/deployed/active. No DB/provider/network access.",
+  "counts": {
+    "apiRoutes": 31,
+    "pages": 23,
+    "services": 64,
+    "libModules": 283,
+    "providerAdapters": 19,
+    "components": 65,
+    "packageScripts": 47
+  },
+  "routes": {
+    "api": [
+      {
+        "path": "app/api/admin/aos-runtime-settings/route.ts",
+        "url": "/api/admin/aos-runtime-settings",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/runtime/aosRuntimeSettings"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/categories/[id]/active/route.ts",
+        "url": "/api/admin/categories/[id]/active",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/categoryAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/categories/[id]/route.ts",
+        "url": "/api/admin/categories/[id]",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/categoryAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/categories/route.ts",
+        "url": "/api/admin/categories",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/categoryAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/lead-assignment-approval/route.ts",
+        "url": "/api/admin/lead-assignment-approval",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/events/emitLeadAssignmentApprovedEvent",
+          "@/lib/aos/runtime/leadAssignmentApprovalService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/lead-assignment-preview/route.ts",
+        "url": "/api/admin/lead-assignment-preview",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/runtime/leadAssignmentApprovalService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/admin/lead-assignments/[id]/route.ts",
+        "url": "/api/admin/lead-assignments/[id]",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/runtime/assignmentLedgerService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/admin/lead-assignments/failed/route.ts",
+        "url": "/api/admin/lead-assignments/failed",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/runtime/assignmentLedgerService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/admin/lead-assignments/logs/route.ts",
+        "url": "/api/admin/lead-assignments/logs",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/runtime/assignmentLedgerService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/admin/lead-assignments/recent/route.ts",
+        "url": "/api/admin/lead-assignments/recent",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/aos/runtime/assignmentLedgerService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/admin/process-due-lead-assignment-queue/route.ts",
+        "url": "/api/admin/process-due-lead-assignment-queue",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [
+          "NODE_ENV"
+        ],
+        "internalImports": [
+          "@/services/delayedLeadFillService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/vendors/[id]/credit-log/route.ts",
+        "url": "/api/admin/vendors/[id]/credit-log",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/vendorAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/admin/vendors/[id]/credits/route.ts",
+        "url": "/api/admin/vendors/[id]/credits",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/vendorAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/vendors/[id]/package/route.ts",
+        "url": "/api/admin/vendors/[id]/package",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/vendorAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/vendors/[id]/status/route.ts",
+        "url": "/api/admin/vendors/[id]/status",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/vendorAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/vendors/route.ts",
+        "url": "/api/admin/vendors",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/vendorAdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/aos/events/route.ts",
+        "url": "/api/aos/events",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/aos/events/safeAgentEventPipeline",
+          "@/lib/aos/sync/n8nSyncService",
+          "@/lib/aos/tools/n8nTool"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/aos/failure/route.ts",
+        "url": "/api/aos/failure",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/aos/sync/n8nSyncService",
+          "@/lib/aos/tools/n8nTool"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/aos/process-lead/route.ts",
+        "url": "/api/aos/process-lead",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [
+          "NODE_ENV"
+        ],
+        "internalImports": [
+          "@/lib/aos/workflows/processLeadWorkflow"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/aos/whatsapp-status/route.ts",
+        "url": "/api/aos/whatsapp-status",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/aos/sync/n8nSyncService",
+          "@/lib/aos/tools/n8nTool"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/auth/hooks/supabase-send-sms/route.ts",
+        "url": "/api/auth/hooks/supabase-send-sms",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/auth/hookDeadline",
+          "@/lib/auth/supabaseSendSmsHook",
+          "@/services/supabaseSendSmsHookService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/categories/route.ts",
+        "url": "/api/categories",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/categories/categoryService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/cities/route.ts",
+        "url": "/api/cities",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/locations/cityService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      },
+      {
+        "path": "app/api/internal/process-consent-ack-intents/route.ts",
+        "url": "/api/internal/process-consent-ack-intents",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "jarvis",
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/communication/consentAckIntent",
+          "@/services/consentAckWorkerService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/vendor/auth/password-reset/complete/route.ts",
+        "url": "/api/vendor/auth/password-reset/complete",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorPasswordResetService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/vendor/auth/password-reset/request/route.ts",
+        "url": "/api/vendor/auth/password-reset/request",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorPasswordResetService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/vendor/auth/password-reset/verify/route.ts",
+        "url": "/api/vendor/auth/password-reset/verify",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorPasswordResetService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/vendor/auth/whatsapp/request/route.ts",
+        "url": "/api/vendor/auth/whatsapp/request",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorVerificationService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/vendor/auth/whatsapp/verify/route.ts",
+        "url": "/api/vendor/auth/whatsapp/verify",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorVerificationService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/webhooks/whatsapp/meta/route.ts",
+        "url": "/api/webhooks/whatsapp/meta",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/communication/providers/metaWebhookRawBody",
+          "@/lib/communication/providers/metaWhatsAppWebhook",
+          "@/services/metaWhatsAppWebhookService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      },
+      {
+        "path": "app/favicon.ico/route.ts",
+        "url": "/favicon.ico",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "api_route",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "pages": [
+      {
+        "path": "app/admin/[section]/page.tsx",
+        "url": "/admin/[section]",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/AdminSectionPage",
+          "@/components/admin/adminConfig"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/dashboard/page.tsx",
+        "url": "/admin/dashboard",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/AdminDashboard"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/login/page.tsx",
+        "url": "/admin/login",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/AdminLoginForm"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/page.tsx",
+        "url": "/admin",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "page"
+      },
+      {
+        "path": "app/category/[slug]/page.tsx",
+        "url": "/category/[slug]",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/ClientEnquiryModal",
+          "@/components/Footer",
+          "@/components/Header",
+          "@/components/VendorCards",
+          "@/lib/lead-assignment/runtimeSettings",
+          "@/lib/quickfurno-data",
+          "@/services/publicVendorService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/category/interiors/carpenters/page.tsx",
+        "url": "/category/interiors/carpenters",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "./vendor-listing.module.css",
+          "@/components/ClientEnquiryModal",
+          "@/components/Footer",
+          "@/components/Header",
+          "@/lib/config"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/enquiry/page.tsx",
+        "url": "/enquiry",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/Footer",
+          "@/components/Header",
+          "@/components/LeadFunnel"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/login/page.tsx",
+        "url": "/login",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "page"
+      },
+      {
+        "path": "app/page.tsx",
+        "url": "/",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/ClientEnquiryModal",
+          "@/components/Footer",
+          "@/components/Header",
+          "@/components/QuickFurnoIcons",
+          "@/components/StickyMobileCTA",
+          "@/components/home/HomeCategoryGrid",
+          "@/components/home/HomeSections"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/pricing/page.tsx",
+        "url": "/pricing",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "page"
+      },
+      {
+        "path": "app/privacy/page.tsx",
+        "url": "/privacy",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/Footer",
+          "@/components/Header",
+          "@/lib/config"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/terms/page.tsx",
+        "url": "/terms",
+        "audience": "public_client",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/Footer",
+          "@/components/Header",
+          "@/lib/config"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/leads/page.tsx",
+        "url": "/vendor/dashboard/leads",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/components/vendors/VendorLeadReportForm",
+          "@/lib/lead-assignment/runtimeSettings",
+          "@/lib/types",
+          "@/lib/vendors/vendorEligibility"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/notifications/page.tsx",
+        "url": "/vendor/dashboard/notifications",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/services/vendorNotificationService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/package/page.tsx",
+        "url": "/vendor/dashboard/package",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/services/vendorPackageOrderService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/page.tsx",
+        "url": "/vendor/dashboard",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/components/VendorDashboard",
+          "@/lib/types"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/profile/page.tsx",
+        "url": "/vendor/dashboard/profile",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/services/vendorProfileChangeService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/support/page.tsx",
+        "url": "/vendor/dashboard/support",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/services/vendorSupportService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/page.tsx",
+        "url": "/vendor",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/FAQ",
+          "@/components/Footer",
+          "@/components/Header",
+          "@/components/vendor/VendorPortal"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendors/[id]/page.tsx",
+        "url": "/vendors/[id]",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/ClientEnquiryModal",
+          "@/components/Footer",
+          "@/components/FreeVendorInterestButton",
+          "@/components/Header",
+          "@/components/PortfolioGallery",
+          "@/components/VendorCards",
+          "@/components/VendorDetailHeader",
+          "@/components/vendors/ClientSelectedVendorEnquiry",
+          "@/lib/config",
+          "@/lib/lead-assignment/runtimeSettings",
+          "@/lib/quickfurno-data",
+          "@/lib/vendors/categoryMatching",
+          "@/services/publicVendorService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendors/dashboard/page.tsx",
+        "url": "/vendors/dashboard",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendors/page.tsx",
+        "url": "/vendors",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "./vendors.module.css",
+          "@/components/Footer",
+          "@/components/Header",
+          "@/components/QuickFurnoIcons",
+          "@/components/vendors/VendorHeroStats"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendors/register/page.tsx",
+        "url": "/vendors/register",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "page"
+      }
+    ]
+  },
+  "services": [
+    {
+      "path": "services/adminAuditService.ts",
+      "name": "adminAuditService",
+      "exports": [
+        "BAD_LEAD_REVIEW_STATUSES",
+        "BadLeadReviewStatus",
+        "LeadMatchingAuditDetails",
+        "addVendorLeadReportComment",
+        "getLeadMatchingAuditDetails",
+        "listClientNotificationLogs",
+        "listLeadDeliveryLogs",
+        "listLeadMatchingRuns",
+        "listPackageOrdersAuditOnly",
+        "listVendorLeadReports",
+        "updateVendorLeadReportStatus"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/adminService.ts",
+      "name": "adminService",
+      "exports": [
+        "approveBadLeadReport",
+        "approveVendor",
+        "createCategory",
+        "createCity",
+        "createPackage",
+        "getAdminDashboardStats",
+        "getAllLeads",
+        "getAllVendors",
+        "getPendingBadLeadReports",
+        "getSuperadminSnapshot",
+        "rejectBadLeadReport",
+        "rejectVendor",
+        "setCategoryActive",
+        "setCityActive",
+        "setPackageActive",
+        "suspendVendor",
+        "updateLeadStatus"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "../lib/types"
+      ]
+    },
+    {
+      "path": "services/aosService.ts",
+      "name": "aosService",
+      "exports": [
+        "AosDecisionLogInput",
+        "AosLogResult",
+        "logAosAgentDecision"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/authSecurityEventService.ts",
+      "name": "authSecurityEventService",
+      "exports": [
+        "AuthSecurityEventError",
+        "RecordAuthSecurityEventInput",
+        "recordAuthSecurityEvent"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "../lib/identity/principal",
+        "../lib/identity/vendorLoginIdentifier",
+        "../lib/identity/verification",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/authenticationDeliveryAttemptService.ts",
+      "name": "authenticationDeliveryAttemptService",
+      "exports": [
+        "AttemptFinalizeInput",
+        "AuthAttemptClaimOutcome",
+        "AuthAttemptClaimOutcomeValue",
+        "AuthAttemptClaimResult",
+        "AuthAttemptFinalizeOutcome",
+        "AuthAttemptFinalizeOutcomeValue",
+        "AuthAttemptFinalizeResult",
+        "FallbackAttemptClaimInput",
+        "PrimaryAttemptClaimInput",
+        "claimFallbackAttempt",
+        "claimPrimaryAttempt",
+        "finalizeAttempt",
+        "isClaimSuccessful"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/authenticationActionIdentity",
+        "../lib/communication/authenticationTransportDecision",
+        "../lib/errors",
+        "../lib/identity/authTransport",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/authenticationTransportPolicyService.ts",
+      "name": "authenticationTransportPolicyService",
+      "exports": [
+        "AUTH_TRANSPORT_POLICY_READ_FAILED",
+        "FallbackDecisionRequest",
+        "decideAuthenticationFallback",
+        "loadAuthTransportPolicy",
+        "loadFailureRuleCandidates",
+        "resolveFailureEligibility"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/authenticationTransportDecision",
+        "../lib/errors",
+        "../lib/identity/authTransport",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/categoryAdminService.ts",
+      "name": "categoryAdminService",
+      "exports": [
+        "CategoryAdminRow",
+        "CategoryResult",
+        "CreateCategoryInput",
+        "UpdateCategoryInput",
+        "createCategory",
+        "listAllCategories",
+        "setCategoryActive",
+        "updateCategory"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/clientAccessService.ts",
+      "name": "clientAccessService",
+      "exports": [
+        "CLIENT_ACCOUNTS_TABLE",
+        "ClientProvisioningResult",
+        "provisionVerifiedClientAccount",
+        "requireClientAccess",
+        "resolveClientAccess",
+        "resolveCurrentClientAccess"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/dbErrors",
+        "../lib/errors",
+        "../lib/identity/clientAccess",
+        "../lib/identity/clientAccount",
+        "../lib/identity/clientOtp",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/clientLoginOtpDeliveryOrchestrator.ts",
+      "name": "clientLoginOtpDeliveryOrchestrator",
+      "exports": [
+        "CLIENT_OTP_AUTH_REFERENCE_TYPE",
+        "CLIENT_OTP_SMS_LANGUAGE",
+        "ClientOtpDeliveryDeps",
+        "ClientOtpDeliveryInput",
+        "ClientOtpDeliveryKind",
+        "ClientOtpDeliveryKindValue",
+        "ClientOtpDeliveryResult",
+        "LEDGER_UNAVAILABLE_LOG_PREFIX",
+        "LEDGER_UNAVAILABLE_REASON",
+        "LedgerUnavailableEventInput",
+        "LedgerUnavailableLogLine",
+        "ORCHESTRATED_AUTH_FLOW",
+        "OrchestratorFallbackBlockReason",
+        "defaultClientOtpDeliveryDeps",
+        "deliverClientLoginOtp"
+      ],
+      "external": [
+        "exotel_sms",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/auth/authAttemptOutcomeMapping",
+        "../lib/auth/hookDeadline",
+        "../lib/communication/authSmsBodyRenderer",
+        "../lib/communication/authenticationActionIdentity",
+        "../lib/communication/authenticationTransportDecision",
+        "../lib/communication/phone",
+        "../lib/communication/providers/smsRuntimeGate",
+        "../lib/communication/types",
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "./authSecurityEventService",
+        "./authenticationDeliveryAttemptService",
+        "./authenticationTransportPolicyService",
+        "./outboundConsentEnforcementService",
+        "./runtimeCommunicationService",
+        "./runtimeSmsAdapterFactory",
+        "./runtimeSmsProviderService",
+        "./smsProviderRuntimeService"
+      ]
+    },
+    {
+      "path": "services/clientOtpAuthService.ts",
+      "name": "clientOtpAuthService",
+      "exports": [
+        "RequestClientWhatsappOtpInput",
+        "VerifyClientWhatsappOtpInput",
+        "VerifyClientWhatsappOtpSuccess",
+        "requestClientWhatsappOtp",
+        "verifyClientWhatsappOtp"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/phone",
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "../lib/identity/clientAccess",
+        "../lib/identity/clientOtp",
+        "../lib/identity/clientOtpAutomation",
+        "../lib/identity/principal",
+        "../lib/identity/sessionInvalidation",
+        "../lib/supabase",
+        "./authSecurityEventService",
+        "./clientAccessService",
+        "./clientOtpAutomationService"
+      ]
+    },
+    {
+      "path": "services/clientOtpAutomationService.ts",
+      "name": "clientOtpAutomationService",
+      "exports": [
+        "evaluateClientLoginOtpGate"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/identity/clientOtpAutomation",
+        "../lib/supabase",
+        "./runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/clientRequirementGroupService.ts",
+      "name": "clientRequirementGroupService",
+      "exports": [
+        "ASSIGNMENT_SOURCE",
+        "AutoFillGroupResult",
+        "CanAssignResult",
+        "FindOrCreateGroupInput",
+        "MIGRATION_HINT",
+        "MIGRATION_HINT_2E",
+        "PreferredVendorWindowResult",
+        "RecordClientSelectedResult",
+        "RequirementGroupCounts",
+        "RequirementGroupRow",
+        "RequirementGroupState",
+        "canAssignVendorToRequirementGroup",
+        "deriveGroupCounts",
+        "findOrCreateRequirementGroup",
+        "getRequirementGroup",
+        "getRequirementGroupAssignmentCounts",
+        "listRequirementGroups",
+        "normalizePhone",
+        "processDuePreferredVendorRechargeWindows",
+        "processDueRequirementAutoFills",
+        "processPreferredVendorWindow",
+        "processRequirementAutoFill",
+        "recordClientSelectedVendor",
+        "scheduleAutoFillForRequirementGroup"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/config",
+        "../lib/errors",
+        "../lib/supabase",
+        "../lib/vendors/categoryMatching",
+        "../lib/vendors/vendorEligibility",
+        "./leadDeliveryService",
+        "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/communicationAdminService.ts",
+      "name": "communicationAdminService",
+      "exports": [
+        "AutomationActivitySummary",
+        "AutomationReadinessSummary",
+        "CommunicationOverview",
+        "WebhookProcessingSummary",
+        "getAutomationActivitySummary",
+        "getAutomationReadinessSummary",
+        "getCommunicationOverview",
+        "getProviderHealthSummary",
+        "getTemplateReadinessSummary",
+        "getWebhookProcessingSummary",
+        "listCommunicationAutomations",
+        "listDeadLetterMessages",
+        "listFailedCommunicationMessages",
+        "listQueuedCommunicationMessages",
+        "listRecentCommunicationMessages",
+        "listRetryScheduledMessages",
+        "listWebhookReceipts"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/whatsappProvider",
+        "../lib/communication/types",
+        "../lib/errors",
+        "../lib/supabase",
+        "./runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/communicationConsentDecisionService.ts",
+      "name": "communicationConsentDecisionService",
+      "exports": [
+        "CommunicationChannel",
+        "CommunicationConsentDecisionInput",
+        "CommunicationConsentScope",
+        "ConsentDecisionDeps",
+        "ConsentDecisionFailure",
+        "ConsentDecisionOutcome",
+        "ConsentDecisionSuccess",
+        "ConsentDisposition",
+        "ConsentIdentityConfidence",
+        "ConsentPreferenceRow",
+        "ConsentPrincipal",
+        "ConsentPrincipalType",
+        "ConsentReasonCode",
+        "ConsentSuppressionReason",
+        "ConsentSuppressionRow",
+        "ReconsentEligibility",
+        "decideCommunicationConsent",
+        "defaultConsentDecisionDeps",
+        "normalizeSupabaseReadResult"
+      ],
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/consentPolicy",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/communicationConsentWriterService.ts",
+      "name": "communicationConsentWriterService",
+      "exports": [
+        "ConsentCommandRpcArgs",
+        "ConsentCommandRpcResult",
+        "ConsentScopeName",
+        "ConsentScopeOutcome",
+        "ConsentScopeWriteResult",
+        "ConsentWriteFailure",
+        "ConsentWriteOutcome",
+        "ConsentWriteResult",
+        "ConsentWriteSuccess",
+        "ConsentWriterDeps",
+        "ConsentWriterInput",
+        "WriterChannel",
+        "WriterIdentityConfidence",
+        "WriterPrincipal",
+        "WriterPrincipalType",
+        "defaultConsentWriterDeps",
+        "normalizeRpcResult",
+        "writeConsentCommand"
+      ],
+      "external": [
+        "exotel_sms",
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/consentCommand",
+        "../lib/communication/consentPolicy",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/communicationProviderHealthService.ts",
+      "name": "communicationProviderHealthService",
+      "exports": [
+        "ProviderHealthOutcome",
+        "runMetaProviderHealthCheck",
+        "toAccountHealthStatus"
+      ],
+      "external": [
+        "meta_whatsapp",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/metaCloudWhatsAppConfig",
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/whatsappProvider",
+        "../lib/supabase",
+        "./communicationProviderRuntimeService"
+      ]
+    },
+    {
+      "path": "services/communicationProviderRuntimeService.ts",
+      "name": "communicationProviderRuntimeService",
+      "exports": [
+        "evaluateMetaOutboundGateForMessage",
+        "fetchActiveCanaryDestinations",
+        "fetchProviderAccount",
+        "fetchRuntimePolicy",
+        "isWebhookProcessingEnabled",
+        "resolveOwningProviderAccount"
+      ],
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/metaRuntimeGate",
+        "../lib/communication/providers/providerAccountOwnership",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/communicationRecipientResolver.ts",
+      "name": "communicationRecipientResolver",
+      "exports": [
+        "SupabaseCommunicationRecipientResolver",
+        "getActiveRecipientResolver",
+        "setActiveRecipientResolver"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/recipientResolver",
+        "../lib/communication/types",
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/communicationService.ts",
+      "name": "communicationService",
+      "exports": [
+        "AUTHENTICATION_MAX_ATTEMPTS",
+        "BUSINESS_MAX_ATTEMPTS",
+        "CommunicationService",
+        "DispatchOptions",
+        "SendOptions",
+        "WebhookProcessingOutcome",
+        "clearWhatsAppProviderOverride",
+        "getActiveWhatsAppProvider",
+        "getWhatsAppProviderOverride",
+        "isSameStateTransition",
+        "isValidTransition",
+        "nextRetryDelaySeconds",
+        "setActiveWhatsAppProvider",
+        "toEnforcementChannel"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/auth/hookDeadline",
+        "../lib/communication/approvedTemplateOutbound",
+        "../lib/communication/channelDispatchGuard",
+        "../lib/communication/dbErrors",
+        "../lib/communication/outboundProviderAccountAttribution",
+        "../lib/communication/phone",
+        "../lib/communication/providers/mockWhatsAppProvider",
+        "../lib/communication/providers/providerAccountOwnership",
+        "../lib/communication/providers/providerError",
+        "../lib/communication/providers/whatsappProvider",
+        "../lib/communication/recipientResolver",
+        "../lib/communication/types",
+        "../lib/communication/whatsappTemplate",
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "../lib/supabase",
+        "./communicationRecipientResolver",
+        "./outboundConsentEnforcementService"
+      ]
+    },
+    {
+      "path": "services/consentAckWorkerService.ts",
+      "name": "consentAckWorkerService",
+      "exports": [
+        "ClaimedAckIntent",
+        "ConsentAckWorkerDeps",
+        "ConsentAckWorkerOutcome",
+        "defaultConsentAckWorkerDeps",
+        "processConsentAckIntents"
+      ],
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/consentAckDestinationSeal",
+        "../lib/communication/consentAckIntent",
+        "../lib/communication/consentCommandResponse",
+        "../lib/communication/phone",
+        "../lib/communication/types",
+        "../lib/supabase",
+        "./communicationConsentDecisionService",
+        "./outboundConsentEnforcementService",
+        "./runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/consentCommandResponseService.ts",
+      "name": "consentCommandResponseService",
+      "exports": [
+        "ACK_MESSAGE_TYPES",
+        "AckCommandItem",
+        "AckEnqueueItemResult",
+        "AckEnqueueOutcome",
+        "AckIntentRow",
+        "AckPersistedItem",
+        "ConsentCommandResponseDeps",
+        "ConsentCommandResponseInput",
+        "ConsentCommandResponseOutcome",
+        "ConsentCommandResponseResult",
+        "InsertIntentResult",
+        "StoredIntentRead",
+        "defaultConsentCommandResponseDeps",
+        "enqueueConsentCommandResponses"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/consentAckDestinationSeal",
+        "../lib/communication/consentAckIntent",
+        "../lib/communication/consentCommandResponse",
+        "../lib/communication/inboundConsentCommandInput",
+        "../lib/communication/phone",
+        "../lib/communication/providers/metaWhatsAppInbound",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/delayedLeadFillService.ts",
+      "name": "delayedLeadFillService",
+      "exports": [
+        "DELAYED_FILL_AFTER_PREFERRED",
+        "DELAYED_FILL_WINDOW_MINUTES",
+        "DelayedFillRowResult",
+        "PREFERRED_NO_CREDITS_PENDING_FALLBACK",
+        "PROCESSOR_QUEUE_REASONS",
+        "ProcessDueResult",
+        "QueuePreferredDelayedFillInput",
+        "processDueLeadAssignmentQueue",
+        "queuePreferredVendorDelayedFill"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/config",
+        "../lib/errors",
+        "../lib/lead-assignment/leadQueueService",
+        "../lib/supabase",
+        "../lib/vendors/categoryMatching",
+        "../lib/vendors/vendorEligibility",
+        "./leadDeliveryService",
+        "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/inboundConsentCommandService.ts",
+      "name": "inboundConsentCommandService",
+      "exports": [
+        "COMMAND_WRITE_UNAVAILABLE",
+        "InboundCommandCandidate",
+        "InboundCommandDisposition",
+        "InboundCommandItemResult",
+        "InboundCommandOutcome",
+        "InboundCommandProcessingResult",
+        "InboundConsentCommandDeps",
+        "defaultInboundConsentCommandDeps",
+        "processInboundConsentCommands"
+      ],
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/consentCommand",
+        "../lib/communication/inboundConsentCommandInput",
+        "./communicationConsentWriterService"
+      ]
+    },
+    {
+      "path": "services/inboundIdentityResolutionService.ts",
+      "name": "inboundIdentityResolutionService",
+      "exports": [
+        "IDENTITY_LOOKUP_FAILED",
+        "InboundIdentityConfidence",
+        "InboundIdentityConfidenceValue",
+        "InboundIdentityDeps",
+        "InboundIdentityResolutionOutcome",
+        "InboundIdentityResult",
+        "InboundPrincipalCandidate",
+        "InboundPrincipalType",
+        "InboundPrincipalTypeValue",
+        "defaultInboundIdentityDeps",
+        "resolveInboundSenderIdentity"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/phone",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/inboundWhatsAppMessageService.ts",
+      "name": "inboundWhatsAppMessageService",
+      "exports": [
+        "INBOUND_ACCOUNT_FENCE",
+        "INBOUND_LEGACY_FENCE",
+        "INBOUND_UNIQUE_FENCE",
+        "InboundInsertRow",
+        "InboundPersistenceReceipt",
+        "InboundProcessedMessage",
+        "InboundProcessingResult",
+        "InboundRowOutcome",
+        "InboundServiceOutcome",
+        "InboundWhatsAppDeps",
+        "PERSISTED_CONTEXT_COLUMNS",
+        "PersistedInboundContext",
+        "PersistedInboundMessage",
+        "ReceiptResolution",
+        "StoredInboundRead",
+        "bindInboundMessage",
+        "buildInboundRow",
+        "createOrResolveReceiptViaDb",
+        "defaultInboundWhatsAppDeps",
+        "finalizeReceiptViaDb",
+        "handleInboundWhatsAppMessages",
+        "persistInboundRowViaDb",
+        "readStoredInboundViaDb",
+        "validatePersistedInboundRow"
+      ],
+      "external": [
+        "jarvis",
+        "meta_whatsapp",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/dbErrors",
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/metaWhatsAppInbound",
+        "../lib/communication/providers/metaWhatsAppWebhook",
+        "../lib/supabase",
+        "./inboundIdentityResolutionService"
+      ]
+    },
+    {
+      "path": "services/leadClarificationService.ts",
+      "name": "leadClarificationService",
+      "exports": [
+        "ClarificationResponseInput",
+        "LeadClarificationRequest",
+        "LeadClarificationResponseRow",
+        "applyClarificationResponsesToLead",
+        "createClarificationRequestForLead",
+        "getClarificationResponses",
+        "getLatestClarificationRequest",
+        "recalculateLeadAfterClarification",
+        "saveClarificationResponses",
+        "shouldCreateClarificationForLead"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/lead-quality/clarificationPresets",
+        "../lib/supabase",
+        "./leadQualityService"
+      ]
+    },
+    {
+      "path": "services/leadDeliveryService.ts",
+      "name": "leadDeliveryService",
+      "exports": [
+        "DeliveredVendor",
+        "LeadAssignmentDeliveryResult",
+        "assignLeadToMatchedVendors",
+        "createClientAssignedVendorsPreview",
+        "createVendorLeadWhatsappPreview",
+        "deliverLeadToVendorDashboard"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/leadMatchingEngine.ts",
+      "name": "leadMatchingEngine",
+      "exports": [
+        "AutoLeadMatchingResult",
+        "CoordinateSource",
+        "EligibleMatchedVendor",
+        "LeadForMatching",
+        "SkippedVendorAudit",
+        "VendorMatchEvaluation",
+        "evaluateVendorsForLead",
+        "getEligibleVendorsForLead",
+        "rankVendorsForLead",
+        "runAutoLeadMatchingForLead"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/geo/distance",
+        "../lib/supabase",
+        "../lib/vendors/categoryMatching",
+        "../lib/vendors/vendorEligibility",
+        "./leadDeliveryService"
+      ]
+    },
+    {
+      "path": "services/leadProcessingDiagnosticsCore.ts",
+      "name": "leadProcessingDiagnosticsCore",
+      "exports": [
+        "ACCOUNTING_CORRELATION_MODE_NONE",
+        "AnomalySeverity",
+        "DiagnosticAssignmentRow",
+        "DiagnosticDeliveryRow",
+        "DiagnosticLeadRow",
+        "DiagnosticMatchingRunRow",
+        "DiagnosticNotificationRow",
+        "DiagnosticScoreRow",
+        "EXPECTED_MATCHING_MODEL_VERSION",
+        "EXPECTED_SCORE_MODEL_VERSION",
+        "HealthStatus",
+        "LEGACY_MATCHING_MODEL_VERSION",
+        "LeadProcessingAnomaly",
+        "LeadProcessingAnomalyCode",
+        "LeadProcessingDiagnostic",
+        "LeadProcessingDiagnosticSources",
+        "LeadProcessingHealth",
+        "MAX_VENDORS_PER_LEAD",
+        "QUALITY_PASS_MIN_SCORE",
+        "ScanCandidate",
+        "classifyHealth",
+        "composeLeadDiagnostic",
+        "highestSeverity",
+        "selectAnomalousScanCandidates",
+        "severityRank"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": []
+    },
+    {
+      "path": "services/leadProcessingDiagnosticsService.ts",
+      "name": "leadProcessingDiagnosticsService",
+      "exports": [
+        "RecentLeadAnomalyScanItem",
+        "RecentLeadAnomalyScanResult",
+        "diagnoseLeadProcessing",
+        "scanRecentLeadProcessingAnomalies"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "./leadProcessingDiagnosticsCore"
+      ]
+    },
+    {
+      "path": "services/leadProcessingRecoveryService.ts",
+      "name": "leadProcessingRecoveryService",
+      "exports": [
+        "retryLeadMatchingAfterQualityPass"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "./leadMatchingEngine",
+        "./leadQualityRecoveryCore"
+      ]
+    },
+    {
+      "path": "services/leadQualityRecoveryCore.ts",
+      "name": "leadQualityRecoveryCore",
+      "exports": [
+        "EMPTY_MATCHING_SUMMARY",
+        "QualityDecisionForCompare",
+        "RETRY_QUALITY_MIN_SCORE",
+        "RecoveryErrorCode",
+        "RecoveryLeadRow",
+        "RecoveryQualityDecision",
+        "RescoreChangeSummary",
+        "RescoreResult",
+        "RetryLeadMatchingResult",
+        "RetryMatchingSummary",
+        "RetryPrecondition",
+        "RetryQualityGate",
+        "RetryStatus",
+        "buildRescoreQualityInput",
+        "classifyRetryPrecondition",
+        "deliverySuppressedForAssignmentStatus",
+        "evaluateRetryQualityGate",
+        "mapMatcherStatusToRetryStatus",
+        "qualityDecisionsConsistent",
+        "readPreviousDecision",
+        "rescoreReadbackConsistent",
+        "summarizeRescoreComparison"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "./leadQualityService"
+      ]
+    },
+    {
+      "path": "services/leadQualityRecoveryService.ts",
+      "name": "leadQualityRecoveryService",
+      "exports": [
+        "rescoreLeadQualityOnly"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "./leadQualityRecoveryCore",
+        "./leadQualityService"
+      ]
+    },
+    {
+      "path": "services/leadQualityService.ts",
+      "name": "leadQualityService",
+      "exports": [
+        "LeadQualityDecision",
+        "LeadQualityInput",
+        "LeadQualityRecommendedAction",
+        "LeadQualityScoreResult",
+        "LeadScoreClass",
+        "SCORE_MODEL_VERSION",
+        "calculateLeadQuality",
+        "canAutoDistributeLead",
+        "classifyLeadScore",
+        "getLeadQualityDecision",
+        "scoreAndStoreLead"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase",
+        "@/lib/lead-quality/budgetFit"
+      ]
+    },
+    {
+      "path": "services/leadService.ts",
+      "name": "leadService",
+      "exports": [
+        "assignLeadToVendors",
+        "createLead",
+        "getEligibleVendors"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/aos/events/emitLeadClarificationRequiredEvent",
+        "../lib/aos/events/emitLeadCreatedEvent",
+        "../lib/config",
+        "../lib/errors",
+        "../lib/supabase",
+        "../lib/supabaseLogging",
+        "../lib/types",
+        "./leadClarificationService",
+        "./leadMatchingEngine",
+        "./leadQualityService",
+        "./preferredVendorLeadService"
+      ]
+    },
+    {
+      "path": "services/manualLeadAssignmentService.ts",
+      "name": "manualLeadAssignmentService",
+      "exports": [
+        "LeadAssignmentCounts",
+        "LeadAssignmentState",
+        "ManualAssignmentMode",
+        "ManualAssignmentPreview",
+        "ManualAssignmentResult",
+        "ManualCandidateVendor",
+        "ManualLeadSummary",
+        "ManualMatchType",
+        "assignLeadManually",
+        "getLeadAssignmentCounts",
+        "getManualAssignmentPreview"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/config",
+        "../lib/errors",
+        "../lib/supabase",
+        "../lib/vendors/categoryMatching",
+        "../lib/vendors/vendorEligibility",
+        "./leadDeliveryService",
+        "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/metaWhatsAppOutboundService.ts",
+      "name": "metaWhatsAppOutboundService",
+      "exports": [
+        "MetaWhatsAppOutboundCoordinator",
+        "getMetaOutboundCoordinator"
+      ],
+      "external": [
+        "jarvis",
+        "meta_whatsapp",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/approvedTemplateOutbound",
+        "../lib/communication/providerMappingFingerprint",
+        "../lib/communication/providers/metaCloudWhatsAppConfig",
+        "../lib/communication/whatsappTemplate",
+        "./communicationProviderRuntimeService",
+        "./providerTemplateMappingService"
+      ]
+    },
+    {
+      "path": "services/metaWhatsAppWebhookService.ts",
+      "name": "metaWhatsAppWebhookService",
+      "exports": [
+        "MetaWebhookDeps",
+        "MetaWebhookPostOutcome",
+        "defaultMetaWebhookDeps",
+        "getWebhookVerifyToken",
+        "handleMetaWhatsAppWebhookPost",
+        "handleMetaWhatsAppWebhookPostBytes"
+      ],
+      "external": [
+        "jarvis",
+        "meta_whatsapp",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/httpTransport",
+        "../lib/communication/inboundProviderAccountAttribution",
+        "../lib/communication/providers/metaCloudWhatsAppConfig",
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/metaWebhookAccountIdentity",
+        "../lib/communication/providers/metaWhatsAppWebhook",
+        "../lib/communication/providers/providerAccountOwnership",
+        "../lib/supabase",
+        "./communicationProviderRuntimeService",
+        "./communicationService",
+        "./consentCommandResponseService",
+        "./inboundConsentCommandService",
+        "./inboundWhatsAppMessageService",
+        "./outboundConsentEnforcementService"
+      ]
+    },
+    {
+      "path": "services/outboundConsentEnforcementService.ts",
+      "name": "outboundConsentEnforcementService",
+      "exports": [
+        "CONSENT_INTEGRITY_OUTCOME",
+        "DerivedIdentity",
+        "EnforcementChannel",
+        "EnforcementDestinationSource",
+        "EnforcementRecipientType",
+        "FAIL_CLOSED_CONSENT_OUTCOME",
+        "OutboundConsentDenyCode",
+        "OutboundConsentEnforcementDeps",
+        "OutboundConsentEnforcementInput",
+        "OutboundConsentEnforcer",
+        "OutboundConsentInvalidCode",
+        "OutboundConsentOutcome",
+        "OutboundConsentUnavailableCode",
+        "authorizeOutboundConsent",
+        "createFailClosedOutboundConsentEnforcer",
+        "createOutboundConsentEnforcer",
+        "defaultOutboundConsentEnforcementDeps",
+        "deriveConsentIdentity",
+        "isOutboundConsentEnforcer",
+        "normalizeOutboundConsentOutcome"
+      ],
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/outboundConsentScope",
+        "./communicationConsentDecisionService"
+      ]
+    },
+    {
+      "path": "services/packageService.ts",
+      "name": "packageService",
+      "exports": [
+        "assignPackageAfterPayment",
+        "assignPackageToVendor",
+        "createManualPayment",
+        "listPackages",
+        "markPaymentPaid"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "../lib/supabaseLogging"
+      ]
+    },
+    {
+      "path": "services/preferredVendorLeadService.ts",
+      "name": "preferredVendorLeadService",
+      "exports": [
+        "PREFERRED_ASSIGNMENT_SOURCE",
+        "PREFERRED_VENDOR_MIGRATION_HINT",
+        "PreferredVendorRoutingResult",
+        "PreferredVendorRoutingStatus",
+        "RoutePreferredVendorInput",
+        "holdPreferredVendorForQualityGate",
+        "routePreferredVendorLead"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase",
+        "../lib/vendors/vendorEligibility",
+        "./delayedLeadFillService",
+        "./leadDeliveryService",
+        "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/providerTemplateMappingService.ts",
+      "name": "providerTemplateMappingService",
+      "exports": [
+        "resolveApprovedMetaMapping",
+        "resolveApprovedMetaMappingById"
+      ],
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/whatsappTemplate",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/publicVendorService.ts",
+      "name": "publicVendorService",
+      "exports": [
+        "getPublicVendorProfileBySlugOrId",
+        "getPublicVendorsForCategory"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/lead-assignment/runtimeSettings",
+        "@/lib/quickfurno-data",
+        "@/lib/supabase",
+        "@/lib/vendors/vendorEligibility",
+        "@/lib/vendors/vendorVisibility"
+      ]
+    },
+    {
+      "path": "services/runtimeCommunicationService.ts",
+      "name": "runtimeCommunicationService",
+      "exports": [
+        "RUNTIME_PROVIDER_UNAVAILABLE",
+        "RuntimeWhatsAppContext",
+        "createRuntimeCommunicationService",
+        "resolveRuntimeWhatsAppContext",
+        "resolveRuntimeWhatsAppProvider"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/approvedTemplateOutbound",
+        "../lib/communication/outboundProviderAccountAttribution",
+        "../lib/communication/providers/whatsappProvider",
+        "../lib/errors",
+        "./communicationProviderRuntimeService",
+        "./communicationRecipientResolver",
+        "./communicationService",
+        "./metaWhatsAppOutboundService",
+        "./outboundConsentEnforcementService",
+        "./whatsAppProviderSelection"
+      ]
+    },
+    {
+      "path": "services/runtimeSmsAdapterFactory.ts",
+      "name": "runtimeSmsAdapterFactory",
+      "exports": [
+        "SMS_ADAPTER_CONFIG_INCOMPLETE",
+        "SMS_ADAPTER_UNSUPPORTED_CANDIDATE",
+        "SmsAdapterConstructionError",
+        "createSmsAdapterForCandidate",
+        "runtimeSmsAdapterFactory"
+      ],
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/httpTransport",
+        "../lib/communication/providers/exotelConfig",
+        "../lib/communication/providers/exotelSmsProvider",
+        "../lib/communication/providers/smsProvider",
+        "./runtimeSmsProviderService",
+        "./smsProviderSelection"
+      ]
+    },
+    {
+      "path": "services/runtimeSmsProviderService.ts",
+      "name": "runtimeSmsProviderService",
+      "exports": [
+        "RUNTIME_SMS_PROVIDER_IDENTITY_MISMATCH",
+        "RUNTIME_SMS_PROVIDER_UNAVAILABLE",
+        "SmsProviderFactory",
+        "createRuntimeSmsProvider",
+        "isSmsProviderCandidateAvailable",
+        "resolveSmsProviderCandidate"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/smsProvider",
+        "../lib/errors",
+        "./smsProviderSelection"
+      ]
+    },
+    {
+      "path": "services/smsProviderCanaryProbeService.ts",
+      "name": "smsProviderCanaryProbeService",
+      "exports": [
+        "CANARY_LANGUAGE",
+        "CANARY_REVIEWED_TEMPLATE_KEY",
+        "SMS_CANARY_READINESS",
+        "SYNTHETIC_CANARY_CODE_PATTERN",
+        "SmsCanaryProbeBlockReason",
+        "SmsCanaryProbeBlockReasonValue",
+        "SmsCanaryProbeDeps",
+        "SmsCanaryProbeInput",
+        "SmsCanaryProbeResult",
+        "SmsCanaryProbeStatus",
+        "SmsCanaryProbeStatusValue",
+        "defaultSmsCanaryProbeDeps",
+        "probeSmsProviderCanaryReadiness"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/authSmsBodyRenderer",
+        "../lib/communication/phone",
+        "../lib/communication/providers/smsProvider",
+        "../lib/communication/providers/smsRuntimeGate",
+        "./runtimeSmsAdapterFactory",
+        "./runtimeSmsProviderService",
+        "./smsProviderRuntimeService"
+      ]
+    },
+    {
+      "path": "services/smsProviderRuntimeService.ts",
+      "name": "smsProviderRuntimeService",
+      "exports": [
+        "SmsRuntimeReadinessQuery",
+        "evaluateSmsRuntimeReadiness",
+        "readSmsCanaryDestinations",
+        "readSmsProviderAccounts",
+        "readSmsRuntimePolicy",
+        "readSmsTemplateMappings"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/smsRuntimeGate",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/smsProviderSelection.ts",
+      "name": "smsProviderSelection",
+      "exports": [
+        "KNOWN_SMS_PROVIDER_MODES",
+        "SMS_PROVIDER_MODE_ENV",
+        "SmsProviderCandidate",
+        "SmsProviderMode",
+        "SmsProviderModeValue",
+        "SmsProviderSelection",
+        "SmsSelectionBlockReason",
+        "SmsSelectionBlockReasonValue",
+        "isSmsProviderSelected",
+        "selectSmsProvider"
+      ],
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/providers/exotelConfig",
+        "../lib/communication/providers/mockSmsProvider"
+      ]
+    },
+    {
+      "path": "services/supabaseSendSmsHookService.ts",
+      "name": "supabaseSendSmsHookService",
+      "exports": [
+        "CONTENT_TYPE_HEADER",
+        "JSON_CONTENT_TYPE",
+        "RETRY_AFTER_HEADER",
+        "RETRY_AFTER_VALUE",
+        "SendSmsHookHttpResponse",
+        "SendSmsHookOutcome",
+        "SendSmsHookOutcomeKind",
+        "SendSmsHookOutcomeKindValue",
+        "SendSmsHookRejectReason",
+        "SendSmsHookRejectReasonValue",
+        "SupabaseSendSmsHookRequest",
+        "buildClientLoginOtpIntent",
+        "handleSupabaseSendSmsHook",
+        "rejectSendSmsHookRequest",
+        "sendSmsHookHttpResponse"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/auth/hookDeadline",
+        "../lib/auth/supabaseSendSmsHook",
+        "../lib/communication/types",
+        "../lib/identity/clientOtpAutomation",
+        "./clientLoginOtpDeliveryOrchestrator",
+        "./clientOtpAutomationService"
+      ]
+    },
+    {
+      "path": "services/vendorAccessService.ts",
+      "name": "vendorAccessService",
+      "exports": [
+        "LinkVendorAuthUserInput",
+        "VENDOR_DASHBOARD_USERS_TABLE",
+        "VendorLinkError",
+        "VendorLoginMethod",
+        "VendorLoginMethodValue",
+        "linkVendorAuthUser",
+        "recordVendorLoginMetadata",
+        "requireVendorAccess",
+        "requireVendorScope",
+        "resolveCurrentVendorAccess",
+        "resolveVendorAccess"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/dbErrors",
+        "../lib/communication/phone",
+        "../lib/errors",
+        "../lib/identity/vendorAccess",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorAdminService.ts",
+      "name": "vendorAdminService",
+      "exports": [
+        "ALLOWED_PACKAGE_STATUSES",
+        "PackageStatus",
+        "ServiceResult",
+        "UpdateCreditsInput",
+        "UpdatePackageInput",
+        "VendorAdminRow",
+        "VendorCreditLogRow",
+        "VendorStatusAction",
+        "getVendorCreditLog",
+        "getVendorsWithEligibility",
+        "setVendorStatusAction",
+        "updateVendorCredits",
+        "updateVendorPackage"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase",
+        "../lib/vendors/vendorEligibility",
+        "./vendorCreditWalletService"
+      ]
+    },
+    {
+      "path": "services/vendorAuthAutomationService.ts",
+      "name": "vendorAuthAutomationService",
+      "exports": [
+        "evaluateVendorAuthAutomationGate"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/identity/vendorAuthAutomation",
+        "../lib/supabase",
+        "./runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/vendorAuthChallengeService.ts",
+      "name": "vendorAuthChallengeService",
+      "exports": [
+        "AttestationRequirement",
+        "COMMUNICATION_MESSAGES_TABLE",
+        "ClaimedGrantIdentity",
+        "ConsumeWhatsappOutcome",
+        "FailedAttemptOutcome",
+        "IssueChallengeInput",
+        "IssueChallengeOutcome",
+        "IssueChallengeReason",
+        "IssuedGrantIdentity",
+        "VERIFICATION_CHALLENGES_TABLE",
+        "VendorChallengeRow",
+        "cancelChallenge",
+        "claimResetGrant",
+        "consumeResetChallengeAndIssueGrant",
+        "consumeWhatsappChallenge",
+        "destinationHashFor",
+        "expirePendingChallenge",
+        "hasFreshChallengeAttestation",
+        "isChallengeUsable",
+        "issueChallengeAtomic",
+        "loadChallenge",
+        "newChallengeId",
+        "recordChallengeDelivery",
+        "registerFailedAttempt"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/dbErrors",
+        "../lib/communication/phone",
+        "../lib/errors",
+        "../lib/identity/vendorAuthAutomation",
+        "../lib/identity/vendorVerification",
+        "../lib/identity/verification",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorAuthService.ts",
+      "name": "vendorAuthService",
+      "exports": [
+        "SessionInvalidationFailure",
+        "SessionInvalidationFailureValue",
+        "SessionInvalidationOutcome",
+        "VENDOR_LOGIN_FAILED_CODE",
+        "VendorLoginFailureClassification",
+        "VendorLoginFailureClassificationValue",
+        "VendorPasswordLoginInput",
+        "VendorPasswordLoginSuccess",
+        "vendorPasswordLogin"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "../lib/identity/principal",
+        "../lib/identity/vendorAccess",
+        "../lib/identity/vendorLoginIdentifier",
+        "../lib/supabase",
+        "./authSecurityEventService",
+        "./vendorAccessService"
+      ]
+    },
+    {
+      "path": "services/vendorCreditWalletService.ts",
+      "name": "vendorCreditWalletService",
+      "exports": [
+        "ApplyVendorCreditDeltaInput",
+        "WalletApplyResult",
+        "WalletChangeType",
+        "applyVendorCreditDelta",
+        "grantCreditsForConfirmedPackagePurchase",
+        "grantVendorCredits",
+        "refundCreditForInvalidLead"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorNotificationService.ts",
+      "name": "vendorNotificationService",
+      "exports": [
+        "VendorNotification",
+        "VendorNotificationInput",
+        "createVendorNotification",
+        "listVendorNotifications",
+        "markAllVendorNotificationsRead",
+        "markVendorNotificationRead"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorPackageOrderService.ts",
+      "name": "vendorPackageOrderService",
+      "exports": [
+        "VendorCurrentPackageSummary",
+        "VendorPackageOption",
+        "VendorPackageOrder",
+        "createVendorPackageOrder",
+        "getVendorCurrentPackageSummary",
+        "listAvailableVendorPackages",
+        "listVendorPackageOrders"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorPasswordResetService.ts",
+      "name": "vendorPasswordResetService",
+      "exports": [
+        "CompleteVendorPasswordResetInput",
+        "RequestVendorPasswordResetInput",
+        "VerifyVendorPasswordResetOtpInput",
+        "completeVendorPasswordReset",
+        "requestVendorPasswordReset",
+        "verifyVendorPasswordResetOtp"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/types",
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "../lib/identity/principal",
+        "../lib/identity/vendorAccess",
+        "../lib/identity/vendorAuthAutomation",
+        "../lib/identity/vendorLoginIdentifier",
+        "../lib/identity/vendorOtpCrypto",
+        "../lib/identity/vendorPasswordReset",
+        "../lib/identity/vendorVerification",
+        "../lib/identity/verification",
+        "../lib/supabase",
+        "./authSecurityEventService",
+        "./runtimeCommunicationService",
+        "./vendorAuthAutomationService",
+        "./vendorAuthChallengeService"
+      ]
+    },
+    {
+      "path": "services/vendorProfileChangeService.ts",
+      "name": "vendorProfileChangeService",
+      "exports": [
+        "VendorApprovedProfileSummary",
+        "VendorProfileChangeInput",
+        "VendorProfileChangeRequest",
+        "approveVendorProfileChangeRequest",
+        "createVendorProfileChangeRequest",
+        "getVendorApprovedProfileSummary",
+        "listPendingVendorProfileChangeRequests",
+        "listVendorProfileChangeRequests",
+        "rejectVendorProfileChangeRequest"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/vendorService.ts",
+      "name": "vendorService",
+      "exports": [
+        "LEAD_REPORT_REASONS",
+        "LeadReportReasonCode",
+        "getVendorAssignedLeads",
+        "getVendorDashboardStats",
+        "registerVendor",
+        "reportBadLead",
+        "submitStructuredLeadReport",
+        "updateVendorLeadStatus",
+        "updateVendorVisibility"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NODE_ENV",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/lead-assignment/runtimeSettings",
+        "../lib/supabase",
+        "../lib/supabaseLogging",
+        "../lib/types",
+        "../lib/vendors/vendorEligibility"
+      ]
+    },
+    {
+      "path": "services/vendorSupportService.ts",
+      "name": "vendorSupportService",
+      "exports": [
+        "VendorSupportMessage",
+        "VendorSupportThread",
+        "VendorSupportThreadWithMessages",
+        "createAdminSupportReply",
+        "createVendorSupportMessage",
+        "createVendorSupportThread",
+        "listAdminSupportThreads",
+        "listVendorSupportThreads"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase",
+        "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/vendorVerificationService.ts",
+      "name": "vendorVerificationService",
+      "exports": [
+        "RequestVendorWhatsappVerificationInput",
+        "VerifyVendorWhatsappChallengeInput",
+        "requestVendorWhatsappVerification",
+        "verifyVendorWhatsappChallenge"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/phone",
+        "../lib/communication/types",
+        "../lib/errors",
+        "../lib/identity/authSecurityEvent",
+        "../lib/identity/principal",
+        "../lib/identity/vendorAccess",
+        "../lib/identity/vendorAuthAutomation",
+        "../lib/identity/vendorOtpCrypto",
+        "../lib/identity/vendorVerification",
+        "../lib/identity/verification",
+        "./authSecurityEventService",
+        "./runtimeCommunicationService",
+        "./vendorAccessService",
+        "./vendorAuthAutomationService",
+        "./vendorAuthChallengeService"
+      ]
+    },
+    {
+      "path": "services/whatsAppProviderSelection.ts",
+      "name": "whatsAppProviderSelection",
+      "exports": [
+        "WhatsAppProviderSelection",
+        "selectWhatsAppProvider"
+      ],
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/httpTransport",
+        "../lib/communication/providers/metaCloudWhatsAppConfig",
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/mockWhatsAppProvider",
+        "../lib/communication/providers/whatsappProvider"
+      ]
+    }
+  ],
+  "providerAdapters": [
+    {
+      "path": "lib/communication/providers/exotelConfig.ts",
+      "name": "exotelConfig",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/exotelSmsProvider.ts",
+      "name": "exotelSmsProvider",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCallbackIdentity.ts",
+      "name": "metaCallbackIdentity",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCloudWhatsAppConfig.ts",
+      "name": "metaCloudWhatsAppConfig",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCloudWhatsAppProvider.ts",
+      "name": "metaCloudWhatsAppProvider",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaRuntimeGate.ts",
+      "name": "metaRuntimeGate",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWebhookAccountIdentity.ts",
+      "name": "metaWebhookAccountIdentity",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWebhookRawBody.ts",
+      "name": "metaWebhookRawBody",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppInbound.ts",
+      "name": "metaWhatsAppInbound",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppWebhook.ts",
+      "name": "metaWhatsAppWebhook",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/mockSmsProvider.ts",
+      "name": "mockSmsProvider",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/mockWhatsAppProvider.ts",
+      "name": "mockWhatsAppProvider",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/providerAccountOwnership.ts",
+      "name": "providerAccountOwnership",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/providerError.ts",
+      "name": "providerError",
+      "external": [
+        "http_fetch"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/providerOutcome.ts",
+      "name": "providerOutcome",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/smsProvider.ts",
+      "name": "smsProvider",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/smsRuntimeGate.ts",
+      "name": "smsRuntimeGate",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/whatsappProvider.ts",
+      "name": "whatsappProvider",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/whatsappTemplateBinding.ts",
+      "name": "whatsappTemplateBinding",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    }
+  ],
+  "libGroupCounts": {
+    "agents": 3,
+    "analytics": 2,
+    "aos": 184,
+    "auth": 3,
+    "categories": 2,
+    "categories.ts": 1,
+    "communication": 43,
+    "config.ts": 1,
+    "crm": 3,
+    "errors.ts": 1,
+    "events": 1,
+    "geo": 1,
+    "geo.ts": 1,
+    "google-maps": 3,
+    "identity": 16,
+    "images.ts": 1,
+    "lead-assignment": 4,
+    "lead-quality": 2,
+    "locations": 2,
+    "quickfurno-data.ts": 1,
+    "supabase.ts": 1,
+    "supabaseBrowser.ts": 1,
+    "supabaseLogging.ts": 1,
+    "types.ts": 1,
+    "vendors": 4
+  },
+  "lib": [
+    {
+      "path": "lib/agents/agentAttribution.ts",
+      "group": "agents",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/agents/agentRecommendation.ts",
+      "group": "agents",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/agents/campaignIntent.ts",
+      "group": "agents",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/analytics/analyticsAdapter.ts",
+      "group": "analytics",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/analytics/types/index.ts",
+      "group": "analytics",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/ad-brain/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/ad-brain/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/ad-brain/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/admin-copilot/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/agentRegistry.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/calendar-sync/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/calendar-sync/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/calendar-sync/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/city-scout/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/city-scout/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/city-scout/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/client-care/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/content-craft/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/deal-tracker/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/deal-tracker/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/deal-tracker/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/engines.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/executive-brief/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/executive-brief/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/executive-brief/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/fraud-radar/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/fraud-radar/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/fraud-radar/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/furno-memory/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/furno-memory/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/furno-memory/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/growth-radar/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-flow/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-flow/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-flow/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-lens/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-lens/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-lens/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-nurture/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-nurture/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/lead-nurture/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/match-forge/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/match-forge/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/match-forge/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/nexus-kernel/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/nexus-kernel/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/nexus-kernel/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/ops-brief/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/ops-brief/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/ops-brief/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/package-advisor/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/package-advisor/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/package-advisor/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/quality-audit/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/quality-audit/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/quality-audit/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/replacement-desk/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/replacement-desk/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/replacement-desk/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/revenue-vault/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/review-shield/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/sales-coach/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/sales-coach/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/sales-coach/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/seo-scout/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/seo-scout/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/seo-scout/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/source-tracker/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/source-tracker/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/source-tracker/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/trust-shield/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/trust-shield/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/trust-shield/service.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/vault-guard/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/vendor-onboard/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/vendor-onboard/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/vendor-onboard/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/vendor-pulse/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/whatsapp-pilot/agent.config.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/whatsapp-pilot/schema.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/agents/whatsapp-pilot/service.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/approvals/approvalRules.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/approvals/approvalService.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/config/featureFlags.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [
+        "ANTHROPIC_API_KEY",
+        "AOS_AI_PROVIDER_KEY",
+        "OPENAI_API_KEY"
+      ]
+    },
+    {
+      "path": "lib/aos/events/emitLeadAssignmentApprovedEvent.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/emitLeadClarificationRequiredEvent.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/emitLeadCreatedEvent.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/eventBus.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/eventHandlers.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/eventTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/n8nEventTypes.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/n8nPreviewWorkflowMap.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/n8nWorkflowMap.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/safeAgentEventPipeline.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/index.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/kernel/approvalBridge.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/kernel/auditWriter.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/kernel/contextBuilder.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/kernel/nexusKernel.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/kernel/permissionGate.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/kernel/taskRouter.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/logs/agentLogger.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/logs/auditLogger.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/memory/agentMemory.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/memory/clientMemory.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/memory/furnoMemory.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/memory/leadMemory.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/memory/vendorMemory.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/distributionAuthorizationPolicy.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/index.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/policyConfig.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/policyDecisionReasons.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/policyFingerprint.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/policyRegistry.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/policyTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/policyValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/runtime/policyConfigStoreAdapter.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/runtime/policyConfigStoreTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/policy/runtime/policyConfigStoreValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/rules/assignmentRules.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/rules/leadRules.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/rules/pricingRules.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/rules/replacementRules.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/rules/securityRules.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/rules/vendorRules.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/runtime/aosRuntimeSettings.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/runtime/assignmentLedgerService.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/runtime/leadAssignmentApprovalService.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/sync/aosCrmSyncService.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/sync/n8nSyncService.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/tools/emailTool.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/tools/n8nTool.ts",
+      "group": "aos",
+      "external": [
+        "http_fetch",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [
+        "NODE_ENV"
+      ]
+    },
+    {
+      "path": "lib/aos/tools/supabaseTool.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/tools/whatsappTool.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/types/index.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/domainEventService.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/failureRedaction.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/failureService.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/idempotencyService.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/outboxService.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/qfKernelTestWorkflow.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/retryPolicy.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workerIdentity.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowKernel.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowPersistenceTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowRegistry.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowRepository.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowState.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowTaskService.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowTransitionService.ts",
+      "group": "aos",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflow/workflowValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/adapters/leadClarificationServiceAdapter.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/adapters/leadLifecycleAdapterFactory.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/adapters/leadLifecycleServicePorts.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/adapters/leadMatchingRecommendationAdapter.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/adapters/leadQualityServiceAdapter.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAdapters.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalBinding.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalPublisher.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovalService.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionApprovedSnapshotResolver.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentAdapter.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentResultMapper.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAuthorizationSnapshotResolver.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAutoAuthorizationValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionPolicyAudit.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionPolicyEvaluationExecutor.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionRecommendationResolver.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionRouteGuard.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionTypes.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/events/leadClarificationCompletedBridge.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/events/leadLifecycleEventPublisher.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/events/leadLifecycleResultMapper.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/execution/leadLifecycleTaskCoordinator.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/execution/leadLifecycleTaskExecutionTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/execution/leadLifecycleTaskExecutor.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleDefinition.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleEvents.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleHandler.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleRegistration.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleStates.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleTaskIntents.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/leadLifecycle/leadLifecycleValidation.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/workflows/processLeadWorkflow.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/auth/authAttemptOutcomeMapping.ts",
+      "group": "auth",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/auth/hookDeadline.ts",
+      "group": "auth",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/auth/supabaseSendSmsHook.ts",
+      "group": "auth",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/categories.ts",
+      "group": "categories.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/categories/categoryService.ts",
+      "group": "categories",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/categories/useActiveCategories.ts",
+      "group": "categories",
+      "external": [
+        "http_fetch"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/approvedTemplateOutbound.ts",
+      "group": "communication",
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/authSmsBodyRenderer.ts",
+      "group": "communication",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/authenticationActionIdentity.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/authenticationTransportDecision.ts",
+      "group": "communication",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/canonicalJson.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/channelDispatchGuard.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/communicationRecommendation.ts",
+      "group": "communication",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/consentAckDestinationSeal.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/consentAckIntent.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/consentCommand.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/consentCommandResponse.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/consentPolicy.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/dbErrors.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/httpTransport.ts",
+      "group": "communication",
+      "external": [
+        "http_fetch"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/inboundConsentCommandInput.ts",
+      "group": "communication",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/inboundProviderAccountAttribution.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/outboundConsentScope.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/outboundProviderAccountAttribution.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/phone.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providerMappingFingerprint.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/exotelConfig.ts",
+      "group": "communication",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/exotelSmsProvider.ts",
+      "group": "communication",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCallbackIdentity.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCloudWhatsAppConfig.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCloudWhatsAppProvider.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaRuntimeGate.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWebhookAccountIdentity.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWebhookRawBody.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppInbound.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppWebhook.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/mockSmsProvider.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/mockWhatsAppProvider.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/providerAccountOwnership.ts",
+      "group": "communication",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/providerError.ts",
+      "group": "communication",
+      "external": [
+        "http_fetch"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/providerOutcome.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/smsProvider.ts",
+      "group": "communication",
+      "external": [
+        "exotel_sms"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/smsRuntimeGate.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/whatsappProvider.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/whatsappTemplateBinding.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/rcs.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/recipientResolver.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/types.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/whatsappTemplate.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/config.ts",
+      "group": "config.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/adapters/leadAdapter.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/crmAdapter.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/types/index.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/errors.ts",
+      "group": "errors.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/events/eventEnvelope.ts",
+      "group": "events",
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/geo.ts",
+      "group": "geo.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/geo/distance.ts",
+      "group": "geo",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/google-maps/loadGoogleMaps.ts",
+      "group": "google-maps",
+      "external": [],
+      "supabase": [],
+      "envRefs": [
+        "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY"
+      ]
+    },
+    {
+      "path": "lib/google-maps/normalizePlace.ts",
+      "group": "google-maps",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/google-maps/types.ts",
+      "group": "google-maps",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/authSecurityEvent.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/authTransport.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/clientAccess.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/clientAccount.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/clientOtp.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/clientOtpAutomation.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/index.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/principal.ts",
+      "group": "identity",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/sessionInvalidation.ts",
+      "group": "identity",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/vendorAccess.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/vendorAuthAutomation.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/vendorLoginIdentifier.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/vendorOtpCrypto.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/vendorPasswordReset.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/vendorVerification.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/verification.ts",
+      "group": "identity",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/images.ts",
+      "group": "images.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/lead-assignment/autoAssignmentEngine.ts",
+      "group": "lead-assignment",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/lead-assignment/freeVendorInterestService.ts",
+      "group": "lead-assignment",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/lead-assignment/leadQueueService.ts",
+      "group": "lead-assignment",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/lead-assignment/runtimeSettings.ts",
+      "group": "lead-assignment",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/lead-quality/budgetFit.ts",
+      "group": "lead-quality",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/lead-quality/clarificationPresets.ts",
+      "group": "lead-quality",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/locations/cityService.ts",
+      "group": "locations",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/locations/useActiveCities.ts",
+      "group": "locations",
+      "external": [
+        "http_fetch"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/quickfurno-data.ts",
+      "group": "quickfurno-data.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/supabase.ts",
+      "group": "supabase.ts",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "server",
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/supabaseBrowser.ts",
+      "group": "supabaseBrowser.ts",
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "browser"
+      ],
+      "envRefs": [
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL"
+      ]
+    },
+    {
+      "path": "lib/supabaseLogging.ts",
+      "group": "supabaseLogging.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/types.ts",
+      "group": "types.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/vendors/categoryMatching.ts",
+      "group": "vendors",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/vendors/vendorAutomaticEligibility.ts",
+      "group": "vendors",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/vendors/vendorEligibility.ts",
+      "group": "vendors",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/vendors/vendorVisibility.ts",
+      "group": "vendors",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    }
+  ],
+  "components": {
+    "count": 65,
+    "paths": [
+      "components/AdminDashboard.tsx",
+      "components/AdminLoginForm.tsx",
+      "components/Avatar.tsx",
+      "components/Brand.tsx",
+      "components/CategoryCards.tsx",
+      "components/ClientEnquiryModal.tsx",
+      "components/FAQ.tsx",
+      "components/FilterChips.tsx",
+      "components/Footer.tsx",
+      "components/FreeVendorInterestButton.tsx",
+      "components/Header.tsx",
+      "components/HeroAmbassador.tsx",
+      "components/HeroVisual.tsx",
+      "components/HomeEnquiryForm.tsx",
+      "components/HowItWorks.tsx",
+      "components/LeadForm.tsx",
+      "components/LeadFunnel.tsx",
+      "components/LoginForm.tsx",
+      "components/Logo.tsx",
+      "components/MobileBottomNav.tsx",
+      "components/PortfolioGallery.tsx",
+      "components/PricingEstimator.tsx",
+      "components/QuickFurnoIcons.tsx",
+      "components/ScrollProgress.tsx",
+      "components/ScrollReveal.tsx",
+      "components/SignOut.tsx",
+      "components/StatsBand.tsx",
+      "components/StickyMobileCTA.tsx",
+      "components/Testimonials.tsx",
+      "components/VendorApplicationForm.tsx",
+      "components/VendorCards.tsx",
+      "components/VendorCompactCard.tsx",
+      "components/VendorCompare.tsx",
+      "components/VendorDashboard.tsx",
+      "components/VendorDashboardPreview.tsx",
+      "components/VendorDetailHeader.tsx",
+      "components/VendorRegisterForm.tsx",
+      "components/WhatsAppButton.tsx",
+      "components/admin/AOSControlCenter.tsx",
+      "components/admin/AdminIcon.tsx",
+      "components/admin/AdminPrimitives.tsx",
+      "components/admin/AdminSectionPage.tsx",
+      "components/admin/AdminShell.tsx",
+      "components/admin/AnalyticsDashboard.tsx",
+      "components/admin/AosAutomationControl.tsx",
+      "components/admin/AssignmentLedgerPanels.tsx",
+      "components/admin/CRMDashboard.tsx",
+      "components/admin/CategoryManager.tsx",
+      "components/admin/LeadAssignmentApprovalControl.tsx",
+      "components/admin/LeadMatchingAuditPanels.tsx",
+      "components/admin/ManualLeadAssignmentPanel.tsx",
+      "components/admin/RequirementGroupsPanel.tsx",
+      "components/admin/adminConfig.ts",
+      "components/admin/adminTypes.ts",
+      "components/admin/adminUtils.ts",
+      "components/home/HomeCategoryGrid.tsx",
+      "components/home/HomeSearchBar.tsx",
+      "components/home/HomeSections.tsx",
+      "components/home/StatsCounter.tsx",
+      "components/home/TestimonialsCarousel.tsx",
+      "components/location/GooglePlaceAutocomplete.tsx",
+      "components/vendor/VendorPortal.tsx",
+      "components/vendors/ClientSelectedVendorEnquiry.tsx",
+      "components/vendors/VendorHeroStats.tsx",
+      "components/vendors/VendorLeadReportForm.tsx"
+    ]
+  },
+  "packageScripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "grant:superadmin": "node scripts/grant-superadmin.mjs",
+    "inventory:mvp": "node scripts/mvp/inventory/run.mjs",
+    "lint": "next lint",
+    "start": "next start",
+    "test:mvp": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace communication",
+    "test:mvp:communication": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs communication",
+    "test:mvp:marketplace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace",
+    "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
+    "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
+    "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",
+    "test:phase2a": "node scripts/phase2a-lead-lifecycle-harness.mjs",
+    "test:phase2b": "node scripts/phase2b-lead-orchestration-adapter-harness.mjs",
+    "test:phase3a": "node scripts/phase3a-distribution-control-harness.mjs",
+    "test:phase3a:diagnostics": "node scripts/phase3a-diagnostics-harness.ts",
+    "test:phase3b": "node scripts/phase3b-recovery-harness.ts",
+    "test:phase3b:aos": "node scripts/phase3b-assignment-execution-harness.mjs",
+    "test:phase4": "node scripts/phase4-credit-wallet-harness.ts",
+    "test:phase4a": "node scripts/phase4a-policy-engine-harness.mjs",
+    "test:phase4b1": "node scripts/phase4b1-policy-inputs-contract-harness.mjs",
+    "test:phase4b2": "node scripts/phase4b2-policy-lifecycle-integration-harness.mjs",
+    "test:phase5a": "node scripts/phase5a-identity-security-harness.mjs",
+    "test:phase5b": "node scripts/phase5b-communication-core-harness.mjs",
+    "test:phase5c": "node scripts/phase5c-vendor-auth-harness.mjs",
+    "test:phase5d": "node scripts/phase5d-client-whatsapp-otp-harness.mjs",
+    "test:phase5e": "node scripts/phase5e-vendor-whatsapp-reset-harness.mjs",
+    "test:phase5f:a": "node scripts/phase5f-a-messaging-foundation-harness.mjs",
+    "test:phase5f:b": "node scripts/phase5f-b-whatsapp-cloud-api-harness.mjs",
+    "test:phase5f:c": "node scripts/phase5f-c-auth-transport-resilience-harness.mjs",
+    "test:phase5f:c2": "node scripts/phase5f-c2-sms-runtime-foundation-harness.mjs",
+    "test:phase5f:c3a": "node scripts/phase5f-c3a-exotel-adapter-harness.mjs",
+    "test:phase5f:c3b": "node scripts/phase5f-c3b-client-otp-fallback-harness.mjs",
+    "test:phase5f:c3c1": "node scripts/phase5f-c3c1-client-otp-resolved-sms-harness.mjs",
+    "test:phase5f:c3c2": "node scripts/phase5f-c3c2-sms-canary-readiness-probe-harness.mjs",
+    "test:phase5f:d1a": "node scripts/phase5f-d1a-whatsapp-inbound-foundation-harness.mjs",
+    "test:phase5f:d1b": "node scripts/phase5f-d1b-whatsapp-inbound-persistence-harness.mjs",
+    "test:phase5f:d2b": "node scripts/phase5f-d2b-consent-evidence-schema-harness.mjs",
+    "test:phase5f:d2c": "node scripts/phase5f-d2c-consent-decision-authority-harness.mjs",
+    "test:phase5f:d2d": "node scripts/phase5f-d2d-consent-command-writer-harness.mjs",
+    "test:phase5f:d2e": "node scripts/phase5f-d2e-inbound-consent-integration-harness.mjs",
+    "test:phase5f:d3b": "node scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs",
+    "test:phase5f:d4b": "node scripts/phase5f-d4b-consent-command-response-harness.mjs",
+    "test:phase5f:d4c": "node scripts/phase5f-d4c-consent-ack-async-harness.mjs",
+    "test:supabase:lead": "node scripts/test-supabase-lead-insert.mjs",
+    "typecheck": "tsc --noEmit",
+    "verify:mvp": "npm run test:mvp && npm run typecheck && npm run lint && npm run build"
+  },
+  "runtimeConfig": [
+    ".eslintrc.json",
+    "middleware.ts",
+    "next.config.mjs",
+    "postcss.config.mjs",
+    "tailwind.config.ts",
+    "tsconfig.json"
+  ],
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "standardwebhooks": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "@types/react": "^18.3.8",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.15",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2"
+  }
+}

@@ -4,6 +4,8 @@
 
 > **This document performs NO database access.** It defines a **later, read-only** procedure to reconcile the committed schema (`supabase/migrations/*` → [`generated ledger JSON`](generated/qf-mvp-migration-ledger.json)) against **staging** and **production**. **No write, `db push`, `db reset`, `migration up`, or `migration repair` is planned as automatic remediation.** Managed-DB history is assumed **possibly drifted**; nothing is applied automatically.
 
+> **QF-MVP-10.7 tool status:** this procedure is now **implemented** as a read-only tool — `scripts/mvp/reconciliation/**` (runbook: `scripts/mvp/reconciliation/README.md`), commands `npm run reconcile:mvp:{selftest,staging,production,compare}`. The tool enforces `BEGIN READ ONLY` + a write/DDL guard, keeps credentials out of `argv`/logs/output, and **refuses to fabricate** (stops with a distinct exit code when credentials/`psql` are absent). **It has not yet been executed** (no read-only credentials / `psql` in the working environment) — results and the completion decision are in [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md); **QF-MVP-10 stays `IN_PROGRESS`** until it runs (or is founder-waived).
+
 ## 0. Why this is the pre-QF-MVP-20 gate
 
 The runtime map + agent audits established that the highest-value facts are **DB-state, not code**:

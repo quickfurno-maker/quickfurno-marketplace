@@ -28,10 +28,12 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **10.4 Core domain map** — `COMPLETE`. 14 domains + AOS; dependency direction; 8 evidence-backed boundary violations (no active bypass).
 - **10.5 Authority audit** — `COMPLETE`. 16 authorities. **No BLOCKER**; 4 HIGH (eligibility duplication · no 6-lifetime cap · live credit-RPC body unverified · un-ledgered `admin_smart_assign` debit).
 - **10.6 Cleanup plan** — `COMPLETE`. A–E buckets; deletion is not an MVP blocker; nothing deleted; DB-proof prerequisites recorded.
-- **10.7 Database reconciliation** — `COMPLETE (plan only)` / **execution PENDING**. Read-only procedure + drift vocabulary + no-automatic-writes. **Its execution is the pre-QF-MVP-20 gate and keeps QF-MVP-10 `IN_PROGRESS`.**
-- **10.8 Execution order** — `COMPLETE`. Order 20→40→(30)→50→70→(60)→80; pre-20 gate = 10.7 + founder decisions (6-vs-9 cap, credit-restore, package coupling).
+- **10.7 Database reconciliation** — **tool BUILT + self-tested; execution PENDING (gate).** Read-only tool `scripts/mvp/reconciliation/**` + `npm run reconcile:mvp:{selftest,staging,production,compare}`: `BEGIN READ ONLY` + write/DDL guard + credential-hygiene + leak-fence + **no fabrication** (stops with a distinct exit code when credentials/`psql` are absent). **Not executed** — no read-only credentials / `psql` in the working environment. Results + completion decision in [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md). **This execution is the pre-QF-MVP-20 gate and keeps QF-MVP-10 `IN_PROGRESS`.**
+- **10.8 Execution order** — `COMPLETE`. Order 20→40→(30)→50→70→(60)→80; pre-20 gate = 10.7 execution + the (now-locked) founder decisions below.
 
-**Key facts established:** AOS holds no authority + **no AI active** + **no Jarvis in-repo**; **Meta non-voice only + gated OFF by DB seed**; consent has a single decision/writer/enforcer; all authoritative writes go through SECURITY DEFINER RPCs (no TS/UI bypass). **Open (blocks COMPLETE):** live-DB reconciliation of the 12 DO-NOT-AUTO-APPLY migrations + the live assign/credit RPC bodies.
+**Locked founder decisions (QF-MVP-10.7):** active cap **3**; **lifetime unique-vendor cap = 6** (the existing **9 is rejected**, corrected in QF-MVP-20); credit restoration requires founder/authorized-admin approval; **every credit mutation requires an audit ledger row**; public vendor profiles must not expose package/plan/credit/monetization; **AOS dormant scaffolding = KEEP_DISABLED**; **Jarvis (QF-MVP-60) = MVP_REQUIRED** (recommendation-only), not optional.
+
+**Key facts established:** AOS holds no authority + **no AI active** + **no Jarvis in-repo**; **Meta non-voice only + gated OFF by DB seed**; consent has a single decision/writer/enforcer; all authoritative writes go through SECURITY DEFINER RPCs (no TS/UI bypass). **Open (blocks COMPLETE):** execute the read-only reconciliation of the 12 DO-NOT-AUTO-APPLY migrations + the live assign/credit RPC bodies (credentials/`psql` required).
 
 ---
 

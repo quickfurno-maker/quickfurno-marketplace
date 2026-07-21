@@ -30,9 +30,9 @@ Audits the 16 locked authorities. Severity: **BLOCKER** (active authority bypass
 ### A4. Replacement limits — HIGH (gap)
 - **Owner (intended):** a one-at-a-time, concurrency-safe replacement that respects the lifetime cap and never reassigns an exhausted vendor.
 - **Impl (actual):** **no swap/replacement flow exists.** "Replacement" = additive admin recovery (`manualLeadAssignmentService`, primary≤3 / total≤9) + bad-lead credit-back (`adminService.approveBadLeadReport` → `restore_vendor_credit`).
-- **⚠ Spec gap (V5):** the locked "**max 6 unique vendors lifetime**" (roadmap 20.4, boundaries §10) is **not implemented** — coded lifetime cap is **9** (`ADMIN_MANUAL_TOTAL_VENDOR_LIMIT`, `lib/config.ts:113`).
-- **Bypass risk:** none active; this is unbuilt scope + a numeric discrepancy requiring a **founder decision (6 vs 9)**.
-- **Rec:** decide the lifetime number; build a concurrency-controlled replacement in QF-MVP-20.6 that enforces it in the RPC. **Phase:** QF-MVP-20.4/20.6.
+- **⚠ Spec gap (V5) — founder DECISION now LOCKED:** lifetime unique vendors per lead = **6**. The current code lifetime cap of **9** (`ADMIN_MANUAL_TOTAL_VENDOR_LIMIT`, `lib/config.ts:113`) is **REJECTED** and must be corrected. There is **no DB-level lifetime constraint today** (the 9 lives only in TS).
+- **Bypass risk:** none active; this is unbuilt scope + a now-resolved numeric discrepancy.
+- **Rec:** in QF-MVP-20 replace `9`→`6`, enforce the **6-vendor lifetime cap in the assignment RPC** (not only TS), and build a concurrency-controlled replacement that never reassigns an exhausted vendor. **Phase:** QF-MVP-20.4/20.6.
 
 ### A5. Package validity — MEDIUM
 - **Owner:** `packageService` / `vendorPackageOrderService` / `vendorAdminService`; RPC `assign_package_to_vendor`.

@@ -6,8 +6,11 @@
 ## Method & evidence rule
 
 - Object lists are **regex-extracted from committed SQL** — repository evidence of what the SQL *declares*, not a full parser. See the JSON for the exact per-migration object arrays.
-- **No database access occurred.** Therefore **every migration's `staging` and `production` applied-status is `UNKNOWN_UNVERIFIED`** and is *not* inferred from filename or repository presence. Applied status is resolved later by the read-only procedure in [`QF-MVP-10-DATABASE-RECONCILIATION.md`](QF-MVP-10-DATABASE-RECONCILIATION.md).
+- **No database access occurred.** Therefore **every migration's `staging` and `production` applied-status is `UNKNOWN_UNVERIFIED`** and is *not* inferred from filename or repository presence. Applied status is resolved by the read-only procedure in [`QF-MVP-10-DATABASE-RECONCILIATION.md`](QF-MVP-10-DATABASE-RECONCILIATION.md).
+- **QF-MVP-10.7 status vocabulary** (to be filled per migration *once the reconciliation tool runs with credentials*): `STAGING_MATCHED` · `STAGING_DRIFT` · `STAGING_NOT_PRESENT` · `PRODUCTION_MATCHED` · `PRODUCTION_DRIFT` · `PRODUCTION_NOT_PRESENT` · `UNKNOWN_UNVERIFIED`. **A migration is never marked applied merely because a similarly-named object exists.** The reconciliation tool (`scripts/mvp/reconciliation/**`) is built and self-tested, but **has not been executed** (no read-only credentials / `psql` in the working environment) — so **all rows remain `UNKNOWN_UNVERIFIED`**. See [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).
 - **No migration is deleted, edited, or reordered by this task.**
+
+> ¹ **Classification correction (QF-MVP-10.7):** the workflow-kernel migrations (49–52) are reclassified `KEEP_DISABLED` (was `KEEP_AS_BUILT`) — the kernel is **not runtime-referenced** (zero live imports; migration DO-NOT-AUTO-APPLY). Per the locked rule, workflow-kernel infrastructure is `KEEP_AS_BUILT` **only when runtime-referenced**, otherwise `KEEP_DISABLED`.
 
 ## Counts (repository declarations)
 
@@ -114,10 +117,10 @@ Legend — **Rv** = for-review/do-not-auto-apply header. **Class**: MVP_REQUIRED
 | 46 | `…0143_preferred_assignment_accepting_leads` | credits | ledger-backed `assign_lead_to_preferred_vendor` | **Y** | MR | high |
 | 47 | `…0144_manual_assignment_accepting_leads` | credits | ledger-backed `assign_lead_to_vendors` | **Y** | MR | high |
 | 48 | `…0145_package_purchase_idempotent_grant` | packages | idempotent `assign_package_to_vendor` | **Y** | MR | high |
-| 49 | `…0146_create_qf_workflow_kernel_foundation` | workflow-kernel | domain_events, outbox_events, idempotency_records, workflow_* | **Y** | KB | high |
-| 50 | `…0147_workflow_kernel_atomic_step` | workflow-kernel | `qf_apply_workflow_step`, `qf_acquire_domain_event` | **Y** | KB | high |
-| 51 | `…0148_workflow_kernel_safety_hardening` | workflow-kernel | dead-letter/retry fns | **Y** | KB | high |
-| 52 | `…0149_workflow_kernel_retry_consistency` | workflow-kernel | retry-consistency fns | **Y** | KB | high |
+| 49 | `…0146_create_qf_workflow_kernel_foundation` | workflow-kernel | domain_events, outbox_events, idempotency_records, workflow_* | **Y** | KD¹ | high |
+| 50 | `…0147_workflow_kernel_atomic_step` | workflow-kernel | `qf_apply_workflow_step`, `qf_acquire_domain_event` | **Y** | KD¹ | high |
+| 51 | `…0148_workflow_kernel_safety_hardening` | workflow-kernel | dead-letter/retry fns | **Y** | KD¹ | high |
+| 52 | `…0149_workflow_kernel_retry_consistency` | workflow-kernel | retry-consistency fns | **Y** | KD¹ | high |
 | 53 | `…0150_automation_policy_config_foundation` | AOS | automation_policy_configs + immutability trigger | **Y** | KD | high |
 | 54 | `…0160_identity_security_foundation` | identity | auth_security_events, client_accounts, password_reset_grants, verification_challenges | | MR | high |
 | 55 | `…0170_unified_communication_core` | communication | communication_messages/templates/delivery_events/webhook_receipts/automation_catalog | | MR | high |

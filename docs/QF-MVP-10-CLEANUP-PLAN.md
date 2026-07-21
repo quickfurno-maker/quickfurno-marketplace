@@ -4,6 +4,16 @@
 
 **Default rule:** *Deletion is NOT an MVP blocker* unless the item causes a **build failure**, a **security exposure**, an **authority bypass**, **migration ambiguity**, or **operational confusion that could cause production misuse**. **No deletion without dependency proof.** No broad rewrites for aesthetics. **This phase deletes/refactors nothing.**
 
+## QF-MVP-10.7 classification corrections & locked founder decisions
+
+Applied to this document and the companion QF-MVP-10 docs:
+- **AOS dormant scaffolding = `KEEP_DISABLED`** (not active Core authority; decision 8). This includes AOS **runtime / events / tools** clusters — corrected from any earlier `KEEP_AS_BUILT` framing. AOS **historical harness/governance** evidence is `LEGACY_NON_BLOCKING`.
+- **Workflow-kernel infrastructure** (`lib/aos/workflow/**`, migrations 146–150) = **`KEEP_DISABLED`** — it is **not runtime-referenced** (zero live imports). It would be `KEEP_AS_BUILT` **only if/when a runtime path references it**.
+- **Jarvis (QF-MVP-60) = `MVP_REQUIRED`**, recommendation-only (decision 9) — **not** "optional". Core must still run with Jarvis offline, so it is not a hard launch-day blocker, but it **is required for MVP-complete** and must never gain direct DB/authority.
+- **Lifetime unique-vendor cap = 6** (decision 2); the existing **9 is rejected** (decision 3) and corrected in QF-MVP-20.
+- **Every credit mutation requires an audit ledger row** (decision 5); **credit restoration requires founder/authorized-admin approval** (decision 4) — reinforces A6/A7.
+- **Public vendor profiles must not expose package/plan/credit-balance/monetization** (decisions 6/7); such data only in authorized vendor/admin/CRM views — QF-MVP-20/30 add an enforcing test + reconciliation checks grants.
+
 ---
 
 ## A. KEEP UNCHANGED (stable, launch-useful — do not touch)
@@ -79,7 +89,7 @@
 | **QF-MVP-30** Vendor CRM | 10, 20 | data-model after 10 | Yes (MVP_REQUIRED) | Build on Core FKs; campaign approval on Core consent (A12) |
 | **QF-MVP-50** n8n | 20, 40 | — | **Yes** | Two-lock already OFF; wire idempotent execution; uncertain-outcome-not-resent |
 | **QF-MVP-70** Ops & control | 20, 40, 50 | scaffold with 50 | **Yes** | Kill switches, approval gates (A15), KPIs; expose A7/A16 audit completeness |
-| **QF-MVP-60** Jarvis | 50, 70 | context API specced early | No | No Jarvis in-repo today; rewire AOS engines to Core before activation (V8) |
+| **QF-MVP-60** Jarvis | 50, 70 | context API specced early | No¹ | **MVP_REQUIRED** (recommendation-only); no Jarvis in-repo today; rewire AOS engines to Core before activation (V8). ¹Not a launch-*day* blocker (Core runs Jarvis-offline) but required for MVP-complete. |
 | **QF-MVP-80** Launch | all upstream | — | **Yes** | Migration rehearsal + rollback; canaries; Pune go/no-go |
 
 ### Already complete — DO NOT REBUILD (verify/activate only)

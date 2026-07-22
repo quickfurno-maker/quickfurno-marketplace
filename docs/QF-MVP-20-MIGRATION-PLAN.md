@@ -11,8 +11,21 @@
 
 ## Staged sequence
 
-### K.1 Repository consumer inventory (no DB)
-Grep the repo for every consumer of the six legacy assignment RPCs and the three legacy credit functions, plus direct reads of `vendors` monetization columns and direct `whatsapp_logs` writes. Produce a consumer map (service/route/RPC → target authority). **This gates every revoke** — nothing is revoked before its consumers are known. Output: a consumer-inventory artifact (external review folder).
+### K.1 Repository consumer inventory (no DB) — ✅ COMPLETE (QF-MVP-20.1)
+
+The consumer audit is done and recorded in [`QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md`](QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md). It replaces the earlier assumptions with audited `file:line` evidence. Authoritative consumer map:
+
+- `assign_lead_to_paid_vendors_phase26a` → `leadDeliveryService.ts:54` (auto-match; service-role).
+- `assign_lead_to_vendors` → `leadService.ts:373` (via `assignLead` public `app/actions.ts:167` **[auth gap]** + `adminAssignLead` superadmin `:685`); **writes `whatsapp_logs` in-txn**.
+- `admin_smart_assign_lead_to_vendors` → `manualLeadAssignmentService.ts:471` (superadmin) + `delayedLeadFillService.ts:444` (secret cron); **un-ledgered**; caller `p_total_limit` up to **9** (`manualLeadAssignmentService.ts:314`).
+- `assign_client_selected_vendor_to_group` → `clientRequirementGroupService.ts:619` (public `sendClientSelectedVendorEnquiry` `app/actions.ts:179→250`); **un-ledgered**.
+- `assign_vendor_to_requirement_group` → `clientRequirementGroupService.ts:371` (public + superadmin processors); **un-ledgered**.
+- `assign_lead_to_preferred_vendor` → `preferredVendorLeadService.ts:256` (public funnel) + `delayedLeadFillService.ts:425` (cron).
+- `qf_apply_vendor_credit_delta` → `vendorCreditWalletService.ts:53` (canonical, ACTIVE_SAFE).
+- `deduct_vendor_credit` / `restore_vendor_credit` / `increment_vendor_credits` → **no direct `.rpc()`**; invoked only inside the legacy assignment RPC bodies (retire after those bodies are replaced).
+- Direct `vendors`/`whatsapp_logs`/`vendor_credit_logs` writes: mapped in the audit §7 (credits/ledger have **no** direct TS writer — RPC-only; `whatsapp_logs` written only inside `assign_lead_to_vendors` SQL + the `whatsapp-dispatch` edge fn).
+
+**Unresolved consumers that remain revoke-blockers** (must be closed before the matching revoke): (a) the live RPC-body question (migrations 141–145 applied? — audit §16.1) determines whether the "ledgered" paths are truly ledgered; (b) `whatsapp-dispatch` edge-fn deploy/schedule state (audit §16.2); (c) `assignLead` server-action invocability without a UI caller (audit §16.3). Until each is proven, its dependent revoke stays **NOT READY**.
 
 ### K.2 Staging provisioning
 Provision a separate Supabase staging project (or approved dev branch). Establish read-only + service-role credentials out-of-band. This is the mandatory unblock for everything downstream (matches QF-MVP-10 §J launch prerequisite).
@@ -32,8 +45,17 @@ Where a consumer cannot migrate immediately, provide thin deprecated shims (lega
 ### K.7 Consumer migration
 Migrate each repository consumer (from K.1) to the orchestrator/`qf_assign_lead_vendors_v2` and the canonical credit authority; migrate public reads to `vendor_public_v`/DTO; migrate assignment comms to the intent boundary (§J). Verify on staging.
 
-### K.8 Grant restriction
-Only after K.1/K.7 prove consumers are migrated: `REVOKE EXECUTE` on the four public/anon SECURITY DEFINER assignment RPCs from `public, anon, authenticated`; revoke `anon` `SELECT` on `vendors` monetization columns (or revoke direct base-table read and force `vendor_public_v`). **First security priority**, but consumer-gated — as an immediate interim, route-level auth gates (§G) neutralize the bypass without dropping the RPCs.
+### K.8 Grant restriction — consumer-gated (audited prerequisites)
+
+Consumers are now fully mapped (K.1), so the ordered grant-restriction sequence is:
+
+1. **Interim app-gate (no revoke, do first):** guard the two public entries that reach a blocker RPC — `sendClientSelectedVendorEnquiry` (`app/actions.ts:179`) and `assignLead` (`app/actions.ts:167`). This closes the *app* bypass immediately without touching grants.
+2. **Migrate credit consumers** (B1–B4, audit §10) onto the canonical ledger authority — a revoke of the un-ledgered RPCs must not strand an un-migrated debit path.
+3. **Deploy `qf_assign_lead_vendors_v2`** (service-role only) + migrate assignment consumers (K.7).
+4. **`REVOKE EXECUTE ... FROM public, anon, authenticated`** on the four blocker RPCs (`admin_smart_assign_lead_to_vendors`, `assign_client_selected_vendor_to_group`, `assign_vendor_to_requirement_group`, `assign_lead_to_preferred_vendor`) — this closes the residual **direct-PostgREST** bypass the app cannot fix.
+5. **Revoke `anon SELECT`** on `vendors.{total_credits,remaining_credits,paid_status,package_name,package_status,package_expires_at}` (or revoke direct base-table read and force `vendor_public_v`).
+
+**Revoke-readiness rule (hard):** a revoke for RPC *X* is marked READY **only when every consumer of *X* in K.1 is migrated and verified on staging**. Today **no revoke is READY** — the unresolved consumers in K.1 (live-body question, edge-fn state, `assignLead` invocability) plus the pending consumer migration keep every revoke **NOT READY**. Interim app-gating (step 1) is the only action available now.
 
 ### K.9 Legacy authority disablement
 Transition the six RPCs to `deprecated_gated` / `superseded`; keep bodies present (rollback safety) with execute revoked from end-user roles. Legacy credit functions revoked/shimmed per §E.3.

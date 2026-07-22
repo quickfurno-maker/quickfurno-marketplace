@@ -10,11 +10,13 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **QF-MVP-00:** **COMPLETE**
 - **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
 - **QF-MVP-20:** **IN_PROGRESS**
-- **Current task:** QF-MVP-20.0 — Authority Repair Design
-- **Implementation status:** **NOT_STARTED**
+- **Completed:** QF-MVP-20.0 — Authority Repair Design
+- **Current task:** QF-MVP-20.1 — Authority Consumer and Call-Path Audit
+- **Implementation:** **NOT_STARTED**
+- **Migration:** **NOT_CREATED**
 - **Database remediation:** **NOT_STARTED**
-- **Production database access:** **NONE**
-- **Staging provisioning:** **OPEN_PREREQUISITE**
+- **Production access:** **NONE**
+- **Staging:** **OPEN_PREREQUISITE**
 - **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine (opening requirement: authority repair before feature expansion)
 - **Roadmap:** LOCKED
 - **Launch market:** Pune
@@ -26,7 +28,13 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.0 — Authority Repair Design** (design & documentation only; `Implementation status: NOT_STARTED`, `Database remediation: NOT_STARTED`, `Production database access: NONE`). Its opening requirement is **authority repair before feature expansion** — the ordered scope 20.A–20.E in [`QF-MVP-10-CLEANUP-PLAN.md`](QF-MVP-10-CLEANUP-PLAN.md), driven by the production reconciliation findings. The canonical engine, credit authority, replacement workflow, eligibility, public projection, communication boundary, migration plan, and acceptance-test matrix are designed in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), and [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md). No runtime code, migration, or DB/provider access in this task. Applying any repair is gated on staging provisioning (`OPEN_PREREQUISITE`).
+**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.1 — Authority Consumer and Call-Path Audit** (read-only repository audit + documentation; `Implementation: NOT_STARTED`, `Migration: NOT_CREATED`, `Database remediation: NOT_STARTED`, `Production access: NONE`). Its opening requirement is **authority repair before feature expansion** — the ordered scope 20.A–20.E in [`QF-MVP-10-CLEANUP-PLAN.md`](QF-MVP-10-CLEANUP-PLAN.md).
+
+**QF-MVP-20 subphase status:**
+- **20.0 Authority Repair Design** — `COMPLETE`. Canonical engine, credit authority, replacement workflow, eligibility, public projection, communication boundary, migration plan, and acceptance-test matrix designed in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md).
+- **20.1 Consumer & call-path audit** — `COMPLETE`. Full repository consumer map in [`QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md`](QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md): 4 Supabase clients, all `.rpc()` consumers of the 10 named RPCs, direct table-mutation matrix, 8 divergent eligibility evaluators, ledger-bypass credit paths (B1–B4), no replacement authority exists, comms-in-transaction only in `assign_lead_to_vendors`, public payload safe-by-convention (DB-grant exposure remains), all AOS `DORMANT_KEEP_DISABLED`. **6 ACTIVE_BLOCKERs**; consumer inventory frozen so grant-revoke can be sequenced safely; no revoke is READY yet.
+
+No runtime code, migration, or DB/provider access in this task. Applying any repair is gated on staging provisioning (`OPEN_PREREQUISITE`).
 
 ### Previous active phase — QF-MVP-10 (COMPLETE)
 **QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).

@@ -19,7 +19,7 @@
 - Source: production **public** schema dump (schema-only).
 - Source SHA256: `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f`
 - Generated baseline SHA256: `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81`
-- Verification SQL SHA256: `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777`
+- Verification SQL SHA256: `e82b757fd618983d91acdd80822daee8b64cd4e0bfbeaa16ea456af83e353d90` (current, QF-MVP-20.2C1R identity-scoped function parity; supersedes `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777`)
 
 ## Regenerate (deterministic, offline — no DB/network)
 

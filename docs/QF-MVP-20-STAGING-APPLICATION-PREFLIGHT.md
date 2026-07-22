@@ -21,7 +21,7 @@ Also present in the org (not touched): `coilipywdvxklewquqvv` (QF-Jarvis). Produ
 |---|---|---|---|
 | Source dump (external, not committed) | `269c9265…` | `269c9265…` | ✅ |
 | Generated baseline | `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` | `920a4aa0…` | ✅ |
-| Verification SQL | `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` | `89362a35…` | ✅ |
+| Verification SQL (at preflight time) | `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` | `89362a35…` | ✅ (superseded by QF-MVP-20.2C1R → `e82b757f…`) |
 
 - **Offline validator:** PASS. **Deterministic regeneration:** YES (regenerated == committed `920a4aa0…`).
 - Baseline is **outside** `supabase/migrations/` (0 matches there); `supabase/migrations/**` unchanged; raw dump not in Git.
@@ -110,7 +110,7 @@ The production public-schema dump does **not** include the managed-schema trigge
 
 ## 13. Blockers / findings for QF-MVP-20.2C2
 
-1. **Managed function delta (parity):** staging already has `public.rls_auto_enable()`. After the baseline applies its 39 functions, the public function count will be **40**, so the verify SQL check `03_public_functions` (expected **39**) will read **40** and FAIL as written. 20.2C2 must reconcile — **scope the function-count assertion to the 39 QuickFurno function names** (or accept a documented "+N managed" delta). **Do not drop `rls_auto_enable`** (it is a managed RLS security default). The verify SQL must not be silently rewritten in a preflight; this is a 20.2C2 decision.
+1. **Managed function delta (parity):** staging already has `public.rls_auto_enable()`. After the baseline applies its 39 functions, the public function count will be **40**, so the old total-only verify check (expected **39**) would read **40** and FAIL. **Do not drop `rls_auto_enable`** (it is a managed RLS security default). **✅ RESOLVED in QF-MVP-20.2C1R:** the verification SQL is now **identity-scoped** — it checks the exact 39 QuickFurno function identities (`03a`=39, `03b` missing=0, `04` SD scoped=33), allows exactly one managed `public.rls_auto_enable()` (`03c`=1), rejects any other unexpected public function (`03d`=0), and keeps `total_public_function_count`=**40** only as a supporting check. Superseded verify hash `89362a35…` → current `e82b757f…`.
 2. **`ensure_rls` fires during apply:** the event trigger auto-enables RLS on each `CREATE TABLE`. The baseline also explicitly enables RLS on all 62 tables → **idempotent/aligned, harmless**; note only.
 3. **Auth new-user trigger absent** (§12) — forward migration.
 4. **authenticated dashboard grants deferred** (from 20.2B) — forward remediation; the baseline grants authenticated only `is_admin`/`owns_vendor` EXECUTE.

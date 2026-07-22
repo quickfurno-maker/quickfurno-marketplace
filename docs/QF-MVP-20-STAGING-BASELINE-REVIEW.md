@@ -10,7 +10,8 @@
 | Source (external, not committed) | production public schema, schema-only |
 | Source SHA256 | `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f` (300,426 bytes / 6,617 lines) |
 | Generated baseline SHA256 | `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` |
-| Verification SQL SHA256 | `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` |
+| Verification SQL SHA256 (current) | `e82b757fd618983d91acdd80822daee8b64cd4e0bfbeaa16ea456af83e353d90` |
+| Verification SQL SHA256 (superseded, pre-20.2C1R) | `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` |
 | Baseline identity | `qf_mvp_staging_baseline_269c9265` · fixed instant `2026-07-22T00:00:00Z` |
 | Production ref (PROHIBITED) | `yqpgcsduqbxulrlzwzap` · Staging ref (ONLY target) | `uckafzuochmbvtiodmcl` |
 
@@ -101,7 +102,7 @@ The six assignment RPCs and `deduct_/restore_/increment_vendor_credit(s)` are re
 ## 13–14. Generated SQL SHA256 & determinism
 
 - Baseline SHA256 `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81`, produced **byte-identical across two runs** (deterministic; fixed identity/instant, no wall-clock, sorted grant enumeration).
-- Verify SQL SHA256 `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` (SELECT-only; 30 checks).
+- Verify SQL SHA256 `e82b757fd618983d91acdd80822daee8b64cd4e0bfbeaa16ea456af83e353d90` (current; SELECT-only; identity-scoped function parity per QF-MVP-20.2C1R). Superseded pre-correction hash: `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777`.
 
 ## 15. Remaining unknowns
 

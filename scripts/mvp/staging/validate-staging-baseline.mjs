@@ -9,12 +9,19 @@ import crypto from "node:crypto";
 
 const REQUIRED_SOURCE_SHA256 =
   "269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f";
+const LOCKED_BASELINE_SHA256 =
+  "920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81";
 const PRODUCTION_REF = "yqpgcsduqbxulrlzwzap";
 const STAGING_REF = "uckafzuochmbvtiodmcl";
 const EXPECT = {
   tables: 62, functions: 39, security_definer: 33, policies: 67,
   rls_enabled: 62, primary_keys: 62, foreign_keys: 69, unique_constraints: 15,
   check_constraints: 169, indexes: 180, triggers: 0, views: 0,
+};
+// QF-MVP-20.2C1R: expectations proven present in the verification SQL.
+const VERIFY_EXPECT = {
+  quickfurno_functions: 39, quickfurno_security_definer: 33,
+  allowed_managed_functions: 1, total_public_functions: 40,
 };
 const BLOCKERS = [
   "admin_smart_assign_lead_to_vendors", "assign_client_selected_vendor_to_group",
@@ -31,9 +38,12 @@ const baselinePath = arg("--baseline");
 const sourcePath = arg("--source");
 const grantsPath = arg("--grants");
 if (!baselinePath || !sourcePath || !grantsPath) {
-  console.error("usage: --baseline <sql> --source <schema.sql> --grants <manifest.json>");
+  console.error("usage: --baseline <sql> --source <schema.sql> --grants <manifest.json> [--verify <sql>]");
   process.exit(2);
 }
+// verification SQL defaults to the sibling of the baseline
+const verifyPath = arg("--verify")
+  || baselinePath.replace(/[^/\\]+$/, "verify_qf_mvp_staging_baseline.sql");
 
 const failures = [];
 const fail = (m) => failures.push(m);
@@ -193,6 +203,102 @@ if (/GENERATED (AT|ON) 20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:]+\.[0-9]/.test(baselin
 // (offline heuristic: the baseline must not contain the dump's OWNER TO / grant block)
 if (/OWNER TO "postgres"/.test(execAll)) fail("raw production ownership present (dump leaked in)");
 
+// ---- 11. baseline SQL byte-identical / locked SHA256 (unmodified) ----------
+const baselineSha = crypto.createHash("sha256").update(fs.readFileSync(baselinePath)).digest("hex");
+if (baselineSha !== LOCKED_BASELINE_SHA256)
+  fail(`baseline SHA256 changed: got ${baselineSha}, locked ${LOCKED_BASELINE_SHA256}`);
+
+// ---- 12. verification SQL: identity-scoped function parity (QF-MVP-20.2C1R) --
+// Derive the 39 QuickFurno identities from the baseline and prove each is encoded
+// as an expected_fn VALUES row in the verification SQL.
+function deriveIdentities(sql) {
+  function splitArgs(s) {
+    const out = []; let buf = "", dP = 0, dB = 0, i = 0, inS = false, inD = false; const n = s.length;
+    while (i < n) { const c = s[i];
+      if (inS) { buf += c; if (c === "'" && s[i+1] === "'") buf += s[++i]; else if (c === "'") inS = false; i++; continue; }
+      if (inD) { buf += c; if (c === '"' && s[i+1] === '"') buf += s[++i]; else if (c === '"') inD = false; i++; continue; }
+      if (c === "'") { inS = true; buf += c; i++; continue; }
+      if (c === '"') { inD = true; buf += c; i++; continue; }
+      if (c === "(") { dP++; buf += c; i++; continue; }
+      if (c === ")") { dP--; buf += c; i++; continue; }
+      if (c === "[") { dB++; buf += c; i++; continue; }
+      if (c === "]") { dB--; buf += c; i++; continue; }
+      if (c === "," && dP === 0 && dB === 0) { out.push(buf.trim()); buf = ""; i++; continue; }
+      buf += c; i++;
+    }
+    if (buf.trim()) out.push(buf.trim());
+    return out;
+  }
+  function argType(a) {
+    a = a.replace(/\s+DEFAULT\s+[\s\S]*$/i, "").trim();
+    const m = /^"(?:[^"]|"")+"\s+([\s\S]+)$/.exec(a);
+    if (m) a = m[1].trim();
+    return a.replace(/"([a-zA-Z0-9_]+)"/g, "$1").replace(/\s+/g, "");
+  }
+  const re = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+"public"\."([a-z_0-9]+)"\s*\(/gi;
+  const res = []; let mm;
+  while ((mm = re.exec(sql))) {
+    const name = mm[1]; let i = re.lastIndex - 1; let depth = 0, inS = false, inD = false; const start = i;
+    for (; i < sql.length; i++) { const c = sql[i];
+      if (inS) { if (c === "'" && sql[i+1] === "'") i++; else if (c === "'") inS = false; continue; }
+      if (inD) { if (c === '"' && sql[i+1] === '"') i++; else if (c === '"') inD = false; continue; }
+      if (c === "'") { inS = true; continue; }
+      if (c === '"') { inD = true; continue; }
+      if (c === "(") depth++; else if (c === ")") { depth--; if (depth === 0) break; }
+    }
+    const list = sql.slice(start + 1, i).trim();
+    const ident = list === "" ? "" : splitArgs(list).map(argType).join(", ");
+    res.push({ name, ident });
+  }
+  const seen = new Set();
+  return res.filter(r => { const k = r.name + "(" + r.ident + ")"; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+const verifySql = fs.readFileSync(verifyPath, "utf8");
+const verifyExec = stripComments(verifySql);
+const identities = deriveIdentities(baseline);
+if (identities.length !== VERIFY_EXPECT.quickfurno_functions)
+  fail(`derived ${identities.length} baseline function identities, expected ${VERIFY_EXPECT.quickfurno_functions}`);
+
+// 12a. every derived identity is encoded as an expected_fn VALUES row
+let encoded = 0;
+for (const { name, ident } of identities) {
+  const row = `('${name}','${ident}')`;
+  if (verifySql.includes(row)) encoded++;
+  else fail(`verify SQL missing expected_fn identity: ${name}(${ident})`);
+}
+if (encoded !== VERIFY_EXPECT.quickfurno_functions)
+  fail(`verify SQL encodes ${encoded}/${VERIFY_EXPECT.quickfurno_functions} QuickFurno identities`);
+
+// 12b. expected_fn VALUES contains exactly 39 rows (no extras)
+const valuesRows = (verifySql.match(/^\s*\('[a-z_0-9]+','[^\n]*'\),?\s*$/gm) || []).length;
+if (valuesRows !== VERIFY_EXPECT.quickfurno_functions)
+  fail(`expected_fn has ${valuesRows} rows, expected ${VERIFY_EXPECT.quickfurno_functions}`);
+
+// 12c. managed rls_auto_enable exception is explicit and singular
+if (!/NOT \(f\.fname = 'rls_auto_enable' AND f\.ident = ''\)/.test(verifySql))
+  fail("verify SQL missing the singular managed rls_auto_enable exclusion in qf_unexpected");
+if (!/'03c_allowed_managed_public_function_count', '1'/.test(verifySql))
+  fail("verify SQL missing allowed_managed_public_function_count=1 check");
+if ((verifySql.match(/rls_auto_enable/g) || []).length < 3)
+  fail("verify SQL does not reference the managed rls_auto_enable exception explicitly");
+
+// 12d. identity-scoped checks with corrected expectations; no total-only=39
+if (!/'03a_quickfurno_function_count', '39'/.test(verifySql)) fail("verify SQL missing identity-scoped quickfurno_function_count=39");
+if (!/'03b_quickfurno_function_missing', '0'/.test(verifySql)) fail("verify SQL missing quickfurno_function_missing=0");
+if (!/'03d_unexpected_public_function_count', '0'/.test(verifySql)) fail("verify SQL missing unexpected_public_function_count=0");
+if (!/'03e_total_public_function_count', '40'/.test(verifySql)) fail("verify SQL missing total_public_function_count=40 (supporting)");
+if (!/'04_quickfurno_security_definer_count', '33'/.test(verifySql)) fail("verify SQL missing quickfurno_security_definer_count=33");
+if (/'03_public_functions', ?'39'/.test(verifySql)) fail("verify SQL still has the superseded total-only public function check (=39)");
+if (/'\d+_[a-z_]*', ?'47'|'\d+_[a-z_]*', ?'178'/.test(verifySql)) fail("verify SQL reintroduced a 47/178 expected count");
+
+// 12e. verification SQL must be SELECT-only (no DML/DDL statements)
+for (const raw of tokenize(verifySql)) {
+  const H = headOf(raw).slice(0, 60).toUpperCase().replace(/\s+/g, " ");
+  if (/^(INSERT|UPDATE|DELETE|MERGE|COPY|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE|COMMENT ON)\b/.test(H))
+    fail(`verify SQL contains a non-SELECT statement: ${H.slice(0,40)}`);
+}
+
 // ---- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`[validate-staging-baseline] FAIL (${failures.length}):`);
@@ -204,3 +310,6 @@ console.log(`  counts        = ${JSON.stringify(counts)}`);
 console.log(`  anon exec     = ${[...(grantExec.entries())].filter(([, r]) => r.has("anon")).map(([f]) => f).join(", ") || "(none)"}`);
 console.log(`  service-only  = ${SERVICE_ONLY.length} mutation RPCs verified not-anon/authenticated/PUBLIC`);
 console.log(`  anon tables   = none`);
+console.log(`  baseline_sha  = ${baselineSha} (locked, unmodified)`);
+console.log(`  verify_fn_ids = ${encoded}/${VERIFY_EXPECT.quickfurno_functions} QuickFurno identities encoded; SD expected 33; managed rls_auto_enable +1; total 40`);
+console.log(`  verify_select_only = yes`);

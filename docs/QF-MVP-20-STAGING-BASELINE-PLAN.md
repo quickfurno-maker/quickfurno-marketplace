@@ -14,7 +14,7 @@ The deterministic generator, validator, grant manifest, baseline SQL, and verifi
 - **Baseline generation:** complete. **Baseline application:** NOT STARTED (20.2C).
 - **Source SHA256:** `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f`
 - **Generated baseline SHA256:** `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` (byte-identical across two runs — deterministic).
-- **Verification SQL SHA256:** `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` (SELECT-only, 30 checks).
+- **Verification SQL SHA256:** `e82b757fd618983d91acdd80822daee8b64cd4e0bfbeaa16ea456af83e353d90` (current; SELECT-only; identity-scoped function parity, QF-MVP-20.2C1R). Superseded pre-correction: `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777`.
 - **Location:** `supabase/staging-baseline/` — intentionally OUTSIDE `supabase/migrations/` so `supabase db push` cannot apply it. Raw dump not committed.
 - **Grant policy:** default-deny; service_role operational; anon = EXECUTE on `get_public_eligible_vendors` only + no table access; authenticated = EXECUTE on `is_admin`/`owns_vendor`; the four blockers + legacy credit primitives + `qf_apply_vendor_credit_delta` are service_role-only. No `ALTER DEFAULT PRIVILEGES` for anon/authenticated.
 - **Counts (catalog):** 62 tables / 39 functions / 33 SD / 67 policies / 62 RLS / 62 PK / 69 FK / 15 unique-constraints (+32 unique indexes = the audit's 47) / 169 check-constraints / 180 indexes / 0 triggers / 0 views.

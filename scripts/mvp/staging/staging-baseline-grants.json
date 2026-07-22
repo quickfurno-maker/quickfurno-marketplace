@@ -1,0 +1,84 @@
+{
+  "_meta": {
+    "artifact": "QF-MVP-20.2B staging-baseline grant manifest",
+    "scope": "STAGING ONLY (uckafzuochmbvtiodmcl) — never production (yqpgcsduqbxulrlzwzap)",
+    "principle": "least-privilege; default-deny to PUBLIC/anon/authenticated; no blanket GRANT ALL; no ALTER DEFAULT PRIVILEGES for anon/authenticated",
+    "note": "Signatures are derived by the generator from the pinned source dump. This manifest carries the reviewed grant RULES + evidence. The generated SQL enumerates every one of the 39 functions and 62 tables explicitly."
+  },
+
+  "schema_usage": {
+    "roles": ["anon", "authenticated", "service_role"],
+    "reason": "USAGE on schema public is required for any role to reference public objects; it grants no object access by itself."
+  },
+
+  "function_policy": {
+    "default": {
+      "revoke_from": ["PUBLIC", "anon", "authenticated"],
+      "grant_execute": ["service_role"],
+      "reason": "Every function is executable only by the trusted server (service_role) unless an override proves a public/authenticated consumer. PostgreSQL grants EXECUTE to PUBLIC by default, so an explicit REVOKE is mandatory."
+    },
+    "overrides": [
+      {
+        "name": "get_public_eligible_vendors",
+        "grant_execute": ["service_role", "anon", "authenticated"],
+        "evidence": "services/leadService.ts:347 — publicClient().rpc('get_public_eligible_vendors', …)",
+        "reason": "Public vendor listing is invoked through the ANON client; anon EXECUTE is required. The function is SECURITY DEFINER and returns only safe fields (no monetization)."
+      },
+      {
+        "name": "is_admin",
+        "grant_execute": ["service_role", "authenticated"],
+        "evidence": "production dump RLS policies at lines 5586/5593/5597 — USING (public.is_admin()) applied TO authenticated",
+        "reason": "Boolean RLS predicate evaluated by the querying role; authenticated must hold EXECUTE for RLS to evaluate. No policies apply TO anon (0 anon policies in the dump), so anon is not granted."
+      },
+      {
+        "name": "owns_vendor",
+        "grant_execute": ["service_role", "authenticated"],
+        "evidence": "production dump RLS policy at line 5597 — USING (public.owns_vendor(vendor_id) OR public.is_admin()) TO authenticated",
+        "reason": "Ownership RLS predicate; authenticated EXECUTE required for RLS evaluation. Not granted to anon (no anon policies reference it)."
+      }
+    ]
+  },
+
+  "table_policy": {
+    "default": {
+      "revoke_from": ["PUBLIC", "anon", "authenticated"],
+      "grants": [{ "roles": ["service_role"], "privileges": ["ALL"] }],
+      "reason": "service_role is the trusted server context (bypasses RLS) that runs every authoritative write via the admin client. anon receives NO direct table access (all anon data flows go through SECURITY DEFINER functions). authenticated table grants for owner/admin dashboard flows are DEFERRED to the QF-MVP-20 forward remediation, not the compatibility baseline."
+    },
+    "overrides": []
+  },
+
+  "service_role_only_rpcs": [
+    { "name": "admin_smart_assign_lead_to_vendors", "signature": "(uuid,uuid[],boolean,integer)", "classification": "EXCLUDE_UNSAFE grant / LEGACY_COMPATIBILITY_TEMPORARY body", "evidence": "QF-MVP-10 PV-1; dump anon/auth grants @6059-6060; un-ledgered body @26-391", "reason": "PUBLIC/anon assignment bypass + un-ledgered debit — must be unreachable by untrusted roles." },
+    { "name": "assign_client_selected_vendor_to_group", "signature": "(uuid,uuid,uuid,integer)", "classification": "EXCLUDE_UNSAFE grant / LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "dump anon/auth grants @6070-6071; un-ledgered @392-487", "reason": "same class as above." },
+    { "name": "assign_vendor_to_requirement_group", "signature": "(uuid,uuid,uuid,text,integer,text)", "classification": "EXCLUDE_UNSAFE grant / LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "dump anon/auth grants @6097-6098; un-ledgered @971-1183", "reason": "same." },
+    { "name": "assign_lead_to_preferred_vendor", "signature": "(uuid,uuid)", "classification": "EXCLUDE_UNSAFE grant / LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "dump anon/auth grants @6081-6082; ledgered but no lifetime/total check @629-739", "reason": "same." },
+    { "name": "assign_lead_to_paid_vendors_phase26a", "signature": "(uuid,uuid[])", "classification": "LEGACY_COMPATIBILITY_TEMPORARY (canonical base)", "evidence": "dump REVOKE FROM PUBLIC @6076 (already service_role-only)", "reason": "ledgered canonical base; keep service_role-only." },
+    { "name": "assign_lead_to_vendors", "signature": "(uuid,uuid[],boolean,text)", "classification": "LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "dump REVOKE FROM PUBLIC @6087; ledgered + writes whatsapp_logs @740-970", "reason": "ledgered but couples comms; keep service_role-only." },
+    { "name": "deduct_vendor_credit", "signature": "(uuid)", "classification": "LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "un-ledgered primitive; called only inside legacy RPC bodies", "reason": "no ledger evidence; keep service_role-only." },
+    { "name": "restore_vendor_credit", "signature": "(uuid)", "classification": "LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "un-ledgered, no approval input", "reason": "keep service_role-only." },
+    { "name": "increment_vendor_credits", "signature": "(uuid,integer)", "classification": "LEGACY_COMPATIBILITY_TEMPORARY", "evidence": "un-ledgered", "reason": "keep service_role-only." },
+    { "name": "qf_apply_vendor_credit_delta", "signature": "(uuid,integer,text,text,text,text,text,boolean)", "classification": "ACTIVE_SAFE (canonical credit authority)", "evidence": "services/vendorCreditWalletService.ts:53 via adminClient (service_role)", "reason": "canonical ledgered credit mutation; service_role-only." }
+  ],
+
+  "denied_by_default": [
+    { "name": "check_duplicate_lead", "role_denied": ["anon", "authenticated"], "evidence": "services/leadService.ts:50→61 — adminClient().rpc (service_role); public lead intake runs server-side", "decision": "service_role only" },
+    { "name": "get_setting_int", "role_denied": ["anon", "authenticated"], "evidence": "services/vendorService.ts:342→352 — adminClient().rpc; also called inside SECURITY DEFINER RPCs", "decision": "service_role only" },
+    { "name": "refresh_requirement_group_counters", "role_denied": ["anon", "authenticated"], "evidence": "no direct repository consumer (grep services/app/lib empty); invoked only inside requirement-group SECURITY DEFINER RPCs", "decision": "service_role only — resolves QF-MVP-20.2A unknown: NOT granted to anon (no proven public/authenticated consumer)" },
+    { "name": "handle_new_user", "role_denied": ["anon", "authenticated"], "evidence": "auth new-user handler; its trigger lives on auth.users (managed schema, not in this public baseline)", "decision": "service_role only" }
+  ],
+
+  "anon_forbidden_tables": [
+    "vendor_credit_logs", "vendor_packages", "payments",
+    "bad_lead_reports", "bad_lead_report_comments",
+    "lead_assignment_approvals",
+    "communication_provider_accounts", "communication_messages",
+    "communication_consent_events", "communication_delivery_events",
+    "communication_webhook_receipts", "communication_inbound_messages"
+  ],
+  "monetization_columns": [
+    "vendors.total_credits", "vendors.remaining_credits", "vendors.paid_status",
+    "vendors.package_name", "vendors.package_status", "vendors.package_expires_at"
+  ],
+  "monetization_rule": "anon must have NO SELECT on the vendors table (baseline grants anon zero table access); the public-safe projection is QF-MVP-20 forward remediation, not this baseline."
+}

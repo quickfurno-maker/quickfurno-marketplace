@@ -36,6 +36,11 @@ The current production **public** schema was captured as a schema-only `supabase
 ### K.4 Additive schema preparation (staging first)
 Applied **after** the reviewed staging baseline (20.2B). Additive, non-breaking migrations only: `lead_assignment_events` (append-only history), `assignment_transactions` (idempotency), `replacement_requests` / `replacement_approvals`, `communication_intents` (or map to existing outbox), credit-restoration approval table, and the cap-enforcing triggers/partial indexes (§C.7) — noting production has **0 enforcement triggers today** (audit §6), so these are net-new. Nothing dropped.
 
+### K.4b Staging baseline generated (QF-MVP-20.2B) — outside the migration chain
+The reviewed staging baseline SQL is **generated** (offline; not applied) at `supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql` (SHA256 `920a4aa0…`), with a SELECT-only verifier `verify_qf_mvp_staging_baseline.sql` (SHA256 `89362a35…`). It is deliberately **outside `supabase/migrations/`** so `supabase db push` can never discover it, and it strips production ownership/grants/default-privileges, locks the four blocker RPCs + legacy credit primitives + `qf_apply_vendor_credit_delta` to service_role-only, and grants anon **no** table/monetization access. See [`QF-MVP-20-STAGING-BASELINE-REVIEW.md`](QF-MVP-20-STAGING-BASELINE-REVIEW.md).
+
+**Migration-history invariants (unchanged):** production migration history is **not modified**; no fake rows; the 68 repository migrations are **not** replayed and **not** marked applied. The baseline applies (in 20.2C) under **one** controlled identity `qf_mvp_staging_baseline_269c9265`; all QF-MVP-20 remediation is **forward-only** after it. Production HISTORY_DRIFT repair remains a separate, still-open production decision. **20.2C application gate:** target ref must be `uckafzuochmbvtiodmcl` (never `yqpgcsduqbxulrlzwzap`), staging empty (preflight-enforced), verify SQL all `PASS`.
+
 ### K.5 Canonical authority deployment (staging)
 Deploy `qf_assign_lead_vendors_v2` and the canonical credit authority (folding the strong parts of `qf_apply_vendor_credit_delta`, `assign_lead_to_paid_vendors_phase26a`, `assign_lead_to_vendors`) as **`service_role`-execute-only**. Legacy RPCs remain in place (not yet revoked). Deploy the public projection view (§I) unpopulated of grants yet.
 

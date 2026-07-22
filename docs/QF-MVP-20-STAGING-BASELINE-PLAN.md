@@ -7,6 +7,21 @@
 
 Reconstruct the **current required public schema** on the empty staging project (`uckafzuochmbvtiodmcl`) as a single reviewed baseline — **without** production data, secrets, production ownership/grants, unsafe PUBLIC/anon authority, migration-history falsification, provider activation, or arbitrary replay of the 68 repository migrations. Compatibility structure is reproduced; unsafe authority is **not**.
 
+## 20.2B generation record — ✅ BASELINE GENERATED, NOT APPLIED
+
+The deterministic generator, validator, grant manifest, baseline SQL, and verification SQL are produced (offline; no DB access). Details in [`QF-MVP-20-STAGING-BASELINE-REVIEW.md`](QF-MVP-20-STAGING-BASELINE-REVIEW.md).
+
+- **Baseline generation:** complete. **Baseline application:** NOT STARTED (20.2C).
+- **Source SHA256:** `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f`
+- **Generated baseline SHA256:** `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` (byte-identical across two runs — deterministic).
+- **Verification SQL SHA256:** `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777` (SELECT-only, 30 checks).
+- **Location:** `supabase/staging-baseline/` — intentionally OUTSIDE `supabase/migrations/` so `supabase db push` cannot apply it. Raw dump not committed.
+- **Grant policy:** default-deny; service_role operational; anon = EXECUTE on `get_public_eligible_vendors` only + no table access; authenticated = EXECUTE on `is_admin`/`owns_vendor`; the four blockers + legacy credit primitives + `qf_apply_vendor_credit_delta` are service_role-only. No `ALTER DEFAULT PRIVILEGES` for anon/authenticated.
+- **Counts (catalog):** 62 tables / 39 functions / 33 SD / 67 policies / 62 RLS / 62 PK / 69 FK / 15 unique-constraints (+32 unique indexes = the audit's 47) / 169 check-constraints / 180 indexes / 0 triggers / 0 views.
+- **FK-cycle:** resolved — all 69 FKs added via `ALTER TABLE` after table creation, so cycles are apply-safe; 5 reference `auth.users`.
+- **Rollback:** staging is empty → drop-and-recreate staging (or `drop schema public cascade` on staging only); never production.
+- **Remaining application prerequisites:** confirm target ref `uckafzuochmbvtiodmcl`; preflight requires an empty project + managed prereqs; recreate the `auth.users` new-user trigger separately (not in the public dump); add authenticated dashboard grants as forward remediation; all rows of the verify SQL must be `PASS` in 20.2C.
+
 ## 1. Sanitization rules (applied when generating the baseline SQL in 20.2B)
 
 1. **Ownership:** strip every `OWNER TO "postgres"` (101×) / `pg_database_owner`; regenerate ownership for the staging migration role. Ownership is **explicitly generated for staging**, never copied.

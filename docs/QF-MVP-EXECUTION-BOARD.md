@@ -9,10 +9,13 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 ## 1. Program status
 - **QF-MVP-00:** **COMPLETE**
 - **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
-- **QF-MVP-20:** **NOT_STARTED**
-- **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine
-- **QF-MVP-20 opening requirement:** Authority repair before feature expansion
-- **Staging provisioning:** **OPEN_LAUNCH_PREREQUISITE**
+- **QF-MVP-20:** **IN_PROGRESS**
+- **Current task:** QF-MVP-20.0 — Authority Repair Design
+- **Implementation status:** **NOT_STARTED**
+- **Database remediation:** **NOT_STARTED**
+- **Production database access:** **NONE**
+- **Staging provisioning:** **OPEN_PREREQUISITE**
+- **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine (opening requirement: authority repair before feature expansion)
 - **Roadmap:** LOCKED
 - **Launch market:** Pune
 - **Meta voice:** excluded
@@ -23,7 +26,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-20 — Marketplace Transaction Engine** — **`NOT_STARTED`** (do not mark `IN_PROGRESS`). Its opening requirement is **authority repair before feature expansion** — the ordered scope 20.A–20.E in [`QF-MVP-10-CLEANUP-PLAN.md`](QF-MVP-10-CLEANUP-PLAN.md), driven by the production reconciliation findings. Applying any of that scope is gated on staging provisioning (`OPEN_LAUNCH_PREREQUISITE`).
+**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.0 — Authority Repair Design** (design & documentation only; `Implementation status: NOT_STARTED`, `Database remediation: NOT_STARTED`, `Production database access: NONE`). Its opening requirement is **authority repair before feature expansion** — the ordered scope 20.A–20.E in [`QF-MVP-10-CLEANUP-PLAN.md`](QF-MVP-10-CLEANUP-PLAN.md), driven by the production reconciliation findings. The canonical engine, credit authority, replacement workflow, eligibility, public projection, communication boundary, migration plan, and acceptance-test matrix are designed in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), and [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md). No runtime code, migration, or DB/provider access in this task. Applying any repair is gated on staging provisioning (`OPEN_PREREQUISITE`).
 
 ### Previous active phase — QF-MVP-10 (COMPLETE)
 **QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).
@@ -66,7 +69,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 |---|---|---|---|---|---|
 | QF-MVP-00 Program Lock & Clean Baseline | **COMPLETE** | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | ✅ Focused MVP tests (40/40) + typecheck + **lint** + build + `verify:mvp` end-to-end; governance non-blocking |
 | QF-MVP-10 Core Architecture & Data Truth | **COMPLETE** | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | ✅ Every route/service/migration classified + ownership map + authority audit + **production SELECT-only reconciliation executed (22 Jul 2026)** |
-| QF-MVP-20 Marketplace Transaction Engine | NOT_STARTED | 10 | 3–5 d | Lead→qualify→eligible→assign→replace→close, deterministic + audited | Limits unbypassable; credit deduction idempotent; replacement concurrency-safe; no AI scoring |
+| QF-MVP-20 Marketplace Transaction Engine | **IN_PROGRESS** (20.0 design) | 10 | 3–5 d | Lead→qualify→eligible→assign→replace→close, deterministic + audited | Limits unbypassable; credit deduction idempotent; replacement concurrency-safe; no AI scoring |
 | QF-MVP-30 Vendor CRM & Campaign Readiness | NOT_STARTED | 10, 20 | 4–6 d | CRM directory/profile/tasks/segments + consent-safe campaigns | Segments deterministic; campaigns cannot bypass consent; snapshots auditable |
 | QF-MVP-40 Meta WhatsApp Production Readiness | NOT_STARTED | 10 (20 for content) | 4–6 d | Non-voice Meta inbound/outbound/delivery/consent activated on staging | Staging webhook verified; foreign callback zero-effect; STOP/START/HELP correct; no voice path |
 | QF-MVP-50 n8n Workflow Automation | NOT_STARTED | 20, 40 | 3–5 d | Core→n8n→Meta execution, idempotent, Jarvis-independent | Duplicate events don't double-act; uncertain outcomes not resent; pausable; auditable |

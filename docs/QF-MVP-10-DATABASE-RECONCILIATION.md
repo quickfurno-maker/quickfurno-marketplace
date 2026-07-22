@@ -1,10 +1,27 @@
-# QF-MVP-10.7 — Database Reconciliation Plan (PLAN ONLY)
+# QF-MVP-10.7/10.8 — Database Reconciliation
 
-**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · **HEAD:** `cda20fd`
+**Branch:** `mvp/qf-mvp-10-core-data-truth-v1`
 
-> **This document performs NO database access.** It defines a **later, read-only** procedure to reconcile the committed schema (`supabase/migrations/*` → [`generated ledger JSON`](generated/qf-mvp-migration-ledger.json)) against **staging** and **production**. **No write, `db push`, `db reset`, `migration up`, or `migration repair` is planned as automatic remediation.** Managed-DB history is assumed **possibly drifted**; nothing is applied automatically.
+## ✅ Execution record (22 July 2026) — production SELECT-only reconciliation COMPLETE
 
-> **QF-MVP-10.7 tool status:** this procedure is now **implemented** as a read-only tool — `scripts/mvp/reconciliation/**` (runbook: `scripts/mvp/reconciliation/README.md`), commands `npm run reconcile:mvp:{selftest,staging,production,compare}`. The tool enforces `BEGIN READ ONLY` + a write/DDL guard, keeps credentials out of `argv`/logs/output, and **refuses to fabricate** (stops with a distinct exit code when credentials/`psql` are absent). **It has not yet been executed** (no read-only credentials / `psql` in the working environment) — results and the completion decision are in [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md); **QF-MVP-10 stays `IN_PROGRESS`** until it runs (or is founder-waived).
+Production was reconciled on **22 July 2026** under a founder-approved, **process-enforced SELECT-only** operating mode. Key facts about the access mode:
+
+- **The connection was NOT technically read-only.** The connected Supabase integration connected as PostgreSQL role `postgres`, and the database reported `transaction_read_only = off` — a write was technically possible over this connection.
+- **Read-only behaviour was enforced by process, not by the connection** — every operation was restricted to an explicit **SELECT-only allowlist**. Do not describe the connection itself as read-only.
+- **Founder approval (verbatim):** `APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`
+- **No database changes.** No `INSERT/UPDATE/DELETE/UPSERT/CREATE/ALTER/DROP/TRUNCATE/GRANT/REVOKE`, no migration application, no provider operation, no deployment.
+- **Staging was not provisioned** (`STAGING_NOT_PROVISIONED`); production was reconciled directly under the SELECT-only allowlist. This is the accepted QF-MVP-10 staging disposition and does **not** waive staging for launch.
+- **No provider access** occurred (no Meta / n8n / SMS operation).
+
+Full production findings and the completion decision are in [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md); the migration-history record is in [`QF-MVP-10-MIGRATION-LEDGER.md`](QF-MVP-10-MIGRATION-LEDGER.md). **QF-MVP-10 is now COMPLETE.** No production migration automation may run until an approved reconciliation/baseline strategy exists; remediation is QF-MVP-20 scope.
+
+The tool `scripts/mvp/reconciliation/**` (`npm run reconcile:mvp:{selftest,staging,production,compare}`) remains available for repeat read-only runs; the 22 July reconciliation was performed through the connected Supabase integration under the SELECT-only allowlist above.
+
+---
+
+## Original plan (retained for the read-only procedure it defines)
+
+> **This section performs NO database access.** It defines the **read-only** procedure used to reconcile the committed schema (`supabase/migrations/*` → [`generated ledger JSON`](generated/qf-mvp-migration-ledger.json)) against production. **No write, `db push`, `db reset`, `migration up`, or `migration repair` is planned as automatic remediation.** Managed-DB history is assumed **possibly drifted**; nothing is applied automatically.
 
 ## 0. Why this is the pre-QF-MVP-20 gate
 

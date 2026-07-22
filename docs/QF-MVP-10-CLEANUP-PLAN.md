@@ -1,6 +1,20 @@
 # QF-MVP-10.6 — Cleanup Plan & QF-MVP-10.8 — Execution Order
 
-**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · **HEAD:** `cda20fd` · Evidence = repository code (no DB access).
+**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · Evidence = repository code **+ ✅ production SELECT-only reconciliation (22 July 2026)**.
+
+## QF-MVP-20 opening repair order (production-reconciled)
+
+The 22 July 2026 production reconciliation (process-enforced SELECT-only; no DB change) confirmed live authority defects that QF-MVP-20 must repair **before feature expansion**. This is the ordered opening scope of QF-MVP-20 — authority repair first. Full evidence: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).
+
+- **20.A — Close public assignment authority.** Revoke PUBLIC/anon/authenticated `EXECUTE` on the four SECURITY DEFINER assignment RPCs (`admin_smart_assign_lead_to_vendors`, `assign_client_selected_vendor_to_group`, `assign_vendor_to_requirement_group`, `assign_lead_to_preferred_vendor`) and add in-body caller-authorization / lead-ownership proof. Active authority bypass — highest priority.
+- **20.B — Canonical 3-active / 6-lifetime transaction.** Consolidate onto one canonical assignment authority (base: `assign_lead_to_paid_vendors_phase26a` + `assign_lead_to_vendors`, both service_role-only), enforcing max **3 active** and max **6 lifetime unique** vendors in the transaction (and via trigger), plus one-replacement-at-a-time. Correct the `app_settings.max_vendors_per_lead = 4` drift to 3 through an approved change. Move the `whatsapp_logs` side effect out of assignment authority and behind the communication authority.
+- **20.C — Ledger-backed credit authority & approval-gated restoration.** Route every credit mutation through `qf_apply_vendor_credit_delta` (mandatory `vendor_credit_logs` evidence under `uq_vendor_credit_logs_reference`); retire the legacy un-ledgered `deduct_vendor_credit` / `restore_vendor_credit` / `increment_vendor_credits`; gate bad-lead restoration behind founder/authorized-admin approval.
+- **20.D — Public vendor monetization-safe projection.** Replace direct anon column access to `vendors` with a public-safe projection/view or server-owned DTO so package/plan/credit/monetization columns are never anon-readable; add automated no-leak regression coverage; keep full data only on authorized vendor/admin/CRM paths.
+- **20.E — Historical assignment-ledger gap investigation.** Design a reviewed historical reconciliation procedure for the 27/46 credit-deducted assignments lacking `lead_assignment` ledger evidence (5 admin / 16 automatic / 6 client-selected) that **proves whether a debit actually occurred** before inserting any historical or compensating ledger row. **No blind backfill.**
+
+> Staging is a hard prerequisite for applying any of these repairs (`STAGING_NOT_PROVISIONED` today — see the Execution Board). No production migration automation may run until an approved reconciliation/baseline strategy exists.
+
+---
 
 **Default rule:** *Deletion is NOT an MVP blocker* unless the item causes a **build failure**, a **security exposure**, an **authority bypass**, **migration ambiguity**, or **operational confusion that could cause production misuse**. **No deletion without dependency proof.** No broad rewrites for aesthetics. **This phase deletes/refactors nothing.**
 

@@ -1,10 +1,71 @@
 # QF-MVP-10.5 — Authority Audit
 
-**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · **HEAD:** `cda20fd` · Evidence = repository code (no DB access; DB state `UNKNOWN_UNVERIFIED`).
+**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · Evidence = repository code **+ ✅ production SELECT-only reconciliation (22 July 2026)**.
 
 Audits the 16 locked authorities. Severity: **BLOCKER** (active authority bypass / security exposure) · **HIGH** (correctness/consolidation must precede the owning phase) · **MEDIUM** (drift risk) · **LOW** · **INFORMATIONAL**. Per the task rule, architectural *preference* is **not** labelled a blocker without evidence.
 
-**Headline:** **No BLOCKER found.** There is **no active authority bypass** — every authoritative write (assignments, credits, consent) goes through a SECURITY DEFINER RPC or a single owning service; no TS/route writes those tables directly; no AI in the decision path; no Jarvis in-repo; Meta/n8n gated off. The material risks are **HIGH consolidation/verification items** concentrated in the marketplace/credits domain.
+> **Headline update (production-reconciled):** the repository-only audit below concluded "No BLOCKER" because no TS/route writes the authoritative tables directly. **Reading the live database changed that verdict.** Four SECURITY DEFINER assignment RPCs are **executable by PUBLIC / anon / authenticated** with **no in-body caller authorization** — an **active authority bypass** exploitable directly against the database. Plus a **HIGH** public monetization exposure (anon `SELECT` on vendor credit/package columns). These are the confirmed BLOCKERS; the money-path consolidation items remain as originally assessed. See the production-verified section immediately below, then the original repository audit.
+
+---
+
+## ✅ Production-verified findings (22 July 2026, SELECT-only)
+
+Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval. No database change, migration, or provider access occurred. Full evidence: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).
+
+### PV-1. Assignment authority — **BLOCKER (active bypass)**
+
+Four assignment RPCs are SECURITY DEFINER **and executable by PUBLIC, anon, authenticated, service_role**, with **no in-body caller-authorization / lead-ownership check**:
+
+| RPC | Signature | Definition MD5 | Key defects |
+|---|---|---|---|
+| `admin_smart_assign_lead_to_vendors` | `(uuid,uuid[],boolean,integer)` | `8b64ca6203b9faa1189ddac3521b2a42` | no admin check; limit clamp 1–9; uses `deduct_vendor_credit`/`restore_vendor_credit`; **no assignment-linked ledger row** |
+| `assign_client_selected_vendor_to_group` | `(uuid,uuid,uuid,integer)` | `3bbe5417b13293ca72a4b8526740be21` | no lead-ownership/caller proof; clamp 1–9; legacy debit/restore; **no ledger row** |
+| `assign_vendor_to_requirement_group` | `(uuid,uuid,uuid,text,integer,text)` | `b63b7656ef95832e2fed8fc37a796d6a` | no caller check; clamp 1–9; legacy debit/restore; **no ledger row** |
+| `assign_lead_to_preferred_vendor` | `(uuid,uuid)` | `0138b0ff9dd89a320b73af57e60fe524` | no caller/lead-ownership check; **does not check existing total assignment count**; **does not enforce lifetime-six**; live body does not enforce complete city/category compatibility; **does** write ledger evidence after success |
+
+### PV-2. Canonical assignment base (service_role-only) — consolidation targets
+
+| RPC | Signature | Definition MD5 | Classification |
+|---|---|---|---|
+| `assign_lead_to_paid_vendors_phase26a` | `(uuid,uuid[])` | `3ab9c1a04b44ec130f032188d2a7f51f` | **STRONG_CANONICAL_BASE_REQUIRES_CONSOLIDATION** — service_role only; max 3; dup-lead + existing-assignment idempotency; normalized eligibility; **mandatory ledger row**; **lifetime-six absent** |
+| `assign_lead_to_vendors` | `(uuid,uuid[],boolean,text)` | `9a9eff43766542aa68d71e0d6860be9b` | **REQUIRES_CONSOLIDATION** — service_role only; max 3; **mandatory ledger row**; **lifetime-six absent**; **directly inserts into `whatsapp_logs`** (comms side effect must move behind the communication authority) |
+
+### PV-3. Assignment limits & live data
+
+- `app_settings.max_vendors_per_lead = 4` — **configuration drift** (canonical RPCs clamp to 3); correct later via approved change.
+- Live counts: 46 total (34 auto / 7 client-selected / 5 admin); all 46 `credit_deducted`; **0** leads above 3 assignments; **0** leads above 6 unique vendors; max-3 assignments and max-3 unique vendors on any one lead.
+- `UNIQUE (lead_id, vendor_id)` exists; `lead_assignment_approvals.selected_vendor_count ≤ 3`. **No** canonical authority enforces 6 lifetime unique vendors; **no** trigger enforces 3-active or 6-lifetime.
+- Current rows do not violate the intended limit, but several live paths are **capable** of violating it.
+
+### PV-4. Credit & ledger authority
+
+- `qf_apply_vendor_credit_delta(uuid,integer,text,text,text,text,text,boolean)` — MD5 `45ad58beb9cb1dd8ea4f77466909cc0e`: SECURITY DEFINER, service_role only, locks vendor row, post-lock duplicate-reference check, writes `vendor_credit_logs`, returns `already_applied` on duplicate. `uq_vendor_credit_logs_reference` exists: `UNIQUE (reference_type, reference_id) WHERE reference_id IS NOT NULL`.
+- Live credit evidence: 47 credit-log rows; **0** arithmetic-inconsistent; 28 without `reference_id`; 19 assignment-debit rows; **0** invalid-lead refunds; **0** vendors with negative credits; **0** duplicate reference groups.
+- **Assignment-ledger gap (A6/A7 confirmed live):** of 46 credit-deducted assignments, **27** lack a matching `lead_assignment` / assignment-UUID / `lead_assignment_debit` ledger row — **5 admin, 16 automatic, 6 client-selected**. **No blind backfill:** QF-MVP-20 must design a reviewed procedure that proves a debit actually occurred before inserting historical/compensating evidence.
+- Legacy `deduct_vendor_credit`, `restore_vendor_credit`, `increment_vendor_credits` all mutate balances **without ledger evidence**; `restore_vendor_credit` has **no approval input** — both violate the locked money-path rules.
+
+### PV-5. Public monetization exposure — **HIGH**
+
+The `vendors` table exposes `total_credits`, `remaining_credits`, `public_visibility`, `paid_status`, `package_name`, `package_status`, `package_expires_at`, and the **anon** role has `SELECT` on these columns. The public-listing RLS policy limits **rows** but not **columns**, so the DB currently permits **anonymous reads of monetization fields** on publicly visible vendor rows. Violates the locked "no monetization on public vendor pages/payloads" rule. QF-MVP-20 must add a public-safe projection/DTO, prevent anon exposure of monetization columns, add no-leak regression coverage, and preserve full data only for authorized vendor/admin/CRM paths.
+
+### PV-6. Consent & communication authority
+
+- Consent writer `apply_communication_consent_command` — MD5 `195e3437ddf2b56f60cd3bb446bc70a4`: SECURITY DEFINER, service_role only, fixed policy version, input validation, deterministic lock ordering, receipt-based replay/conflict handling, marketing+transactional suppression, immutable evidence. **Clean.**
+- Consent-ack functions present: `qf_claim_consent_ack_intents`, `qf_reserve_consent_ack_provider_attempt`, `qf_terminalize_consent_ack_intent`, `qf_expire_consent_ack_intents`, `qf_recover_stale_dispatching_consent_ack_intents`.
+- Meta correctly inactive: 0 provider accounts; 1 runtime policy (`meta_whatsapp_cloud`/`whatsapp`/`disabled`); 16 internal templates (16 active); 0 provider mappings; 0 messages/receipts/inbound/delivery/consent-ack/consent-events/suppressions.
+- Provider-account hardening **present**: provider-account tables + FKs; account-scoped webhook/inbound/delivery indexes; `communication_delivery_events_provider_account_required_check`. **Missing**: `communication_consent_ack_intents.provider_account_id` still **nullable**; expected ack provider-account-required check **absent** → **`QF-MVP-40_BLOCKER`**.
+
+### PV-7. RLS, grants & triggers
+
+Communication authority tables: RLS enabled, no anon/authenticated policies, service-role access, fail-closed. Core tables carry older broad grants with RLS as the row boundary. The **primary authority defect** is public/anon execution of the SECURITY DEFINER assignment functions (PV-1). **No reviewed trigger** enforces max-3, lifetime-6, or mandatory ledger evidence.
+
+**Production severity roll-up:** **BLOCKER** — PV-1 (4 PUBLIC/anon-executable assignment RPCs, active bypass). **HIGH** — PV-5 (public monetization exposure); PV-4 assignment-ledger gap (27/46). **QF-MVP-40_BLOCKER** — PV-6 nullable ack `provider_account_id`. **Consolidation** — PV-2. **Config drift** — PV-3 (`max_vendors_per_lead = 4`).
+
+---
+
+## Original repository audit (pre-reconciliation; retained)
+
+> The section below was written from **repository code only**, before the database was read. Where it says "no active bypass / DB state UNKNOWN_UNVERIFIED," the production-verified findings above are now authoritative — most importantly, the live assignment RPCs are PUBLIC/anon-executable (a BLOCKER the code-only view could not see).
 
 ---
 

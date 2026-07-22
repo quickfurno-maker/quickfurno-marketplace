@@ -1,7 +1,28 @@
 # QF-MVP-10.3 — Migration Ledger
 
-**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · **HEAD:** `cda20fd` · **Status:** evidence map (no DB access)
+**Branch:** `mvp/qf-mvp-10-core-data-truth-v1` · **Status:** evidence map + ✅ production migration-history reconciled (22 July 2026)
 **Source of truth:** `supabase/migrations/*.sql` (68 files) → parsed into [`docs/generated/qf-mvp-migration-ledger.json`](generated/qf-mvp-migration-ledger.json) by `scripts/mvp/inventory/run.mjs`.
+
+## ✅ Production migration-history reconciliation (22 July 2026) — `HISTORY_DRIFT`
+
+Production was inspected under a founder-approved, **process-enforced SELECT-only** mode (the connection was **not** technically read-only — role `postgres`, `transaction_read_only = off`; behaviour was constrained by an explicit SELECT-only allowlist). No migration was applied, edited, reordered or repaired.
+
+- **Repository migrations:** **68** (QF-MVP-10 inventory).
+- **Production migration-history rows:** **4**.
+- **Classification: material `HISTORY_DRIFT`** — the production migration history diverges materially from the repository migration ledger.
+
+**The four recorded production migration-history rows (exact):**
+
+| # | Version | Name | Statements | Statements MD5 |
+|---|---|---|---|---|
+| 1 | `20260624095535` | `sync_vendor_onboarding_fields` | 1 | `cce0116365cc624ca829e081ec9a9ee0` |
+| 2 | `20260713000100` | `communication_consent_ack_intents` | 42 | `17104f28552e13292444941a689bf3ab` |
+| 3 | `20260716000100` | `communication_provider_account_binding` | 24 | `34340a9f2061088494fa760aa266809f` |
+| 4 | `20260720000100` | `communication_delivery_event_provider_account_required` | 1 | `5ad09e6fca9df163f919fcb1ea417d31` |
+
+> **An unrecorded migration version does NOT prove its objects are absent.** Several unrecorded migration features are visibly present in live production: `qf_apply_vendor_credit_delta`, `uq_vendor_credit_logs_reference`, ledger-backed assignment RPC bodies, `apply_communication_consent_command`, consent receipt-validation functions, consent-ack worker functions, and provider-account objects all exist despite the version list holding only 4 rows. Applied-state must be judged from **live object evidence**, not the history list.
+
+**Production automation remains prohibited.** No `supabase db push` / `db reset` / `migration up` / `migration repair` / `apply_migration` may run against production until an approved reconciliation/baseline strategy exists (a founder-reviewed manual reconciliation — never an automatic repair/reset). See [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md) for the live object, RPC, credit and consent findings.
 
 ## Method & evidence rule
 

@@ -7,9 +7,13 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 ---
 
 ## 1. Program status
+- **QF-MVP-00:** **COMPLETE**
+- **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
+- **QF-MVP-20:** **NOT_STARTED**
+- **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine
+- **QF-MVP-20 opening requirement:** Authority repair before feature expansion
+- **Staging provisioning:** **OPEN_LAUNCH_PREREQUISITE**
 - **Roadmap:** LOCKED
-- **Active implementation:** QF-MVP-10 — Core Architecture & Data Truth — **IN_PROGRESS** (QF-MVP-00 COMPLETE)
-- **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine (`NOT_STARTED`, after 10.7 DB reconciliation)
 - **Launch market:** Pune
 - **Meta voice:** excluded
 - **AI scoring / ranking:** excluded
@@ -19,7 +23,10 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-10 — Core Architecture and Data Truth** — **`IN_PROGRESS`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON). **Remains `IN_PROGRESS` until the read-only staging/production DB reconciliation (QF-MVP-10.7) is completed or formally waived by an explicit founder decision** — no live database was accessed in this phase.
+**QF-MVP-20 — Marketplace Transaction Engine** — **`NOT_STARTED`** (do not mark `IN_PROGRESS`). Its opening requirement is **authority repair before feature expansion** — the ordered scope 20.A–20.E in [`QF-MVP-10-CLEANUP-PLAN.md`](QF-MVP-10-CLEANUP-PLAN.md), driven by the production reconciliation findings. Applying any of that scope is gated on staging provisioning (`OPEN_LAUNCH_PREREQUISITE`).
+
+### Previous active phase — QF-MVP-10 (COMPLETE)
+**QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).
 
 **QF-MVP-10 subphase status:**
 - **10.1 Read-only inventory tooling** — `COMPLETE`. `scripts/mvp/inventory/**` + `npm run inventory:mvp` → byte-stable `docs/generated/qf-mvp-runtime-inventory.json` + `qf-mvp-migration-ledger.json` (no DB/network/secrets; repo-relative; identical across runs).
@@ -28,12 +35,12 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **10.4 Core domain map** — `COMPLETE`. 14 domains + AOS; dependency direction; 8 evidence-backed boundary violations (no active bypass).
 - **10.5 Authority audit** — `COMPLETE`. 16 authorities. **No BLOCKER**; 4 HIGH (eligibility duplication · no 6-lifetime cap · live credit-RPC body unverified · un-ledgered `admin_smart_assign` debit).
 - **10.6 Cleanup plan** — `COMPLETE`. A–E buckets; deletion is not an MVP blocker; nothing deleted; DB-proof prerequisites recorded.
-- **10.7 Database reconciliation** — **tool BUILT + self-tested; execution PENDING (gate).** Read-only tool `scripts/mvp/reconciliation/**` + `npm run reconcile:mvp:{selftest,staging,production,compare}`: `BEGIN READ ONLY` + write/DDL guard + credential-hygiene + leak-fence + **no fabrication** (stops with a distinct exit code when credentials/`psql` are absent). **Not executed** — no read-only credentials / `psql` in the working environment. Results + completion decision in [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md). **This execution is the pre-QF-MVP-20 gate and keeps QF-MVP-10 `IN_PROGRESS`.**
-- **10.8 Execution order** — `COMPLETE`. Order 20→40→(30)→50→70→(60)→80; pre-20 gate = 10.7 execution + the (now-locked) founder decisions below.
+- **10.7 Database reconciliation** — **`COMPLETE` (executed 22 July 2026).** Production inspected through the connected Supabase integration under a founder-approved, **process-enforced SELECT-only** mode (connection **not** technically read-only — role `postgres`, `transaction_read_only = off`; behaviour constrained by an explicit SELECT-only allowlist). No DB change / migration / provider access. Findings: **`HISTORY_DRIFT`** (4 history rows vs 68 repo migrations, exact records in the ledger); 62 base tables / 39 functions / 33 SECURITY DEFINER; **4 assignment RPCs PUBLIC/anon-executable = BLOCKER**; canonical service_role RPCs lack the lifetime-six rule; 27/46 credit-deducted assignments lack ledger evidence; anon `SELECT` on vendor monetization columns = **HIGH**; Meta correctly inactive but ack `provider_account_id` nullable = **`QF-MVP-40_BLOCKER`**. Results in [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).
+- **10.8 Execution order** — `COMPLETE`. Order 20→40→(30)→50→70→(60)→80; QF-MVP-20 opens with authority repair (20.A–20.E). QF-MVP-10 is now **COMPLETE**.
 
 **Locked founder decisions (QF-MVP-10.7):** active cap **3**; **lifetime unique-vendor cap = 6** (the existing **9 is rejected**, corrected in QF-MVP-20); credit restoration requires founder/authorized-admin approval; **every credit mutation requires an audit ledger row**; public vendor profiles must not expose package/plan/credit/monetization; **AOS dormant scaffolding = KEEP_DISABLED**; **Jarvis (QF-MVP-60) = MVP_REQUIRED** (recommendation-only), not optional.
 
-**Key facts established:** AOS holds no authority + **no AI active** + **no Jarvis in-repo**; **Meta non-voice only + gated OFF by DB seed**; consent has a single decision/writer/enforcer; all authoritative writes go through SECURITY DEFINER RPCs (no TS/UI bypass). **Open (blocks COMPLETE):** execute the read-only reconciliation of the 12 DO-NOT-AUTO-APPLY migrations + the live assign/credit RPC bodies (credentials/`psql` required).
+**Key facts established:** AOS holds no authority + **no AI active** + **no Jarvis in-repo**; **Meta non-voice only + gated OFF by DB seed**; consent has a single decision/writer/enforcer. **Production reconciliation added the critical correction:** four SECURITY DEFINER assignment RPCs are **PUBLIC/anon-executable with no in-body authorization** — an active bypass that repository-only evidence could not see — now the QF-MVP-20 20.A repair. **Reconciliation is executed; QF-MVP-10 is COMPLETE.**
 
 ---
 
@@ -58,7 +65,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 | Phase | Status | Depends on | Est. effort | Primary deliverable | Exit gate |
 |---|---|---|---|---|---|
 | QF-MVP-00 Program Lock & Clean Baseline | **COMPLETE** | — | 1–2 d | Clean branch, governance de-blocked, `verify:mvp`, green build | ✅ Focused MVP tests (40/40) + typecheck + **lint** + build + `verify:mvp` end-to-end; governance non-blocking |
-| QF-MVP-10 Core Architecture & Data Truth | **IN_PROGRESS** | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | ✅ Every route/service/migration classified + ownership map + authority audit; **⏳ live-DB reconciliation (10.7) pending → stays IN_PROGRESS** |
+| QF-MVP-10 Core Architecture & Data Truth | **COMPLETE** | 00 | 2–3 d | Runtime + DB inventory, Migration Ledger, ownership map, cleanup classification | ✅ Every route/service/migration classified + ownership map + authority audit + **production SELECT-only reconciliation executed (22 Jul 2026)** |
 | QF-MVP-20 Marketplace Transaction Engine | NOT_STARTED | 10 | 3–5 d | Lead→qualify→eligible→assign→replace→close, deterministic + audited | Limits unbypassable; credit deduction idempotent; replacement concurrency-safe; no AI scoring |
 | QF-MVP-30 Vendor CRM & Campaign Readiness | NOT_STARTED | 10, 20 | 4–6 d | CRM directory/profile/tasks/segments + consent-safe campaigns | Segments deterministic; campaigns cannot bypass consent; snapshots auditable |
 | QF-MVP-40 Meta WhatsApp Production Readiness | NOT_STARTED | 10 (20 for content) | 4–6 d | Non-voice Meta inbound/outbound/delivery/consent activated on staging | Staging webhook verified; foreign callback zero-effect; STOP/START/HELP correct; no voice path |
@@ -125,4 +132,4 @@ AI lead scoring · AI vendor ranking · predictive conversion scoring · Jarvis-
 
 ---
 
-**Reminder:** QF-MVP-00 is **COMPLETE**. QF-MVP-10 is **IN_PROGRESS** — the evidence-based Core map, runtime inventory, migration ledger, authority audit, cleanup plan, and DB-reconciliation *plan* are done, but QF-MVP-10 **stays IN_PROGRESS until the read-only live-DB reconciliation (10.7) is executed or waived by an explicit founder decision**. No live DB was accessed. Six QF-MVP-10 docs + `docs/generated/*.json` are the authoritative map; the four locked docs (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`, this board) remain the governing inputs. **Do not begin QF-MVP-20 until 10.7 reconciliation + the founder decisions (6-vs-9 lifetime cap, credit-restore, package coupling) are resolved.**
+**Reminder:** QF-MVP-00 is **COMPLETE**. QF-MVP-10 is **COMPLETE** — the evidence-based Core map, runtime inventory, migration ledger, authority audit, cleanup plan, DB-reconciliation procedure, **and the executed production SELECT-only reconciliation (22 July 2026)** are all done. The reconciliation ran through the connected Supabase integration under a founder-approved, process-enforced SELECT-only allowlist (the connection was not technically read-only); no database change, migration application or provider access occurred. Six QF-MVP-10 docs + `docs/generated/*.json` are the authoritative map; the four locked docs (`QF-MVP-LOCKED-ROADMAP.md`, `QF-MVP-SCOPE-MATRIX.md`, `QF-MVP-ARCHITECTURE-BOUNDARIES.md`, this board) remain the governing inputs. **QF-MVP-20 is `NOT_STARTED` and opens with authority repair (20.A–20.E); applying that repair is gated on staging provisioning (`OPEN_LAUNCH_PREREQUISITE`).**

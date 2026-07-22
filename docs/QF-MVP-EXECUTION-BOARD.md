@@ -10,14 +10,18 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **QF-MVP-00:** **COMPLETE**
 - **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
 - **QF-MVP-20:** **IN_PROGRESS**
-- **Completed:** QF-MVP-20.0 — Authority Repair Design
-- **Current task:** QF-MVP-20.1 — Authority Consumer and Call-Path Audit
+- **Completed:** QF-MVP-20.0 — Authority Repair Design · QF-MVP-20.1 — Consumer and Call-Path Audit
+- **Current task:** QF-MVP-20.2A — Staging Schema Baseline Audit
 - **Implementation:** **NOT_STARTED**
 - **Migration:** **NOT_CREATED**
 - **Database remediation:** **NOT_STARTED**
-- **Production access:** **NONE**
-- **Staging:** **OPEN_PREREQUISITE**
-- **Next active phase:** QF-MVP-20 — Marketplace Transaction Engine (opening requirement: authority repair before feature expansion)
+- **Staging project:** **PROVISIONED** (ref `uckafzuochmbvtiodmcl`)
+- **Staging state:** **EMPTY**
+- **Staging baseline:** **NOT_CREATED**
+- **Staging database mutation:** **NONE**
+- **Production database access:** **NONE**
+- **Production database mutation:** **NONE**
+- **Next:** QF-MVP-20.2B — Generate Reviewed Staging Baseline
 - **Roadmap:** LOCKED
 - **Launch market:** Pune
 - **Meta voice:** excluded
@@ -28,13 +32,14 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.1 — Authority Consumer and Call-Path Audit** (read-only repository audit + documentation; `Implementation: NOT_STARTED`, `Migration: NOT_CREATED`, `Database remediation: NOT_STARTED`, `Production access: NONE`). Its opening requirement is **authority repair before feature expansion** — the ordered scope 20.A–20.E in [`QF-MVP-10-CLEANUP-PLAN.md`](QF-MVP-10-CLEANUP-PLAN.md).
+**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.2A — Staging Schema Baseline Audit** (read-only schema audit of an external production public-schema dump + documentation; `Implementation: NOT_STARTED`, `Migration: NOT_CREATED`, `Database remediation: NOT_STARTED`, staging + production DB mutation: `NONE`). Staging is now **PROVISIONED and EMPTY**; the reviewed baseline is `NOT_CREATED` (generation is 20.2B).
 
 **QF-MVP-20 subphase status:**
-- **20.0 Authority Repair Design** — `COMPLETE`. Canonical engine, credit authority, replacement workflow, eligibility, public projection, communication boundary, migration plan, and acceptance-test matrix designed in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md).
-- **20.1 Consumer & call-path audit** — `COMPLETE`. Full repository consumer map in [`QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md`](QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md): 4 Supabase clients, all `.rpc()` consumers of the 10 named RPCs, direct table-mutation matrix, 8 divergent eligibility evaluators, ledger-bypass credit paths (B1–B4), no replacement authority exists, comms-in-transaction only in `assign_lead_to_vendors`, public payload safe-by-convention (DB-grant exposure remains), all AOS `DORMANT_KEEP_DISABLED`. **6 ACTIVE_BLOCKERs**; consumer inventory frozen so grant-revoke can be sequenced safely; no revoke is READY yet.
+- **20.0 Authority Repair Design** — `COMPLETE`. Canonical engine, credit authority, replacement, eligibility, public projection, communication boundary, migration plan, acceptance-test matrix in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md).
+- **20.1 Consumer & call-path audit** — `COMPLETE`. Repository consumer map in [`QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md`](QF-MVP-20-CONSUMER-CALL-PATH-AUDIT.md): 4 Supabase clients, all `.rpc()` consumers, table-mutation matrix, 8 eligibility evaluators, ledger-bypass paths, no replacement authority, comms-in-transaction only in `assign_lead_to_vendors`, all AOS `DORMANT_KEEP_DISABLED`; 6 ACTIVE_BLOCKERs.
+- **20.2A Staging schema baseline audit** — `COMPLETE`. Read-only audit of the external production public-schema dump (SHA256 `269c9265…`) in [`QF-MVP-20-STAGING-BASELINE-AUDIT.md`](QF-MVP-20-STAGING-BASELINE-AUDIT.md) + [`QF-MVP-20-STAGING-BASELINE-PLAN.md`](QF-MVP-20-STAGING-BASELINE-PLAN.md). Inventory (62 tables / 39 functions / 33 SECURITY DEFINER / 67 policies / 62 RLS / 180 indexes / **0 triggers** / **0 destructive** / **0 secrets**); classification matrix; the 4 blocker RPCs confirmed `GRANT ALL TO anon+authenticated` (EXCLUDE_UNSAFE); `GRANT ALL ON vendors TO anon` monetization exposure; live-body evidence resolves the 20.1 "which body is live" unknown (3 un-ledgered blockers vs 3 ledgered RPCs). Truthful migration-history strategy (one baseline row, no fake 68), sanitization rules, application order, parity plan. Raw dump **not** committed.
 
-No runtime code, migration, or DB/provider access in this task. Applying any repair is gated on staging provisioning (`OPEN_PREREQUISITE`).
+No runtime code, migration, or DB/provider access in this task. Next: **QF-MVP-20.2B — Generate Reviewed Staging Baseline**.
 
 ### Previous active phase — QF-MVP-10 (COMPLETE)
 **QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).

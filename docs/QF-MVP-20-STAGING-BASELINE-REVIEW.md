@@ -110,6 +110,16 @@ The six assignment RPCs and `deduct_/restore_/increment_vendor_credit(s)` are re
 3. **`gen_random_uuid` provisioning** on the fresh staging project is asserted by the preflight, not proven offline.
 4. Exact **catalog check-constraint total on the live DB** is expected to equal 169; confirmed only when the verify SQL runs in 20.2C.
 
+## 15b. QF-MVP-20.2C1 preflight result (SELECT-only staging access)
+
+The application preflight ran (SELECT-only staging access + `db push --dry-run`; **no apply, no mutation, no production access**) — full record in [`QF-MVP-20-STAGING-APPLICATION-PREFLIGHT.md`](QF-MVP-20-STAGING-APPLICATION-PREFLIGHT.md):
+- External apply workspace prepared (outside repo); copied migration hash `920a4aa0…` preserved; exactly one `.sql`, no seed.
+- **Linked to staging only** (`uckafzuochmbvtiodmcl`); no production ref in any link marker.
+- Staging SELECT-only: PG **17.6**; public tables **0**, policies **0**, indexes **0**, views **0**, RLS-tables **0**; migration-history rows **0** (history table absent); `auth.users` ✅, `gen_random_uuid` ✅; provider accounts **0**; no production ref in public objects.
+- **New finding:** staging carries one Supabase-managed function `public.rls_auto_enable()` (via the managed `ensure_rls` event trigger) → after apply, public functions = **40** not 39, so the verify SQL `03_public_functions` check needs a 20.2C2 reconciliation (scope to the 39 QuickFurno names; do **not** drop the managed default).
+- `migration list --linked`: local **1** (`20260722000100`) / remote **0**. Dry-run proposes **exactly one** migration; no seed/edge/reset/repair/config/prod.
+- Staging remained EMPTY (re-verified post-dry-run); no baseline applied.
+
 ## 16. QF-MVP-20.2C application prerequisites
 
 1. Confirm target project ref = `uckafzuochmbvtiodmcl` (abort on `yqpgcsduqbxulrlzwzap`).

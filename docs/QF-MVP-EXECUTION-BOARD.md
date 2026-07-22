@@ -10,19 +10,18 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **QF-MVP-00:** **COMPLETE**
 - **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
 - **QF-MVP-20:** **IN_PROGRESS**
-- **Completed:** QF-MVP-20.0 — Authority Repair Design · QF-MVP-20.1 — Consumer and Call-Path Audit · QF-MVP-20.2A — Staging Schema Baseline Audit
-- **Current task:** QF-MVP-20.2B — Generate Reviewed Staging Baseline
+- **Completed:** QF-MVP-20.0 — Authority Repair Design · QF-MVP-20.1 — Consumer and Call-Path Audit · QF-MVP-20.2A — Staging Schema Baseline Audit · QF-MVP-20.2B — Generate Reviewed Staging Baseline
+- **Current task:** QF-MVP-20.2C1 — Staging Application Preflight
 - **Implementation:** **NOT_STARTED**
 - **Migration:** **NOT_CREATED** (baseline is outside `supabase/migrations/`)
 - **Database remediation:** **NOT_STARTED**
 - **Staging project:** **PROVISIONED** (ref `uckafzuochmbvtiodmcl`)
-- **Staging current state:** **EMPTY**
-- **Baseline SQL:** **GENERATED_NOT_APPLIED** (SHA256 `920a4aa0…`)
-- **Verification SQL:** **GENERATED_NOT_EXECUTED** (SHA256 `89362a35…`)
-- **Staging database mutation:** **NONE**
-- **Production database access:** **NONE**
-- **Production mutation:** **NONE**
-- **Next:** QF-MVP-20.2C — Apply and Verify Staging Baseline
+- **Staging expected state:** **EMPTY** (verified SELECT-only; +1 Supabase-managed `rls_auto_enable` function present)
+- **Baseline:** **GENERATED_NOT_APPLIED** (SHA256 `920a4aa0…`)
+- **Database access:** **SELECT_ONLY_STAGING** (dry-run proposes exactly `20260722000100`)
+- **Database mutation:** **NONE**
+- **Production access:** **NONE**
+- **Next:** QF-MVP-20.2C2 — Apply and Verify Staging Baseline
 - **Roadmap:** LOCKED
 - **Launch market:** Pune
 - **Meta voice:** excluded
@@ -33,7 +32,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.2B — Generate Reviewed Staging Baseline** (offline SQL generation + review; `Implementation: NOT_STARTED`, `Migration: NOT_CREATED`, `Database remediation: NOT_STARTED`, staging + production DB mutation: `NONE`). Staging is **PROVISIONED and EMPTY**; the reviewed baseline is **GENERATED, NOT APPLIED** (application is 20.2C).
+**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.2C1 — Staging Application Preflight** (SELECT-only staging access + `db push --dry-run`; no apply, no staging mutation, no production access). Staging is **PROVISIONED and EMPTY**; the reviewed baseline is **GENERATED, NOT APPLIED** (application is 20.2C2).
 
 **QF-MVP-20 subphase status:**
 - **20.0 Authority Repair Design** — `COMPLETE`. Canonical engine, credit authority, replacement, eligibility, public projection, communication boundary, migration plan, acceptance-test matrix in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md).
@@ -41,7 +40,9 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **20.2A Staging schema baseline audit** — `COMPLETE`. Read-only audit of the external production public-schema dump (SHA256 `269c9265…`) in [`QF-MVP-20-STAGING-BASELINE-AUDIT.md`](QF-MVP-20-STAGING-BASELINE-AUDIT.md) + [`QF-MVP-20-STAGING-BASELINE-PLAN.md`](QF-MVP-20-STAGING-BASELINE-PLAN.md). Inventory (62 tables / 39 functions / 33 SECURITY DEFINER / 67 policies / 62 RLS / 180 indexes / **0 triggers** / **0 destructive** / **0 secrets**); classification matrix; the 4 blocker RPCs confirmed `GRANT ALL TO anon+authenticated` (EXCLUDE_UNSAFE); `GRANT ALL ON vendors TO anon` monetization exposure; live-body evidence resolves the 20.1 "which body is live" unknown (3 un-ledgered blockers vs 3 ledgered RPCs). Truthful migration-history strategy (one baseline row, no fake 68), sanitization rules, application order, parity plan. Raw dump **not** committed.
 - **20.2B Generate reviewed staging baseline** — `COMPLETE`. Deterministic generator + offline validator + grant manifest + generated baseline SQL + SELECT-only verifier in `scripts/mvp/staging/**` and `supabase/staging-baseline/**`; review in [`QF-MVP-20-STAGING-BASELINE-REVIEW.md`](QF-MVP-20-STAGING-BASELINE-REVIEW.md). Baseline SHA256 `920a4aa0…` (byte-identical across two runs); verifier SHA256 `89362a35…`. Strips 102 owner + 201 grant + 28 revoke + 12 default-privilege statements; injects safe `search_path` into 6 invoker helpers; the 4 blockers + legacy credit primitives + `qf_apply_vendor_credit_delta` are **service_role-only**; anon gets **no** table/monetization access. FK-cycle unknown resolved (all 69 FKs added post-table). Baseline lives **outside** `supabase/migrations/`; **not applied**; production history untouched; raw dump not committed.
 
-No runtime code applied, no migration in the chain, no DB/provider access in this task. Next: **QF-MVP-20.2C — Apply and Verify Staging Baseline**.
+- **20.2C1 Staging application preflight** — `COMPLETE`. SELECT-only staging access + `db push --dry-run` in [`QF-MVP-20-STAGING-APPLICATION-PREFLIGHT.md`](QF-MVP-20-STAGING-APPLICATION-PREFLIGHT.md). Artifact hashes re-verified (baseline `920a4aa0…`, verify `89362a35…`); offline validator PASS; deterministic. External apply workspace prepared (outside repo, 1 migration, no seed); **linked to staging only** (`uckafzuochmbvtiodmcl`, no prod ref in link markers). Staging SELECT-only: PG 17.6; public tables 0 / policies 0 / indexes 0 / history rows 0; `auth.users` + `gen_random_uuid` present; no provider accounts; no prod ref in public objects. `migration list --linked` local 1 / remote 0; **dry-run proposes exactly `20260722000100`** (no seed/edge/reset/repair/config/prod). Staging remained EMPTY. **Finding:** 1 Supabase-managed `rls_auto_enable` function (via `ensure_rls`) → 20.2C2 must reconcile the post-apply function count (40 vs 39) without dropping the managed default; `auth.users→handle_new_user` trigger absent (forward migration).
+
+No baseline applied, no staging mutation, no migration-history change, no production access in this task. Next: **QF-MVP-20.2C2 — Apply and Verify Staging Baseline**.
 
 ### Previous active phase — QF-MVP-10 (COMPLETE)
 **QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).

@@ -91,7 +91,11 @@ Canonical targets: DB `qf_assign_lead_vendors_v2` · service `services/marketpla
 
 ---
 
-## 7. Migration order (consumer release)
+## 7. Migration order (consumer release) — CORRECTED by QF-MVP-20.3A1
+
+> **Ordering correction (binding).** Canonical authority must exist **before** consumers migrate to it. The release sequence is **A → A2 → B1 (canonical RPCs deployed, legacy retained, no triggers) → R1 (this consumer release) → B2 (enable enforcement triggers) → C → D → E**. Everything in this section is **R1**, and R1 **cannot start until B1 is deployed**. Enforcement triggers (B2) are deliberately deployed *after* R1 so legacy writers never meet a trigger they can violate — see the closure document §9.
+>
+> **Additional R1 scope from 20.3A1:** the public lead-intake path (#2 and the public forms) moves to a **server-owned service-role intake with an explicit field allow-list**; the always-true `leads` INSERT policy and anon table privileges are removed later in **Migration C**, strictly after R1 is live. Production evidence: anon can currently set 17 internal `leads` columns including `lead_quality_score`, `status`, `preferred_vendor_id` and `lead_priority` — enough to forge the auto-distribution quality gate and consume real vendor credits.
 
 1. **Remove** `assignLead` (#1) — no replacement needed.
 2. Land `marketplaceAssignmentService` + canonical eligibility behind a flag; migrate **automatic** (#5) and **delayed fill** (#7, #8) first (lowest external surface, worker identity).

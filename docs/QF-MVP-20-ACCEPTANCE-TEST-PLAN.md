@@ -59,6 +59,15 @@ The 20.3A design fixes the semantics these acceptance tests depend on. L1–L24 
 
 Deterministic fixtures (seeded UUIDs, 8 vendors so lifetime-6 can be exceeded) and real parallel-session concurrency barriers are mandatory; staging must return to zero application rows between suites.
 
+## QF-MVP-20.3A1 closure — final locked definitions
+
+- **Active set is final: `{assigned, delivered, accepted}`.** `in_progress` is **not** a lifecycle status (CRM-only); any earlier active set containing it is **superseded and void**. All acceptance tests read the set from one shared SQL+TS constant.
+- **Backfill/lineage tests added** (T23–T25): 46 rows → `assigned` deterministically; 46 lineage events + 1 batch operation, idempotent; lineage survives a lead/vendor delete attempt via `RESTRICT`.
+- **Trigger sequencing tests added** (T26, T27): no triggers after B1, triggers present after B2, and a legacy 9-vendor recovery attempt is rejected post-B2 with no partial assignment or debit.
+- **Suspension tests added** (T28, T29): temporary suspension is a hard gate that admin override cannot bypass, and suspension fields never reach the public projection.
+- **Intake and privilege tests added** (T30, T31): crafted intake payloads cannot set `lead_quality_score`/`status`/`preferred_vendor_id`/`lead_priority`/`internal_notes`; after Migration C, `anon` holds **no** table privilege on `leads` or `vendors` and the always-true INSERT policy is gone.
+- **Divergence view test added** (T32): `vendor_wallet_package_divergence_v` classifies correctly and mutates nothing; the wallet is the sole assignment-debit authority.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

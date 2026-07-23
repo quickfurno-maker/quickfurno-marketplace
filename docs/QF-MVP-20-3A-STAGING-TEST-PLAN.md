@@ -55,6 +55,23 @@ For T1, T3, T8: N sessions each `BEGIN`, then synchronise on a barrier (advisory
 - **No caller-controlled limit:** static assertion that `qf_assign_lead_vendors_v2` has no `p_total_limit`-style parameter and that `ADMIN_MANUAL_TOTAL_VENDOR_LIMIT` no longer reaches any RPC.
 - **Zero-data invariant** between suites: fixtures torn down; no residual application rows.
 
+## QF-MVP-20.3A1 additions (binding)
+
+| # | Test | Type | Assertion |
+|---|---|---|---|
+| **T23** | Lifecycle backfill is deterministic and idempotent | migration rehearsal | seeded copy of the 46-row production shape → all rows `lifecycle_status='assigned'`; re-running A2 changes **0** rows |
+| **T24** | Lineage seed is idempotent | migration rehearsal | 46 lineage rows + **1** batch operation row; re-run inserts **0** (`ON CONFLICT (lead_id,vendor_id) DO NOTHING`); `first_assigned_at` equals the source `assigned_at`; no ledger row created |
+| **T25** | Lineage survives lead/vendor deletion attempt | DB integrity | `DELETE FROM leads`/`vendors` for a lead/vendor with lineage **fails with RESTRICT**; lineage row intact; no cascade fires |
+| **T26** | Enforcement triggers are absent in B1 and present in B2 | migration rehearsal | after B1: 0 new triggers, legacy RPCs still succeed; after B2: 3 triggers, caps enforced |
+| **T27** | Legacy 9-vendor recovery is rejected after B2 | integration | a `p_total_limit=9`-style attempt fails with `active_limit_reached`; **no partial assignment, no debit** |
+| **T28** | Temporary suspension is a hard gate | integration | vendor with `assignment_suspended_at` set and `assignment_suspended_until` in the future → `vendor_not_eligible`; after expiry (time-shifted fixture) → eligible again; admin override **cannot** bypass it |
+| **T29** | Suspension fields never reach the public projection | API + view | `vendor_public_v` exposes no `assignment_suspension_*`/`status`/`verification_status` column |
+| **T30** | Public intake cannot set internal columns | API contract | a crafted intake payload containing `lead_quality_score`, `status`, `preferred_vendor_id`, `lead_priority`, `internal_notes` → those fields are **ignored/server-set**; the stored row carries defaults |
+| **T31** | anon has no table privilege on `leads`/`vendors` after C | grant | `information_schema.role_table_grants` returns **no rows** for `anon` on either table; the always-true `leads` INSERT policy no longer exists |
+| **T32** | Divergence view is read-only and classifies correctly | view | `vendor_wallet_package_divergence_v` returns a row per vendor with the expected `divergence_class`; executing it mutates **nothing** (balances and ledger counts unchanged before/after) |
+
+**Note on T20 (Auth trigger):** unchanged — runs only inside the dedicated Auth window; no Auth user is created in any other suite.
+
 ## Gate
 
 20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.**

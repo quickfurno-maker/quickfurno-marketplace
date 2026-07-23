@@ -60,6 +60,13 @@ The canonical authority deployment (K.5) is fully specified by [`QF-MVP-20-3A-RE
 
 **Ordering rule:** A → migrate consumers → B → C → E (so legacy writers never meet a trigger they can violate), unless staging proves legacy paths already satisfy the caps. **Grant/revoke sequence is unchanged from K.8** and remains consumer-gated; the public no-auth `assignLead` action must be **removed** before E. The 27-row historical ledger gap is explicitly **out of scope** here and is assigned to **QF-MVP-20.4 — Historical Credit-Ledger Reconciliation** (no blind backfill; indeterminate ⇒ no mutation).
 
+### K.4f Decisions closed (QF-MVP-20.3A1) — final release order is binding
+SELECT-only reconciliation of **production and staging** closed every remaining decision; see [`QF-MVP-20-3A1-DECISION-CLOSURE.md`](QF-MVP-20-3A1-DECISION-CLOSURE.md). The release order below **supersedes** any earlier ordering and fixes the inversion in which consumer migration preceded canonical-authority deployment:
+
+**A** (foundation) → **A2** (reviewed data backfill: 46 rows → `assigned`; 46 lineage events + 1 batch operation) → **B1** (canonical RPCs; legacy retained; **no triggers**) → **R1** (runtime consumer release) → **B2** (enable the 3 enforcement triggers after zero-legacy proof) → **C** (public projection; **revoke anon on `leads` and `vendors`**; drop the always-true `leads` INSERT policy) → **D** (Auth trigger) → **E** (legacy EXECUTE revocation) → **QF-MVP-20.4** (historical reconciliation) → later legacy removal.
+
+**Production evidence driving this (SELECT-only, this task):** production `lead_assignments` matches the staging baseline exactly; 46 rows, all `vendor_status='New'`, all `credit_deducted=true`, 0 nulls/orphans/duplicates, max 3 rows and 3 distinct vendors per lead (so the caps are satisfiable, but legacy `p_total_limit=9` flows would break — hence the B1/B2 split); the **27-row ledger gap is reconfirmed exactly**; `vendor_packages` has **0 rows** (wallet is already the sole balance); the **four blocker RPCs are live-verified `PUBLIC/anon/authenticated = true` in production**; and **anon holds `INSERT/SELECT/UPDATE/DELETE/TRUNCATE` on `leads` and `vendors`** with an always-true `leads` INSERT policy permitting 17 internal columns to be set — the largest open exposure, closed by C and E.
+
 ### K.5 Canonical authority deployment (staging)
 Deploy `qf_assign_lead_vendors_v2` and the canonical credit authority (folding the strong parts of `qf_apply_vendor_credit_delta`, `assign_lead_to_paid_vendors_phase26a`, `assign_lead_to_vendors`) as **`service_role`-execute-only**. Legacy RPCs remain in place (not yet revoked). Deploy the public projection view (§I) unpopulated of grants yet.
 

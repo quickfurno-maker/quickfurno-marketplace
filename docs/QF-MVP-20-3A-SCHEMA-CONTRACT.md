@@ -218,6 +218,28 @@ All three raise sanitized errors (`active_limit_reached`, `lifetime_limit_reache
 
 ---
 
+## 10b. QF-MVP-20.3A1 additions and confirmations (binding)
+
+**FK actions confirmed** (retention decision, §8 of the closure): `lead_assignment_events → leads` **RESTRICT**, `→ vendors` **RESTRICT**, `→ lead_assignments` **SET NULL**; `assignment_operations → leads` **RESTRICT**; `replacement_requests → lead_assignments` **RESTRICT**; `credit_restoration_approvals → lead_assignments` **RESTRICT**. No denormalized UUID snapshot columns are added (RESTRICT already guarantees the referent survives). Existing `lead_assignments` CASCADEs are unchanged. Erasure = anonymisation-in-place; lineage holds only UUIDs/timestamps.
+
+**`vendors` — additive suspension columns (Migration A):**
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `assignment_suspended_at` | `timestamptz` | NULL | suspension start |
+| `assignment_suspended_until` | `timestamptz` | NULL | NULL = indefinite |
+| `assignment_suspension_reason` | `text` | NULL | controlled vocabulary |
+| `assignment_suspended_by` | `uuid` | NULL | server-derived admin |
+| `assignment_suspension_reference` | `text` | NULL | evidence reference |
+
+Suspended predicate (read-time, no scheduled job): `assignment_suspended_at IS NOT NULL AND (assignment_suspended_until IS NULL OR assignment_suspended_until > now())`. Partial index `idx_vendors_assignment_suspended ON vendors (id) WHERE assignment_suspended_at IS NOT NULL`. These columns are **excluded from `vendor_public_v`**. `status='Suspended'` remains the separate permanent legal/security block (CHECK already permits it; unused in production today).
+
+**`public.vendor_wallet_package_divergence_v` — NEW read-only view** (`security_invoker`, `service_role` only). Columns: `vendor_id, wallet_remaining, wallet_total, ledger_net, ledger_last_after, package_status_meta, package_name_meta, package_expires_at_meta, package_rows, package_active_rows, package_remaining_leads, divergence_class`. `divergence_class` ∈ `package_metadata_without_backing_row, package_expired_but_active_metadata, active_package_null_counters, multiple_active_packages, impossible_value, ledger_discontinuity, wallet_package_mismatch, no_active_package, aligned` (evaluated in that order). **Never mutates.** `vendors.remaining_credits` is the **sole** assignment-debit authority; `vendor_packages` is an entitlement record only (production has **0** package rows).
+
+**Backfill (Migration A2 — reviewed data step, not DDL):** `lifecycle_status='assigned'` for all 46 production rows (unconditional — `vendor_status='New'` is the only observed value); 46 lineage rows from `lead_assignments` with `first_assigned_at := assigned_at`, `origin_mode='migration_backfill'`, `actor_kind='worker'`, `actor_id=NULL`, all pointing at **one** batch `assignment_operations` row (`idempotency_key='qf_lineage_backfill_v1'`); written `ON CONFLICT (lead_id, vendor_id) DO NOTHING` so re-running is a no-op.
+
+**`in_progress` is not part of the lifecycle vocabulary.** `ACTIVE = {assigned, delivered, accepted}` — defined once, sourced from one shared SQL+TS constant.
+
 ## 11. Expected catalog delta (staging, post-A+B+C+D)
 
 | Object | Before | After | Δ |
@@ -225,7 +247,8 @@ All three raise sanitized errors (`active_limit_reached`, `lifetime_limit_reache
 | public base tables | 62 | 67 | +5 |
 | public functions | 40 (39 QF + 1 managed) | 45 | +5 canonical |
 | SECURITY DEFINER (QuickFurno) | 33 | 37 | +4 (eligibility is INVOKER) |
-| views | 0 | 1 | +1 (`vendor_public_v`) |
+| views | 0 | 2 | +2 (`vendor_public_v`, `vendor_wallet_package_divergence_v`) |
+| `vendors` columns | 65 | 70 | +5 (assignment-suspension fields) |
 | triggers on public tables | 0 | 3 | +3 |
 | triggers on `auth.users` | 0 | 1 | +1 (Migration D) |
 | policies | 67 | 67 | 0 (new tables are RLS-on/no-policy) |

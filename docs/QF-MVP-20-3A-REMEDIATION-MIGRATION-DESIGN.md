@@ -389,7 +389,23 @@ Full matrix (current call → defect → new call → change → compatibility �
 
 ---
 
-## 17. Remaining unknowns (must be closed in 20.3B)
+## 16b. DECISIONS CLOSED BY QF-MVP-20.3A1 (binding — supersedes §17 below)
+
+All unknowns in §17 are **closed**; see [`QF-MVP-20-3A1-DECISION-CLOSURE.md`](QF-MVP-20-3A1-DECISION-CLOSURE.md) for the SELECT-only production evidence.
+
+1. **Lifecycle backfill:** all **46** production rows → `lifecycle_status='assigned'`. Evidence: `vendor_status='New'` for all 46 (only value), `credit_deducted=true` for all 46, and the single `is_bad_lead_reported=true` row's `bad_lead_reports` entry is `status='Pending'`/`admin_decision=NULL` → **not** `invalid`. Zero ambiguity, no conditional branches.
+2. **Lineage seed:** 46 events (0 duplicate `(lead_id,vendor_id)` pairs) + **one batch operation row**; `first_assigned_at` sourced from `assigned_at`; `actor_kind='worker'`, `actor_id=NULL`; idempotent via `UNIQUE(lead_id,vendor_id)` + `ON CONFLICT DO NOTHING`. Fabricates no ledger row and proves no debit.
+3. **Trigger ordering — Migration B is SPLIT:** **B1** (canonical RPCs, legacy retained, **no triggers**) → **R1** (runtime consumer release) → **B2** (enable the 3 triggers after zero-legacy proof). Production *data* satisfies the caps (0 leads over 3 or 6), but legacy *flows* would break: `p_total_limit=9` recovery, legacy RPCs write no lineage, and the 4 blockers are still `anon`-executable in production. **This also corrects the ordering inversion — canonical authority (B1) deploys before consumer migration (R1).**
+4. **Temporary suspension:** existing fields are **insufficient** (no vendor is `Suspended`; no expiry/reason/actor/reference field exists). Add five additive `vendors` columns: `assignment_suspended_at`, `assignment_suspended_until`, `assignment_suspension_reason`, `assignment_suspended_by`, `assignment_suspension_reference`. `status='Suspended'` remains the permanent legal/security block that no override may bypass. `public_visibility` is never overloaded.
+5. **Public lead intake:** **server-owned service-role intake** (option 2). Production evidence: `leads public insert` is `WITH CHECK true` for `anon`, and anon holds `INSERT/SELECT/UPDATE/DELETE/TRUNCATE` on `leads` and `vendors`; `leads` has 76 columns of which **17 internal ones** (incl. `lead_quality_score`, `status`, `preferred_vendor_id`, `lead_priority`) are anon-settable — allowing a forged lead to pass the auto-distribution quality gate and consume real credits. Migration C drops the policy and revokes anon on both tables.
+6. **Wallet/package divergence:** `vendor_packages` has **0 rows** and `package_name` is NULL for all 28 vendors, so packages exist only as denormalized metadata — **the wallet is already the sole balance**. View `vendor_wallet_package_divergence_v` (9 classes, read-only, never mutates).
+7. **Active set (defined exactly once):** `ACTIVE = {assigned, delivered, accepted}`. **`in_progress` is NOT a lifecycle status** — it is CRM-only; the QF-MVP-20.0 draft's active set containing it is **superseded and void**.
+8. **Retention/FKs:** lineage → `leads`/`vendors` **ON DELETE RESTRICT**; lineage → `lead_assignments` **SET NULL**; `assignment_operations`/`replacement_requests`/`credit_restoration_approvals` → **RESTRICT**. Existing `lead_assignments` CASCADEs are left unchanged (the lineage RESTRICT blocks the delete first). Erasure is **anonymisation-in-place**, not deletion; lineage stores only UUIDs/timestamps (no personal data).
+9. **Final release order:** A → A2 (reviewed data backfill) → B1 → R1 → B2 → C → D → E → QF-MVP-20.4 → later legacy removal.
+
+**Additional confirmed evidence:** production `lead_assignments` schema is **identical** to the applied staging baseline; 0 nulls/orphans/duplicates (so a later `NOT NULL` tightening is safe, deliberately deferred); the 27-row ledger gap is **reconfirmed exactly** and remains QF-MVP-20.4 scope; the four blocker RPCs are **live-verified** `PUBLIC/anon/authenticated = true` in production while the two canonical bases and credit primitives are correctly locked.
+
+## 17. Remaining unknowns (SUPERSEDED — all closed by §16b / QF-MVP-20.3A1)
 
 1. **`lifecycle_status` backfill for production's 46 existing assignments** — staging is empty so the default covers it; production needs an explicit, reviewed backfill mapping (`vendor_status` + `is_bad_lead_reported` → lifecycle) before the triggers are enabled there.
 2. **Lineage backfill for production** — `lead_assignment_events` must be seeded from existing `lead_assignments` (46 rows) in the same reviewed step; until then lifetime-6 has no history on production.

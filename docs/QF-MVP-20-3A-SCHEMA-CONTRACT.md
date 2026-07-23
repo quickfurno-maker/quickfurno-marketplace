@@ -35,28 +35,58 @@ Existing (unchanged): `id`, `lead_id`, `vendor_id`, `assigned_at`, `assignment_t
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
+> **CORRECTED by QF-MVP-20.3A1R.** An earlier draft proposed `UNIQUE (lead_id, vendor_id)` on this table and used it as the append-idempotency guard. **That is wrong and is removed.** This is an append-only *lifecycle event stream*: the same (lead, vendor) must legitimately record many events (`assigned → delivered → accepted → completed`, or `rejected`/`invalid`/`replaced`). Event uniqueness is now carried by `event_idempotency_key`, and lifetime-vendor uniqueness is a **query**, not a constraint.
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
 | `id` | `uuid` | NOT NULL | `gen_random_uuid()` | PK |
+| `assignment_id` | `uuid` | **NULL** | — | FK → `lead_assignments(id)` **ON DELETE SET NULL** (event survives assignment deletion) |
 | `lead_id` | `uuid` | NOT NULL | — | **FK → `leads(id)` ON DELETE RESTRICT** (deliberately non-cascading) |
 | `vendor_id` | `uuid` | NOT NULL | — | **FK → `vendors(id)` ON DELETE RESTRICT** |
-| `first_assignment_id` | `uuid` | NULL | — | FK → `lead_assignments(id)` ON DELETE SET NULL (row survives assignment deletion) |
-| `origin_operation_id` | `uuid` | NULL | — | FK → `assignment_operations(id)` ON DELETE SET NULL |
-| `first_assigned_at` | `timestamptz` | NOT NULL | `now()` | immutable |
-| `origin_mode` | `text` | NOT NULL | — | CHECK ∈ `automatic, client_selected, admin_manual, delayed_fill, replacement, recovery_replay, migration_backfill` |
-| `created_at` | `timestamptz` | NOT NULL | `now()` | immutable |
+| `operation_id` | `uuid` | NULL | — | FK → `assignment_operations(id)` **ON DELETE SET NULL** (existing reviewed retention decision) |
+| `event_type` | `text` | NOT NULL | — | CHECK ∈ `assignment_created, lifecycle_transition, replacement_linked, reconciliation_note` |
+| `lifecycle_from` | `text` | **NULL** | — | NULL for `assignment_created`; otherwise the prior lifecycle value |
+| `lifecycle_to` | `text` | NOT NULL | — | CHECK ∈ the 10-value lifecycle vocabulary |
+| `occurred_at` | `timestamptz` | NOT NULL | — | when the event happened in business time (for the seed: the source `assigned_at`) |
+| `recorded_at` | `timestamptz` | NOT NULL | `now()` | when the row was written — distinct from `occurred_at` so reconstruction is visible |
+| `actor_kind` | `text` | NOT NULL | — | CHECK ∈ `system, client, admin, worker` |
+| `actor_id` | `uuid` | **NULL** | — | server-derived; NULL when no human actor |
+| `reason_code` | `text` | NOT NULL | — | controlled vocabulary |
+| `source_kind` | `text` | NOT NULL | — | CHECK ∈ `canonical_authority, migration_backfill, reconciliation` |
+| `source_reference` | `text` | NOT NULL | — | e.g. the operation key or backfill batch key |
+| `event_idempotency_key` | `text` | NOT NULL | — | **UNIQUE** — the sole event replay guard |
+| `metadata` | `jsonb` | NOT NULL | `'{}'::jsonb` | provenance only (e.g. original `assignment_type`); **no personal-data snapshots** |
 
-- **Unique:** `UNIQUE (lead_id, vendor_id)` — one lineage row per (lead, vendor) forever; makes the append idempotent.
-- **Index:** `idx_lead_assignment_events_lead (lead_id)`.
-- **Immutable fields:** every column. Enforced by trigger `trg_lead_assignment_events_immutable` rejecting `UPDATE`/`DELETE`.
+- **Unique:** **`UNIQUE (event_idempotency_key)`** — and **nothing else**. There is **no** `(lead_id, vendor_id)` unique constraint on this table.
+- **Indexes:** `idx_lead_assignment_events_lead (lead_id)`; `idx_lead_assignment_events_lifetime (lead_id, vendor_id) WHERE event_type='assignment_created' AND lifecycle_to='assigned'` (serves the lifetime query); `idx_lead_assignment_events_assignment (assignment_id)`.
+- **Immutable fields:** every column. Enforced by trigger `trg_lead_assignment_events_immutable` rejecting `UPDATE`/`DELETE` (append-only).
 - **Retention:** permanent. Never pruned; it is the lifetime-six authority.
 - **RLS/grants:** RLS enabled, no policies; `service_role` only.
 
-**Lifetime count** = `SELECT count(*) FROM lead_assignment_events WHERE lead_id = $1`. A row is appended **only** when an assignment actually succeeds (credit debited + assignment inserted). Failed/`requested` candidates never append.
+**Lifetime count (query, not a constraint):**
+```
+SELECT count(DISTINCT vendor_id)
+FROM lead_assignment_events
+WHERE lead_id = $1
+  AND event_type = 'assignment_created'
+  AND lifecycle_to = 'assigned';
+```
+Only a successful initial assignment contributes. Later `delivered/accepted/rejected/invalid/replaced/cancelled/completed` events **never** add another lifetime vendor. A vendor already present in successful lineage does **not** consume a second slot if encountered again. A candidate that fails **before** assignment creation emits no `assignment_created` event and therefore consumes **no** lifetime slot.
+
+**Event idempotency key formats (authority-generated, never caller-supplied):**
+- Historical seed: `legacy_assignment_seed_v1:<assignment_id>`
+- Canonical runtime: `assignment_event:<operation_id>:<assignment_id>:<event_type>`
+- When one operation may legitimately emit the same event type more than once, the authority appends a deterministic ordinal/transition id: `assignment_event:<operation_id>:<assignment_id>:<event_type>:<ordinal>`
+
+The **authoritative transaction** creates and validates the key; an untrusted caller can neither supply nor influence it.
 
 ---
 
 ## 3. `assignment_operations` — NEW (idempotency + operation result)
 
-**Purpose:** one row per logical assignment operation; the replay guard and the source of the returned contract.
+**Purpose:** one row per logical assignment operation; the **operation-level** replay guard and the source of the returned contract.
+
+> **Idempotency boundaries are separate and must not be merged (20.3A1R).** One operation may legitimately create **multiple** assignment rows, **multiple** `assignment_created` events, **multiple** communication intents and **multiple** ledger entries. Each child object therefore carries its **own** deterministic idempotency reference: operations → `assignment_operations.idempotency_key`; events → `lead_assignment_events.event_idempotency_key`; ledger → `uq_vendor_credit_logs_reference (reference_type, reference_id)`; intents → `communication_intents.idempotency_key`; assignment rows → the existing `lead_assignments UNIQUE(lead_id, vendor_id)`. **No single broad uniqueness constraint may substitute for these boundaries.**
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -183,7 +213,7 @@ Unchanged and still authoritative: `uq_vendor_credit_logs_reference UNIQUE (refe
 | Trigger | On | Timing | Enforces |
 |---|---|---|---|
 | `trg_lead_assignments_active_cap` | `lead_assignments` | `BEFORE INSERT OR UPDATE OF lifecycle_status` | rejects any transition producing **> 3** rows in the ACTIVE set for that `lead_id` (counts under the caller's lead lock) |
-| `trg_lead_assignment_events_lifetime_cap` | `lead_assignment_events` | `BEFORE INSERT` | rejects an append producing **> 6** distinct vendors for that `lead_id` |
+| `trg_lead_assignment_events_lifetime_cap` | `lead_assignment_events` | `BEFORE INSERT` | **only when `NEW.event_type='assignment_created' AND NEW.lifecycle_to='assigned'`**: rejects the insert if the lead's `count(DISTINCT vendor_id)` over qualifying events would exceed **6** and `NEW.vendor_id` is not already present. Non-qualifying events (`delivered`, `accepted`, `replaced`, …) are **never** blocked. |
 | `trg_lead_assignment_events_immutable` | `lead_assignment_events` | `BEFORE UPDATE OR DELETE` | raises unconditionally (append-only) |
 
 All three raise sanitized errors (`active_limit_reached`, `lifetime_limit_reached`, `lineage_immutable`). They are the **defence-in-depth** layer: application counts are advisory, the triggers are authoritative.
@@ -236,7 +266,9 @@ Suspended predicate (read-time, no scheduled job): `assignment_suspended_at IS N
 
 **`public.vendor_wallet_package_divergence_v` — NEW read-only view** (`security_invoker`, `service_role` only). Columns: `vendor_id, wallet_remaining, wallet_total, ledger_net, ledger_last_after, package_status_meta, package_name_meta, package_expires_at_meta, package_rows, package_active_rows, package_remaining_leads, divergence_class`. `divergence_class` ∈ `package_metadata_without_backing_row, package_expired_but_active_metadata, active_package_null_counters, multiple_active_packages, impossible_value, ledger_discontinuity, wallet_package_mismatch, no_active_package, aligned` (evaluated in that order). **Never mutates.** `vendors.remaining_credits` is the **sole** assignment-debit authority; `vendor_packages` is an entitlement record only (production has **0** package rows).
 
-**Backfill (Migration A2 — reviewed data step, not DDL):** `lifecycle_status='assigned'` for all 46 production rows (unconditional — `vendor_status='New'` is the only observed value); 46 lineage rows from `lead_assignments` with `first_assigned_at := assigned_at`, `origin_mode='migration_backfill'`, `actor_kind='worker'`, `actor_id=NULL`, all pointing at **one** batch `assignment_operations` row (`idempotency_key='qf_lineage_backfill_v1'`); written `ON CONFLICT (lead_id, vendor_id) DO NOTHING` so re-running is a no-op.
+**Backfill (Migration A2 — reviewed data step, not DDL) — CORRECTED by 20.3A1R:** `lifecycle_status='assigned'` for all 46 production rows (unconditional — `vendor_status='New'` is the only observed value); **exactly one initial event per existing assignment** (46 events) with `event_type='assignment_created'`, `lifecycle_from=NULL`, `lifecycle_to='assigned'`, `occurred_at := lead_assignments.assigned_at`, `recorded_at := now()`, `actor_kind='worker'`, `actor_id=NULL`, `source_kind='migration_backfill'`, `source_reference='qf_mvp_20_a2_lineage_backfill_v1'`, `reason_code='lineage_backfill'`, and `event_idempotency_key = 'legacy_assignment_seed_v1:' || assignment_id`. All events point at **one** batch `assignment_operations` row with `idempotency_key='qf_mvp_20_a2_lineage_backfill_v1'`.
+
+Written **`ON CONFLICT (event_idempotency_key) DO NOTHING`** — **never** `ON CONFLICT (lead_id, vendor_id)`. Re-running A2 yields zero duplicate operation rows, zero duplicate events, zero assignment changes and zero credit changes.
 
 **`in_progress` is not part of the lifecycle vocabulary.** `ACTIVE = {assigned, delivered, accepted}` — defined once, sourced from one shared SQL+TS constant.
 

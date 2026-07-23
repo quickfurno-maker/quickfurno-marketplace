@@ -8,6 +8,32 @@
 
 ---
 
+## 0-A. CORRECTION NOTICE — QF-MVP-20.3A1R (assignment lineage idempotency)
+
+An earlier draft of this release described `lead_assignment_events` as idempotent through a **`UNIQUE (lead_id, vendor_id)`** constraint, and specified the historical seed as `ON CONFLICT (lead_id, vendor_id) DO NOTHING`. **That model is wrong and is withdrawn in full.** It is incompatible with an append-only lifecycle event stream: the same (lead, vendor) pair must be able to record many events over time (`assigned → delivered → accepted → completed`, and `rejected`/`invalid`/`replaced`). A lifetime-vendor uniqueness constraint would silently discard every event after the first.
+
+**Superseded statements — void wherever they appear, including in documents this task may not edit:**
+
+| Source | Statement | Status |
+|---|---|---|
+| [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md) §"Append-only `lead_assignment_events`" | "one row per (lead, vendor) the first time that vendor is ever assigned … `UNIQUE(lead_id, vendor_id)`" | **SUPERSEDED AND VOID** |
+| [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md) constraint list | "`UNIQUE(lead_id, vendor_id)` on `lead_assignment_events` (new, append-only)" | **SUPERSEDED AND VOID** |
+| This document §4 step 13, §16b item 2 (earlier revision) | idempotent on / `ON CONFLICT (lead_id, vendor_id)` | **CORRECTED IN PLACE** |
+| [`QF-MVP-20-3A-SCHEMA-CONTRACT.md`](QF-MVP-20-3A-SCHEMA-CONTRACT.md) §2 (earlier revision) | `UNIQUE (lead_id, vendor_id)` on the event table | **CORRECTED IN PLACE** |
+
+`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md` is outside this task's permitted paths and is therefore **not edited**; it is superseded in writing here. Where the two documents disagree about the event table, **this correction governs**.
+
+**Replacement model (locked):**
+
+- `lead_assignment_events.event_idempotency_key text NOT NULL`, with **`UNIQUE (event_idempotency_key)`** as the table's **only** unique constraint.
+- Historical seed key: `legacy_assignment_seed_v1:<assignment_id>`.
+- Runtime key: `assignment_event:<operation_id>:<assignment_id>:<event_type>` (with a trailing `:<ordinal>` only where one operation legitimately emits more than one event of the same type for the same assignment).
+- The **authoritative transaction** derives and validates the key. It is never accepted from an untrusted caller.
+- **Lifetime vendor count is a query, not a constraint** — `COUNT(DISTINCT vendor_id)` over `event_type = 'assignment_created' AND lifecycle_to = 'assigned'`.
+- The uniqueness of `lead_assignments (lead_id, vendor_id)` is **unchanged** by this correction and remains in force.
+
+---
+
 ## 0. Grounding facts that drive the design (read from the applied baseline)
 
 These are the decisive structural facts; every design choice below follows from them.
@@ -105,7 +131,7 @@ Existing structures are **extended, not replaced**, wherever the existing table 
 | `credit_restoration_approvals` | **NEW** | `bad_lead_reports.credit_restored` is an unlinked boolean; approval evidence + ledger linkage is absent. |
 | `communication_intents` | **NEW** | No outbox exists; `whatsapp_logs` is a legacy delivery log, not an intent. |
 
-**Explicitly not duplicated:** vendor commercial state stays in `vendors`; consent/suppression stays in the communication authority tables; delivery records stay in `lead_delivery_logs`/`communication_*`. The lineage table stores only `(lead_id, vendor_id, first_assigned_at, origin_operation_id)` — it is a *lifetime membership* fact, not a copy of the assignment.
+**Explicitly not duplicated:** vendor commercial state stays in `vendors`; consent/suppression stays in the communication authority tables; delivery records stay in `lead_delivery_logs`/`communication_*`. The lineage table is an **append-only lifecycle event stream** keyed by `event_idempotency_key`; it stores identifiers, lifecycle transition, actor, source and provenance metadata only — **no personal-data snapshots** and no copy of the assignment payload.
 
 Full DDL-level definitions: [`SCHEMA-CONTRACT`](QF-MVP-20-3A-SCHEMA-CONTRACT.md).
 
@@ -127,7 +153,9 @@ ACTIVE = { assigned, delivered, accepted }
 - `rejected, expired, cancelled, invalid, replaced` → **not active**, but **retain their lifetime slot** (the assignment did occur).
 - `completed` → **not active** (terminal success), retains its lifetime slot.
 
-**Lifetime history = distinct vendors that were ever successfully assigned to the lead**, materialised in `lead_assignment_events`. A row is appended **only** at the moment an assignment is actually created (i.e. a credit debit + `lead_assignments` insert succeeded). A candidate that failed eligibility, lost a race, or was only `requested` **never** appends a lineage row and therefore **never consumes a lifetime slot**.
+**Lifetime history = distinct vendors that were ever successfully assigned to the lead**, derived by query from `lead_assignment_events`. Only an `event_type='assignment_created'` event with `lifecycle_to='assigned'` counts, and it is appended **only** at the moment an assignment is actually created (i.e. a credit debit + `lead_assignments` insert succeeded). A candidate that failed eligibility, lost a race, or was only `requested` **never** appends a qualifying event and therefore **never consumes a lifetime slot**.
+
+Every **later** lifecycle event for that same (lead, vendor) — `delivered`, `accepted`, `completed`, `rejected`, `replaced`, `invalid` — is appended freely with its own `event_idempotency_key` and consumes **no additional slot**, because the count is `DISTINCT vendor_id` over qualifying events only. This is precisely why the event table carries **no** `(lead_id, vendor_id)` unique constraint.
 
 **Transition rules (enforced in the service; trigger-guarded for the invariants):**
 `requested → assigned | cancelled` · `assigned → delivered | rejected | expired | cancelled | invalid | replaced` · `delivered → accepted | rejected | expired | invalid | replaced | completed` · `accepted → completed | invalid | replaced` · terminal: `rejected, expired, cancelled, invalid, replaced, completed`. **No transition ever deletes a row** (locked rule 6).
@@ -146,7 +174,14 @@ ACTIVE = { assigned, delivered, accepted }
 2. **Idempotency claim:** `INSERT INTO assignment_operations (idempotency_key, …) ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`. If no row returned → this is a **replay**: read the stored result and return it with `already_applied = true`, performing **no** further writes.
 3. **Lead lock:** `SELECT … FROM leads WHERE id = p_lead_id FOR UPDATE` — serialises *all* assignment/replacement mutations for that lead. This is the master invariant lock.
 4. **Replacement-operation lock** (replacement mode only): the partial unique index on `replacement_requests` is the authority; additionally `SELECT … FOR UPDATE` the open request row.
-5. **Read immutable lifetime history:** `SELECT count(*) FROM lead_assignment_events WHERE lead_id = …` (under the lead lock).
+5. **Read immutable lifetime history** (under the lead lock) — a **query over distinct vendors**, never a raw row count and never a constraint:
+   ```sql
+   SELECT count(DISTINCT vendor_id)
+   FROM lead_assignment_events
+   WHERE lead_id = $1
+     AND event_type = 'assignment_created'
+     AND lifecycle_to = 'assigned';
+   ```
 6. **Compute active count:** `SELECT count(*) FROM lead_assignments WHERE lead_id = … AND lifecycle_status IN ('assigned','delivered','accepted')`.
 7. **Validate active-3 headroom** → `active_limit_reached` if none.
 8. **Validate lifetime-6 headroom** for each *genuinely new* vendor → `lifetime_limit_reached`.
@@ -154,14 +189,23 @@ ACTIVE = { assigned, delivered, accepted }
 10. **Validate eligibility** (canonical function, §11) per candidate.
 11. **Ledger-backed debit** via the canonical credit authority (locks the same vendor row it already holds).
 12. **Insert `lead_assignments`** (`lifecycle_status='assigned'`, `operation_id`).
-13. **Append `lead_assignment_events`** (idempotent on `UNIQUE(lead_id,vendor_id)`).
+13. **Append `lead_assignment_events`** — one `assignment_created` / `lifecycle_to='assigned'` event, idempotent on `UNIQUE (event_idempotency_key)`. The authoritative transaction derives the key (`assignment_event:<operation_id>:<assignment_id>:<event_type>`); no caller supplies it. Later lifecycle events for the same `(lead_id, vendor_id)` are appended with **different** keys and are never blocked.
 14. **Append audit** (`audit_logs`).
 15. **Create `communication_intents`** row(s) — intent only, never a send.
 16. **Finalise `assignment_operations`** with the result payload; **commit atomically**.
 
 **Deadlock avoidance:** always lead → replacement → vendors(ascending uuid). No other order is permitted anywhere in the codebase.
 
-**Idempotent replay:** guaranteed by step 2 (`assignment_operations.idempotency_key` UNIQUE) *plus* the ledger's `uq_vendor_credit_logs_reference` *plus* `lead_assignments UNIQUE(lead_id,vendor_id)` — three independent layers, so a replay can neither double-assign nor double-debit.
+**Idempotent replay:** guaranteed by **four independent boundaries**, each owned by the object it protects (20.3A1R — none may be merged into one broad constraint):
+
+| Boundary | Constraint | Protects against |
+|---|---|---|
+| Operation | `assignment_operations.idempotency_key` UNIQUE | replaying the whole operation |
+| Assignment row | `lead_assignments UNIQUE(lead_id, vendor_id)` (existing, unchanged) | two assignment rows for one (lead, vendor) |
+| Ledger | `uq_vendor_credit_logs_reference (reference_type, reference_id)` | double debit |
+| Lineage event | `lead_assignment_events UNIQUE(event_idempotency_key)` | duplicating **one specific event**, while still permitting later events for the same (lead, vendor) |
+
+A replay can therefore neither double-assign, double-debit, nor duplicate an event — and an append-only stream is preserved.
 
 **Duplicate-operation handling:** same key → stored result returned (`already_applied`). Different key, same (lead,vendor) → blocked by the unique constraint and reported as `duplicate_assignment` in `skipped`.
 
@@ -394,7 +438,7 @@ Full matrix (current call → defect → new call → change → compatibility �
 All unknowns in §17 are **closed**; see [`QF-MVP-20-3A1-DECISION-CLOSURE.md`](QF-MVP-20-3A1-DECISION-CLOSURE.md) for the SELECT-only production evidence.
 
 1. **Lifecycle backfill:** all **46** production rows → `lifecycle_status='assigned'`. Evidence: `vendor_status='New'` for all 46 (only value), `credit_deducted=true` for all 46, and the single `is_bad_lead_reported=true` row's `bad_lead_reports` entry is `status='Pending'`/`admin_decision=NULL` → **not** `invalid`. Zero ambiguity, no conditional branches.
-2. **Lineage seed:** 46 events (0 duplicate `(lead_id,vendor_id)` pairs) + **one batch operation row**; `first_assigned_at` sourced from `assigned_at`; `actor_kind='worker'`, `actor_id=NULL`; idempotent via `UNIQUE(lead_id,vendor_id)` + `ON CONFLICT DO NOTHING`. Fabricates no ledger row and proves no debit.
+2. **Lineage seed:** 46 `assignment_created` / `lifecycle_to='assigned'` events (one per existing `lead_assignments` row) + **one batch operation row**; `occurred_at` sourced from `assigned_at`; `actor_kind='worker'`, `actor_id=NULL`; `source_kind='backfill'`. Idempotent via `event_idempotency_key = 'legacy_assignment_seed_v1:' || assignment_id` with `ON CONFLICT (event_idempotency_key) DO NOTHING` — **not** `ON CONFLICT (lead_id, vendor_id)`, which does not and must not exist on an append-only event stream. Fabricates no ledger row and proves no debit. **Corrected by QF-MVP-20.3A1R.**
 3. **Trigger ordering — Migration B is SPLIT:** **B1** (canonical RPCs, legacy retained, **no triggers**) → **R1** (runtime consumer release) → **B2** (enable the 3 triggers after zero-legacy proof). Production *data* satisfies the caps (0 leads over 3 or 6), but legacy *flows* would break: `p_total_limit=9` recovery, legacy RPCs write no lineage, and the 4 blockers are still `anon`-executable in production. **This also corrects the ordering inversion — canonical authority (B1) deploys before consumer migration (R1).**
 4. **Temporary suspension:** existing fields are **insufficient** (no vendor is `Suspended`; no expiry/reason/actor/reference field exists). Add five additive `vendors` columns: `assignment_suspended_at`, `assignment_suspended_until`, `assignment_suspension_reason`, `assignment_suspended_by`, `assignment_suspension_reference`. `status='Suspended'` remains the permanent legal/security block that no override may bypass. `public_visibility` is never overloaded.
 5. **Public lead intake:** **server-owned service-role intake** (option 2). Production evidence: `leads public insert` is `WITH CHECK true` for `anon`, and anon holds `INSERT/SELECT/UPDATE/DELETE/TRUNCATE` on `leads` and `vendors`; `leads` has 76 columns of which **17 internal ones** (incl. `lead_quality_score`, `status`, `preferred_vendor_id`, `lead_priority`) are anon-settable — allowing a forged lead to pass the auto-distribution quality gate and consume real credits. Migration C drops the policy and revokes anon on both tables.

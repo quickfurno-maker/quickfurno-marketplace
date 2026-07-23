@@ -64,7 +64,7 @@ Every observed production value is covered; no value is omitted.
 |---|---|---|---|---|---|---|
 | `vendor_status` | `New` | 46 | **`assigned`** | assignment exists, `credit_deducted=true`, vendor has not progressed the CRM pipeline | none — single observed value | set `lifecycle_status='assigned'` |
 | `vendor_status` | Contacted / Follow-up Needed / Site Visit Scheduled / Quotation Sent / Converted / Won / Lost | **0** | *n/a — CRM only* | permitted by CHECK but **unused in production** | none | no mapping needed; `vendor_status` is never read as lifecycle |
-| `assignment_type` | auto_assigned 34 · client_selected 7 · admin_assigned 5 | 46 | *not a lifecycle input* | provenance only | none | preserved verbatim; also copied to lineage `origin_mode` context |
+| `assignment_type` | auto_assigned 34 · client_selected 7 · admin_assigned 5 | 46 | *not a lifecycle input* | provenance only | none | preserved verbatim; also mirrored into the lineage event's `metadata` as provenance |
 | `credit_deducted` | `true` | 46 | supports `assigned` | a debit occurred (ledger evidence separately incomplete for 27) | none | preserved; **never** used to fabricate ledger rows |
 | `is_bad_lead_reported` | `true` | **1** | **`assigned`** (NOT `invalid`) | the single `bad_lead_reports` row is `status='Pending'`, `admin_decision=NULL`, `credit_restored=false` → **no admin decision exists** | resolved by evidence | remains `assigned`; only an *approved* bad-lead decision may later move it to `invalid` |
 | `is_bad_lead_reported` | `false` | 45 | `assigned` | — | none | — |
@@ -101,20 +101,33 @@ Reverified count: **46 assignments, 0 duplicate `(lead_id, vendor_id)` pairs →
 | Field | Value |
 |---|---|
 | receives a lineage event | **every** one of the 46 assignments (all have non-null lead+vendor, all `credit_deducted=true`) |
-| event type / `origin_mode` | `migration_backfill` |
-| `first_assigned_at` | **source: `lead_assignments.assigned_at`** (never `now()`) |
-| `created_at` (recorded_at) | `now()` at migration time — distinct from `first_assigned_at` so reconstruction is visible |
+| `event_type` / `lifecycle_to` | `assignment_created` / `assigned` — the only pair that counts toward lifetime |
+| `source_kind` | `backfill` |
+| `occurred_at` | **source: `lead_assignments.assigned_at`** (never `now()`) |
+| `recorded_at` | `now()` at migration time — distinct from `occurred_at` so reconstruction is visible |
 | `actor_kind` | `worker` |
 | `actor_id` | **NULL** — no human actor performed these; never invented |
-| `origin_operation_id` | the **single** batch `assignment_operations` row (`mode='recovery_replay'`, `actor_kind='worker'`, `reason_code='lineage_backfill_20_3B'`) |
+| `operation_id` | the **single** batch `assignment_operations` row (`mode='recovery_replay'`, `actor_kind='worker'`, `reason_code='lineage_backfill_20_3B'`) |
 | reason code | `lineage_backfill` |
 | source authority | `lead_assignments` only |
-| idempotency key | batch operation: `qf_lineage_backfill_v1`; per-row idempotency is the natural `UNIQUE(lead_id, vendor_id)` |
+| idempotency key | batch operation: `qf_mvp_20_a2_lineage_backfill_v1`; **per-event** idempotency is `event_idempotency_key = 'legacy_assignment_seed_v1:' \|\| assignment_id`, guarded by `UNIQUE (event_idempotency_key)` (**corrected by QF-MVP-20.3A1R** — the earlier "natural `UNIQUE(lead_id, vendor_id)`" is void) |
 | `assignment_type` preservation | retained on `lead_assignments`; mirrored into lineage metadata as provenance |
 | `credit_deducted` evidence | recorded as **claimed, not proven** — the 27-row gap is untouched |
 | incomplete history | none exists (0 nulls/orphans); if any appeared, the row would be skipped and reported, never guessed |
 
-**Idempotency constraint making a rerun a no-op:** `UNIQUE (lead_id, vendor_id)` on `lead_assignment_events`, written with `ON CONFLICT (lead_id, vendor_id) DO NOTHING`, plus `UNIQUE(idempotency_key)` on the batch operation row. Re-running inserts zero rows.
+**Idempotency constraint making a rerun a no-op (CORRECTED by QF-MVP-20.3A1R):** `UNIQUE (event_idempotency_key)` on `lead_assignment_events`, written with `ON CONFLICT (event_idempotency_key) DO NOTHING`, plus `UNIQUE(idempotency_key)` on the batch operation row. Re-running inserts zero rows.
+
+The earlier proposal — `UNIQUE (lead_id, vendor_id)` on the event table with `ON CONFLICT (lead_id, vendor_id) DO NOTHING` — is **withdrawn and void**. `lead_assignment_events` is an append-only lifecycle event stream, so one (lead, vendor) pair must be able to record many events (`assigned → delivered → accepted → completed`, or `rejected`/`invalid`/`replaced`); a lifetime-vendor unique constraint would silently swallow every event after the first. **Lifetime vendor count is a query, not a constraint:**
+
+```sql
+SELECT count(DISTINCT vendor_id)
+FROM lead_assignment_events
+WHERE lead_id = $1
+  AND event_type = 'assignment_created'
+  AND lifecycle_to = 'assigned';
+```
+
+Idempotency boundaries stay **separate** and are never collapsed into one broad constraint: operations → `assignment_operations.idempotency_key`; events → `lead_assignment_events.event_idempotency_key`; ledger → `uq_vendor_credit_logs_reference`; intents → `communication_intents.idempotency_key`; assignment rows → the existing, **unchanged** `lead_assignments UNIQUE(lead_id, vendor_id)`. The authoritative transaction — never an untrusted caller — creates and validates the event key.
 
 **The seed must not and does not:** fabricate a ledger row · claim a debit was proven · change any assignment status · change any balance · send communication · create provider records · discard uncertain history.
 
@@ -266,7 +279,7 @@ This is a **concrete, exploitable defect**: `leadPassesQualityGate` (`app/action
 | Prior unknown (20.3A §17) | Status | Resolution |
 |---|---|---|
 | 1. Production `lifecycle_status` backfill mapping | **CLOSED** | §5 — all 46 rows → `assigned`; exhaustive matrix, zero ambiguity |
-| 2. Production lineage seed | **CLOSED** | §7 — 46 events + 1 batch operation, `assigned_at` sourced, idempotent via `UNIQUE(lead_id,vendor_id)` |
+| 2. Production lineage seed | **CLOSED** (corrected 20.3A1R) | §7 — 46 `assignment_created` events + 1 batch operation, `assigned_at` sourced, idempotent via `UNIQUE(event_idempotency_key)` |
 | 3. Trigger-vs-legacy ordering | **CLOSED** | §9 — B split into B1/B2 with R1 between; ordering inversion corrected |
 | 4. Temporary-suspension modelling | **CLOSED** | §11 — five additive `vendors` columns; existing fields proven insufficient |
 | 5. `leads` intake policy replacement | **CLOSED** | §12 — server-owned service-role intake; always-true policy and anon grants removed in C |

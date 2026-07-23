@@ -107,3 +107,15 @@ Canonical targets: DB `qf_assign_lead_vendors_v2` · service `services/marketpla
 8. Prove zero legacy callers → apply **Migration E** (revokes).
 
 **Hard gate:** step 8 cannot start until #1 is deleted and #2/#9 have ownership binding, because those are the only paths by which an unauthenticated caller can currently reach assignment authority.
+
+## Consumer rules for assignment lineage (QF-MVP-20.3A1R — binding)
+
+`lead_assignment_events` is an **append-only lifecycle event stream** with **no** `(lead_id, vendor_id)` unique constraint. Any consumer written against the withdrawn model would be wrong in ways that fail silently, so R1 must observe:
+
+1. **No consumer writes lineage directly.** Events are written only inside the canonical RPCs (`service_role`), which derive `event_idempotency_key` themselves. A consumer must never construct, supply, or override that key — it is not a caller-controlled input, and no runtime path accepts one.
+2. **Never rely on the event table to deduplicate a (lead, vendor) pair.** It does not. Assignment-row uniqueness is still enforced by the existing, unchanged `lead_assignments UNIQUE(lead_id, vendor_id)`; that is the constraint a consumer may reason about.
+3. **Read lifetime by query, not by row count.** `COUNT(DISTINCT vendor_id)` filtered to `event_type='assignment_created' AND lifecycle_to='assigned'`. A plain `count(*)` over the lead's events will over-count as soon as any `delivered`/`accepted`/`replaced` event exists, and would wrongly report a lead as at its lifetime cap.
+4. **Expect multiple rows per (lead, vendor).** Any admin/CRM read, export, or join that assumes at most one lineage row per pair must be corrected to aggregate or to select the latest event by `occurred_at`.
+5. **Treat the stream as immutable.** No consumer issues `UPDATE` or `DELETE` against it; corrections are appended as new events.
+
+Affected reads are the lifetime/eligibility previews behind #5, #7–#11 and the admin assignment views (#3, #4, #36); they consume the canonical eligibility helper rather than querying lineage directly, so rule 3 is satisfied centrally. Proven by **T33–T42** in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md).

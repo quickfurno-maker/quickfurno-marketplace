@@ -49,9 +49,9 @@ Every acceptance criterion below must have a proving test **before** the corresp
 The 20.3A design fixes the semantics these acceptance tests depend on. L1–L24 above remain valid; the following are now **locked** and the staging matrix in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) (T1–T22) is the executable form:
 
 - **Active set = `{assigned, delivered, accepted}`** on the new `lead_assignments.lifecycle_status` column (10-value vocabulary). `vendor_status` is the vendor CRM pipeline and is **not** the lifecycle. L1–L3 must count the active set, not row totals.
-- **Lifetime = distinct vendors in `lead_assignment_events`** (append-only, non-cascading). `rejected/expired/cancelled/invalid/replaced` **retain** their lifetime slot; a `requested` or failed candidate **never** consumes one. L4/L5 assert against the lineage table, not `lead_assignments`.
+- **Lifetime = distinct vendors in `lead_assignment_events`** (append-only, non-cascading), computed by **query** — `COUNT(DISTINCT vendor_id)` over `event_type='assignment_created' AND lifecycle_to='assigned'` — **not** by a uniqueness constraint. `rejected/expired/cancelled/invalid/replaced` **retain** their lifetime slot; a `requested` or failed candidate **never** consumes one. L4/L5 assert against the lineage table, not `lead_assignments`.
 - **Replacement** transitions the original to `replaced` (never deletes) and is capped one-per-lead by a partial unique index — L6/L7 map to T7/T8, plus new **T9** (replacement cannot exceed lifetime six).
-- **Idempotency has three layers** — `assignment_operations.idempotency_key`, `uq_vendor_credit_logs_reference`, `lead_assignments UNIQUE(lead_id,vendor_id)`. L8/L9 map to T3/T4.
+- **Idempotency has four separate boundaries** (corrected by 20.3A1R; the earlier "three layers" wording is superseded) — `assignment_operations.idempotency_key`, `lead_assignments UNIQUE(lead_id,vendor_id)`, `uq_vendor_credit_logs_reference`, and `lead_assignment_events UNIQUE(event_idempotency_key)`. Each protects its own object; **no single broad uniqueness constraint may substitute for them**. L8/L9 map to T3/T4.
 - **No caller-controlled ceiling exists** — a static assertion replaces L21's `max_vendors_per_lead` tampering test: `qf_assign_lead_vendors_v2` has no limit parameter and `ADMIN_MANUAL_TOTAL_VENDOR_LIMIT` reaches no RPC.
 - **Public projection** is `vendor_public_v` with an explicit allow-list; L14 gains **T13** (no `select("*")` on public paths) alongside anon column-privilege assertions.
 - **Communication** is an intent row only; L17/L18 map to T15/T16/T17, and **uncertain outcomes are terminal** (T18).
@@ -67,6 +67,12 @@ Deterministic fixtures (seeded UUIDs, 8 vendors so lifetime-6 can be exceeded) a
 - **Suspension tests added** (T28, T29): temporary suspension is a hard gate that admin override cannot bypass, and suspension fields never reach the public projection.
 - **Intake and privilege tests added** (T30, T31): crafted intake payloads cannot set `lead_quality_score`/`status`/`preferred_vendor_id`/`lead_priority`/`internal_notes`; after Migration C, `anon` holds **no** table privilege on `leads` or `vendors` and the always-true INSERT policy is gone.
 - **Divergence view test added** (T32): `vendor_wallet_package_divergence_v` classifies correctly and mutates nothing; the wallet is the sole assignment-debit authority.
+
+## QF-MVP-20.3A1R correction — assignment lineage idempotency
+
+`lead_assignment_events` is an **append-only lifecycle event stream**. Any earlier statement making `(lead_id, vendor_id)` unique on that table — wherever it appears, including [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md) — is **superseded and void**; that document is outside this correction's permitted paths and is superseded in writing rather than edited. Event uniqueness is carried by `event_idempotency_key` (seed `legacy_assignment_seed_v1:<assignment_id>`, runtime `assignment_event:<operation_id>:<assignment_id>:<event_type>`), always derived by the authoritative transaction and never by a caller. The existing `lead_assignments UNIQUE(lead_id, vendor_id)` is **unchanged**.
+
+Consequences for this matrix: **L6** must assert that the replaced vendor's `assignment_created` event persists *and* that a further `replaced` event is appended alongside it (not in place of it); **L4/L5** must count distinct vendors by query. Ten binding tests **T33–T42** in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) prove the corrected model — including two event types for one (lead, vendor), the full `assigned → delivered → accepted → completed` chain, duplicate-key no-op, distinct-key acceptance, later events consuming no slot, failed candidates consuming no slot, 7th-vendor rejection, and append-only immutability. T34/T35/T37/T42 fail under the withdrawn model and are the regression guards.
 
 ## Gate
 

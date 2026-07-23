@@ -30,7 +30,7 @@ For T1, T3, T8: N sessions each `BEGIN`, then synchronise on a barrier (advisory
 | **T6** | Assignment failure rolls back credit mutation | DB fault-injection | force the assignment insert to fail after debit | balance unchanged; no ledger row persists |
 | **T7** | Replacement preserves original history | integration | assign V1, replace with V2 | V1 row still exists with `lifecycle_status='replaced'` and `replaced_by_assignment_id` set; V1 lineage row **intact**; lifetime = 2 |
 | **T8** | Second concurrent replacement request rejected | DB concurrency | 2 parallel replacement requests for one lead | exactly **1** open request; the other → `replacement_in_progress` (partial unique index proven) |
-| **T9** | Replacement cannot exceed lifetime six | integration | lineage already 6, replace with a **new** vendor | rejected `lifetime_limit_reached`; original stays active; replacing with an **existing** lineage vendor is blocked by `UNIQUE(lead_id,vendor_id)` |
+| **T9** | Replacement cannot exceed lifetime six | integration | lineage already 6 distinct vendors, replace with a **new** vendor | rejected `lifetime_limit_reached`; original stays active; replacing with a vendor already in the lead's lineage is blocked by the existing `lead_assignments UNIQUE(lead_id, vendor_id)` — **not** by any constraint on `lead_assignment_events`, which has none |
 | **T10** | public/anon cannot execute assignment RPC | RLS/grant | — | `has_function_privilege` false for `PUBLIC`/`anon`/`authenticated` on `qf_assign_lead_vendors_v2` and all four legacy blockers; direct PostgREST call fails |
 | **T11** | Authenticated user cannot mutate another lead | integration | user A session, lead owned by B | `unauthorized`; no assignment/debit/intent |
 | **T12** | Public vendor projection leaks no monetization | API + grant | query `vendor_public_v` as anon; scan every public API payload | no `total_credits/remaining_credits/paid_status/package_name/package_status/package_expires_at`/package id/private contact; `has_column_privilege('anon','vendors',<monetization>,'SELECT')` all **false** |
@@ -60,7 +60,7 @@ For T1, T3, T8: N sessions each `BEGIN`, then synchronise on a barrier (advisory
 | # | Test | Type | Assertion |
 |---|---|---|---|
 | **T23** | Lifecycle backfill is deterministic and idempotent | migration rehearsal | seeded copy of the 46-row production shape → all rows `lifecycle_status='assigned'`; re-running A2 changes **0** rows |
-| **T24** | Lineage seed is idempotent | migration rehearsal | 46 lineage rows + **1** batch operation row; re-run inserts **0** (`ON CONFLICT (lead_id,vendor_id) DO NOTHING`); `first_assigned_at` equals the source `assigned_at`; no ledger row created |
+| **T24** | Lineage seed is idempotent | migration rehearsal | 46 `assignment_created`/`lifecycle_to='assigned'` events + **1** batch operation row; re-run inserts **0** via `ON CONFLICT (event_idempotency_key) DO NOTHING` (**not** `(lead_id, vendor_id)` — no such constraint exists); each key equals `legacy_assignment_seed_v1:<assignment_id>`; `occurred_at` equals the source `assigned_at`; no ledger row created |
 | **T25** | Lineage survives lead/vendor deletion attempt | DB integrity | `DELETE FROM leads`/`vendors` for a lead/vendor with lineage **fails with RESTRICT**; lineage row intact; no cascade fires |
 | **T26** | Enforcement triggers are absent in B1 and present in B2 | migration rehearsal | after B1: 0 new triggers, legacy RPCs still succeed; after B2: 3 triggers, caps enforced |
 | **T27** | Legacy 9-vendor recovery is rejected after B2 | integration | a `p_total_limit=9`-style attempt fails with `active_limit_reached`; **no partial assignment, no debit** |
@@ -72,6 +72,25 @@ For T1, T3, T8: N sessions each `BEGIN`, then synchronise on a barrier (advisory
 
 **Note on T20 (Auth trigger):** unchanged — runs only inside the dedicated Auth window; no Auth user is created in any other suite.
 
+## QF-MVP-20.3A1R additions — assignment lineage idempotency (binding)
+
+These ten tests prove the corrected model: `lead_assignment_events` is an **append-only stream** whose only unique constraint is `event_idempotency_key`, and whose lifetime-vendor count is a **query**, not a constraint. Any test that would pass under a `(lead_id, vendor_id)` unique constraint but fail under the corrected model — or vice versa — is deliberately included.
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T33** | Backfill A2 run twice is a no-op | migration rehearsal | seeded 46-row assignment shape; run A2, then run A2 again | second run inserts **0** events and **0** operation rows; total stays 46 events + 1 operation; no assignment row, balance or ledger row changes |
+| **T34** | Two different event types for one (lead, vendor) both persist | DB integrity | insert `assignment_created`/`assigned`, then `assignment_delivered`/`delivered` for the **same** `lead_id` + `vendor_id`, distinct keys | **both rows exist** (2 rows for the pair). Proves no `(lead_id, vendor_id)` uniqueness. Under the withdrawn model this test fails — that is the point |
+| **T35** | Full lifecycle chain appends four events | DB integrity | drive one (lead, vendor) through `assigned → delivered → accepted → completed` | **4** rows for the pair, `lifecycle_to` values in order, `occurred_at` non-decreasing; no row updated or deleted |
+| **T36** | Duplicate `event_idempotency_key` is a silent no-op | DB integrity | insert an event, then re-insert the **identical** key with `ON CONFLICT (event_idempotency_key) DO NOTHING` | row count unchanged; the stored row is byte-identical to the original (no overwrite); no error surfaced to the caller |
+| **T37** | Different keys, same (lead, vendor), both accepted | DB integrity | two inserts sharing `lead_id`+`vendor_id` but with distinct `event_idempotency_key` values | **both** rows inserted; no unique violation |
+| **T38** | Lifetime count derives from distinct `assignment_created` vendors | query semantics | lead with 3 distinct vendors, each carrying several lifecycle events | `COUNT(DISTINCT vendor_id) WHERE event_type='assignment_created' AND lifecycle_to='assigned'` = **3**, not the raw row count |
+| **T39** | A later lifecycle event consumes no additional lifetime slot | query semantics | append `delivered`, `accepted`, `rejected`, `replaced` for an already-counted vendor | lifetime count stays **unchanged**; the lifetime-6 gate verdict is unaffected |
+| **T40** | A failed candidate consumes no lifetime slot | integration | candidate rejected by eligibility, losing a race, or only `requested` — no assignment row created | **zero** `assignment_created` events written for that vendor; lifetime count unchanged; no debit |
+| **T41** | 7th distinct vendor is rejected | integration | lead with 6 distinct vendors in lineage; request a 7th **new** vendor | rejected `lifetime_limit_reached`; **no** assignment row, **no** debit, **no** lineage event; the 6 existing vendors are untouched |
+| **T42** | The event stream is append-only | DB integrity | attempt `UPDATE` and `DELETE` on an existing `lead_assignment_events` row as the runtime role | both are **refused** (no privilege / guard trigger); row count and content unchanged; the immutability guarantee holds for lifetime history |
+
+**Cross-check binding on T33/T24:** the seed key is `legacy_assignment_seed_v1:<assignment_id>` and the runtime key is `assignment_event:<operation_id>:<assignment_id>:<event_type>`. Tests must assert the **key format**, not merely that a rerun inserted zero rows — a rerun of a broken seed can also insert zero rows for the wrong reason.
+
 ## Gate
 
-20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.**
+20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32) and the 20.3A1R lineage additions (**T33–T42**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table.

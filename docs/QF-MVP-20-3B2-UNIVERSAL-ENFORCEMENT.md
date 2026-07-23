@@ -1,17 +1,15 @@
 # QF-MVP-20.3B2 — Universal Assignment Enforcement
 
-**Status: `CORRECTED_B2_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW` (QF-MVP-20.3B2R1P).**
+**Status: `CORRECTED_B2_APPLIED_VERIFIED_ON_STAGING_READY_FOR_COMMIT_REVIEW` (QF-MVP-20.3B2R1A).**
 
-> **GENERATED, REVIEWED, PREFLIGHTED, ONE FAILED APPLY, NOW CORRECTED — STILL NOT APPLIED.**
-> The first application attempt (QF-MVP-20.3B2A, 2026-07-23T17:22:22Z) **rolled back
-> atomically** on a runtime type-resolution defect in B2's own self-verification block —
-> `array_agg(a.attname …) = array[…]` compared `name[]` to `text[]` (SQLSTATE 42883). **B2 was
-> never recorded remotely; staging history stayed 6 local / 5 remote.** QF-MVP-20.3B2R1 casts
-> the catalog `name` arrays to `text` at all five sites (migration §5.7, verifier B13/B15),
-> preserving every enforcement semantic, and hardens the offline validator (rule **R23**) so
-> the defect family is caught before any future apply. **The next phase is a fresh B2 staging
-> preflight**, not application and not Migration C. See sections 13 (preflight) and 14 (failure
-> + correction).
+> **APPLIED AND VERIFIED ON STAGING.** After one failed attempt (QF-MVP-20.3B2A, `name[] = text[]`,
+> atomic rollback) and the QF-MVP-20.3B2R1 correction, the corrected B2 (`d1370355…`) was applied to
+> staging on **2026-07-23T18:16:43Z** (`npx supabase db push --linked`, **exit 0**); its self-verification
+> NOTICE reported **4 functions, 4 triggers, 0 unexpected triggers, B1 authority intact**. Remote history
+> is now **6 local / 6 remote**, B2 recorded **exactly once**, and the locked 34-row verifier returns
+> **34 PASS / 0 FAIL**. All four functions and four triggers are live; staging application data remains
+> **entirely empty**. Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never
+> accessed. **The next phase is Migration C**, which is not started. See section 16.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized R1 commit
 `5c78ea37a28bb55442bd409636bdfe3dc8efaad7` (parent `4bcdcc55c181ca374e93c9093d45c45620379031`),
@@ -589,3 +587,114 @@ application data, auth user, provider activation, deploy, PR or push.
 **Corrected QF-MVP-20.3B2 staging application** — *not* Migration C. The corrected B2 (`d1370355…`)
 is now preflighted and remains unapplied and local-only. Migrations A, A2, B1 and G stay applied
 and immutable.
+
+
+---
+
+## 16. QF-MVP-20.3B2R1A — corrected B2 staging application and verification
+
+**Status: `CORRECTED_B2_APPLIED_VERIFIED_ON_STAGING_READY_FOR_COMMIT_REVIEW`.**
+
+Executed at repository HEAD `4947eec9b73d8cfe0d6736b7b50852260ce5e43d` (origin identical, 0/0, clean),
+parent `c3350cd…`. All corrected hashes verified, workspace B2 byte-identical to the repository,
+offline gates green (B2 validator 61/61, B1/G 165/165, R1 62/62, `verify:mvp` exit 0), and R23
+re-proved load-bearing on both real artifacts.
+
+### Application
+
+| Item | Value |
+|---|---|
+| Command | `npx supabase db push --linked` (from the external apply workspace) |
+| Start / end (UTC) | `2026-07-23T18:16:43Z` → `2026-07-23T18:16:54Z` |
+| **Exit code** | **0** |
+| Migration applied | **only** `20260723000500_qf_mvp_assignment_universal_enforcement.sql` (`d1370355…`) |
+| Self-verification NOTICE | `4 functions, 4 triggers, 0 unexpected triggers, B1 authority intact.` |
+
+The corrected `DO $verify$` block ran to completion — the `name[] = text[]` defect that aborted the
+first attempt is fixed. A trailing `failed to cache migrations catalog` pgdelta-certificate Warning
+appeared; it is the known **post-commit** local catalog-cache convenience step (identical to
+QF-MVP-20.3B1A2 and B1G-A), runs after the migration commits, changed nothing, and the command
+still exited 0.
+
+### Migration history
+
+| | Before | After |
+|---|---|---|
+| local | 6 | 6 |
+| remote | 5 | **6** |
+| pending | B2 only | **none** |
+
+Remote now holds all six versions — B2 recorded **exactly once**, no unexpected version. The failed
+20.3B2A attempt left no history row (atomic rollback), as expected.
+
+### Locked verifier — 34 PASS / 0 FAIL
+
+Executed the locked SELECT-only `verify_qf_mvp_20_3b2.sql` (hash re-checked `89903749…`, unchanged)
+against staging. **All 34 rows PASS, zero FAIL, none skipped, no expected value altered, no DML.**
+Rows proving the enforcement is live:
+
+| Row | Check | Actual | Verdict |
+|---|---|---|---|
+| 1 | B2 recorded once | 1 | PASS |
+| 2 | 4 enforcement functions | 4 | PASS |
+| 3 / 4 | both cap functions SECURITY DEFINER / pinned search_path | 2 / 2 | PASS |
+| 5 | none untrusted-executable | 0 | PASS |
+| 6 | `trg_lead_assignments_active_cap` (BEFORE INSERT/UPDATE, tgtype 23, enabled) | 1 | PASS |
+| 7 | `trg_lead_assignment_events_lifetime_cap` (BEFORE INSERT, tgtype 7) | 1 | PASS |
+| 8 | `trg_lead_assignment_events_immutable` (BEFORE UPDATE/DELETE, tgtype 27) | 1 | PASS |
+| 9 | `trg_lead_assignment_events_no_truncate` (BEFORE TRUNCATE, tgtype 34) | 1 | PASS |
+| 10 | no unexpected trigger on the two tables | 0 | PASS |
+| 13 | **UNIQUE (lead_id, vendor_id) present** (the corrected B13) | 1 | PASS |
+| 15 | **event stream not pair-unique** (the corrected B15) | 0 | PASS |
+| 16 / 17 | one-open-replacement index; open = {requested, approved, activating} | 1 / 1 | PASS |
+| 18 / 19 | 5 canonical B1 functions intact; authority service-role-only | 5 / 1 | PASS |
+| 20–22 | Migration G lineage boundary preserved (untrusted 0, service_role forbidden 0, SELECT+INSERT 2) | 0 / 0 / 2 | PASS |
+| 23 | owner = `postgres`, informational break-glass | postgres | PASS |
+| 24 | legacy RPCs RETAINED | RETAINED | PASS |
+| 25 / 26 | Migration C projection absent / Migration D auth trigger absent | 0 / 0 | PASS |
+| 27 / 28 | owner-binding column / client-selection table still absent | 0 / 0 | PASS |
+| 29 / 30 | no `in_progress` lifecycle value; RLS still enabled on both tables | 1 / 2 | PASS |
+| 31–33 | no active-3, lifetime-6 or open-replacement breach in live data | 0 / 0 / 0 | PASS |
+| 34 | application data | assignments=0 events=0 operations=0 replacements=0 | PASS |
+
+The corrected **B13** and **B15** — the two rows whose cast was fixed in B2R1 — both PASS against the
+live catalog, confirming the fix works end-to-end.
+
+### Staging state (SELECT-only)
+
+67 public tables, **sum of all public-table rows = 0** (every table empty), `auth.users` **0**,
+provider accounts **0**, ready/active providers **0**, `vendor_public_v` **absent**, `auth.users`
+trigger **absent**, legacy RPCs **6**, B2 functions **4**, B2 triggers **4**, **total public
+triggers 4** (only B2's). B2 introduced exactly its four functions, four triggers and one history
+row — nothing else, no application data.
+
+### Advisors (read-only, after 34/34) — none blocking, none B2-related
+
+**Security — 44 lints.** 37 INFO `rls_enabled_no_policy` (deliberate fail-closed posture, incl. the
+Migration A tables); 1 WARN `rls_policy_always_true` on the `leads` INSERT policy (pre-existing;
+**Migration C** closes it); 6 WARN SECURITY DEFINER executable (`get_public_eligible_vendors`,
+`is_admin`, `owns_vendor`, `rls_auto_enable` — all pre-existing).
+
+**Performance — 230 lints.** 153 INFO `unused_index` (empty-DB artifact); 36 WARN
+`multiple_permissive_policies`; 30 INFO `unindexed_foreign_keys`; 7 WARN `auth_rls_initplan`; 3 WARN
+`duplicate_index` (Migration C scope); 1 INFO platform.
+
+**No advisor references any B2 object.** B2 added only trigger functions (not REST-callable) and
+triggers, so it cannot create or resolve an index or policy lint. Nothing was auto-fixed. None
+blocks: none proves B2 failed its reviewed contract, an unexpected schema change, or a critical
+staging safety defect.
+
+### Safety confirmations
+
+One real `db push` only. No second push. No `migration up`/`repair`/`reset`. No hand-executed B2
+SQL. No link change. No application data, auth user, provider activation, seed, Edge Function or
+deployment. No PR, no push. Production and QF-Jarvis were never accessed. The earlier 20.3B2A
+failure (SQLSTATE 42883) rolled back atomically and is not a remote history event.
+
+**Transcript:** `qf-staging-workspace\QF-MVP-20.3B2R1A-APPLICATION-20260723T181643Z.txt` — outside Git.
+
+### Next phase
+
+**Migration C** — public vendor projection, anon revokes on `leads`/`vendors`, and replacement of the
+always-true `leads` INSERT policy. **C is not started.** Migrations A, A2, B1, G and now B2 are
+applied and immutable.

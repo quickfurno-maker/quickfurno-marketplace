@@ -28,9 +28,18 @@
 --     • empty staging (zero application rows)
 --     • a production-shaped database containing historical assignments
 --
+-- QF-MVP-20.3B1R ADDITIONS
+--   Checks 601-614 close the four reviewed contracts: operation request
+--   fingerprint and result persistence (601-604), replay/conflict semantics,
+--   the locked one-credit assignment cost, package non-mutation, the
+--   client_selected fail-closed disposition and the audit_logs boundary
+--   (605-614). They sort last in the output.
+--
 -- OUTPUT
 --   check_name · expected · actual · status · details
 --   status is PASS or FAIL. Any FAIL row blocks the phase.
+--   Two rows are INFORMATIONAL and always report PASS (27, 614); their details
+--   say so explicitly and they must never be read as proof of anything else.
 -- ============================================================================
 
 with
@@ -140,6 +149,59 @@ select 6, 'A06_operation_idempotency_unique', '1',
                             and conname = 'uq_assignment_operations_idempotency')
             then 'PASS' else 'FAIL' end,
        'operation-level replay guard'
+
+-- QF-MVP-20.3B1R — replay contract support
+union all
+select 601, 'A06b_operation_request_fingerprint', 'present and NOT NULL',
+       coalesce((select case when attnotnull then 'present and NOT NULL' else 'present but NULLABLE' end
+                   from pg_catalog.pg_attribute
+                  where attrelid = 'public.assignment_operations'::regclass
+                    and attname = 'request_fingerprint' and not attisdropped), 'absent'),
+       case when exists (select 1 from pg_catalog.pg_attribute
+                          where attrelid = 'public.assignment_operations'::regclass
+                            and attname = 'request_fingerprint' and attnotnull and not attisdropped)
+            then 'PASS' else 'FAIL' end,
+       'idempotency must never be decided on the key alone; same key + different request = idempotency_conflict'
+
+union all
+select 602, 'A06c_operation_result_persistence', 'jsonb NOT NULL + terminal completion check',
+       case when exists (select 1 from pg_catalog.pg_attribute
+                          where attrelid = 'public.assignment_operations'::regclass
+                            and attname = 'result' and attnotnull and not attisdropped)
+             and exists (select 1 from pg_catalog.pg_constraint
+                          where conrelid = 'public.assignment_operations'::regclass
+                            and conname = 'assignment_operations_terminal_completion_check')
+            then 'jsonb NOT NULL + terminal completion check' else 'incomplete' end,
+       case when exists (select 1 from pg_catalog.pg_attribute
+                          where attrelid = 'public.assignment_operations'::regclass
+                            and attname = 'result' and attnotnull and not attisdropped)
+             and exists (select 1 from pg_catalog.pg_constraint
+                          where conrelid = 'public.assignment_operations'::regclass
+                            and conname = 'assignment_operations_terminal_completion_check')
+            then 'PASS' else 'FAIL' end,
+       'a terminal operation must carry completed_at AND a non-empty result, so a replay can be reconstructed without recomputation'
+
+union all
+select 603, 'A06d_no_terminal_operation_without_result', '0',
+       (select count(*)::text from public.assignment_operations
+         where status <> 'in_progress'
+           and (completed_at is null or result = '{}'::jsonb)),
+       case when (select count(*) from public.assignment_operations
+                   where status <> 'in_progress'
+                     and (completed_at is null or result = '{}'::jsonb)) = 0
+            then 'PASS' else 'FAIL' end,
+       'asserted independently of the CHECK constraint'
+
+union all
+select 604, 'A06e_no_duplicate_operation_key', '0',
+       (select count(*)::text from (
+          select idempotency_key from public.assignment_operations
+           group by idempotency_key having count(*) > 1) d),
+       case when (select count(*) from (
+                    select idempotency_key from public.assignment_operations
+                     group by idempotency_key having count(*) > 1) d) = 0
+            then 'PASS' else 'FAIL' end,
+       'exactly one invocation may claim an operation key'
 
 union all
 select 7, 'A07_replacement_one_open_per_lead', '1',
@@ -395,6 +457,138 @@ select 23, 'B05_service_role_execute_granted', '5',
           and has_function_privilege('service_role', to_regprocedure(s.sig), 'EXECUTE')) = 5
             then 'PASS' else 'FAIL' end,
        'the approved execution role, and the only one'
+
+-- === 7b. QF-MVP-20.3B1R — canonical authority behavioural contracts ========
+union all
+select 605, 'B05a_replay_and_conflict_semantics_present', 'fingerprint + conflict + retry',
+       (select case when d ~ 'request_fingerprint' then 'fingerprint ' else '' end
+                 || case when d ~ 'idempotency_conflict' then 'conflict ' else '' end
+                 || case when d ~ 'conflict_retry' then 'retry' else '' end
+          from (select coalesce(pg_catalog.pg_get_functiondef(
+                  to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')), '') as d) s),
+       case when (select d ~ 'request_fingerprint' and d ~ 'idempotency_conflict' and d ~ 'conflict_retry'
+                    from (select coalesce(pg_catalog.pg_get_functiondef(
+                            to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')), '') as d) s)
+            then 'PASS' else 'FAIL' end,
+       'same key + same request replays the persisted result; same key + different request is idempotency_conflict with zero mutation'
+
+union all
+select 606, 'B05b_no_caller_cost_or_delta_parameter', 'absent',
+       coalesce((select pg_catalog.pg_get_function_identity_arguments(
+                   to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), 'function absent'),
+       case when coalesce((select pg_catalog.pg_get_function_identity_arguments(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 !~* '(cost|delta|credit|limit|max)'
+            then 'PASS' else 'FAIL' end,
+       'ASSIGNMENT_CREDIT_COST = 1 is an internal locked constant; no caller may supply a cost, delta or ceiling'
+
+union all
+select 607, 'B05c_assignment_cost_not_configurable', 'no app_settings / vendor_packages read',
+       case when coalesce((select pg_catalog.pg_get_functiondef(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 ~* '(app_settings|get_setting_int|vendor_packages)'
+            then 'configuration or package lookup present' else 'no app_settings / vendor_packages read' end,
+       case when coalesce((select pg_catalog.pg_get_functiondef(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 ~* '(app_settings|get_setting_int|vendor_packages)'
+            then 'FAIL' else 'PASS' end,
+       'cost must not be read from configuration, and package state must not influence it'
+
+union all
+select 608, 'B05d_package_counters_not_debited', 'no vendor_packages mutation',
+       (select count(*)::text from pg_catalog.pg_proc p
+          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
+                             'qf_request_replacement_v2','qf_approve_credit_restoration_v2')
+           and pg_catalog.pg_get_functiondef(p.oid) ~* 'update\s+public\.vendor_packages') || ' mutating functions',
+       case when (select count(*) from pg_catalog.pg_proc p
+                    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'public'
+                     and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
+                                       'qf_request_replacement_v2','qf_approve_credit_restoration_v2')
+                     and pg_catalog.pg_get_functiondef(p.oid) ~* 'update\s+public\.vendor_packages') = 0
+            then 'PASS' else 'FAIL' end,
+       'the wallet is the sole assignment-debit authority; vendor_packages is an entitlement record only'
+
+union all
+select 609, 'B05e_every_assignment_debit_is_exactly_one_credit', '0 deviating',
+       (select count(*)::text from public.vendor_credit_logs
+         where change_type = 'lead_assignment_debit'
+           and idempotency_key like 'assignment_debit:%'
+           and credits_delta <> -1) || ' deviating',
+       case when (select count(*) from public.vendor_credit_logs
+                   where change_type = 'lead_assignment_debit'
+                     and idempotency_key like 'assignment_debit:%'
+                     and credits_delta <> -1) = 0
+            then 'PASS' else 'FAIL' end,
+       'scoped to canonical-authority debits; legacy historical rows are not judged here'
+
+union all
+select 610, 'B05f_no_canonical_debit_without_matching_assignment', '0',
+       (select count(*)::text from public.vendor_credit_logs l
+         where l.change_type = 'lead_assignment_debit'
+           and l.idempotency_key like 'assignment_debit:%'
+           and not exists (select 1 from public.lead_assignments la
+                            where la.id::text = l.reference_id)),
+       case when (select count(*) from public.vendor_credit_logs l
+                   where l.change_type = 'lead_assignment_debit'
+                     and l.idempotency_key like 'assignment_debit:%'
+                     and not exists (select 1 from public.lead_assignments la
+                                      where la.id::text = l.reference_id)) = 0
+            then 'PASS' else 'FAIL' end,
+       'a canonical debit exists only for a genuinely created assignment; replays, rejected and cap-blocked candidates debit nothing'
+
+union all
+select 611, 'B05g_client_selected_fails_closed', 'unauthorized before any write',
+       case when coalesce((select pg_catalog.pg_get_functiondef(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 ~ 'R1_BLOCKED_PENDING_OWNER_BINDING'
+            then 'unauthorized before any write' else 'fail-closed marker absent' end,
+       case when coalesce((select pg_catalog.pg_get_functiondef(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 ~ 'R1_BLOCKED_PENDING_OWNER_BINDING'
+            then 'PASS' else 'FAIL' end,
+       'the schema has no lead-to-client ownership binding and no canonical phone normalizer, so client_selected is refused rather than authorised by phone equality'
+
+union all
+select 612, 'B05h_no_phone_equality_ownership_authority', 'absent',
+       case when coalesce((select pg_catalog.pg_get_functiondef(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 ~* 'client_accounts'
+            then 'phone/account matching present' else 'absent' end,
+       case when coalesce((select pg_catalog.pg_get_functiondef(
+                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
+                 ~* 'client_accounts'
+            then 'FAIL' else 'PASS' end,
+       'phone equality is not accepted as ownership authority in any form'
+
+union all
+select 613, 'B05i_no_audit_logs_dependency', 'absent',
+       (select count(*)::text from pg_catalog.pg_proc p
+          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
+                             'qf_request_replacement_v2','qf_approve_credit_restoration_v2',
+                             'qf_vendor_assignment_eligible')
+           and pg_catalog.pg_get_functiondef(p.oid) ~* 'audit_logs') || ' functions referencing audit_logs',
+       case when (select count(*) from pg_catalog.pg_proc p
+                    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'public'
+                     and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
+                                       'qf_request_replacement_v2','qf_approve_credit_restoration_v2',
+                                       'qf_vendor_assignment_eligible')
+                     and pg_catalog.pg_get_functiondef(p.oid) ~* 'audit_logs') = 0
+            then 'PASS' else 'FAIL' end,
+       'audit_logs is absent from the baseline; the domain tables carry the evidence and the operation result is completed instead'
+
+union all
+select 614, 'B05j_audit_logs_table_not_created', '0',
+       (select count(*)::text from pg_catalog.pg_class c
+          join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relname = 'audit_logs'),
+       'PASS',
+       'INFORMATIONAL, never a failure of this phase: A/A2/B1 neither create nor require public.audit_logs. A non-zero actual means the drifted migration 20260621000006 was applied by some other route. That drift is tracked separately and is non-blocking here.'
 
 -- === 8. Legacy compatibility must be intact ================================
 union all

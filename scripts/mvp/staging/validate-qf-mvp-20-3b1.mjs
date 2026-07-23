@@ -256,6 +256,11 @@ for (const [key, rel] of Object.entries({
     bodies: tok.bodies.map((b) => norm(stripComments(b, rel))),
     // executable text with literals preserved and every comment removed
     all: norm(stripped),
+    // STRUCTURAL view of function bodies: comments AND string literals removed.
+    // Needed because a guard regex or a COMMENT ON text may legitimately spell
+    // "app_settings" or "vendor_packages" inside a literal; only a real table
+    // reference in executable code is a finding.
+    bodyCode: norm(tok.bodies.map((b) => tokenize(b, rel).code).join(" ")),
   };
   record(`tokenize:${rel}`, true, `${raw.length} bytes, ${tok.bodies.length} dollar-quoted bodies`);
 }
@@ -686,6 +691,205 @@ for (const f of MIGRATIONS) {
       suspensionWrite ? "a suspension write path exists" : "suspension columns are inert storage only"
     );
   }
+}
+
+/* ------------------------------------------------------------------------- */
+/* 9b. QF-MVP-20.3B1R — reviewed contract closures                            */
+/* ------------------------------------------------------------------------- */
+
+/* --- Contract 1: idempotent replay must not trust the key alone ---------- */
+{
+  const hasColumn = /request_fingerprint\s+text\s+not null/.test(A.code);
+  record(
+    "3B1R:assignment_operations.request_fingerprint is text NOT NULL",
+    hasColumn,
+    hasColumn ? "declared in Migration A" : "MISSING — replay would degrade to key-only trust"
+  );
+
+  const terminalCheck = /assignment_operations_terminal_completion_check/.test(A.code);
+  record(
+    "3B1R:terminal operations must carry completed_at and a non-empty result",
+    terminalCheck,
+    terminalCheck ? "CHECK present" : "missing — replay could not be reconstructed"
+  );
+
+  const assignBody = B1.bodies.find((b) => /request_fingerprint/.test(b) && /assignment_operations/.test(b)) || "";
+
+  const comparesFingerprint =
+    /request_fingerprint is distinct from/.test(assignBody) ||
+    /request_fingerprint\s*<>/.test(assignBody);
+  record(
+    "3B1R:replay compares the normalized request fingerprint",
+    comparesFingerprint,
+    comparesFingerprint
+      ? "same key + different request is detected"
+      : "FAIL-CLOSED: no fingerprint comparison, so one key could be reused for a different request"
+  );
+
+  const emitsConflict = /idempotency_conflict/.test(assignBody);
+  record(
+    "3B1R:same key + different request yields idempotency_conflict",
+    emitsConflict,
+    emitsConflict ? "sanitized code emitted" : "missing"
+  );
+
+  const emitsRetry = /conflict_retry/.test(assignBody);
+  record(
+    "3B1R:incomplete/rolled-back attempt yields conflict_retry",
+    emitsRetry,
+    emitsRetry ? "in_progress and lost-claim branches present" : "missing"
+  );
+
+  /* The fingerprint must be built from authority inputs and must exclude
+   * volatile values. now()/random()/txid inside the fingerprint expression
+   * would make every replay look like a conflict. */
+  const fpExpr = (assignBody.match(/v_fingerprint\s*:=[\s\S]*?;/) || [""])[0];
+  const fpIncludes = ["lead_id", "mode", "candidates", "reason_code", "replacement_ref", "actor_kind"]
+    .filter((k) => fpExpr.includes(k));
+  const fpVolatile = /now\(\)|random\(|txid|clock_timestamp|current_timestamp/.test(fpExpr);
+  record(
+    "3B1R:fingerprint covers authority inputs",
+    fpIncludes.length === 6,
+    `${fpIncludes.length}/6 present: ${fpIncludes.join(", ")}`
+  );
+  record(
+    "3B1R:fingerprint excludes volatile values",
+    !fpVolatile && fpExpr.length > 0,
+    fpVolatile ? "VOLATILE value inside the fingerprint" : "no now()/random()/txid/clock_timestamp"
+  );
+  const fpSorted = /order by/.test(fpExpr) && /distinct/.test(fpExpr);
+  record(
+    "3B1R:candidate vendors are deduplicated and deterministically sorted",
+    fpSorted,
+    fpSorted ? "distinct + order by in the fingerprint expression" : "caller ordering could change the fingerprint"
+  );
+
+  /* The replay branch must return the persisted result, not recompute. */
+  const replayReturnsStored = /return v_existing_op\.result/.test(assignBody);
+  record(
+    "3B1R:exact replay returns the persisted result verbatim",
+    replayReturnsStored,
+    replayReturnsStored ? "no recomputation, no new id" : "replay does not return the stored result"
+  );
+
+  /* Every mutating branch after the claim must reach a terminal status. */
+  const persistsResult = /update public\.assignment_operations[\s\S]{0,400}?result\s*=/.test(assignBody);
+  record(
+    "3B1R:operation result is persisted in the assignment transaction",
+    persistsResult,
+    persistsResult ? "completion is atomic with the assignment writes" : "result is never persisted"
+  );
+
+  /* A2 must supply a fingerprint too, deterministically. */
+  const a2Fingerprint = /request_fingerprint/.test(A2.all) && /sha256/.test(A2.all);
+  const a2Volatile = /'recorded_at'|now\(\)/.test((A2.all.match(/encode\(sha256[\s\S]{0,400}?'hex'\)/) || [""])[0]);
+  record(
+    "3B1R:A2 supplies a deterministic operation fingerprint",
+    a2Fingerprint && !a2Volatile,
+    a2Fingerprint ? (a2Volatile ? "fingerprint contains a volatile value" : "sha256 of a canonical constant payload") : "missing"
+  );
+}
+
+/* --- Contract 2: assignment credit cost is locked at exactly one --------- */
+{
+  const cost = (B1.bodyCode.match(/c_credit_cost\s+constant\s+integer\s*:=\s*(\d+)/) || [])[1];
+  record(
+    "3B1R:ASSIGNMENT_CREDIT_COST is the literal 1",
+    cost === "1",
+    cost === undefined ? "constant not found" : `c_credit_cost := ${cost}`
+  );
+
+  const debitsOne = /-c_credit_cost, 'lead_assignment_debit'/.test(B1.all);
+  record(
+    "3B1R:the assignment debit is exactly -ASSIGNMENT_CREDIT_COST",
+    debitsOne,
+    debitsOne ? "delta = -c_credit_cost" : "debit does not use the locked constant"
+  );
+
+  /* Structural view only: a guard regex or COMMENT ON text may legitimately
+   * spell app_settings inside a string literal. Only a real read counts. */
+  const configurable = /(public\.app_settings|get_setting_int\s*\()/.test(B1.bodyCode);
+  record(
+    "3B1R:assignment cost is never read from app_settings",
+    !configurable,
+    configurable ? "configuration lookup present in executable SQL" : "no configuration lookup"
+  );
+
+  const costParam = /p_(credit_)?(cost|delta|amount)\b/.test(
+    (B1.code.match(/create or replace function public\.qf_assign_lead_vendors_v2\s*\([^)]*\)/) || [""])[0]
+  );
+  record(
+    "3B1R:the assignment authority exposes no caller cost or delta parameter",
+    !costParam,
+    costParam ? "a cost/delta parameter is exposed" : "no cost, delta or amount parameter"
+  );
+
+  const packageDebit = /(update|insert into|delete from)\s+public\.vendor_packages/.test(B1.all) ||
+                       /(update|insert into|delete from)\s+public\.vendor_packages/.test(A2.all);
+  record(
+    "3B1R:package counters are never mutated by B1 or A2",
+    !packageDebit,
+    packageDebit ? "a vendor_packages mutation exists" : "vendor_packages is an entitlement record only"
+  );
+
+  const modeVaried = /c_credit_cost\s*\*|case[\s\S]{0,120}c_credit_cost\s*:=/.test(B1.all);
+  record(
+    "3B1R:cost does not vary by operation mode",
+    !modeVaried,
+    modeVaried ? "the cost constant is recomputed or scaled" : "single unambiguous authority"
+  );
+}
+
+/* --- Contract 3: client ownership fails closed --------------------------- */
+{
+  const failsClosed = /r1_blocked_pending_owner_binding/.test(B1.all) ||
+                      /r1_blocked_pending_owner_binding/.test(norm(B1.raw));
+  record(
+    "3B1R:client_selected is documented R1_BLOCKED_PENDING_OWNER_BINDING",
+    failsClosed,
+    failsClosed ? "marker present" : "missing"
+  );
+
+  const rejectsMode = /p_mode = 'client_selected'[\s\S]{0,200}unauthorized/.test(B1.all);
+  record(
+    "3B1R:client_selected is rejected before any write",
+    rejectsMode,
+    rejectsMode ? "returns unauthorized ahead of the operation claim" : "mode is not fail-closed"
+  );
+
+  const phoneOwnership = /client_accounts/.test(B1.all);
+  record(
+    "3B1R:phone equality is not used as ownership authority",
+    !phoneOwnership,
+    phoneOwnership
+      ? "client_accounts phone matching present — ambiguous ownership could be accepted"
+      : "no phone/account ownership check exists"
+  );
+}
+
+/* --- Contract 4: audit and historical gap -------------------------------- */
+{
+  const createsAudit = MIGRATIONS.some((f) => /create table[^;]*audit_logs/.test(f.code));
+  const writesAudit = MIGRATIONS.some((f) => /insert into[^;]*audit_logs/.test(f.all));
+  record(
+    "3B1R:no migration creates or writes public.audit_logs",
+    !createsAudit && !writesAudit,
+    !createsAudit && !writesAudit ? "domain tables carry the evidence" : "audit_logs is created or written"
+  );
+
+  const a2LedgerWrite = /(insert into|update)\s+public\.vendor_credit_logs/.test(A2.all);
+  record(
+    "3B1R:A2 fabricates no historical credit evidence",
+    !a2LedgerWrite,
+    a2LedgerWrite ? "A2 writes vendor_credit_logs" : "the 27 historical ledger gaps are left untouched"
+  );
+
+  const a2TouchesAssignments = /(update|delete from)\s+public\.lead_assignments/.test(A2.all);
+  record(
+    "3B1R:A2 changes no existing assignment row",
+    !a2TouchesAssignments,
+    a2TouchesAssignments ? "A2 mutates lead_assignments" : "lifecycle comes from Migration A's column default only"
+  );
 }
 
 /* ------------------------------------------------------------------------- */

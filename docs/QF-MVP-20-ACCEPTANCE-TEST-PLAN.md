@@ -90,6 +90,16 @@ Bindings this adds to the matrix:
 
 New rehearsal coverage **T43–T48** in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) proves clean application, empty-staging inertness, per-lead seeding, re-run no-op, incomplete-history skip-and-report, and the B1/B2 boundary.
 
+## QF-MVP-20.3B1R — reviewed authority contracts
+
+The review corrected three of four contracts. Consequences for this matrix:
+
+- **L8/L9 (replay) are strengthened and split.** Idempotency is no longer decided on the key alone. The authority compares a **normalized request fingerprint** (lead, mode, deduplicated and sorted candidates, reason code, replacement reference, actor), so the matrix now needs four outcomes, not one: exact replay returns the persisted result with `already_applied=true` and zero new rows (**T49–T51**); same key with a different request returns **`idempotency_conflict`** with zero mutation (**T52**); a still-`in_progress` row returns `conflict_retry` rather than a fabricated success (**T56**); concurrent duplicates resolve to exactly one operation (**T54/T55**). `idempotency_conflict` joins the sanitized reason vocabulary.
+- **L10/L11 (atomicity) gain a persistence obligation.** Operation completion and result persistence happen inside the assignment transaction, and a terminal operation is constrained to carry both `completed_at` and a non-empty `result` — otherwise a later replay could not be reconstructed.
+- **L21 is now provable twice over.** `ASSIGNMENT_CREDIT_COST = 1` is a locked internal constant: no caller parameter, no `app_settings` read, no `vendor_packages` inference, no variation by mode. **T57–T63** prove one credit per created assignment, zero for rejected, cap-blocked and replayed candidates, no clamping, and byte-identical `vendor_packages`.
+- **L13 (ownership) is deferred, not weakened.** `client_selected` mode is **fail-closed** (`R1_BLOCKED_PENDING_OWNER_BINDING`): the schema has no lead-to-client binding and no canonical phone normalizer, so the mode returns `unauthorized` before any write rather than trusting phone equality. **L13 cannot be satisfied in this phase**; it becomes testable only after R1 introduces an explicit ownership binding. **T64/T65** prove the fail-closed behaviour and that no untrusted role can reach the authority in any mode.
+- **L20 (historical investigation) is unaffected.** **T66/T67** confirm no `audit_logs` dependency and that A2 leaves the 27 ledger-gap assignments byte-identical.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

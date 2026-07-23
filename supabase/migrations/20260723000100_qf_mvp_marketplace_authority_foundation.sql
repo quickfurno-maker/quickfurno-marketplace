@@ -29,6 +29,16 @@
 --   docs/QF-MVP-20-3A-REMEDIATION-MIGRATION-DESIGN.md  (sections 1, 2, 3)
 --   docs/QF-MVP-20-3A1-DECISION-CLOSURE.md  (sections 6, 8, 11)
 --
+-- REVIEWED AND CORRECTED BY QF-MVP-20.3B1R
+--   The first generation of this file carried only assignment_operations.
+--   idempotency_key, which is not sufficient: it would have let the SAME key be
+--   reused for a DIFFERENT authority request and still replay as success.
+--   This revision adds request_fingerprint (NOT NULL, minimum length) and a
+--   terminal-completion CHECK, so the canonical authority can distinguish an
+--   exact replay, a conflicting reuse, a completed operation, a deterministic
+--   rejection and an incomplete or rolled-back attempt. See the column
+--   comments below and section 2 of Migration B1.
+--
 -- LOCKED CONTRACTS IMPLEMENTED HERE
 --   • Lifecycle vocabulary (10): requested, assigned, delivered, accepted,
 --     rejected, expired, cancelled, invalid, replaced, completed.
@@ -115,6 +125,7 @@
 create table public.assignment_operations (
   id                     uuid primary key default gen_random_uuid(),
   idempotency_key        text        not null,
+  request_fingerprint    text        not null,
   lead_id                uuid        not null,
   mode                   text        not null,
   actor_kind             text        not null,
@@ -134,6 +145,18 @@ create table public.assignment_operations (
     check (status = any (array['in_progress','applied','already_applied','partial','rejected','failed'])),
   constraint assignment_operations_replacement_ref_check
     check ((mode = 'replacement') = (replacement_request_id is not null)),
+  -- The fingerprint must be a real value, never an empty placeholder, or the
+  -- replay-versus-conflict decision would silently degrade to key-only trust.
+  constraint assignment_operations_request_fingerprint_check
+    check (length(request_fingerprint) >= 16),
+  -- A terminal operation MUST carry both a completion stamp and a
+  -- reconstructible result. This is what lets a replay distinguish
+  --   * a completed operation          (terminal + non-empty result)
+  --   * a deterministic rejection      (terminal + non-empty result)
+  --   * an incomplete/rolled-back try  (status still 'in_progress')
+  constraint assignment_operations_terminal_completion_check
+    check (status = 'in_progress'
+           or (completed_at is not null and result <> '{}'::jsonb)),
   constraint assignment_operations_lead_id_fkey
     foreign key (lead_id) references public.leads (id) on delete restrict
 );
@@ -142,7 +165,13 @@ create index idx_assignment_operations_lead
   on public.assignment_operations (lead_id, created_at desc);
 
 comment on table public.assignment_operations is
-  'QF-MVP-20 canonical authority: one row per logical assignment operation. idempotency_key is the operation-level replay guard; result replays the sanitized return contract verbatim.';
+  'QF-MVP-20 canonical authority: one row per logical assignment operation. Replay safety needs BOTH columns: idempotency_key is the claim, request_fingerprint proves the replay is the same authority request. result replays the sanitized return contract verbatim.';
+
+comment on column public.assignment_operations.request_fingerprint is
+  'QF-MVP-20.3B1R. SHA-256 hex of the canonical normalized authority request: version, lead_id, mode, DETERMINISTICALLY SORTED distinct candidate vendor ids, reason_code, replacement reference, actor kind and actor id. Deliberately excludes timestamps, transaction ids, random values and volatile database state, so the same authority request always fingerprints identically. Reusing an idempotency_key with a DIFFERENT fingerprint is idempotency_conflict and must mutate nothing.';
+
+comment on column public.assignment_operations.result is
+  'QF-MVP-20.3B1R. The persisted replay contract. Must be sufficient to reconstruct the canonical return value without recomputation: operation_id, assigned[] (assignment_id, vendor_id, credit_ledger_id), skipped[] (vendor_id, sanitized reason_code), active_count_after, lifetime_count_after and communication_intent_ids[]. Written atomically with the assignment transaction; a replay returns it verbatim and mints no new id.';
 
 -- ---------------------------------------------------------------------------
 -- 2. replacement_requests — approval-gated, one open request per lead
@@ -599,6 +628,25 @@ begin
     select 1 from pg_catalog.pg_constraint
      where conname = 'lead_assignment_events_operation_id_fkey' and confdeltype = 'n') then
     v_missing := v_missing || ' [lineage operation FK SET NULL]';
+  end if;
+
+  -- 10.5b the replay contract is structurally supported (QF-MVP-20.3B1R):
+  --       a NOT NULL request fingerprint plus terminal-completion integrity.
+  if not exists (
+    select 1 from pg_catalog.pg_attribute
+     where attrelid = 'public.assignment_operations'::regclass
+       and attname = 'request_fingerprint' and attnotnull and not attisdropped
+  ) then
+    raise exception
+      'QF-MVP-20.3B1R Migration A aborted: assignment_operations.request_fingerprint is missing or nullable. Idempotency must never be decided on the key alone.';
+  end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_constraint
+     where conrelid = 'public.assignment_operations'::regclass
+       and conname = 'assignment_operations_terminal_completion_check'
+  ) then
+    v_missing := v_missing || ' [assignment_operations terminal completion check]';
   end if;
 
   -- 10.6 additive columns landed

@@ -65,17 +65,17 @@ SELECT-only reconciliation of **production and staging** closed every remaining 
 
 **A** (foundation) → **A2** (reviewed data backfill: historical rows → `assigned`; one `assignment_created` lineage event per qualifying assignment, idempotent via `ON CONFLICT (event_idempotency_key) DO NOTHING`) → **B1** (canonical RPCs; legacy retained; **no triggers**) → **R1** (runtime consumer release) → **B2** (enable the 3 enforcement triggers after zero-legacy proof) → **C** (public projection; **revoke anon on `leads` and `vendors`**; drop the always-true `leads` INSERT policy) → **D** (Auth trigger) → **E** (legacy EXECUTE revocation) → **QF-MVP-20.4** (historical reconciliation) → later legacy removal.
 
-### K.4g A / A2 / B1 GENERATED (QF-MVP-20.3B1) — `GENERATED_NOT_APPLIED`
+### K.4g A / A2 / B1 GENERATED AND REVIEWED (QF-MVP-20.3B1 + 20.3B1R) — `GENERATED_REVIEWED_NOT_APPLIED`
 
 The first three steps now exist as reviewed, forward-only files. Full record and object deltas: [`QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md`](QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md).
 
 | Step | File | SHA256 | State |
 |---|---|---|---|
-| **A** | `supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql` | `7d569d33…` | GENERATED_NOT_APPLIED |
-| **A2** | `supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql` | `6bc0285d…` | GENERATED_NOT_APPLIED |
-| **B1** | `supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql` | `151f6b43…` | GENERATED_NOT_APPLIED |
-| Phase verifier | `supabase/staging-verification/verify_qf_mvp_20_3b1.sql` | `ebe0ef75…` | SELECT-only, 44 checks |
-| Offline validator | `scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` | `eddec25a…` | PASS 82/82 |
+| **A** | `supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql` | `b6307094…` | GENERATED_REVIEWED_NOT_APPLIED |
+| **A2** | `supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql` | `9d77f446…` | GENERATED_REVIEWED_NOT_APPLIED |
+| **B1** | `supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql` | `a4b5c378…` | GENERATED_REVIEWED_NOT_APPLIED |
+| Phase verifier | `supabase/staging-verification/verify_qf_mvp_20_3b1.sql` | `688ab439…` | SELECT-only, 58 checks |
+| Offline validator | `scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` | `4497a3c0…` | PASS 105/105 |
 
 Locked baseline `920a4aa0…` and baseline verifier `7ba9792f…` are **unchanged**; the baseline verifier was not converted into a forward-migration verifier.
 
@@ -87,6 +87,15 @@ Locked baseline `920a4aa0…` and baseline verifier `7ba9792f…` are **unchange
 Also locked: `source_kind = 'migration_backfill'` (never `'backfill'`), and `source_reference = 'legacy_assignment_seed_v1:<assignment_id>'`.
 
 **Deliberately excluded from these three files:** every B2 enforcement trigger (none created, none defined) · all Migration C work (`vendor_public_v`, `vendor_wallet_package_divergence_v`, anon revokes, policy replacement, duplicate-index removal) · Migration D's `auth.users` trigger · Migration E's legacy revocations · any `audit_logs` object · any suspension or restoration **mutation** path (the five `vendors` suspension columns are inert storage that B1 only reads).
+
+**QF-MVP-20.3B1R review corrections (three of four contracts changed):**
+
+1. **Replay is no longer key-only.** `assignment_operations` gains `request_fingerprint text NOT NULL` plus a terminal-completion CHECK, and B1 compares a normalized fingerprint (lead, mode, deduplicated and sorted candidates, reason code, replacement reference, actor). Same key + same request replays the persisted result with `already_applied=true`; same key + **different** request returns **`idempotency_conflict`** with zero mutation; an `in_progress` or vanished claim returns `conflict_retry`. No branch recomputes eligibility or mints a new id.
+2. **`ASSIGNMENT_CREDIT_COST = 1` is a single locked authority** — no caller parameter, no `app_settings` read, no `vendor_packages` inference, no variation by mode, no clamping.
+3. **`client_selected` mode fails closed** as `R1_BLOCKED_PENDING_OWNER_BINDING`. The schema has no lead-to-client ownership binding and no canonical phone normalizer, so the mode is refused before any write rather than authorised by phone equality. **R1 must add an explicit ownership binding before the mode can be activated.**
+4. **Audit model confirmed unchanged** — no `audit_logs` created or written; A2 fabricates no ledger evidence and the 27 historical gaps stay untouched.
+
+**Baseline-validator reproducibility is RESOLVED.** The approved external production schema source was located, hashed to the required `269c9265…`, and `validate-staging-baseline.mjs` returned **PASS**. The `BLOCKED_EXTERNAL_EVIDENCE` status carried by 20.3B1 no longer applies, so **B1P is not blocked on it**.
 
 **Consequence for production planning:** applying A/A2/B1 to production **closes no existing production exposure**. The anon privileges on `leads`/`vendors` and the anon-executable blocker RPCs remain until C and E respectively. A2 additionally mutates production data (lineage rows) and requires founder sign-off separately from the schema DDL.
 

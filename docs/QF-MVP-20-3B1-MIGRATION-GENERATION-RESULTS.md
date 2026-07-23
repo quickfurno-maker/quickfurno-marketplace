@@ -1,9 +1,9 @@
 # QF-MVP-20.3B1 — Migration Generation Results
 
-**Branch:** `mvp/qf-mvp-20-marketplace-engine-v1` @ `054a446e38f207b62bab6685928c146279b559ad` · **Type:** OFFLINE migration authoring + static validation.
+**Branch:** `mvp/qf-mvp-20-marketplace-engine-v1` · **Generated at** `054a446e38f207b62bab6685928c146279b559ad` (QF-MVP-20.3B1) · **Reviewed and corrected at** `33646e8177b5bb73b9a0985778a3819fe972560d` (QF-MVP-20.3B1R) · **Type:** OFFLINE migration authoring, review and static validation.
 **No database access of any kind.** No production, no staging, no SQL execution, no `db push` (not even `--dry-run`), no `db reset`, no `migration repair`, no history change, no deploy, no runtime TypeScript.
 
-**Status: GENERATED_NOT_APPLIED.** Three forward-only migrations, one phase verifier and one offline validator exist in the repository and have never been run against a database.
+**Status: GENERATED_REVIEWED_NOT_APPLIED** (reviewed and corrected by QF-MVP-20.3B1R). Three forward-only migrations, one phase verifier and one offline validator exist in the repository and have never been run against a database.
 
 ---
 
@@ -11,11 +11,11 @@
 
 | Artifact | SHA256 |
 |---|---|
-| `supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql` | `7d569d334d92c216686e100159cb030459350c4272f40d02dbde64e1fb82716c` |
-| `supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql` | `6bc0285d66c5d75ef47f648e2716a18f746e2e396a61387df5719aa6a974e01d` |
-| `supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql` | `151f6b430539c8f9c475dd24310d370ea05e6c13c189cdfe3df50beca5fc5487` |
-| `supabase/staging-verification/verify_qf_mvp_20_3b1.sql` | `ebe0ef75c5692eb9c145812e10dce72385d79c4b00b71010ae2801a9b65b60fa` |
-| `scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` | `eddec25a6e69fac59ba54143c7c5ae2c663b08a2d9e3b75cbd5e98a3753161e0` |
+| `supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql` | `b6307094715a102fa0cfccc1533cb8089e5b26fbe1e80a294c127b81e29f2b83` |
+| `supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql` | `9d77f4460701caa1caf172b50886b681f4b7e86849172ca2a7af1ece70eb3d60` |
+| `supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql` | `a4b5c3783afc6ed82598035afeff60d0e0e84a0c8cdaa08d874e7b2832b842db` |
+| `supabase/staging-verification/verify_qf_mvp_20_3b1.sql` | `688ab439efac077d8868078875cd501d3221a62c8682c63df6223296f3144cf7` |
+| `scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` | `4497a3c0f5b36e061ce4a1d4d4977bd831b194fa4ea2335f3dd92f728b5f4795` |
 
 **Locked artifacts re-hashed and byte-identical (unchanged by this phase):**
 
@@ -189,7 +189,7 @@ B2 is deliberately withheld because B1 lands **before** R1: the legacy admin pat
 
 ## 11. Phase verification design
 
-`supabase/staging-verification/verify_qf_mvp_20_3b1.sql` — 44 checks, each returning `check_name · expected · actual · status · details`, `status ∈ {PASS, FAIL}`.
+`supabase/staging-verification/verify_qf_mvp_20_3b1.sql` — 58 checks, each returning `check_name · expected · actual · status · details`, `status ∈ {PASS, FAIL}`.
 
 **SELECT-only by construction:** the whole file is one `WITH … SELECT … UNION ALL` statement. It contains no INSERT/UPDATE/DELETE/MERGE/TRUNCATE/CREATE/ALTER/DROP/GRANT/REVOKE/COPY/CALL/DO/SET outside comments — asserted independently by the offline validator.
 
@@ -201,7 +201,7 @@ Check 27 is explicitly **informational** and always reports PASS, with details s
 
 ## 12. Offline validator design
 
-`scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` — **82 checks, all passing.** Entirely offline: it opens no socket, spawns no process, reads no environment variable and touches no database.
+`scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` — **105 checks, all passing** (82 generation checks plus 23 QF-MVP-20.3B1R contract checks). Entirely offline: it opens no socket, spawns no process, reads no environment variable and touches no database.
 
 It uses two complementary SQL views, both fail-closed on an unterminated comment, string or dollar-quoted body:
 
@@ -210,12 +210,69 @@ It uses two complementary SQL views, both fail-closed on an unterminated comment
 
 Checks: exact identities and ascending order above the baseline · SHA256 of all five artifacts · locked baseline and baseline-verifier hashes unchanged · no unapproved destructive operation (the single approved exception is the additive `change_type` CHECK replacement) · no TRUNCATE/DELETE/DROP DATABASE · no role or session-authority change · no URL, project ref, token or credential in executable text · no grant to PUBLIC/anon/authenticated · explicit `REVOKE … FROM PUBLIC` and `GRANT … TO service_role` for each of the five canonical RPCs · `search_path` pinned on every DEFINER function · no legacy function dropped and no legacy `service_role` EXECUTE revoked · no trigger attached · no `auth.users` trigger · no Migration C work · no `audit_logs` object or write · no `UNIQUE (lead_id, vendor_id)` defined and `UNIQUE (event_idempotency_key)` present and NOT NULL · existing `lead_assignments` uniqueness not dropped · A2 seeds on the event key and never on `(lead_id, vendor_id)` · `source_kind='migration_backfill'` · per-lead operation key · A2 writes no ledger row and no intent · no hardcoded `46`/`24` in executable SQL · B1 writes assignment, ledger, lineage and intent in one function body with no explicit COMMIT/ROLLBACK/SAVEPOINT · runtime event-key format · lifetime is `count(distinct vendor_id)` · no limit parameter · no provider primitive · wallet-only debit · no suspension mutation path · phase verifier is SELECT-only with the five required output columns and derived expectations · header discipline on all three migrations.
 
+## 12b. QF-MVP-20.3B1R - contract review and corrections
+
+Four contracts were reviewed against the generated SQL. **Three required correction; one was already satisfied.**
+
+### Contract 1 - idempotent replay: CORRECTED
+
+The generated B1 trusted `assignment_operations.idempotency_key` **alone**. Reusing one key with a *different* authority request would have replayed a foreign result as success. Corrections:
+
+- **Migration A** gains `assignment_operations.request_fingerprint text NOT NULL` (minimum length 16) and `assignment_operations_terminal_completion_check` - a terminal operation must carry both `completed_at` and a non-empty `result`.
+- **Migration B1** computes a normalized fingerprint before the claim and branches four ways:
+
+| Situation | Outcome | Mutation |
+|---|---|---|
+| Key free | claim, proceed | the operation itself |
+| Same key, same fingerprint, terminal | persisted `result` verbatim + `already_applied = true` | **none** |
+| Same key, **different** fingerprint | `idempotency_conflict` | **none** |
+| Same key, same fingerprint, still `in_progress` | `conflict_retry` (incomplete/rolled-back attempt) | **none** |
+| Key row vanished (claimant rolled back) | `conflict_retry` | **none** |
+
+**Fingerprint composition** - SHA-256 hex of a canonical JSON payload: `v`, `lead_id`, `mode`, **deduplicated and sorted** candidate vendor ids, `reason_code`, `replacement_ref`, `actor_kind`, `actor_id`. Caller ordering is only a ranking preference, so sorting keeps the fingerprint stable. It deliberately excludes `now()`, transaction ids, random values and all volatile database state - the validator asserts this, because a volatile fingerprint would make every genuine replay look like a conflict.
+
+**Persisted replay result** - `result` carries `operation_id`, `assigned[]` (assignment_id, vendor_id, credit_ledger_id), `skipped[]` (vendor_id, sanitized reason_code), `active_count_after`, `lifetime_count_after` and `communication_intent_ids[]`. The replay branch returns it verbatim: it mints no new id, runs no second eligibility calculation, and does not change its answer because vendor state, credit balance or assignment counts moved after the original commit. Completion is written inside the same transaction as the assignment, ledger, lineage and intent writes.
+
+**Concurrency** - `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` means exactly one invocation claims the operation; a concurrent duplicate blocks until the first transaction resolves and then takes the replay-or-conflict path. A2 supplies its own deterministic fingerprint so backfill rows satisfy the same schema.
+
+### Contract 2 - assignment credit cost: CONFIRMED, made explicit
+
+`ASSIGNMENT_CREDIT_COST = 1` is now stated as a single named authority with a locked comment. The debit is `-c_credit_cost` with `change_type='lead_assignment_debit'`, reference `lead_assignment`/`<assignment_id>` and idempotency key `assignment_debit:<operation_id>:<assignment_id>`.
+
+Zero-cost by construction, because none of these reaches the debit: a replay (returns before the loop), an already-assigned vendor (`duplicate_assignment` on the existing unique constraint), a rejected candidate, a cap-blocked candidate, and the A2 backfill. Replacement debits only when it creates a genuinely new assignment.
+
+Not configurable: no caller parameter, no `app_settings` or `get_setting_int` read, no inference from `vendor_packages`, no variation by mode. Balances never clamp - an insufficient balance returns `insufficient_credits`. Atomicity is symmetric: the assignment rolls back if the debit fails, and the debit rolls back if the assignment, event or intent fails.
+
+### Contract 3 - client ownership: FAIL-CLOSED, `R1_BLOCKED_PENDING_OWNER_BINDING`
+
+The generated B1 re-asserted client ownership by matching `client_accounts.phone_e164` to `leads.phone` through `qf_norm_text`. Review rejected this:
+
+- `public.qf_norm_text` is `nullif(lower(trim(coalesce(...))), '')` - **raw-text equality after casing and trimming**, not canonical phone normalization, and the schema contains no phone normalizer at all.
+- `public.leads` has no `client_account_id`, `user_id` or `created_by` column, so there is no ownership binding to re-assert against.
+- Founder decision 3 requires canonical normalized phone values and forbids accepting zero or multiple matches. That condition cannot be met with the available schema, and inventing a canonicalisation here would be a new runtime ownership system the schema contract never froze.
+
+**Disposition:** `client_selected` mode returns `unauthorized` and mutates nothing - the rejection happens *before* the operation claim, so not even an operation row is created. This is the founder's stated fallback, chosen over weakening authorization to make the mode operational. The whole function remains `service_role`-only, so `anon` and `authenticated` reach it in no mode.
+
+**R1 unblocks it** with either an explicit lead/client ownership binding column, or a server-created client-selection request row binding authenticated client, lead and requested vendor. Until that review lands, no runtime consumer may activate the mode.
+
+### Contract 4 - audit and historical gap: CONFIRMED, no change needed
+
+Migration A does not create `public.audit_logs`; B1 does not insert into it; the five domain tables carry the evidence. A2 creates no `vendor_credit_logs` row, changes no existing assignment row and fabricates no historical debit, so the 27 ledger-gap assignments are untouched and remain QF-MVP-20.4 scope. The `audit_logs` drift stays non-blocking.
+
+## 12c. Baseline-validator reproducibility: RESOLVED
+
+The previous phase reported this **BLOCKED_EXTERNAL_EVIDENCE**. It is now closed.
+
+The approved external source at `Desktop\qf-staging-workspace\production-public-schema.sql` exists and hashes to `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f`, matching the required SHA256 exactly. `scripts/mvp/staging/validate-staging-baseline.mjs` ran with its documented arguments and returned **PASS**: 62 tables, 39 functions, 33 SECURITY DEFINER, 67 policies, 62 RLS, 62 PK, 69 FK, 15 unique, 169 check, 180 indexes, 0 triggers, 0 views; `anon` holds no table grant and executes only `get_public_eligible_vendors`; 10 mutation RPCs verified not reachable by anon/authenticated/PUBLIC; baseline SHA confirmed locked and unmodified.
+
+The raw schema was **not** copied into Git, **not** modified, and no database was accessed.
+
 ## 13. Remaining unknowns and open items
 
-1. **Client ownership linkage is inferred, not declared.** `public.leads` has no `client_account_id`, `user_id` or `created_by` column. The only linkage that exists is `client_accounts.user_id` ↔ `client_accounts.phone_e164` ↔ `leads.phone`, so the in-body re-assertion for `p_actor_kind='client'` is a normalised phone match. **R1 must confirm this is the intended ownership contract**, or introduce an explicit ownership column in a later reviewed migration. Until then, client-mode assignment is only as strong as phone-to-account verification.
+1. **`client_selected` mode is FAIL-CLOSED - `R1_BLOCKED_PENDING_OWNER_BINDING`.** `public.leads` has no `client_account_id`, `user_id` or `created_by` column, and the schema has no canonical phone normalizer, so the database cannot re-assert client ownership. The mode now returns `unauthorized` before any write (see 12b, contract 3). **R1 must add an explicit ownership binding** - either a lead/client column or a server-created client-selection request row - before any runtime consumer activates the mode. This is the one functional capability deliberately withheld.
 2. **`public.audit_logs` drift is now documented but not closed.** The table is created by repository migration `20260621000006_superadmin_foundation.sql` yet is absent from the applied baseline and therefore from production. Whether to apply that drifted migration is a separate decision, tracked outside this phase.
-3. **`assignment_operations.result` replay shape.** On replay B1 returns the stored result merged with `status='already_applied'`. R1 must treat `already_applied` as success, not as a failed attempt.
-4. **Credit cost is the internal constant `1`**, mirroring the legacy `LEAD_CREDIT_COST` in `assign_lead_to_paid_vendors_phase26a` and `lib/vendors/vendorEligibility.ts`. A shared SQL+TS constant assertion is R1 work.
+3. **Replay and conflict codes are runtime contract.** R1 must treat `already_applied` as success, `idempotency_conflict` as a caller bug (never retry the same key with changed inputs) and `conflict_retry` as safe to retry with the same key. The server must also derive the operation key deterministically, or a retried request will fingerprint-match but key-miss.
+4. **`ASSIGNMENT_CREDIT_COST = 1` is locked in SQL**, mirroring the legacy `LEAD_CREDIT_COST` in `assign_lead_to_paid_vendors_phase26a` and `lib/vendors/vendorEligibility.ts`. A shared SQL+TS constant assertion is R1 work.
 5. **The 27-row ledger gap is untouched** and remains QF-MVP-20.4 scope. Neither A2 nor B1 improves or worsens it.
 
 ## 14. Rollback boundaries
@@ -245,11 +302,13 @@ Migration history is never manually falsified; rollback is expressed as a new re
 
 | Gate | Result |
 |---|---|
-| Offline validator (`validate-qf-mvp-20-3b1.mjs`) | **PASS** — 82/82 |
+| Offline validator (`validate-qf-mvp-20-3b1.mjs`) | **PASS** — 105/105 |
 | Locked baseline + verifier hashes | **UNCHANGED** |
 | `git diff --check` | clean |
 | `npm run verify:mvp` | **PASS** — 40/40 test cases, typecheck, lint, build |
 | Database access | **NONE** — no production, no staging, no SQL executed |
-| Migration state | **A / A2 / B1 = GENERATED_NOT_APPLIED** |
+| Migration state | **A / A2 / B1 = GENERATED_REVIEWED_NOT_APPLIED** |
 
-**Note on the pre-existing baseline validator:** `scripts/mvp/staging/validate-staging-baseline.mjs` hard-requires `--source <schema.sql>`, the raw production schema dump, and validates its SHA256. That dump is deliberately stored outside the repository and is not present in this environment, so the validator **could not be re-run** in this phase. The guarantee it would provide for this task — that the locked artifacts are unchanged — was obtained directly instead: both files were re-hashed byte-for-byte and match, and the new validator asserts the same two hashes independently.
+**Locked baseline validator:** **PASS**. The external source at `Desktop\qf-staging-workspace\production-public-schema.sql` was located and hashed to the required `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f`, and `scripts/mvp/staging/validate-staging-baseline.mjs` ran to PASS with its documented arguments. This closes the `BLOCKED_EXTERNAL_EVIDENCE` status carried by QF-MVP-20.3B1. See 12c. The raw schema was not copied into Git, not modified, and no database was accessed.
+
+**QF-MVP-20.3B1P readiness: READY.** The baseline-validator blocker is resolved, the phase validator passes 105/105, and the three migrations plus the phase verifier are reviewed. The one open functional gap, `client_selected` fail-closed, does not block staging application - it is deliberately withheld authority, not a defect.

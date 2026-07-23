@@ -186,11 +186,26 @@ begin
   -- 1. One deterministic backfill operation per DISTINCT qualifying lead
   -- -------------------------------------------------------------------------
   insert into public.assignment_operations (
-    idempotency_key, lead_id, mode, actor_kind, actor_id,
+    idempotency_key, request_fingerprint, lead_id, mode, actor_kind, actor_id,
     replacement_request_id, reason_code, status, result, created_at, completed_at
   )
   select
     v_batch_key || ':' || la.lead_id::text,
+    -- Deterministic request fingerprint, built with the SAME canonical encoding
+    -- the canonical authority uses (QF-MVP-20.3B1R): version, lead, mode,
+    -- sorted candidate list (empty for a backfill), reason code, replacement
+    -- reference and actor. No timestamp, no random value, no volatile state, so
+    -- re-running A2 reproduces byte-identical fingerprints.
+    encode(sha256(convert_to(jsonb_build_object(
+      'v',               1,
+      'lead_id',         la.lead_id::text,
+      'mode',            'recovery_replay',
+      'candidates',      '[]'::jsonb,
+      'reason_code',     'migration_backfill',
+      'replacement_ref', '',
+      'actor_kind',      'worker',
+      'actor_id',        ''
+    )::text, 'UTF8')), 'hex'),
     la.lead_id,
     'recovery_replay',
     'worker',

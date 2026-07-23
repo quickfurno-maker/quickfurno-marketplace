@@ -52,6 +52,27 @@
 --   self-approve one.
 --
 -- ---------------------------------------------------------------------------
+-- REVIEWED AND CORRECTED BY QF-MVP-20.3B1R
+-- ---------------------------------------------------------------------------
+--   1. IDEMPOTENT REPLAY IS NO LONGER KEY-ONLY. The first generation trusted
+--      assignment_operations.idempotency_key alone, so the same key submitted
+--      with a DIFFERENT authority request would have replayed someone else's
+--      result as success. The authority now computes a normalized request
+--      fingerprint and compares it, yielding four distinct outcomes:
+--        exact replay        -> persisted result verbatim, already_applied=true
+--        conflicting reuse   -> idempotency_conflict, ZERO mutation
+--        incomplete attempt  -> conflict_retry, ZERO mutation
+--        lost claim race     -> conflict_retry, ZERO mutation
+--      No branch recomputes eligibility and no branch mints a new id.
+--
+--   2. ASSIGNMENT_CREDIT_COST = 1 is stated as a single locked authority.
+--
+--   3. CLIENT_SELECTED MODE FAILS CLOSED (R1_BLOCKED_PENDING_OWNER_BINDING).
+--      Phone equality is not ownership authority, and the schema has neither a
+--      lead-to-client binding nor a canonical phone normalizer. The mode is
+--      rejected before any write rather than authorised by a weaker check.
+--
+-- ---------------------------------------------------------------------------
 -- LOCKED INVARIANTS ENFORCED INSIDE qf_assign_lead_vendors_v2
 -- ---------------------------------------------------------------------------
 --   ACTIVE SET      = {assigned, delivered, accepted}   (never in_progress)
@@ -381,8 +402,19 @@ begin
     'credits_before', v_before, 'credits_after', v_after);
 exception
   when unique_violation then
-    -- A concurrent transaction won the reference/idempotency race.
+    -- A concurrent transaction won the reference/idempotency race. PL/pgSQL has
+    -- already rolled this block's subtransaction back, so NO balance change and
+    -- NO ledger row of ours survives: nothing partial is preserved. Resolve the
+    -- winner's ledger id so the answer is a complete replay response rather
+    -- than a bare status.
+    select id into v_existing from public.vendor_credit_logs
+      where (p_reference_type is not null and p_reference_id is not null
+             and reference_type = p_reference_type and reference_id = p_reference_id)
+         or (p_idempotency_key is not null and idempotency_key = p_idempotency_key)
+      limit 1;
+
     return jsonb_build_object('status','already_applied','reason_code',null,
+                              'ledger_id', v_existing,
                               'vendor_id', p_vendor_id);
 end;
 $$;
@@ -410,13 +442,24 @@ create or replace function public.qf_assign_lead_vendors_v2(
 as $$
 declare
   -- Internal constants. Deliberately NOT parameters and deliberately NOT read
-  -- from app_settings: no caller and no configuration row may raise them.
+  -- from app_settings, vendor_packages or any configuration row: no caller and
+  -- no data value may raise or lower them.
   c_active_cap   constant integer := 3;
   c_lifetime_cap constant integer := 6;
+
+  -- ASSIGNMENT_CREDIT_COST = 1 (LOCKED, QF-MVP-20.3B1R founder decision 2).
+  -- One newly created vendor assignment costs exactly one wallet credit.
+  -- This literal is the single unambiguous authority for that cost. It is never
+  -- accepted from the caller, never read from app_settings, never inferred from
+  -- vendor_packages and never varied by operation mode. A replay, an
+  -- already-assigned vendor, a rejected candidate, a cap-blocked candidate and
+  -- the A2 historical backfill all cost ZERO because none of them reaches the
+  -- debit at all.
   c_credit_cost  constant integer := 1;
 
   v_lead          public.leads%rowtype;
   v_operation_id  uuid;
+  v_fingerprint   text;
   v_existing_op   public.assignment_operations%rowtype;
   v_replacement   public.replacement_requests%rowtype;
   v_active_count  integer;
@@ -466,21 +509,103 @@ begin
     return jsonb_build_object('status','unauthorized','reason_code','unauthorized');
   end if;
 
-  -- 2. Operation idempotency claim, BEFORE any lock.
+  -- 1b. CLIENT-SELECTED MODE IS FAIL-CLOSED IN THIS PHASE.
+  --     R1_BLOCKED_PENDING_OWNER_BINDING (QF-MVP-20.3B1R founder decision 3).
+  --
+  --     A client-selected assignment requires the AUTHORITY to re-assert, in the
+  --     database, that this client owns this lead. The schema provides no such
+  --     binding: public.leads has no client_account_id, user_id or created_by
+  --     column, and the only available correlation is the lead's phone text.
+  --     Phone equality is explicitly NOT accepted as ownership authority, and
+  --     the schema offers no canonical phone normalizer either
+  --     (public.qf_norm_text is lower(trim(...)), i.e. raw-text equality after
+  --     casing, which cannot canonicalise a telephone number).
+  --
+  --     Inventing a phone canonicalisation here would be a new runtime
+  --     ownership system that the schema contract never froze, and would weaken
+  --     authorization purely to make the mode operational. So this mode fails
+  --     closed and mutates NOTHING - the rejection happens BEFORE the operation
+  --     claim, so not even an operation row is created.
+  --
+  --     Unblocking is R1 work and needs one of:
+  --       * an explicit lead/client ownership binding column, or
+  --       * a server-created client-selection request row binding the
+  --         authenticated client, the lead and the requested vendor.
+  --     Until then no runtime consumer may activate client_selected mode.
+  if p_mode = 'client_selected' then
+    return jsonb_build_object('status','unauthorized','reason_code','unauthorized');
+  end if;
+
+  -- 2. Normalized authority-request fingerprint.
+  --
+  --    Includes every input that materially affects authority, with the
+  --    candidate list DEDUPLICATED and SORTED so that caller ordering - which is
+  --    only a ranking preference - never changes the fingerprint. Deliberately
+  --    excludes now(), txid, random values and all volatile database state, so
+  --    the same authority request always fingerprints identically and a genuine
+  --    replay is always recognised as one.
+  v_fingerprint := encode(sha256(convert_to(jsonb_build_object(
+    'v',               1,
+    'lead_id',         p_lead_id::text,
+    'mode',            p_mode,
+    'candidates',      coalesce((
+                         select jsonb_agg(to_jsonb(v.vid::text) order by v.vid)
+                           from (select distinct u.vid
+                                   from unnest(coalesce(p_candidate_vendors, '{}'::uuid[])) as u(vid)
+                                  where u.vid is not null) v
+                       ), '[]'::jsonb),
+    'reason_code',     coalesce(p_reason_code, ''),
+    'replacement_ref', coalesce(p_replacement_ref::text, ''),
+    'actor_kind',      p_actor_kind,
+    'actor_id',        coalesce(p_actor_id::text, '')
+  )::text, 'UTF8')), 'hex');
+
+  -- 3. Operation idempotency claim, BEFORE any lock. Exactly one invocation can
+  --    win the unique key; a concurrent duplicate blocks here until the first
+  --    transaction resolves, then takes the replay/conflict path below.
   insert into public.assignment_operations (
-    idempotency_key, lead_id, mode, actor_kind, actor_id,
+    idempotency_key, request_fingerprint, lead_id, mode, actor_kind, actor_id,
     replacement_request_id, reason_code, status)
   values (
-    p_operation_key, p_lead_id, p_mode, p_actor_kind, p_actor_id,
+    p_operation_key, v_fingerprint, p_lead_id, p_mode, p_actor_kind, p_actor_id,
     p_replacement_ref, p_reason_code, 'in_progress')
   on conflict (idempotency_key) do nothing
   returning id into v_operation_id;
 
   if v_operation_id is null then
-    -- Replay: return the stored result verbatim and perform NO further write.
+    -- The key was already claimed. Decide replay versus conflict WITHOUT
+    -- trusting the key alone, and WITHOUT mutating anything on any branch.
     select * into v_existing_op from public.assignment_operations
       where idempotency_key = p_operation_key;
-    return coalesce(v_existing_op.result, '{}'::jsonb)
+
+    if not found then
+      -- The concurrent claimant rolled back after ON CONFLICT saw its row.
+      -- Nothing is authoritative yet; the caller may retry with the same key.
+      return jsonb_build_object('status','rejected','reason_code','conflict_retry');
+    end if;
+
+    -- 3a. Same key, DIFFERENT authority request. This is misuse of the key and
+    --     must never replay somebody else's result. Zero mutation.
+    if v_existing_op.request_fingerprint is distinct from v_fingerprint then
+      return jsonb_build_object(
+        'status','rejected','reason_code','idempotency_conflict',
+        'operation_id', v_existing_op.id);
+    end if;
+
+    -- 3b. Same key, same request, but the original attempt never reached a
+    --     terminal state: an incomplete or rolled-back infrastructure attempt.
+    --     There is no authoritative result to replay, so do not invent one.
+    if v_existing_op.status = 'in_progress' then
+      return jsonb_build_object(
+        'status','rejected','reason_code','conflict_retry',
+        'operation_id', v_existing_op.id);
+    end if;
+
+    -- 3c. EXACT REPLAY. Return the persisted result verbatim: no recomputation,
+    --     no new eligibility evaluation, no new id, and no dependence on vendor
+    --     state, credit balance or assignment counts that changed after the
+    --     original operation committed.
+    return v_existing_op.result
            || jsonb_build_object('status','already_applied',
                                  'operation_id', v_existing_op.id,
                                  'already_applied', true);
@@ -507,27 +632,11 @@ begin
                               'operation_id', v_operation_id);
   end if;
 
-  -- 3b. Client ownership re-assertion, UNDER the lead lock. The calling route
-  --     verifies ownership before the privileged call; the authority re-asserts
-  --     it here so a compromised route cannot assign another client's lead.
-  --     The only ownership linkage that exists in the schema is the verified
-  --     client account phone, so that is what is cross-checked.
-  if p_actor_kind = 'client' then
-    if not exists (
-      select 1 from public.client_accounts ca
-       where ca.user_id = p_actor_id
-         and ca.status = 'active'
-         and ca.phone_e164 is not null
-         and public.qf_norm_text(ca.phone_e164) = public.qf_norm_text(v_lead.phone)
-    ) then
-      update public.assignment_operations
-         set status = 'rejected', completed_at = now(),
-             result = jsonb_build_object('status','unauthorized','reason_code','unauthorized')
-       where id = v_operation_id;
-      return jsonb_build_object('status','unauthorized','reason_code','unauthorized',
-                                'operation_id', v_operation_id);
-    end if;
-  end if;
+  -- NOTE: there is deliberately NO database-side client ownership re-assertion
+  -- here. The only mode that would need one, client_selected, is rejected in
+  -- step 1b before any write, because the schema provides no trustworthy
+  -- lead-to-client binding to re-assert against
+  -- (R1_BLOCKED_PENDING_OWNER_BINDING). No weaker substitute is accepted.
 
   -- 4. Replacement request lock. The partial unique index is the one-at-a-time
   --    authority; this lock serialises the approved row itself.
@@ -993,6 +1102,41 @@ begin
   ) then
     raise exception
       'QF-MVP-20.3B1 Migration B1 aborted: an enforcement trigger exists on lead_assignments or lead_assignment_events. Those belong to Migration B2, after the R1 consumer release.';
+  end if;
+
+  -- 7.5b the replay contract is structurally present (QF-MVP-20.3B1R): the
+  --      authority must compare a request fingerprint, not the key alone, and
+  --      must be able to emit idempotency_conflict.
+  if not exists (
+    select 1 from pg_catalog.pg_attribute
+     where attrelid = 'public.assignment_operations'::regclass
+       and attname = 'request_fingerprint' and attnotnull and not attisdropped
+  ) then
+    raise exception
+      'QF-MVP-20.3B1R Migration B1 aborted: assignment_operations.request_fingerprint is missing. Apply Migration A (20260723000100) first; replay must never be decided on the idempotency key alone.';
+  end if;
+
+  if (select pg_catalog.pg_get_functiondef(
+               to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')))
+     not like '%idempotency_conflict%' then
+    raise exception
+      'QF-MVP-20.3B1R Migration B1 aborted: qf_assign_lead_vendors_v2 cannot emit idempotency_conflict. Reusing one key for a different authority request must be refused, not replayed.';
+  end if;
+
+  if (select pg_catalog.pg_get_functiondef(
+               to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')))
+     not like '%request_fingerprint%' then
+    raise exception
+      'QF-MVP-20.3B1R Migration B1 aborted: qf_assign_lead_vendors_v2 does not compare a request fingerprint.';
+  end if;
+
+  -- 7.5c the assignment cost has exactly one authority and is never sourced
+  --      from configuration or from package state.
+  if (select pg_catalog.pg_get_functiondef(
+               to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')))
+     ~* '(app_settings|get_setting_int|vendor_packages)' then
+    raise exception
+      'QF-MVP-20.3B1R Migration B1 aborted: the assignment authority reads app_settings or vendor_packages. ASSIGNMENT_CREDIT_COST = 1 is an internal locked constant.';
   end if;
 
   -- 7.6 legacy compatibility is intact: the six legacy assignment RPCs remain.

@@ -106,8 +106,48 @@ The three migrations now exist as reviewed files and are `GENERATED_NOT_APPLIED`
 
 **T48 is the B1/B2 boundary proof.** If it fails, B1 has taken authority away before the R1 consumer release, which the split exists to prevent.
 
+## QF-MVP-20.3B1R additions — reviewed authority contracts (binding)
+
+These fifteen tests prove the four contracts closed by the 20.3B1R review. Record: [`QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md`](QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md) §12b.
+
+### Replay and idempotency conflict
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T49** | Exact replay returns the persisted IDs | integration | run an assignment, then re-invoke with the **same** operation key and the **same** request | returns the original `operation_id`, the original `assignment_id`s, `vendor_id`s, `credit_ledger_id`s, `active_count_after`, `lifetime_count_after` and `communication_intent_ids`, plus `already_applied = true`. **No new UUID appears anywhere in the response.** |
+| **T50** | Exact replay creates zero new child rows | integration/DB | count `lead_assignments`, `vendor_credit_logs`, `lead_assignment_events`, `communication_intents` and `assignment_operations` before and after the replay | all five deltas are **0**; vendor balances unchanged; the operation's `result` and `completed_at` are unchanged |
+| **T51** | Replay is immune to later state drift | integration | after the original commit, change the vendor's credit balance, suspend a vendor and add an unrelated assignment; then replay | the replayed result is **byte-identical** to the original; eligibility is not recalculated and the answer does not move |
+| **T52** | Conflicting request under the same key is refused | integration | replay the same operation key with a **different** candidate vendor list (or different mode/reason/replacement ref) | returns `idempotency_conflict`; **zero mutation** across all five tables; the original operation row is untouched |
+| **T53** | Candidate ordering is not a conflict | integration | replay the same key with the same candidate set in a **different order**, and with a duplicate id added | treated as an **exact replay**, not a conflict — the fingerprint deduplicates and sorts, so caller ordering is only a ranking preference |
+| **T54** | Concurrent identical requests produce one result | DB concurrency | two parallel sessions, same key, same request | exactly **one** `assignment_operations` row; one session applies and the other returns the same persisted result; exactly one set of assignments, debits, events and intents |
+| **T55** | Concurrent conflicting requests: one success, one conflict | DB concurrency | two parallel sessions, same key, **different** requests | one applies; the other returns `idempotency_conflict` and mutates nothing. Never two operations, never a merged result |
+| **T56** | Incomplete attempt is not replayed as success | DB | force an operation row to remain `in_progress`, then invoke with the same key and request | returns `conflict_retry`, **not** `already_applied`; no result is invented; zero mutation |
+
+### Assignment credit cost
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T57** | One successful assignment debits exactly one credit | integration | vendor with N credits, one eligible candidate | balance becomes **N−1**; exactly **one** `lead_assignment_debit` row with `credits_delta = -1`, correct `credits_before`/`credits_after`, `reference_type='lead_assignment'`, `reference_id = assignment_id` |
+| **T58** | Two successful assignments debit exactly two credits | integration | two distinct eligible vendors in one operation | each vendor loses exactly 1; exactly **two** ledger rows, each `-1`; no third row |
+| **T59** | Rejected candidates debit zero | integration | mix eligible and ineligible candidates (wrong city, wrong category, suspended, insufficient credits) | rejected vendors' balances are **unchanged**; **zero** ledger rows for them; they appear in `skipped[]` with sanitized reason codes |
+| **T60** | Cap rejection debits zero | integration | lead already at 3 active, and separately a 7th distinct lifetime vendor | `active_limit_reached` / `lifetime_limit_reached`; **zero** ledger rows, zero assignments, zero events, zero intents |
+| **T61** | Replay debits zero | integration | replay a successful operation | ledger row count and every vendor balance are **unchanged** |
+| **T62** | Package counters remain unchanged | integration/DB | snapshot `vendor_packages` (all columns) before and after every assignment, replacement and restoration test | **byte-identical** afterwards; the wallet is the sole debit target |
+| **T63** | Insufficient balance never clamps | integration | vendor with 0 credits | `insufficient_credits`; balance stays **0**, never negative; no assignment, no ledger row |
+
+### Authorization and audit
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T64** | `client_selected` mode fails closed | integration | invoke as `service_role` with `p_mode='client_selected'` and any actor | returns `unauthorized`; **zero mutation** — not even an `assignment_operations` row is created. Ambiguous, zero-match and multi-match phone situations are irrelevant because no phone path exists |
+| **T65** | Canonical authority is unreachable by anon/authenticated | RLS/grant | attempt `qf_assign_lead_vendors_v2` (every mode, including `client_selected`) as `anon` and as `authenticated` | rejected on privilege; `has_function_privilege` is false for both roles on all five canonical functions |
+| **T66** | No `audit_logs` table is required | migration rehearsal | apply A → A2 → B1 on a database where `public.audit_logs` does **not** exist | all three apply and every canonical RPC executes successfully; no statement references `audit_logs` |
+| **T67** | A2 leaves the historical ledger gap unchanged | migration rehearsal | production-shaped fixture reproducing assignments with no matching ledger evidence | the count of assignments lacking ledger evidence is **identical** before and after A2; `vendor_credit_logs` row count unchanged; no debit fabricated |
+
+**T51, T52 and T56 are the replay regression guards.** Each one passes under the corrected fingerprint model and fails under the withdrawn key-only model. **T62** is the wallet-authority guard, and **T64/T65** together are the authorization guards.
+
 **Verifier-behaviour binding:** `verify_qf_mvp_20_3b1.sql` must be run **twice** — once against empty staging (T44) and once against the production-shaped fixture (T45) — and must return all-PASS both times. A verifier that only passes on one shape is not acceptable, because it will be run against production later.
 
 ## Gate
 
-20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32), the 20.3A1R lineage additions (**T33–T42**) and the 20.3B1 migration-rehearsal additions (**T43–T48**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table, and **T48** is the guard against B1 absorbing B2's enforcement.
+20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32), the 20.3A1R lineage additions (**T33–T42**), the 20.3B1 migration-rehearsal additions (**T43–T48**) and the 20.3B1R authority-contract additions (**T49–T67**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table, **T48** is the guard against B1 absorbing B2's enforcement, and **T51, T52, T56** are the guards against regressing to key-only idempotency.

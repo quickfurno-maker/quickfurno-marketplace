@@ -474,7 +474,67 @@ export function evaluateB2Migration(sql, label = "B2") {
     add("R22_owner_break_glass", "owner authority is reported as an application-role failure");
   }
 
+  // -- R23 catalog `name` arrays must be cast before comparison to text[] ----
+  //
+  // The B2A application rolled back on SQLSTATE 42883:
+  //   array_agg(a.attname ...) = array['lead_id','vendor_id']
+  // attname is catalog type `name`, so array_agg yields name[], and there is no
+  // name[] = text[] operator. Neither the offline structure scan nor the dry run
+  // executes the statement, so this is enforced textually here.
+  //
+  // Scans the COMMENT-STRIPPED source (strings preserved) so whitespace and
+  // comments cannot hide the pattern. Every array_agg over a known name-typed
+  // catalog column must cast its element to text.
+  for (const finding of findCatalogNameArrayDefects(stripComments(sql, label))) {
+    add("R23_catalog_name_array_cast", finding);
+  }
+
   return findings;
+}
+
+/**
+ * PostgreSQL catalog columns declared type `name`. An array_agg over any of
+ * these yields name[], which has no equality operator against text[]. The list
+ * is deliberately the columns actually reachable in verification SQL, not every
+ * name column in the catalog.
+ */
+const NAME_TYPED_CATALOG_COLUMNS = [
+  "attname", "relname", "proname", "tgname", "nspname", "conname",
+  "typname", "amname", "rolname", "datname", "spcname",
+];
+
+/**
+ * Return a finding for every `array_agg(<name-col> ...)` whose aggregated
+ * element is a bare name-typed catalog column with no `::text` (or `::varchar`)
+ * cast. Operates on comment-stripped SQL. Whitespace-tolerant: it inspects the
+ * balanced argument list of each array_agg(...) rather than a fixed regex, so
+ * reformatting cannot bypass it.
+ */
+export function findCatalogNameArrayDefects(strippedSql) {
+  const out = [];
+  const lower = strippedSql;
+  const re = /array_agg\s*\(/gi;
+  let m;
+  while ((m = re.exec(lower)) !== null) {
+    // Extract the balanced (...) argument list.
+    let depth = 0, i = m.index + m[0].length - 1, start = i + 1;
+    for (; i < lower.length; i += 1) {
+      if (lower[i] === "(") depth += 1;
+      else if (lower[i] === ")") { depth -= 1; if (depth === 0) break; }
+    }
+    if (depth !== 0) continue; // unbalanced — leave to the tokenizer's fail-closed
+    const arg = lower.slice(start, i); // e.g. "a.attname order by a.attname"
+    // The aggregated element is everything before ORDER BY.
+    const element = arg.split(/\border\s+by\b/i)[0];
+    const colMatch = element.match(/\b([a-z_][a-z0-9_]*)\.([a-z_]+)\b/i);
+    if (!colMatch) continue;
+    const col = colMatch[2].toLowerCase();
+    if (!NAME_TYPED_CATALOG_COLUMNS.includes(col)) continue;
+    // Cast present on the aggregated element?
+    if (/::\s*(text|varchar)\b/i.test(element)) continue;
+    out.push(`array_agg over catalog name column "${col}" is not cast to text before comparison (name[] vs text[] -> SQLSTATE 42883)`);
+  }
+  return out;
 }
 
 /* ===========================================================================
@@ -632,7 +692,30 @@ const FIXTURES = [
   { id: "Y", rule: "R21_append_only",
     why: "the TRUNCATE guard removed",
     mutate: (s) => s.replace(/qf_prevent_lead_assignment_event_truncate/g, "qf_removed_truncate_guard") },
+
+  // The exact B2A failure family: strip the ::text casts back off the §5.7
+  // constraint check so it reverts to the name[] = text[] form (SQLSTATE 42883).
+  { id: "Z", rule: "R23_catalog_name_array_cast",
+    why: "array_agg(attname) reverted to the uncast name[] = text[] form",
+    mutate: (s) => s
+      .replace("array_agg(a.attname::text order by a.attname::text)", "array_agg(a.attname order by a.attname)")
+      .replace("= array['lead_id', 'vendor_id']::text[]", "= array['lead_id', 'vendor_id']") },
 ];
+
+/* A PASSING control: the corrected `attname::text` form must produce NO R23
+ * finding, so the rule is discriminating rather than a blanket ban on array_agg. */
+{
+  const passingBody =
+    "select 1 where (select array_agg(a.attname::text order by a.attname::text) " +
+    "from unnest(con.conkey) k join pg_attribute a on true) = array['lead_id','vendor_id']::text[];";
+  const clean = findCatalogNameArrayDefects(passingBody);
+  record("04 fixture Z-pass :: corrected attname::text produces no R23 finding",
+    clean.length === 0, clean.join(" | ") || "clean");
+  // ...and the same shape WITHOUT the cast must be flagged, proving discrimination.
+  const dirty = findCatalogNameArrayDefects(passingBody.replace(/a\.attname::text/g, "a.attname"));
+  record("04 fixture Z-defect :: uncast attname array is flagged",
+    dirty.length >= 1, dirty.join(" | ") || "NOT flagged");
+}
 
 for (const fx of FIXTURES) {
   const mutated = fx.mutate(b2Raw);
@@ -677,6 +760,14 @@ const verCode = norm(verTokens.code);
 record("07 verifier performs no DML or DDL",
   !/(^|;)\s*(insert\s+into|update\s+|delete\s+from|create\s+|alter\s+|drop\s+|truncate|grant\s+|revoke\s+)/.test(verCode),
   "SELECT-only");
+
+// The verifier runs against the live catalog at application time, so it is
+// subject to the SAME name[] = text[] runtime type error. Rows B13/B15 must
+// keep their ::text casts.
+const verNameArrayDefects = findCatalogNameArrayDefects(stripComments(verRaw, "verifier"));
+record("07b verifier casts every catalog name array to text (B13/B15)",
+  verNameArrayDefects.length === 0,
+  verNameArrayDefects.join(" | ") || "clean");
 
 record("08 verifier contains no transaction control",
   !/(^|;|\s)(begin|commit|rollback|savepoint)\s*(;|$)/.test(verCode), "no transaction control");

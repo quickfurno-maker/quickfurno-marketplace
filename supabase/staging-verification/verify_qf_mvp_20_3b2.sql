@@ -255,20 +255,20 @@ select 13, 'B13_assignment_uniqueness_preserved', '1',
           join pg_catalog.pg_class c on c.oid = con.conrelid
           join pg_catalog.pg_namespace n on n.oid = c.relnamespace
          where n.nspname = 'public' and c.relname = 'lead_assignments' and con.contype = 'u'
-           and (select array_agg(a.attname order by a.attname)
+           and (select array_agg(a.attname::text order by a.attname::text)
                   from unnest(con.conkey) k
                   join pg_catalog.pg_attribute a
                     on a.attrelid = con.conrelid and a.attnum = k)
-               = array['lead_id','vendor_id']),
+               = array['lead_id','vendor_id']::text[]),
        case when (select count(*) from pg_catalog.pg_constraint con
                     join pg_catalog.pg_class c on c.oid = con.conrelid
                     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
                    where n.nspname = 'public' and c.relname = 'lead_assignments' and con.contype = 'u'
-                     and (select array_agg(a.attname order by a.attname)
+                     and (select array_agg(a.attname::text order by a.attname::text)
                             from unnest(con.conkey) k
                             join pg_catalog.pg_attribute a
                               on a.attrelid = con.conrelid and a.attnum = k)
-                         = array['lead_id','vendor_id']) = 1
+                         = array['lead_id','vendor_id']::text[]) = 1
             then 'PASS' else 'FAIL' end,
        'UNIQUE (lead_id, vendor_id) settles duplicate races'
 
@@ -286,19 +286,19 @@ select 15, 'B15_no_lead_vendor_uniqueness_on_events', '0',
        (select count(*)::text from pg_catalog.pg_constraint con
           join pg_catalog.pg_class c on c.oid = con.conrelid
          where c.relname = 'lead_assignment_events' and con.contype = 'u'
-           and (select array_agg(a.attname order by a.attname)
+           and (select array_agg(a.attname::text order by a.attname::text)
                   from unnest(con.conkey) k
                   join pg_catalog.pg_attribute a
                     on a.attrelid = con.conrelid and a.attnum = k)
-               = array['lead_id','vendor_id']),
+               = array['lead_id','vendor_id']::text[]),
        case when (select count(*) from pg_catalog.pg_constraint con
                     join pg_catalog.pg_class c on c.oid = con.conrelid
                    where c.relname = 'lead_assignment_events' and con.contype = 'u'
-                     and (select array_agg(a.attname order by a.attname)
+                     and (select array_agg(a.attname::text order by a.attname::text)
                             from unnest(con.conkey) k
                             join pg_catalog.pg_attribute a
                               on a.attrelid = con.conrelid and a.attnum = k)
-                         = array['lead_id','vendor_id']) = 0
+                         = array['lead_id','vendor_id']::text[]) = 0
             then 'PASS' else 'FAIL' end,
        'QF-MVP-20.3A1R regression guard: the event stream is not pair-unique'
 

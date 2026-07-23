@@ -524,10 +524,13 @@ begin
      where n.nspname = 'public'
        and c.relname = 'lead_assignments'
        and con.contype = 'u'
-       and (select array_agg(a.attname order by a.attname)
+       -- attname is catalog type `name`; cast to text on BOTH sides so the
+       -- comparison is text[] = text[]. A bare name[] = text[] has no operator
+       -- (SQLSTATE 42883) and is what rolled back the first B2 apply attempt.
+       and (select array_agg(a.attname::text order by a.attname::text)
               from unnest(con.conkey) k
               join pg_attribute a on a.attrelid = con.conrelid and a.attnum = k)
-           = array['lead_id', 'vendor_id']
+           = array['lead_id', 'vendor_id']::text[]
   ) then
     raise exception
       'QF-MVP-20.3B2 aborted: the lead_assignments UNIQUE (lead_id, vendor_id) constraint is missing.';

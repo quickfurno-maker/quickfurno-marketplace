@@ -1,23 +1,32 @@
 # QF-MVP-20.3B2 — Universal Assignment Enforcement
 
-**Status: `B2_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW` (QF-MVP-20.3B2P).**
+**Status: `B2_RUNTIME_TYPE_CORRECTION_IMPLEMENTED_REVIEWED_READY_FOR_PREFLIGHT` (QF-MVP-20.3B2R1).**
 
-> **GENERATED, REVIEWED AND PREFLIGHTED — STILL NOT APPLIED.** The staging preflight
-> (QF-MVP-20.3B2P) proved B2 is the **only** pending migration and that one
-> `db push --linked --dry-run` would apply **exactly** it — exit 0, one migration proposed,
-> **zero** remote history rows created. B2 remains **local-only**. Production
-> `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never contacted.
-> The next phase is the **B2 staging application**, not Migration C. See section 13.
+> **GENERATED, REVIEWED, PREFLIGHTED, ONE FAILED APPLY, NOW CORRECTED — STILL NOT APPLIED.**
+> The first application attempt (QF-MVP-20.3B2A, 2026-07-23T17:22:22Z) **rolled back
+> atomically** on a runtime type-resolution defect in B2's own self-verification block —
+> `array_agg(a.attname …) = array[…]` compared `name[]` to `text[]` (SQLSTATE 42883). **B2 was
+> never recorded remotely; staging history stayed 6 local / 5 remote.** QF-MVP-20.3B2R1 casts
+> the catalog `name` arrays to `text` at all five sites (migration §5.7, verifier B13/B15),
+> preserving every enforcement semantic, and hardens the offline validator (rule **R23**) so
+> the defect family is caught before any future apply. **The next phase is a fresh B2 staging
+> preflight**, not application and not Migration C. See sections 13 (preflight) and 14 (failure
+> + correction).
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized R1 commit
 `5c78ea37a28bb55442bd409636bdfe3dc8efaad7` (parent `4bcdcc55c181ca374e93c9093d45c45620379031`),
 origin identical, ahead/behind 0/0, clean tree.
 
+**Corrected artifact hashes (QF-MVP-20.3B2R1):**
+
 | Artifact | SHA-256 |
 |---|---|
-| `supabase/migrations/20260723000500_qf_mvp_assignment_universal_enforcement.sql` | `ab31023ebddaec53e9224b04ffaffbb032da130fd67b63b77345c4fc62ca484b` |
-| `supabase/staging-verification/verify_qf_mvp_20_3b2.sql` | `0772409ea2fd25b9f315ea72da7371baaecb2fa7de0b439b19b729e8f2c2e214` |
-| `scripts/mvp/staging/validate-qf-mvp-20-3b2.mjs` | `85cd5f9b033f832165b3dcc4ed439f5e6bbd50e6c00409a2cf14f321472ee460` |
+| `supabase/migrations/20260723000500_qf_mvp_assignment_universal_enforcement.sql` | `d13703553663271172cfdcedc5e9be8374e7e9c1d225d2c67816fce837450cf3` |
+| `supabase/staging-verification/verify_qf_mvp_20_3b2.sql` | `89903749acf61061f5332fe1e57a4808a1bf45c6bb0a929ad703810606270677` |
+| `scripts/mvp/staging/validate-qf-mvp-20-3b2.mjs` | `87739ae0abc9e1587754add5016199ad0c6312a23c4f4137e22da55ca08aa00d` |
+
+*Pre-correction hashes (superseded, retained for the preflight/failed-apply record in §13–14):*
+migration `ab31023e…ca484b`, verifier `0772409e…c2e214`, validator `85cd5f9b…2ee460`.
 
 ---
 
@@ -379,3 +388,122 @@ Function or deployment. No PR, no push.
 
 **QF-MVP-20.3B2 staging application** — *not* Migration C. B2 remains generated, reviewed and
 preflighted, but unapplied. Migrations A, A2, B1 and G stay applied and immutable.
+
+---
+
+## 14. QF-MVP-20.3B2A failed application, and the QF-MVP-20.3B2R1 correction
+
+**Status: `B2_RUNTIME_TYPE_CORRECTION_IMPLEMENTED_REVIEWED_READY_FOR_PREFLIGHT`. B2 is NOT applied.**
+
+### The failed application (QF-MVP-20.3B2A)
+
+The single authorized `npx supabase db push --linked` ran at **2026-07-23T17:22:22Z** and exited
+**non-zero**. The CLI ran the four `drop trigger if exists` guards (NOTICE skips — normal on a
+first apply) and then aborted at **statement 20**, the `DO $verify$` self-verification block:
+
+```
+ERROR: operator does not exist: name[] = text[] (SQLSTATE 42883)
+At statement: 20
+```
+
+The Supabase CLI wraps a migration and its history insert in **one transaction**, so the abort
+**rolled the entire migration back atomically**. Confirmed read-only afterwards:
+
+* migration history stayed **6 local / 5 remote**, byte-identical to before;
+* `20260723000500` remained **remote-empty** — not recorded;
+* **no** B2 function or trigger persisted;
+* no second application attempt was made; no repair/reset/up was run.
+
+Transcript (outside Git): `qf-staging-workspace\QF-MVP-20.3B2A-APPLICATION-20260723T172222Z.txt`.
+
+### Root cause — proved from catalog semantics
+
+`pg_attribute.attname` is PostgreSQL type **`name`**. Therefore `array_agg(a.attname …)` returns
+**`name[]`**. The comparison literal `array['lead_id','vendor_id']` resolves to **`text[]`**, and
+PostgreSQL has **no `name[] = text[]` equality operator** → SQLSTATE 42883. The statement fails at
+**plan time**, which is why:
+
+* the **offline validator** (structural/lexical; it never executes the block) passed 57/57; and
+* the **dry run** (reports *which* migration would apply; it never runs the SQL) proposed exactly
+  B2 with exit 0.
+
+Neither harness executes catalog SQL, so a runtime type-resolution error can only surface at real
+application. This is the same defect **family** as QF-MVP-20.3B1A (a `pg_get_functiondef` regex
+that only failed on apply).
+
+### Corrected sites — five, all the same family
+
+| # | File | Location | Before | After |
+|---|---|---|---|---|
+| 1 | migration | §5.7 (constraint-column check) | `array_agg(a.attname order by a.attname) … = array['lead_id', 'vendor_id']` | `array_agg(a.attname::text order by a.attname::text) … = array['lead_id', 'vendor_id']::text[]` |
+| 2–3 | verifier | row **B13** (value + CASE) | same uncast form | `a.attname::text` both places + `::text[]` on the literal |
+| 4–5 | verifier | row **B15** (value + CASE) | same uncast form | `a.attname::text` both places + `::text[]` on the literal |
+
+A repository-wide search found **no other** `array_agg` over a `name`-typed catalog column and no
+sibling in any other catalog (`relname`, `proname`, `tgname`, `conname`, `nspname`). All single
+`name = text` comparisons (`relname = 'x'`, `proname in (…)`, `tgname = v_name`) are **type-safe**
+— PostgreSQL has a `name = text` operator — and were left unchanged.
+
+### Enforcement semantics are unchanged
+
+The cast changes only the **type domain**, not the values: `array_agg(a.attname::text order by
+a.attname::text)` yields the same ordered set of column-name strings, and `= array[…]::text[]`
+compares the same values. Ordering, set membership, null behaviour and row cardinality are
+identical. Row **B13** still asserts `UNIQUE (lead_id, vendor_id)` **is present** (expected 1) and
+row **B15** still asserts the event table is **not** pair-unique (expected 0). No check was removed
+or weakened; the migration self-verification was **corrected, not deleted**.
+
+### Validator hardening — rule R23
+
+The offline validator gains **R23_catalog_name_array_cast**, enforced on both the real migration
+(via `evaluateB2Migration`, check 02) and the real verifier (check 07b). It parses the **balanced
+argument list** of every `array_agg(...)` over comment-stripped SQL (whitespace- and
+comment-tolerant, not a brittle regex) and fails if the aggregated element is a known `name`-typed
+catalog column (`attname`, `relname`, `proname`, `tgname`, `nspname`, `conname`, …) without a
+`::text`/`::varchar` cast. Coverage:
+
+* **fixture Z** reverts the §5.7 cast on the real migration and must trip R23 (proves it bites);
+* **fixture Z-pass** proves the corrected `attname::text` form yields **no** finding (the rule is
+  discriminating, not a blanket ban on `array_agg`);
+* **fixture Z-defect** proves the uncast shape is flagged;
+* **real-artifact mutation tests** removed the casts from the actual migration and the actual
+  verifier — each tripped its check (02 and 07b), and both files were restored **byte-identical**.
+
+### Independent runtime-type review
+
+Re-reviewed the whole verify block and verifier for type-resolution risk: `v_relname` / `v_enabled`
+are declared `text` (the latter fed by `tgenabled::text`), `v_tgtype` is `smallint` compared to
+integer literals, `v_sigs`/`v_b1_sigs`/`v_expected` are explicit `text[]`, `proconfig` is coalesced
+with `'{}'::text[]`, and every `unnest(array['…'])` is a `text[]` literal passed to
+`has_table_privilege(text, text, text)`. **The `array_agg(name)` family was the only defect.** No
+over-casting was introduced.
+
+### Gates (all after correction)
+
+| Gate | Result |
+|---|---|
+| B2 validator | **61 passed, 0 failed** · 26 fixtures (incl. Z, Z-pass, Z-defect, 07b) |
+| Real-artifact R23 mutations | migration + verifier both caught; restored byte-identical |
+| B1/G validator | **165 passed, 0 failed** |
+| R1 harness | **62 passed, 0 failed** |
+| `npm run verify:mvp` | **exit 0** |
+| typecheck / lint / build | exit 0 |
+| `git diff --check` | exit 0 |
+
+### Corrected hashes
+
+| Artifact | SHA-256 |
+|---|---|
+| B2 migration | `d13703553663271172cfdcedc5e9be8374e7e9c1d225d2c67816fce837450cf3` |
+| B2 verifier | `89903749acf61061f5332fe1e57a4808a1bf45c6bb0a929ad703810606270677` |
+| B2 validator | `87739ae0abc9e1587754add5016199ad0c6312a23c4f4137e22da55ca08aa00d` |
+
+Baseline, A, A2, B1, G and the B1/G validator+verifier are **byte-unchanged**. No database was
+accessed, no dry run was run, no application was retried, and production/QF-Jarvis were never
+contacted.
+
+### Next phase
+
+**A fresh QF-MVP-20.3B2 staging preflight** against the corrected artifacts — not application, not
+Migration C. The preflight in §13 was run against the superseded `ab31023e…` migration and must be
+re-run for the corrected `d1370355…` migration before any new application attempt.

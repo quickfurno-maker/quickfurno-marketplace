@@ -11,20 +11,21 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
 - **QF-MVP-20:** **IN_PROGRESS**
 - **Completed:** QF-MVP-20.0 — Authority Repair Design · QF-MVP-20.1 — Consumer and Call-Path Audit · QF-MVP-20.2A — Staging Schema Baseline Audit · QF-MVP-20.2B — Generate Reviewed Staging Baseline · QF-MVP-20.2C1 — Staging Application Preflight · QF-MVP-20.2C1R — Managed Function Parity Reconciliation
-- **QF-MVP-20.2C2:** **COMPLETE** (resolved via QF-MVP-20.2C1R + QF-MVP-20.2C2R)
+- **Completed (20.2 chain):** 20.2A · 20.2B · 20.2C1 · 20.2C1R · 20.2C2 · 20.2C2R
+- **Current task:** QF-MVP-20.3A — Marketplace Authority Remediation Migration Design
 - **Implementation:** **NOT_STARTED**
+- **Forward migration:** **NOT_CREATED**
 - **Database remediation:** **NOT_STARTED**
 - **Staging project:** **PROVISIONED** (ref `uckafzuochmbvtiodmcl`)
 - **Staging baseline:** **APPLIED_AND_VERIFIED** (40/40 verification rows PASS)
 - **Staging migration history:** **ONE_BASELINE_ROW** (`20260722000100` / `qf_mvp_staging_baseline_269c9265`)
 - **Staging data:** **EMPTY** (all 62 tables zero rows; `auth.users` = 0)
-- **Baseline reapplication:** **NONE**
 - **Baseline SHA256:** `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` (unchanged)
-- **Verification SHA256:** `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193` (supersedes `e82b757f…`, `89362a35…`)
+- **Verification SHA256:** `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193`
 - **Production access:** **NONE**
 - **Production mutation:** **NONE**
 - **Open prerequisite:** `AUTH_USERS_HANDLE_NEW_USER_TRIGGER`
-- **Next:** QF-MVP-20.3A — Marketplace Authority Remediation Migration Design
+- **Next:** QF-MVP-20.3B — Generate Marketplace Authority Remediation Migration
 - **Roadmap:** LOCKED
 - **Launch market:** Pune
 - **Meta voice:** excluded
@@ -35,7 +36,10 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **QF-MVP-20.2C2 is `COMPLETE`: the staging baseline is APPLIED_AND_VERIFIED.** The reviewed baseline was applied to staging `uckafzuochmbvtiodmcl` (single `db push --linked`, exit 0, one honest history row, zero application data, production untouched), and the **corrected** SELECT-only verifier (`7ba9792f…`) returns **40/40 PASS** — function parity by exact `to_regprocedure` OID resolution, index parity by `pg_constraint.conindid` classification. Baseline SQL unchanged; no reapplication, reset, repair or history change. Advisors read (staging only) — none blocking. **Next: QF-MVP-20.3A — Marketplace Authority Remediation Migration Design.**
+**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.3A — Marketplace Authority Remediation Migration Design** (design + repository audit + documentation only; no SQL migration, no runtime change, **no database access**). The remediation is specified as **five separate forward-only migrations** (A foundation · B canonical authority + enforcement triggers · C public projection + privilege hardening · D Auth trigger · E legacy revokes) in [`QF-MVP-20-3A-REMEDIATION-MIGRATION-DESIGN.md`](QF-MVP-20-3A-REMEDIATION-MIGRATION-DESIGN.md) with a [`SCHEMA-CONTRACT`](QF-MVP-20-3A-SCHEMA-CONTRACT.md), [`CONSUMER-MIGRATION-MATRIX`](QF-MVP-20-3A-CONSUMER-MIGRATION-MATRIX.md), [`STAGING-TEST-PLAN`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) and [`ROLLBACK-PLAN`](QF-MVP-20-3A-ROLLBACK-PLAN.md). Locked: active set `{assigned,delivered,accepted}`, lifetime = distinct vendors in append-only `lead_assignment_events`, no caller-controlled limit, ledger-only credit, approval-gated restoration, `vendor_public_v` projection, intent-only communication. The 27-row historical ledger gap is assigned to **QF-MVP-20.4**. **Next: QF-MVP-20.3B — Generate Marketplace Authority Remediation Migration.**
+
+### Superseded status line
+**QF-MVP-20.2C2 is `COMPLETE`: the staging baseline is APPLIED_AND_VERIFIED.** The reviewed baseline was applied to staging `uckafzuochmbvtiodmcl` (single `db push --linked`, exit 0, one honest history row, zero application data, production untouched), and the **corrected** SELECT-only verifier (`7ba9792f…`) returns **40/40 PASS** — function parity by exact `to_regprocedure` OID resolution, index parity by `pg_constraint.conindid` classification. Baseline SQL unchanged; no reapplication, reset, repair or history change. Advisors read (staging only) — none blocking. **Next: QF-MVP-20.3A — Marketplace Authority Remediation Migration Design.**
 
 **QF-MVP-20 subphase status:**
 - **20.0 Authority Repair Design** — `COMPLETE`. Canonical engine, credit authority, replacement, eligibility, public projection, communication boundary, migration plan, acceptance-test matrix in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md).
@@ -51,7 +55,9 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 
 - **20.2C2R Correct and reverify applied staging baseline** — `COMPLETE`. Verification artifact corrected **offline** (staging untouched, baseline byte-identical `920a4aa0…`): functions resolved by exact **`to_regprocedure` OID** (never string-comparing `pg_get_function_identity_arguments`), indexes classified by **`pg_constraint.conindid`**. Re-executed SELECT-only against staging → **40/40 PASS** (functions 39/0 missing/0 dup/33 SD/1 managed/0 unexpected/40 total; indexes 77 constraint-backed / 180 standalone / 32 standalone-unique / 47 combined / 257 / 109). Extended proofs: 0 tables with rows, `auth.users` 0, all provider/communication tables 0, no production ref or URL in function bodies/defaults/comments, Meta disabled, `on_auth_user_created` **absent**. Advisors (staging only): security 32 INFO `rls_enabled_no_policy` (fail-closed, expected) + 7 WARN (permissive `leads public insert`, intentional/managed SECURITY DEFINER exposure); performance 212 (147 unused-index artifacts of an empty DB, 36 multiple-permissive-policies, 18 unindexed FKs, 7 auth_rls_initplan, 3 duplicate indexes, 1 platform Auth config) — **none blocking**, routed to 20.3A. Verification SHA256 `7ba9792f…`. **No db push, no reapplication, no reset/repair, no history change, no staging write, no production access.**
 
-Next: **QF-MVP-20.3A — Marketplace Authority Remediation Migration Design**.
+- **20.3A Marketplace authority remediation migration design** — `COMPLETE`. Five forward-only migrations specified (A/B/C/D/E) with exact objects, dependencies, rollback boundaries, staging gates and catalog deltas. Grounded in the applied baseline: `lead_assignments` cascades on lead/vendor delete → **append-only `lead_assignment_events` is mandatory** for lifetime-6; `vendor_status` is CRM pipeline, so a **new `lifecycle_status`** column carries the 10-state lifecycle with `ACTIVE={assigned,delivered,accepted}`; `UNIQUE(lead_id,vendor_id)` means replacement transitions the row and a replaced vendor can't be re-assigned to the same lead. Canonical RPC `qf_assign_lead_vendors_v2` (**no caller-controlled limit**, no trusted-actor-by-parameter), triple-layer idempotency, ledger-only credit with approval-gated restoration, `vendor_public_v` allow-list projection, `communication_intents` outbox (uncertain = terminal), consumer matrix for all 40 call sites, 22-test staging matrix, per-migration rollback. Historical 27-row gap → **QF-MVP-20.4**. Advisors triaged (none blocking; do not remove indexes on empty-staging evidence). **No SQL, no runtime change, no database access.**
+
+Next: **QF-MVP-20.3B — Generate Marketplace Authority Remediation Migration**.
 
 ### Previous active phase — QF-MVP-10 (COMPLETE)
 **QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).

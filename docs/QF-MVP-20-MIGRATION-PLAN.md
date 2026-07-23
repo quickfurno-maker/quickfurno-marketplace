@@ -49,6 +49,17 @@ The reviewed baseline was applied to **staging only** (`uckafzuochmbvtiodmcl`) w
 
 **Verification: 24 PASS / 6 FAIL** → the phase is **not** complete. The failures are expectation defects in the verification artifact (`pg_get_function_identity_arguments` returns `argname type`; `pg_indexes`/`indisunique` include constraint-backed indexes), not schema defects — standalone indexes measured **180** and standalone unique **32**, matching the reviewed inventory. Correcting the verification artifact and re-running to all-PASS is the gate before **K.5**. See [`QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md`](QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md).
 
+### K.4e Remediation release designed (QF-MVP-20.3A) — K.5 now specified
+The canonical authority deployment (K.5) is fully specified by [`QF-MVP-20-3A-REMEDIATION-MIGRATION-DESIGN.md`](QF-MVP-20-3A-REMEDIATION-MIGRATION-DESIGN.md) + [`SCHEMA-CONTRACT`](QF-MVP-20-3A-SCHEMA-CONTRACT.md) + [`CONSUMER-MIGRATION-MATRIX`](QF-MVP-20-3A-CONSUMER-MIGRATION-MATRIX.md) + [`STAGING-TEST-PLAN`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) + [`ROLLBACK-PLAN`](QF-MVP-20-3A-ROLLBACK-PLAN.md). It is **five separate forward-only migrations**, not one:
+
+- **A — foundation (additive):** `lead_assignment_events` (append-only lineage, non-cascading FKs), `assignment_operations` (idempotency), `replacement_requests`, `credit_restoration_approvals`, `communication_intents`; additive columns on `lead_assignments` (`lifecycle_status` + 3) and `vendor_credit_logs` (approval ref, idempotency key, trusted actor) with a widened `change_type` CHECK.
+- **B — canonical authority (enforcing):** `qf_assign_lead_vendors_v2` (no caller-controlled limit), `qf_apply_credit_mutation_v2`, `qf_request_replacement_v2`, `qf_approve_credit_restoration_v2`, `qf_vendor_assignment_eligible`, plus the **3 enforcement triggers** (active-3, lifetime-6, lineage-immutable).
+- **C — public projection + privilege hardening (restrictive):** `vendor_public_v` (explicit allow-list, `security_invoker`), anon monetization revoke, duplicate-index cleanup.
+- **D — Auth trigger restoration (independent):** `auth.users → public.handle_new_user`, idempotent, deliberately decoupled.
+- **E — legacy revokes (restrictive, last):** REVOKE only, **no DROP**, only after zero legacy callers is proven.
+
+**Ordering rule:** A → migrate consumers → B → C → E (so legacy writers never meet a trigger they can violate), unless staging proves legacy paths already satisfy the caps. **Grant/revoke sequence is unchanged from K.8** and remains consumer-gated; the public no-auth `assignLead` action must be **removed** before E. The 27-row historical ledger gap is explicitly **out of scope** here and is assigned to **QF-MVP-20.4 — Historical Credit-Ledger Reconciliation** (no blind backfill; indeterminate ⇒ no mutation).
+
 ### K.5 Canonical authority deployment (staging)
 Deploy `qf_assign_lead_vendors_v2` and the canonical credit authority (folding the strong parts of `qf_apply_vendor_credit_delta`, `assign_lead_to_paid_vendors_phase26a`, `assign_lead_to_vendors`) as **`service_role`-execute-only**. Legacy RPCs remain in place (not yet revoked). Deploy the public projection view (§I) unpopulated of grants yet.
 

@@ -44,6 +44,21 @@ Every acceptance criterion below must have a proving test **before** the corresp
 - **Migration rehearsal tests:** apply the staged additive migrations (§K.4–K.11) on staging in order; verify each step is additive and the engine flag can fall back to legacy.
 - **Rollback tests:** each production-bound step has a proven reverse migration / re-grant / flag-off; snapshot-restore rehearsed on staging (§K.13).
 
+## QF-MVP-20.3A refinement — locked definitions the tests must use
+
+The 20.3A design fixes the semantics these acceptance tests depend on. L1–L24 above remain valid; the following are now **locked** and the staging matrix in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) (T1–T22) is the executable form:
+
+- **Active set = `{assigned, delivered, accepted}`** on the new `lead_assignments.lifecycle_status` column (10-value vocabulary). `vendor_status` is the vendor CRM pipeline and is **not** the lifecycle. L1–L3 must count the active set, not row totals.
+- **Lifetime = distinct vendors in `lead_assignment_events`** (append-only, non-cascading). `rejected/expired/cancelled/invalid/replaced` **retain** their lifetime slot; a `requested` or failed candidate **never** consumes one. L4/L5 assert against the lineage table, not `lead_assignments`.
+- **Replacement** transitions the original to `replaced` (never deletes) and is capped one-per-lead by a partial unique index — L6/L7 map to T7/T8, plus new **T9** (replacement cannot exceed lifetime six).
+- **Idempotency has three layers** — `assignment_operations.idempotency_key`, `uq_vendor_credit_logs_reference`, `lead_assignments UNIQUE(lead_id,vendor_id)`. L8/L9 map to T3/T4.
+- **No caller-controlled ceiling exists** — a static assertion replaces L21's `max_vendors_per_lead` tampering test: `qf_assign_lead_vendors_v2` has no limit parameter and `ADMIN_MANUAL_TOTAL_VENDOR_LIMIT` reaches no RPC.
+- **Public projection** is `vendor_public_v` with an explicit allow-list; L14 gains **T13** (no `select("*")` on public paths) alongside anon column-privilege assertions.
+- **Communication** is an intent row only; L17/L18 map to T15/T16/T17, and **uncertain outcomes are terminal** (T18).
+- **New additions:** T10 (anon/PUBLIC cannot execute the canonical RPC), T19 (zero legacy callers), T20 (Auth trigger provisions exactly once — dedicated window only), T21 (rollback rehearsal), T22 (tooling rejects the production ref).
+
+Deterministic fixtures (seeded UUIDs, 8 vendors so lifetime-6 can be exceeded) and real parallel-session concurrency barriers are mandatory; staging must return to zero application rows between suites.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

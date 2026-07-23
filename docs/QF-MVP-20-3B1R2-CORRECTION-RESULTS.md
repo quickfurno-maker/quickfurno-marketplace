@@ -1,6 +1,10 @@
 # QF-MVP-20.3B1R2 — Canonical Authority Self-Verification Correction
 
-**Status: `COMPLETE`. Migration B1 is `CORRECTED_REVIEWED_NOT_APPLIED`.**
+**Status: `COMPLETE`. Migration B1 is `APPLIED_AND_VERIFIED_EXCEPT_ONE_PRE-EXISTING_GAP`.**
+
+> **OUTCOME (QF-MVP-20.3B1A2): the correction worked.** Corrected B1 (`46ce7377…`) applied to staging at **exit 0** and its §7 verification block ran to completion — the `pg_get_functiondef` false positive did not recur. The corrected phase verifier (`b66ec060…`) then returned **57 PASS / 1 FAIL**, and the two rows this correction fixed (607 `app_settings|vendor_packages` and 613 `audit_logs`) both **PASSED**, confirming they would indeed have failed had they not been corrected.
+>
+> The single remaining failure is **unrelated to this correction**: `R03_lineage_append_only_grants` detected that Supabase platform default privileges left `UPDATE`/`DELETE` on `lead_assignment_events` for `postgres` and `service_role`, because **Migration A** granted narrowly without first revoking. That is an A-scope gap, and A is applied and immutable, so it is corrected forward. See [`QF-MVP-20-3B1A2-STAGING-APPLICATION-RESULTS.md`](QF-MVP-20-3B1A2-STAGING-APPLICATION-RESULTS.md) §14.
 
 **Type:** offline SQL correction · validator hardening · documentation.
 **No production access. No staging access. No SQL executed. No `db push`, not even a dry-run. No migration repair. No staging reset. No runtime code. No provider access.**

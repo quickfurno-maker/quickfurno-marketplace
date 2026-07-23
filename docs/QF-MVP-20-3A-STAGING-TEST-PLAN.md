@@ -171,6 +171,27 @@ These fifteen tests prove the four contracts closed by the 20.3B1R review. Recor
 
 T68 exists because neither a dry-run nor an offline validator can execute a `DO` block: the dry-run proves only *which* migrations would run, and the validator inspects comment-stripped file text while the in-database guard inspects comment-retaining catalog output. The two disagreed, and only the database-side view was wrong.
 
+## QF-MVP-20.3B1A2 execution status (corrected B1 applied)
+
+| Test | Status | Evidence |
+|---|---|---|
+| **T43** apply A/A2/B1 in order on empty staging | **PASSED on retry** | corrected B1 applied at exit 0; history holds four truthful rows; the 20.3B1A `pg_get_functiondef` failure did not recur |
+| **T44** A2 on empty staging creates nothing | **PASSED (re-confirmed)** | 0 backfill operations, 0 lineage events, 0 ledger rows, 0 intents; still 0 rows across all 67 tables |
+| **T45–T47** A2 on production-shaped data | not run | requires a fixture; fixtures are not created in an application phase |
+| **T48** B1 deploys without constraining legacy flows | **PASSED** | 0 enforcement triggers exist, all six legacy assignment RPCs remain, legacy `service_role` EXECUTE retained, no legacy grant broadened |
+| **T68** in-migration `DO` blocks rehearsed before declared ready | **PASSED** | the corrected §7 block ran to completion against a real database — the outcome T68 exists to force |
+
+**New failure surfaced by the phase verifier:** `R03_lineage_append_only_grants` — expected 0 UPDATE/DELETE grants on `lead_assignment_events`, found **4** (`postgres` and `service_role`, from Supabase default privileges that Migration A never revoked). Full analysis: [`QF-MVP-20-3B1A2-STAGING-APPLICATION-RESULTS.md`](QF-MVP-20-3B1A2-STAGING-APPLICATION-RESULTS.md) §14.
+
+### New binding test — grant posture is not implied by a narrow GRANT
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T69** | A restricted table's privilege posture is asserted, not assumed | migration rehearsal + grant | apply any migration that creates a `public` table claiming a restricted posture (append-only, service_role-only, read-only) | after apply, `information_schema.role_table_grants` for that table contains **only** the privileges the migration explicitly intends — for **every** grantee including `postgres` and `service_role`, not merely `anon`/`authenticated`. Supabase default privileges grant `arwdDxtm` on creation, so the migration must `REVOKE ALL … FROM service_role, postgres` **before** its narrow `GRANT`. A migration that only grants, and never revokes, must fail this test |
+| **T70** | Lineage immutability is enforced by at least one live mechanism | DB integrity | attempt `UPDATE` and `DELETE` on a `lead_assignment_events` row as `service_role` | both refused — by privilege, by trigger, or by both. Today **neither** is in force, which is exactly why this test exists. `service_role` bypasses RLS, so RLS alone can never satisfy T70 |
+
+T69 generalises the finding: on Supabase, "grant only what you need" is not sufficient, because the platform has already granted everything. T70 is the behavioural backstop for the invariant that failed.
+
 ## Gate
 
 20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32), the 20.3A1R lineage additions (**T33–T42**), the 20.3B1 migration-rehearsal additions (**T43–T48**) and the 20.3B1R authority-contract additions (**T49–T67**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table, **T48** is the guard against B1 absorbing B2's enforcement, and **T51, T52, T56** are the guards against regressing to key-only idempotency.

@@ -123,6 +123,21 @@ Consequences for this matrix:
 - **L21 (no configurable cap/cost)** is now proved two ways that cannot be fooled by prose: the signature check over `pg_get_function_identity_arguments` (comment-free by construction) and the offline validator's executable-SQL view.
 - **T68** in the staging test plan generalises the lesson, and the validator's fixtures A–G lock it in — including fixture F, which reproduces the exact guard that failed and confirms it is now rejected before application.
 
+## QF-MVP-20.3B1A2 — B1 live on staging; one invariant unmet
+
+Migration B1 applied at exit 0 and the corrected phase verifier returned **57 PASS / 1 FAIL**. The canonical authority now exists on staging, so the L-class tests that drive it are finally runnable in a later behavioural phase.
+
+**Proved by this application:**
+
+- **L12 (untrusted roles cannot execute assignment mutation)** — all five canonical functions hold **zero** EXECUTE for `PUBLIC`, `anon` and `authenticated`; `service_role` holds all five. This is now a live catalog fact, not a design claim.
+- **L21 (no configurable cap or cost)** — the live signature is `p_lead_id, p_mode, p_candidate_vendors, p_operation_key, p_actor_kind, p_actor_id, p_replacement_ref, p_reason_code`. No cost, delta, credit, limit or max parameter exists.
+- **L18/L19 (provider boundary)** — no provider send, no `whatsapp_logs` delivery authority, no `audit_logs` dependency, and zero communication delivery rows.
+- **L13 (ownership)** remains **untestable**: `client_selected` is fail-closed pending R1's ownership binding.
+
+**One acceptance criterion is now demonstrably unmet.** The append-only guarantee behind **L6** and the lineage half of **L4/L5** rests on `lead_assignment_events` being immutable. On staging it currently is not: Supabase default privileges left `UPDATE`/`DELETE` for `postgres` and `service_role`, and B2's immutability trigger does not yet exist. Untrusted roles hold nothing and zero rows exist, so nothing is at risk today — but **no L-class test that depends on lineage immutability may be treated as satisfied until a forward grant-hardening migration closes it.**
+
+**Lesson for the matrix.** A narrow `GRANT` is not a privilege contract on Supabase. Platform default privileges grant `arwdDxtm` on every new `public` table to four roles, so any table claiming a restricted posture must issue an explicit `REVOKE` first. Every future migration that creates a table needs a grant-posture assertion, not just a grant statement.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

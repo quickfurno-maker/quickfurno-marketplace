@@ -1,0 +1,255 @@
+# QF-MVP-20.3B1 — Migration Generation Results
+
+**Branch:** `mvp/qf-mvp-20-marketplace-engine-v1` @ `054a446e38f207b62bab6685928c146279b559ad` · **Type:** OFFLINE migration authoring + static validation.
+**No database access of any kind.** No production, no staging, no SQL execution, no `db push` (not even `--dry-run`), no `db reset`, no `migration repair`, no history change, no deploy, no runtime TypeScript.
+
+**Status: GENERATED_NOT_APPLIED.** Three forward-only migrations, one phase verifier and one offline validator exist in the repository and have never been run against a database.
+
+---
+
+## 1. Artifacts and hashes
+
+| Artifact | SHA256 |
+|---|---|
+| `supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql` | `7d569d334d92c216686e100159cb030459350c4272f40d02dbde64e1fb82716c` |
+| `supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql` | `6bc0285d66c5d75ef47f648e2716a18f746e2e396a61387df5719aa6a974e01d` |
+| `supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql` | `151f6b430539c8f9c475dd24310d370ea05e6c13c189cdfe3df50beca5fc5487` |
+| `supabase/staging-verification/verify_qf_mvp_20_3b1.sql` | `ebe0ef75c5692eb9c145812e10dce72385d79c4b00b71010ae2801a9b65b60fa` |
+| `scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` | `eddec25a6e69fac59ba54143c7c5ae2c663b08a2d9e3b75cbd5e98a3753161e0` |
+
+**Locked artifacts re-hashed and byte-identical (unchanged by this phase):**
+
+| Locked artifact | SHA256 |
+|---|---|
+| `supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql` | `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` |
+| `supabase/staging-baseline/verify_qf_mvp_staging_baseline.sql` | `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193` |
+
+The baseline verifier was **not** converted into a forward-migration verifier. `verify_qf_mvp_20_3b1.sql` is a separate, phase-specific artifact in a new directory.
+
+## 2. Identity and ordering
+
+Repository `supabase/migrations/**` held 68 files, highest version `20260721000100`. No `20260723*` version or filename existed. All three new versions are greater than the staging baseline version `20260722000100` and are strictly ascending in the required order:
+
+```
+20260722000100 (baseline)  <  20260723000100 (A)  <  20260723000200 (A2)  <  20260723000300 (B1)
+```
+
+No collision. Preferred identities were used exactly as specified.
+
+## 3. Design blockers resolved by founder decision
+
+Two contradictions in the authoritative documents blocked the first attempt at this phase. Both were resolved by explicit founder decision and are implemented verbatim.
+
+| # | Contradiction | Founder decision implemented |
+|---|---|---|
+| 1 | `assignment_operations.lead_id` is frozen `uuid NOT NULL`, but the lineage seed was specified as **one** global batch operation row — impossible across many leads | `lead_id` stays NOT NULL. A2 creates **one operation per distinct lead**, keyed `qf_mvp_20_a2_lineage_backfill_v1:<lead_id>`, `mode='recovery_replay'`, `actor_kind='worker'`, `actor_id=NULL`, `reason_code='migration_backfill'`. The shared batch identity is retained in `metadata`/`result`. Counts derived dynamically, never hardcoded. |
+| 2 | Design step 14 requires B1 to append `public.audit_logs`, which is **absent** from the applied baseline (62 tables) and created only by drifted migration `20260621000006` | `audit_logs` is **not** created in A and **not** written in B1. `assignment_operations`, `lead_assignment_events`, `vendor_credit_logs`, `credit_restoration_approvals` and `communication_intents` are the authoritative domain audit evidence. The separate audit step is replaced by **completing the `assignment_operations` result** after the assignment, ledger, lineage and intent writes succeed. |
+
+**Vocabulary confirmation (founder decision 3):** `source_kind = 'migration_backfill'` (never `'backfill'`); historical `source_reference = 'legacy_assignment_seed_v1:<assignment_id>'`. This closes the `backfill` vs `migration_backfill` discrepancy between closure §7 and the schema-contract CHECK vocabulary; the CHECK vocabulary governs and the founder confirmed it.
+
+**Divergence view placement:** the design assigns `vendor_wallet_package_divergence_v` to "Migration C or a later ops migration", not to A. It is therefore **not** created in this phase, and the verifier asserts its absence.
+
+## 4. Migration A — schema delta
+
+`20260723000100_qf_mvp_marketplace_authority_foundation.sql` — **ADDITIVE ONLY**, no data statement, no behaviour change.
+
+| Object | Change | Notes |
+|---|---|---|
+| `assignment_operations` | **NEW** | `UNIQUE (idempotency_key)`; mode/actor/status CHECKs; `lead_id → leads RESTRICT`; `replacement_request_id` required iff `mode='replacement'` |
+| `replacement_requests` | **NEW** | partial `uq_replacement_requests_open_per_lead` is the one-at-a-time authority; FKs to leads/assignments/vendors RESTRICT |
+| `credit_restoration_approvals` | **NEW** | `UNIQUE (idempotency_key)`; `uq_restoration_per_assignment_reason`; `applied ⇒ restoration_ledger_id NOT NULL` |
+| `lead_assignment_events` | **NEW** | append-only lineage — see §5 |
+| `communication_intents` | **NEW** | `UNIQUE (idempotency_key)`; `uncertain_outcome ⇒ status='uncertain'` (terminal) |
+| `lead_assignments` | +4 columns | `lifecycle_status` (NOT NULL DEFAULT `'assigned'`, 10-value CHECK), `lifecycle_updated_at`, `operation_id`, `replaced_by_assignment_id`; +2 indexes. **Existing `UNIQUE (lead_id, vendor_id)` untouched.** |
+| `vendor_credit_logs` | +4 columns | `approval_reference` (FK RESTRICT, required for restorations), `idempotency_key` (partial unique), `actor_kind`, `actor_id` |
+| `vendor_credit_logs.change_type` | CHECK replaced | strict superset: **all 11 legacy values retained** + 4 canonical values, so every historical row stays valid |
+| `vendors` | +5 columns | assignment-suspension storage + `idx_vendors_assignment_suspended`. **Inert:** nothing in A/A2/B1 can write them |
+
+**Catalog delta:** +5 tables · +4 `lead_assignments` columns · +4 `vendor_credit_logs` columns · +5 `vendors` columns · +11 indexes · +5 RLS enables · **+0 policies** · +0 views · **+0 triggers**.
+
+**RLS/grants:** all five new tables are RLS-enabled with **no policies** (fail-closed for `anon`/`authenticated`) and granted to `service_role` only. `lead_assignment_events` is granted `SELECT, INSERT` only — **no UPDATE and no DELETE to any role**, so append-only holds at the privilege layer before B2's trigger exists.
+
+**Fail-closed on drift:** deliberately no `IF NOT EXISTS` on new tables, columns or constraints, and no exception-swallowing block. A closing verification block re-asserts the delivered shape and aborts on any deviation — including aborting outright if a `UNIQUE (lead_id, vendor_id)` is ever found on the event table or if the existing `lead_assignments` uniqueness is missing.
+
+## 5. Event-idempotency implementation (QF-MVP-20.3A1R)
+
+`lead_assignment_events.event_idempotency_key text NOT NULL` with `UNIQUE (event_idempotency_key)` as the table's **only** non-primary business uniqueness constraint. There is **no** `(lead_id, vendor_id)` unique constraint, and both Migration A's verification block and the phase verifier fail closed if one ever appears.
+
+| Key | Format | Written by |
+|---|---|---|
+| Historical seed | `legacy_assignment_seed_v1:<assignment_id>` | A2 |
+| Canonical runtime | `assignment_event:<operation_id>:<assignment_id>:<event_type>` | B1 |
+
+The authoritative transaction derives the key in both cases. No RPC parameter accepts one, so an untrusted caller can neither supply nor influence it.
+
+**Four separate boundaries, never merged:** operation → `assignment_operations.idempotency_key` · assignment row → the existing `lead_assignments UNIQUE (lead_id, vendor_id)` · ledger → `uq_vendor_credit_logs_reference` (+ the new `uq_vendor_credit_logs_idempotency`) · event → `event_idempotency_key`.
+
+**Retention:** `lead_id → leads RESTRICT`, `vendor_id → vendors RESTRICT`, `assignment_id → lead_assignments SET NULL`, `operation_id → assignment_operations SET NULL`. No personal-data snapshot columns; `metadata` carries provenance only.
+
+## 6. Migration A2 — backfill behaviour
+
+`20260723000200_qf_mvp_assignment_lineage_backfill.sql` — reviewed **data** migration, fully idempotent.
+
+**Seed set, defined once and used identically by both INSERTs and by verification:**
+
+```
+lead_id is not null and vendor_id is not null and assigned_at is not null
+and not exists (select 1 from lead_assignment_events e where e.assignment_id = la.id)
+```
+
+The "has no lineage at all" clause is what makes re-running safe, and it also guarantees that once B1/R1 are live — when canonical assignments always write their own `assignment_event:...` lineage — a later re-run can never re-seed a canonical row as a legacy one.
+
+| Behaviour | Implementation |
+|---|---|
+| Operations | one per distinct qualifying lead, `qf_mvp_20_a2_lineage_backfill_v1:<lead_id>`, `ON CONFLICT (idempotency_key) DO NOTHING` |
+| Events | exactly one per qualifying assignment, `ON CONFLICT (event_idempotency_key) DO NOTHING` — **never** `ON CONFLICT (lead_id, vendor_id)` |
+| Event contract | `assignment_created` / `lifecycle_from=NULL` / `lifecycle_to='assigned'` / `occurred_at := assigned_at` / `recorded_at :=` one deterministic batch stamp / `actor_kind='worker'` / `actor_id=NULL` / `reason_code='lineage_backfill'` / `source_kind='migration_backfill'` |
+| Evidence preserved | `metadata` carries `assignment_type`, `credit_deducted_claimed` and an explicit `credit_debit_proven: false` |
+| Empty staging | 0 operations, 0 events, no application data — both statements select from `lead_assignments` |
+| Re-run | 0 new operations, 0 new events, 0 other change |
+| Incomplete rows | a NULL `lead_id`/`vendor_id`/`assigned_at` row is **skipped and reported** by notice, never guessed |
+| Counts | every count derived at runtime; the validator asserts no literal `46` or `24` appears in executable SQL |
+
+**Lifecycle backfill method preserved:** Migration A's `NOT NULL DEFAULT 'assigned'` already sets every pre-existing row. A2 performs **no bulk UPDATE**; it verifies the outcome instead, exactly as instructed.
+
+**A2 does not:** create any `vendor_credit_logs` row · change any balance · claim a debit was proven · create any communication intent · send anything · touch provider state · change any existing column value · convert the pending bad-lead report to `invalid` · create any schema object. Verification blocks abort the migration if the ledger or intent row-count changes at all.
+
+## 7. Migration B1 — canonical authority behaviour
+
+`20260723000300_qf_mvp_canonical_assignment_authority.sql` — five functions, nothing else.
+
+| Function | Signature (type-only) | Security |
+|---|---|---|
+| `qf_vendor_assignment_eligible` | `(uuid, uuid, integer) → jsonb` | STABLE, **INVOKER** |
+| `qf_apply_credit_mutation_v2` | `(uuid, integer, text, text, text, text, text, uuid, text, boolean) → jsonb` | DEFINER |
+| `qf_assign_lead_vendors_v2` | `(uuid, text, uuid[], text, text, uuid, uuid, text) → jsonb` | DEFINER |
+| `qf_request_replacement_v2` | `(uuid, uuid, text, text, uuid) → jsonb` | DEFINER |
+| `qf_approve_credit_restoration_v2` | `(uuid, uuid, text) → jsonb` | DEFINER |
+
+Signatures are exactly those frozen in schema contract §9; parameter names come from design §5. Every DEFINER routine pins `SET search_path = pg_catalog, public, pg_temp`.
+
+**Transaction and locking order inside `qf_assign_lead_vendors_v2`:** argument shape → trusted-actor resolution → operation idempotency claim → **lead `FOR UPDATE`** → client ownership re-assertion → **replacement request `FOR UPDATE`** → lifetime read → active count → active-3 validation → candidate loop with **vendors locked in ascending UUID order** → eligibility → ledger-backed debit → assignment insert → lineage event → communication intent → operation completion. Isolation is the PostgreSQL default `READ COMMITTED`; every invariant is protected by a row lock taken before the read that informs it.
+
+**Rejected inputs:** no caller-controlled maximum count (no `p_total_limit` — the legacy 1..9 ceiling never reaches the database), no caller-proven actor identity, no arbitrary credit delta, no provider-send instruction, and `public_visibility` is not an eligibility gate.
+
+**Actor handling:** `p_actor_id` is recorded and cross-checked, never proof. `system`/`worker` must pass NULL; `client`/`admin` must pass a value. For `client`, ownership is **re-asserted under the lead lock** against an active `client_accounts` row whose normalised `phone_e164` matches the lead's phone — the only ownership linkage that exists in the schema (see §13, open item 1).
+
+**Sanitized result:** `{operation_id, status, lead_id, assigned[], skipped[], active_count_after, lifetime_count_after, communication_intent_ids[]}` with reason codes drawn only from the frozen vocabulary. No SQL text, balances or internal reasons are returned.
+
+### Lifetime-six
+
+```sql
+select count(distinct vendor_id)
+from public.lead_assignment_events
+where lead_id = p_lead_id
+  and event_type = 'assignment_created'
+  and lifecycle_to = 'assigned';
+```
+
+Read once under the lead lock, then re-checked **per candidate**: a candidate is "genuinely new" only if it has no qualifying event. A new candidate against a lead already at six is rejected `lifetime_limit_reached` **before** the assignment insert, **before** the debit, **before** the event and **before** any intent. A failed candidate writes no `assignment_created` event and therefore consumes no slot; a later lifecycle event consumes no additional slot because the count is `DISTINCT vendor_id` over qualifying events only.
+
+### Active-three
+
+`count(*)` over `lifecycle_status IN ('assigned','delivered','accepted')` under the lead lock, compared against the internal constant `3`. The loop exits the moment the running active count reaches the cap. The set is written identically in the RPC, in the `idx_lead_assignments_active` predicate and in the CHECK vocabulary; `in_progress` appears nowhere.
+
+### Credit authority
+
+`qf_apply_credit_mutation_v2` is the sole mutation path. Wallet-only: `vendors.remaining_credits` is the debit target and `vendor_packages` is never touched (the validator asserts no `vendor_packages` UPDATE exists). Change types are restricted to the five canonical values. Every row records vendor, delta, before, after, change type, reason, trusted actor, reference type, reference id, idempotency key, approval reference and timestamp. The ledger insert has **no exception handler**, so a failure rolls back the balance change with it. Debits never clamp — an insufficient balance returns `insufficient_credits`; a negative result requires both `p_allow_negative` and `change_type='authorized_manual_adjustment'`. Duplicate reference or idempotency key returns `already_applied` and writes nothing. The 27 historical missing-evidence cases are untouched and remain QF-MVP-20.4 scope.
+
+### Communication boundary
+
+The transaction inserts a `communication_intents` row and nothing more. `recipient_ref` is a SHA-256 hex digest, never a plaintext destination. No Meta, n8n, Jarvis, WhatsApp or SMS call; no `whatsapp_logs` delivery write; no retry of an uncertain outcome. The validator asserts no `pg_net`, `http`, `dblink` or `pg_background` primitive appears anywhere in the three files.
+
+## 8. Authorization and grants
+
+Every canonical function is `REVOKE ALL … FROM PUBLIC, anon, authenticated` followed by `GRANT EXECUTE … TO service_role`, and nothing else. No mutation authority is granted to `PUBLIC`, `anon` or `authenticated` anywhere in the three migrations — asserted by the validator across every `GRANT` statement and re-asserted by B1's own verification block, which aborts the migration if any canonical function is executable by an untrusted role.
+
+No SECURITY DEFINER function treats a supplied actor UUID as proof of authority. Client and admin authorization through server-owned APIs belongs to R1, not to this SQL-only phase.
+
+## 9. Compatibility behaviour
+
+Legacy authority is fully retained. No legacy function is dropped, replaced, altered or revoked, and no legacy grant is broadened. B1's verification block aborts if fewer than six of the legacy assignment RPCs are present:
+
+`admin_smart_assign_lead_to_vendors` · `assign_client_selected_vendor_to_group` · `assign_lead_to_preferred_vendor` · `assign_lead_to_vendors` · `assign_package_to_vendor` · `assign_vendor_to_requirement_group`
+
+Because legacy `service_role` compatibility survives, a runtime revert during R1 never requires a database rollback.
+
+## 10. Excluded work (B2, C, D, E)
+
+| Excluded | Confirmed absent |
+|---|---|
+| **B2** universal enforcement triggers | **Zero** triggers created. No trigger function is defined either — the design does not require inert preparation in B1. Both A and B1 abort if any non-internal trigger exists on `lead_assignments` or `lead_assignment_events`. |
+| **C** public projection and hardening | No `vendor_public_v`, no `vendor_wallet_package_divergence_v`, no anon revoke on `leads`/`vendors`, no policy drop, no duplicate-index removal, no `select("*")` conversion |
+| **D** Auth trigger | No `auth.users` trigger; no Auth user created or referenced |
+| **E** legacy revocation | No `REVOKE` of any legacy EXECUTE; no function removal |
+
+B2 is deliberately withheld because B1 lands **before** R1: the legacy admin path still accepts a total limit up to 9, legacy RPCs write no lineage at all, and in production the legacy blockers remain anon-executable. A universal trigger now would convert working legacy flows into mid-transaction failures.
+
+**Also excluded:** no suspension or restoration **mutation** path. Migration A adds the five suspension columns as inert storage and B1 reads them as a hard gate; nothing in A/A2/B1 can write them. `qf_approve_credit_restoration_v2` applies an approval that is **already** in status `approved` — it can neither create nor self-approve one. An audited administrative path is R1/B2 or a later reviewed migration.
+
+## 11. Phase verification design
+
+`supabase/staging-verification/verify_qf_mvp_20_3b1.sql` — 44 checks, each returning `check_name · expected · actual · status · details`, `status ∈ {PASS, FAIL}`.
+
+**SELECT-only by construction:** the whole file is one `WITH … SELECT … UNION ALL` statement. It contains no INSERT/UPDATE/DELETE/MERGE/TRUNCATE/CREATE/ALTER/DROP/GRANT/REVOKE/COPY/CALL/DO/SET outside comments — asserted independently by the offline validator.
+
+**Environment agnostic:** no production-specific count is used as a universal expectation. A `facts` CTE derives `assignments_total`, `assignments_qualifying`, `leads_qualifying`, `seed_events` and `seed_operations` from live data, and the A2 checks compare derived against derived. On empty staging the seed checks read `0 = 0` and pass; on a production-shaped database they compare real counts.
+
+Coverage maps to the required list: Migration A columns (1–3) · foundation tables, PK/unique/partial-index contracts (4–7) · event key exists/NOT NULL/uniquely constrained, no `(lead_id, vendor_id)` uniqueness, existing `lead_assignments` uniqueness preserved (8–11) · retention FK delete actions (12–13) · lifecycle vocabulary and active set, lifetime index, ledger vocabulary (14–17) · views absent in this phase (18) · exact canonical signatures resolved by **OID**, not by name, and untrusted roles hold no EXECUTE while `service_role` does (19–23) · six legacy RPCs present and legacy grants not broadened (24–25) · no B2 trigger, no false Migration C claim, no `auth.users` trigger, no provider account, no delivery row (26–30) · A2 semantics: no fabricated ledger row, derived seed counts, key format, event contract, no missing seed, no duplicate key, correct operation anchoring, empty-database consistency (31–39) · migration history holds exactly the baseline plus the three expected versions and no extra same-day version (40–41) · RLS on with no policies, no anon/authenticated grant, no UPDATE/DELETE grant on lineage (42–44).
+
+Check 27 is explicitly **informational** and always reports PASS, with details stating it must never be read as proof that Migration C hardening happened.
+
+## 12. Offline validator design
+
+`scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs` — **82 checks, all passing.** Entirely offline: it opens no socket, spawns no process, reads no environment variable and touches no database.
+
+It uses two complementary SQL views, both fail-closed on an unterminated comment, string or dollar-quoted body:
+
+- **`code`** — comments, string literals, quoted identifiers and function bodies removed. Used for structural keyword scans, so a keyword inside a comment or a literal can never trigger a finding.
+- **`all`** — comments removed recursively (including inside function bodies) but string literals preserved. Used for value assertions, so a word appearing only in a header comment can never satisfy or violate one.
+
+Checks: exact identities and ascending order above the baseline · SHA256 of all five artifacts · locked baseline and baseline-verifier hashes unchanged · no unapproved destructive operation (the single approved exception is the additive `change_type` CHECK replacement) · no TRUNCATE/DELETE/DROP DATABASE · no role or session-authority change · no URL, project ref, token or credential in executable text · no grant to PUBLIC/anon/authenticated · explicit `REVOKE … FROM PUBLIC` and `GRANT … TO service_role` for each of the five canonical RPCs · `search_path` pinned on every DEFINER function · no legacy function dropped and no legacy `service_role` EXECUTE revoked · no trigger attached · no `auth.users` trigger · no Migration C work · no `audit_logs` object or write · no `UNIQUE (lead_id, vendor_id)` defined and `UNIQUE (event_idempotency_key)` present and NOT NULL · existing `lead_assignments` uniqueness not dropped · A2 seeds on the event key and never on `(lead_id, vendor_id)` · `source_kind='migration_backfill'` · per-lead operation key · A2 writes no ledger row and no intent · no hardcoded `46`/`24` in executable SQL · B1 writes assignment, ledger, lineage and intent in one function body with no explicit COMMIT/ROLLBACK/SAVEPOINT · runtime event-key format · lifetime is `count(distinct vendor_id)` · no limit parameter · no provider primitive · wallet-only debit · no suspension mutation path · phase verifier is SELECT-only with the five required output columns and derived expectations · header discipline on all three migrations.
+
+## 13. Remaining unknowns and open items
+
+1. **Client ownership linkage is inferred, not declared.** `public.leads` has no `client_account_id`, `user_id` or `created_by` column. The only linkage that exists is `client_accounts.user_id` ↔ `client_accounts.phone_e164` ↔ `leads.phone`, so the in-body re-assertion for `p_actor_kind='client'` is a normalised phone match. **R1 must confirm this is the intended ownership contract**, or introduce an explicit ownership column in a later reviewed migration. Until then, client-mode assignment is only as strong as phone-to-account verification.
+2. **`public.audit_logs` drift is now documented but not closed.** The table is created by repository migration `20260621000006_superadmin_foundation.sql` yet is absent from the applied baseline and therefore from production. Whether to apply that drifted migration is a separate decision, tracked outside this phase.
+3. **`assignment_operations.result` replay shape.** On replay B1 returns the stored result merged with `status='already_applied'`. R1 must treat `already_applied` as success, not as a failed attempt.
+4. **Credit cost is the internal constant `1`**, mirroring the legacy `LEAD_CREDIT_COST` in `assign_lead_to_paid_vendors_phase26a` and `lib/vendors/vendorEligibility.ts`. A shared SQL+TS constant assertion is R1 work.
+5. **The 27-row ledger gap is untouched** and remains QF-MVP-20.4 scope. Neither A2 nor B1 improves or worsens it.
+
+## 14. Rollback boundaries
+
+| Migration | Rollback | Caveat |
+|---|---|---|
+| **A** | drop the five new tables, the added columns on `lead_assignments`/`vendor_credit_logs`/`vendors`, and restore the 11-value `change_type` CHECK | Fully reversible **while the new tables are empty**. Once lineage or operation rows exist they are business truth and must not be dropped to roll back code (rollback rule 6) — stop using them instead. |
+| **A2** | `delete from lead_assignment_events where source_kind='migration_backfill' and event_idempotency_key like 'legacy_assignment_seed_v1:%'` then `delete from assignment_operations where idempotency_key like 'qf_mvp_20_a2_lineage_backfill_v1:%'` | In that order, as a reviewed forward step. Re-running A2 afterwards reproduces the identical seed, because every key is derived deterministically from existing row identifiers. |
+| **B1** | drop the five canonical functions | Legacy RPCs are untouched and serve traffic immediately. Rows already created by the canonical engine are never deleted to roll back code. |
+
+Migration history is never manually falsified; rollback is expressed as a new reviewed forward migration.
+
+## 15. Application prerequisites
+
+**Staging (QF-MVP-20.3B1P — Staging Application Preflight):**
+1. Confirm staging is still `APPLIED_AND_VERIFIED` at baseline `920a4aa0…` with verifier `7ba9792f…` unchanged.
+2. Confirm `supabase_migrations.schema_migrations` holds exactly the one baseline row and no `20260723*` version.
+3. `db push --dry-run` (linked staging) — confirm exactly these three versions are pending, in order.
+4. Confirm staging remains empty, providers inactive, no Auth users.
+5. Apply A → A2 → B1 in one reviewed push, then run `verify_qf_mvp_20_3b1.sql` and require **all-PASS**.
+6. Re-run the locked baseline verifier and confirm it still passes unchanged.
+7. Execute the staging test matrix, including T33–T42 (lineage idempotency) and the new T43–T48 (this phase).
+
+**Production:** staging all-PASS **and** rollback rehearsed **and** founder sign-off on A2 as a reviewed data step — A2 mutates production by creating lineage rows and must be approved separately from the schema DDL. Migration C remains the fix for the live anon exposure on `leads`/`vendors`, and Migration E for the anon-executable blockers; neither is in this phase, so **applying A/A2/B1 to production closes no existing production exposure.**
+
+## 16. Gate result
+
+| Gate | Result |
+|---|---|
+| Offline validator (`validate-qf-mvp-20-3b1.mjs`) | **PASS** — 82/82 |
+| Locked baseline + verifier hashes | **UNCHANGED** |
+| `git diff --check` | clean |
+| `npm run verify:mvp` | **PASS** — 40/40 test cases, typecheck, lint, build |
+| Database access | **NONE** — no production, no staging, no SQL executed |
+| Migration state | **A / A2 / B1 = GENERATED_NOT_APPLIED** |
+
+**Note on the pre-existing baseline validator:** `scripts/mvp/staging/validate-staging-baseline.mjs` hard-requires `--source <schema.sql>`, the raw production schema dump, and validates its SHA256. That dump is deliberately stored outside the repository and is not present in this environment, so the validator **could not be re-run** in this phase. The guarantee it would provide for this task — that the locked artifacts are unchanged — was obtained directly instead: both files were re-hashed byte-for-byte and match, and the new validator asserts the same two hashes independently.

@@ -91,6 +91,23 @@ These ten tests prove the corrected model: `lead_assignment_events` is an **appe
 
 **Cross-check binding on T33/T24:** the seed key is `legacy_assignment_seed_v1:<assignment_id>` and the runtime key is `assignment_event:<operation_id>:<assignment_id>:<event_type>`. Tests must assert the **key format**, not merely that a rerun inserted zero rows — a rerun of a broken seed can also insert zero rows for the wrong reason.
 
+## QF-MVP-20.3B1 additions — generated migrations (binding)
+
+The three migrations now exist as reviewed files and are `GENERATED_NOT_APPLIED`. Record: [`QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md`](QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md). Phase verifier: `supabase/staging-verification/verify_qf_mvp_20_3b1.sql` (SHA256 `ebe0ef75…`), separate from the locked baseline verifier.
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T43** | A/A2/B1 apply cleanly in order on empty staging | migration rehearsal | staging at baseline `920a4aa0…`, zero application rows | all three apply in one push; history gains exactly `20260723000100`, `20260723000200`, `20260723000300`; `verify_qf_mvp_20_3b1.sql` returns **all-PASS**; the locked baseline verifier still passes unchanged |
+| **T44** | A2 on empty staging creates nothing | migration rehearsal | zero `lead_assignments` rows | **0** backfill operations and **0** lineage events; no ledger row, no intent, no application data of any kind |
+| **T45** | A2 on a production-shaped fixture seeds per lead | migration rehearsal | seeded copy of the production shape (N assignments across M distinct leads) | exactly **M** operations keyed `qf_mvp_20_a2_lineage_backfill_v1:<lead_id>` and **N** events keyed `legacy_assignment_seed_v1:<assignment_id>`; every event anchored to the operation of **its own** lead; counts derived, never hardcoded |
+| **T46** | A2 is a no-op on a third run | migration rehearsal | run A2, run again, run again | second and third runs insert **0** operations and **0** events; ledger count, intent count, balances and every assignment column are byte-identical across runs |
+| **T47** | A2 skips and reports incomplete history | migration rehearsal | fixture with one row having NULL `vendor_id` | that row receives **no** lineage event; the migration emits a skip notice naming the count; all complete rows are still seeded; the migration does **not** fail |
+| **T48** | B1 deploys without constraining legacy flows | migration rehearsal | apply B1, then exercise a legacy assignment RPC as `service_role` | **0** triggers exist on `lead_assignments`/`lead_assignment_events`; all six legacy assignment RPCs remain; the legacy call still succeeds exactly as before B1; no lineage event is written by the legacy path |
+
+**T48 is the B1/B2 boundary proof.** If it fails, B1 has taken authority away before the R1 consumer release, which the split exists to prevent.
+
+**Verifier-behaviour binding:** `verify_qf_mvp_20_3b1.sql` must be run **twice** — once against empty staging (T44) and once against the production-shaped fixture (T45) — and must return all-PASS both times. A verifier that only passes on one shape is not acceptable, because it will be run against production later.
+
 ## Gate
 
-20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32) and the 20.3A1R lineage additions (**T33–T42**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table.
+20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32), the 20.3A1R lineage additions (**T33–T42**) and the 20.3B1 migration-rehearsal additions (**T43–T48**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table, and **T48** is the guard against B1 absorbing B2's enforcement.

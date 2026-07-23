@@ -74,6 +74,22 @@ Deterministic fixtures (seeded UUIDs, 8 vendors so lifetime-6 can be exceeded) a
 
 Consequences for this matrix: **L6** must assert that the replaced vendor's `assignment_created` event persists *and* that a further `replaced` event is appended alongside it (not in place of it); **L4/L5** must count distinct vendors by query. Ten binding tests **T33–T42** in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) prove the corrected model — including two event types for one (lead, vendor), the full `assigned → delivered → accepted → completed` chain, duplicate-key no-op, distinct-key acceptance, later events consuming no slot, failed candidates consuming no slot, 7th-vendor rejection, and append-only immutability. T34/T35/T37/T42 fail under the withdrawn model and are the regression guards.
 
+## QF-MVP-20.3B1 — the migrations under test now exist
+
+L1–L24 are unchanged. What changed is that the objects they assert against are now generated files rather than a specification: `20260723000100` (A), `20260723000200` (A2) and `20260723000300` (B1), all `GENERATED_NOT_APPLIED`. Record and hashes: [`QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md`](QF-MVP-20-3B1-MIGRATION-GENERATION-RESULTS.md).
+
+Bindings this adds to the matrix:
+
+- **L1–L3 (active-three) and L4/L5 (lifetime-six) are enforced by `qf_assign_lead_vendors_v2` only, not yet by triggers.** B1 ships with **zero** enforcement triggers by design, because it lands before the R1 consumer release. Until Migration B2, a write that bypasses the canonical RPC is *not* capped. Every cap test in this phase must therefore drive the canonical RPC, and a separate B2 test must later prove the trigger layer independently.
+- **L21 (`max_vendors_per_lead` tampering)** is now a static fact: `qf_assign_lead_vendors_v2` has no limit parameter and the cap is an internal constant that reads no `app_settings` row. The offline validator asserts no `p_total_limit`-style parameter exists.
+- **L8/L9 (replay)** map to the operation key plus the ledger reference; a replay returns the stored `assignment_operations.result` merged with `already_applied`. Consumers must treat `already_applied` as success.
+- **L10/L11 (atomicity)** are satisfied within one function body: assignment insert, ledger debit, lineage event and communication intent share a transaction with no explicit COMMIT/ROLLBACK/SAVEPOINT.
+- **L14/L15/L16 (public projection)** remain **untestable in this phase** — `vendor_public_v` belongs to Migration C, which is deliberately not generated. So does `vendor_wallet_package_divergence_v` (T32).
+- **L12 (anon cannot execute)** is provable now for the canonical RPCs, which are `service_role`-only. It is **not** yet provable for the legacy blockers in production: those remain anon-executable until Migration E. Applying A/A2/B1 to production closes no existing exposure.
+- **L18/L19 (provider boundary)** hold structurally: the migrations contain no `pg_net`, `http`, `dblink` or `pg_background` primitive, and the transaction writes an intent whose `recipient_ref` is a hash, never a plaintext destination.
+
+New rehearsal coverage **T43–T48** in [`QF-MVP-20-3A-STAGING-TEST-PLAN.md`](QF-MVP-20-3A-STAGING-TEST-PLAN.md) proves clean application, empty-staging inertness, per-lead seeding, re-run no-op, incomplete-history skip-and-report, and the B1/B2 boundary.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

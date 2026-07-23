@@ -5,6 +5,15 @@
 > **CORRECTION LANDED — QF-MVP-20.3B1R2.** This document is the historical record of the application attempt and is **not** rewritten. The defect it identifies has since been corrected offline: B1's unsound self-verification guard was withdrawn, the phase verifier was found to carry the same defect in six rows (two of which would have failed even against a correctly applied B1) and was corrected, and the offline validator was hardened to 126 checks with regression fixtures that reproduce this exact failure. Corrected B1 SHA256 `46ce7377…` (was `a4b5c378…`), still version `20260723000300`. See [`QF-MVP-20-3B1R2-CORRECTION-RESULTS.md`](QF-MVP-20-3B1R2-CORRECTION-RESULTS.md). Next: **QF-MVP-20.3B1A2 — preflight and apply corrected B1 only.**
 >
 > **SUPERSEDED BY QF-MVP-20.3B1A2.** Corrected B1 applied successfully at exit 0 on the retry; the defect recorded in this document did **not** recur. B1 now holds a truthful migration-history row and staging has four rows. Verification returned 57 PASS / 1 FAIL for a **separate, pre-existing Migration A privilege gap**. Record: [`QF-MVP-20-3B1A2-STAGING-APPLICATION-RESULTS.md`](QF-MVP-20-3B1A2-STAGING-APPLICATION-RESULTS.md).
+>
+> **SUCCESSOR NOTE — current position as of QF-MVP-20.3B1G.** The history below is unchanged and remains the authoritative record of *this* attempt. What happened afterwards:
+>
+> 1. **Corrected B1 applied successfully in QF-MVP-20.3B1A2** at exit 0. Staging migration history holds four truthful rows (baseline, A, A2, B1) and the failure recorded in this document did not recur.
+> 2. **B1A2 verification returned 57 PASS / 1 FAIL**, surfacing a **separate Migration A grant gap**: `service_role` retained `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` and `MAINTAIN` on `public.lead_assignment_events`, inherited from Supabase's platform default table privileges because Migration A granted narrowly without first revoking. Untrusted roles held nothing and zero rows existed. The `postgres` table owner's implicit authority is **break-glass administrative access, informational only** — it is not part of that gap and is not an application-role failure.
+> 3. **Migration G has now been generated and reviewed but NOT applied** — `20260723000400_qf_mvp_lineage_append_only_grants.sql`, **`GENERATED_REVIEWED_NOT_APPLIED`**. It is forward-only and REVOKE-only, and it establishes the locked boundary: PUBLIC/anon/authenticated hold no lineage privilege; `service_role` holds SELECT and INSERT only, with no `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` or `MAINTAIN`.
+> 4. **Next phase: QF-MVP-20.3B1GP — staging preflight** for Migration G, followed by application and a 62-row phase verifier requiring all-PASS.
+>
+> Migrations A, A2 and B1 remain applied and immutable. No `migration repair` and no `db reset` has been or will be used.
 
 **Migration A applied. Migration A2 applied. Migration B1 FAILED and rolled back completely.**
 

@@ -123,7 +123,7 @@ Consequences for this matrix:
 - **L21 (no configurable cap/cost)** is now proved two ways that cannot be fooled by prose: the signature check over `pg_get_function_identity_arguments` (comment-free by construction) and the offline validator's executable-SQL view.
 - **T68** in the staging test plan generalises the lesson, and the validator's fixtures A–G lock it in — including fixture F, which reproduces the exact guard that failed and confirms it is now rejected before application.
 
-## QF-MVP-20.3B1A2 — B1 live on staging; one invariant unmet
+## QF-MVP-20.3B1A2 — B1 live on staging; one application-role boundary unmet
 
 Migration B1 applied at exit 0 and the corrected phase verifier returned **57 PASS / 1 FAIL**. The canonical authority now exists on staging, so the L-class tests that drive it are finally runnable in a later behavioural phase.
 
@@ -134,9 +134,42 @@ Migration B1 applied at exit 0 and the corrected phase verifier returned **57 PA
 - **L18/L19 (provider boundary)** — no provider send, no `whatsapp_logs` delivery authority, no `audit_logs` dependency, and zero communication delivery rows.
 - **L13 (ownership)** remains **untestable**: `client_selected` is fail-closed pending R1's ownership binding.
 
-**One acceptance criterion is now demonstrably unmet.** The append-only guarantee behind **L6** and the lineage half of **L4/L5** rests on `lead_assignment_events` being immutable. On staging it currently is not: Supabase default privileges left `UPDATE`/`DELETE` for `postgres` and `service_role`, and B2's immutability trigger does not yet exist. Untrusted roles hold nothing and zero rows exist, so nothing is at risk today — but **no L-class test that depends on lineage immutability may be treated as satisfied until a forward grant-hardening migration closes it.**
+**One acceptance criterion is demonstrably unmet.** The append-only guarantee behind **L6** and the lineage half of **L4/L5** rests on `lead_assignment_events` being immutable to application paths. The verifier's single FAIL identified the precise gap: **`service_role` retained `UPDATE`, `DELETE`, `TRUNCATE` and the related `REFERENCES`, `TRIGGER` and `MAINTAIN` mutation privileges** on the lineage table, inherited from Supabase's platform default table privileges, because Migration A granted narrowly without first revoking. Untrusted roles held nothing and zero rows existed, so nothing was at risk — but the declared boundary was not in force.
 
-**Lesson for the matrix.** A narrow `GRANT` is not a privilege contract on Supabase. Platform default privileges grant `arwdDxtm` on every new `public` table to four roles, so any table claiming a restricted posture must issue an explicit `REVOKE` first. Every future migration that creates a table needs a grant-posture assertion, not just a grant statement.
+**Owner authority is not an application-role failure.** The `postgres` table owner and any superuser hold implicit administrative authority over every object they own. That is a property of PostgreSQL, not a defect, not a grant this project issued, and not something a `REVOKE` can meaningfully or safely remove. Owner authority is **break-glass administrative access, recorded informationally only**, and it is excluded from application-role evaluation. Any earlier wording in this document that counted `postgres` alongside `service_role` as part of the unmet boundary is **superseded and void**.
+
+### Locked lineage privilege boundary
+
+| Principal | Locked posture |
+|---|---|
+| `PUBLIC`, `anon`, `authenticated` | **no lineage-table privileges** |
+| `service_role` | **SELECT and INSERT only** |
+| `service_role` | **no `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` or `MAINTAIN`** |
+| `postgres` / table owner | implicit **break-glass administrative authority — informational only**, never an application-role control and never an acceptance failure |
+
+Proof must be by **effective** privilege (`has_table_privilege`), never by `information_schema.role_table_grants`, which PostgreSQL documents as omitting grants made to PUBLIC.
+
+### T69 clarified — assert the posture, do not infer it
+
+A restricted table's **effective application-role privilege posture must be explicitly asserted**. A narrow `GRANT` is **not** proof that broader default privileges are absent: on Supabase the platform default ACL `arwdDxtm` already grants every privilege on each new `public` table to four roles, so a `GRANT SELECT, INSERT` only *adds* and leaves the rest untouched. Any migration creating a table that claims a restricted posture must issue an explicit `REVOKE` and then assert the resulting effective posture for every application role — not merely state its intent.
+
+### T70 clarified — what enforces immutability before B2
+
+Before Migration B2, lineage immutability is enforced **for application paths** by three concurrent mechanisms, none of which involves owner authority:
+
+1. **zero untrusted access** — `PUBLIC`, `anon` and `authenticated` hold no lineage privilege at all;
+2. **service_role mutation denial** — the only application role that reaches the table holds `SELECT` and `INSERT` and is denied every mutation privilege; and
+3. **reviewed canonical routines** — the B1 functions insert lineage and never `UPDATE`, `DELETE` or `TRUNCATE` it, verified on the tokenized executable source.
+
+RLS cannot contribute here, because `service_role` bypasses it.
+
+**Migration B2 later adds trigger-based universal immutability** (`trg_lead_assignment_events_immutable`), which extends the guarantee beyond application roles to every writer including the owner. That is defence in depth layered on top of the privilege boundary, not a replacement for it.
+
+### Remediation status
+
+Migration **`20260723000400_qf_mvp_lineage_append_only_grants.sql`** — **`GENERATED_REVIEWED_NOT_APPLIED`**. It is forward-only and REVOKE-only, and it establishes exactly the locked boundary above.
+
+**T69 and T70 remain operationally open** until Migration G is applied to staging **and** the 62-row phase verifier returns all-PASS. Until then, no L-class test that depends on lineage immutability may be treated as satisfied.
 
 ## Gate
 

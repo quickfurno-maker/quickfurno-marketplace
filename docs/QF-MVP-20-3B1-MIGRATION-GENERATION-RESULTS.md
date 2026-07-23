@@ -267,6 +267,20 @@ The approved external source at `Desktop\qf-staging-workspace\production-public-
 
 The raw schema was **not** copied into Git, **not** modified, and no database was accessed.
 
+## 12d. QF-MVP-20.3B1P — staging application preflight: PASSED
+
+Full record: [`QF-MVP-20-3B1-STAGING-APPLICATION-PREFLIGHT.md`](QF-MVP-20-3B1-STAGING-APPLICATION-PREFLIGHT.md).
+
+All seven locked artifact hashes re-verified, phase validator **105/105 PASS**, baseline validator **PASS**. Staging (`uckafzuochmbvtiodmcl`) proven as the sole linked target — production and QF-Jarvis both `linked=false`, and zero production/Jarvis references anywhere under `supabase/.temp/`.
+
+**Staging pre-application state (SELECT-only, 20/20 as expected):** PostgreSQL 17.6 · 62 tables · 39 QuickFurno + 1 managed = 40 functions · 62 RLS · 67 policies · exactly one history row `20260722000100` / `qf_mvp_staging_baseline_269c9265` · all 62 tables zero rows · `auth.users` 0 · providers empty and disabled · none of the five foundation tables present · neither canonical RPC present · zero production or Jarvis references in object bodies, defaults or comments.
+
+**Locked baseline verifier re-executed verbatim → 40 PASS / 0 FAIL.** The phase verifier was deliberately not run, since A/A2/B1 are not applied.
+
+**Dry-run:** `npx supabase db push --linked --dry-run`, exit code **0**, proposing **exactly three** migrations in order — A, then A2, then B1. The baseline was not re-proposed and none of the other 68 repository migrations appeared. **Post-dry-run non-mutation proof:** history still 1 row, A/A2/B1 still absent remotely, foundation tables and canonical functions still absent, all tables still empty, `auth.users` still 0, providers still inactive, 0 public-table triggers.
+
+**Status: A / A2 / B1 remain `GENERATED_REVIEWED_NOT_APPLIED`.** No staging write, no real `db push`, no migration-history change, no production access.
+
 ## 13. Remaining unknowns and open items
 
 1. **`client_selected` mode is FAIL-CLOSED - `R1_BLOCKED_PENDING_OWNER_BINDING`.** `public.leads` has no `client_account_id`, `user_id` or `created_by` column, and the schema has no canonical phone normalizer, so the database cannot re-assert client ownership. The mode now returns `unauthorized` before any write (see 12b, contract 3). **R1 must add an explicit ownership binding** - either a lead/client column or a server-created client-selection request row - before any runtime consumer activates the mode. This is the one functional capability deliberately withheld.

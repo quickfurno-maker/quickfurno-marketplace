@@ -1,9 +1,13 @@
 # QF-MVP-20.3C — Public Vendor Projection and Direct-Table Privilege Hardening
 
-**Status: `C_PUBLIC_PROJECTION_HARDENING_GENERATED_REVIEWED_READY_FOR_PREFLIGHT`.**
+**Status: `C_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW` (QF-MVP-20.3CP).**
 
-> **GENERATED AND REVIEWED, NOT APPLIED.** No database was accessed in this phase — not
-> staging, not production, not QF-Jarvis. No dry run was executed. Nothing was pushed.
+> **GENERATED, REVIEWED AND PREFLIGHTED — STILL NOT APPLIED.** The staging preflight
+> (QF-MVP-20.3CP) proved C is the **only** pending migration and that one
+> `db push --linked --dry-run` would apply **exactly** it — exit 0, one migration proposed,
+> **zero** remote history rows created. C remains **local-only**; staging stayed 7 local / 6
+> remote. Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never
+> contacted. The next phase is the **C staging application**, not Migration D. See section 13.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `7d88519c86572a20538b4305469c900634bd8b73` (B2 applied), origin identical, ahead/behind 0/0,
@@ -270,3 +274,81 @@ A2, B1, G and B2 remain applied and immutable.
 > not started" check. Those locked verifier files are untouched by C; their absence-assertion is
 > intentionally superseded by this C verifier for the post-C state, exactly as each phase's verifier
 > reflects its own end-state.
+
+---
+
+## 13. QF-MVP-20.3CP — staging preflight
+
+**Status: `C_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`. C was NOT applied.**
+
+Executed at repository HEAD `13eeac81f662bba64381fded927c920bd9982ccd` (the C generation commit),
+branch `mvp/qf-mvp-20-marketplace-engine-v1`, **origin identical, ahead/behind 0/0**, worktree
+clean. Parent `7d88519c86572a20538b4305469c900634bd8b73`.
+
+### Locked hashes — recomputed, all verified
+
+| Artifact | SHA-256 |
+|---|---|
+| C migration | `0d3d871b0c6ab9de8d82eeb8499437f1f40a8a6c81561cf41cb8ade60b464da2` |
+| C validator | `9115ed0b79e675351fb631992499adfbcc9f9bf66a0d226b3e26ba6f8c82d3e4` |
+| C verifier | `1d2bb61a6d0822fa2cac5ffd161e0535c63d514044b158fc61e072ea16a05a75` |
+
+baseline / A / A2 / B1 / G / B2 and the B2 verifier + validator are byte-unchanged; the C
+generation commit `13eeac8` contains exactly the seven approved paths and no applied migration.
+
+### Offline gates
+
+C validator **79/79** (23 fixtures) · B2 **61/61** · B1/G **165/165** · R1 **62/62** ·
+`verify:mvp` exit 0 · typecheck/lint/build exit 0 · `git diff --check` exit 0. **Load-bearing
+re-proved on the real artifacts:** leaking `gst_number` into the real view tripped R08 (check 02);
+removing the real anon-leads revoke tripped R11 (check 02); reverting the verifier `::text` cast
+tripped 07b. All restored byte-identical (`git diff HEAD` exit 0). Fixtures share
+`evaluateCMigration()` with the real grade (lines 391 vs 457); the anti-vacuity guard is present.
+
+### External apply workspace
+
+`C:\Users\KESHAV SHARMA\Desktop\qf-staging-apply` — **outside Git**, no `seed.sql`, no
+`supabase/functions`, no non-SQL file. **Before: 6 SQL** (baseline/A/A2/B1/G/B2, all hash-exact);
+C was **absent** (state A) → copied exactly once. **After: 7 SQL**; `cmp` exit 0 and workspace C
+hashes `0d3d871b…` — **byte-identical** to the repository.
+
+### Linked target
+
+`uckafzuochmbvtiodmcl` (QuickFurno Staging) only. **Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis
+`coilipywdvxklewquqvv` are not linked and were never contacted** — the production ref appears in
+the workspace only inside the baseline migration's own warning comments (documentation, not a
+link).
+
+### Migration history and the dry run
+
+| | Before dry run | After dry run |
+|---|---|---|
+| local / remote | 7 / 6 | 7 / **6** |
+| C | local-only, sole pending | local-only |
+
+```
+$ npx supabase db push --linked --dry-run      # cwd: qf-staging-apply
+DRY RUN: migrations will *not* be pushed to the database.
+Would push these migrations:
+ • 20260723000600_qf_mvp_public_projection_privilege_hardening.sql
+Finished supabase db push.
+```
+
+`2026-07-23T19:06:25Z → 19:06:31Z UTC`, **exit 0**. Structurally verified: DRY RUN banner present,
+**exactly one** migration proposed and it is C, no earlier migration proposed, no application
+claim, no error text. Run **once**, never repeated. The immediate re-list is **byte-identical** to
+the pre-run listing — **zero remote history rows created**, C still remote-empty.
+
+### Safety confirmations
+
+C not applied. No `db push` without `--dry-run`. No `migration up`/`repair`/`reset`. No
+hand-executed SQL. No link change. No application data, auth user, provider activation, deploy, PR
+or push.
+
+**Transcript:** `qf-staging-workspace\QF-MVP-20.3CP-PREFLIGHT-20260723T190625Z.txt` — outside Git.
+
+### Next phase
+
+**QF-MVP-20.3C staging application** — *not* Migration D. C remains generated, reviewed and
+preflighted, but unapplied and local-only. Migrations A, A2, B1, G and B2 stay applied and
+immutable.

@@ -1,6 +1,6 @@
 # QF-MVP-20.3B2 — Universal Assignment Enforcement
 
-**Status: `B2_RUNTIME_TYPE_CORRECTION_IMPLEMENTED_REVIEWED_READY_FOR_PREFLIGHT` (QF-MVP-20.3B2R1).**
+**Status: `CORRECTED_B2_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW` (QF-MVP-20.3B2R1P).**
 
 > **GENERATED, REVIEWED, PREFLIGHTED, ONE FAILED APPLY, NOW CORRECTED — STILL NOT APPLIED.**
 > The first application attempt (QF-MVP-20.3B2A, 2026-07-23T17:22:22Z) **rolled back
@@ -507,3 +507,85 @@ contacted.
 **A fresh QF-MVP-20.3B2 staging preflight** against the corrected artifacts — not application, not
 Migration C. The preflight in §13 was run against the superseded `ab31023e…` migration and must be
 re-run for the corrected `d1370355…` migration before any new application attempt.
+
+
+---
+
+## 15. QF-MVP-20.3B2R1P — corrected B2 fresh staging preflight
+
+**Status: `CORRECTED_B2_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`. B2 was NOT applied.**
+
+Executed at repository HEAD `c3350cd09e2fc9f9048018cd8e7c7eea90e87cdb` (the correction commit),
+branch `mvp/qf-mvp-20-marketplace-engine-v1`, **origin identical, ahead/behind 0/0**, worktree
+clean. Parent `f633f86cd12ccda27a25183304def60cee744627`.
+
+### Corrected hashes — recomputed, all verified
+
+| Artifact | SHA-256 |
+|---|---|
+| B2 migration | `d13703553663271172cfdcedc5e9be8374e7e9c1d225d2c67816fce837450cf3` |
+| B2 validator | `87739ae0abc9e1587754add5016199ad0c6312a23c4f4137e22da55ca08aa00d` |
+| B2 verifier | `89903749acf61061f5332fe1e57a4808a1bf45c6bb0a929ad703810606270677` |
+
+Baseline, A, A2, B1, G are byte-unchanged; the correction commit `c3350cd` contains exactly the
+five approved paths and no applied migration.
+
+### Offline gates
+
+B2 validator **61/61** (26 fixtures) · B1/G **165/165** · R1 **62/62** · `verify:mvp` exit 0 ·
+typecheck/lint/build exit 0 · `git diff --check` exit 0. **R23 re-proved load-bearing on the real
+artifacts:** reverting the `::text` cast on the actual migration tripped check 02, and on the
+actual verifier tripped check 07b; both restored byte-identical.
+
+### Superseded workspace file — safely replaced
+
+The external apply workspace still held the pre-correction B2 (`ab31023e…ca484b`,
+state **KNOWN_SUPERSEDED_PRESENT**), with baseline/A/A2/B1/G all hash-exact. **Before** any
+replacement, the linked migration list proved remote B2 **absent** (6 local / 5 remote, B2 sole
+pending). The superseded file was then preserved outside Git and outside the migrations directory
+as `qf-staging-workspace\QF-MVP-20.3B2R1P-SUPERSEDED-B2-ab31023e-20260723T174000Z.sql`, and only
+the workspace B2 was overwritten from the corrected repository file. Result: workspace B2 =
+`d1370355…`, `cmp` byte-identical to the repository; migrations directory still exactly six SQL
+files; baseline/A/A2/B1/G untouched.
+
+### Linked target
+
+`uckafzuochmbvtiodmcl` (QuickFurno Staging) only. **Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis
+`coilipywdvxklewquqvv` are not linked and were never contacted** — the production ref appears in
+the workspace only inside the baseline migration's own warning comments (documentation, not a
+link).
+
+### Migration history and the dry run
+
+| | Before dry run | After dry run |
+|---|---|---|
+| local / remote | 6 / 5 | 6 / **5** |
+| B2 | local-only, sole pending | local-only |
+
+```
+$ npx supabase db push --linked --dry-run      # cwd: qf-staging-apply
+DRY RUN: migrations will *not* be pushed to the database.
+Would push these migrations:
+ • 20260723000500_qf_mvp_assignment_universal_enforcement.sql
+Finished supabase db push.
+```
+
+`2026-07-23T18:04:38Z → 18:04:42Z UTC`, **exit 0**. Structurally verified: DRY RUN banner present,
+**exactly one** migration proposed and it is the corrected B2, no earlier migration proposed, no
+application claim, no error text. Run **once**, never repeated. The immediate re-list is
+**byte-identical** to the pre-run listing — **zero remote history rows created**, B2 still
+remote-empty.
+
+### Safety confirmations
+
+B2 not applied. No `db push` without `--dry-run`. No `migration up`/`repair`/`reset`. No
+hand-executed SQL. No link change. No applied migration modified in repo or workspace. No
+application data, auth user, provider activation, deploy, PR or push.
+
+**Transcript:** `qf-staging-workspace\QF-MVP-20.3B2R1P-PREFLIGHT-20260723T180438Z.txt` — outside Git.
+
+### Next phase
+
+**Corrected QF-MVP-20.3B2 staging application** — *not* Migration C. The corrected B2 (`d1370355…`)
+is now preflighted and remains unapplied and local-only. Migrations A, A2, B1 and G stay applied
+and immutable.

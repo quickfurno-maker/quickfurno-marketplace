@@ -1,8 +1,8 @@
 # QF-MVP-20.3B1G — Lineage Append-Only Grant Repair
 
-**Status: `GENERATED_REVIEWED_NOT_APPLIED` — staging preflight complete (QF-MVP-20.3B1GP).**
+**Status: `APPLIED_AND_VERIFIED_ON_STAGING` (QF-MVP-20.3B1G-A).**
 
-> **PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW.** Migration G is proven to be the only pending staging migration, and one `db push --linked --dry-run` confirmed the CLI would apply exactly it. **G was not applied.** See §9.
+> **MIGRATION_G_APPLIED_VERIFIED_ON_STAGING_READY_FOR_COMMIT_REVIEW.** Migration G was applied to staging on **2026-07-23T15:12:59Z-15:13:09Z UTC** (exit 0), is recorded remotely exactly once, and the locked 62-row phase verifier returns **62 PASS / 0 FAIL**. The append-only application-role boundary is now in force. See section 10.
 
 **Type:** offline SQL authoring review and correction (§1–§8), plus the staging preflight (§9).
 
@@ -236,6 +236,107 @@ The linked migration list was re-read immediately afterwards: remote still holds
 ### Remaining step
 
 QF-MVP-20.3B1G-A: apply Migration G once, then run the 62-row phase verifier requiring all-PASS, then read staging-only advisors. The pre-G live verifier result of 57 PASS / 1 FAIL is the expected historical position and is **not** a new blocker.
+
+## 10. QF-MVP-20.3B1G-A - staging application and verification
+
+**Status: `MIGRATION_G_APPLIED_VERIFIED_ON_STAGING_READY_FOR_COMMIT_REVIEW`.**
+
+Executed at repository HEAD `7d483a355711a53fb69c90d5a4591ecaa601ede8`, branch synchronized with `origin` at **0/0**, worktree clean.
+
+### Application
+
+| Item | Value |
+|---|---|
+| Command | `npx supabase db push --linked` (from the external apply workspace) |
+| Start / end (UTC) | `2026-07-23T15:12:59Z` -> `2026-07-23T15:13:09Z` |
+| **Exit code** | **0** |
+| Migrations identified by the CLI | **exactly one** - `20260723000400_qf_mvp_lineage_append_only_grants.sql` |
+| Baseline / A / A2 / B1 | **not proposed, not re-applied** |
+| Real-push budget | **one** command, run once, never repeated |
+
+Migration G SHA-256 `91544524c27ca26020b648f13f462d2613ca407366c8de0f258ea4f04d8c553b`, byte-identical between repository and apply workspace.
+
+A post-commit CLI warning appeared (`failed to cache migrations catalog`, missing local pgdelta certificate / edge-runtime container). This is the same known **local** catalog-caching convenience step seen in QF-MVP-20.3B1A2. It runs *after* the migration commits, changed nothing in the database, and the command still exited 0.
+
+### Migration history
+
+| | Before | After |
+|---|---|---|
+| local | 5 | 5 |
+| remote | 4 | **5** |
+| pending | G only | **none** |
+
+Remote now holds exactly `20260722000100`, `20260723000100`, `20260723000200`, `20260723000300`, `20260723000400` - G recorded **exactly once**, no unexpected version, no history falsification. No `migration repair`, `db reset` or `migration up` was run.
+
+### Phase verifier - 62 PASS / 0 FAIL
+
+Executed verbatim from the locked file, re-hashed to `e1d9edb85008c8f157016cb04f09ec127aba850d1980ca86ebb8e6721aab7483` immediately before execution, SELECT-only, against staging only. **All 62 rows PASS. Zero FAIL. No skipped row, no altered expectation.**
+
+The rows that prove the locked boundary:
+
+| Row | Check | Expected | Actual | Status |
+|---|---|---|---|---|
+| 44 | `R03_lineage_untrusted_table_privileges` | 0 | **0** | PASS |
+| 45 | `R04_lineage_service_role_forbidden_privileges` | 0 | **0** | PASS |
+| 46 | `R05_lineage_service_role_required_privileges` | 2 | **2** | PASS |
+| 47 | `R06_lineage_owner_break_glass_information` | INFORMATIONAL | `postgres` | PASS |
+| 48 | `R07_no_lineage_mutation_trigger_yet` | 0 | **0** | PASS |
+
+Row 47 reports the owner as informational break-glass and is **not** an application-role failure, exactly as the governance correction requires.
+
+### Application-role boundary - live proof
+
+Live `information_schema.role_table_grants` for `public.lead_assignment_events`:
+
+| Principal | Privileges held | Verdict |
+|---|---|---|
+| `PUBLIC` | *(absent)* | none |
+| `anon` | *(absent)* | none |
+| `authenticated` | *(absent)* | none |
+| **`service_role`** | **INSERT, SELECT** | exactly the locked set |
+| `postgres` (owner) | SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER | break-glass, informational only |
+
+`service_role` holds **no** `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` or `MAINTAIN` - confirmed by row 45's **effective** `has_table_privilege` check, which also catches inheritance. The QF-MVP-20.3B1A2 failure (`4 update/delete grants`) is closed.
+
+### Post-application staging state
+
+67 public tables, **0 rows across every table**, `auth.users` **0**, provider accounts **0**, template mappings **0**, no active/canary provider policy, 45 public functions, 67 policies, 67 RLS-enabled tables, **0** public-table triggers, **0** views/matviews, **0** `auth.users` trigger. No B2, C or D work appeared.
+
+**Only two things changed in this phase:** the ACL on `public.lead_assignment_events`, and one migration-history row. No application data, auth user, provider configuration or unrelated schema was touched.
+
+### Advisors (read-only, after 62/62)
+
+**Security - 44 lints, none blocking.**
+
+| Count | Level | Lint | Disposition |
+|---|---|---|---|
+| 37 | INFO | `rls_enabled_no_policy` | **Expected and correct** - RLS-on/no-policy is the deliberate fail-closed posture for service_role-only tables. 32 at baseline plus 5 from Migration A's new tables, including `lead_assignment_events`. Pre-existing design, not introduced by G. |
+| 1 | WARN | `rls_policy_always_true` on `leads` | Pre-existing; **Migration C** closes it. Unrelated to G. |
+| 2 | WARN | `anon_security_definer_function_executable` (`get_public_eligible_vendors`, `rls_auto_enable`) | Pre-existing; evidence-backed public listing plus Supabase-managed function. Unrelated to G. |
+| 4 | WARN | `authenticated_security_definer_function_executable` (`get_public_eligible_vendors`, `is_admin`, `owns_vendor`, `rls_auto_enable`) | Pre-existing; RLS predicates must be executable by the evaluating role. Unrelated to G. |
+
+**Performance - 233 lints, none blocking.**
+
+| Count | Level | Lint | Disposition |
+|---|---|---|---|
+| 156 | INFO | `unused_index` | Artifact of an **empty** database with no traffic. **Not removal candidates** without workload evidence. |
+| 36 | WARN | `multiple_permissive_policies` | Pre-existing; QF-MVP-70. |
+| 30 | INFO | `unindexed_foreign_keys` | Pre-existing pattern; 10 relate to Migration A's new tables (2 on the lineage table). Non-blocking; QF-MVP-70. |
+| 7 | WARN | `auth_rls_initplan` | Pre-existing; QF-MVP-70. |
+| 3 | WARN | `duplicate_index` | Pre-existing; Migration C scope. |
+| 1 | INFO | `auth_db_connections_absolute` | Platform-managed. |
+
+**No advisor finding is attributable to Migration G.** G only revokes privileges; it cannot create or resolve an index or policy lint. None proves G failed to establish the boundary, none indicates an unexpected schema change, and none identifies a critical safety issue introduced by this application. Nothing was auto-fixed and nothing was changed in response.
+
+### Safety confirmations
+
+Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were **never accessed**. No second real `db push`. No `migration up`, `migration repair` or `db reset`. No hand-executed SQL from G. No application data, auth user, provider activation, seed, Edge Function deploy or application deploy. No PR, no push.
+
+**Transcript:** `qf-staging-workspace\QF-MVP-20.3B1G-A-APPLICATION-20260723T151214Z.txt` - outside Git.
+
+### Remaining next phase
+
+The lineage append-only boundary is now enforced at the **privilege** layer. **Migration B2** remains outstanding and will add `trg_lead_assignment_events_immutable`, extending immutability beyond application roles to every writer including the owner - the defence-in-depth layer for staging test **T70**. B2 comes after the **R1** runtime consumer release.
 
 ## 8. Residual observations (not defects, recorded for the founder)
 

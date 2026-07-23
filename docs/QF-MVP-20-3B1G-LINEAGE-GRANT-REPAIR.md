@@ -1,9 +1,14 @@
 # QF-MVP-20.3B1G — Lineage Append-Only Grant Repair
 
-**Status: `GENERATED_REVIEWED_NOT_APPLIED`.**
+**Status: `GENERATED_REVIEWED_NOT_APPLIED` — staging preflight complete (QF-MVP-20.3B1GP).**
 
-**Type:** offline SQL authoring review, correction and static validation.
-**No staging access. No production access. No SQL executed. No `db push`, not even a dry-run. Migration G was NOT copied to the apply workspace.**
+> **PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW.** Migration G is proven to be the only pending staging migration, and one `db push --linked --dry-run` confirmed the CLI would apply exactly it. **G was not applied.** See §9.
+
+**Type:** offline SQL authoring review and correction (§1–§8), plus the staging preflight (§9).
+
+**Sections 1–8 — authoring phase (QF-MVP-20.3B1G):** no staging access, no production access, no SQL executed, no `db push` of any kind, and Migration G was not copied to the apply workspace by that phase.
+
+**Section 9 — preflight phase (QF-MVP-20.3B1GP):** staging was inspected read-only and exactly one `db push --linked --dry-run` was run. **Migration G was still not applied**, and no remote history row was created. Migration G was found *already present* in the apply workspace from an earlier attempt, so it was verified byte-identical rather than copied again.
 
 Closes the single failure from QF-MVP-20.3B1A2: `R03_lineage_append_only_grants` found **4** UPDATE/DELETE grants on `public.lead_assignment_events` where the declared append-only contract requires none.
 
@@ -144,6 +149,93 @@ The premise that "the offline validator passes" did not hold. Migration G's veri
 10. Only then read staging-only advisors.
 
 **Prohibited throughout:** `migration repair`, `db reset`, editing A/A2/B1, re-applying any applied migration, hand-executing G.
+
+## 9. QF-MVP-20.3B1GP — staging preflight
+
+**Status: `PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.** Executed at repository HEAD `5b51241bec813be66f47e50c08395e56ada8f63b`, branch `mvp/qf-mvp-20-marketplace-engine-v1`, worktree clean and synchronized with `origin`.
+
+**Migration G was NOT applied.** Exactly one `db push --linked --dry-run` was run; no `db push` without `--dry-run`, no `migration up`, no `migration repair`, no `db reset`, no remote history change, no DDL, no DML, no auth user, no provider activation.
+
+### Tooling deviation — prior wrapper attempts
+
+Earlier QF-MVP-20.3B1GP attempts used a generated PowerShell wrapper that failed on wrapper portability and argument handling. Those failures were **local tooling defects only**: they never authorized or performed an application. This preflight was executed with direct, individually reviewed shell commands instead of any wrapper.
+
+### Offline gates
+
+| Gate | Result |
+|---|---|
+| Locked artifact hashes (9, incl. external evidence) | **all verified** |
+| Grants manifest `scripts/mvp/staging/staging-baseline-grants.json` | `11a3ad402ef910d7fbcbe207c0694a64ad90857353fbf9ee5c3e22e86d291dd2` |
+| Phase validator | **165 passed, 0 failed — PASS** |
+| `npm run verify:mvp` | **2 suites / 40 cases passed**, exit 0 |
+| `git diff --check` | exit 0 |
+| Baseline validator (real interface, external source) | **PASS**, exit 0 |
+
+**Validator load-bearing evidence.** All ten fixtures **A–J** ran and passed. `3B1G:real Migration G satisfies every grant-posture rule` reported **0 findings**, and the validator tokenized and hashed `20260723000400`, echoing `91544524…` — so G was not silently skipped. The link is structural, not decorative: `evaluateGrantMigration()` is invoked at one site on `G.raw` (read from the locked repository path) and at a second site by every fixture, so fixture B — which injects `grant update … to service_role` — exercises the identical code path that grades the real migration.
+
+`npm run verify:mvp` emitted one stderr warning (`Using edge runtime on a page currently disables static generation for that page`). The process exited 0; this is recorded as a warning, not a failure.
+
+### External apply workspace
+
+`Desktop\qf-staging-apply` — **not a Git repository** (no `.git`, and `git rev-parse --show-toplevel` resolves to nothing), so nothing in it can be committed. No `seed.sql` anywhere, no Edge Function directory, and `config.toml` declares no `[functions]` block and names neither prohibited project.
+
+**Inventory before this phase — Migration G was already present**, not absent. It was therefore **not copied again**; it was verified instead:
+
+| File | SHA256 | Verdict |
+|---|---|---|
+| `20260722000100_qf_mvp_staging_baseline_269c9265.sql` | `920a4aa0…` | OK |
+| `20260723000100_qf_mvp_marketplace_authority_foundation.sql` | `b6307094…` | OK |
+| `20260723000200_qf_mvp_assignment_lineage_backfill.sql` | `9d77f446…` | OK |
+| `20260723000300_qf_mvp_canonical_assignment_authority.sql` | `46ce7377…` | OK |
+| `20260723000400_qf_mvp_lineage_append_only_grants.sql` | `91544524…` | OK, `cmp` vs repository → **IDENTICAL** |
+
+Exactly five `.sql` migrations, zero non-SQL files in the migrations directory. Inventory after the phase is unchanged — nothing was copied, deleted, renamed or repaired.
+
+The `_evidence/` folder holds transcripts from earlier phases. The files named `01-migration-list-pre` … `04-migration-list-post` were inspected and belong to **QF-MVP-20.2C2**, the authorized baseline application of `20260722000100` on 22 July — they are **not** B1GP wrapper output and record no unauthorized application of Migration G.
+
+### Linked target
+
+**Authoritative:** `supabase/.temp/project-ref` = `uckafzuochmbvtiodmcl`, and `linked-project.json` resolves to *QuickFurno Staging*. A scan of every `.temp` file found **3** staging references, **0** production, **0** QF-Jarvis. **Supporting only:** `projects list` shows `linked=True` for staging and `linked=False` for both `yqpgcsduqbxulrlzwzap` and `coilipywdvxklewquqvv`. Neither prohibited project was connected to.
+
+### Migration history — before the dry run
+
+Parsed structurally from the CLI's JSON rather than by counting lines:
+
+| Version | Local | Remote |
+|---|---|---|
+| `20260722000100` | ✓ | ✓ |
+| `20260723000100` | ✓ | ✓ |
+| `20260723000200` | ✓ | ✓ |
+| `20260723000300` | ✓ | ✓ |
+| `20260723000400` | ✓ | — **pending** |
+
+**5 local / 4 remote / exactly one pending**, the pending version being G alone, with no unexpected local or remote version.
+
+### The dry run
+
+```
+npx supabase db push --linked --dry-run
+```
+
+**Exit code 0.** The CLI printed `DRY RUN: migrations will *not* be pushed to the database.` and proposed **exactly one** migration, by complete filename:
+
+```
+20260723000400_qf_mvp_lineage_append_only_grants.sql
+```
+
+The baseline, A, A2 and B1 were **not** proposed. No seed, repair, reset, config-deploy or Edge Function step appeared, and the output makes no claim of successful application.
+
+### Proof the dry run wrote nothing
+
+The linked migration list was re-read immediately afterwards: remote still holds exactly baseline + A + A2 + B1 (**4 rows**), G remains **local-only**, local count remains 5, and **no remote history row was created**. No DDL or data query was needed for this proof.
+
+### Transcript
+
+`Desktop\qf-staging-workspace\QF-MVP-20.3B1GP-PREFLIGHT-20260723T132554Z.txt` — outside Git and untracked.
+
+### Remaining step
+
+QF-MVP-20.3B1G-A: apply Migration G once, then run the 62-row phase verifier requiring all-PASS, then read staging-only advisors. The pre-G live verifier result of 57 PASS / 1 FAIL is the expected historical position and is **not** a new blocker.
 
 ## 8. Residual observations (not defects, recorded for the founder)
 

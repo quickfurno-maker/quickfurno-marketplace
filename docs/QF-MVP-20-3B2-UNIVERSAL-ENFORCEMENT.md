@@ -1,10 +1,13 @@
 # QF-MVP-20.3B2 — Universal Assignment Enforcement
 
-**Status: `B2_UNIVERSAL_ENFORCEMENT_GENERATED_REVIEWED_READY_FOR_PREFLIGHT`.**
+**Status: `B2_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW` (QF-MVP-20.3B2P).**
 
-> **GENERATED AND REVIEWED, NOT APPLIED.** No database was accessed in this phase — not
-> staging, not production, not QF-Jarvis. No dry run was executed. Nothing was pushed.
-> The next phase is the **B2 staging preflight**, not application.
+> **GENERATED, REVIEWED AND PREFLIGHTED — STILL NOT APPLIED.** The staging preflight
+> (QF-MVP-20.3B2P) proved B2 is the **only** pending migration and that one
+> `db push --linked --dry-run` would apply **exactly** it — exit 0, one migration proposed,
+> **zero** remote history rows created. B2 remains **local-only**. Production
+> `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never contacted.
+> The next phase is the **B2 staging application**, not Migration C. See section 13.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized R1 commit
 `5c78ea37a28bb55442bd409636bdfe3dc8efaad7` (parent `4bcdcc55c181ca374e93c9093d45c45620379031`),
@@ -252,3 +255,127 @@ strengthens the gate and removes nothing.
 **QF-MVP-20.3B2 staging preflight** — *not* application. B2 is generated and reviewed only.
 Nothing has been applied, no dry run has been executed, and no database has been contacted.
 Migrations A, A2, B1 and G remain applied and immutable.
+
+---
+
+## 13. QF-MVP-20.3B2P — staging preflight
+
+**Status: `B2_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`. B2 was NOT applied.**
+
+Executed at repository HEAD `5ffce96f15b6ae3ceac6ecbd2afe442fcd5e9c98`, branch
+`mvp/qf-mvp-20-marketplace-engine-v1`, **origin identical, ahead/behind 0/0**, worktree clean.
+Parent is the R1 commit `5c78ea37a28bb55442bd409636bdfe3dc8efaad7`, unamended.
+
+### Locked hashes — recomputed in full, all verified
+
+| Artifact | SHA-256 |
+|---|---|
+| B2 migration `20260723000500_...` | `ab31023ebddaec53e9224b04ffaffbb032da130fd67b63b77345c4fc62ca484b` |
+| B2 validator | `85cd5f9b033f832165b3dcc4ed439f5e6bbd50e6c00409a2cf14f321472ee460` |
+| B2 verifier (34 rows) | `0772409ea2fd25b9f315ea72da7371baaecb2fa7de0b439b19b729e8f2c2e214` |
+| baseline `20260722000100` | `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` |
+| baseline verifier | `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193` |
+| A | `b6307094715a102fa0cfccc1533cb8089e5b26fbe1e80a294c127b81e29f2b83` |
+| A2 | `9d77f4460701caa1caf172b50886b681f4b7e86849172ca2a7af1ece70eb3d60` |
+| B1 | `46ce7377a217a13620305572f1be9038a56c911ce76a556b4d52f91fe107177e` |
+| G | `91544524c27ca26020b648f13f462d2613ca407366c8de0f258ea4f04d8c553b` |
+| B1 verifier | `e1d9edb85008c8f157016cb04f09ec127aba850d1980ca86ebb8e6721aab7483` |
+| B1 validator | `e27d62d09f38e599c34b1084019777b0147df68bba1c91389b52d1df6577a6c8` |
+
+The three B2 hashes were cross-checked three ways — working tree, the **accepted commit object**
+(`git show 5ffce96:<path>`), and the values recorded in this document — and all three agree. No
+applied migration was edited: `git diff 5c78ea37..HEAD -- supabase/migrations/` lists only
+`20260723000500`.
+
+### Offline gates
+
+| Gate | Result |
+|---|---|
+| B2 validator | **57 passed, 0 failed** · 25 fixtures |
+| B1/G validator | **165 passed, 0 failed** |
+| R1 harness | **62 passed, 0 failed** |
+| `npm run verify:mvp` | **exit 0** — `test:mvp` 66 cases, r1 62, b2 57, typecheck, lint, build |
+| typecheck / lint / build | exit 0 |
+| `git diff --check` | exit 0 |
+
+**Load-bearing re-proved independently**, not taken from the validator's self-report: injecting
+`begin;/commit;`, `drop table public.lead_assignments;` and a Migration C
+`create or replace view public.vendor_public_v` into the **real** migration each tripped check 02
+(*real B2 migration has zero findings*); the file was restored **byte-identical** each time
+(`ab31023e...` before and after, `git status` clean). Source inspection confirms all 25 fixtures
+call the same `evaluateB2Migration()` that grades the real file (line 496 vs 640), that a fixture
+whose mutation becomes a no-op is reported **vacuous**, and that check 05 proves every enforced
+rule has a fixture.
+
+### External apply workspace
+
+`C:\Users\KESHAV SHARMA\Desktop\qf-staging-apply` — **outside Git** (`git rev-parse` →
+*fatal: not a git repository*), no `seed.sql`, no `supabase/functions` directory, no non-SQL file
+in `supabase/migrations`.
+
+| | Before | After |
+|---|---|---|
+| SQL files | **5** — baseline, A, A2, B1, G (all hash-matching the repository) | **6** — plus B2 |
+
+B2 was **absent**, so it was copied exactly once. `cmp` exits 0 and both copies hash
+`ab31023ebddaec53e9224b04ffaffbb032da130fd67b63b77345c4fc62ca484b` — **byte-identical**.
+
+### Linked target
+
+`.temp/project-ref` = `uckafzuochmbvtiodmcl`; `.temp/linked-project.json` =
+`{"ref":"uckafzuochmbvtiodmcl","name":"QuickFurno Staging"}`; the pooler host
+`aws-0-ap-southeast-1.pooler.supabase.com` carries the staging ref only. **Production
+`yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` are not linked and were never
+contacted.**
+
+> The production ref does appear three times in the workspace — all inside the **baseline
+> migration's own warning comments** ("MUST NEVER be applied to production"). That is
+> documentation warning against production, not a link to it.
+
+### Migration history
+
+| | Before dry run | After dry run |
+|---|---|---|
+| local | 6 | 6 |
+| remote | 5 | **5** |
+| pending | B2 only | B2 only |
+
+Parsed structurally from the CLI's JSON, not by eye: remote is exactly
+`20260722000100`, `20260723000100`, `20260723000200`, `20260723000300`, `20260723000400`;
+`20260723000500` is **local-only**; no unexpected version exists.
+
+### The dry run — exactly one
+
+```
+$ npx supabase db push --linked --dry-run      # cwd: qf-staging-apply
+Initialising login role...
+DRY RUN: migrations will *not* be pushed to the database.
+Connecting to remote database...
+Would push these migrations:
+ - 20260723000500_qf_mvp_assignment_universal_enforcement.sql
+Finished supabase db push.
+```
+
+`2026-07-23T17:08:21Z` to `17:08:26Z UTC`, **exit code 0**. Structurally verified: the DRY RUN
+banner is present, **exactly one** migration is proposed and it is B2, **no earlier migration is
+proposed**, there is **no application claim** (`Applying` / `Applied` / `successfully applied` all
+absent) and no error text. The command was run **once** and never repeated.
+
+### Proof no write occurred
+
+The migration list was re-run immediately afterwards. Remote history is **byte-identical** to the
+pre-dry-run listing: still exactly five remote versions, still 6 local / 5 remote, B2 still
+local-only. **No remote history row was created.**
+
+### Safety confirmations
+
+B2 was **not applied**. No `db push` without `--dry-run`. No `migration up`, `repair` or `reset`.
+No hand-executed SQL. No link change. No application data, auth user, provider activation, Edge
+Function or deployment. No PR, no push.
+
+**Transcript:** `qf-staging-workspace\QF-MVP-20.3B2P-PREFLIGHT-20260723T170821Z.txt` — outside Git.
+
+### Next phase
+
+**QF-MVP-20.3B2 staging application** — *not* Migration C. B2 remains generated, reviewed and
+preflighted, but unapplied. Migrations A, A2, B1 and G stay applied and immutable.

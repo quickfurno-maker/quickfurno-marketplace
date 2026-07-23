@@ -1,6 +1,10 @@
 # QF-MVP-20.3B1P — Marketplace Authority Migrations Staging Application Preflight
 
-**Status: `COMPLETE` — every preflight check passed. Staging application (QF-MVP-20.3B1A) is authorized.**
+**Status: `COMPLETE` — every preflight check passed. Staging application (QF-MVP-20.3B1A) was authorized and has since been attempted.**
+
+> **OUTCOME UPDATE (QF-MVP-20.3B1A):** application ran and produced a **partial result** — A and A2 committed, **B1 failed and rolled back completely**. The preflight was sound: every gate it checked held true at application time. The failure came from a defect the preflight could not see — a false positive inside **B1's own in-database verification block**, where a negative regex over `pg_get_functiondef()` matched the function's own explanatory comments. Full analysis: [`QF-MVP-20-3B1-STAGING-APPLICATION-RESULTS.md`](QF-MVP-20-3B1-STAGING-APPLICATION-RESULTS.md).
+>
+> **Preflight gap to close:** neither the dry-run nor either validator can execute a migration's in-database `DO` block. A dry-run proves *which* migrations would run, never that their internal assertions will pass. Future preflights should treat in-migration verification blocks as unverified until applied.
 
 **Type:** target verification · SELECT-only staging inspection · external-workspace preparation · one migration dry-run.
 **No staging write. No real `db push`. No migration applied. No migration-history change. No production access. No QF-Jarvis access.**

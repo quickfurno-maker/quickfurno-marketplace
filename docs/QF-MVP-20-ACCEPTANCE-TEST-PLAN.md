@@ -100,6 +100,18 @@ The review corrected three of four contracts. Consequences for this matrix:
 - **L13 (ownership) is deferred, not weakened.** `client_selected` mode is **fail-closed** (`R1_BLOCKED_PENDING_OWNER_BINDING`): the schema has no lead-to-client binding and no canonical phone normalizer, so the mode returns `unauthorized` before any write rather than trusting phone equality. **L13 cannot be satisfied in this phase**; it becomes testable only after R1 introduces an explicit ownership binding. **T64/T65** prove the fail-closed behaviour and that no untrusted role can reach the authority in any mode.
 - **L20 (historical investigation) is unaffected.** **T66/T67** confirm no `audit_logs` dependency and that A2 leaves the 27 ledger-gap assignments byte-identical.
 
+## QF-MVP-20.3B1A staging application outcome
+
+**A and A2 are live on staging; B1 is not.** The canonical authority does not yet exist on any database, so every L-class test that drives `qf_assign_lead_vendors_v2` or `qf_apply_credit_mutation_v2` remains **unrunnable** until QF-MVP-20.3B1R2 lands B1.
+
+What the partial application *does* establish:
+
+- **A2's empty-staging contract is proven in a real database** (T44): on zero historical assignments it created **0** operations and **0** lineage events, wrote **0** ledger rows and **0** intents, and its own verification block confirmed the ledger and intent counts never moved.
+- **A's authority substrate is proven installed and self-verified**: `request_fingerprint` NOT NULL, the terminal-completion CHECK, `UNIQUE (event_idempotency_key)` with **no** `(lead_id, vendor_id)` uniqueness on the event table, the pre-existing `lead_assignments UNIQUE(lead_id, vendor_id)` preserved, correct lineage FK retention, and all five new tables RLS-on with `service_role`-only grants.
+- **The B1/B2 boundary holds** (T48, partially): zero enforcement triggers exist and all six legacy assignment RPCs remain callable — A and A2 took no authority away.
+
+**Lesson for the matrix.** A migration's *in-database* verification block is itself untested code that only executes at apply time. Neither a dry-run nor an offline validator can exercise it. Any future migration carrying a `DO` block with negative assertions needs a rehearsal apply on a disposable database before it is treated as ready.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

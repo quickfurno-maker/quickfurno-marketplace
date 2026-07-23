@@ -148,6 +148,27 @@ These fifteen tests prove the four contracts closed by the 20.3B1R review. Recor
 
 **Verifier-behaviour binding:** `verify_qf_mvp_20_3b1.sql` must be run **twice** — once against empty staging (T44) and once against the production-shaped fixture (T45) — and must return all-PASS both times. A verifier that only passes on one shape is not acceptable, because it will be run against production later.
 
+## QF-MVP-20.3B1A execution status (real staging run)
+
+| Test | Status | Evidence |
+|---|---|---|
+| **T43** apply A/A2/B1 in order on empty staging | **FAILED** | A and A2 applied; **B1 aborted and rolled back**. History gained only `20260723000100` and `20260723000200`. Phase verifier not run as a gate. |
+| **T44** A2 on empty staging creates nothing | **PASSED** | 0 backfill operations, 0 lineage events, 0 ledger rows, 0 intents; A2's own verification block confirmed ledger and intent counts never moved |
+| **T45** A2 seeds per lead on production-shaped data | not run | requires a production-shaped fixture; no fixture may be created in the application phase |
+| **T46** A2 no-op on re-run | not run | blocked with T45 |
+| **T47** A2 skips and reports incomplete history | not run | blocked with T45 |
+| **T48** B1 deploys without constraining legacy flows | **partially observed** | 0 enforcement triggers exist and all 6 legacy assignment RPCs remain — but B1 itself never installed, so the full assertion is unproven |
+
+**Root cause of the T43 failure is a defect in B1, not in the test or the environment.** B1's §7.5c self-verification guard runs a negative regex over `pg_get_functiondef()`, whose output **includes comments**; the body of `qf_assign_lead_vendors_v2` documents that it never reads `app_settings` or `vendor_packages`, so the guard matched its own prose. Full analysis: [`QF-MVP-20-3B1-STAGING-APPLICATION-RESULTS.md`](QF-MVP-20-3B1-STAGING-APPLICATION-RESULTS.md) §12.
+
+### New binding test — in-migration verification blocks are untested code
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T68** | Every in-migration `DO` verification block is rehearsed before it is declared ready | migration rehearsal | apply the migration to a disposable database that matches the target's pre-state | the block runs to completion. A **negative** assertion (`NOT LIKE`, `!~`, `~* '(...)'` used to forbid something) over `pg_get_functiondef()`, `prosrc` or any catalog text that retains comments must additionally be proven not to match the object's own documentation |
+
+T68 exists because neither a dry-run nor an offline validator can execute a `DO` block: the dry-run proves only *which* migrations would run, and the validator inspects comment-stripped file text while the in-database guard inspects comment-retaining catalog output. The two disagreed, and only the database-side view was wrong.
+
 ## Gate
 
 20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32), the 20.3A1R lineage additions (**T33–T42**), the 20.3B1 migration-rehearsal additions (**T43–T48**) and the 20.3B1R authority-contract additions (**T49–T67**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table, **T48** is the guard against B1 absorbing B2's enforcement, and **T51, T52, T56** are the guards against regressing to key-only idempotency.

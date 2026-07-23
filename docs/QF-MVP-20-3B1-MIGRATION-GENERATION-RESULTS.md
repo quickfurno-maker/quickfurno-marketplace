@@ -3,7 +3,9 @@
 **Branch:** `mvp/qf-mvp-20-marketplace-engine-v1` · **Generated at** `054a446e38f207b62bab6685928c146279b559ad` (QF-MVP-20.3B1) · **Reviewed and corrected at** `33646e8177b5bb73b9a0985778a3819fe972560d` (QF-MVP-20.3B1R) · **Type:** OFFLINE migration authoring, review and static validation.
 **No database access of any kind.** No production, no staging, no SQL execution, no `db push` (not even `--dry-run`), no `db reset`, no `migration repair`, no history change, no deploy, no runtime TypeScript.
 
-**Status: GENERATED_REVIEWED_NOT_APPLIED** (reviewed and corrected by QF-MVP-20.3B1R). Three forward-only migrations, one phase verifier and one offline validator exist in the repository and have never been run against a database.
+**Status: PARTIALLY APPLIED ON STAGING — A and A2 committed; B1 FAILED and rolled back (QF-MVP-20.3B1A).**
+
+> **Migration B1 carries a known authoring defect.** Its §7.5c self-verification guard runs a negative regex over `pg_get_functiondef()`, which returns the function definition **including comments** — and the body of `qf_assign_lead_vendors_v2` documents that it never reads `app_settings` or `vendor_packages`. The guard matched its own prose and aborted a compliant function. The underlying contract is **not** violated: the executable SQL contains no configuration or package read. This is the same class of defect fixed in the *offline* validator during 20.3B1R; the fix was not carried into the migration's in-database block. Correction is QF-MVP-20.3B1R2. See [`QF-MVP-20-3B1-STAGING-APPLICATION-RESULTS.md`](QF-MVP-20-3B1-STAGING-APPLICATION-RESULTS.md) §12. Three forward-only migrations, one phase verifier and one offline validator exist in the repository and have never been run against a database.
 
 ---
 

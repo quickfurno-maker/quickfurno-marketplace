@@ -6,12 +6,13 @@
 --     20260723000100_qf_mvp_marketplace_authority_foundation.sql   (A)
 --     20260723000200_qf_mvp_assignment_lineage_backfill.sql        (A2)
 --     20260723000300_qf_mvp_canonical_assignment_authority.sql     (B1)
+--     20260723000400_qf_mvp_lineage_append_only_grants.sql       (G)
 --
 -- THIS FILE IS SEPARATE FROM THE LOCKED BASELINE VERIFIER
 --   supabase/staging-baseline/verify_qf_mvp_staging_baseline.sql
 --   (SHA256 7ba9792f...) is NOT modified, NOT replaced and NOT extended by this
 --   phase. It continues to verify the baseline shape. This file verifies only
---   the A/A2/B1 delta.
+--   the A/A2/B1/G delta.
 --
 -- SELECT-ONLY BY CONSTRUCTION
 --   The entire file is ONE read-only statement: a chain of SELECT ... UNION ALL
@@ -776,23 +777,23 @@ select 39, 'D09_empty_database_produced_no_a2_rows', 'consistent',
 
 -- === 11. Migration history =================================================
 union all
-select 40, 'H01_expected_migration_versions_present', 'baseline + A + A2 + B1',
+select 40, 'H01_expected_migration_versions_present', 'baseline + A + A2 + B1 + G',
        coalesce((select string_agg(version, ',' order by version)
                    from supabase_migrations.schema_migrations
-                  where version in ('20260722000100','20260723000100','20260723000200','20260723000300')), 'none'),
+                  where version in ('20260722000100','20260723000100','20260723000200','20260723000300','20260723000400')), 'none'),
        case when (select count(*) from supabase_migrations.schema_migrations
-                   where version in ('20260722000100','20260723000100','20260723000200','20260723000300')) = 4
+                   where version in ('20260722000100','20260723000100','20260723000200','20260723000300','20260723000400')) = 5
             then 'PASS' else 'FAIL' end,
-       'exactly the reviewed baseline plus the three QF-MVP-20.3B1 versions; run AFTER application'
+       'reviewed baseline plus A, A2, B1 and the forward-only Migration G repair; run AFTER G application'
 
 union all
 select 41, 'H02_no_unexpected_20260723_versions', '0',
        (select count(*)::text from supabase_migrations.schema_migrations
          where version like '20260723%'
-           and version not in ('20260723000100','20260723000200','20260723000300')),
+           and version not in ('20260723000100','20260723000200','20260723000300','20260723000400')),
        case when (select count(*) from supabase_migrations.schema_migrations
                    where version like '20260723%'
-                     and version not in ('20260723000100','20260723000200','20260723000300')) = 0
+                     and version not in ('20260723000100','20260723000200','20260723000300','20260723000400')) = 0
             then 'PASS' else 'FAIL' end,
        'no history falsification and no extra same-day migration'
 
@@ -838,15 +839,64 @@ select 43, 'R02_no_anon_authenticated_grant_on_new_tables', '0',
        'no mutation authority is granted to PUBLIC, anon or authenticated'
 
 union all
-select 44, 'R03_lineage_append_only_grants', '0 update/delete grants',
-       (select count(*)::text from information_schema.role_table_grants
-         where table_schema = 'public' and table_name = 'lead_assignment_events'
-           and privilege_type in ('UPDATE','DELETE')) || ' update/delete grants',
-       case when (select count(*) from information_schema.role_table_grants
-                   where table_schema = 'public' and table_name = 'lead_assignment_events'
-                     and privilege_type in ('UPDATE','DELETE')) = 0
+select 44, 'R03_lineage_untrusted_table_privileges', '0',
+       (select count(*)::text
+          from unnest(array['public','anon','authenticated']) as r(role_name)
+          cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) as p(privilege_name)
+         where has_table_privilege(r.role_name, 'public.lead_assignment_events', p.privilege_name)),
+       case when (select count(*)
+                    from unnest(array['public','anon','authenticated']) as r(role_name)
+                    cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) as p(privilege_name)
+                   where has_table_privilege(r.role_name, 'public.lead_assignment_events', p.privilege_name)) = 0
             then 'PASS' else 'FAIL' end,
-       'append-only: no role, including service_role, may UPDATE or DELETE lineage'
+       'PUBLIC, anon and authenticated hold no EFFECTIVE lineage privilege. Uses has_table_privilege, not information_schema.role_table_grants: that view is documented to omit grants made to PUBLIC, so a grantee = PUBLIC predicate against it can never match and would silently pass.'
+
+union all
+select 45, 'R04_lineage_service_role_forbidden_privileges', '0',
+       (select count(*)::text
+          from unnest(array['UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) as p(privilege_name)
+         where has_table_privilege('service_role', 'public.lead_assignment_events', p.privilege_name)),
+       case when (select count(*)
+                    from unnest(array['UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) as p(privilege_name)
+                   where has_table_privilege('service_role', 'public.lead_assignment_events', p.privilege_name)) = 0
+            then 'PASS' else 'FAIL' end,
+       'service_role is denied every direct lineage mutation or authority privilege. EFFECTIVE check, so a privilege reaching service_role by inheritance is caught too.'
+
+union all
+select 46, 'R05_lineage_service_role_required_privileges', '2',
+       (select count(*)::text
+          from unnest(array['SELECT','INSERT']) as p(privilege_name)
+         where has_table_privilege('service_role', 'public.lead_assignment_events', p.privilege_name)),
+       case when (select count(*)
+                    from unnest(array['SELECT','INSERT']) as p(privilege_name)
+                   where has_table_privilege('service_role', 'public.lead_assignment_events', p.privilege_name)) = 2
+            then 'PASS' else 'FAIL' end,
+       'service_role retains exactly the required read-and-append capabilities'
+
+union all
+select 47, 'R06_lineage_owner_break_glass_information', 'INFORMATIONAL',
+       coalesce((
+         select owner_role.rolname
+           from pg_catalog.pg_class relation
+           join pg_catalog.pg_roles owner_role
+             on owner_role.oid = relation.relowner
+          where relation.oid = 'public.lead_assignment_events'::regclass
+       ), 'owner not resolved'),
+       'PASS',
+       'INFORMATIONAL: PostgreSQL owner/superuser authority is implicit break-glass administration and is excluded from normal application-role enforcement'
+
+union all
+select 48, 'R07_no_lineage_mutation_trigger_yet', '0',
+       (select count(*)::text
+          from pg_catalog.pg_trigger
+         where tgrelid = 'public.lead_assignment_events'::regclass
+           and not tgisinternal),
+       case when (select count(*)
+                    from pg_catalog.pg_trigger
+                   where tgrelid = 'public.lead_assignment_events'::regclass
+                     and not tgisinternal) = 0
+            then 'PASS' else 'FAIL' end,
+       'B2 has not started; Migration G currently enforces append-only behaviour at the application-role privilege boundary'
 
 )
 

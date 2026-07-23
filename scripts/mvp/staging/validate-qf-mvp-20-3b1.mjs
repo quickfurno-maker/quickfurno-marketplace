@@ -23,6 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.
 const MIGRATION_A = "supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql";
 const MIGRATION_A2 = "supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql";
 const MIGRATION_B1 = "supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql";
+const MIGRATION_G = "supabase/migrations/20260723000400_qf_mvp_lineage_append_only_grants.sql";
 const PHASE_VERIFIER = "supabase/staging-verification/verify_qf_mvp_20_3b1.sql";
 
 const LOCKED = [
@@ -228,6 +229,7 @@ for (const [key, rel] of Object.entries({
   A: MIGRATION_A,
   A2: MIGRATION_A2,
   B1: MIGRATION_B1,
+  G: MIGRATION_G,
   VERIFIER: PHASE_VERIFIER,
 })) {
   let raw;
@@ -273,15 +275,16 @@ for (const [key, rel] of Object.entries({
   record(`tokenize:${rel}`, true, `${raw.length} bytes, ${tok.bodies.length} dollar-quoted bodies`);
 }
 
-if (Object.keys(files).length < 4) {
+if (Object.keys(files).length < 5) {
   report();
 }
 
 const A = files.A;
 const A2 = files.A2;
 const B1 = files.B1;
+const G = files.G;
 const V = files.VERIFIER;
-const MIGRATIONS = [A, A2, B1];
+const MIGRATIONS = [A, A2, B1, G];
 
 /* ------------------------------------------------------------------------- */
 /* 1. Identity and ordering                                                   */
@@ -291,6 +294,7 @@ const EXPECTED_ORDER = [
   ["20260723000100", MIGRATION_A],
   ["20260723000200", MIGRATION_A2],
   ["20260723000300", MIGRATION_B1],
+  ["20260723000400", MIGRATION_G],
 ];
 
 let orderOk = true;
@@ -302,7 +306,7 @@ for (const [version, rel] of EXPECTED_ORDER) {
   prev = version;
 }
 record(
-  "identity:three exact versions, ascending, all greater than the baseline",
+  "identity:four exact versions, ascending, all greater than the baseline",
   orderOk,
   `${BASELINE_VERSION} < ${EXPECTED_ORDER.map(([v]) => v).join(" < ")}`
 );
@@ -345,7 +349,7 @@ for (const f of MIGRATIONS) {
     drops.length === 0 ? "none" : `unapproved: ${drops.slice(0, 3).join(" | ")}`
   );
 
-  const wipes = f.code.match(/\b(truncate|delete\s+from|drop\s+database|db\s+reset)\b/g) || [];
+  const wipes = f.code.match(/\b(truncate\s+(?:table\s+)?(?:only\s+)?(?:public\.)?[a-z_"]|delete\s+from|drop\s+database|db\s+reset)\b/g) || [];
   record(
     `no-data-destruction:${path.basename(f.rel)}`,
     wipes.length === 0,
@@ -1032,6 +1036,7 @@ for (const f of MIGRATIONS) {
   const appliedLocks = [
     [MIGRATION_A, "b6307094715a102fa0cfccc1533cb8089e5b26fbe1e80a294c127b81e29f2b83"],
     [MIGRATION_A2, "9d77f4460701caa1caf172b50886b681f4b7e86849172ca2a7af1ece70eb3d60"],
+    [MIGRATION_B1, "46ce7377a217a13620305572f1be9038a56c911ce76a556b4d52f91fe107177e"],
   ];
   for (const [rel, want] of appliedLocks) {
     let got = null;
@@ -1171,6 +1176,323 @@ for (const f of MIGRATIONS) {
   );
 }
 
+
+/* ------------------------------------------------------------------------- */
+/* 9e. QF-MVP-20.3B1G — lineage application-role grant repair                */
+/* ------------------------------------------------------------------------- */
+
+{
+  record(
+    "3B1G:exact migration identity",
+    path.basename(G.rel) === "20260723000400_qf_mvp_lineage_append_only_grants.sql",
+    path.basename(G.rel)
+  );
+
+  const grants = G.code.match(/\bgrant\b[^;]*/g) || [];
+  record(
+    "3B1G:migration is REVOKE-only and contains no GRANT",
+    grants.length === 0,
+    grants.length === 0 ? "zero GRANT statements" : "forbidden GRANT present"
+  );
+
+  const revokesUntrusted =
+    /revoke all privileges on table public\.lead_assignment_events from public, anon, authenticated/.test(G.code);
+
+  record(
+    "3B1G:PUBLIC anon authenticated are fully revoked",
+    revokesUntrusted,
+    revokesUntrusted ? "explicit REVOKE ALL PRIVILEGES" : "required revoke missing"
+  );
+
+  const revokesServiceRole =
+    /revoke update, delete, truncate, references, trigger, maintain on table public\.lead_assignment_events from service_role/.test(G.code);
+
+  record(
+    "3B1G:service_role forbidden privileges are revoked",
+    revokesServiceRole,
+    revokesServiceRole
+      ? "UPDATE DELETE TRUNCATE REFERENCES TRIGGER MAINTAIN"
+      : "required service_role revoke missing"
+  );
+
+  const forbiddenDefinition =
+    /\b(create\s+(table|function|trigger|policy|view)|alter\s+table|alter\s+default\s+privileges|drop\s+|insert\s+into|delete\s+from|merge\s+into|copy\s+)/.test(G.code) ||
+    /\bupdate\s+(?!,)/.test(G.code) ||
+    /\btruncate\s+(?:table\s+)?public\./.test(G.code);
+
+  record(
+    "3B1G:no schema or data mutation",
+    !forbiddenDefinition,
+    forbiddenDefinition ? "forbidden DDL/DML found" : "REVOKE plus verification only"
+  );
+
+  const requiredChecks =
+    /has_table_privilege\(\s*'service_role'[\s\S]*?'select'/.test(G.all) &&
+    /has_table_privilege\(\s*'service_role'[\s\S]*?'insert'/.test(G.all);
+
+  record(
+    "3B1G:service_role SELECT and INSERT are fail-closed prerequisites",
+    requiredChecks,
+    requiredChecks ? "both required privileges checked" : "required privilege proof missing"
+  );
+
+  const noOwnerRevoke =
+    !/from postgres/.test(G.code) &&
+    !/alter owner|owner to/.test(G.code);
+
+  record(
+    "3B1G:owner authority is not used as an application control",
+    noOwnerRevoke,
+    noOwnerRevoke
+      ? "postgres/owner untouched; break-glass boundary documented"
+      : "owner privilege mutation found"
+  );
+
+  const noDefaultAcl = !/alter default privileges/.test(G.code);
+
+  record(
+    "3B1G:default-privilege hardening remains deferred to Migration C",
+    noDefaultAcl,
+    noDefaultAcl ? "no ALTER DEFAULT PRIVILEGES" : "scope widened into Migration C"
+  );
+
+  const verifierChecks = [
+    "R03_lineage_untrusted_table_privileges",
+    "R04_lineage_service_role_forbidden_privileges",
+    "R05_lineage_service_role_required_privileges",
+    "R06_lineage_owner_break_glass_information",
+    "R07_no_lineage_mutation_trigger_yet",
+  ];
+
+  const missingVerifierChecks =
+    verifierChecks.filter((name) => !V.raw.includes(name));
+
+  record(
+    "3B1G:phase verifier carries the five corrected grant checks",
+    missingVerifierChecks.length === 0,
+    missingVerifierChecks.length === 0
+      ? "all five rows present"
+      : "missing: " + missingVerifierChecks.join(", ")
+  );
+
+  record(
+    "3B1G:owner-inclusive legacy R03 is removed",
+    !V.raw.includes("R03_lineage_append_only_grants"),
+    V.raw.includes("R03_lineage_append_only_grants")
+      ? "old owner-inclusive check remains"
+      : "withdrawn check absent"
+  );
+
+  record(
+    "3B1G:phase verifier expects Migration G history",
+    V.raw.includes("20260723000400"),
+    V.raw.includes("20260723000400")
+      ? "Migration G history is asserted"
+      : "Migration G missing from history proof"
+  );
+
+  const mutatesLineage =
+    /\bupdate\s+public\.lead_assignment_events\b/.test(B1.exec) ||
+    /\bdelete\s+from\s+public\.lead_assignment_events\b/.test(B1.exec) ||
+    /\btruncate\s+(?:table\s+)?public\.lead_assignment_events\b/.test(B1.exec);
+
+  record(
+    "3B1G:B1 canonical routines contain no executable lineage mutation",
+    !mutatesLineage,
+    mutatesLineage
+      ? "UPDATE/DELETE/TRUNCATE lineage mutation found"
+      : "append-only writes remain INSERT-only"
+  );
+
+  /**
+   * The REAL Migration-G rule set, applied to SQL TEXT.
+   *
+   * QF-MVP-20.3B1G review finding: the first draft tested a private helper that
+   * took hand-written privilege arrays and was never applied to Migration G.
+   * Deleting it would have changed nothing about the validation, so fixtures
+   * A-H proved nothing. This evaluator replaces it and is LOAD-BEARING: the
+   * real Migration G is graded by it below, and every fixture exercises the
+   * same code path. A regression in any rule breaks both at once.
+   *
+   * Returns an array of findings; empty means compliant.
+   */
+  function evaluateGrantMigration(rawSql, label) {
+    const tok = tokenize(rawSql, label);
+    /* Structural view: comments, string literals and bodies removed. */
+    const code = norm(tok.code);
+    /* Value view: comments removed, string LITERALS preserved, so an assertion
+     * about a written value such as 'service_role' can actually be seen. */
+    const values = norm(stripComments(rawSql, label));
+    const f = [];
+
+    /* Forward-only, REVOKE-only. */
+    if (/\bgrant\b/.test(code)) f.push("contains GRANT");
+    if (/\balter\s+default\s+privileges\b/.test(code)) f.push("ALTER DEFAULT PRIVILEGES");
+
+    /* The CLI already wraps each migration; an inner COMMIT would end its
+     * transaction early and break atomicity with the history-row insert. */
+    if (/(^|\s)begin\s*;/.test(code) || /(^|\s)(commit|rollback)\s*;/.test(code)) {
+      f.push("explicit transaction control");
+    }
+
+    /* Owner/postgres is break-glass, never an application control. */
+    if (/\bfrom\s+postgres\b/.test(code) || /\bowner\s+to\b/.test(code)) {
+      f.push("owner privilege mutation");
+    }
+
+    /* No schema or data mutation. */
+    if (/\b(create|alter)\s+(table|function|trigger|policy|view|index|materialized)\b/.test(code)) {
+      f.push("schema mutation");
+    }
+    if (/\b(insert\s+into|delete\s+from|merge\s+into|copy\s+)/.test(code)) f.push("data mutation");
+    /* Anchored to a statement start. `grant update on ...` and
+     * `revoke update, delete, ...` name the PRIVILEGE, not a statement. */
+    if (/(^|;)\s*update\s+[a-z_"]/.test(code)) f.push("UPDATE statement");
+
+    /* TRUNCATE the STATEMENT is forbidden; TRUNCATE the PRIVILEGE in a REVOKE
+     * list is required. The statement form is always followed by an optional
+     * TABLE/ONLY keyword and then an identifier, never by a comma. */
+    if (/(^|;)\s*truncate\s+(?:table\s+)?(?:only\s+)?(?:public\.)?[a-z_"]/.test(code)) {
+      f.push("TRUNCATE statement");
+    }
+
+    /* The two required revokes. */
+    if (!/revoke all privileges on table public\.lead_assignment_events from public, anon, authenticated/.test(code)) {
+      f.push("missing untrusted REVOKE ALL");
+    }
+    if (!/revoke update, delete, truncate, references, trigger, maintain on table public\.lead_assignment_events from service_role/.test(code)) {
+      f.push("missing service_role forbidden REVOKE");
+    }
+
+    /* PUBLIC cannot be proven absent via information_schema.role_table_grants:
+     * that view omits grants made to PUBLIC. */
+    if (/role_table_grants/.test(values)) f.push("PUBLIC proof uses role_table_grants");
+
+    /* service_role must keep SELECT and INSERT, proven by effective privilege. */
+    if (!/has_table_privilege\( *'service_role', *'public\.lead_assignment_events', *'select' *\)/.test(values)) {
+      f.push("missing service_role SELECT proof");
+    }
+    if (!/has_table_privilege\( *'service_role', *'public\.lead_assignment_events', *'insert' *\)/.test(values)) {
+      f.push("missing service_role INSERT proof");
+    }
+
+    return f;
+  }
+
+  /* LOAD-BEARING LINK: the real Migration G is graded by the same evaluator
+   * the fixtures exercise. */
+  const gFindings = evaluateGrantMigration(G.raw, "migration-G");
+  record(
+    "3B1G:real Migration G satisfies every grant-posture rule",
+    gFindings.length === 0,
+    gFindings.length === 0 ? "0 findings" : "findings: " + gFindings.join("; ")
+  );
+
+  /* A compliant Migration-G skeleton, reused as the base for each fixture so a
+   * fixture differs from a PASSING migration by exactly one defect. */
+  const G_OK = `
+    do $pre$
+    begin
+      if not has_table_privilege('service_role','public.lead_assignment_events','SELECT') then
+        raise exception 'no select';
+      end if;
+      if not has_table_privilege('service_role','public.lead_assignment_events','INSERT') then
+        raise exception 'no insert';
+      end if;
+    end
+    $pre$;
+
+    revoke all privileges
+    on table public.lead_assignment_events
+    from public, anon, authenticated;
+
+    revoke update, delete, truncate, references, trigger, maintain
+    on table public.lead_assignment_events
+    from service_role;
+  `;
+
+  const grantFixtures = [
+    ["A", "compliant migration (TRUNCATE privilege in a REVOKE list is not a TRUNCATE statement)",
+      G_OK, []],
+    ["B", "a GRANT is rejected",
+      G_OK + "\ngrant update on table public.lead_assignment_events to service_role;", ["contains GRANT"]],
+    ["C", "missing service_role forbidden REVOKE is rejected",
+      G_OK.replace(/revoke update, delete, truncate, references, trigger, maintain[\s\S]*?from service_role;/, ""),
+      ["missing service_role forbidden REVOKE"]],
+    ["D", "missing untrusted REVOKE ALL is rejected",
+      G_OK.replace(/revoke all privileges[\s\S]*?from public, anon, authenticated;/, ""),
+      ["missing untrusted REVOKE ALL"]],
+    ["E", "ALTER DEFAULT PRIVILEGES is rejected",
+      G_OK + "\nalter default privileges in schema public grant select on tables to anon;",
+      ["contains GRANT", "ALTER DEFAULT PRIVILEGES"]],
+    ["F", "revoking from the owner is rejected",
+      G_OK + "\nrevoke all privileges on table public.lead_assignment_events from postgres;",
+      ["owner privilege mutation"]],
+    ["G", "an explicit begin/commit wrapper is rejected",
+      "begin;\n" + G_OK + "\ncommit;", ["explicit transaction control"]],
+    ["H", "a real TRUNCATE statement is rejected",
+      G_OK + "\ntruncate table public.lead_assignment_events;", ["TRUNCATE statement"]],
+  ];
+
+  for (const [id, name, sql, expected] of grantFixtures) {
+    let actual;
+    try {
+      actual = evaluateGrantMigration(sql, `fixture-${id}`);
+    } catch (err) {
+      actual = [`tokenizer threw: ${err.message}`];
+    }
+    const ok =
+      actual.length === expected.length &&
+      expected.every((e) => actual.includes(e));
+    record(
+      `3B1G:fixture ${id} — ${name}`,
+      ok,
+      ok
+        ? (expected.length === 0 ? "compliant, as required" : `rejected for: ${actual.join("; ")}`)
+        : `expected [${expected.join("; ")}], got [${actual.join("; ")}]`
+    );
+  }
+
+  function sourceIsLineageSafe(sql) {
+    const tokenized = tokenize(sql, "3B1G-source-fixture");
+    const executable = norm(
+      tokenized.code +
+      " " +
+      tokenized.bodies
+        .map((body) => tokenize(body, "3B1G-source-fixture").code)
+        .join(" ")
+    );
+
+    return !(
+      /\bupdate\s+public\.lead_assignment_events\b/.test(executable) ||
+      /\bdelete\s+from\s+public\.lead_assignment_events\b/.test(executable) ||
+      /\btruncate\s+(?:table\s+)?public\.lead_assignment_events\b/.test(executable)
+    );
+  }
+
+  const fixtureI =
+    sourceIsLineageSafe(
+      "create function f() returns void language plpgsql as $$ begin update public.lead_assignment_events set event_type = 'x'; end $$;"
+    );
+
+  record(
+    "3B1G:fixture I — executable lineage UPDATE fails",
+    fixtureI === false,
+    fixtureI ? "mutation escaped detection" : "mutation detected"
+  );
+
+  const fixtureJ =
+    sourceIsLineageSafe(
+      "create function f() returns int language plpgsql as $$ begin -- UPDATE public.lead_assignment_events\n /* DELETE FROM public.lead_assignment_events */ return 1; end $$;"
+    );
+
+  record(
+    "3B1G:fixture J — comment-only mutation words pass",
+    fixtureJ === true,
+    fixtureJ ? "comments excluded from executable source" : "comment caused false failure"
+  );
+}
+
 /* ------------------------------------------------------------------------- */
 /* 10. Phase verifier must be SELECT-only                                     */
 /* ------------------------------------------------------------------------- */
@@ -1204,7 +1526,12 @@ for (const f of MIGRATIONS) {
   );
 
   /* Production-specific counts must never be universal expectations. */
-  const hardcoded46 = /\b46\b/.test(V.code);
+  /* QF-MVP-20.3B1G review finding: a check row's SEQUENCE NUMBER is a row
+   * ordinal, not an expectation value. Migration G's verifier rows reach seq 46,
+   * which collided with this guard and produced a false failure. Strip the
+   * "select <n>," ordinal prefix first, so only real expectation values count. */
+  const verifierExpectations = V.code.replace(/select\s+\d+\s*(?:as\s+seq\s*)?,/g, "select ,");
+  const hardcoded46 = /\b46\b/.test(verifierExpectations);
   record(
     "verifier:no production-specific count as a universal expectation",
     !hardcoded46,
@@ -1250,7 +1577,7 @@ function report() {
   }
   console.log("=".repeat(78));
   console.log("SHA256");
-  for (const key of ["A", "A2", "B1", "VERIFIER"]) {
+  for (const key of ["A", "A2", "B1", "G", "VERIFIER"]) {
     if (files[key]) console.log(`  ${files[key].sha256}  ${files[key].rel}`);
   }
   console.log("=".repeat(78));

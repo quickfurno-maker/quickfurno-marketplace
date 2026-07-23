@@ -192,6 +192,19 @@ T68 exists because neither a dry-run nor an offline validator can execute a `DO`
 
 T69 generalises the finding: on Supabase, "grant only what you need" is not sufficient, because the platform has already granted everything. T70 is the behavioural backstop for the invariant that failed.
 
+## QF-MVP-20.3B1G additions — grant repair (binding)
+
+Migration **G** `20260723000400` is authored and reviewed but **not applied**. It is the mechanism that will satisfy **T69** and the privilege half of **T70**.
+
+| # | Test | Type | Setup | Assertion |
+|---|---|---|---|---|
+| **T71** | Migration G applies as exactly one pending migration | migration rehearsal | staging at baseline + A + A2 + B1 | `migration list --linked` shows 5 local / 4 remote / **exactly one pending**; dry-run proposes only `20260723000400`; `db push` exits 0; history gains exactly one row |
+| **T72** | Post-G lineage privilege posture is exact | grant | after G applies | `has_table_privilege` is **false** for `public`, `anon` and `authenticated` across all eight privileges; **false** for `service_role` on `UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN`; **true** for `service_role` on `SELECT` and `INSERT`. Effective checks only — `information_schema.role_table_grants` omits PUBLIC grants and must never be the proof |
+| **T73** | Migration G is idempotent | migration rehearsal | apply G, then replay its statements against an already-repaired database | the pre-check still passes (service_role retains SELECT/INSERT), the revokes are no-ops, and the post-check still passes; no privilege is lost that the contract requires |
+| **T74** | G does not disturb the other new tables | grant | before/after G | privileges on `assignment_operations`, `replacement_requests`, `credit_restoration_approvals` and `communication_intents` are **byte-identical**; G touches only the lineage table |
+
+**T70 remains only half-satisfied after G.** G closes the privilege boundary; the trigger backstop is still Migration B2. `service_role` bypasses RLS, so RLS can never satisfy T70 on its own.
+
 ## Gate
 
 20.3B is complete only when **T1–T19, T21, T22 pass on staging**, the catalog delta matches, and the corrected verification artifact (updated for the new objects) returns all-PASS. **T20 runs only inside the dedicated Auth window.** The 20.3A1 additions (T23–T32), the 20.3A1R lineage additions (**T33–T42**), the 20.3B1 migration-rehearsal additions (**T43–T48**) and the 20.3B1R authority-contract additions (**T49–T67**) are equally binding; **T34, T35, T37 and T42 are the regression guards** against reintroducing lead/vendor uniqueness on the event table, **T48** is the guard against B1 absorbing B2's enforcement, and **T51, T52, T56** are the guards against regressing to key-only idempotency.

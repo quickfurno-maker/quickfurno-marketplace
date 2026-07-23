@@ -2,6 +2,8 @@
 
 ## STATUS: `B1_APPLIED_VERIFICATION_FAILED_REQUIRES_REVIEW`
 
+> **REPAIR AUTHORED — QF-MVP-20.3B1G.** This document remains the historical record and is not rewritten. The `R03_lineage_append_only_grants` failure analysed in §14 is addressed by forward Migration **G** `20260723000400` (`91544524…`), which is authored, independently reviewed and **not yet applied**. Line-by-line review of that repair found four defects in it — an explicit transaction wrapper, PUBLIC proofs built on a view that omits PUBLIC grants, vacuous validator fixtures, and a false-passing validator premise — all corrected before commit. The phase verifier is now **62 checks**. See [`QF-MVP-20-3B1G-LINEAGE-GRANT-REPAIR.md`](QF-MVP-20-3B1G-LINEAGE-GRANT-REPAIR.md). Next: **QF-MVP-20.3B1G-A**.
+
 **Migration B1 applied successfully (exit 0). The phase verifier returned 57 PASS / 1 FAIL.**
 
 The single failure is **not** a B1 defect and **not** a repeat of the QF-MVP-20.3B1A failure. It is a genuine, correctly-detected **privilege gap originating in Migration A**, which is already applied and immutable: `lead_assignment_events` was declared append-only, but Supabase's platform default privileges granted `UPDATE`/`DELETE` on it to `postgres` and `service_role`, and Migration A never revoked them.

@@ -22,6 +22,13 @@ The deterministic generator, validator, grant manifest, baseline SQL, and verifi
 - **Rollback:** staging is empty → drop-and-recreate staging (or `drop schema public cascade` on staging only); never production.
 - **Remaining application prerequisites:** confirm target ref `uckafzuochmbvtiodmcl`; preflight requires an empty project + managed prereqs; recreate the `auth.users` new-user trigger separately (not in the public dump); add authenticated dashboard grants as forward remediation; all rows of the verify SQL must be `PASS` in 20.2C.
 
+## 20.2C2 application record — APPLIED; VERIFICATION `FAILED_REQUIRES_REVIEW`
+
+- **Baseline application: SUCCEEDED.** Single `npx supabase db push --linked` to staging `uckafzuochmbvtiodmcl`, **exit 0**; one history row `20260722000100` / `qf_mvp_staging_baseline_269c9265` (821 statements). No reset, repair, seed, retry, or manual patch. Production never accessed.
+- **Verification: 24 PASS / 6 FAIL → phase NOT complete.** The 6 failures are expectation defects in the verification artifact (function identity form `argname type`; index counts including constraint-backed indexes), not schema defects — the applied schema matches the reviewed inventory (62 tables / 62 RLS / 67 policies / 62 PK / 69 FK / 15 UNIQUE / 169 CHECK / 0 triggers / 40 functions = 39 QF + 1 managed / 180 standalone indexes / 32 standalone unique).
+- **Staging left applied** (not reset) with zero application data; advisors not yet read.
+- **Follow-up required:** correct the verification artifact expectations, re-run to all-PASS, then collect advisors. Details: [`QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md`](QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md).
+
 ## 1. Sanitization rules (applied when generating the baseline SQL in 20.2B)
 
 1. **Ownership:** strip every `OWNER TO "postgres"` (101×) / `pg_database_owner`; regenerate ownership for the staging migration role. Ownership is **explicitly generated for staging**, never copied.

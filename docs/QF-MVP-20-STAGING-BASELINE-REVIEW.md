@@ -121,6 +121,16 @@ The application preflight ran (SELECT-only staging access + `db push --dry-run`;
 - `migration list --linked`: local **1** (`20260722000100`) / remote **0**. Dry-run proposes **exactly one** migration; no seed/edge/reset/repair/config/prod.
 - Staging remained EMPTY (re-verified post-dry-run); no baseline applied.
 
+## 15c. QF-MVP-20.2C2 application result — `FAILED_REQUIRES_REVIEW`
+
+The baseline was **applied to staging** (`uckafzuochmbvtiodmcl`) via a single `npx supabase db push --linked`, **exit code 0**, creating **one** migration-history row (`20260722000100` / `qf_mvp_staging_baseline_269c9265`, 821 statements). Full record: [`QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md`](QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md).
+
+**Verification returned 24 PASS / 6 FAIL**, so the phase is **not** complete. All six failures are **expectation defects in the verification artifact**, not schema defects:
+- `03a/03b/03d/04` — `pg_get_function_identity_arguments()` returns `argname type` (e.g. `p_vendor_id uuid`), but `expected_fn` encodes **type-only** strings; only the 3 zero-arg functions matched. Corroborated correct by `03e_total_public_function_count`=40 PASS and `18_six_assignment_rpcs_exist`=6 PASS.
+- `09b/11` — `pg_indexes`/`indisunique` include **constraint-backed** indexes. Live: 257 total = **180 standalone** + 77 constraint-backed (62 PK + 15 UNIQUE); 109 unique = **32 standalone** + 77. The standalone figures equal the reviewed 180 / 32 exactly.
+
+Everything else verified: 62 tables, 62 RLS, 67 policies, 62 PK, 69 FK, 15 UNIQUE, 169 CHECK, 0 triggers/views/matviews, all tables zero-row, all privilege lockdowns (blockers/credit primitives/`qf_apply_vendor_credit_delta`/anon monetization), providers empty and Meta disabled, one honest history row. Advisors were **not** read (gated on full pass). Correcting the verification artifact is a follow-up task — this phase was not authorized to modify it.
+
 ## 16. QF-MVP-20.2C application prerequisites
 
 1. Confirm target project ref = `uckafzuochmbvtiodmcl` (abort on `yqpgcsduqbxulrlzwzap`).

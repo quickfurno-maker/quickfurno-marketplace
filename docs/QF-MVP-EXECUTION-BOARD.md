@@ -10,20 +10,20 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **QF-MVP-00:** **COMPLETE**
 - **QF-MVP-10:** **COMPLETE** (production SELECT-only reconciliation completed 22 July 2026)
 - **QF-MVP-20:** **IN_PROGRESS**
-- **Completed:** QF-MVP-20.0 — Authority Repair Design · QF-MVP-20.1 — Consumer and Call-Path Audit · QF-MVP-20.2A — Staging Schema Baseline Audit · QF-MVP-20.2B — Generate Reviewed Staging Baseline · QF-MVP-20.2C1 — Staging Application Preflight
-- **Current task:** QF-MVP-20.2C1R — Managed Function Parity Reconciliation
+- **Completed:** QF-MVP-20.0 — Authority Repair Design · QF-MVP-20.1 — Consumer and Call-Path Audit · QF-MVP-20.2A — Staging Schema Baseline Audit · QF-MVP-20.2B — Generate Reviewed Staging Baseline · QF-MVP-20.2C1 — Staging Application Preflight · QF-MVP-20.2C1R — Managed Function Parity Reconciliation
+- **Current task:** **QF-MVP-20.2C2 — FAILED_REQUIRES_REVIEW** (baseline applied; verification 24 PASS / 6 FAIL)
 - **Implementation:** **NOT_STARTED**
-- **Migration:** **NOT_CREATED** (baseline is outside `supabase/migrations/`)
 - **Database remediation:** **NOT_STARTED**
 - **Staging project:** **PROVISIONED** (ref `uckafzuochmbvtiodmcl`)
-- **Staging state:** **EMPTY**
-- **Baseline:** **GENERATED_NOT_APPLIED**
+- **Staging baseline:** **APPLIED** (exit 0) — **verification NOT fully passing**
+- **Staging migration history:** **ONE_BASELINE_ROW** (`20260722000100` / `qf_mvp_staging_baseline_269c9265`)
+- **Staging data:** **EMPTY** (all 62 tables zero rows; `auth.users` = 0)
 - **Baseline SHA256:** `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` (unchanged)
-- **Verification:** **CORRECTED_NOT_EXECUTED** (identity-scoped; SHA256 `e82b757f…`, supersedes `89362a35…`)
-- **Database access:** **NONE**
-- **Database mutation:** **NONE**
+- **Verification SHA256:** `e82b757f…` (unchanged; **6 expectation defects found — correction required**)
 - **Production access:** **NONE**
-- **Next:** QF-MVP-20.2C2 — Apply and Verify Staging Baseline
+- **Production mutation:** **NONE**
+- **Known open prerequisite:** `AUTH_USERS_HANDLE_NEW_USER_TRIGGER`
+- **Next:** correct the verification artifact expectations, re-verify to all-PASS, collect advisors — **then** QF-MVP-20.3A — Marketplace Authority Remediation Migration
 - **Roadmap:** LOCKED
 - **Launch market:** Pune
 - **Meta voice:** excluded
@@ -34,7 +34,7 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 - **Legacy governance:** non-blocking
 
 ## 2. Current active phase
-**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.2C1R — Managed Function Parity Reconciliation** (offline verification-artifact correction; no DB access, no SQL execution, baseline SQL unchanged). Staging is **PROVISIONED and EMPTY**; the reviewed baseline is **GENERATED, NOT APPLIED**; the verification SQL is **CORRECTED (identity-scoped), NOT EXECUTED** (application/verification is 20.2C2).
+**QF-MVP-20 — Marketplace Transaction Engine** — **`IN_PROGRESS`**. **Current task: QF-MVP-20.2C2 — `FAILED_REQUIRES_REVIEW`.** The reviewed baseline **was applied** to staging `uckafzuochmbvtiodmcl` (single `db push --linked`, exit 0, one honest history row, zero application data, production untouched), but the reviewed verification SQL returned **24 PASS / 6 FAIL**, so the phase is **not** complete. All six failures are **expectation defects in the verification artifact** (function-identity format and constraint-backed index counting), not schema defects — the applied schema matches the reviewed inventory. Staging was **not** patched, `db push` was **not** re-run, and no reset/repair occurred.
 
 **QF-MVP-20 subphase status:**
 - **20.0 Authority Repair Design** — `COMPLETE`. Canonical engine, credit authority, replacement, eligibility, public projection, communication boundary, migration plan, acceptance-test matrix in [`QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md`](QF-MVP-20-AUTHORITY-REPAIR-DESIGN.md), [`QF-MVP-20-MIGRATION-PLAN.md`](QF-MVP-20-MIGRATION-PLAN.md), [`QF-MVP-20-ACCEPTANCE-TEST-PLAN.md`](QF-MVP-20-ACCEPTANCE-TEST-PLAN.md).
@@ -46,7 +46,9 @@ Statuses used: `LOCKED` · `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `COMPL
 
 - **20.2C1R Managed function parity reconciliation** — `COMPLETE`. Offline correction of the verification SQL (baseline SQL **unchanged**, SHA256 `920a4aa0…`). Function parity is now **identity-scoped**: an expected-function CTE encodes the exact **39** QuickFurno identities (schema.name + `pg_get_function_identity_arguments`), with `03a` count=39, `03b` missing=0, `04` SECURITY DEFINER scoped=33, `03c` allowed managed `public.rls_auto_enable()`=1, `03d` unexpected=0, and `03e` total public functions=40 (supporting only). Old total-only `=39` check removed; `rls_auto_enable` preserved (not dropped). Offline validator extended to prove all 39 identities are encoded, the managed exception is singular, total=40, SD=33, and the verify SQL is SELECT-only. Verify SQL SHA256 `e82b757f…` supersedes `89362a35…`.
 
-No baseline applied, no staging mutation, no migration-history change, no database access in this task. Next: **QF-MVP-20.2C2 — Apply and Verify Staging Baseline**.
+- **20.2C2 Apply and verify staging baseline** — **`FAILED_REQUIRES_REVIEW`**. Baseline **applied** to staging (single `npx supabase db push --linked`, **exit 0**); migration history holds **one** row `20260722000100` / `qf_mvp_staging_baseline_269c9265` (821 statements); all 62 public tables zero-row; `auth.users` = 0. Verification: **24 PASS / 6 FAIL** → not complete. Failing: `03a` (39→3), `03b` (0→36), `03d` (0→36), `04` (33→3), `09b` (32→109), `11` (180→257) — all **verification-artifact expectation defects**: `pg_get_function_identity_arguments()` returns `argname type` (not type-only), and `pg_indexes`/`indisunique` include constraint-backed indexes (standalone measured **180**/**32**, matching the reviewed inventory). Passing: 62 tables, 62 RLS, 67 policies, 62 PK, 69 FK, 15 UNIQUE, 169 CHECK, 0 triggers/views/matviews, total functions 40 (39 QF + 1 managed), 6 assignment RPCs, all blocker/credit/anon privilege lockdowns, providers empty + Meta disabled, honest single history row. Advisors **not** read (gated on full pass). `auth.users→handle_new_user` trigger **absent** (`OPEN_FORWARD_MIGRATION_PREREQUISITE`). No patch, no re-push, no reset/repair; production never accessed. Record: [`QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md`](QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md).
+
+Next: correct the verification artifact expectations, re-verify to all-PASS, collect advisors, then **QF-MVP-20.3A — Marketplace Authority Remediation Migration**.
 
 ### Previous active phase — QF-MVP-10 (COMPLETE)
 **QF-MVP-10 — Core Architecture and Data Truth** — **`COMPLETE`**. Evidence-based repository + migration map produced (six QF-MVP-10 docs + generated JSON), and the **read-only production reconciliation is executed** (22 July 2026). Access mode: the connection was **not** technically read-only (role `postgres`, `transaction_read_only = off`); read-only behaviour was **process-enforced through an explicit SELECT-only allowlist** under founder approval (`APPROVE SELECT-ONLY PRODUCTION RECONCILIATION. STAGING_NOT_PROVISIONED. NO DATABASE CHANGES.`). No database change, migration application or provider access occurred. Production materially drifts from the repository ledger (**`HISTORY_DRIFT`**: 4 recorded migration-history rows vs 68 repository migrations); an unrecorded version does **not** prove absent objects. Results: [`QF-MVP-10-RECONCILIATION-RESULTS.md`](QF-MVP-10-RECONCILIATION-RESULTS.md).

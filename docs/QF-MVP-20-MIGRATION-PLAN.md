@@ -41,6 +41,11 @@ The reviewed staging baseline SQL is **generated** (offline; not applied) at `su
 
 **Migration-history invariants (unchanged):** production migration history is **not modified**; no fake rows; the 68 repository migrations are **not** replayed and **not** marked applied. The baseline applies (in 20.2C) under **one** controlled identity `qf_mvp_staging_baseline_269c9265`; all QF-MVP-20 remediation is **forward-only** after it. Production HISTORY_DRIFT repair remains a separate, still-open production decision. **20.2C application gate:** target ref must be `uckafzuochmbvtiodmcl` (never `yqpgcsduqbxulrlzwzap`), staging empty (preflight-enforced), verify SQL all `PASS`.
 
+### K.4c Staging baseline APPLIED (QF-MVP-20.2C2) — verification `FAILED_REQUIRES_REVIEW`
+The reviewed baseline was applied to **staging only** (`uckafzuochmbvtiodmcl`) with a single `npx supabase db push --linked` (**exit 0**), creating **one** honest migration-history row: version `20260722000100`, name `qf_mvp_staging_baseline_269c9265` (821 statements). **Production migration history was not touched**; the 68 repository migrations remain unrecorded and unreplayed; no reset/repair/seed/retry occurred.
+
+**Verification: 24 PASS / 6 FAIL** → the phase is **not** complete. The failures are expectation defects in the verification artifact (`pg_get_function_identity_arguments` returns `argname type`; `pg_indexes`/`indisunique` include constraint-backed indexes), not schema defects — standalone indexes measured **180** and standalone unique **32**, matching the reviewed inventory. Correcting the verification artifact and re-running to all-PASS is the gate before **K.5**. See [`QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md`](QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md).
+
 ### K.5 Canonical authority deployment (staging)
 Deploy `qf_assign_lead_vendors_v2` and the canonical credit authority (folding the strong parts of `qf_apply_vendor_credit_delta`, `assign_lead_to_paid_vendors_phase26a`, `assign_lead_to_vendors`) as **`service_role`-execute-only**. Legacy RPCs remain in place (not yet revoked). Deploy the public projection view (§I) unpopulated of grants yet.
 

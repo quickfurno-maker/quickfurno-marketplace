@@ -5,6 +5,11 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
+import {
+  executeCanonicalAssignment,
+  MAX_CANONICAL_CANDIDATE_POOL,
+  type CanonicalAssignmentOutcome,
+} from "./canonicalAssignmentAuthority";
 
 export type DeliveredVendor = {
   vendor_id: string;
@@ -14,11 +19,18 @@ export type DeliveredVendor = {
 };
 
 export type LeadAssignmentDeliveryResult = {
+  /** Canonical authority status: applied | partial | rejected | already_applied | unauthorized. */
   status: string;
   lead_id: string;
   assigned: DeliveredVendor[];
   skipped: string[];
   assigned_count: number;
+  /** Whole-operation reason, or the first per-vendor skip reason on a rejection. */
+  reason_code: string | null;
+  /** `assignment_operations.id` — the audit anchor for this operation. */
+  operation_id: string | null;
+  /** True when the authority replayed an already-committed operation. */
+  already_applied: boolean;
 };
 
 type LeadPreviewRow = {
@@ -42,36 +54,65 @@ type VendorPreviewRow = {
 };
 
 // Phase 4: the matcher passes a bounded RANKED candidate POOL (not just 3) so the
-// RPC can fill until 3 SUCCESSFUL assignments. This is a sanity bound only — the
-// RPC remains the authority that caps SUCCESSFUL assignments at max-3. Must agree
-// with MAX_ASSIGNMENT_CANDIDATE_POOL in services/leadMatchingEngine.ts.
-const MAX_ASSIGNMENT_CANDIDATE_POOL = 20;
+// authority can fill until 3 SUCCESSFUL assignments. This is a sanity bound only —
+// the authority remains the one that caps SUCCESSFUL assignments at max-3. Must
+// agree with MAX_ASSIGNMENT_CANDIDATE_POOL in services/leadMatchingEngine.ts.
+const MAX_ASSIGNMENT_CANDIDATE_POOL = MAX_CANONICAL_CANDIDATE_POOL;
 
+/**
+ * Deterministic operation scope for the automatic auto-match of a lead.
+ * One logical automatic operation per lead: a retry with the same ranked pool
+ * REPLAYS through the authority instead of assigning again.
+ */
+const AUTO_MATCH_OPERATION_SCOPE = "auto_match";
+
+/**
+ * QF-MVP-20.3R1 — automatic auto-match assignment.
+ *
+ * Migrated from the legacy `assign_lead_to_paid_vendors_phase26a` RPC to the sole
+ * canonical authority `qf_assign_lead_vendors_v2` (mode `automatic`, actor
+ * `system`). There is deliberately NO fallback to the legacy RPC and no direct
+ * credit mutation: if the authority rejects or is unavailable, this fails closed.
+ */
 export async function assignLeadToMatchedVendors(leadId: string, vendorIds: string[]): Promise<Result<LeadAssignmentDeliveryResult>> {
   try {
     if (!leadId || vendorIds.length > MAX_ASSIGNMENT_CANDIDATE_POOL) throw appError("VALIDATION");
 
-    const { data, error } = await adminClient().rpc("assign_lead_to_paid_vendors_phase26a", {
-      p_lead_id: leadId,
-      p_vendor_ids: vendorIds,
+    const outcome = await executeCanonicalAssignment({
+      leadId,
+      mode: "automatic",
+      candidateVendorIds: vendorIds,
+      operationScope: AUTO_MATCH_OPERATION_SCOPE,
+      actorKind: "system",
+      actorId: null,
+      reasonCode: "automatic_match",
     });
-    if (error) {
-      if (isMissingRpcError(error)) {
-        return {
-          ok: false,
-          code: "MIGRATION_NOT_APPLIED",
-          error:
-            "assign_lead_to_paid_vendors_phase26a is missing on this database. Apply migration 20260701000027_phase26a_auto_lead_matching_foundation.sql.",
-        };
-      }
-      throw error;
-    }
+    if (!outcome.ok) return outcome;
 
-    const result = normalizeAssignmentResult(data, leadId);
-    return ok(result);
+    return ok(toDeliveryResult(outcome.data));
   } catch (e) {
     return fail(e);
   }
+}
+
+/**
+ * Project the canonical outcome onto this service's delivery shape.
+ *
+ * `credits_before` / `credits_after` are intentionally absent: the canonical
+ * authority never returns wallet balances, and this service must not read or
+ * infer them. Only the wallet ledger is the debit authority.
+ */
+function toDeliveryResult(outcome: CanonicalAssignmentOutcome): LeadAssignmentDeliveryResult {
+  return {
+    status: outcome.status,
+    lead_id: outcome.lead_id,
+    assigned: outcome.assigned.map((row) => ({ vendor_id: row.vendor_id, assignment_id: row.assignment_id })),
+    skipped: outcome.skipped.map((row) => row.vendor_id),
+    assigned_count: outcome.assigned.length,
+    reason_code: outcome.reason_code,
+    operation_id: outcome.operation_id,
+    already_applied: outcome.already_applied,
+  };
 }
 
 export async function deliverLeadToVendorDashboard(
@@ -181,54 +222,4 @@ export async function createClientAssignedVendorsPreview(
   } catch (e) {
     return fail(e);
   }
-}
-
-function normalizeAssignmentResult(value: unknown, fallbackLeadId: string): LeadAssignmentDeliveryResult {
-  const record = isRecord(value) ? value : {};
-  const assigned = Array.isArray(record.assigned)
-    ? record.assigned.flatMap((item) => {
-        if (!isRecord(item)) return [];
-        const vendorId = asText(item.vendor_id);
-        const assignmentId = asText(item.assignment_id);
-        if (!vendorId || !assignmentId) return [];
-        return [{
-          vendor_id: vendorId,
-          assignment_id: assignmentId,
-          credits_before: asNumber(item.credits_before),
-          credits_after: asNumber(item.credits_after),
-        }];
-      })
-    : [];
-
-  const skipped = Array.isArray(record.skipped)
-    ? record.skipped.map(String).filter(Boolean)
-    : [];
-
-  return {
-    status: asText(record.status) ?? "unknown",
-    lead_id: asText(record.lead_id) ?? fallbackLeadId,
-    assigned,
-    skipped,
-    assigned_count: Number(record.assigned_count ?? assigned.length) || assigned.length,
-  };
-}
-
-/** 42883 = Postgres undefined_function; PGRST202 = PostgREST function not in schema cache. */
-function isMissingRpcError(error: { code?: string; message?: string }): boolean {
-  if (error.code === "42883" || error.code === "PGRST202") return true;
-  const message = error.message ?? "";
-  return message.includes("assign_lead_to_paid_vendors_phase26a") && /does not exist|schema cache/i.test(message);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function asNumber(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }

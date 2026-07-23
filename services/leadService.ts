@@ -4,7 +4,11 @@
 // All credit-touching work is delegated to the tested DB RPC.
 // ============================================================================
 import { adminClient, publicClient } from "../lib/supabase";
-import { appError, fromPgError, type Result, ok, fail } from "../lib/errors";
+import { appError, type Result, ok, fail } from "../lib/errors";
+import {
+  executeCanonicalAssignment,
+  blockedClientSelectedAssignment,
+} from "./canonicalAssignmentAuthority";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
@@ -358,27 +362,60 @@ export async function getEligibleVendors(leadId: string): Promise<Result<PublicV
 }
 
 /**
- * Hybrid assignment: client picks 0–3 vendors, the system fills the rest to a
- * hard cap of MAX_VENDORS_PER_LEAD, deducting one credit per assigned vendor —
- * atomically. The DB RPC enforces the same cap via app_settings.
+ * QF-MVP-20.3R1 — assignment through the sole canonical authority.
+ *
+ * Migrated off the legacy `assign_lead_to_vendors` RPC. Two callers exist and
+ * they are treated very differently:
+ *
+ *   • `client_selected` (the default, and the PUBLIC unauthenticated path) is
+ *     FAIL-CLOSED under R1_BLOCKED_PENDING_OWNER_BINDING. The database has no
+ *     trustworthy lead-to-client ownership binding to re-assert, so no vendor is
+ *     assigned and no credit is deducted. This also closes the long-standing
+ *     unauthenticated-assignment gap on `app/actions.ts#assignLead`.
+ *
+ *   • `admin_assigned` runs as canonical mode `admin_manual` with the ADMIN as
+ *     the attributed actor. `adminId` is mandatory — the authority rejects an
+ *     admin actor with a NULL id.
+ *
+ * `allowDuplicate` is gone: no caller may relax the duplicate rule. Duplicates
+ * are settled inside the authority by the UNIQUE (lead_id, vendor_id) index and
+ * reported as a per-vendor `duplicate_assignment` skip. The active-3 and
+ * lifetime-6 caps are the authority's alone.
  */
 export async function assignLeadToVendors(
   leadId: string,
   selectedVendorIds: string[] = [],
-  opts: { allowDuplicate?: boolean; assignmentType?: "client_selected" | "admin_assigned" } = {}
+  opts: { assignmentType?: "client_selected" | "admin_assigned"; adminId?: string } = {}
 ): Promise<Result<AssignResult>> {
   try {
     if (selectedVendorIds.length > MAX_VENDORS_PER_LEAD) throw appError("MAX_VENDORS_EXCEEDED");
 
-    const { data, error } = await adminClient().rpc("assign_lead_to_vendors", {
-      p_lead_id: leadId,
-      p_selected_vendor_ids: selectedVendorIds,
-      p_allow_duplicate: opts.allowDuplicate ?? false,
-      p_selected_type: opts.assignmentType ?? "client_selected",
-    });
-    if (error) throw fromPgError(error);
+    const assignmentType = opts.assignmentType ?? "client_selected";
+    if (assignmentType !== "admin_assigned") {
+      return blockedClientSelectedAssignment<AssignResult>();
+    }
 
-    return ok(data as AssignResult);
+    const outcome = await executeCanonicalAssignment({
+      leadId,
+      mode: "admin_manual",
+      candidateVendorIds: selectedVendorIds,
+      operationScope: "admin_assign_lead",
+      actorKind: "admin",
+      actorId: opts.adminId ?? null,
+      reasonCode: "admin_assigned",
+    });
+    if (!outcome.ok) return outcome;
+
+    return ok({
+      status: outcome.data.status,
+      lead_id: outcome.data.lead_id,
+      assigned: outcome.data.assigned_vendor_ids,
+      skipped: outcome.data.skipped_vendor_ids,
+      assigned_count: outcome.data.assigned.length,
+      operation_id: outcome.data.operation_id,
+      reason_code: outcome.data.reason_code,
+      already_applied: outcome.data.already_applied,
+    });
   } catch (e) {
     return fail(e);
   }

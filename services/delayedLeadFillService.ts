@@ -15,19 +15,31 @@
 //     credits; after 1 hour, assign the preferred vendor if they recharged/became
 //     eligible, otherwise fill with better matching eligible vendors.
 //
-// Credits are NEVER touched here directly. Assignment + deduction run through the
-// tested DB RPCs (assign_lead_to_preferred_vendor for the preferred vendor;
-// admin_smart_assign_lead_to_vendors for the fill — it re-validates city +
-// approved + active + package + credits HARD, skips duplicates, and clamps the
-// lead to 3 total). Category matching uses the shared categoryMatching helper.
-// WhatsApp stays preview/log only. Nothing here throws to the caller.
+// Credits are NEVER touched here directly.
+//
+// QF-MVP-20.3R1:
+//   * The system FILL runs through the sole canonical authority
+//     `qf_assign_lead_vendors_v2` (mode `delayed_fill`, actor `worker`), which
+//     owns the active-3 / lifetime-6 caps, re-validates eligibility, skips
+//     duplicates and debits exactly 1 wallet credit per assignment. No ceiling
+//     is passed by this service and no legacy RPC is used as a fallback.
+//   * The PREFERRED-vendor recharge re-assignment is a CLIENT-SELECTED
+//     assignment and is therefore FAIL-CLOSED under
+//     R1_BLOCKED_PENDING_OWNER_BINDING. The lead is still filled with system
+//     vendors; nothing is assigned to the preferred vendor and no credit moves.
+//
+// Category matching uses the shared categoryMatching helper. WhatsApp stays
+// preview/log only. Nothing here throws to the caller.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { fail, ok, isMissingRelationError, type Result } from "../lib/errors";
 import { NORMAL_PRIMARY_VENDOR_LIMIT, MANUAL_INTERIOR_FALLBACK_ENABLED } from "../lib/config";
 import {
+  executeCanonicalAssignment,
+  R1_BLOCKED_PENDING_OWNER_BINDING,
+} from "./canonicalAssignmentAuthority";
+import {
   evaluateVendorLeadAssignmentEligibility,
-  evaluateClientSelectedVendorEligibility,
 } from "../lib/vendors/vendorEligibility";
 import {
   isExactLeadVendorSubcategoryMatch,
@@ -295,7 +307,7 @@ async function processOneDelayedFillRow(row: Record<string, unknown>): Promise<D
       };
     }
 
-    const assign = await callSmartAssignRpc(leadId, candidateIds, NORMAL_PRIMARY_VENDOR_LIMIT);
+    const assign = await callCanonicalDelayedFill(leadId, candidateIds);
     if (!assign.ok) {
       if (assign.code === "DUPLICATE_LEAD" || assign.code === "LEAD_NOT_FOUND") {
         await resolveQueueRow(queueId, `delayed_fill_${assign.code.toLowerCase()}_admin_review`);
@@ -413,57 +425,46 @@ async function loadAssignedVendorIds(leadId: string): Promise<Set<string>> {
   return new Set((data ?? []).map((r: { vendor_id?: string | null }) => String(r.vendor_id ?? "")).filter(Boolean));
 }
 
-/** Re-check the preferred vendor and, if now eligible, assign + deduct one credit. */
+/**
+ * QF-MVP-20.3R1 — preferred-vendor re-assignment is FAIL-CLOSED.
+ *
+ * Re-assigning the client's chosen vendor is a CLIENT-SELECTED assignment. The
+ * canonical authority rejects that mode because the database has no trustworthy
+ * lead-to-client ownership binding to re-assert (R1_BLOCKED_PENDING_OWNER_BINDING
+ * — see services/canonicalAssignmentAuthority.ts). This function therefore
+ * performs NO assignment, NO credit deduction, NO ledger write and NO database
+ * round-trip at all; the caller continues with the system fill instead.
+ */
 async function tryAssignPreferredVendor(leadId: string, vendorId: string): Promise<{ assigned: boolean; reason: string }> {
-  const { data: vendor, error } = await adminClient().from("vendors").select("*").eq("id", vendorId).maybeSingle();
-  if (error || !vendor) return { assigned: false, reason: "vendor_not_found" };
-
-  // Client-selected eligibility: credit-based (active package NOT required).
-  const eligibility = evaluateClientSelectedVendorEligibility(vendor as Record<string, unknown>);
-  if (!eligibility.eligible) return { assigned: false, reason: eligibility.reasonCode ?? "not_eligible" };
-
-  const { data, error: rpcError } = await adminClient().rpc("assign_lead_to_preferred_vendor", {
-    p_lead_id: leadId,
-    p_vendor_id: vendorId,
+  console.warn("[delayed fill] preferred re-assignment blocked pending owner binding", {
+    lead_id: leadId,
+    vendor_id: vendorId,
+    reason: R1_BLOCKED_PENDING_OWNER_BINDING,
   });
-  if (rpcError) {
-    console.warn("[delayed fill] preferred re-assign RPC failed", { message: rpcError.message });
-    return { assigned: false, reason: "rpc_error" };
-  }
-  const record = (data ?? {}) as Record<string, unknown>;
-  const status = typeof record.status === "string" ? record.status : "";
-  const assigned = record.assigned === true && (status === "assigned_to_preferred_vendor" || status === "already_assigned");
-  return { assigned, reason: status || "unknown" };
+  return { assigned: false, reason: R1_BLOCKED_PENDING_OWNER_BINDING };
 }
 
 type SmartAssignData = { assigned: string[]; skipped: string[] };
 
-/** Wrap admin_smart_assign_lead_to_vendors; surface its raised error codes. */
-async function callSmartAssignRpc(leadId: string, vendorIds: string[], totalLimit: number): Promise<Result<SmartAssignData>> {
-  try {
-    const { data, error } = await adminClient().rpc("admin_smart_assign_lead_to_vendors", {
-      p_lead_id: leadId,
-      p_vendor_ids: vendorIds,
-      p_allow_duplicate: false,
-      p_total_limit: totalLimit,
-    });
-    if (error) {
-      const message = error.message ?? "";
-      if ((error as { code?: string }).code === "42883" || /schema cache|could not find the function/i.test(message)) {
-        return { ok: false, code: "MIGRATION_NOT_APPLIED", error: "admin_smart_assign_lead_to_vendors is missing. Apply migration 20260701000031." };
-      }
-      const known = ["DUPLICATE_LEAD", "LEAD_NOT_FOUND", "LEAD_ALREADY_ASSIGNED"].find((k) => message.includes(k));
-      if (known) return { ok: false, code: known, error: message };
-      return { ok: false, code: "RPC_ERROR", error: message || "Fill assignment failed." };
-    }
-    const record = (data ?? {}) as Record<string, unknown>;
-    return ok({
-      assigned: Array.isArray(record.assigned) ? record.assigned.map(String) : [],
-      skipped: Array.isArray(record.skipped) ? record.skipped.map(String) : [],
-    });
-  } catch (e) {
-    return fail(e);
-  }
+/**
+ * QF-MVP-20.3R1 — system fill through the canonical authority.
+ *
+ * Takes NO limit argument: active-3 / lifetime-6 belong to the authority. Fails
+ * closed; there is no fallback to `admin_smart_assign_lead_to_vendors`.
+ */
+async function callCanonicalDelayedFill(leadId: string, vendorIds: string[]): Promise<Result<SmartAssignData>> {
+  const outcome = await executeCanonicalAssignment({
+    leadId,
+    mode: "delayed_fill",
+    candidateVendorIds: vendorIds,
+    operationScope: "delayed_fill",
+    actorKind: "worker",
+    actorId: null,
+    reasonCode: "delayed_fill",
+  });
+  if (!outcome.ok) return outcome;
+
+  return ok({ assigned: outcome.data.assigned_vendor_ids, skipped: outcome.data.skipped_vendor_ids });
 }
 
 /** Dashboard delivery + WhatsApp preview (log only) + vendor notification. */

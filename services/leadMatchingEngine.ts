@@ -209,14 +209,19 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
 
     const assigned = assignment.data.assigned.slice(0, MAX_VENDOR_MATCHES);
 
-    // Concurrent-retry safety (Phase 3B correction): the RPC returns
-    // status = "already_assigned" when this lead's assignments already exist (its
-    // idempotent short-circuit / a race with another retry). Those assignments —
-    // and their delivery/preview logs — were already created by the original run,
-    // so DO NOT recreate delivery side effects (dashboard / whatsapp_preview /
-    // client preview). Record a truthful terminal run and return the EXISTING
-    // assigned vendors. Ranking, selection, max-3, the RPC, and credits are unchanged.
-    if (assignment.data.status === "already_assigned") {
+    // Concurrent-retry safety (Phase 3B correction): the assignment boundary
+    // reports a replay when this lead's assignments already exist (its idempotent
+    // short-circuit / a race with another retry). Those assignments — and their
+    // delivery/preview logs — were already created by the original run, so DO NOT
+    // recreate delivery side effects (dashboard / whatsapp_preview / client
+    // preview). Record a truthful terminal run and return the EXISTING assigned
+    // vendors. Ranking, selection, max-3 and credits are unchanged.
+    //
+    // QF-MVP-20.3R1: the canonical authority reports a replay as
+    // status = "already_applied" (plus already_applied = true). The legacy
+    // "already_assigned" literal is still accepted so an injected test boundary
+    // and any in-flight legacy payload keep the same safe behaviour.
+    if (assignment.data.status === "already_assigned" || assignment.data.already_applied === true) {
       await updateMatchingRun(runId, {
         run_status: "matched",
         eligible_vendor_count: eligible.length,

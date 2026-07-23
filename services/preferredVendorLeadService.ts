@@ -10,18 +10,25 @@
 //     paid_status, or category/area. Only the essentials gate it: status is
 //     approved/active (case-insensitive), verification is not rejected/pending/
 //     failed/unverified, is_active (default true), and remaining_credits > 0.
-//   * if eligible → assigns ONLY that vendor and deducts one credit via the atomic
-//     assign_lead_to_preferred_vendor RPC, then delivers the dashboard +
-//     WhatsApp-preview + client-preview logs (WhatsApp stays preview/log only)
 //   * if no credits → assigns nothing, deducts nothing, shares NO client contact,
 //     notifies the vendor to recharge, and queues the delayed fallback (Phase 2)
 //   * if not approved/verified/active → assigns nothing and marks for admin review
 //   * NEVER fans out to other vendors here (delayed fill is Phase 2)
 //
+// QF-MVP-20.3R1 — DIRECT PREFERRED-VENDOR ASSIGNMENT IS FAIL-CLOSED.
+// Assigning the vendor a CLIENT picked is a client-selected assignment, and the
+// canonical authority rejects that mode until the schema carries a trustworthy
+// lead-to-client ownership binding (R1_BLOCKED_PENDING_OWNER_BINDING). The
+// legacy `assign_lead_to_preferred_vendor` RPC is no longer called and is not a
+// fallback. A commercially eligible pick now resolves to
+// `preferred_vendor_pending` with NO assignment, NO credit deduction and NO
+// client contact shared, and the lead is queued for the delayed SYSTEM fill.
+//
 // It never throws: every failure resolves to a safe result so lead submission is
-// never blocked. Credits are only ever touched by the tested DB RPC/primitives.
+// never blocked. Credits are only ever touched by the canonical authority.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
+import { R1_BLOCKED_PENDING_OWNER_BINDING } from "./canonicalAssignmentAuthority";
 import { normalizeCredits } from "../lib/vendors/vendorEligibility";
 import {
   createClientAssignedVendorsPreview,
@@ -192,8 +199,25 @@ export async function routePreferredVendorLead(
       return result("preferred_vendor_not_eligible", false, vendorId, vendorName, eligibility.blockReason);
     }
 
-    // Eligible → atomic single-vendor assignment + one credit deduction.
+    // Commercially eligible, but assignment authority is a separate question.
     const assign = await callAssignPreferredVendorRpc(input.leadId, vendorId);
+
+    if (assign.status === R1_BLOCKED_PENDING_OWNER_BINDING) {
+      // Fail-closed: nothing assigned, no credit, no contact shared. The lead is
+      // saved and queued so the delayed SYSTEM fill (canonical `delayed_fill`
+      // mode) can still connect the client with verified vendors.
+      const queued = await queueDelayedFillSafe(input, vendorId, false);
+      await markLeadPreferred(input, "preferred_vendor_pending", R1_BLOCKED_PENDING_OWNER_BINDING, vendorName);
+      return result(
+        "preferred_vendor_pending",
+        false,
+        vendorId,
+        vendorName,
+        R1_BLOCKED_PENDING_OWNER_BINDING,
+        false,
+        queued,
+      );
+    }
 
     if (assign.status === "assigned_to_preferred_vendor" || assign.status === "already_assigned") {
       await deliverPreferredAssignment(input.leadId, vendorId, vendorName);
@@ -252,27 +276,32 @@ export async function holdPreferredVendorForQualityGate(
 
 type RpcResult = { status: string; assigned: boolean; reason: string | null; assignment_id: string | null };
 
+/**
+ * QF-MVP-20.3R1 — direct assignment to a client-picked vendor is FAIL-CLOSED.
+ *
+ * This is the archetypal CLIENT-SELECTED assignment: the client, not the system
+ * and not an admin, chose the vendor. The canonical authority
+ * `qf_assign_lead_vendors_v2` rejects that mode because the database has no
+ * trustworthy lead-to-client ownership binding to re-assert, and phone equality
+ * is not accepted as ownership authority (R1_BLOCKED_PENDING_OWNER_BINDING —
+ * see services/canonicalAssignmentAuthority.ts for the exact prerequisite).
+ *
+ * The legacy `assign_lead_to_preferred_vendor` RPC is NOT called and is not
+ * available as a fallback. Nothing is assigned, no credit is deducted, no
+ * ledger row is written and no client contact is shared. The lead itself is
+ * already captured and is queued for the delayed system fill by the caller.
+ */
 async function callAssignPreferredVendorRpc(leadId: string, vendorId: string): Promise<RpcResult> {
-  const { data, error } = await adminClient().rpc("assign_lead_to_preferred_vendor", {
-    p_lead_id: leadId,
-    p_vendor_id: vendorId,
+  console.warn("[preferred vendor] direct assignment blocked pending owner binding", {
+    lead_id: leadId,
+    vendor_id: vendorId,
+    reason: R1_BLOCKED_PENDING_OWNER_BINDING,
   });
-  if (error) {
-    const missing = (error as { code?: string }).code === "42883"
-      || (error as { code?: string }).code === "PGRST202"
-      || /schema cache|could not find the function|does not exist/i.test(error.message ?? "");
-    if (missing) {
-      console.warn(`[preferred vendor] assign RPC missing. ${PREFERRED_VENDOR_MIGRATION_HINT}`);
-      return { status: "migration_not_applied", assigned: false, reason: "migration_not_applied", assignment_id: null };
-    }
-    return { status: "failed", assigned: false, reason: error.message ?? "rpc_error", assignment_id: null };
-  }
-  const record = (data ?? {}) as Record<string, unknown>;
   return {
-    status: typeof record.status === "string" ? record.status : "failed",
-    assigned: record.assigned === true,
-    reason: typeof record.reason === "string" ? record.reason : null,
-    assignment_id: typeof record.assignment_id === "string" ? record.assignment_id : null,
+    status: R1_BLOCKED_PENDING_OWNER_BINDING,
+    assigned: false,
+    reason: R1_BLOCKED_PENDING_OWNER_BINDING,
+    assignment_id: null,
   };
 }
 

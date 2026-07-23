@@ -33,7 +33,7 @@ export interface LeadAssignmentExecutionResult {
 
 /**
  * The standard-route assignment execution port. The real adapter wraps the
- * existing `assignLeadToMatchedVendors` (RPC `assign_lead_to_paid_vendors_phase26a`)
+ * existing `assignLeadToMatchedVendors` (canonical authority `qf_assign_lead_vendors_v2`)
  * and reuses its credit / package / assignment-insert / lead-lock logic verbatim.
  */
 export interface LeadDistributionAssignmentPort {

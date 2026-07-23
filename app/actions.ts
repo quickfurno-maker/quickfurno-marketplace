@@ -164,8 +164,18 @@ export async function fetchEligibleVendors(leadId: string) {
   return leads.getEligibleVendors(leadId);
 }
 
+/**
+ * QF-MVP-20.3R1 — PUBLIC (no auth) client-selected assignment is FAIL-CLOSED.
+ *
+ * This action is unauthenticated, so it can only ever have asserted lead
+ * ownership from untrusted caller input. The canonical assignment authority
+ * refuses `client_selected` mode until the schema carries a trustworthy
+ * lead-to-client ownership binding (R1_BLOCKED_PENDING_OWNER_BINDING), and this
+ * action must NOT fall back to any legacy assignment RPC. It therefore assigns
+ * nothing and deducts no credit.
+ */
 export async function assignLead(leadId: string, selectedVendorIds: string[]) {
-  return leads.assignLeadToVendors(leadId, selectedVendorIds);
+  return leads.assignLeadToVendors(leadId, selectedVendorIds, { assignmentType: "client_selected" });
 }
 
 /**
@@ -681,14 +691,26 @@ export const adminMarkPaymentPaid = async (paymentId: string, note?: string) =>
 export const adminAssignPackage = async (paymentId: string) =>
   asAdmin(() => packages.assignPackageAfterPayment(paymentId));
 
-/** Admin manually assigns/overrides a lead (can include flagged duplicates). */
-export const adminAssignLead = async (leadId: string, vendorIds: string[], allowDuplicate = false) =>
-  asAdmin(() => leads.assignLeadToVendors(leadId, vendorIds, { allowDuplicate, assignmentType: "admin_assigned" }));
+/**
+ * Admin manually assigns/overrides a lead.
+ *
+ * QF-MVP-20.3R1: runs as canonical mode `admin_manual` with the acting
+ * superadmin as the attributed actor. The former `allowDuplicate` escape hatch
+ * is gone — duplicates are settled inside the authority and reported as
+ * per-vendor `duplicate_assignment` skips.
+ */
+export const adminAssignLead = async (leadId: string, vendorIds: string[]) =>
+  asAdmin(async () => {
+    const user = await requireSuperadmin();
+    return leads.assignLeadToVendors(leadId, vendorIds, { assignmentType: "admin_assigned", adminId: user.id });
+  });
 
 // --------------------------------------------------------------------------
-// ADMIN — Phase 26A-2B manual lead-assignment fallback. Reuses the existing
-// safe assign_lead_to_vendors RPC (credit deduction handled there); adds only
-// audit + preview logs. WhatsApp stays preview/log only.
+// ADMIN — Phase 26A-2B manual lead-assignment fallback. Since QF-MVP-20.3R1 it
+// runs through the canonical authority `qf_assign_lead_vendors_v2` (mode
+// `admin_manual`, actor `admin`), which owns active-3 / lifetime-6 and the
+// one-credit ledger debit; this layer adds only audit + preview logs.
+// WhatsApp stays preview/log only.
 // --------------------------------------------------------------------------
 export const adminPreviewManualLeadAssignment = async (leadId: string) =>
   asAdmin(() => manualAssign.getManualAssignmentPreview(leadId));

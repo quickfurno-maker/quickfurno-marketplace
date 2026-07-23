@@ -9,13 +9,28 @@
 // from Sofa 3/3 etc. Auto matching / auto-fill never exceed 3; only admin
 // recovery may go above 3 (up to 9), and that is handled elsewhere.
 //
-// Credits are NEVER touched here directly. Assignment + deduction run through
-// the DB RPC assign_vendor_to_requirement_group, which reuses the existing
-// atomic deduct_vendor_credit / restore_vendor_credit primitives. WhatsApp
-// stays preview/log only. No live sends.
+// Credits are NEVER touched here directly.
+//
+// QF-MVP-20.3R1:
+//   * AUTO-FILL runs through the sole canonical authority
+//     `qf_assign_lead_vendors_v2` (mode `delayed_fill`, actor `worker`), which
+//     owns active-3 / lifetime-6 and debits exactly 1 wallet credit per
+//     assignment. No ceiling is passed and no legacy RPC is a fallback.
+//   * CLIENT-SELECTED assignment is FAIL-CLOSED under
+//     R1_BLOCKED_PENDING_OWNER_BINDING. A client's pick is recorded as an
+//     intent — the selection window and auto-fill still open — but nothing is
+//     assigned to that vendor and no credit moves.
+//
+// WhatsApp stays preview/log only. No live sends.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { fail, ok, isMissingRelationError, type Result } from "../lib/errors";
+import {
+  executeCanonicalAssignment,
+  blockedClientSelectedAssignment,
+  CLIENT_SELECTED_BLOCK_CLIENT_MESSAGE,
+  R1_BLOCKED_PENDING_OWNER_BINDING,
+} from "./canonicalAssignmentAuthority";
 import {
   NORMAL_PRIMARY_VENDOR_LIMIT,
   REQUIREMENT_GROUP_WINDOW_DAYS,
@@ -360,38 +375,49 @@ export async function canAssignVendorToRequirementGroup(
 // ---------------------------------------------------------------------------
 type RpcAssignResult = { status: string; assigned: boolean; vendor_id?: string; group_id?: string; assigned_count?: number };
 
+/**
+ * QF-MVP-20.3R1 — requirement-group AUTO-FILL through the canonical authority.
+ *
+ * The only live caller is `processRequirementAutoFill`, i.e. a system fill of
+ * the remaining primary slots after the client-selection window. That is a
+ * `delayed_fill` operation performed by a `worker`; the client picked nothing
+ * here, so no client-ownership authority is involved.
+ *
+ * No ceiling is passed — active-3 / lifetime-6 belong to the authority. Fails
+ * closed; `assign_vendor_to_requirement_group` is not called and is not a
+ * fallback.
+ */
 async function callGroupAssignRpc(
   groupId: string,
   leadId: string,
   vendorId: string,
   source: string,
-  assignmentType: "client_selected" | "auto_assigned" | "admin_assigned",
 ): Promise<Result<RpcAssignResult>> {
-  try {
-    const { data, error } = await adminClient().rpc("assign_vendor_to_requirement_group", {
-      p_group_id: groupId,
-      p_lead_id: leadId,
-      p_vendor_id: vendorId,
-      p_assignment_source: source,
-      p_total_limit: NORMAL_PRIMARY_VENDOR_LIMIT,
-      p_assignment_type: assignmentType,
-    });
-    if (error) {
-      const missing = (error as { code?: string }).code === "42883" || /schema cache|could not find the function/i.test(error.message ?? "");
-      if (missing) return { ok: false, code: "MIGRATION_NOT_APPLIED", error: `assign_vendor_to_requirement_group is missing. ${MIGRATION_HINT}` };
-      return { ok: false, code: error.message ?? "RPC_ERROR", error: error.message ?? "Assignment failed." };
-    }
-    const record = (data ?? {}) as Record<string, unknown>;
-    return ok({
-      status: typeof record.status === "string" ? record.status : "unknown",
-      assigned: record.assigned === true,
-      vendor_id: typeof record.vendor_id === "string" ? record.vendor_id : vendorId,
-      group_id: typeof record.group_id === "string" ? record.group_id : groupId,
-      assigned_count: Number(record.assigned_count ?? 0),
-    });
-  } catch (e) {
-    return fail(e);
-  }
+  const outcome = await executeCanonicalAssignment({
+    leadId,
+    mode: "delayed_fill",
+    candidateVendorIds: [vendorId],
+    operationScope: `requirement_auto_fill:${groupId}`,
+    actorKind: "worker",
+    actorId: null,
+    reasonCode: source,
+  });
+  if (!outcome.ok) return outcome;
+
+  const assigned = outcome.data.assigned.length > 0;
+  // The authority reports a full lead as reason_code `active_limit_reached`;
+  // this service's loop reads that as `group_full` and stops filling.
+  const status = !assigned && outcome.data.reason_code === "active_limit_reached"
+    ? "group_full"
+    : outcome.data.status;
+
+  return ok({
+    status,
+    assigned,
+    vendor_id: vendorId,
+    group_id: groupId,
+    assigned_count: outcome.data.assigned.length,
+  });
 }
 
 /** Best-effort dashboard + WhatsApp-preview + notification logs after an assign. */
@@ -473,6 +499,67 @@ export async function recordClientSelectedVendor(
 
     const eligibleNow = elig.eligible && parentOk && !alreadyInGroup;
 
+    // QF-MVP-20.3R1 — the client's own pick can no longer be assigned directly.
+    // Client-selected assignment is fail-closed (R1_BLOCKED_PENDING_OWNER_BINDING),
+    // so a commercially eligible pick is recorded as an INTENT only: nothing is
+    // assigned, no credit is deducted, no client contact is shared. The
+    // selection window and auto-fill are still opened so the system fill
+    // (canonical `delayed_fill` mode) connects the client with verified vendors.
+    if (eligibleNow) {
+      console.warn("[requirement group] client selection recorded without assignment", {
+        group_id: groupId,
+        lead_id: leadId,
+        vendor_id: vendorId,
+        reason: R1_BLOCKED_PENDING_OWNER_BINDING,
+      });
+
+      await db.from("client_requirement_groups").update({
+        ...(isFirstSelection ? { first_selection_at: nowIso, client_selection_deadline_at: deadlineIso } : {}),
+        auto_fill_enabled: true,
+        auto_fill_status: "waiting_for_client_selection",
+        ...(isFirstSelection || !group.preferred_vendor_id
+          ? {
+              preferred_vendor_id: vendorId,
+              preferred_vendor_name: vendorName,
+              preferred_vendor_status: "pending_owner_binding",
+              preferred_vendor_status_reason: R1_BLOCKED_PENDING_OWNER_BINDING,
+              preferred_vendor_processed_at: nowIso,
+            }
+          : {}),
+        updated_at: nowIso,
+      }).eq("id", groupId);
+
+      await db.from("leads").update({
+        selected_vendor_id: vendorId,
+        selected_vendor_name: vendorName,
+        assignment_intent: "client_selected_vendor",
+        preferred_vendor_id: vendorId,
+        preferred_vendor_status: "pending_owner_binding",
+        preferred_vendor_status_reason: R1_BLOCKED_PENDING_OWNER_BINDING,
+        ...(isFirstSelection ? { client_selection_deadline_at: deadlineIso } : {}),
+      }).eq("id", leadId);
+
+      await scheduleAutoFillForRequirementGroup(groupId);
+
+      return ok({
+        status: "preferred_vendor_waiting",
+        assigned: false,
+        group_id: groupId,
+        vendor_id: vendorId,
+        lead_id: leadId,
+        counts: await reloadCounts(groupId),
+        client_selection_deadline_at: isFirstSelection ? deadlineIso : effectiveSelectionDeadline,
+        preferred_vendor_status: "pending_owner_binding",
+        preferred_vendor_not_eligible: false,
+        ineligible_reason: R1_BLOCKED_PENDING_OWNER_BINDING,
+        message: CLIENT_SELECTED_BLOCK_CLIENT_MESSAGE,
+      });
+    }
+
+    // Unreachable: the block above returns for every `eligibleNow` selection.
+    // Retained so re-enabling client-selected assignment is a single-branch
+    // change once the ownership binding lands. Its inner assignment call is
+    // ALSO fail-closed, so this can never become a silent fallback.
     if (eligibleNow) {
       // Immediate assignment — first selected vendor never waits 1 hour.
       if (isFirstSelection) {
@@ -613,29 +700,27 @@ export async function recordClientSelectedVendor(
 
 type RpcAssignResult2E = { status: string; assigned: boolean; assigned_count?: number };
 
-/** Credit-based client-selected assignment RPC (active package not required). */
+/**
+ * QF-MVP-20.3R1 — client-selected group assignment is FAIL-CLOSED.
+ *
+ * The canonical authority rejects `client_selected` mode until the schema
+ * carries a trustworthy lead-to-client ownership binding
+ * (R1_BLOCKED_PENDING_OWNER_BINDING — the exact missing prerequisite is
+ * documented in services/canonicalAssignmentAuthority.ts). The legacy
+ * `assign_client_selected_vendor_to_group` RPC is NOT called and is not
+ * available as a fallback, and ownership is never inferred from caller input.
+ *
+ * Performs no I/O and has no side effect: no assignment, no credit deduction,
+ * no ledger row, no lineage event, no communication intent.
+ */
 async function callClientSelectedAssignRpc(groupId: string, leadId: string, vendorId: string): Promise<Result<RpcAssignResult2E>> {
-  try {
-    const { data, error } = await adminClient().rpc("assign_client_selected_vendor_to_group", {
-      p_group_id: groupId,
-      p_lead_id: leadId,
-      p_vendor_id: vendorId,
-      p_total_limit: NORMAL_PRIMARY_VENDOR_LIMIT,
-    });
-    if (error) {
-      const missing = (error as { code?: string }).code === "42883" || /schema cache|could not find the function/i.test(error.message ?? "");
-      if (missing) return { ok: false, code: "MIGRATION_NOT_APPLIED", error: `assign_client_selected_vendor_to_group is missing. ${MIGRATION_HINT_2E}` };
-      return { ok: false, code: error.message ?? "RPC_ERROR", error: error.message ?? "Assignment failed." };
-    }
-    const record = (data ?? {}) as Record<string, unknown>;
-    return ok({
-      status: typeof record.status === "string" ? record.status : "unknown",
-      assigned: record.assigned === true,
-      assigned_count: Number(record.assigned_count ?? 0),
-    });
-  } catch (e) {
-    return fail(e);
-  }
+  console.warn("[requirement group] client-selected assignment blocked pending owner binding", {
+    group_id: groupId,
+    lead_id: leadId,
+    vendor_id: vendorId,
+    reason: R1_BLOCKED_PENDING_OWNER_BINDING,
+  });
+  return blockedClientSelectedAssignment<RpcAssignResult2E>();
 }
 
 /**
@@ -850,7 +935,7 @@ export async function processRequirementAutoFill(groupId: string): Promise<Resul
     let slots = counts.pending_primary_slots;
     for (const vendor of candidates) {
       if (slots <= 0) break;
-      const assign = await callGroupAssignRpc(groupId, leadId, String(vendor.id), ASSIGNMENT_SOURCE.autoFill, "auto_assigned");
+      const assign = await callGroupAssignRpc(groupId, leadId, String(vendor.id), ASSIGNMENT_SOURCE.autoFill);
       if (!assign.ok) {
         if (assign.code === "MIGRATION_NOT_APPLIED") return assign;
         continue; // transient per-vendor failure — try the next candidate

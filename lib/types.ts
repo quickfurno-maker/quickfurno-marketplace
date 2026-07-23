@@ -99,6 +99,12 @@ export interface AssignResult {
   assigned: string[];
   skipped: string[];
   assigned_count: number;
+  /** QF-MVP-20.3R1 — `assignment_operations.id`, the audit anchor. */
+  operation_id?: string | null;
+  /** Whole-operation reason, or the first per-vendor skip reason. */
+  reason_code?: string | null;
+  /** True when the canonical authority replayed a committed operation. */
+  already_applied?: boolean;
 }
 
 export interface VendorRegistrationInput {

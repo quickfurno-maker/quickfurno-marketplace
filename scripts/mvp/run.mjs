@@ -17,9 +17,10 @@ const REGISTER = './scripts/mvp/loader/register.mjs';
 const ENTRY = './scripts/mvp/run.mjs';
 
 // Canonical order. Every MVP suite is mandatory (no soft/optional suites).
-const SUITE_ORDER = ['marketplace', 'communication'];
+const SUITE_ORDER = ['marketplace', 'assignment-authority', 'communication'];
 const SUITE_FILES = {
   marketplace: './suites/marketplace.mjs',
+  'assignment-authority': './suites/assignmentAuthority.mjs',
   communication: './suites/communication.mjs',
 };
 

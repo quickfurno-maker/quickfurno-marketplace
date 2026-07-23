@@ -9,16 +9,23 @@
 //   recovery (3 ≤ total < 9) → recovery assign extra vendors (max 9 total)
 //   max      (total ≥ 9)  → locked
 //
-// Credit logic is never reimplemented here: assignment + deduction run through
-// admin_smart_assign_lead_to_vendors, which reuses the existing atomic
-// deduct_vendor_credit / restore_vendor_credit primitives, relaxes only soft
-// category/area matching (city + approved + active + package + credits stay
-// HARD), and clamps the total to 9. Auto matching is untouched (max 3).
-// WhatsApp stays preview/log only. No live sends.
+// QF-MVP-20.3R1 — assignment and credit deduction now run through the SOLE
+// canonical authority `qf_assign_lead_vendors_v2` (mode `admin_manual`, actor
+// `admin`). The legacy `admin_smart_assign_lead_to_vendors` RPC is no longer
+// called and there is no fallback to it.
+//
+// IMPORTANT CONTRACT CHANGE: the caller-supplied `p_total_limit` ceiling is
+// GONE. The authority enforces max 3 ACTIVE and max 6 LIFETIME vendors per lead
+// internally, and no caller may raise, lower or waive either cap. The former
+// admin recovery ceiling of 9 (ADMIN_MANUAL_TOTAL_VENDOR_LIMIT) is therefore no
+// longer reachable through assignment; it survives only as the UI's local
+// state/labelling threshold. Credits are debited exactly 1 per successful
+// assignment through the wallet ledger. WhatsApp stays preview/log only.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
 import { NORMAL_PRIMARY_VENDOR_LIMIT, ADMIN_MANUAL_TOTAL_VENDOR_LIMIT, MANUAL_INTERIOR_FALLBACK_ENABLED } from "../lib/config";
+import { executeCanonicalAssignment } from "./canonicalAssignmentAuthority";
 import {
   createClientAssignedVendorsPreview,
   createVendorLeadWhatsappPreview,
@@ -311,8 +318,8 @@ export async function assignLeadManually(
           ? "manual_primary_top_up"
           : "manual_primary_assignment";
 
-    const totalLimit = mode === "recovery" ? ADMIN_MANUAL_TOTAL_VENDOR_LIMIT : NORMAL_PRIMARY_VENDOR_LIMIT;
-    const assignment = await callSmartAssignRpc(leadId, selected, totalLimit);
+    // No ceiling is passed: the canonical authority owns active-3 / lifetime-6.
+    const assignment = await callCanonicalAdminAssign(leadId, selected, adminId, mode);
     if (!assignment.ok) {
       await recordManualRun(leadId, adminId, {
         run_status: `${assignmentSource}_failed`,
@@ -466,31 +473,38 @@ function classifyCandidate(
 
 type RpcAssignmentData = { status?: string; assigned?: string[]; skipped?: string[]; assigned_count?: number };
 
-async function callSmartAssignRpc(leadId: string, vendorIds: string[], totalLimit: number): Promise<Result<RpcAssignmentData>> {
-  try {
-    const { data, error } = await adminClient().rpc("admin_smart_assign_lead_to_vendors", {
-      p_lead_id: leadId,
-      p_vendor_ids: vendorIds,
-      p_allow_duplicate: false,
-      p_total_limit: totalLimit,
-    });
-    if (error) {
-      const missing = (error as { code?: string }).code === "42883" || /schema cache|could not find the function/i.test(error.message ?? "");
-      if (missing) {
-        return { ok: false, code: "MIGRATION_NOT_APPLIED", error: "admin_smart_assign_lead_to_vendors is missing. Apply migration 20260701000031_phase26a2c_recovery_fallback_reporting.sql." };
-      }
-      return { ok: false, code: error.message ?? "RPC_ERROR", error: error.message ?? "Assignment failed." };
-    }
-    const record = (data ?? {}) as Record<string, unknown>;
-    return ok({
-      status: typeof record.status === "string" ? record.status : "ok",
-      assigned: Array.isArray(record.assigned) ? record.assigned.map(String) : [],
-      skipped: Array.isArray(record.skipped) ? record.skipped.map(String) : [],
-      assigned_count: Number(record.assigned_count ?? 0),
-    });
-  } catch (e) {
-    return fail(e);
-  }
+/**
+ * QF-MVP-20.3R1 — admin manual assignment through the canonical authority.
+ *
+ * Deliberately takes NO limit argument: the active-3 / lifetime-6 caps are the
+ * authority's, never the caller's. Fails closed — there is no fallback to
+ * `admin_smart_assign_lead_to_vendors` or to any direct credit mutation.
+ */
+async function callCanonicalAdminAssign(
+  leadId: string,
+  vendorIds: string[],
+  adminId: string,
+  mode: ManualAssignmentMode,
+): Promise<Result<RpcAssignmentData>> {
+  const outcome = await executeCanonicalAssignment({
+    leadId,
+    mode: "admin_manual",
+    candidateVendorIds: vendorIds,
+    // Deterministic per admin action: the same admin re-submitting the same
+    // vendor set for the same lead REPLAYS instead of assigning twice.
+    operationScope: `admin_manual:${mode}`,
+    actorKind: "admin",
+    actorId: adminId,
+    reasonCode: mode === "recovery" ? "admin_manual_recovery" : "admin_manual",
+  });
+  if (!outcome.ok) return outcome;
+
+  return ok({
+    status: outcome.data.status,
+    assigned: outcome.data.assigned_vendor_ids,
+    skipped: outcome.data.skipped_vendor_ids,
+    assigned_count: outcome.data.assigned.length,
+  });
 }
 
 async function loadVendors(): Promise<Array<Record<string, unknown>>> {

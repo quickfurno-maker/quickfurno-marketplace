@@ -13,9 +13,11 @@ import type {
  * QuickFurno Distribution Control — standard-route assignment adapter (Phase 3B,
  * authoritative-truth corrected).
  *
- * The credit-affecting boundary is UNCHANGED: `assignLeadToMatchedVendors`
- * (RPC `assign_lead_to_paid_vendors_phase26a`) remains the ONLY assignment / credit
- * mutation. After it returns successfully, lifecycle assignment truth is derived
+ * The credit-affecting boundary is UNCHANGED in shape: `assignLeadToMatchedVendors`
+ * remains the ONLY assignment / credit mutation this adapter can reach. Since
+ * QF-MVP-20.3R1 that boundary calls the canonical authority
+ * `qf_assign_lead_vendors_v2` (mode `automatic`, actor `system`) instead of the
+ * legacy `assign_lead_to_paid_vendors_phase26a` RPC. After it returns successfully, lifecycle assignment truth is derived
  * from an AUTHORITATIVE read-back of committed `public.lead_assignments` rows — NOT
  * from the lossily-normalized service response (which may silently drop malformed
  * entries or substitute a fallback lead id). The service `status` is preserved only

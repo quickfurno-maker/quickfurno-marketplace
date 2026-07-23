@@ -13,7 +13,7 @@
 // SAFETY CONTRACT:
 //   - SERVER ONLY. Uses the Supabase service-role client; never reaches the
 //     browser. The service-role key is never returned to any caller.
-//   - PREVIEW ONLY. This NEVER assigns leads (public.assign_lead_to_vendors and
+//   - PREVIEW ONLY. This NEVER assigns leads (no assignment RPC and
 //     lead_assignments are untouched), NEVER notifies vendors, NEVER sends
 //     WhatsApp, and NEVER deducts credits.
 //   - Hard cap of 3 vendors, enforced here AND by a DB CHECK constraint.

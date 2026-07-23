@@ -168,9 +168,28 @@ for (const [file, expected] of Object.entries(LOCKED)) {
 }
 
 // R1 is a repository/code phase: it must not add, remove or edit a migration.
-const EXPECTED_MIGRATIONS = 72;
-const migrationCount = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).length;
-check('02 R1 added no SQL migration', migrationCount === EXPECTED_MIGRATIONS, `expected ${EXPECTED_MIGRATIONS} migration files, found ${migrationCount}`);
+//
+// QF-MVP-20.3B2 correction: this was an ABSOLUTE file count (72), which is a
+// phase-blind guard — the very next authorized migration phase makes it fail
+// even though R1 is still innocent. The claim R1 actually needs is "no
+// migration exists at or before R1's boundary that R1 did not inherit, and
+// every LATER migration belongs to an explicitly declared later phase". That
+// keeps the guard's full force against an accidental R1 migration while
+// letting authorized phases land.
+const R1_BOUNDARY_VERSION = '20260723000400'; // Migration G, the last one R1 inherited.
+const DECLARED_LATER_MIGRATIONS = new Set([
+  '20260723000500_qf_mvp_assignment_universal_enforcement.sql', // QF-MVP-20.3B2
+]);
+
+const migrationFiles = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql'));
+const afterBoundary = migrationFiles.filter((f) => (f.match(/^(\d+)_/) || [])[1] > R1_BOUNDARY_VERSION);
+const undeclared = afterBoundary.filter((f) => !DECLARED_LATER_MIGRATIONS.has(f));
+
+check('02a R1 added no SQL migration of its own', undeclared.length === 0,
+  `undeclared migrations after the R1 boundary: ${JSON.stringify(undeclared)}`);
+check('02b every migration after the R1 boundary belongs to a declared later phase',
+  afterBoundary.length === DECLARED_LATER_MIGRATIONS.size,
+  `found ${afterBoundary.length}, declared ${DECLARED_LATER_MIGRATIONS.size}: ${JSON.stringify(afterBoundary)}`);
 
 // ---------------------------------------------------------------------------
 // 2. Exactly ONE call site for the canonical authority

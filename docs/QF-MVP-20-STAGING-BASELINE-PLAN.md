@@ -22,7 +22,15 @@ The deterministic generator, validator, grant manifest, baseline SQL, and verifi
 - **Rollback:** staging is empty → drop-and-recreate staging (or `drop schema public cascade` on staging only); never production.
 - **Remaining application prerequisites:** confirm target ref `uckafzuochmbvtiodmcl`; preflight requires an empty project + managed prereqs; recreate the `auth.users` new-user trigger separately (not in the public dump); add authenticated dashboard grants as forward remediation; all rows of the verify SQL must be `PASS` in 20.2C.
 
-## 20.2C2 application record — APPLIED; VERIFICATION `FAILED_REQUIRES_REVIEW`
+## 20.2C2 + 20.2C2R — APPLIED AND FULLY VERIFIED ✅
+
+- **Final status: `COMPLETE`.** Baseline applied (exit 0, one history row) and the **corrected** verification returns **40/40 PASS**.
+- Verification SHA256 `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193` (supersedes `e82b757f…`, `89362a35…`). Baseline unchanged `920a4aa0…`.
+- Corrections were **offline only**: exact `to_regprocedure` OID function resolution + `pg_constraint.conindid` index classification. **No `db push`, no reapplication, no reset/repair, no migration-history change, no staging write.**
+- Catalog verified: 62 tables · 39 QuickFurno functions (33 SD) + 1 managed · 67 policies · 62 PK · 69 FK · 15 UNIQUE · 169 CHECK · 77 constraint-backed + 180 standalone indexes (32 standalone unique, 47 combined) · 0 triggers/views/matviews · all tables zero-row · providers empty, Meta disabled.
+- Advisors read (staging only): none blocking; candidates routed to QF-MVP-20.3A. `auth.users→handle_new_user` trigger remains `OPEN_FORWARD_MIGRATION_PREREQUISITE`.
+
+### Historical: 20.2C2 initial record — APPLIED; initial verifier `FAILED_REQUIRES_REVIEW`
 
 - **Baseline application: SUCCEEDED.** Single `npx supabase db push --linked` to staging `uckafzuochmbvtiodmcl`, **exit 0**; one history row `20260722000100` / `qf_mvp_staging_baseline_269c9265` (821 statements). No reset, repair, seed, retry, or manual patch. Production never accessed.
 - **Verification: 24 PASS / 6 FAIL → phase NOT complete.** The 6 failures are expectation defects in the verification artifact (function identity form `argname type`; index counts including constraint-backed indexes), not schema defects — the applied schema matches the reviewed inventory (62 tables / 62 RLS / 67 policies / 62 PK / 69 FK / 15 UNIQUE / 169 CHECK / 0 triggers / 40 functions = 39 QF + 1 managed / 180 standalone indexes / 32 standalone unique).

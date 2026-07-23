@@ -121,7 +121,16 @@ The application preflight ran (SELECT-only staging access + `db push --dry-run`;
 - `migration list --linked`: local **1** (`20260722000100`) / remote **0**. Dry-run proposes **exactly one** migration; no seed/edge/reset/repair/config/prod.
 - Staging remained EMPTY (re-verified post-dry-run); no baseline applied.
 
-## 15c. QF-MVP-20.2C2 application result — `FAILED_REQUIRES_REVIEW`
+## 15d. QF-MVP-20.2C2R — corrected verification: **40/40 PASS → `COMPLETE`**
+
+The verification artifact was corrected **offline** (staging untouched, baseline byte-identical) and re-executed against staging:
+- **Functions:** expected signatures now resolve to exact catalog OIDs via `to_regprocedure(format('%I.%I(%s)', …))`; the OID is the comparison key. `pg_get_function_identity_arguments()` is used for *details only* and never string-compared. Results: count **39**, missing **0**, duplicate/unresolved **0**, SECURITY DEFINER **33**, managed `rls_auto_enable()` **1**, unexpected **0**, total **40**.
+- **Indexes:** classified via `pg_constraint.conindid`. Results: constraint-backed **77**, standalone **180**, standalone unique **32**, combined uniqueness **47**, catalog totals **257 / 109**.
+- All other rows PASS (62 tables, 62 RLS, 67 policies, 62 PK, 69 FK, 15 UNIQUE, 169 CHECK, 0 triggers/views/matviews, zero rows, six RPCs, all privilege lockdowns, providers empty + Meta disabled, one truthful history row).
+- Verification SHA256 `7ba9792f…` supersedes `e82b757f…`. Baseline unchanged (`920a4aa0…`). **No `db push`, no reapplication, no reset/repair, no history change, no staging write.**
+- Advisors collected (security + performance): **none blocking**; remediation candidates routed to QF-MVP-20.3A.
+
+## 15c. QF-MVP-20.2C2 initial application result (superseded by 15d)
 
 The baseline was **applied to staging** (`uckafzuochmbvtiodmcl`) via a single `npx supabase db push --linked`, **exit code 0**, creating **one** migration-history row (`20260722000100` / `qf_mvp_staging_baseline_269c9265`, 821 statements). Full record: [`QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md`](QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md).
 

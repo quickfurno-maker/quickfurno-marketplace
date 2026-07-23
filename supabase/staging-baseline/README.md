@@ -19,7 +19,8 @@
 - Source: production **public** schema dump (schema-only).
 - Source SHA256: `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f`
 - Generated baseline SHA256: `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81`
-- Verification SQL SHA256: `e82b757fd618983d91acdd80822daee8b64cd4e0bfbeaa16ea456af83e353d90` (current, QF-MVP-20.2C1R identity-scoped function parity; supersedes `89362a35ea5ef503df4c06aa6782a5a084e29cfa1ffb8b13df5d4436a6cd7777`)
+- Verification SQL SHA256: `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193` (**current**, QF-MVP-20.2C2R — exact `to_regprocedure` OID function resolution + `conindid` index classification). Superseded: `e82b757f…` (20.2C1R identity-scoped) and `89362a35…` (original).
+- **Status: baseline APPLIED to staging and FULLY VERIFIED** — all 40 corrected verification rows PASS. Migration history holds exactly one row (`20260722000100` / `qf_mvp_staging_baseline_269c9265`).
 
 ## Regenerate (deterministic, offline — no DB/network)
 

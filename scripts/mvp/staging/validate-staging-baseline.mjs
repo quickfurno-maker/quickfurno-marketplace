@@ -18,10 +18,15 @@ const EXPECT = {
   rls_enabled: 62, primary_keys: 62, foreign_keys: 69, unique_constraints: 15,
   check_constraints: 169, indexes: 180, triggers: 0, views: 0,
 };
-// QF-MVP-20.2C1R: expectations proven present in the verification SQL.
+// QF-MVP-20.2C1R / 20.2C2R: expectations proven present in the verification SQL.
 const VERIFY_EXPECT = {
   quickfurno_functions: 39, quickfurno_security_definer: 33,
   allowed_managed_functions: 1, total_public_functions: 40,
+  // 20.2C2R index classification (constraint-backed vs standalone)
+  primary_key_constraints: 62, unique_constraints: 15,
+  constraint_backed_indexes: 77, standalone_indexes: 180,
+  standalone_unique_indexes: 32, combined_uniqueness_mechanisms: 47,
+  total_catalog_indexes: 257, total_catalog_unique_indexes: 109,
 };
 const BLOCKERS = [
   "admin_smart_assign_lead_to_vendors", "assign_client_selected_vendor_to_group",
@@ -260,37 +265,72 @@ const identities = deriveIdentities(baseline);
 if (identities.length !== VERIFY_EXPECT.quickfurno_functions)
   fail(`derived ${identities.length} baseline function identities, expected ${VERIFY_EXPECT.quickfurno_functions}`);
 
-// 12a. every derived identity is encoded as an expected_fn VALUES row
+// 12a. every derived signature is encoded as a TYPE-ONLY expected_fn VALUES row
+//      in the ('public','<name>','<type args>') form used for OID resolution.
 let encoded = 0;
 for (const { name, ident } of identities) {
-  const row = `('${name}','${ident}')`;
+  const row = `('public','${name}','${ident}')`;
   if (verifySql.includes(row)) encoded++;
-  else fail(`verify SQL missing expected_fn identity: ${name}(${ident})`);
+  else fail(`verify SQL missing expected_fn signature: public.${name}(${ident})`);
 }
 if (encoded !== VERIFY_EXPECT.quickfurno_functions)
-  fail(`verify SQL encodes ${encoded}/${VERIFY_EXPECT.quickfurno_functions} QuickFurno identities`);
+  fail(`verify SQL encodes ${encoded}/${VERIFY_EXPECT.quickfurno_functions} QuickFurno signatures`);
 
 // 12b. expected_fn VALUES contains exactly 39 rows (no extras)
-const valuesRows = (verifySql.match(/^\s*\('[a-z_0-9]+','[^\n]*'\),?\s*$/gm) || []).length;
+const valuesRows = (verifySql.match(/^\s*\('public','[a-z_0-9]+','[^\n]*'\),?\s*$/gm) || []).length;
 if (valuesRows !== VERIFY_EXPECT.quickfurno_functions)
   fail(`expected_fn has ${valuesRows} rows, expected ${VERIFY_EXPECT.quickfurno_functions}`);
 
-// 12c. managed rls_auto_enable exception is explicit and singular
-if (!/NOT \(f\.fname = 'rls_auto_enable' AND f\.ident = ''\)/.test(verifySql))
-  fail("verify SQL missing the singular managed rls_auto_enable exclusion in qf_unexpected");
-if (!/'03c_allowed_managed_public_function_count', '1'/.test(verifySql))
-  fail("verify SQL missing allowed_managed_public_function_count=1 check");
-if ((verifySql.match(/rls_auto_enable/g) || []).length < 3)
-  fail("verify SQL does not reference the managed rls_auto_enable exception explicitly");
+// 12c. functions must be resolved to an exact OID via to_regprocedure(format(...)),
+//      and MUST NOT be matched by string-comparing pg_get_function_identity_arguments.
+if (!/to_regprocedure\(\s*format\(\s*'%I\.%I\(%s\)'/.test(verifySql))
+  fail("verify SQL does not resolve expected functions via to_regprocedure(format('%I.%I(%s)', ...))");
+if (!/proc_reg::oid/.test(verifySql))
+  fail("verify SQL does not compare on the resolved OID (proc_reg::oid)");
+if (/f\.ident\s*=\s*e\.ident|e\.ident\s*=\s*f\.ident|ON\s+f\.ident\s*=/.test(verifySql))
+  fail("verify SQL still string-compares identity args against type-only expectations");
 
-// 12d. identity-scoped checks with corrected expectations; no total-only=39
-if (!/'03a_quickfurno_function_count', '39'/.test(verifySql)) fail("verify SQL missing identity-scoped quickfurno_function_count=39");
-if (!/'03b_quickfurno_function_missing', '0'/.test(verifySql)) fail("verify SQL missing quickfurno_function_missing=0");
-if (!/'03d_unexpected_public_function_count', '0'/.test(verifySql)) fail("verify SQL missing unexpected_public_function_count=0");
-if (!/'03e_total_public_function_count', '40'/.test(verifySql)) fail("verify SQL missing total_public_function_count=40 (supporting)");
-if (!/'04_quickfurno_security_definer_count', '33'/.test(verifySql)) fail("verify SQL missing quickfurno_security_definer_count=33");
-if (/'03_public_functions', ?'39'/.test(verifySql)) fail("verify SQL still has the superseded total-only public function check (=39)");
-if (/'\d+_[a-z_]*', ?'47'|'\d+_[a-z_]*', ?'178'/.test(verifySql)) fail("verify SQL reintroduced a 47/178 expected count");
+// 12d. managed exception is exactly public.rls_auto_enable(), resolved separately
+if (!/to_regprocedure\('public\.rls_auto_enable\(\)'\)/.test(verifySql))
+  fail("verify SQL missing exact managed exception to_regprocedure('public.rls_auto_enable()')");
+if (!/'03e_allowed_managed_public_function_count', '1'/.test(verifySql))
+  fail("verify SQL missing allowed_managed_public_function_count=1 check");
+
+// 12e. required function checks with corrected expectations
+const FN_CHECKS = [
+  [/'03a_quickfurno_function_count', '39'/, "quickfurno_function_count=39"],
+  [/'03b_quickfurno_function_missing', '0'/, "quickfurno_function_missing=0"],
+  [/'03c_quickfurno_function_duplicate_or_unresolved', '0'/, "quickfurno_function_duplicate_or_unresolved=0"],
+  [/'03d_quickfurno_security_definer_count', '33'/, "quickfurno_security_definer_count=33"],
+  [/'03f_unexpected_public_function_count', '0'/, "unexpected_public_function_count=0"],
+  [/'03g_total_public_function_count', '40'/, "total_public_function_count=40 (supporting)"],
+];
+for (const [re, label] of FN_CHECKS) if (!re.test(verifySql)) fail(`verify SQL missing ${label}`);
+
+// 12f. index classification must exclude constraint-backed indexes via conindid
+if (!/pg_constraint\s+k\s+WHERE\s+k\.conindid\s*=\s*i\.indexrelid/.test(verifySql))
+  fail("verify SQL does not classify constraint-backed indexes via pg_constraint.conindid");
+if (!/NOT constraint_backed/.test(verifySql))
+  fail("verify SQL does not exclude constraint-backed indexes from standalone counts");
+const IDX_CHECKS = [
+  [/'06a_primary_key_constraint_count', '62'/, "primary_key_constraint_count=62"],
+  [/'06c_unique_constraint_count', '15'/, "unique_constraint_count=15"],
+  [/'07a_constraint_backed_index_count', '77'/, "constraint_backed_index_count=77"],
+  [/'07b_standalone_index_count', '180'/, "standalone_index_count=180"],
+  [/'07c_standalone_unique_index_count', '32'/, "standalone_unique_index_count=32"],
+  [/'07d_combined_uniqueness_mechanism_count', '47'/, "combined_uniqueness_mechanism_count=47"],
+  [/'07e_total_public_table_catalog_index_count', '257'/, "total_catalog_index_count=257 (supporting)"],
+  [/'07f_total_catalog_unique_index_count', '109'/, "total_catalog_unique_index_count=109 (supporting)"],
+  [/'06d_check_constraint_count', '169'/, "check_constraint_count=169"],
+];
+for (const [re, label] of IDX_CHECKS) if (!re.test(verifySql)) fail(`verify SQL missing ${label}`);
+
+// 12g. superseded/incorrect expectations must not reappear
+if (/'03_public_functions', ?'39'/.test(verifySql)) fail("verify SQL reintroduced total-only public function check (=39)");
+if (/'\w*unique_constraint\w*', ?'47'/.test(verifySql)) fail("verify SQL reintroduced UNIQUE constraints = 47");
+if (/'\w*check_constraint\w*', ?'178'/.test(verifySql)) fail("verify SQL reintroduced CHECK constraints = 178");
+if (/'\w*total\w*index\w*', ?'180'/.test(verifySql)) fail("verify SQL reintroduced total catalog indexes = 180");
+if (/'\w*total\w*unique\w*index\w*', ?'32'/.test(verifySql)) fail("verify SQL reintroduced total catalog unique indexes = 32");
 
 // 12e. verification SQL must be SELECT-only (no DML/DDL statements)
 for (const raw of tokenize(verifySql)) {
@@ -311,5 +351,6 @@ console.log(`  anon exec     = ${[...(grantExec.entries())].filter(([, r]) => r.
 console.log(`  service-only  = ${SERVICE_ONLY.length} mutation RPCs verified not-anon/authenticated/PUBLIC`);
 console.log(`  anon tables   = none`);
 console.log(`  baseline_sha  = ${baselineSha} (locked, unmodified)`);
-console.log(`  verify_fn_ids = ${encoded}/${VERIFY_EXPECT.quickfurno_functions} QuickFurno identities encoded; SD expected 33; managed rls_auto_enable +1; total 40`);
+console.log(`  verify_fn_ids = ${encoded}/${VERIFY_EXPECT.quickfurno_functions} type-only signatures encoded, resolved via to_regprocedure OID; SD 33; managed rls_auto_enable 1; total 40`);
+console.log(`  verify_indexes = conindid-classified: constraint-backed ${VERIFY_EXPECT.constraint_backed_indexes}, standalone ${VERIFY_EXPECT.standalone_indexes}, standalone-unique ${VERIFY_EXPECT.standalone_unique_indexes}, combined ${VERIFY_EXPECT.combined_uniqueness_mechanisms}, catalog totals ${VERIFY_EXPECT.total_catalog_indexes}/${VERIFY_EXPECT.total_catalog_unique_indexes}`);
 console.log(`  verify_select_only = yes`);

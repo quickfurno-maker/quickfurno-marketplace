@@ -2,6 +2,8 @@
 
 ## STATUS: `PARTIAL_APPLICATION_REQUIRES_REVIEW`
 
+> **CORRECTION LANDED — QF-MVP-20.3B1R2.** This document is the historical record of the application attempt and is **not** rewritten. The defect it identifies has since been corrected offline: B1's unsound self-verification guard was withdrawn, the phase verifier was found to carry the same defect in six rows (two of which would have failed even against a correctly applied B1) and was corrected, and the offline validator was hardened to 126 checks with regression fixtures that reproduce this exact failure. Corrected B1 SHA256 `46ce7377…` (was `a4b5c378…`), still version `20260723000300`. See [`QF-MVP-20-3B1R2-CORRECTION-RESULTS.md`](QF-MVP-20-3B1R2-CORRECTION-RESULTS.md). Next: **QF-MVP-20.3B1A2 — preflight and apply corrected B1 only.**
+
 **Migration A applied. Migration A2 applied. Migration B1 FAILED and rolled back completely.**
 
 The failure was **not** a schema conflict, a data problem or a staging-state problem. It was a **false positive in Migration B1's own self-verification block** — a guard that inspects `pg_get_functiondef()` output and matched the function's own explanatory comments. Details in §12.

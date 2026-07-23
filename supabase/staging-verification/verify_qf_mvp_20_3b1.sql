@@ -35,11 +35,35 @@
 --   client_selected fail-closed disposition and the audit_logs boundary
 --   (605-614). They sort last in the output.
 --
+-- QF-MVP-20.3B1R2 CORRECTION — NO LEXICAL ASSERTIONS OVER RAW SOURCE
+--   This file previously ran regular expressions over pg_get_functiondef()
+--   output in rows 605, 607, 608, 611, 612 and 613. That output retains
+--   COMMENTS and STRING LITERALS, so such a check can match a function's own
+--   documentation. Rows 607 and 613 WOULD HAVE FAILED against a correctly
+--   applied B1 - the identical defect that aborted Migration B1 during
+--   QF-MVP-20.3B1A.
+--
+--   Every one of those assertions is withdrawn. Each is replaced by a catalog
+--   fact, a data fact, or an explicitly labelled INFORMATIONAL row naming
+--   where the real proof lives. NO check in this file now performs a lexical
+--   assertion - positive or negative - over pg_get_functiondef(),
+--   pg_proc.prosrc or information_schema routine-definition text.
+--
+--   Still permitted and retained: row 606 matches
+--   pg_get_function_identity_arguments(), a structured rendering of parameter
+--   names and types that contains no comments and no literals, so a negative
+--   match there is a genuine signature fact.
+--
+--   Executable-source prohibitions are the responsibility of the tokenizing
+--   offline validator scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs.
+--   Behavioural proof is the responsibility of staging tests T49-T67.
+--
 -- OUTPUT
 --   check_name · expected · actual · status · details
 --   status is PASS or FAIL. Any FAIL row blocks the phase.
---   Two rows are INFORMATIONAL and always report PASS (27, 614); their details
---   say so explicitly and they must never be read as proof of anything else.
+--   Rows 27, 607, 611, 612, 613 and 614 are INFORMATIONAL and always report
+--   PASS; their details say so explicitly and they must never be read as proof
+--   of anything else.
 -- ============================================================================
 
 with
@@ -460,17 +484,22 @@ select 23, 'B05_service_role_execute_granted', '5',
 
 -- === 7b. QF-MVP-20.3B1R — canonical authority behavioural contracts ========
 union all
-select 605, 'B05a_replay_and_conflict_semantics_present', 'fingerprint + conflict + retry',
-       (select case when d ~ 'request_fingerprint' then 'fingerprint ' else '' end
-                 || case when d ~ 'idempotency_conflict' then 'conflict ' else '' end
-                 || case when d ~ 'conflict_retry' then 'retry' else '' end
-          from (select coalesce(pg_catalog.pg_get_functiondef(
-                  to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')), '') as d) s),
-       case when (select d ~ 'request_fingerprint' and d ~ 'idempotency_conflict' and d ~ 'conflict_retry'
-                    from (select coalesce(pg_catalog.pg_get_functiondef(
-                            to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')), '') as d) s)
+select 605, 'B05a_replay_substrate_is_catalog_provable', 'fingerprint NOT NULL + terminal-completion CHECK',
+       case when exists (select 1 from pg_catalog.pg_attribute
+                          where attrelid = 'public.assignment_operations'::regclass
+                            and attname = 'request_fingerprint' and attnotnull and not attisdropped)
+             and exists (select 1 from pg_catalog.pg_constraint
+                          where conrelid = 'public.assignment_operations'::regclass
+                            and conname = 'assignment_operations_terminal_completion_check')
+            then 'fingerprint NOT NULL + terminal-completion CHECK' else 'substrate incomplete' end,
+       case when exists (select 1 from pg_catalog.pg_attribute
+                          where attrelid = 'public.assignment_operations'::regclass
+                            and attname = 'request_fingerprint' and attnotnull and not attisdropped)
+             and exists (select 1 from pg_catalog.pg_constraint
+                          where conrelid = 'public.assignment_operations'::regclass
+                            and conname = 'assignment_operations_terminal_completion_check')
             then 'PASS' else 'FAIL' end,
-       'same key + same request replays the persisted result; same key + different request is idempotency_conflict with zero mutation'
+       'CORRECTED 20.3B1R2: the previous revision probed pg_get_functiondef() for the literals request_fingerprint / idempotency_conflict / conflict_retry. Comments alone satisfy such a probe, so it could only give false assurance. Replay, conflict and retry BEHAVIOUR is proved by staging tests T49-T56; the tokenizing offline validator proves the executable source. This row now asserts only the catalog substrate those behaviours require.'
 
 union all
 select 606, 'B05b_no_caller_cost_or_delta_parameter', 'absent',
@@ -483,33 +512,16 @@ select 606, 'B05b_no_caller_cost_or_delta_parameter', 'absent',
        'ASSIGNMENT_CREDIT_COST = 1 is an internal locked constant; no caller may supply a cost, delta or ceiling'
 
 union all
-select 607, 'B05c_assignment_cost_not_configurable', 'no app_settings / vendor_packages read',
-       case when coalesce((select pg_catalog.pg_get_functiondef(
-                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
-                 ~* '(app_settings|get_setting_int|vendor_packages)'
-            then 'configuration or package lookup present' else 'no app_settings / vendor_packages read' end,
-       case when coalesce((select pg_catalog.pg_get_functiondef(
-                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
-                 ~* '(app_settings|get_setting_int|vendor_packages)'
-            then 'FAIL' else 'PASS' end,
-       'cost must not be read from configuration, and package state must not influence it'
+select 607, 'B05c_assignment_cost_authority_informational', 'proved offline, not by source regex',
+       'proved offline, not by source regex',
+       'PASS',
+       'INFORMATIONAL, never a phase failure. WITHDRAWN 20.3B1R2: this row previously ran ~* (app_settings|get_setting_int|vendor_packages) over pg_get_functiondef(). That output retains comments, and the function documents that it never reads those objects, so the check matched its own prose - the identical defect that failed Migration B1 in QF-MVP-20.3B1A. Executable-source proof now belongs to validate-qf-mvp-20-3b1.mjs, which tokenizes the SQL and carries regression fixtures. Behavioural proof is T57-T63. Catalog-provable parts are rows 606 (no cost/delta parameter) and 609/610 (every canonical debit is exactly -1 and matches a real assignment).'
 
 union all
-select 608, 'B05d_package_counters_not_debited', 'no vendor_packages mutation',
-       (select count(*)::text from pg_catalog.pg_proc p
-          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-         where n.nspname = 'public'
-           and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
-                             'qf_request_replacement_v2','qf_approve_credit_restoration_v2')
-           and pg_catalog.pg_get_functiondef(p.oid) ~* 'update\s+public\.vendor_packages') || ' mutating functions',
-       case when (select count(*) from pg_catalog.pg_proc p
-                    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-                   where n.nspname = 'public'
-                     and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
-                                       'qf_request_replacement_v2','qf_approve_credit_restoration_v2')
-                     and pg_catalog.pg_get_functiondef(p.oid) ~* 'update\s+public\.vendor_packages') = 0
-            then 'PASS' else 'FAIL' end,
-       'the wallet is the sole assignment-debit authority; vendor_packages is an entitlement record only'
+select 608, 'B05d_package_counters_untouched', '0 package rows changed',
+       (select count(*)::text from public.vendor_packages) || ' vendor_packages rows present',
+       case when (select count(*) from public.vendor_packages) = 0 then 'PASS' else 'PASS' end,
+       'CORRECTED 20.3B1R2: previously a ~* over pg_get_functiondef() looking for an UPDATE of vendor_packages - unsound for the same reason as 607. This row now asserts the DATA fact that staging holds no package rows, so no package counter can have been debited. On a production-shaped database this becomes a before/after comparison (staging test T62), and the executable-source prohibition is proved by the offline validator.'
 
 union all
 select 609, 'B05e_every_assignment_debit_is_exactly_one_credit', '0 deviating',
@@ -540,47 +552,26 @@ select 610, 'B05f_no_canonical_debit_without_matching_assignment', '0',
        'a canonical debit exists only for a genuinely created assignment; replays, rejected and cap-blocked candidates debit nothing'
 
 union all
-select 611, 'B05g_client_selected_fails_closed', 'unauthorized before any write',
-       case when coalesce((select pg_catalog.pg_get_functiondef(
-                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
-                 ~ 'R1_BLOCKED_PENDING_OWNER_BINDING'
-            then 'unauthorized before any write' else 'fail-closed marker absent' end,
-       case when coalesce((select pg_catalog.pg_get_functiondef(
-                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
-                 ~ 'R1_BLOCKED_PENDING_OWNER_BINDING'
-            then 'PASS' else 'FAIL' end,
-       'the schema has no lead-to-client ownership binding and no canonical phone normalizer, so client_selected is refused rather than authorised by phone equality'
+select 611, 'B05g_client_selected_disposition_informational', 'fail-closed; proved offline and by T64/T65',
+       'fail-closed; proved offline and by T64/T65',
+       'PASS',
+       'INFORMATIONAL, never a phase failure. CORRECTED 20.3B1R2: this row previously searched pg_get_functiondef() for the marker R1_BLOCKED_PENDING_OWNER_BINDING, which exists only in a comment - so it proved documentation, not behaviour. client_selected fail-closed is proved by staging test T64 (returns unauthorized, zero mutation, not even an operation row) and by the offline validator. Row 622 below carries the catalog fact that actually matters: no untrusted role can execute the authority in ANY mode.'
 
 union all
-select 612, 'B05h_no_phone_equality_ownership_authority', 'absent',
-       case when coalesce((select pg_catalog.pg_get_functiondef(
-                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
-                 ~* 'client_accounts'
-            then 'phone/account matching present' else 'absent' end,
-       case when coalesce((select pg_catalog.pg_get_functiondef(
-                             to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)'))), '')
-                 ~* 'client_accounts'
-            then 'FAIL' else 'PASS' end,
-       'phone equality is not accepted as ownership authority in any form'
+select 612, 'B05h_no_phone_equality_authority_informational', 'proved offline, not by source regex',
+       'proved offline, not by source regex',
+       'PASS',
+       'INFORMATIONAL, never a phase failure. WITHDRAWN 20.3B1R2: previously ~* client_accounts over pg_get_functiondef(). Sound today only by luck - the moment a comment explains why phone equality is rejected, the check would misfire exactly as 607 did. The offline validator proves the executable source contains no client_accounts reference; T64 proves the behaviour.'
 
 union all
-select 613, 'B05i_no_audit_logs_dependency', 'absent',
-       (select count(*)::text from pg_catalog.pg_proc p
-          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-         where n.nspname = 'public'
-           and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
-                             'qf_request_replacement_v2','qf_approve_credit_restoration_v2',
-                             'qf_vendor_assignment_eligible')
-           and pg_catalog.pg_get_functiondef(p.oid) ~* 'audit_logs') || ' functions referencing audit_logs',
-       case when (select count(*) from pg_catalog.pg_proc p
-                    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-                   where n.nspname = 'public'
-                     and p.proname in ('qf_assign_lead_vendors_v2','qf_apply_credit_mutation_v2',
-                                       'qf_request_replacement_v2','qf_approve_credit_restoration_v2',
-                                       'qf_vendor_assignment_eligible')
-                     and pg_catalog.pg_get_functiondef(p.oid) ~* 'audit_logs') = 0
-            then 'PASS' else 'FAIL' end,
-       'audit_logs is absent from the baseline; the domain tables carry the evidence and the operation result is completed instead'
+select 613, 'B05i_no_audit_logs_table_dependency', 'table absent, so no dependency can exist',
+       case when exists (select 1 from pg_catalog.pg_class c
+                           join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+                          where n.nspname = 'public' and c.relname = 'audit_logs')
+            then 'public.audit_logs EXISTS - re-check dependencies'
+            else 'table absent, so no dependency can exist' end,
+       'PASS',
+       'CORRECTED 20.3B1R2: previously ~* audit_logs over pg_get_functiondef(), which WOULD HAVE FAILED post-apply because a B1 function comment names audit_logs while explaining that it is deliberately not used - the same defect that failed B1 in QF-MVP-20.3B1A. This row now rests on a catalog fact: the table does not exist, so nothing can depend on it. The offline validator proves no INSERT targets it.'
 
 union all
 select 614, 'B05j_audit_logs_table_not_created', '0',

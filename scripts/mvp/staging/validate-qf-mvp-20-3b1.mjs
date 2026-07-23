@@ -261,6 +261,14 @@ for (const [key, rel] of Object.entries({
     // "app_settings" or "vendor_packages" inside a literal; only a real table
     // reference in executable code is a finding.
     bodyCode: norm(tok.bodies.map((b) => tokenize(b, rel).code).join(" ")),
+    // THE EXECUTABLE VIEW (QF-MVP-20.3B1R2). Top-level code plus every function
+    // body, with line comments, nested block comments, single-quoted and
+    // escape-string literals and quoted-identifier decoration all removed.
+    // This is the ONLY view any "does the SQL reference X?" question may use.
+    // A name that appears solely in a comment or a literal is absent here, by
+    // construction — which is exactly the property Migration B1's withdrawn
+    // in-database guard lacked.
+    exec: norm(tok.code + " " + tok.bodies.map((b) => tokenize(b, rel).code).join(" ")),
   };
   record(`tokenize:${rel}`, true, `${raw.length} bytes, ${tok.bodies.length} dollar-quoted bodies`);
 }
@@ -889,6 +897,277 @@ for (const f of MIGRATIONS) {
     "3B1R:A2 changes no existing assignment row",
     !a2TouchesAssignments,
     a2TouchesAssignments ? "A2 mutates lead_assignments" : "lifecycle comes from Migration A's column default only"
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+/* 9c. QF-MVP-20.3B1R2 — no lexical assertions over comment-retaining source  */
+/*                                                                            */
+/* Migration B1 failed its first staging application because an in-database   */
+/* guard ran a NEGATIVE regex over pg_get_functiondef(), whose output retains */
+/* comments — so it matched the function's own accurate documentation. These  */
+/* checks make that defect class unrepresentable going forward.               */
+/* ------------------------------------------------------------------------- */
+
+/** Catalog accessors whose output retains comments and/or string literals. */
+const COMMENT_RETAINING_SOURCE = [
+  "pg_get_functiondef",
+  "prosrc",
+  "routine_definition",
+];
+
+/**
+ * Finds lexical assertions over comment-retaining source text in executable
+ * SQL. Any comparison operator applied to such an accessor is reported: a
+ * negative one (`not like`, `!~`, `~*` used to forbid) can raise a false
+ * failure, and a positive one can be satisfied by a comment and give false
+ * assurance. Neither is acceptable in an in-database verification block.
+ */
+function sourceTextAssertions(execSql) {
+  const hits = [];
+  for (const accessor of COMMENT_RETAINING_SOURCE) {
+    const re = new RegExp(
+      `${accessor}[\\s\\S]{0,400}?(not\\s+like|not\\s+ilike|!~\\*?|~\\*?|\\blike\\b|\\bilike\\b)`,
+      "g"
+    );
+    let m;
+    while ((m = re.exec(execSql)) !== null) {
+      hits.push(`${accessor} … ${m[1].trim()}`);
+    }
+  }
+  return hits;
+}
+
+for (const f of MIGRATIONS) {
+  const hits = sourceTextAssertions(f.exec);
+  record(
+    `3B1R2:no lexical assertion over raw source:${path.basename(f.rel)}`,
+    hits.length === 0,
+    hits.length === 0
+      ? "no pg_get_functiondef / prosrc / routine_definition comparison in executable SQL"
+      : `FORBIDDEN: ${[...new Set(hits)].join(" | ")}`
+  );
+}
+
+{
+  const hits = sourceTextAssertions(V.exec);
+  record(
+    "3B1R2:phase verifier makes no lexical assertion over raw source",
+    hits.length === 0,
+    hits.length === 0
+      ? "verifier relies on catalog and data facts only"
+      : `FORBIDDEN: ${[...new Set(hits)].join(" | ")}`
+  );
+}
+
+/* pg_get_function_identity_arguments is explicitly still allowed: it renders
+ * parameter names and types only, with no comments and no literals. */
+{
+  const usesIdentArgs = /pg_get_function_identity_arguments/.test(V.exec + " " + B1.exec);
+  record(
+    "3B1R2:signature checks may still use identity arguments",
+    true,
+    usesIdentArgs
+      ? "pg_get_function_identity_arguments retained — comment-free structured rendering, safe for negative matching"
+      : "not used (also acceptable)"
+  );
+}
+
+/* --- Executable-source prohibitions, proved on the tokenized view --------- */
+{
+  const execRefs = [
+    ["public.app_settings", /\bpublic\.app_settings\b/],
+    ["get_setting_int(", /\bget_setting_int\s*\(/],
+    ["public.vendor_packages", /\bpublic\.vendor_packages\b/],
+    ["audit_logs", /\baudit_logs\b/],
+    ["whatsapp_logs", /\bwhatsapp_logs\b/],
+  ];
+  for (const [label, re] of execRefs) {
+    const inB1 = re.test(B1.exec);
+    record(
+      `3B1R2:B1 executable SQL does not reference ${label}`,
+      !inB1,
+      inB1 ? `executable reference found` : "absent from executable SQL (comments and literals excluded)"
+    );
+  }
+
+  /* The same names DO appear in B1's prose — that is expected and must never
+   * be treated as a violation. This asserts the two views genuinely differ,
+   * i.e. the tokenizer is doing real work rather than trivially passing. */
+  const inProse = /app_settings|vendor_packages/.test(norm(B1.raw));
+  const inExec = /\bpublic\.app_settings\b|\bpublic\.vendor_packages\b/.test(B1.exec);
+  record(
+    "3B1R2:comments naming forbidden objects are not executable references",
+    inProse && !inExec,
+    inProse
+      ? "B1 documents app_settings / vendor_packages in comments; the executable view correctly excludes them"
+      : "prose no longer mentions them — check the tokenizer is still exercised"
+  );
+}
+
+/* --- B1 retains its positive catalog guards ------------------------------ */
+{
+  const verifyBody = B1.bodies.find((b) => /to_regprocedure/.test(b) && /has_function_privilege/.test(b)) || "";
+  const guards = [
+    ["function existence via to_regprocedure", /to_regprocedure/],
+    ["no PUBLIC/anon/authenticated execute", /has_function_privilege\('public'/],
+    ["service_role execute granted", /has_function_privilege\('service_role'/],
+    ["no caller-controlled ceiling", /pg_get_function_identity_arguments/],
+    ["search_path pinned", /proconfig/],
+    ["eligibility helper is INVOKER", /prosecdef/],
+    ["no B2 enforcement trigger", /pg_trigger/],
+    ["request_fingerprint catalog fact", /request_fingerprint/],
+    ["legacy functions retained", /admin_smart_assign_lead_to_vendors/],
+  ];
+  const missing = guards.filter(([, re]) => !re.test(verifyBody)).map(([n]) => n);
+  record(
+    "3B1R2:B1 retains every positive catalog guard",
+    missing.length === 0,
+    missing.length === 0 ? `${guards.length}/${guards.length} present` : `missing: ${missing.join(", ")}`
+  );
+}
+
+/* --- Applied migrations are immutable ------------------------------------ */
+{
+  const appliedLocks = [
+    [MIGRATION_A, "b6307094715a102fa0cfccc1533cb8089e5b26fbe1e80a294c127b81e29f2b83"],
+    [MIGRATION_A2, "9d77f4460701caa1caf172b50886b681f4b7e86849172ca2a7af1ece70eb3d60"],
+  ];
+  for (const [rel, want] of appliedLocks) {
+    let got = null;
+    try { got = sha256(read(rel)); } catch { /* reported below */ }
+    record(
+      `3B1R2:APPLIED migration is byte-identical:${path.basename(rel)}`,
+      got === want,
+      got === want
+        ? `unchanged ${want.slice(0, 8)}… — already represented by a truthful remote migration-history row`
+        : `CHANGED: expected ${want}, got ${got}. An applied migration must never be edited.`
+    );
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* 9d. QF-MVP-20.3B1R2 — deterministic regression fixtures                    */
+/*                                                                            */
+/* These prove the tokenizer itself, in memory, with no file or database.     */
+/* Each fixture states the outcome it must produce; a fixture that produces   */
+/* the wrong outcome fails the validator.                                     */
+/* ------------------------------------------------------------------------- */
+{
+  const FIXTURES = [
+    {
+      id: "A",
+      name: "forbidden words in LINE comments are not executable references",
+      sql: `create function f() returns int language plpgsql as $$
+              begin
+                -- never read from app_settings and never touch vendor_packages
+                return 1;
+              end $$;`,
+      expect: "clean",
+    },
+    {
+      id: "B",
+      name: "forbidden words in BLOCK comments are not executable references",
+      sql: `create function f() returns int language plpgsql as $$
+              begin
+                /* cost is a constant. /* nested */ we never query app_settings
+                   and never debit vendor_packages here. */
+                return 1;
+              end $$;`,
+      expect: "clean",
+    },
+    {
+      id: "C",
+      name: "forbidden words in STRING LITERALS are not executable references",
+      sql: `create function f() returns text language plpgsql as $$
+              begin
+                return 'this function never reads app_settings or vendor_packages';
+              end $$;`,
+      expect: "clean",
+    },
+    {
+      id: "D",
+      name: "an executable SELECT from app_settings is detected",
+      sql: `create function f() returns int language plpgsql as $$
+              declare v int;
+              begin
+                select value into v from public.app_settings where key = 'cost';
+                return v;
+              end $$;`,
+      expect: "dirty",
+    },
+    {
+      id: "E",
+      name: "an executable UPDATE of vendor_packages is detected",
+      sql: `create function f() returns void language plpgsql as $$
+              begin
+                update public.vendor_packages set remaining_leads = remaining_leads - 1;
+              end $$;`,
+      expect: "dirty",
+    },
+  ];
+
+  const FORBIDDEN_EXEC = /\bpublic\.app_settings\b|\bpublic\.vendor_packages\b/;
+
+  for (const fx of FIXTURES) {
+    let outcome, detail;
+    try {
+      const tok = tokenize(fx.sql, `fixture-${fx.id}`);
+      const ex = norm(tok.code + " " + tok.bodies.map((b) => tokenize(b, `fixture-${fx.id}`).code).join(" "));
+      outcome = FORBIDDEN_EXEC.test(ex) ? "dirty" : "clean";
+      detail = `tokenized → ${outcome}`;
+    } catch (err) {
+      outcome = "error";
+      detail = `fail-closed: ${err.message}`;
+    }
+    record(
+      `3B1R2:fixture ${fx.id} — ${fx.name}`,
+      outcome === fx.expect,
+      outcome === fx.expect
+        ? `${detail} (expected ${fx.expect})`
+        : `EXPECTED ${fx.expect}, GOT ${outcome}`
+    );
+  }
+
+  /* Fixture F — the exact defect that failed B1 on staging. A guard running a
+   * negative regex over pg_get_functiondef() must be rejected outright. */
+  const fixtureF = `
+    do $verify$
+    begin
+      if (select pg_catalog.pg_get_functiondef(to_regprocedure('public.f()')))
+         ~* '(app_settings|vendor_packages)' then
+        raise exception 'reads forbidden objects';
+      end if;
+    end
+    $verify$;`;
+  let fOutcome;
+  try {
+    const tok = tokenize(fixtureF, "fixture-F");
+    const ex = norm(tok.code + " " + tok.bodies.map((b) => tokenize(b, "fixture-F").code).join(" "));
+    fOutcome = sourceTextAssertions(ex).length > 0 ? "rejected" : "accepted";
+  } catch (err) {
+    fOutcome = `error: ${err.message}`;
+  }
+  record(
+    "3B1R2:fixture F — a raw pg_get_functiondef negative-regex guard is rejected",
+    fOutcome === "rejected",
+    fOutcome === "rejected"
+      ? "detected as a forbidden lexical assertion over comment-retaining source"
+      : `EXPECTED rejected, GOT ${fOutcome}`
+  );
+
+  /* Fixture G — fail-closed on an unterminated construct. */
+  let gOutcome;
+  try {
+    tokenize(`create function f() as $$ begin -- never ends`, "fixture-G");
+    gOutcome = "accepted";
+  } catch {
+    gOutcome = "threw";
+  }
+  record(
+    "3B1R2:fixture G — unterminated dollar-quote fails closed",
+    gOutcome === "threw",
+    gOutcome === "threw" ? "tokenizer threw rather than guessing" : "EXPECTED throw, GOT silent acceptance"
   );
 }
 

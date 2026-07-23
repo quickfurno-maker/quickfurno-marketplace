@@ -52,6 +52,31 @@
 --   self-approve one.
 --
 -- ---------------------------------------------------------------------------
+-- CORRECTED BY QF-MVP-20.3B1R2 — self-verification reliability only
+-- ---------------------------------------------------------------------------
+--   The first staging application of this file (QF-MVP-20.3B1A) FAILED and
+--   rolled back. The cause was entirely inside this file's own section 7
+--   verification block, not in the canonical authority it creates:
+--   pg_get_functiondef() returns the definition INCLUDING comments, and a
+--   negative regex over it matched the function's own accurate documentation.
+--
+--   This revision removes that unsound assertion and its two sibling
+--   source-text probes. See the withdrawal notice in section 7.5c for the
+--   locked policy and for where each proof now lives.
+--
+--   NO BUSINESS BEHAVIOUR CHANGED. The request fingerprint, persisted replay
+--   result, exact-replay path, idempotency_conflict, conflict_retry, the
+--   one-wallet-credit cost, wallet-only debit, active-three, lifetime-six,
+--   deterministic vendor locking, transactional atomicity, client_selected
+--   fail-closed posture, service_role-only execution, the absence of provider
+--   sends, whatsapp_logs authority, audit_logs and B2 triggers, and the six
+--   retained legacy functions are all byte-for-byte as reviewed in 20.3B1R.
+--
+--   The migration keeps version 20260723000300: it never committed and no
+--   remote migration-history row exists for it, so correcting it in place is
+--   truthful. No repair, no reset, no replacement version.
+--
+-- ---------------------------------------------------------------------------
 -- REVIEWED AND CORRECTED BY QF-MVP-20.3B1R
 -- ---------------------------------------------------------------------------
 --   1. IDEMPOTENT REPLAY IS NO LONGER KEY-ONLY. The first generation trusted
@@ -1104,9 +1129,8 @@ begin
       'QF-MVP-20.3B1 Migration B1 aborted: an enforcement trigger exists on lead_assignments or lead_assignment_events. Those belong to Migration B2, after the R1 consumer release.';
   end if;
 
-  -- 7.5b the replay contract is structurally present (QF-MVP-20.3B1R): the
-  --      authority must compare a request fingerprint, not the key alone, and
-  --      must be able to emit idempotency_conflict.
+  -- 7.5b the replay substrate is present as a CATALOG FACT: replay must never
+  --      be decided on the idempotency key alone.
   if not exists (
     select 1 from pg_catalog.pg_attribute
      where attrelid = 'public.assignment_operations'::regclass
@@ -1116,28 +1140,56 @@ begin
       'QF-MVP-20.3B1R Migration B1 aborted: assignment_operations.request_fingerprint is missing. Apply Migration A (20260723000100) first; replay must never be decided on the idempotency key alone.';
   end if;
 
-  if (select pg_catalog.pg_get_functiondef(
-               to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')))
-     not like '%idempotency_conflict%' then
-    raise exception
-      'QF-MVP-20.3B1R Migration B1 aborted: qf_assign_lead_vendors_v2 cannot emit idempotency_conflict. Reusing one key for a different authority request must be refused, not replayed.';
-  end if;
-
-  if (select pg_catalog.pg_get_functiondef(
-               to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')))
-     not like '%request_fingerprint%' then
-    raise exception
-      'QF-MVP-20.3B1R Migration B1 aborted: qf_assign_lead_vendors_v2 does not compare a request fingerprint.';
-  end if;
-
-  -- 7.5c the assignment cost has exactly one authority and is never sourced
-  --      from configuration or from package state.
-  if (select pg_catalog.pg_get_functiondef(
-               to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)')))
-     ~* '(app_settings|get_setting_int|vendor_packages)' then
-    raise exception
-      'QF-MVP-20.3B1R Migration B1 aborted: the assignment authority reads app_settings or vendor_packages. ASSIGNMENT_CREDIT_COST = 1 is an internal locked constant.';
-  end if;
+  -- =========================================================================
+  -- 7.5c WITHDRAWN BY QF-MVP-20.3B1R2 — DO NOT REINTRODUCE
+  --
+  -- An earlier revision asserted here that qf_assign_lead_vendors_v2 does not
+  -- read app_settings or vendor_packages, by running a NEGATIVE regular
+  -- expression over pg_get_functiondef() output:
+  --
+  --     if (select pg_get_functiondef(...)) ~* '(app_settings|vendor_packages)'
+  --       then raise exception ...
+  --
+  -- That is unsound. pg_get_functiondef() returns the stored definition
+  -- INCLUDING its comments and string literals, so the guard matched the
+  -- function's own documentation - the comments that truthfully state those
+  -- objects are NEVER read - and aborted a fully compliant function. It failed
+  -- the first real staging application of B1 (QF-MVP-20.3B1A) even though the
+  -- executable SQL contains no such read.
+  --
+  -- Two sibling probes were withdrawn with it for the same defect class: they
+  -- asserted the PRESENCE of 'idempotency_conflict' and 'request_fingerprint'
+  -- in pg_get_functiondef() output. A comment alone would satisfy those, so
+  -- they could only ever produce false assurance, never real proof.
+  --
+  -- LOCKED POLICY. No in-database self-verification block in this release may
+  -- make a lexical assertion - positive or negative - over any representation
+  -- that retains comments or quoted literals: pg_get_functiondef(),
+  -- pg_proc.prosrc, or information_schema routine-definition text. Proving a
+  -- property of EXECUTABLE SQL requires tokenization (stripping line comments,
+  -- nested block comments, single-quoted and escape-string literals,
+  -- dollar-quoted bodies, and quoted identifiers), which is not available here
+  -- and must NOT be added to the production schema as a helper function purely
+  -- to serve migration self-verification.
+  --
+  -- Where the proof now lives instead:
+  --   * executable-source prohibitions (no app_settings / get_setting_int read,
+  --     no vendor_packages read or debit, no caller-controlled cost or delta,
+  --     no audit_logs insert, no provider call, no B2 trigger attachment, no
+  --     untrusted grant) -> scripts/mvp/staging/validate-qf-mvp-20-3b1.mjs,
+  --     which tokenizes the SQL and carries regression fixtures proving that
+  --     comments and string literals never count as executable references;
+  --   * replay, conflict and cost BEHAVIOUR -> staging tests T49-T63;
+  --   * everything catalog-provable -> the positive assertions retained above
+  --     and below, which read catalog facts (pg_proc, pg_attribute, pg_trigger,
+  --     pg_proc.proconfig, has_function_privilege) and cannot be influenced by
+  --     comments at all.
+  --
+  -- NOTE on 7.2: that check is retained and is NOT the same defect class. It
+  -- matches pg_get_function_identity_arguments(), a structured rendering of
+  -- parameter names and types only. It contains no comments and no literals,
+  -- so a negative match there is a genuine signature fact.
+  -- =========================================================================
 
   -- 7.6 legacy compatibility is intact: the six legacy assignment RPCs remain.
   if (select count(*) from pg_catalog.pg_proc p

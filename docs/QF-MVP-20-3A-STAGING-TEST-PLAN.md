@@ -167,6 +167,8 @@ These fifteen tests prove the four contracts closed by the 20.3B1R review. Recor
 |---|---|---|---|---|
 | **T68** | Every in-migration `DO` verification block is rehearsed before it is declared ready | migration rehearsal | apply the migration to a disposable database that matches the target's pre-state | the block runs to completion. A **negative** assertion (`NOT LIKE`, `!~`, `~* '(...)'` used to forbid something) over `pg_get_functiondef()`, `prosrc` or any catalog text that retains comments must additionally be proven not to match the object's own documentation |
 
+**T68 is now enforced offline by validator fixtures A–G** (QF-MVP-20.3B1R2): forbidden names in line comments, block comments and string literals must PASS; a real executable `SELECT FROM public.app_settings` and `UPDATE public.vendor_packages` must FAIL; a raw `pg_get_functiondef` negative-regex guard must be **rejected**; and an unterminated construct must fail closed. Fixture F reproduces the exact guard that aborted B1. The validator additionally forbids any lexical assertion over `pg_get_functiondef` / `prosrc` / `routine_definition` in **all three** migrations *and* in the phase verifier — which is how the six defective verifier rows were caught before they could fail a second application.
+
 T68 exists because neither a dry-run nor an offline validator can execute a `DO` block: the dry-run proves only *which* migrations would run, and the validator inspects comment-stripped file text while the in-database guard inspects comment-retaining catalog output. The two disagreed, and only the database-side view was wrong.
 
 ## Gate

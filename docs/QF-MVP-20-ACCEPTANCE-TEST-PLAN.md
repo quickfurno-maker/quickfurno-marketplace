@@ -112,6 +112,17 @@ What the partial application *does* establish:
 
 **Lesson for the matrix.** A migration's *in-database* verification block is itself untested code that only executes at apply time. Neither a dry-run nor an offline validator can exercise it. Any future migration carrying a `DO` block with negative assertions needs a rehearsal apply on a disposable database before it is treated as ready.
 
+## QF-MVP-20.3B1R2 — verification-tooling correction
+
+The B1 failure exposed a defect **in the verification tooling itself**, not in the acceptance criteria. Both the migration's in-database guard and six rows of the phase verifier asserted properties of SQL by pattern-matching `pg_get_functiondef()`, whose output retains comments and string literals. Two verifier rows would have failed even against a correctly applied B1.
+
+Consequences for this matrix:
+
+- **No acceptance criterion changed.** L1–L24 and T1–T67 stand exactly as written; the corrected B1 preserves all eighteen locked behaviours byte-for-byte.
+- **Proof responsibility is now explicitly partitioned.** Catalog facts (`pg_proc`, `pg_attribute`, `pg_constraint`, `pg_trigger`, `proconfig`, `has_function_privilege`) are proved in-database. Executable-source prohibitions are proved by the tokenizing offline validator. Behaviour is proved by staging tests. No layer may substitute a lexical scan of comment-retaining text for any of the three.
+- **L21 (no configurable cap/cost)** is now proved two ways that cannot be fooled by prose: the signature check over `pg_get_function_identity_arguments` (comment-free by construction) and the offline validator's executable-SQL view.
+- **T68** in the staging test plan generalises the lesson, and the validator's fixtures A–G lock it in — including fixture F, which reproduces the exact guard that failed and confirms it is now rejected before application.
+
 ## Gate
 
 QF-MVP-20 is not COMPLETE until: all L1–L24 pass on staging; concurrency and RLS/grant classes pass; migration rehearsal + rollback verified; historical ledger investigation closed (no blind mutation); `verify:mvp` green. Production canary only after founder sign-off.

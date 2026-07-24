@@ -332,3 +332,43 @@ binding deferred; 68 public tables.
 **Migration-006 divergence boundary:** only `vendor_internal_notes` is handled here; `audit_logs`/
 `admin_notifications`/other omitted 006 tables are NOT created/assumed — **QF-MVP-30.4 must revalidate them
 before reuse**. **Next: QF-MVP-30.1B staging application review.**
+
+## 17. QF-MVP-30.1BA — staging application (APPLIED + VERIFIED)
+
+**Status:** `VENDOR_CRM_FOUNDATION_APPLIED_AND_VERIFIED_ON_STAGING`. **Date:** 2026-07-24 (18:56–18:59 UTC) ·
+**Linked target:** authorized staging `uckafzuochmbvtiodmcl` (production/QF-Jarvis not contacted). Migration
+`20260723001100` is **APPLIED** via exactly one `supabase db push --linked` (18:57:24→18:57:34 UTC, **exit
+0**); exactly that migration, no earlier migration, no repair/reset, no second push. Applied at HEAD
+`51126e094bb7c79ada044c9d26d19d77e8924d94` (parent `d5ee7cf…`, origin identical, 0/0, clean). Hashes exact
+(migration `9212f746…`, verifier `e10caa56…`).
+
+**ABSENT path executed + verified.** The pre-state proved `vendor_internal_notes` ABSENT; the apply log shows
+16 `drop … if exists … does not exist, skipping` NOTICEs (the converge block running on the freshly-created
+table) and the in-transaction `$verify$` NOTICE confirming the six tables, the sole append-only notes
+authority, RESTRICT vendor FKs + SET NULL actor FKs, no Core-truth columns, no segment/campaign, and A–E/
+20.4C/20.5A + vendor_public_v + owner-binding-deferral intact. Trailing `pgdelta-target-ca.crt ENOENT` is the
+known non-blocking cache artifact.
+
+**History:** before **12 local / 11 remote** (sole pending) → after **12 local / 12 remote**, all paired
+once, applied once.
+
+**Locked verifier `verify_qf_mvp_30_1b.sql` (`e10caa56…`) ran once: 25 rows, 25 PASS / 0 FAIL.** Proven live:
+six foundation tables present; no rival `vendor_notes`; RLS on all six; PUBLIC/anon/authenticated zero;
+service_role SELECT+INSERT on notes / SELECT+INSERT+UPDATE on the five lifecycle tables, no DELETE/TRUNCATE;
+notes append-only triggers; every CRM→vendors FK RESTRICT; **W25** notes final contract (exact 7 columns,
+created_by SET NULL, PK, legacy policy absent) — the ABSENT bootstrap converged to the canonical shape;
+tag/profile/contact/task uniqueness + idempotency; no Core-truth columns; no segment/campaign; vendor_public_v
+intact; B1/B2/C/D/E/20.4C/20.5A posture + owner-binding deferral preserved.
+
+**Zero-data-write:** a post-application SELECT-only pass confirmed all six foundation tables hold **0 rows**;
+`auth.users`/`profiles`/`vendors`/`lead_assignments`/`vendor_credit_logs` and the 20.4C register remain 0;
+all public rows total 0; public table count **68 → 74** (exactly the six new CRM tables — **no** unrelated
+006 table created). No note content inserted; no Core backfill; no RPC.
+
+**Gates:** 30.1B 46/46, blueprint 36/36, all Marketplace gates green, `verify:mvp` exit 0, `git diff --check`
+exit 0. Transcript + captures outside Git in `qf-staging-workspace/QF-MVP-30.1BA-APPLICATION-20260724T185637Z/`.
+
+**Migration-006 divergence:** only `vendor_internal_notes` was created from the omitted set; the other 006
+tables were **not** created (table count +6 exactly) and must be revalidated before reuse — QF-MVP-30.4 must
+not assume `audit_logs`/`admin_notifications` exist. **Next: QF-MVP-30.2 — Vendor CRM Directory and Combined
+Vendor Profile** (not started).

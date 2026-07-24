@@ -1,11 +1,43 @@
 # QF-MVP-20.3E — Legacy Assignment RPC EXECUTE Revocation
 
-**Status: `E_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.**
+**Status: `E_APPLIED_VERIFIED_ON_STAGING_READY_FOR_COMMIT_REVIEW`.**
 
-> **PREFLIGHT COMPLETE — NOT APPLIED.** The single authorized dry run (2026-07-24 11:01:33→11:01:38Z,
-> exit 0) proposed exactly Migration E and wrote nothing; the live pre-state proves E is an ACL no-op
-> (the six are already `service_role`-only). Production and QF-Jarvis were never accessed. E is not
-> applied; nothing pushed beyond the two already-pushed E commits.
+> **APPLIED AND VERIFIED ON STAGING.** Migration E was applied to `uckafzuochmbvtiodmcl` exactly once
+> on 2026-07-24 11:18:14→11:18:22Z (exit 0); the locked 21-row verifier returned **21 PASS / 0 FAIL**;
+> pre/post catalog snapshots are **byte-identical** (unchanged OIDs + `prosrc` md5 + ACL), proving E
+> was an **ACL no-op**. Production and QF-Jarvis were never accessed. The completion commit is not
+> pushed.
+
+## 0-C. Staging application (QF-MVP-20.3EA) — COMPLETE
+
+Applied from the accepted preflight HEAD `4e8d6f0`. The single authorized `npx supabase db push
+--linked` (exit 0) applied **exactly** `20260723000800`; the migration's §2 self-verification NOTICE
+confirmed in-transaction that *the six legacy assignment RPCs are service_role-only (PUBLIC/anon/
+authenticated hold no EXECUTE), all still present as SECURITY DEFINER jsonb functions,
+get_public_eligible_vendors anon/authenticated EXECUTE preserved, canonical B1 authority server-only
+and intact, A/A2/B1/G/B2/C/D preserved, owner binding and 20.4 not started*. The trailing
+`pgdelta-target-ca.crt ENOENT` was the same **local** edge-runtime catalog-cache artifact (as in D),
+non-blocking at exit 0.
+
+**Migration history:** 9 local / 8 remote → **9 local / 9 remote**, E recorded exactly once, no
+pending. **Locked verifier** (`verify_qf_mvp_20_3e.sql`, re-hashed `a4ab76fa…`, run byte-exact via
+`supabase db query --linked --file`): **21 rows, 21 PASS / 0 FAIL**, contiguous, SELECT-only, no RPC
+invoked — per-target server-only posture (E03–E08), no untrusted EXECUTE (E09), all six SECURITY
+DEFINER jsonb (E10), safe public RPC preserved (E11), canonical server-only (E12), B1/B2/G/C/D
+preserved (E13–E17), six retained (E18), owner-binding + 20.4 fenced (E19/E21).
+
+**ACL no-op proved:** a SELECT-only catalog snapshot taken **before and after** application is
+byte-identical — every target **OID unchanged** (17490/17494/17495/17497/17499/17502 → no
+DROP+CREATE), every `prosrc` md5 unchanged (no body drift), untrusted EXECUTE = 0 and service_role
+present throughout; canonical (19377) and safe public (17509) unchanged. **Empty state:** 67 public
+tables, **0 total rows**, 0 auth users — no data written, no RPC invoked. **Advisors:** E introduced
+**zero** new security or performance advisors (identical to post-D; none references E or the six —
+the only ERROR remains the known C `vendor_public_v`). Transcript `QF-MVP-20.3EA-APPLICATION-…txt` in
+the external evidence workspace, never committed.
+
+**Next after commit review: QF-MVP-20.4.**
+
+---
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `2210ac71cac222b719613eb1b9c12c8e49ac5148` (D applied and verified 37/37), origin identical,
@@ -248,11 +280,10 @@ gained the E filename (its phase-progression guard). Both strictly strengthen th
 
 ## 12. Next phase
 
-**QF-MVP-20.3E staging application** — the preflight (EP, §0-B) is complete: the source-proof gate is
-satisfied, the live pre-state proves E is an ACL no-op (the six are already `service_role`-only), the
-dry run proposed exactly `20260723000800` at exit 0, and no write occurred. The application phase runs
-the single authorized non-dry-run `npx supabase db push --linked` to record exactly Migration E, then
-the SELECT-only verifier (`verify_qf_mvp_20_3e.sql`, 21 rows) confirms the posture. **Not** QF-MVP-20.4,
-**not** owner binding. Migrations A, A2, B1, G, B2, C and D remain applied and immutable; the two
-disclosed follow-ups (`profiles` `authenticated` table-GRANT — mandatory before final closeout; inert
-`profiles.admin_role` drift) remain open and out of scope.
+**QF-MVP-20.4** (historical ledger reconciliation) — after this application commit is reviewed.
+Migration E is now **applied and verified on staging** (§0-C): 9/9 history, 21/21 verifier, a proven
+ACL no-op (byte-identical pre/post catalog snapshots, unchanged OIDs and bodies), empty state
+preserved, zero new advisors. **Not** owner binding. The two disclosed follow-ups remain open and
+out of scope: the `profiles` `authenticated` table-GRANT (**mandatory** before final marketplace
+closeout) and the inert `profiles.admin_role` drift. Migrations A, A2, B1, G, B2, C, D and **E**
+remain applied and immutable.

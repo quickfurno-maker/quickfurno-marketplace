@@ -1,20 +1,23 @@
 # QF-MVP-20.3E — Legacy Assignment RPC EXECUTE Revocation
 
-**Status: `E_LEGACY_ASSIGNMENT_RPC_EXECUTE_REVOCATION_GENERATED_REVIEWED_READY_FOR_PREFLIGHT`.**
+**Status: `E_ACL_DURABILITY_CONTRACT_CORRECTED_READY_FOR_PREFLIGHT`.**
 
-> **GENERATED AND REVIEWED — NOT APPLIED.** No database was accessed in this phase — not staging,
-> not production, not QF-Jarvis. No dry run was executed. Nothing was pushed.
+> **GENERATED, CORRECTED AND REVIEWED — NOT APPLIED.** No database was accessed in this phase or the
+> one before it — not staging, not production, not QF-Jarvis. No dry run was executed. Nothing was
+> pushed.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `2210ac71cac222b719613eb1b9c12c8e49ac5148` (D applied and verified 37/37), origin identical,
 ahead/behind 0/0, clean tree. No collision for `20260723000800`; D was the highest migration.
+**Corrected in QF-MVP-20.3EGR1** on top of the generation commit `26bd744` — the durability
+overclaim was retracted (see §2a); the executable REVOKE/GRANT design is unchanged.
 
 | Artifact | SHA-256 |
 |---|---|
-| `supabase/migrations/20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql` | `4cca9c6a26e1f21ed65c1f946cd08b56fb20020af47eec3f5bada31ab2f12cba` |
-| `scripts/mvp/staging/validate-qf-mvp-20-3e.mjs` *(48/48)* | `559bf5b1b31020ba73974632214861290fcad1d331bda069e4d4adf27e8b9c9f` |
-| `supabase/staging-verification/verify_qf_mvp_20_3e.sql` *(21 rows)* | `a4ab76fa5df9d4b23b64618976ab89e41178239c643cc65a381e01f9782f3115` |
-| `scripts/mvp/staging/qf-mvp-20-3e-manifest.json` *(definition-immutability manifest)* | `8bfba9662e2a74a39c32e671419251d2db8ce233fc708cfad5540bdb90282c4a` |
+| `supabase/migrations/20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql` *(comment-only correction)* | `94c696cdd5c1e91ad75222aa8cad544daf8c5271b1453fb78729bd62d7db520a` |
+| `scripts/mvp/staging/validate-qf-mvp-20-3e.mjs` *(51/51, +R12)* | `2e9ef53a8e4fb6822bfc4b479cddcef7ebf5c14dcff1040b864baaa263960b0b` |
+| `supabase/staging-verification/verify_qf_mvp_20_3e.sql` *(21 rows, unchanged)* | `a4ab76fa5df9d4b23b64618976ab89e41178239c643cc65a381e01f9782f3115` |
+| `scripts/mvp/staging/qf-mvp-20-3e-manifest.json` *(definition-immutability manifest, unchanged)* | `8bfba9662e2a74a39c32e671419251d2db8ce233fc708cfad5540bdb90282c4a` |
 
 ---
 
@@ -37,11 +40,34 @@ executable SECURITY DEFINER functions on staging are `get_public_eligible_vendor
 `is_admin`, `owns_vendor` — **none of the six**.
 
 So on the current staging state the six are **already** `service_role`-only. **E does not close an
-open exposure.** Its value is forward-only **enforcement + catalog proof**: it re-asserts the safe
-posture as an explicit, idempotent step in the migration chain (guaranteeing the lockdown independent
-of the baseline dump — e.g. if a target were ever `DROP`+`CREATE`d, which resets ACLs to the
-PUBLIC-executable default), and its verifier proves the posture from catalog facts. The six-RPC count
-reconciles **exactly**: six reported, six targeted, six already locked.
+open exposure.** Its value is a **current-object ACL re-assertion plus a catalog-verification
+milestone**: it pins the ACLs of the six function objects that exist at E's application time (a no-op
+on the accepted current posture, since they are already `service_role`-only), and its verifier proves
+that posture from catalog facts. The six-RPC count reconciles **exactly**: six reported, six targeted,
+six already locked.
+
+### 2a. Honest durability contract (QF-MVP-20.3EGR1 correction)
+
+The original generation report claimed E is an *"idempotent re-assertion surviving any future
+DROP+CREATE ACL reset."* **That guarantee is impossible and is retracted.** The PostgreSQL ACL
+lifecycle is:
+
+| Operation | ACL effect | Does E cover it? |
+|---|---|---|
+| `REVOKE` / `GRANT` on the current object | mutates the current function's ACL; re-running is idempotent for that identity | **Yes** — this is exactly what E does at application time |
+| `CREATE OR REPLACE FUNCTION` (same identity) | normally **preserves** the existing object's ACL | ACL survives; E separately forbids body/signature changes to a target |
+| `DROP FUNCTION` + `CREATE FUNCTION` (later migration) | old object **and its ACL are destroyed**; the new object gets **creation-time defaults — PUBLIC gets EXECUTE** | **No** — E applies once, does not re-run, and does not alter default privileges |
+
+E is therefore a **current-object** guarantee, not a future-object one. Because E intentionally does
+**not** use `ALTER DEFAULT PRIVILEGES`, it makes no promise about objects created after it.
+
+**Forward governance obligation (not a database mechanism).** Any later migration that recreates one
+of the six target signatures **MUST**, in the same migration: (1) `REVOKE EXECUTE … FROM PUBLIC,
+anon, authenticated`; (2) re-`GRANT EXECUTE … TO service_role`; and (3) re-validate/update the
+immutability manifest if a definition change is separately authorized. The repository gates must
+reject a recreated state-changing RPC that lacks the required ACL posture. This validator (rule
+**R12**) encodes the obligation for E itself; a future recreation phase must carry its own equivalent
+check.
 
 ## 3. Complete assignment-RPC inventory
 
@@ -106,8 +132,8 @@ cannot have changed any body, signature, security mode or return type — E chan
 
 ## 7. Validator and verifier
 
-**Offline validator** — `scripts/mvp/staging/validate-qf-mvp-20-3e.mjs`, **48/48 PASS**. One
-`evaluateEMigration()` grades the migration (rules R01–R11, **19 one-defect fixtures**), one
+**Offline validator** — `scripts/mvp/staging/validate-qf-mvp-20-3e.mjs`, **51/51 PASS**. One
+`evaluateEMigration()` grades the migration (rules R01–R12, **22 one-defect fixtures**), one
 `evaluateEVerifier()` grades the verifier (V01–V08, **6 fixtures**), plus manifest-faithfulness and
 runtime-posture checks. Anti-vacuity guards flag any no-op mutation; check 05 proves every enforced
 migration rule has a fixture. Required mutations all caught: leave PUBLIC/anon/authenticated EXECUTE
@@ -117,6 +143,14 @@ add an unrelated RPC / unqualified name (F/G/H → R05); DROP / CREATE OR REPLAC
 (N/O → R03); owner-binding column (P → R10); functiondef assertion / removed self-verification
 (Q/R → R09); verifier DML (VF1 → V01); comment/source proof in the verifier (VF2 → V03); dropped
 target/safe/canonical/role assertions (VF3–VF6).
+
+**Rule R12 — the honest durability contract (QF-MVP-20.3EGR1).** A dedicated structural rule proves
+E is a *current-object* ACL operation only: no `ALTER DEFAULT PRIVILEGES`, no `ON ALL FUNCTIONS/
+ROUTINES` or `ON SCHEMA` grant/revoke, and **every** executable EXECUTE grant/revoke is
+signature-qualified against a specific overload identity. Its absence of any default-privilege
+mechanism is exactly why E makes no false future-object promise. Fixtures **T** (ALTER DEFAULT
+PRIVILEGES shortcut), **U** (schema-wide `ON ALL FUNCTIONS` revoke) and **V** (an unqualified,
+arg-list-less target) all trip R12.
 
 **SELECT-only verifier** — `supabase/staging-verification/verify_qf_mvp_20_3e.sql`, **21 rows**, one
 `SELECT … UNION ALL` chain, no DML/DDL, never invokes an assignment RPC. Per-target rows (E03–E08)
@@ -150,7 +184,7 @@ E does **not**: drop/rename/recreate/alter any function; change any RPC argument
 volatility, security mode, search_path or owner; alter assignment caps, replacement, eligibility,
 credit, lineage or audit behaviour; revoke the safe public discovery RPC; use broad/default-privilege
 changes; touch tables/policies/indexes/triggers/data; implement QF-MVP-20.4, owner binding, the
-`profiles` table-GRANT or `admin_role` cleanup. Enforced by validator rules R02–R04, R08, R10 and
+`profiles` table-GRANT or `admin_role` cleanup. Enforced by validator rules R02–R04, R08, R10, R12 and
 verifier rows E10–E21.
 
 ## 10. Disclosed follow-ups (still tracked, out of scope)
@@ -163,7 +197,7 @@ verifier rows E10–E21.
 
 | Gate | Result |
 |---|---|
-| `npm run test:mvp:e` | **48 passed, 0 failed** · 19 + 6 fixtures |
+| `npm run test:mvp:e` | **51 passed, 0 failed** · 22 + 6 fixtures |
 | `npm run test:mvp:d` | **110 passed, 0 failed** |
 | `npm run test:mvp:c` | **83 passed, 0 failed** |
 | `npm run test:mvp:b2` | **61 passed, 0 failed** |
@@ -178,6 +212,8 @@ gained the E filename (its phase-progression guard). Both strictly strengthen th
 
 ## 12. Next phase
 
-**QF-MVP-20.3E staging preflight** — *not* application. E is generated and reviewed only; nothing has
-been applied, no dry run has been executed, and no database has been contacted. Migrations A, A2, B1,
+**QF-MVP-20.3E staging preflight** — *not* application, and only after this EGR1 correction is
+accepted and both local E commits are pushed (the preflight's origin-sync gate requires it; EGR1 is
+forbidden from pushing). E is generated, corrected and reviewed only; nothing has been applied, no
+dry run has been executed, and no database has been contacted in either phase. Migrations A, A2, B1,
 G, B2, C and D remain applied and immutable.

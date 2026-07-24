@@ -334,6 +334,30 @@ export function evaluateEMigration(sql, label = "E") {
     add("R11_hygiene", "URL/project-ref/credential-shaped token in executable SQL");
   }
 
+  // -- R12 HONEST DURABILITY CONTRACT (QF-MVP-20.3EGR1) ----------------------
+  //    E is a CURRENT-OBJECT ACL re-assertion. It must NOT attempt any
+  //    future-object / default-privilege / schema-wide guarantee — the very
+  //    absence of those is why E makes no false "survives future DROP+CREATE"
+  //    promise. Structurally: (a) no ALTER DEFAULT PRIVILEGES; (b) no ON ALL
+  //    FUNCTIONS/ROUTINES or ON SCHEMA grant/revoke; (c) EVERY executable
+  //    EXECUTE grant/revoke is signature-qualified against a specific object
+  //    (a `name(args)` identity), never a bare or wildcard target. This makes
+  //    the honest contract load-bearing rather than a natural-language claim.
+  if (/\balter\s+default\s+privileges\b/.test(exec)) {
+    add("R12_current_object_acl_only", "ALTER DEFAULT PRIVILEGES would falsely imply a future-object guarantee E cannot make");
+  }
+  if (/\b(revoke|grant)\b[^;]*\bon\s+(all\s+(functions|routines)|schema)\b/.test(exec)) {
+    add("R12_current_object_acl_only", "schema-wide / ON ALL grant or revoke is not a current-object operation");
+  }
+  const aclStmts = [...exec.matchAll(/(revoke|grant)\s+execute\s+on\s+function\s+([^;]+?)\s+(from|to)\s+[^;]+;/g)];
+  for (const m of aclStmts) {
+    // the function reference between "on function" and from/to must carry an
+    // argument list "(...)" — i.e. a specific overload identity.
+    if (!/\([^)]*\)/.test(m[2])) {
+      add("R12_current_object_acl_only", `EXECUTE ${m[1]} is not signature-qualified: "${m[2].trim()}"`);
+    }
+  }
+
   return findings;
 }
 
@@ -456,6 +480,16 @@ const FIXTURES = [
     mutate: (s) => s.replace(/do \$verify\$[\s\S]*\$verify\$;/, "-- self-verification deleted\n") },
   { id: "S", rule: "R11_hygiene", why: "project ref smuggled in",
     mutate: (s) => `comment on schema public is 'https://uckafzuochmbvtiodmcl.supabase.co';\n${s}` },
+  // QF-MVP-20.3EGR1 — the honest durability contract. A false "future guarantee"
+  // shortcut via ALTER DEFAULT PRIVILEGES, and a schema-wide (non-current-object)
+  // revoke, must both be rejected as not-current-object operations.
+  { id: "T", rule: "R12_current_object_acl_only", why: "ALTER DEFAULT PRIVILEGES as a false future-durability shortcut",
+    mutate: (s) => `${s}\nalter default privileges in schema public grant execute on functions to service_role;\n` },
+  { id: "U", rule: "R12_current_object_acl_only", why: "schema-wide ON ALL FUNCTIONS revoke (not current-object)",
+    mutate: (s) => `${s}\nrevoke execute on all functions in schema public from public;\n` },
+  { id: "V", rule: "R12_current_object_acl_only", why: "an unqualified (no arg-list) EXECUTE revoke target",
+    mutate: (s) => s.replace("revoke execute on function public.assign_lead_to_vendors(uuid, uuid[], boolean, text) from public, anon, authenticated;",
+      "revoke execute on function public.assign_lead_to_vendors from public, anon, authenticated;") },
 ];
 
 for (const fx of FIXTURES) {

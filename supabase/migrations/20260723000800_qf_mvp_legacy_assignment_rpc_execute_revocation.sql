@@ -32,13 +32,28 @@
 -- service_role-only — the QF-MVP-20.3D advisors confirm none of the six is anon/
 -- authenticated-executable. E does not close an open exposure.
 --
--- E's value is forward-only ENFORCEMENT and CATALOG PROOF: it re-asserts the
--- safe posture as an explicit, idempotent step in the migration chain, so the
--- lockdown is guaranteed independently of the baseline dump (e.g. if a target is
--- ever DROP+CREATE'd, which resets ACLs to the PUBLIC-executable default). The
--- REVOKE/GRANT statements are idempotent: re-revoking an already-absent grant
--- and re-granting an existing one are both no-ops. The §self-verification block
--- is the load-bearing deliverable — it PROVES the posture from catalog facts.
+-- E's value is a CURRENT-OBJECT ACL re-assertion plus a CATALOG-VERIFICATION
+-- milestone. It pins the ACLs of the six function objects that exist AT E'S
+-- APPLICATION TIME, and its §self-verification block — the load-bearing
+-- deliverable — PROVES the posture from catalog facts. The REVOKE/GRANT
+-- statements are idempotent for those current identities: re-revoking an
+-- already-absent grant and re-granting an existing one are both no-ops, so E is
+-- expected to be a no-op ACL change on the accepted current staging posture.
+--
+-- WHAT E CANNOT DO (honest durability contract — QF-MVP-20.3EGR1). E is NOT a
+-- default-privilege policy and does NOT protect against a LATER migration that
+-- DROP+CREATEs a target. A DROP FUNCTION destroys the object and its ACL; the
+-- following CREATE FUNCTION mints a NEW object with creation-time defaults, and
+-- PostgreSQL grants EXECUTE to PUBLIC by default. Because E deliberately does not
+-- touch ALTER DEFAULT PRIVILEGES and applies only once in migration order, it
+-- does not re-run and cannot re-secure such a new object. (A CREATE OR REPLACE
+-- that keeps the same identity normally preserves the existing ACL — but E still
+-- forbids body/signature changes to a target itself.) The forward guarantee is
+-- therefore a GOVERNANCE obligation, not a database mechanism: any future
+-- migration that recreates one of the six signatures MUST, in the same
+-- migration, re-REVOKE EXECUTE from PUBLIC/anon/authenticated and re-GRANT
+-- service_role, and the repository gates must reject a recreated state-changing
+-- RPC that lacks that posture.
 --
 -- ---------------------------------------------------------------------------
 -- WHY PUBLIC MUST BE REVOKED (role inheritance)

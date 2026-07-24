@@ -1,13 +1,18 @@
 # QF-MVP-20.3C — Public Vendor Projection and Direct-Table Privilege Hardening
 
-**Status: `C_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW` (QF-MVP-20.3CP).**
+**Status: `C_VERIFIER_CORRECTION_IMPLEMENTED_REVIEWED_READY_FOR_STAGING_REVERIFY` (QF-MVP-20.3CVR1).**
 
-> **GENERATED, REVIEWED AND PREFLIGHTED — STILL NOT APPLIED.** The staging preflight
-> (QF-MVP-20.3CP) proved C is the **only** pending migration and that one
-> `db push --linked --dry-run` would apply **exactly** it — exit 0, one migration proposed,
-> **zero** remote history rows created. C remains **local-only**; staging stayed 7 local / 6
-> remote. Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never
-> contacted. The next phase is the **C staging application**, not Migration D. See section 13.
+> **MIGRATION C IS APPLIED ON STAGING; VERIFICATION COMPLETION IS STILL PENDING.**
+> C was applied on **2026-07-24T02:16:04Z** (`npx supabase db push --linked`, **exit 0**),
+> is recorded remotely **exactly once**, and staging is **7 local / 7 remote**. Its own
+> self-verification reported *vendor_public_v (21 cols, 0 leaks), vendors/leads anon access
+> revoked, unsafe policies dropped, B1/B2/G/legacy intact, D absent*. The locked verifier then
+> returned **22 PASS / 1 FAIL** — a **false negative** in row **C03** caused by the verifier
+> comparing a DB-sorted array against a raw hand-ordered literal. **No migration, view, ACL,
+> policy or data defect exists.** QF-MVP-20.3CVR1 corrects the verifier to normalize both sides
+> symmetrically and hardens the validator against the whole defect class. **The staging verifier
+> has NOT yet been re-run — the next phase is a read-only staging re-verification, not Migration D.**
+> See section 14.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `7d88519c86572a20538b4305469c900634bd8b73` (B2 applied), origin identical, ahead/behind 0/0,
@@ -352,3 +357,145 @@ or push.
 **QF-MVP-20.3C staging application** — *not* Migration D. C remains generated, reviewed and
 preflighted, but unapplied and local-only. Migrations A, A2, B1, G and B2 stay applied and
 immutable.
+
+
+---
+
+## 14. QF-MVP-20.3CA application, and the QF-MVP-20.3CVR1 verifier correction
+
+**Status: `C_VERIFIER_CORRECTION_IMPLEMENTED_REVIEWED_READY_FOR_STAGING_REVERIFY`.**
+**Migration C is applied and correct. Verification completion is pending a read-only re-run.**
+
+### What happened on application (QF-MVP-20.3CA)
+
+| Item | Value |
+|---|---|
+| Command | `npx supabase db push --linked` |
+| Window (UTC) | `2026-07-24T02:16:04Z` -> `02:16:09Z` |
+| **Exit code** | **0** |
+| Applied | **only** `20260723000600_qf_mvp_public_projection_privilege_hardening.sql` |
+| Self-verification NOTICE | `vendor_public_v (21 cols, 0 leaks), vendors/leads anon access revoked, unsafe policies dropped, B1/B2/G/legacy intact, D absent.` |
+| Post-application history | **7 local / 7 remote**, C recorded **exactly once**, no pending |
+| Application data | unchanged and empty (`vendors=0 leads=0`; sum of all public rows = 0) |
+| Locked verifier | **22 PASS / 1 FAIL** — row **C03** only |
+
+A trailing Docker/pgdelta warning appeared; it is the known **post-commit** local
+catalog-cache step (Docker Desktop not running). It ran after the migration committed,
+changed nothing, and the command still exited 0.
+
+### The C03 false negative — exact cause
+
+C03 compared a **DB-sorted** aggregate against a **raw hand-ordered** literal:
+
+```sql
+-- BEFORE (defective: asymmetric)
+(select array_agg(a.attname::text order by a.attname::text) from pg_catalog.pg_attribute a ...)
+  = array['areas_covered', ..., 'covers_full_city','cover_image_url', ...]::text[]
+```
+
+The literal held the **identical 21-name set**, but `cover_image_url` and `covers_full_city`
+were **transposed** (PostgreSQL sorts `cover_image_url` first). The left side was sorted by the
+database, the right side by hand — so the literal's typed order silently became part of the
+assertion. Result: `expected 21, actual 21, FAIL`.
+
+Proved read-only at the time: re-sorting the **same** literal inside PostgreSQL reproduced the
+actual array exactly, and `set_matches_when_both_sorted = true`. Migration C's own section 5.2
+passed precisely because it already sorts **both** sides (`array_agg(x order by x)` over
+`unnest(...)`). **The asymmetry was the entire bug.**
+
+### The correction — symmetric normalization
+
+```sql
+-- AFTER (correct: both sides normalized by PostgreSQL)
+(select array_agg(a.attname::text order by a.attname::text)
+   from pg_catalog.pg_attribute a
+  where a.attrelid='public.vendor_public_v'::regclass and a.attnum>0 and not a.attisdropped)
+  = (select array_agg(x order by x) from unnest(
+       array['areas_covered', ..., 'covers_full_city','cover_image_url', ...]::text[]) x)
+```
+
+The literal is **deliberately left in its original hand-typed (transposed) order**. That is the
+strongest available proof that the fix is real: the comparison now passes *despite* the literal
+being hand-mis-sorted, so the hand-ordering failure mode is genuinely removed rather than merely
+papered over by swapping two elements.
+
+**Contract preserved exactly:** 23 verifier rows; row name `C03_view_columns_match_allowlist`
+unchanged; `expected` still `'21'`; `actual` still the live column count; the **identical
+21-field allowlist set**; verifier still SELECT-only; no assertion weakened and C03 not removed.
+
+### Validator hardening — rule R20
+
+The C validator gains a symmetric-normalization rule enforced against the **real** verifier:
+
+* `findAsymmetricArrayComparisons()` scans comment-stripped SQL for any comparison whose
+  right-hand side is a **raw `array[...]` literal** and whose left-hand side (within a 400-char
+  window) contains `array_agg(` — i.e. a DB-ordered aggregate measured against a hand-typed list.
+  `= any(array[...])` membership tests never match this shape and are correctly exempt.
+* **check 13** requires the real verifier to be free of that shape;
+* **check 13b** requires C03 and its full 21-name allowlist to still be present (C03 cannot be
+  deleted to make the rule pass);
+* **checks 13c / 13d** are a discriminating control pair: the corrected symmetric form must
+  produce **no** finding, and the asymmetric form **must** be flagged — so the rule is not a
+  blanket ban on `array_agg`.
+
+**Load-bearing, proved on the real artifact:** reverting C03 to the exact original asymmetric
+raw-literal form made check 13 **FAIL** (83 -> 82/83); the verifier was then restored
+**byte-identical**.
+
+One defect was found and corrected *in the hardening itself* during this phase: the first
+detector walked **forward** from `array_agg(` and was defeated by the intervening `from ... )`
+clause, so control **13d** did not flag the asymmetric form. It was rewritten as a **backward**
+window scan from the `= array[` site. The control pair is what caught it.
+
+### Order-sensitivity search — full classification
+
+| Site | Comparison | Class |
+|---|---|---|
+| `verify_qf_mvp_20_3c.sql` C03 | DB-sorted `array_agg` **=** raw hand-ordered literal | **FIX_REQUIRED** (corrected) |
+| `verify_qf_mvp_20_3b2.sql` B13/B15 (4 occurrences) | `array_agg(...) = array['lead_id','vendor_id']` | **OUT_OF_SCOPE_WITH_REASON** — the 2-element literal is already in correct sort order (`lead_id` < `vendor_id`), so no defect is proven; the artifact is locked and outside this phase's edit authorization |
+| C verifier `= any(array[...])` (5 sites) | membership | **TYPE_SAFE_AND_ORDER_SAFE** |
+| C verifier `unnest(array[...])` row sources | existence / count | **TYPE_SAFE_AND_ORDER_SAFE** |
+| `verify_qf_mvp_20_3b1.sql`, baseline verifier | 0 ordered `array_agg` sites | **TYPE_SAFE_AND_ORDER_SAFE** |
+
+### Independent verifier review
+
+Re-reviewed the whole corrected verifier: every catalog `name` value is compared as a single
+`name = text` (safe) or cast with `::text`; **no** `name[] = text[]` array comparison remains;
+the only surviving raw `= array[` text sits inside a **header comment** (the validator strips
+comments before scanning); a missing view raises `undefined_table` via `::regclass`, so C03 fails
+closed rather than silently passing; C03 asserts **both** the count and the set; and the D/E
+scope rows (18, 19, 20) are untouched. **No further defect was found.**
+
+### Hashes
+
+| Artifact | SHA-256 |
+|---|---|
+| **Applied Migration C — UNCHANGED** | `0d3d871b0c6ab9de8d82eeb8499437f1f40a8a6c81561cf41cb8ade60b464da2` |
+| C verifier (corrected) | `1f7bf9a511eb77f37578ef92771fdddf85cd2aa0522ac4648a7041b56586a980` |
+| C validator (hardened) | `d632aa2584976cce1ac6058e782ac1910675c3cbaa70ccf6f30593f9c2c3725d` |
+
+baseline, A, A2, B1, G, B2 and the B1/G + B2 validators/verifiers are all byte-unchanged.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| C validator | **83 passed, 0 failed** (79 prior + 4 hardening) · 23 fixtures |
+| Real-artifact mutation (C03 -> asymmetric) | caught; verifier restored byte-identical |
+| B2 validator | **61 passed, 0 failed** |
+| B1/G validator | **165 passed, 0 failed** |
+| R1 harness | **62 passed, 0 failed** |
+| `npm run verify:mvp` | **exit 0** |
+| typecheck / lint / build | exit 0 |
+| `git diff --check` | exit 0 |
+
+**No database was accessed in this phase**: no staging, production or QF-Jarvis; no dry run; no
+migration application, repair, reset or `up`; and **the staging verifier was deliberately NOT
+re-run**.
+
+### Next phase
+
+**A read-only QF-MVP-20.3C staging RE-VERIFICATION** — run the corrected verifier
+(`1f7bf9a5…`) against staging to reach **23 PASS / 0 FAIL**, then read advisors and complete the
+C record. **Not Migration D.** Migration C is applied and immutable; C is **not** marked fully
+complete until that re-verification passes.

@@ -17,6 +17,16 @@
 --   Every catalog `name` array is cast to text (attname::text = array[...]::text[])
 --   so the query itself is runtime type-safe (the name[] = text[] defect).
 --
+-- LOCKED POLICY (QF-MVP-20.3CVR1) — SYMMETRIC SET NORMALIZATION
+--   A column-name SET comparison must NEVER compare a DB-sorted aggregate against
+--   a raw hand-ordered ARRAY literal: the expected literal's typed order then
+--   silently becomes part of the assertion, and a transposed pair yields a FALSE
+--   NEGATIVE (that is exactly how C03 failed after Migration C applied correctly).
+--   BOTH sides must be aggregated by PostgreSQL under the SAME `order by`, so the
+--   comparison is over sets and is independent of how the literal was typed.
+--   Membership tests (`attname::text = any(array[...])`) are inherently
+--   order-insensitive and are unaffected.
+--
 -- VIEW SECURITY MODEL
 --   vendor_public_v is a deliberate OWNER-RIGHTS projection (security_invoker
 --   OFF). A Supabase security_definer_view advisor notice on it is EXPECTED and
@@ -47,15 +57,24 @@ union all
 select 3, 'C03_view_columns_match_allowlist', '21',
        (select count(*)::text from pg_catalog.pg_attribute a
          where a.attrelid='public.vendor_public_v'::regclass and a.attnum>0 and not a.attisdropped),
-       case when (select array_agg(a.attname::text order by a.attname::text) from pg_catalog.pg_attribute a
-                   where a.attrelid='public.vendor_public_v'::regclass and a.attnum>0 and not a.attisdropped)
-                 = array['areas_covered','business_name','business_type','city','completed_projects',
-                         'covers_full_city','cover_image_url','experience','id','office_city',
-                         'portfolio_urls','profile_image_url','public_business_hours','public_description',
-                         'public_service_area_summary','rating','selected_category','selected_subcategories',
-                         'service_categories','starting_price','years_experience']::text[]
+       -- SYMMETRIC NORMALIZATION (QF-MVP-20.3CVR1). BOTH sides are aggregated by
+       -- PostgreSQL under the SAME `order by`, so this compares SETS and can never
+       -- depend on how the expected literal happens to be hand-typed. The previous
+       -- form compared a DB-sorted array against a raw hand-ordered literal, whose
+       -- 'cover_image_url'/'covers_full_city' pair was transposed — a false negative
+       -- that failed C03 even though the view held exactly the right 21 columns.
+       case when (select array_agg(a.attname::text order by a.attname::text)
+                    from pg_catalog.pg_attribute a
+                   where a.attrelid='public.vendor_public_v'::regclass
+                     and a.attnum>0 and not a.attisdropped)
+                 = (select array_agg(x order by x) from unnest(
+                      array['areas_covered','business_name','business_type','city','completed_projects',
+                            'covers_full_city','cover_image_url','experience','id','office_city',
+                            'portfolio_urls','profile_image_url','public_business_hours','public_description',
+                            'public_service_area_summary','rating','selected_category','selected_subcategories',
+                            'service_categories','starting_price','years_experience']::text[]) x)
             then 'PASS' else 'FAIL' end,
-       'view columns are EXACTLY the reviewed 21-field allowlist'
+       'view columns are EXACTLY the reviewed 21-field allowlist (both sides sorted by PostgreSQL)'
 
 union all
 select 4, 'C04_view_has_no_forbidden_column', '0',

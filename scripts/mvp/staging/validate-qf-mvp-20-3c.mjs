@@ -507,6 +507,64 @@ for (const col of FORBIDDEN.slice(0, 8)) {
 record("12 verifier makes no lexical assertion over function source",
   !/pg_get_functiondef|prosrc\b|routine_definition/.test(norm(stripComments(verRaw, "verifier"))), "clean");
 
+/* ---------------------------------------------------------------------------
+ * R20 — symmetric set normalization (QF-MVP-20.3CVR1).
+ *
+ * A column-name SET comparison must never compare a DB-sorted aggregate against
+ * a RAW hand-ordered ARRAY literal: the literal's typed order silently becomes
+ * part of the assertion. That is exactly how C03 produced a FALSE NEGATIVE after
+ * Migration C applied correctly (cover_image_url / covers_full_city transposed).
+ *
+ * Both sides must be aggregated by PostgreSQL under the same `order by`.
+ * Membership tests (`= any(array[...])`) are order-insensitive and exempt.
+ * ------------------------------------------------------------------------- */
+export function findAsymmetricArrayComparisons(strippedSql) {
+  const out = [];
+  // Every comparison whose RIGHT-hand side is a RAW `array[...]` literal.
+  // `= any(array[...])` is a membership test and never matches this shape,
+  // because `any(` sits between the `=` and the `array[`.
+  const re = /=\s*array\s*\[/gi;
+  let m;
+  while ((m = re.exec(strippedSql)) !== null) {
+    // Look BACKWARD across the comparison's left-hand side. An `array_agg(`
+    // there means a DB-ordered aggregate is being compared to a hand-typed
+    // literal, so the literal's ordering silently becomes part of the assertion.
+    const windowStart = Math.max(0, m.index - 400);
+    const lhs = strippedSql.slice(windowStart, m.index);
+    if (!/array_agg\s*\(/i.test(lhs)) continue;
+    const preview = strippedSql.slice(m.index, m.index + 60).replace(/\s+/g, " ");
+    out.push(`array_agg(...) compared directly with a raw ARRAY literal (${preview}…) — hand ordering becomes part of the assertion`);
+  }
+  return out;
+}
+
+const verStrippedR20 = stripComments(verRaw, "verifier");
+record("13 verifier C03 normalizes BOTH sides symmetrically (no raw hand-ordered literal)",
+  findAsymmetricArrayComparisons(verStrippedR20).length === 0,
+  findAsymmetricArrayComparisons(verStrippedR20).join(" | ") || "symmetric");
+
+record("13b verifier still contains the C03 row and its 21-name allowlist",
+  /C03_view_columns_match_allowlist/.test(verRaw)
+    && ALLOWLIST.every((c) => new RegExp(`'${c}'`).test(verRaw)),
+  "C03 present with the full reviewed allowlist");
+
+// Discriminating control pair: the corrected symmetric form must be clean, and
+// the asymmetric form must be flagged — so the rule is not a blanket ban.
+{
+  const symmetric =
+    "case when (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a) " +
+    "= (select array_agg(x order by x) from unnest(array['b','a']::text[]) x) then 'PASS' else 'FAIL' end";
+  const asymmetric =
+    "case when (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a) " +
+    "= array['b','a']::text[] then 'PASS' else 'FAIL' end";
+  record("13c control :: symmetric normalization produces no R20 finding",
+    findAsymmetricArrayComparisons(symmetric).length === 0,
+    findAsymmetricArrayComparisons(symmetric).join(" | ") || "clean");
+  record("13d control :: raw hand-ordered literal IS flagged",
+    findAsymmetricArrayComparisons(asymmetric).length >= 1,
+    findAsymmetricArrayComparisons(asymmetric).join(" | ") || "NOT flagged");
+}
+
 /* ===========================================================================
  * 5. Repository posture — no unsafe browser/anon table access exists
  * ========================================================================= */

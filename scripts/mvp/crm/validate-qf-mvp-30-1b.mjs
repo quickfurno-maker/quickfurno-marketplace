@@ -109,6 +109,30 @@ export function evaluateMigration(sql, label = "30.1B") {
     add("F04_no_vendor_cascade", "a CRM->vendors FK uses ON DELETE CASCADE");
   }
 
+  // -- F25 vendor_internal_notes presence-idempotent two-path bootstrap ------
+  //     staging omits the whole migration-006 set, so the table is ABSENT on
+  //     staging and PRESENT on production: the migration must CREATE IF NOT
+  //     EXISTS (legacy base shape) BEFORE any dependent ALTER, and converge both
+  //     paths to one contract (created_by SET NULL, vendor RESTRICT, legacy
+  //     policy dropped).
+  {
+    const iCreate = exec.search(/create\s+table\s+if\s+not\s+exists\s+public\.vendor_internal_notes\b/);
+    const iAlter = exec.search(/alter\s+table\s+public\.vendor_internal_notes\b/);
+    if (iCreate === -1) add("F25_notes_bootstrap", "missing CREATE TABLE IF NOT EXISTS for vendor_internal_notes");
+    else if (iAlter !== -1 && iCreate > iAlter) add("F25_notes_bootstrap", "CREATE occurs after an ALTER that would fail when the table is absent");
+    const m = /create\s+table\s+if\s+not\s+exists\s+public\.vendor_internal_notes\s*\(([\s\S]*?)\)\s*;/.exec(exec);
+    const block = m ? m[1] : "";
+    if (iCreate !== -1 && !/primary\s+key/.test(block)) add("F25_notes_bootstrap", "bootstrap CREATE lacks a primary key");
+    if (iCreate !== -1 && !/note\s+text\s+not\s+null/.test(block)) add("F25_notes_bootstrap", "bootstrap CREATE lacks note text not null (legacy base shape)");
+    if (!/vin_created_by_fk\s+foreign\s+key\s*\(\s*created_by\s*\)[^;]*on\s+delete\s+set\s+null/.test(exec)) add("F25_notes_bootstrap", "notes created_by FK is not ON DELETE SET NULL");
+    if (!/vin_vendor_fk\s+foreign\s+key\s*\(\s*vendor_id\s*\)[^;]*on\s+delete\s+restrict/.test(exec)) add("F25_notes_bootstrap", "notes vendor FK is not ON DELETE RESTRICT");
+    if (!/drop\s+policy\s+if\s+exists\s+"vendor notes admin all"/.test(exec)) add("F25_notes_bootstrap", "does not drop the legacy authenticated notes policy");
+  }
+
+  // -- F26 self-verification proves the notes FINAL contract (path-agnostic) --
+  if (!/supersedes_note_id/.test(bodies)) add("F26_notes_selfverify", "self-verification does not assert the notes final column set");
+  if (!/'vendor notes admin all'/.test(bodies)) add("F26_notes_selfverify", "self-verification does not assert the legacy notes policy is absent");
+
   // -- F05 no Core-truth duplicate columns in CRM tables --------------------
   //     scan each create-table column block + the notes ADD COLUMN list.
   for (const col of PROHIBITED) {
@@ -263,6 +287,20 @@ const FIX = [
   { id: "T", rule: "F21_no_broad_priv", why: "ALTER DEFAULT PRIVILEGES is added", mutate: (s) => `${s}\nalter default privileges in schema public grant select on tables to authenticated;\n` },
   { id: "U", rule: "F23_self_verification", why: "the self-verification block is removed", mutate: (s) => s.replace(/do \$verify\$[\s\S]*\$verify\$;/, "-- verify removed\n") },
   { id: "V", rule: "F24_no_core_mutation", why: "a Core table is mutated", mutate: (s) => `${s}\nupdate public.vendors set is_active = true;\n` },
+  { id: "W", rule: "F25_notes_bootstrap", why: "the create-if-absent bootstrap is removed",
+    mutate: (s) => s.replace(/create table if not exists public\.vendor_internal_notes \([\s\S]*?created_by uuid\n\);\n/, "") },
+  { id: "X", rule: "F25_notes_bootstrap", why: "an ALTER precedes the create (order defect)",
+    mutate: (s) => s.replace("create table if not exists public.vendor_internal_notes (\n  id ",
+      "alter table public.vendor_internal_notes add column if not exists zzz int;\ncreate table if not exists public.vendor_internal_notes (\n  id ") },
+  { id: "Y", rule: "F25_notes_bootstrap", why: "the absent-path base shape omits note not null",
+    mutate: (s) => s.replace("  note       text        not null,\n", "  note       text,\n") },
+  { id: "Z", rule: "F25_notes_bootstrap", why: "created_by FK becomes CASCADE (history loss)",
+    mutate: (s) => s.replace("add constraint vin_created_by_fk foreign key (created_by)\n  references public.profiles (id) on update restrict on delete set null;",
+      "add constraint vin_created_by_fk foreign key (created_by)\n  references public.profiles (id) on update restrict on delete cascade;") },
+  { id: "AA", rule: "F25_notes_bootstrap", why: "the legacy authenticated policy drop is removed",
+    mutate: (s) => s.replace('drop policy if exists "vendor notes admin all" on public.vendor_internal_notes;', "-- removed") },
+  { id: "BB", rule: "F26_notes_selfverify", why: "the absent-path notes final-contract self-check is removed",
+    mutate: (s) => s.replace(/-- 9\.6b[\s\S]*?the legacy authenticated notes policy is still present\.';\n  end if;\n/, "") },
 ];
 for (const fx of FIX) {
   const mutated = fx.mutate(migRaw); const changed = mutated !== migRaw;
@@ -314,6 +352,14 @@ record("11 manifest freezes access model + canonical notes + zero-row + no campa
     && Array.isArray(man?.prohibited_core_truth_columns) && man.prohibited_core_truth_columns.includes("remaining_credits")
     && !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(s);
 })(), "access A + canonical notes + 5 zero-row tables + no-campaign + prohibited cols + no UUID");
+record("11b manifest freezes the two-path notes bootstrap (both start states)", (() => {
+  const ss = man?.supported_start_states;
+  return man?.notes_bootstrap_mode === "CREATE_IF_ABSENT_THEN_CONVERGE"
+    && Array.isArray(ss) && ss.includes("ABSENT") && ss.includes("LEGACY_MINIMAL")
+    && man?.lossless_existing_row_preservation === true
+    && man?.no_second_notes_authority === true
+    && man?.no_note_content_rewrite === true;
+})(), "notes_bootstrap_mode + supported_start_states[ABSENT,LEGACY_MINIMAL] + lossless flags");
 
 /* ===========================================================================
  * 6. Docs

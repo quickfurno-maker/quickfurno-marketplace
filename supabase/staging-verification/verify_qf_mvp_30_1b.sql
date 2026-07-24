@@ -299,4 +299,38 @@ select 24, 'W24_owner_binding_still_deferred', '0',
             then 'PASS' else 'FAIL' end,
        'owner binding remains deferred (no owner-binding columns on leads)'
 
+union all
+select 25, 'W25_notes_final_contract_path_agnostic', '1',
+       (select case when
+          -- exact 7-column final set (holds whether bootstrapped or evolved)
+          (select array_agg(a.attname::text order by a.attname::text) from pg_catalog.pg_attribute a
+             where a.attrelid=to_regclass('public.vendor_internal_notes') and a.attnum>0 and not a.attisdropped)
+            = array['category','created_at','created_by','id','note','supersedes_note_id','vendor_id']
+          -- created_by actor FK is ON DELETE SET NULL
+          and exists (select 1 from pg_catalog.pg_constraint con
+                       where con.conrelid=to_regclass('public.vendor_internal_notes') and con.contype='f'
+                         and con.confrelid=to_regclass('public.profiles') and con.confdeltype='n')
+          -- primary key present
+          and exists (select 1 from pg_catalog.pg_constraint con
+                       where con.conrelid=to_regclass('public.vendor_internal_notes') and con.contype='p')
+          -- legacy authenticated policy gone
+          and not exists (select 1 from pg_catalog.pg_policy pol
+                           where pol.polrelid=to_regclass('public.vendor_internal_notes')
+                             and pol.polname::text='vendor notes admin all')
+        then '1' else '0' end),
+       case when
+          (select array_agg(a.attname::text order by a.attname::text) from pg_catalog.pg_attribute a
+             where a.attrelid=to_regclass('public.vendor_internal_notes') and a.attnum>0 and not a.attisdropped)
+            = array['category','created_at','created_by','id','note','supersedes_note_id','vendor_id']
+          and exists (select 1 from pg_catalog.pg_constraint con
+                       where con.conrelid=to_regclass('public.vendor_internal_notes') and con.contype='f'
+                         and con.confrelid=to_regclass('public.profiles') and con.confdeltype='n')
+          and exists (select 1 from pg_catalog.pg_constraint con
+                       where con.conrelid=to_regclass('public.vendor_internal_notes') and con.contype='p')
+          and not exists (select 1 from pg_catalog.pg_policy pol
+                           where pol.polrelid=to_regclass('public.vendor_internal_notes')
+                             and pol.polname::text='vendor notes admin all')
+        then 'PASS' else 'FAIL' end,
+       'vendor_internal_notes final contract holds regardless of ABSENT/LEGACY_MINIMAL start: exact 7 columns, created_by SET NULL, PK present, legacy authenticated policy gone'
+
 order by seq;

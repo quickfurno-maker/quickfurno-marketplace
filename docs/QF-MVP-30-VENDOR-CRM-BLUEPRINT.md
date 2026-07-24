@@ -243,20 +243,35 @@ second database; duplicated Core truth; public exposure of GST/PAN/contacts; QF-
 **QF-MVP-30.1B — CRM foundation schema and security** (one additive migration + validator + SELECT-only
 staging verifier, staging-first), per §11. No foundation implementation is started in this blueprint phase.
 
-## 15. QF-MVP-30.1B — Foundation schema GENERATED (not applied)
+## 15. QF-MVP-30.1B — Foundation schema GENERATED + notes-bootstrap CORRECTED (not applied)
 
-**Status:** `VENDOR_CRM_FOUNDATION_GENERATED_REVIEWED_READY_FOR_PREFLIGHT` (offline; **no managed DB access**;
-migration **generated but unapplied**). One forward-only migration
+**Status:** `VENDOR_CRM_FOUNDATION_NOTES_BOOTSTRAP_CORRECTED_READY_FOR_PREFLIGHT` (offline; **no managed DB
+access**; migration **generated but unapplied**). One forward-only migration
 `supabase/migrations/20260723001100_qf_mvp_vendor_crm_foundation.sql` establishes the six foundation tables.
 
-**Canonical notes decision — evolve `vendor_internal_notes` in place (rejected: a new `vendor_notes`).**
-Inventory proved `vendor_internal_notes` (migration 006) exists with `id/created_at/vendor_id/note/created_by`,
-RLS + a legacy "vendor notes admin all" policy, and **zero** runtime readers/writers/types. It is evolved
-into the **single** canonical notes authority: add `category` + `supersedes_note_id`; a NOT-VALID non-empty
-body check (lossless on legacy rows); retarget the vendor FK to **RESTRICT**; drop the legacy authenticated
-policy (server-only); add append-only immutability triggers. No `vendor_notes` table is created; no note is
-rewritten. A new `vendor_notes` was rejected because it would leave `vendor_internal_notes` a competing
-writable notes path.
+**Blocker corrected (QF-MVP-30.1BP → 30.1B1).** A staging preflight proved the staging baseline squash
+`269c9265` **omits the entire migration-006 table set** — `vendor_internal_notes` (and `lead_internal_notes`,
+`lead_timeline_events`, `audit_logs`, `admin_notifications`, `reviews`, `ai_agents`, `localities`) are
+**absent** on staging, though `vendor_internal_notes` is **present** (minimal shape) on production. The
+original migration's unconditional `ALTER TABLE public.vendor_internal_notes …` would have failed
+(`42P01 relation does not exist`) on staging.
+
+**Canonical notes decision — single authority, PRESENCE-IDEMPOTENT two-path bootstrap (rejected: a new
+`vendor_notes`).** Section 5 now `CREATE TABLE IF NOT EXISTS public.vendor_internal_notes (…legacy base
+shape…)` **before** any dependent ALTER, then converges **both** start states — **ABSENT** (staging, table
+created) and **LEGACY_MINIMAL** (production, no-op create) — to one exact final contract: columns
+`id, created_at, vendor_id, note, created_by, category, supersedes_note_id`; PK `id`; vendor FK **RESTRICT**;
+created_by FK **SET NULL**; self-supersede FK **RESTRICT**; **NOT-VALID** `vin_note_nonempty` /
+`vin_vendor_required` / `vin_category_check` (lossless — legacy rows never validated/rejected/rewritten);
+legacy "vendor notes admin all" policy dropped; append-only immutability triggers; server-only grants. No
+`vendor_notes` table; no note row created/deleted/rewritten; existing production rows preserved. A new
+`vendor_notes` was rejected because it would leave a competing writable notes path.
+
+**Migration-006 divergence follow-up.** This correction handles `vendor_internal_notes` **only** because
+30.1B requires it. The other omitted 006 tables (`audit_logs`, `admin_notifications`, …) are **not** created
+opportunistically here and must be **revalidated on staging before any later phase reuses them** — in
+particular **QF-MVP-30.4 must not assume `audit_logs`/`admin_notifications` exist**; its audit integration
+must first confirm or bootstrap them.
 
 **Access model — A (server-only).** PUBLIC/anon/authenticated hold **zero** direct privilege on every CRM
 table (RLS default-deny, no untrusted policy); `service_role` (which the existing `adminClient` admin path
@@ -277,7 +292,10 @@ source are closed CHECK sets mirrored in `lib/crm/vendorCrmContracts.ts`. Unique
 `vendor_tags.normalized_name` unique, active tag-assignment partial unique, active-primary-contact partial
 unique, task `idempotency_key` partial unique. No segments/campaigns/AI/KYC/owner-binding.
 
-**Artifacts + gates:** migration `20260723001100`; validator `scripts/mvp/crm/validate-qf-mvp-30-1b.mjs`
-(22 migration + 3 verifier fixtures); SELECT-only verifier `supabase/staging-verification/verify_qf_mvp_30_1b.sql`
-(24 rows); contract manifest `scripts/mvp/crm/qf-mvp-30-1b-foundation-contract.json`; blueprint validator
-36/36; all Marketplace gates green; `verify:mvp` exit 0. **Next: QF-MVP-30.1B staging preflight.**
+**Artifacts + gates (post-correction):** migration `20260723001100` (`9212f746…`); validator
+`scripts/mvp/crm/validate-qf-mvp-30-1b.mjs` **46/46** (28 migration + 3 verifier fixtures, incl. two-path
+bootstrap fixtures W/X/Y/Z/AA/BB); SELECT-only verifier `supabase/staging-verification/verify_qf_mvp_30_1b.sql`
+(**25 rows**, adds the path-agnostic notes-final-contract row W25); contract manifest
+`scripts/mvp/crm/qf-mvp-30-1b-foundation-contract.json` (`notes_bootstrap_mode: CREATE_IF_ABSENT_THEN_CONVERGE`,
+`supported_start_states: [ABSENT, LEGACY_MINIMAL]`); blueprint validator 36/36; all Marketplace gates green;
+`verify:mvp` exit 0. **Next: a fresh QF-MVP-30.1B staging preflight.**

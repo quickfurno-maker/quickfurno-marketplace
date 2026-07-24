@@ -50,17 +50,22 @@
 -- notes are append-only; tags/assignments/tasks/contacts archive via state.
 --
 -- ---------------------------------------------------------------------------
--- CANONICAL NOTES DECISION (refinement #3) — OPTION A: EVOLVE IN PLACE
+-- CANONICAL NOTES DECISION (refinement #3) — SINGLE AUTHORITY, PRESENCE-IDEMPOTENT
 -- ---------------------------------------------------------------------------
--- public.vendor_internal_notes already exists (migration 20260621000006) with
--- id/created_at/vendor_id/note/created_by and RLS + a legacy "vendor notes admin
--- all" authenticated policy, but has ZERO runtime readers/writers/types. It is
--- evolved in place into the SINGLE canonical Vendor CRM notes authority:
--- add category + supersession + append-only immutability, retarget its vendor FK
--- to RESTRICT, and drop the legacy authenticated policy (server-only model). No
--- second `vendor_notes` table is created; no note content is rewritten; existing
--- rows are preserved. Rejected alternative: a new vendor_notes table — it would
--- leave vendor_internal_notes as a competing writable notes path.
+-- public.vendor_internal_notes is the SINGLE canonical Vendor CRM notes authority
+-- (migration 20260621000006: id/created_at/vendor_id/note/created_by + RLS + a
+-- legacy "vendor notes admin all" authenticated policy; ZERO runtime readers/
+-- writers/types). HOWEVER the staging baseline squash (20260722000100_..269c9265)
+-- OMITS the whole migration-006 table set, so the table is ABSENT on staging but
+-- PRESENT (minimal shape) on production. Section 5 is therefore a TWO-PATH
+-- BOOTSTRAP: CREATE the legacy-equivalent base shape when absent (staging), else a
+-- no-op (production), then converge BOTH paths losslessly to ONE exact final
+-- contract (add category + supersession + NOT-VALID required/format checks,
+-- retarget the vendor FK to RESTRICT, keep created_by SET NULL, drop the legacy
+-- policy, add append-only immutability). No second `vendor_notes` table; no note
+-- row is created, deleted or rewritten; existing production rows are preserved.
+-- Rejected alternative: a new vendor_notes table — it would leave a competing
+-- writable notes path.
 -- No explicit transaction control, no ALTER DEFAULT PRIVILEGES, no broad schema
 -- grant, no migration-history write, no project ref/secret.
 -- ============================================================================
@@ -243,55 +248,80 @@ comment on table public.vendor_tag_assignments is
 
 
 -- ---------------------------------------------------------------------------
--- 5. vendor_internal_notes — CANONICAL notes authority (evolved in place).
---    Existing columns id/created_at/vendor_id/note/created_by are preserved.
+-- 5. vendor_internal_notes — CANONICAL notes authority (PRESENCE-IDEMPOTENT).
+--
+--    TWO-PATH BOOTSTRAP. The staging baseline squash (20260722000100_..269c9265)
+--    OMITS the whole migration-006 table set, so vendor_internal_notes is ABSENT
+--    on staging but PRESENT (minimal 006 shape) on production. Both paths converge
+--    to ONE exact final contract. No second notes table; no note row is created,
+--    deleted or rewritten.
+--
+--      Path A (ABSENT — staging): the CREATE below builds the legacy-equivalent
+--        base shape; the shared convergence then adds the CRM columns, retargets
+--        the FKs, adds the checks, drops the legacy policy, grants and triggers.
+--      Path B (LEGACY_MINIMAL present — production): CREATE TABLE IF NOT EXISTS is
+--        a no-op; ALL rows/ids/timestamps/body/author/vendor are preserved; the
+--        shared convergence adds the same CRM columns and retargets the same
+--        constraints, ending at the identical final contract.
+--
+--    Legacy-compatible base shape (matches 20260621000006 exactly, so the CREATE
+--    is a true no-op on production): id uuid pk / created_at timestamptz default
+--    now() / vendor_id uuid / note text not null / created_by uuid. Required-ness
+--    is enforced going forward via NOT VALID checks so no legacy row is rejected.
 -- ---------------------------------------------------------------------------
-alter table public.vendor_internal_notes
-  add column if not exists category          text,
-  add column if not exists supersedes_note_id uuid;
+create table if not exists public.vendor_internal_notes (
+  id         uuid        default gen_random_uuid() primary key,
+  created_at timestamptz default now(),
+  vendor_id  uuid,
+  note       text        not null,
+  created_by uuid
+);
 
--- non-empty body enforced for NEW notes only (NOT VALID skips legacy rows —
--- lossless; append-only means legacy content is never rewritten).
-alter table public.vendor_internal_notes
-  drop constraint if exists vin_note_nonempty;
-alter table public.vendor_internal_notes
-  add constraint vin_note_nonempty check (char_length(btrim(note)) > 0) not valid;
+-- CONVERGE (identical on both paths): CRM columns.
+alter table public.vendor_internal_notes add column if not exists category           text;
+alter table public.vendor_internal_notes add column if not exists supersedes_note_id  uuid;
 
-alter table public.vendor_internal_notes
-  drop constraint if exists vin_category_check;
-alter table public.vendor_internal_notes
-  add constraint vin_category_check check (category is null or category in
+-- Required/format contracts as NOT VALID: enforced for NEW notes; existing legacy
+-- rows are never validated, rejected or rewritten (append-only is preserved).
+alter table public.vendor_internal_notes drop constraint if exists vin_note_nonempty;
+alter table public.vendor_internal_notes add constraint vin_note_nonempty
+  check (char_length(btrim(note)) > 0) not valid;
+alter table public.vendor_internal_notes drop constraint if exists vin_vendor_required;
+alter table public.vendor_internal_notes add constraint vin_vendor_required
+  check (vendor_id is not null) not valid;
+alter table public.vendor_internal_notes drop constraint if exists vin_category_check;
+alter table public.vendor_internal_notes add constraint vin_category_check
+  check (category is null or category in
     ('general','call','meeting','onboarding','support','payment','complaint','campaign')) not valid;
 
--- correction lineage: a new note may reference the note it supersedes (RESTRICT).
-alter table public.vendor_internal_notes
-  drop constraint if exists vin_supersedes_fk;
-alter table public.vendor_internal_notes
-  add constraint vin_supersedes_fk foreign key (supersedes_note_id)
-    references public.vendor_internal_notes (id) on update restrict on delete restrict;
-alter table public.vendor_internal_notes
-  drop constraint if exists vin_no_self_supersede;
-alter table public.vendor_internal_notes
-  add constraint vin_no_self_supersede check (supersedes_note_id is null or supersedes_note_id <> id);
+-- FK convergence. drop-if-exists covers BOTH the legacy auto-named constraints
+-- (…_vendor_id_fkey CASCADE, …_created_by_fkey SET NULL) and any re-run, so both
+-- paths end with exactly: vendor RESTRICT, created_by SET NULL, self-FK RESTRICT.
+alter table public.vendor_internal_notes drop constraint if exists vendor_internal_notes_vendor_id_fkey;
+alter table public.vendor_internal_notes drop constraint if exists vin_vendor_fk;
+alter table public.vendor_internal_notes add constraint vin_vendor_fk foreign key (vendor_id)
+  references public.vendors (id) on update restrict on delete restrict;
 
--- retarget the vendor FK from the legacy CASCADE to evidence-preserving RESTRICT.
-alter table public.vendor_internal_notes
-  drop constraint if exists vendor_internal_notes_vendor_id_fkey;
-alter table public.vendor_internal_notes
-  drop constraint if exists vin_vendor_fk;
-alter table public.vendor_internal_notes
-  add constraint vin_vendor_fk foreign key (vendor_id)
-    references public.vendors (id) on update restrict on delete restrict;
+alter table public.vendor_internal_notes drop constraint if exists vendor_internal_notes_created_by_fkey;
+alter table public.vendor_internal_notes drop constraint if exists vin_created_by_fk;
+alter table public.vendor_internal_notes add constraint vin_created_by_fk foreign key (created_by)
+  references public.profiles (id) on update restrict on delete set null;
 
--- server-only model: drop the legacy authenticated-facing policy (zero runtime
--- users). RLS stays enabled; service_role bypasses RLS; untrusted roles are
--- default-denied and hold no grant (§7 below).
+alter table public.vendor_internal_notes drop constraint if exists vin_supersedes_fk;
+alter table public.vendor_internal_notes add constraint vin_supersedes_fk foreign key (supersedes_note_id)
+  references public.vendor_internal_notes (id) on update restrict on delete restrict;
+alter table public.vendor_internal_notes drop constraint if exists vin_no_self_supersede;
+alter table public.vendor_internal_notes add constraint vin_no_self_supersede
+  check (supersedes_note_id is null or supersedes_note_id <> id);
+
+-- server-only model: drop the legacy authenticated-facing policy (no-op when the
+-- table was just created on the absent path).
 drop policy if exists "vendor notes admin all" on public.vendor_internal_notes;
 
 create index if not exists idx_vendor_internal_notes_vendor on public.vendor_internal_notes (vendor_id, created_at desc);
 
 comment on table public.vendor_internal_notes is
-  'QF-MVP-30.1B CANONICAL Vendor CRM notes authority (evolved in place). Append-only (UPDATE/DELETE/TRUNCATE blocked for every role); private (server-only); corrections are NEW notes via supersedes_note_id. Body column = note.';
+  'QF-MVP-30.1B CANONICAL Vendor CRM notes authority (presence-idempotent: created if absent on staging, evolved losslessly if the legacy 006 minimal table exists on production; both paths converge to one contract). Append-only (UPDATE/DELETE/TRUNCATE blocked for every role); private (server-only); corrections are NEW notes via supersedes_note_id. Body column = note.';
 
 
 -- ---------------------------------------------------------------------------
@@ -524,6 +554,48 @@ begin
        and con.confdeltype not in ('r','a')      -- r=RESTRICT, a=NO ACTION
   ) then
     raise exception 'QF-MVP-30.1B aborted: a CRM->vendors FK is not RESTRICT/NO ACTION (history-loss risk).';
+  end if;
+
+  -- 9.6b canonical notes FINAL contract — proven from live catalog facts, so it
+  --      holds whether the table was bootstrapped (absent path) or evolved
+  --      (legacy-minimal path). Does NOT assume the table pre-existed.
+  --      exact column set:
+  if (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a
+        where a.attrelid = to_regclass('public.vendor_internal_notes') and a.attnum > 0 and not a.attisdropped)
+     is distinct from
+     (select array_agg(x order by x) from unnest(array[
+        'category','created_at','created_by','id','note','supersedes_note_id','vendor_id']::text[]) x)
+  then
+    raise exception 'QF-MVP-30.1B aborted: vendor_internal_notes final column set is not the exact contract.';
+  end if;
+  --      primary key present:
+  if not exists (select 1 from pg_constraint con
+                  where con.conrelid = to_regclass('public.vendor_internal_notes') and con.contype = 'p') then
+    raise exception 'QF-MVP-30.1B aborted: vendor_internal_notes has no primary key.';
+  end if;
+  --      created_by actor FK is SET NULL (n); self-supersede FK is RESTRICT/NO ACTION.
+  if not exists (select 1 from pg_constraint con
+                  where con.conrelid = to_regclass('public.vendor_internal_notes') and con.contype = 'f'
+                    and con.confrelid = to_regclass('public.profiles') and con.confdeltype = 'n') then
+    raise exception 'QF-MVP-30.1B aborted: vendor_internal_notes created_by FK is not ON DELETE SET NULL.';
+  end if;
+  if exists (select 1 from pg_constraint con
+              where con.conrelid = to_regclass('public.vendor_internal_notes') and con.contype = 'f'
+                and con.confrelid = to_regclass('public.vendor_internal_notes') and con.confdeltype not in ('r','a')) then
+    raise exception 'QF-MVP-30.1B aborted: the notes self-supersede FK cascades.';
+  end if;
+  --      required/format contracts present; legacy authenticated policy gone.
+  for v_missing in
+    select n from unnest(array['vin_note_nonempty','vin_vendor_required','vin_category_check']) s(n)
+    where not exists (select 1 from pg_constraint con
+                       where con.conrelid = to_regclass('public.vendor_internal_notes') and con.conname::text = s.n)
+  loop
+    raise exception 'QF-MVP-30.1B aborted: notes contract constraint % missing.', v_missing;
+  end loop;
+  if exists (select 1 from pg_policy pol
+              where pol.polrelid = to_regclass('public.vendor_internal_notes')
+                and pol.polname::text = 'vendor notes admin all') then
+    raise exception 'QF-MVP-30.1B aborted: the legacy authenticated notes policy is still present.';
   end if;
 
   -- 9.7 uniqueness/idempotency contracts present.

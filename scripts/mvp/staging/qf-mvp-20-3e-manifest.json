@@ -1,0 +1,84 @@
+{
+  "note": "QF-MVP-20.3E definition-immutability manifest. E changes ACLs ONLY; every field below must remain unchanged after E applies. Body hash is over the whitespace-normalised, lower-cased dollar-body of the applied baseline definition (the live staging source, since no applied migration re-creates these).",
+  "source": "supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql",
+  "functions": [
+    {
+      "schema": "public",
+      "name": "admin_smart_assign_lead_to_vendors",
+      "identity_args": "uuid, uuid[], boolean, integer",
+      "result_type": "jsonb",
+      "owner_expected": "postgres",
+      "security_definer": true,
+      "volatility": "volatile",
+      "language": "plpgsql",
+      "search_path": "public",
+      "body_sha256": "1f07a2d3cd8af35b3a6ceb13a127c9c1cb56038da82a68f2fcb68c1a7358e386",
+      "body_chars": 3854
+    },
+    {
+      "schema": "public",
+      "name": "assign_client_selected_vendor_to_group",
+      "identity_args": "uuid, uuid, uuid, integer",
+      "result_type": "jsonb",
+      "owner_expected": "postgres",
+      "security_definer": true,
+      "volatility": "volatile",
+      "language": "plpgsql",
+      "search_path": "public",
+      "body_sha256": "d93c404d4bad75c304a25ff53e2c2e657eb67096c98e536b14f91bd908d88715",
+      "body_chars": 3471
+    },
+    {
+      "schema": "public",
+      "name": "assign_lead_to_paid_vendors_phase26a",
+      "identity_args": "uuid, uuid[]",
+      "result_type": "jsonb",
+      "owner_expected": "postgres",
+      "security_definer": true,
+      "volatility": "volatile",
+      "language": "plpgsql",
+      "search_path": "pg_catalog",
+      "body_sha256": "a86110d37a5984fd7175325633e47c036b1ca92adfaac781a447dd2d443e78ef",
+      "body_chars": 6061
+    },
+    {
+      "schema": "public",
+      "name": "assign_lead_to_preferred_vendor",
+      "identity_args": "uuid, uuid",
+      "result_type": "jsonb",
+      "owner_expected": "postgres",
+      "security_definer": true,
+      "volatility": "volatile",
+      "language": "plpgsql",
+      "search_path": "public",
+      "body_sha256": "00d29476da3364910fa1b99a97878b0c8226787f157fde2f5f10c813146cc45f",
+      "body_chars": 4604
+    },
+    {
+      "schema": "public",
+      "name": "assign_lead_to_vendors",
+      "identity_args": "uuid, uuid[], boolean, text",
+      "result_type": "jsonb",
+      "owner_expected": "postgres",
+      "security_definer": true,
+      "volatility": "volatile",
+      "language": "plpgsql",
+      "search_path": "public",
+      "body_sha256": "cbd848ae6adc72b04296dc25b942fe17e089769aa1c1a3694d5d7c954a8bfbea",
+      "body_chars": 6878
+    },
+    {
+      "schema": "public",
+      "name": "assign_vendor_to_requirement_group",
+      "identity_args": "uuid, uuid, uuid, text, integer, text",
+      "result_type": "jsonb",
+      "owner_expected": "postgres",
+      "security_definer": true,
+      "volatility": "volatile",
+      "language": "plpgsql",
+      "search_path": "public",
+      "body_sha256": "8e54d2ea2c5180336776258d5884ed294d7b86c0d34601a8b0dbf9425880355f",
+      "body_chars": 4177
+    }
+  ]
+}

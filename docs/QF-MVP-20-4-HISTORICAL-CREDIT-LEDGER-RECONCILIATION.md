@@ -1,6 +1,6 @@
 # QF-MVP-20.4 — Historical Credit-Ledger Reconciliation (Design + SELECT-only Audit Contract)
 
-**Status: `HISTORICAL_LEDGER_EXCEPTION_REGISTER_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.**
+**Status: `HISTORICAL_LEDGER_EXCEPTION_REGISTER_APPLIED_AND_VERIFIED_ON_STAGING`.**
 
 > **20.4A DESIGN + 20.4B PRODUCTION SELECT-ONLY AUDIT + 20.4C EXCEPTION-REGISTER MIGRATION COMPLETE.**
 > 20.4A built the audit pack; 20.4B (founder-authorized) executed it read-only against production and
@@ -11,6 +11,52 @@
 > semantics. **Facts and a schema only — no classification changed, no correction executed, no data
 > written, no managed database accessed in 20.4C.** Evidence lives outside Git; only aggregate,
 > UUID-free facts are committed here.
+
+## 0-D. Exception-register staging application (QF-MVP-20.4CA) — APPLIED + VERIFIED
+
+**Date:** 2026-07-24 (13:53–13:57 UTC) · **Linked target:** authorized staging `uckafzuochmbvtiodmcl`
+(production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` not the target, not contacted).
+**Migration `20260723000900` is APPLIED to staging** via exactly one `supabase db push --linked`
+(13:54:46→13:54:53 UTC, **exit 0**); exactly that migration applied, no earlier migration, no
+repair/reset, no second push. The migration's in-transaction `$verify$` self-check NOTICE fired (immutable
+append-only table, RLS on, service_role SELECT+INSERT only, U/D/T trigger-blocked for every role, financial
+outcome locked to INSUFFICIENT_EVIDENCE / EXCEPTION_RECORD_ONLY / NO_FINANCIAL_CHANGE, all mutation flags
+false, no `vendor_credit_logs` backfill, only a non-cascading self-supersession FK, **zero rows**, A…E
+intact). Trailing `pgdelta-target-ca.crt ENOENT` is the known non-blocking local edge-runtime cache
+artifact (same as the E application); exit 0.
+
+**Identity:** applied at HEAD `06b900a37f65cafee162fa16f5b970ea3860d955` (parent
+`729abc4698547a5a18558ca2462ab1720dd92fbd`, origin identical, **0/0**, clean). Locked hashes exact
+(migration `75b6faf2…`, validator `0a4256a1…`, verifier `1cfd9104…`, manifest `bafe0951…`); applied
+A/A2/B1/G/B2/C/D/E + 20.4A artifacts byte-unchanged.
+
+**History:** before **10 local / 9 remote** (`20260723000900` sole pending) → after **10 local / 10
+remote**, all versions paired exactly once, the register migration applied once with no duplicate.
+
+**Locked verifier `verify_qf_mvp_20_4c.sql` (`1cfd9104…`) ran once against staging: 22 rows, 22 PASS / 0
+FAIL.** Proven live: register present with exactly the 20-column contract and **0 rows**; RLS enabled;
+PUBLIC/anon/authenticated hold **zero** privilege; `service_role` **SELECT+INSERT only** (no
+UPDATE/DELETE/TRUNCATE); the `BEFORE UPDATE|DELETE` row trigger (tgtype 27) and `BEFORE TRUNCATE` statement
+trigger (tgtype 34) both present and bound to their guards; trigger functions not untrusted-executable; the
+six financial locks and ten integrity constraints (incl. unique `idempotency_key`) all present; the **only**
+FK is the non-cascading self-supersession reference; `vendor_credit_logs` untouched (its reference-unique
+index + `lead_assignment_debit` CHECK remain); and A/A2/B1/G/B2/C/D/E all intact. Register owner is
+`postgres` (break-glass, informational).
+
+**No financial write:** a post-application SELECT-only pass confirmed the register holds **0 rows** and the
+sum of ALL public-table rows is **0**; `vendors` / `vendor_packages` / `lead_assignments` /
+`vendor_credit_logs` / `auth.users` / `profiles` all remain **0**; public base tables went 67 → 68 (only the
+register added). The sole database change was schema `20260723000900` — no exception row, no
+balance/package/assignment/ledger mutation, no state-changing RPC, no candidate data, no owner
+binding/`profiles` grant/`admin_role` change.
+
+**Gates:** 20.4C **42/42**, 20.4A 39/39, E 51/51, D 110/110, C 83/83, B2 61/61, B1/G 165/165, R1 62/62,
+`verify:mvp` exit 0, typecheck/lint/build clean, `git diff --check` exit 0. Transcript + queries + before/
+after captures outside Git in `qf-staging-workspace/QF-MVP-20.4CA-APPLICATION-20260724T135333Z/`.
+
+**Next:** founder-approved exception-population design/review, or a Marketplace closeout decision — **not**
+automatic candidate insertion. Populating the 27 exceptions stays a separate, founder-authorized insertion
+plan (still not authorized). `profiles`-GRANT, `admin_role` and owner binding remain separate follow-ups.
 
 ## 0-C. Exception-register staging preflight (QF-MVP-20.4CP) — COMPLETE, NOT APPLIED
 
@@ -389,11 +435,11 @@ canonical credit authority untouched).
 
 ## 13. Next phase
 
-The **staging preflight is complete** (§0-C): the dry run proposed exactly `20260723000900` as the sole
-pending migration and no write occurred. Next is a **separately authorized application review** — one
-`supabase db push --linked` that applies exactly `20260723000900` (schema only, zero rows), followed by
-the SELECT-only verifier `supabase/staging-verification/verify_qf_mvp_20_4c.sql` proving the register is
-immutable, append-only and grants nothing to untrusted roles. Any later population of the register (the 27
-exceptions) is a separate, founder-authorized insertion plan gated on that application. `profiles`-GRANT,
-`admin_role` and owner binding remain separate follow-ups. Migrations A, A2, B1, G, B2, C, D and E remain
-applied and immutable.
+The exception register is **applied and verified on staging** (§0-D): `20260723000900` applied once
+(10 local / 10 remote), the locked verifier returned **22/22 PASS**, and a post-application SELECT-only
+pass proved the register is **empty** with no financial/operational write. Next is a **founder-approved
+exception-population design/review** (a separate, founder-authorized insertion plan that would record the
+27 `INSUFFICIENT_EVIDENCE` rulings as append-only rows — still **not** authorized, and never automatic),
+**or** a Marketplace closeout decision. `profiles`-GRANT, `admin_role` and owner binding remain separate
+follow-ups. Migrations A, A2, B1, G, B2, C, D, E and now the 20.4C exception register remain applied and
+immutable.

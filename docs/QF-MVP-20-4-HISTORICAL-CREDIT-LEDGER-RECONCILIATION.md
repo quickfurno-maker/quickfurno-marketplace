@@ -1,11 +1,68 @@
 # QF-MVP-20.4 — Historical Credit-Ledger Reconciliation (Design + SELECT-only Audit Contract)
 
-**Status: `HISTORICAL_LEDGER_RECONCILIATION_DESIGN_READY_FOR_PRODUCTION_SELECT_ONLY_AUDIT`.**
+**Status: `PRODUCTION_LEDGER_EVIDENCE_AUDIT_COMPLETE_READY_FOR_FOUNDER_REVIEW`.**
 
-> **DESIGN + AUDIT PACK ONLY — NO DATABASE ACCESSED.** This phase designed the reconciliation, built
-> a **SELECT-only** production audit SQL pack, an offline safety validator, and an **empty**
-> evidence-manifest schema. No production, staging or QF-Jarvis was contacted; no migration was
-> created; no data was read or written; nothing was pushed.
+> **20.4A DESIGN + 20.4B PRODUCTION SELECT-ONLY AUDIT COMPLETE.** 20.4A built the audit pack; 20.4B
+> (founder-authorized) executed it read-only against production. **Facts only — no classification
+> approved, no correction authorized, no data changed.** Evidence lives outside Git; only aggregate,
+> UUID-free facts are committed here.
+
+## 0-A. Production SELECT-only evidence audit (QF-MVP-20.4B) — COMPLETE
+
+**Date:** 2026-07-24 · **Project ref:** `yqpgcsduqbxulrlzwzap` (production "QuickFurno", ap-southeast-1,
+PostgreSQL 17.6). **Connection truth:** `transaction_read_only = off` — the connection is *technically
+writable*; SELECT-only was **process-enforced** through the R00–R11 allowlist, not connection-enforced.
+Staging and QF-Jarvis were not contacted.
+
+**Locked artifacts (hashes exact):** audit SQL `615d3712…`, validator `3f660420…` (39/39), manifest
+schema `a63d04a7…`. The R02 fingerprint confirms the expected model — `qf_apply_vendor_credit_delta`
+definition MD5 **`45ad58beb9cb1dd8ea4f77466909cc0e`**, matching the QF-MVP-10 record. **Fingerprint
+gate: PASS.** Migration history reported (4 rows, `HISTORY_DRIFT`) — **not repaired**.
+
+**Aggregate findings (no UUIDs / no PII):**
+
+| Metric | Value |
+|---|---|
+| Total assignments (R03) | 46 |
+| `credit_deducted` assignments | 46 |
+| Canonical assignment-debit ledger rows | 19 |
+| Logs without `reference_id` | 28 |
+| **Candidate population (R04)** | **27** |
+| Source breakdown (R05) | admin 5 · automatic 16 · client-selected 6 |
+| Legacy/equivalent supporting signals (R06) | 0 unreferenced `lead_assignment_debit` logs for every candidate vendor |
+| Duplicate/reference conflicts (R07) | 0 |
+| Arithmetic violations (R08) | 0 |
+| Distinct candidate vendors (R09) | 3 (current balances — **prohibited as sole proof**) |
+| Unreconcilable rows (R10) | 0 |
+| Conservative SQL class (R11) | **27 → `INSUFFICIENT_EVIDENCE`** · 0 `PROVEN_*` · 0 `DATA_INVARIANT_VIOLATION` · 0 `DUPLICATE_OR_REFERENCE_CONFLICT` |
+
+**Comparison with the historical 46/19/27 (2026-07-22): UNCHANGED** — identical totals and source
+split; no divergence. No schema/fingerprint warning.
+
+**Evidence class outcome:** every one of the 27 candidates is `INSUFFICIENT_EVIDENCE`. No candidate
+has any ledger evidence (canonical *or* legacy) and none carries a conflict or arithmetic violation,
+so **no strong-evidence path exists in the current data** — therefore **no `PROVEN_DEBIT_ALREADY_APPLIED`
+or `PROVEN_NO_DEBIT` may be asserted**, and none was.
+
+**Decision state:** reviewer_decision **PENDING**; approval actor **unset**; correction_mode
+**NONE_PENDING_REVIEW**; `balance_mutation=false`; `package_mutation=false`; execution **not authorized**
+(schema enum `NOT_STARTED`); verification **evidence-captured-only** (schema enum `NOT_VERIFIED`). **No
+classification is approved and no correction is authorized by this phase.**
+
+**Evidence location (outside Git):** `qf-production-workspace/QF-MVP-20.4B-PRODUCTION-AUDIT-…/` holds the
+transcript, query allowlist + statement hashes, complete R00–R11 outputs + hashes, the schema-valid
+evidence-manifest instance (27 candidate UUIDs), and the aggregate report. **No production UUID, row or
+secret entered Git.**
+
+**No-write proof:** only the identity SELECT and the exact R00–R11 SELECTs ran, each once; no write/DDL/
+DCL/`CALL`/`DO`/`COPY`, no RPC (no `qf_apply_vendor_credit_delta`/`deduct_`/`restore_`/`increment_vendor_credit`/
+assignment RPC), no migration command, no session change, no data change.
+
+**Next: founder evidence review + a correction-plan decision** — *not* a migration application. Any
+correction remains gated on an approved manifest (§6–§7). `profiles`-GRANT, `admin_role` and owner
+binding remain separate.
+
+---
 
 Generated at HEAD `46c97e4628a075b6f169680a751668a6805bda8f` (origin identical, 0/0). The locked
 release sequence A → A2 → B1 → G → R1 → B2 → C → D → **E is complete on staging**; QF-MVP-20.4 is the

@@ -180,6 +180,7 @@ const R1_BOUNDARY_VERSION = '20260723000400'; // Migration G, the last one R1 in
 const DECLARED_LATER_MIGRATIONS = new Set([
   '20260723000500_qf_mvp_assignment_universal_enforcement.sql', // QF-MVP-20.3B2
   '20260723000600_qf_mvp_public_projection_privilege_hardening.sql', // QF-MVP-20.3C
+  '20260723000700_qf_mvp_auth_user_onboarding_trigger.sql', // QF-MVP-20.3D
 ]);
 
 const migrationFiles = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql'));

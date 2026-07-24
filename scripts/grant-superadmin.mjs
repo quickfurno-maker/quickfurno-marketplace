@@ -124,5 +124,5 @@ if (!user) {
 
 console.log(`\n✓ ${email} is now a Superadmin.`);
 console.log(`  - auth app_metadata.admin_role = "Superadmin"`);
-console.log(`  - profiles.role = "admin", profiles.admin_role = "Superadmin"`);
+console.log(`  - profiles.role = "admin"`);
 console.log(`Sign in at /admin/login with this email and its Supabase Auth password.`);

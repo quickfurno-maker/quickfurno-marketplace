@@ -1711,7 +1711,7 @@ function AdminUsersPage({ data }: { data: Snapshot }) {
       columns={[
         { header: "Name", cell: (profile) => <Strong title={profile.full_name || "Admin user"} subtitle={profile.id} /> },
         { header: "Email", cell: () => "Managed in Supabase Auth" },
-        { header: "Role", cell: (profile) => <StatusBadge value={profile.admin_role || "Superadmin"} /> },
+        { header: "Role", cell: () => <StatusBadge value="Superadmin" /> },
         { header: "Status", cell: (profile) => <StatusBadge value={profile.is_active === false ? "Disabled" : "Active"} /> },
         { header: "Last Login", cell: () => "Auth dashboard" },
         { header: "Created", cell: (profile) => formatDate(profile.created_at) },

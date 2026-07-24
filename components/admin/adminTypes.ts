@@ -210,7 +210,6 @@ export type Profile = {
   full_name?: string | null;
   phone?: string | null;
   role?: string | null;
-  admin_role?: string | null;
   is_active?: boolean | null;
 };
 

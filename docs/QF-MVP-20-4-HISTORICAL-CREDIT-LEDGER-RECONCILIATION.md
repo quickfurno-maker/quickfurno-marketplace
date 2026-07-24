@@ -1,6 +1,6 @@
 # QF-MVP-20.4 — Historical Credit-Ledger Reconciliation (Design + SELECT-only Audit Contract)
 
-**Status: `HISTORICAL_LEDGER_EXCEPTION_REGISTER_GENERATED_REVIEWED_READY_FOR_PREFLIGHT`.**
+**Status: `HISTORICAL_LEDGER_EXCEPTION_REGISTER_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.**
 
 > **20.4A DESIGN + 20.4B PRODUCTION SELECT-ONLY AUDIT + 20.4C EXCEPTION-REGISTER MIGRATION COMPLETE.**
 > 20.4A built the audit pack; 20.4B (founder-authorized) executed it read-only against production and
@@ -11,6 +11,54 @@
 > semantics. **Facts and a schema only — no classification changed, no correction executed, no data
 > written, no managed database accessed in 20.4C.** Evidence lives outside Git; only aggregate,
 > UUID-free facts are committed here.
+
+## 0-C. Exception-register staging preflight (QF-MVP-20.4CP) — COMPLETE, NOT APPLIED
+
+**Date:** 2026-07-24 (13:29–13:32 UTC) · **Linked target:** authorized staging `uckafzuochmbvtiodmcl`
+(production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` not the linked target, not contacted).
+**Nothing was applied** — one `supabase db push --linked --dry-run`, plus SELECT-only catalog checks and
+`migration list`. No `db push` without `--dry-run`, no `migration up/repair/reset`, no hand-executed SQL,
+no exception-register row, no RPC, no balance/package/assignment/ledger change.
+
+**Identity:** generated at HEAD `729abc4698547a5a18558ca2462ab1720dd92fbd` (parent
+`854709d206d115a8e375b4cb406ee2c94de18b72`, origin identical, **0/0**, clean; the generation commit touched
+exactly its eight authorized paths). **Phase-locked full hashes** (match the 20.4C prefixes): migration
+`75b6faf2f7ed52007b79b9036dd5998f00eb67d88e62ffa34b3d9d1343c5039d`, validator
+`0a4256a1b534c91a18f240de0be8ea28a2e8e2c3325e07e08733c20968c6a9b2`, verifier
+`1cfd910408c196b3a2e857d233bcdcf9d19ba6492bc0dc65c374dbfe593fbcbc`, contract manifest
+`bafe0951d8a4b8f0f72fd1524c1a2034394e4d611869e99f9fa62df1264462fc`. Applied A/A2/B1/G/B2/C/D/E, the 20.4A
+audit/validator/manifest-schema, and the R1 runtime are byte-unchanged.
+
+**External apply workspace (`qf-staging-apply`, outside Git):** no `seed.sql`, no Edge Functions; migrations
+held exactly the nine applied files (baseline + A…E, all byte-identical to the repo); the register
+`20260723000900` was absent, so **only** the locked migration was copied in (byte-identical, hash `75b6faf2…`),
+giving exactly ten SQL migrations.
+
+**Live pre-state (SELECT-only) — as expected:** register table / immutability functions / immutability
+triggers **absent**; `20260723000900` **absent** from remote history; **nine** earlier migrations present;
+A/A2/B1/G/B2/C/D/E preserved (B1 authority, four B2 triggers, C `vendor_public_v`, D `on_auth_user_created`,
+E six-RPC untrusted-EXECUTE = 0); **67** public tables summing to **0** rows; `auth.users` = 0, `profiles` = 0,
+`lead_assignments`/`vendor_credit_logs`/`vendors`/`vendor_packages` = 0 (no candidate rows anywhere); no
+owner-binding column on `leads`; `profiles.admin_role` absent on staging and `authenticated` holds no
+`profiles` grant (both follow-ups un-implemented).
+
+**Migration history:** **10 local / 9 remote**; baseline…E paired; `20260723000900` local-only and the **sole
+pending** migration.
+
+**Dry run (once, exit 0):** `DRY RUN: migrations will *not* be pushed`; **exactly one** proposed migration —
+`20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql`; no earlier migration, no
+application claim.
+
+**No-write proof:** re-listing history and re-running the pre-state after the dry run returned **identical**
+results — remote still nine, `20260723000900` still local-only, register still absent, all tables still empty.
+
+**Offline gates:** 20.4C **42/42**, 20.4A 39/39, E 51/51, D 110/110, C 83/83, B2 61/61, B1/G 165/165, R1
+62/62, `verify:mvp` exit 0, typecheck/lint/build clean, `git diff --check` exit 0. Transcript + query +
+before/after captures live outside Git in `qf-staging-workspace/QF-MVP-20.4CP-PREFLIGHT-…/`.
+
+**Next: application review** — a separately authorized single `db push` that applies exactly
+`20260723000900` (schema only, zero rows), then the SELECT-only verifier `verify_qf_mvp_20_4c.sql`.
+Populating the 27 exceptions stays a later, separate founder-authorized insertion plan.
 
 ## 0-B. Immutable exception-register migration (QF-MVP-20.4C) — GENERATED, NOT APPLIED
 
@@ -341,12 +389,11 @@ canonical credit authority untouched).
 
 ## 13. Next phase
 
-A **staging preflight** for the 20.4C exception-register migration: exactly one
-`supabase db push --linked --dry-run` against staging plus the SELECT-only verifier
-`supabase/staging-verification/verify_qf_mvp_20_4c.sql`, proving the register applies cleanly, is
-immutable and append-only, and grants nothing to untrusted roles — **before** any application. The
-migration is **generated and reviewed but not applied**; **no managed database was accessed in 20.4C**,
-and the register ships **empty** (zero rows). Any later population of the register is a separate,
-founder-authorized insertion plan gated on this design. `profiles`-GRANT, `admin_role` and owner
-binding remain separate follow-ups. Migrations A, A2, B1, G, B2, C, D and E remain applied and
-immutable.
+The **staging preflight is complete** (§0-C): the dry run proposed exactly `20260723000900` as the sole
+pending migration and no write occurred. Next is a **separately authorized application review** — one
+`supabase db push --linked` that applies exactly `20260723000900` (schema only, zero rows), followed by
+the SELECT-only verifier `supabase/staging-verification/verify_qf_mvp_20_4c.sql` proving the register is
+immutable, append-only and grants nothing to untrusted roles. Any later population of the register (the 27
+exceptions) is a separate, founder-authorized insertion plan gated on that application. `profiles`-GRANT,
+`admin_role` and owner binding remain separate follow-ups. Migrations A, A2, B1, G, B2, C, D and E remain
+applied and immutable.

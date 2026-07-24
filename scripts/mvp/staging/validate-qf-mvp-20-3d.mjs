@@ -9,12 +9,23 @@
  * verifier, and the repository's onboarding posture, against the frozen D
  * contract.
  *
- * The single most important rule here is R08: the profile `role` must be a
- * TRUSTED CONSTANT and must never be derived from raw_user_meta_data. The
- * original repository function used `coalesce(new.raw_user_meta_data->>'role',
- * 'vendor')`, which would let any anonymous signup self-assign 'admin' and
- * unlock every is_admin() RLS policy. This validator makes that regression
- * impossible to reintroduce silently.
+ * Two regressions are load-bearing here:
+ *
+ *   R08 — the profile `role` must never be derived from client-writable signup
+ *         metadata. The original repository function used
+ *         `coalesce(new.raw_user_meta_data->>'role','vendor')`, which would let
+ *         any anonymous signup self-assign 'admin' and unlock every is_admin()
+ *         RLS policy.
+ *   R19/R20 — nor may it be a blanket constant. auth.users ALSO carries
+ *         homeowner/client principals (services/clientOtpAuthService.ts calls
+ *         signInWithOtp through the anon client, creating first-time users),
+ *         so an unconditional 'vendor' would misclassify every homeowner.
+ *         Classification comes only from the server-set app_metadata marker
+ *         `qf_principal`, and defaults to a NEUTRAL null role.
+ *
+ * Sections 6 and 7 additionally prove the runtime writer and the trigger reader
+ * cannot drift apart, and grade the frozen contract against nine concrete
+ * principal scenarios derived from the migration text itself.
  *
  * Usage:  node scripts/mvp/staging/validate-qf-mvp-20-3d.mjs
  * Exit 0 = PASS, exit 1 = FAIL. Fails closed on ambiguous parsing.
@@ -197,6 +208,46 @@ const FORBIDDEN_META_KEYS = [
   "verification_status", "package", "package_status", "paid", "paid_status",
   "credits", "remaining_credits", "total_credits", "status", "approved",
 ];
+/** The TRUSTED classification source: Supabase Auth app_metadata (server-set only). */
+const TRUSTED_META_COLUMN = "raw_app_meta_data";
+/** The narrow namespaced marker key. Must match lib/identity/authPrincipalMarker.ts. */
+const MARKER_KEY = "qf_principal";
+/** The only marker value that classifies a new auth user as a vendor. */
+const MARKER_VENDOR = "vendor";
+/** The runtime half of the marker contract. */
+const MARKER_MODULE = "lib/identity/authPrincipalMarker.ts";
+const VENDOR_SIGNUP_MODULE = "app/actions.ts";
+
+/** Split on commas that are not nested inside parentheses. */
+function splitTopLevel(s) {
+  const out = []; let depth = 0, cur = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "(") depth++;
+    else if (c === ")") depth--;
+    if (c === "," && depth === 0) { out.push(cur.trim()); cur = ""; continue; }
+    cur += c;
+  }
+  if (cur.trim() !== "") out.push(cur.trim());
+  return out;
+}
+
+/** Isolate the profiles INSERT column list and its parallel VALUES expressions. */
+function profilesInsertParts(fnBody) {
+  const m = fnBody.match(/insert\s+into\s+public\.profiles\s*\(([^)]*)\)\s*values\s*\(/);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  let depth = 1, i = start;
+  for (; i < fnBody.length && depth > 0; i++) {
+    if (fnBody[i] === "(") depth++;
+    else if (fnBody[i] === ")") depth--;
+  }
+  if (depth !== 0) return null;
+  return {
+    cols: m[1].split(",").map((c) => c.trim()),
+    values: splitTopLevel(fnBody.slice(start, i - 1)),
+  };
+}
 
 export function evaluateDMigration(sql, label = "D") {
   const findings = [];
@@ -273,19 +324,69 @@ export function evaluateDMigration(sql, label = "D") {
     add("R07_trigger_present", `expected exactly one trigger (${TRG}), found ${JSON.stringify(created)}`);
   }
 
-  // -- R08 THE CRITICAL RULE: role is a trusted CONSTANT, never metadata -----
+  // -- R08 THE CRITICAL RULE: role never comes from client-writable metadata --
   if (fnBody) {
-    // Any metadata read that feeds the role is a privilege-escalation vector.
+    // Any signup-metadata read that feeds the role is a privilege-escalation vector.
     if (/raw_user_meta_data\s*->>\s*'role'/.test(fnBody)
         || /raw_app_meta_data\s*->>\s*'role'/.test(fnBody)) {
       add("R08_role_is_trusted_constant",
-        "role is derived from raw_user_meta_data — this is the self-signup admin escalation vector");
-    }
-    if (!/'vendor'/.test(fnBody)) {
-      add("R08_role_is_trusted_constant", "the constant non-privileged role 'vendor' is not present");
+        "role is derived from a metadata 'role' key — this is the self-signup admin escalation vector");
     }
     if (/'admin'/.test(fnBody)) {
-      add("R08_role_is_trusted_constant", "the function references the privileged role 'admin'");
+      add("R08_role_is_trusted_constant",
+        "the function references the privileged role 'admin' — admin must be unreachable from onboarding");
+    }
+  }
+
+  // -- R19 classification is CONDITIONAL on the TRUSTED marker, neutral by
+  //        default. auth.users also carries homeowner/client OTP principals
+  //        (services/clientOtpAuthService.ts signInWithOtp creates them through
+  //        the ANON client), so NO single constant role is correct for it.
+  if (fnBody) {
+    const parts = profilesInsertParts(fnBody);
+    if (!parts) {
+      add("R19_trusted_marker_classification", "could not isolate the profiles INSERT values list");
+    } else {
+      const idx = parts.cols.indexOf("role");
+      const expr = idx >= 0 && idx < parts.values.length ? parts.values[idx] : null;
+      if (expr === null) {
+        add("R19_trusted_marker_classification", "no value is supplied for the role column");
+      } else if (/^'[a-z_]*'$/.test(expr)) {
+        add("R19_trusted_marker_classification",
+          `role is the UNCONDITIONAL constant ${expr} — that misclassifies every client OTP auth user`);
+      } else if (/raw_user_meta_data/.test(expr)) {
+        add("R19_trusted_marker_classification", "the role value expression reads untrusted signup metadata");
+      }
+    }
+    if (!new RegExp(`${TRUSTED_META_COLUMN}\\s*->>\\s*'${MARKER_KEY}'`).test(fnBody)) {
+      add("R19_trusted_marker_classification",
+        `the trusted marker new.${TRUSTED_META_COLUMN}->>'${MARKER_KEY}' is never read`);
+    }
+    if (!new RegExp(`=\\s*'${MARKER_VENDOR}'\\s+then`).test(fnBody)
+        && !new RegExp(`when\\s+[^;]{0,80}?=\\s*'${MARKER_VENDOR}'`).test(fnBody)) {
+      add("R19_trusted_marker_classification",
+        "the vendor role is not gated by an equality test on the trusted marker");
+    }
+    if (!/else\s+[a-z_]+\s*:=\s*null\s*;/.test(fnBody) && !/else\s+null\b/.test(fnBody)) {
+      add("R19_trusted_marker_classification",
+        "absent or unknown classification has no NEUTRAL null default");
+    }
+  }
+
+  // -- R20 marker namespace: the trusted column only, exactly one key --------
+  if (fnBody) {
+    if (new RegExp(`raw_user_meta_data\\s*->>\\s*'${MARKER_KEY}'`).test(fnBody)) {
+      add("R20_marker_namespace",
+        `the marker is read from raw_user_meta_data, which any anonymous signup can write`);
+    }
+    const appKeys = [...fnBody.matchAll(/raw_app_meta_data\s*->>\s*'([a-z_]+)'/g)].map((m) => m[1]);
+    for (const k of appKeys) {
+      if (k !== MARKER_KEY) {
+        add("R20_marker_namespace", `unexpected app_metadata key '${k}' is read (expected only '${MARKER_KEY}')`);
+      }
+    }
+    if (appKeys.length === 0) {
+      add("R20_marker_namespace", "the trusted app_metadata column is never read");
     }
   }
 
@@ -455,8 +556,9 @@ const FIXTURES = [
   { id: "H", rule: "R07_trigger_present", why: "a second auth trigger",
     mutate: (s) => `${s}\ncreate trigger on_auth_user_created_extra after insert on auth.users for each row execute function public.handle_new_user();\n` },
   // THE critical regression: reintroduce the metadata-derived role.
-  { id: "I", rule: "R08_role_is_trusted_constant", why: "role reverted to raw_user_meta_data (admin escalation)",
-    mutate: (s) => s.replace("    'vendor'\n", "    coalesce(new.raw_user_meta_data ->> 'role', 'vendor')\n") },
+  { id: "I", rule: "R08_role_is_trusted_constant", why: "classification reverted to raw_user_meta_data ->> 'role' (admin escalation)",
+    mutate: (s) => s.replace("new.raw_app_meta_data ->> 'qf_principal'",
+      "new.raw_user_meta_data ->> 'role'") },
   { id: "J", rule: "R09_metadata_allowlist", why: "a privileged metadata key is read",
     mutate: (s) => s.replace("new.raw_user_meta_data ->> 'phone',",
       "new.raw_user_meta_data ->> 'phone',\n    -- x\n    new.raw_user_meta_data ->> 'admin_role',") },
@@ -481,6 +583,17 @@ const FIXTURES = [
       "  if pg_get_functiondef(v_fn) !~ 'vendor' then raise exception 'x'; end if;\n  -- 4.1 the onboarding function exists") },
   { id: "S", rule: "R18_prior_phases_untouched", why: "redefines the canonical B1 authority",
     mutate: (s) => `${s}\ncreate or replace function public.qf_assign_lead_vendors_v2(p_lead_id uuid) returns jsonb language sql as $x$ select '{}'::jsonb $x$;\n` },
+  // THE QF-MVP-20.3DR1 regression: a blanket vendor role for every auth user,
+  // which would stamp every homeowner/client OTP principal as a vendor.
+  { id: "T", rule: "R19_trusted_marker_classification", why: "role reverted to the UNCONDITIONAL constant 'vendor' (client misclassified)",
+    mutate: (s) => s.replace("    v_role\n  )", "    'vendor'\n  )") },
+  { id: "U", rule: "R19_trusted_marker_classification", why: "the neutral default became vendor (unknown principal misclassified)",
+    mutate: (s) => s.replace("    v_role := null;", "    v_role := 'vendor';") },
+  { id: "V", rule: "R20_marker_namespace", why: "marker read from the client-writable user_metadata namespace",
+    mutate: (s) => s.replace("new.raw_app_meta_data ->> 'qf_principal'",
+      "new.raw_user_meta_data ->> 'qf_principal'") },
+  { id: "W", rule: "R20_marker_namespace", why: "trigger reads the WRONG metadata key (writer/reader divergence)",
+    mutate: (s) => s.replace("->> 'qf_principal'", "->> 'principal'") },
 ];
 
 for (const fx of FIXTURES) {
@@ -597,6 +710,160 @@ const leaking = clientComponents.filter((f) => {
 });
 record("15 no \"use client\" module holds the service-role client or key",
   leaking.length === 0, `leaking: ${JSON.stringify(leaking)}`);
+
+// app_metadata is the trusted source ONLY because no browser path can write it.
+const appMetaWriters = clientComponents.filter((f) => /app_metadata\s*:/.test(stripTs(read(f))));
+record("15b no \"use client\" module writes app_metadata (the marker stays server-owned)",
+  appMetaWriters.length === 0, `writers: ${JSON.stringify(appMetaWriters)}`);
+
+// A forged marker must never arrive through the client-writable namespace.
+const userMetaMarkerSenders = runtimeFiles.filter((f) =>
+  new RegExp(`user_metadata\\s*:\\s*\\{[^}]*${MARKER_KEY}`).test(stripTs(read(f))));
+record("15c no runtime module puts the principal marker in user_metadata",
+  userMetaMarkerSenders.length === 0, `senders: ${JSON.stringify(userMetaMarkerSenders)}`);
+
+/* ===========================================================================
+ * 6. RUNTIME <-> TRIGGER MARKER AGREEMENT
+ *    One evaluator, applied to the real triple AND to mutated ones, so a
+ *    renamed/removed writer or a renamed reader cannot pass silently.
+ * ========================================================================= */
+function evaluateMarkerAgreement({ marker, actions, migration }) {
+  const findings = [];
+  const m = stripTs(marker);
+  const keyM = m.match(/QF_PRINCIPAL_APP_METADATA_KEY\s*=\s*["'`]([a-z_]+)["'`]/);
+  const valM = m.match(/QF_PRINCIPAL_VENDOR\s*=\s*["'`]([a-z_]+)["'`]/);
+  if (!keyM) findings.push("marker module does not export QF_PRINCIPAL_APP_METADATA_KEY");
+  if (!valM) findings.push("marker module does not export QF_PRINCIPAL_VENDOR");
+  if (!/export\s+function\s+vendorPrincipalAppMetadata\s*\(/.test(m)) {
+    findings.push("marker module does not export vendorPrincipalAppMetadata()");
+  }
+
+  const a = stripTs(actions);
+  if (!/app_metadata\s*:\s*vendorPrincipalAppMetadata\(\)/.test(a)) {
+    findings.push("the vendor createUser path does not set the trusted app_metadata marker");
+  }
+  if (/user_metadata\s*:\s*\{[^}]*\brole\s*:/.test(a)) {
+    findings.push("the vendor createUser path still supplies a role in user_metadata");
+  }
+
+  if (keyM && valM) {
+    const body = stripComments(migration, "agreement");
+    if (!new RegExp(`raw_app_meta_data\\s*->>\\s*'${keyM[1]}'`).test(body)) {
+      findings.push(`the trigger does not read the runtime marker key '${keyM[1]}' — writer/reader divergence`);
+    }
+    if (!new RegExp(`=\\s*'${valM[1]}'\\s+then`).test(body)) {
+      findings.push(`the trigger does not test the runtime marker value '${valM[1]}' — writer/reader divergence`);
+    }
+  }
+  return findings;
+}
+
+const REAL_TRIPLE = {
+  marker: read(MARKER_MODULE),
+  actions: read(VENDOR_SIGNUP_MODULE),
+  migration: dRaw,
+};
+const agreement = evaluateMarkerAgreement(REAL_TRIPLE);
+record("16 runtime marker writer and trigger marker reader agree exactly",
+  agreement.length === 0, agreement.length === 0 ? "in agreement" : agreement.join(" | "));
+
+const AGREEMENT_MUTATIONS = [
+  { id: "M1", why: "runtime marker writer removed",
+    mutate: (t) => ({ ...t, actions: t.actions.replace("app_metadata: vendorPrincipalAppMetadata(),", "") }) },
+  { id: "M2", why: "runtime marker key renamed (trigger still reads the old one)",
+    mutate: (t) => ({ ...t, marker: t.marker.replace('QF_PRINCIPAL_APP_METADATA_KEY = "qf_principal"',
+      'QF_PRINCIPAL_APP_METADATA_KEY = "qf_actor"') }) },
+  { id: "M3", why: "runtime marker value renamed (trigger still tests the old one)",
+    mutate: (t) => ({ ...t, marker: t.marker.replace('QF_PRINCIPAL_VENDOR = "vendor"',
+      'QF_PRINCIPAL_VENDOR = "supplier"') }) },
+  { id: "M4", why: "vendor signup re-adds an untrusted role to user_metadata",
+    mutate: (t) => ({ ...t, actions: t.actions.replace("user_metadata: {\n        full_name:",
+      "user_metadata: {\n        role: \"vendor\",\n        full_name:") }) },
+  { id: "M5", why: "marker helper export removed",
+    mutate: (t) => ({ ...t, marker: t.marker.replace("export function vendorPrincipalAppMetadata(",
+      "function vendorPrincipalAppMetadata(") }) },
+];
+for (const mu of AGREEMENT_MUTATIONS) {
+  const mutated = mu.mutate(REAL_TRIPLE);
+  const changed = JSON.stringify(mutated) !== JSON.stringify(REAL_TRIPLE);
+  const f = changed ? evaluateMarkerAgreement(mutated) : [];
+  record(`17 agreement mutation ${mu.id} is caught :: ${mu.why}`, changed && f.length > 0,
+    !changed ? "MUTATION WAS A NO-OP — the fixture is vacuous"
+      : f.length > 0 ? f[0] : "NOT CAUGHT");
+}
+
+/* ===========================================================================
+ * 7. FOCUSED PRINCIPAL-CLASSIFICATION BEHAVIOUR
+ *    The classifier is DERIVED FROM THE MIGRATION TEXT, so these scenarios
+ *    re-grade automatically if the frozen contract is ever edited.
+ * ========================================================================= */
+function buildClassifierFromMigration(sql) {
+  const text = stripComments(sql, "classifier");
+  const fm = text.match(new RegExp(
+    `create\\s+or\\s+replace\\s+function\\s+public\\.${FN}\\s*\\(\\s*\\)[\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$`, "i"));
+  const body = fm ? norm(fm[1]) : "";
+  const src = body.match(/:=\s*new\.(raw_[a-z_]+)\s*->>\s*'([a-z_]+)'/) || [];
+  const gate = body.match(/if\s+[a-z_]+\s*=\s*'([a-z_]+)'\s+then\s+[a-z_]+\s*:=\s*'([a-z_]+)'/) || [];
+  const column = src[1] || null, key = src[2] || null;
+  const markerValue = gate[1] || null, grantedRole = gate[2] || null;
+  const neutral = /else\s+[a-z_]+\s*:=\s*null\s*;/.test(body);
+  const conflictKeeps = /on\s+conflict\s*\(\s*id\s*\)\s*do\s+nothing/.test(body);
+  return {
+    ok: Boolean(column && key && markerValue && grantedRole),
+    column, key, markerValue, grantedRole, neutral, conflictKeeps,
+    classify(user) {
+      const source = column === "raw_app_meta_data" ? user.app_metadata : user.user_metadata;
+      const seen = source ? source[key] : undefined;
+      if (seen === markerValue) return grantedRole;
+      return neutral ? null : "NO_NEUTRAL_DEFAULT";
+    },
+  };
+}
+const CLS = buildClassifierFromMigration(dRaw);
+record("18 the classification contract is parseable from the migration", CLS.ok,
+  CLS.ok ? `new.${CLS.column}->>'${CLS.key}' == '${CLS.markerValue}' -> '${CLS.grantedRole}', else NEUTRAL null` : "unparseable");
+record("18b the trusted column is app_metadata, not user_metadata",
+  CLS.column === TRUSTED_META_COLUMN, String(CLS.column));
+
+const SCENARIOS = [
+  { id: "S1", who: "anonymous self-signup forging an ADMIN role",
+    user: { user_metadata: { role: "admin", full_name: "x" }, app_metadata: { provider: "email" } }, expect: null },
+  { id: "S2", who: "anonymous self-signup forging a VENDOR role",
+    user: { user_metadata: { role: "vendor" }, app_metadata: { provider: "email" } }, expect: null },
+  { id: "S3", who: "anonymous self-signup forging the MARKER in user_metadata",
+    user: { user_metadata: { qf_principal: "vendor" }, app_metadata: { provider: "email" } }, expect: null },
+  { id: "S4", who: "first-time homeowner/client phone OTP (signInWithOtp, anon client)",
+    user: { user_metadata: {}, app_metadata: { provider: "phone", providers: ["phone"] } }, expect: null },
+  { id: "S5", who: "server-created vendor (admin.createUser + trusted marker)",
+    user: { user_metadata: { full_name: "V", phone: "+91..." }, app_metadata: { qf_principal: "vendor" } }, expect: "vendor" },
+  { id: "S6", who: "auth user with NO app_metadata at all",
+    user: { user_metadata: {} }, expect: null },
+  { id: "S7", who: "unknown/unrecognised marker value",
+    user: { user_metadata: {}, app_metadata: { qf_principal: "wizard" } }, expect: null },
+  { id: "S8", who: "admin/superadmin bootstrap (grant-superadmin.mjs createUser)",
+    user: { user_metadata: { full_name: "QuickFurno Admin" }, app_metadata: { admin_role: "Superadmin" } }, expect: null },
+  { id: "S9", who: "marker itself set to 'admin' by a server path",
+    user: { user_metadata: {}, app_metadata: { qf_principal: "admin" } }, expect: null },
+];
+for (const sc of SCENARIOS) {
+  const got = CLS.ok ? CLS.classify(sc.user) : "UNPARSEABLE";
+  record(`19 ${sc.id} ${sc.who} -> ${sc.expect === null ? "NEUTRAL (null)" : `'${sc.expect}'`}`,
+    got === sc.expect, `got ${got === null ? "NEUTRAL (null)" : JSON.stringify(got)}`);
+}
+record("19b no scenario can ever yield the admin role",
+  SCENARIOS.every((sc) => (CLS.ok ? CLS.classify(sc.user) : null) !== "admin"), "admin unreachable");
+record("19c a duplicate/established profile row is preserved, never overwritten",
+  CLS.conflictKeeps, "ON CONFLICT (id) DO NOTHING");
+
+// The client-versus-vendor discrimination must stay covered: these fixture ids
+// and scenarios are load-bearing and may not be quietly deleted.
+record("20 the client-vs-vendor fixtures and scenarios are all present", (() => {
+  const needFx = ["I", "T", "U", "V", "W"];
+  const needSc = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9"];
+  const haveFx = new Set(FIXTURES.map((f) => f.id));
+  const haveSc = new Set(SCENARIOS.map((s) => s.id));
+  return needFx.every((i) => haveFx.has(i)) && needSc.every((i) => haveSc.has(i));
+})(), "5 classification mutations + 9 principal scenarios");
 
 /* ===========================================================================
  * Report

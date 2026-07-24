@@ -19,10 +19,20 @@
 --   * QF-MVP-20.3CVR1 — any set comparison normalises BOTH sides in PostgreSQL;
 --     a DB-sorted aggregate is never compared with a hand-ordered literal.
 --
---   Consequence: the source-level guarantee that the profile role is a trusted
---   CONSTANT (never raw_user_meta_data) is enforced by the OFFLINE VALIDATOR,
---   which grades the migration text. Proving it in-database would require
---   inserting a test auth user, which this phase forbids.
+--   Consequence: the source-level guarantee that the profile role is classified
+--   ONLY from the server-set app_metadata marker `qf_principal` — never from
+--   raw_user_meta_data, and never as a blanket constant — is enforced by the
+--   OFFLINE VALIDATOR, which grades the migration text with a comment-aware
+--   tokenizer. It CANNOT be asserted here: pg_proc.prosrc retains the function's
+--   own inline comments, which legitimately name `raw_user_meta_data` and
+--   'admin' while describing what is forbidden, so a negative lexical assertion
+--   would produce a false FAIL. Proving the behaviour in-database would instead
+--   require inserting a test auth user, which this phase forbids.
+--
+--   Rows 26-28 add the catalog-decidable half of the corrected contract: the
+--   neutral role remains storable, the applied function DECLARES its trusted
+--   source (via the COMMENT catalog object, not source text), and the client
+--   principal model is intact.
 --
 -- TRIGGER TYPE BITS (pg_trigger.tgtype)
 --   1 ROW · 2 BEFORE · 4 INSERT · 8 DELETE · 16 UPDATE · 32 TRUNCATE
@@ -307,5 +317,44 @@ select 25, 'D25_application_data_unchanged_by_d', 'INFORMATIONAL',
                       ' leads=', (select count(*) from public.leads))),
        'PASS',
        'D creates only a function and a trigger; it writes no application row'
+
+-- ---------------------------------------------------------------------------
+-- QF-MVP-20.3DR1 — PRINCIPAL-CLASSIFICATION CORRECTION
+-- ---------------------------------------------------------------------------
+union all
+select 26, 'D26_profiles_role_nullable_for_neutral_principal', '1',
+       (select count(*)::text from pg_catalog.pg_attribute
+         where attrelid='public.profiles'::regclass and attnum>0 and not attisdropped
+           and attname::text='role' and not attnotnull),
+       case when (select count(*) from pg_catalog.pg_attribute
+                   where attrelid='public.profiles'::regclass and attnum>0 and not attisdropped
+                     and attname::text='role' and not attnotnull)=1
+            then 'PASS' else 'FAIL' end,
+       'an unclassified principal (first-time client OTP user) is initialised with the NEUTRAL null role, which requires role to stay nullable'
+
+union all
+select 27, 'D27_trusted_classification_source_declared', '1',
+       (select case when pg_catalog.obj_description(to_regprocedure('public.handle_new_user()'),'pg_proc')
+                      like '%raw_app_meta_data%'
+                     and pg_catalog.obj_description(to_regprocedure('public.handle_new_user()'),'pg_proc')
+                      like '%qf_principal%'
+                    then '1' else '0' end),
+       case when pg_catalog.obj_description(to_regprocedure('public.handle_new_user()'),'pg_proc')
+                   like '%raw_app_meta_data%'
+              and pg_catalog.obj_description(to_regprocedure('public.handle_new_user()'),'pg_proc')
+                   like '%qf_principal%'
+            then 'PASS' else 'FAIL' end,
+       'the applied function declares the server-only app_metadata marker as its classification source. This reads the COMMENT catalog object authored by D, NOT function source text, so the B1R2 prohibition is respected; the source-level guarantee is graded offline.'
+
+union all
+select 28, 'D28_client_principal_model_intact', '1',
+       (select count(*)::text from pg_catalog.pg_class c
+          join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+         where n.nspname::text='public' and c.relname::text='client_accounts' and c.relkind='r'),
+       case when (select count(*) from pg_catalog.pg_class c
+                    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+                   where n.nspname::text='public' and c.relname::text='client_accounts' and c.relkind='r')=1
+            then 'PASS' else 'FAIL' end,
+       'homeowner/client principals remain modelled by client_accounts, provisioned by the OTP verify path; D never creates a client account and never classifies a client as a vendor'
 
 order by seq;

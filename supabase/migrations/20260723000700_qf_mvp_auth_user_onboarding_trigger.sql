@@ -42,25 +42,87 @@
 -- unlocking every `is_admin()` RLS policy in the schema (profiles, vendors,
 -- leads, lead_assignments, …).
 --
--- ROLE IS NEVER READ FROM METADATA HERE. Administrator access is granted only
--- by the deliberate, service-role operator path (scripts/grant-superadmin.mjs),
+-- ROLE IS NEVER READ FROM SIGNUP METADATA HERE. Administrator access is granted
+-- only by the deliberate, service-role operator path (scripts/grant-superadmin.mjs),
 -- which sets auth app_metadata.admin_role (not client-writable) and upserts
--- profiles.role = 'admin'. Signup initialises the non-privileged role only.
+-- profiles.role = 'admin'. Signup never produces a privileged role.
 --
 -- ---------------------------------------------------------------------------
--- FROZEN ONBOARDING CONTRACT (proved from the repository, not invented)
+-- THE SECOND DEFECT THIS MIGRATION CLOSES (QF-MVP-20.3DR1)
 -- ---------------------------------------------------------------------------
+-- The first generation of this migration replaced the metadata role with the
+-- blanket CONSTANT 'vendor'. That closed the escalation but MISCLASSIFIED a
+-- second, proved principal type: auth.users is ALSO created by the homeowner/
+-- client WhatsApp OTP login. services/clientOtpAuthService.ts calls the
+-- request-scoped ANON SSR client's
+--
+--     sb.auth.signInWithOtp({ phone: phoneE164 })
+--
+-- with first-time user creation left at its default (enabled), supplies no
+-- vendor marker of any kind, and afterwards provisions public.client_accounts —
+-- the client principal model. A blanket 'vendor' would therefore have stamped
+-- every homeowner as a vendor profile. `auth.users` is NOT a vendor-only table,
+-- so no single constant role is correct for it.
+--
+-- ---------------------------------------------------------------------------
+-- FROZEN CLASSIFICATION CONTRACT (proved from the repository, not invented)
+-- ---------------------------------------------------------------------------
+-- Classification comes from ONE trusted, server-only source: the Supabase Auth
+-- app_metadata key `qf_principal`, seen here as auth.users.raw_app_meta_data.
+--
+--   WHY IT IS TRUSTED: app_metadata cannot be set by an anonymous or an
+--   authenticated caller. `auth.signUp({ options: { data } })` and
+--   `auth.updateUser({ data })` write user_metadata ONLY; GoTrue exposes no
+--   non-admin route to app_metadata. It is settable exclusively through the
+--   Admin API (auth.admin.createUser / updateUserById), which requires the
+--   service-role key, and no browser module in this repository holds that key
+--   or writes app_metadata at all — every client-side reference only READS it.
+--
 --   target table   : public.profiles
 --   key            : profiles.id = new.id  (FK -> auth.users(id) ON DELETE CASCADE)
 --   columns written: id, full_name, phone, role   (explicit list, as originally)
 --     id           <- new.id                                    TRUSTED (auth)
 --     full_name    <- new.raw_user_meta_data->>'full_name'      untrusted, NON-privileged display text, single allowlisted key
 --     phone        <- new.raw_user_meta_data->>'phone'          untrusted, NON-privileged display text, single allowlisted key
---     role         <- CONSTANT 'vendor'                         TRUSTED CONSTANT — never metadata
+--     role         <- new.raw_app_meta_data->>'qf_principal':
+--                       exactly 'vendor'  -> 'vendor'           TRUSTED, server-set only
+--                       anything else / absent / NULL -> NULL   NEUTRAL, no privilege
+--   `admin` IS UNREACHABLE: no branch of this function can ever produce it.
+--
+--   NULL is a legitimate, deliberate role. public.profiles.role has NO NOT NULL
+--   constraint, and profiles_role_check is `role = ANY (ARRAY['admin','vendor'])`
+--   — a CHECK whose expression evaluates to NULL is SATISFIED, so a neutral row
+--   is accepted without widening the role vocabulary. Section 4 asserts the
+--   nullability as a catalog fact and fails closed if it is ever removed.
+--
+--   WHY EVERY AUTH USER STILL GETS A ROW: public.vendors.user_id carries a
+--   foreign key to public.profiles(id), so a vendor signup REQUIRES the profile
+--   to exist. Creating the row universally (and only the ROLE conditionally)
+--   preserves that invariant and the pre-existing "one profile per auth user"
+--   shape, while granting a homeowner nothing.
+--
+--   NEUTRAL GRANTS NOTHING, PROVED: public.is_admin() matches role = 'admin'
+--   only; public.owns_vendor() reads public.vendors.user_id and never consults
+--   profiles.role; and no RLS policy, function or application query in the
+--   repository selects on role = 'vendor' (the sole role filter anywhere is
+--   role = 'admin'). A neutral or a vendor role therefore confers identical —
+--   zero — database privilege; the role is a routing/display attribute.
+--
 --   not written    : created_at, is_active  (left to their table defaults)
 --   conflict       : ON CONFLICT (id) DO NOTHING — idempotent, never overwrites
 --   fires on       : INSERT only (never UPDATE, so password reset / email change
 --                    / ordinary auth-user updates do not re-run initialisation)
+--
+--   PRINCIPAL OUTCOMES (each proved against a repository path):
+--     server-created vendor  (app/actions.ts submitVendorAccountRegistration,
+--                             admin.createUser + app_metadata qf_principal)  -> role 'vendor'
+--     first-time client OTP  (clientOtpAuthService signInWithOtp, anon client) -> role NULL
+--     admin/superadmin boot  (scripts/grant-superadmin.mjs admin.createUser)   -> role NULL,
+--                             then that script's OWN explicit service-role upsert sets 'admin'
+--     malicious self-signup  ({"role":"admin"} or {"qf_principal":"vendor"} in
+--                             user_metadata)                                    -> role NULL
+--     password reset/update  (no INSERT on auth.users)                          -> no trigger, no change
+--     existing user re-init  (ON CONFLICT DO NOTHING)                           -> established row preserved
 --
 -- WHAT THIS TRIGGER DOES NOT CREATE:
 --   no vendor row, no client account, no credits, no package/subscription, no
@@ -120,7 +182,8 @@
 --
 --    Same target, same key, same explicit column list and same idempotent
 --    conflict behaviour as the original contract. The ONLY semantic change is
---    that `role` is a trusted constant instead of untrusted signup metadata.
+--    that `role` comes from the TRUSTED, server-only app_metadata marker
+--    instead of untrusted signup metadata — and defaults to NEUTRAL.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.handle_new_user()
@@ -129,7 +192,25 @@ language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
+declare
+  -- THE ONLY CLASSIFICATION INPUT. raw_app_meta_data is server-set (Admin API +
+  -- service-role key); raw_user_meta_data is attacker-controlled and is never
+  -- consulted for classification.
+  v_principal text := new.raw_app_meta_data ->> 'qf_principal';
+  v_role      text;
 begin
+  if v_principal = 'vendor' then
+    -- Server-created vendor account (app/actions.ts submitVendorAccountRegistration).
+    v_role := 'vendor';
+  else
+    -- Absent, unknown, or forged classification -> NEUTRAL. This is the correct
+    -- outcome for a first-time homeowner/client OTP auth user, for an operator
+    -- bootstrap user, and for any principal type added later. It is not an
+    -- error and it grants nothing. NOTE there is deliberately NO branch that
+    -- can produce 'admin' — administrator access is never granted here.
+    v_role := null;
+  end if;
+
   -- Only two non-privileged display fields are read from signup metadata, each
   -- by an explicit single key. The metadata JSON is NEVER copied wholesale, and
   -- NO privileged value (role, admin, verification, package, credit, status) is
@@ -139,9 +220,7 @@ begin
     new.id,
     new.raw_user_meta_data ->> 'full_name',
     new.raw_user_meta_data ->> 'phone',
-    -- TRUSTED CONSTANT. Administrator access is granted only by the deliberate
-    -- service-role operator path, never by self-service signup.
-    'vendor'
+    v_role
   )
   on conflict (id) do nothing;
 
@@ -150,7 +229,7 @@ end;
 $$;
 
 comment on function public.handle_new_user() is
-  'QF-MVP-20.3D auth-user onboarding. Creates the public.profiles row for a NEW auth user with a NON-PRIVILEGED constant role. Never reads role/admin/verification/package/credit/status from raw_user_meta_data. Idempotent via ON CONFLICT (id) DO NOTHING and never overwrites an existing profile. Creates no vendor, client, credit, package, verification or assignment state.';
+  'QF-MVP-20.3D auth-user onboarding. Creates the public.profiles row for a NEW auth user. The role is classified ONLY from the server-set app_metadata key qf_principal (raw_app_meta_data): exactly ''vendor'' yields the vendor role, everything else yields a NEUTRAL null role. Never reads role/admin/verification/package/credit/status from raw_user_meta_data, and can never produce the admin role. Idempotent via ON CONFLICT (id) DO NOTHING and never overwrites an existing profile. Creates no vendor, client, credit, package, verification or assignment state.';
 
 
 -- ---------------------------------------------------------------------------
@@ -190,10 +269,11 @@ create trigger on_auth_user_created
 --    CATALOG FACTS ONLY. No pg_get_functiondef()/prosrc text assertion (the
 --    QF-MVP-20.3B1A defect class); every catalog `name` is compared as text and
 --    any set comparison normalises both sides (the B2R1 / CVR1 defect classes).
---    The source-level guarantee that `role` is a constant is enforced by the
---    OFFLINE VALIDATOR, which grades the migration text — the correct place for
---    a semantic assertion, since proving it in-database would require inserting
---    a test auth user, which is prohibited.
+--    The source-level guarantee that `role` is classified ONLY from the trusted
+--    app_metadata marker is enforced by the OFFLINE VALIDATOR, which grades the
+--    migration text — the correct place for a semantic assertion, since proving
+--    it in-database would require inserting a test auth user, which is
+--    prohibited.
 -- ---------------------------------------------------------------------------
 
 do $verify$
@@ -305,6 +385,23 @@ begin
       'QF-MVP-20.3D aborted: the profiles_role_check constraint is missing.';
   end if;
 
+  -- 4.6b THE NEUTRAL ROLE MUST REMAIN STORABLE. An unclassified principal (the
+  --      first-time client OTP user) is written with role NULL, which
+  --      profiles_role_check accepts because a CHECK expression evaluating to
+  --      NULL is satisfied. If public.profiles.role ever gains NOT NULL, that
+  --      would silently break every unclassified signup — so fail closed here
+  --      instead, as a catalog fact.
+  if not exists (
+    select 1 from pg_attribute a
+     where a.attrelid = 'public.profiles'::regclass
+       and a.attname::text = 'role'
+       and a.attnum > 0 and not a.attisdropped
+       and not a.attnotnull
+  ) then
+    raise exception
+      'QF-MVP-20.3D aborted: public.profiles.role must exist and remain nullable so an unclassified principal can be initialised NEUTRAL.';
+  end if;
+
   -- 4.7 SCOPE FENCE — A/A2/B1/G/B2/C are untouched.
   if to_regprocedure('public.qf_assign_lead_vendors_v2(uuid, text, uuid[], text, text, uuid, uuid, text)') is null then
     raise exception 'QF-MVP-20.3D aborted: the canonical B1 authority is missing.';
@@ -342,6 +439,6 @@ begin
       'QF-MVP-20.3D aborted: the legacy assignment RPCs are gone — removing them is Migration E, not D.';
   end if;
 
-  raise notice 'QF-MVP-20.3D auth-user onboarding verified: handle_new_user() hardened (constant role), on_auth_user_created AFTER INSERT on auth.users (tgtype 5, enabled, sole auth trigger), untrusted EXECUTE revoked, A/A2/B1/G/B2/C intact, E not started, no backfill.';
+  raise notice 'QF-MVP-20.3D auth-user onboarding verified: handle_new_user() hardened (role classified only from the server-set app_metadata marker, neutral by default, admin unreachable), profiles.role nullable, on_auth_user_created AFTER INSERT on auth.users (tgtype 5, enabled, sole auth trigger), untrusted EXECUTE revoked, A/A2/B1/G/B2/C intact, E not started, no backfill.';
 end;
 $verify$;

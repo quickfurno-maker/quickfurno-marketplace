@@ -76,7 +76,10 @@ if (!user) {
     password,
     email_confirm: true,
     app_metadata: { admin_role: "Superadmin" },
-    user_metadata: { role: "admin", full_name: "QuickFurno Admin" },
+    // NO role in user_metadata: signup metadata is not an authority for
+    // profiles.role. The onboarding trigger ignores it entirely, and step 2
+    // below is the ONLY thing that grants 'admin'.
+    user_metadata: { full_name: "QuickFurno Admin" },
   });
   if (error) {
     console.error("Failed to create user:", error.message);

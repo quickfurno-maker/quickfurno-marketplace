@@ -28,6 +28,7 @@ import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
 import { processDueLeadAssignmentQueue } from "../services/delayedLeadFillService";
 import { captureFreeVendorInterest, markInterestStatus, type CaptureFreeVendorInterestInput } from "../lib/lead-assignment/freeVendorInterestService";
 import { updateMarketplaceRuntimeSetting } from "../lib/lead-assignment/runtimeSettings";
+import { vendorPrincipalAppMetadata } from "../lib/identity/authPrincipalMarker";
 import type { AosDecisionLogInput } from "../services/aosService";
 import type {
   CreateLeadInput, VendorRegistrationInput, VendorLeadStatus,
@@ -64,7 +65,9 @@ async function currentUser(): Promise<CurrentUser | null> {
   const { data: profile } = await sb.from("profiles").select("role").eq("id", user.id).single();
   return {
     id: user.id,
-    role: profile?.role as "admin" | "vendor" | undefined,
+    // A NEUTRAL profile (unclassified principal) carries role NULL. Normalize it
+    // to undefined so no consumer ever compares against a null role.
+    role: (profile?.role ?? undefined) as "admin" | "vendor" | undefined,
     adminRole: (user.app_metadata?.admin_role as AdminRoleName | undefined) ?? null,
   };
 }
@@ -300,12 +303,17 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     }
 
     const db = adminClient();
+    // The TRUSTED vendor classification travels in app_metadata, which only the
+    // service-role Admin API can set — never in user_metadata, which a public
+    // signup writes verbatim. public.handle_new_user() reads this key and this
+    // key alone; without it the new auth user gets a NEUTRAL, unprivileged
+    // profile instead of a vendor one.
     const { data: auth, error: authErr } = await db.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
+      app_metadata: vendorPrincipalAppMetadata(),
       user_metadata: {
-        role: "vendor",
         full_name: input.owner_name || input.business_name,
         phone: input.phone,
       },

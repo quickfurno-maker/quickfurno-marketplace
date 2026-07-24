@@ -1,0 +1,88 @@
+{
+  "$comment": "QF-MVP-20.4C — immutable historical credit-ledger reconciliation exception register CONTRACT MANIFEST. Freezes the register model, constraints, privileges and immutability contract. This is a SCHEMA CONTRACT ONLY — it contains NO production candidate rows, UUIDs, evidence or PII. The expected post-application state is ZERO rows; any later population is a separate founder-authorized insertion plan.",
+  "contract_version": "20.4C-v1",
+  "migration": "supabase/migrations/20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql",
+  "table": "public.credit_ledger_reconciliation_exceptions",
+  "model": "single immutable append-only table with optional self-referencing supersedes_record_id",
+  "expected_post_application_rows": 0,
+  "columns": {
+    "id": "uuid not null default gen_random_uuid() (PK)",
+    "assignment_id": "uuid not null (plain UUID — no FK to operational tables, evidence-preserving)",
+    "vendor_id": "uuid not null (plain UUID — no FK)",
+    "assignment_source": "text null",
+    "assignment_type": "text null",
+    "classification": "text not null (locked)",
+    "correction_mode": "text not null (locked)",
+    "founder_decision": "text not null (locked)",
+    "reason": "text not null (non-empty)",
+    "audit_run_id": "text not null (non-empty)",
+    "audit_sql_sha256": "text not null (^[0-9a-f]{64}$)",
+    "evidence_manifest_sha256": "text not null (^[0-9a-f]{64}$)",
+    "reviewer_actor": "text not null (FOUNDER | AUTHORIZED_ADMIN)",
+    "reviewed_at": "timestamptz not null (supplied, no default)",
+    "balance_mutation": "boolean not null (locked false)",
+    "package_mutation": "boolean not null (locked false)",
+    "vendor_credit_logs_backfill": "boolean not null (locked false)",
+    "idempotency_key": "text not null unique (non-empty)",
+    "supersedes_record_id": "uuid null (self-FK, ON DELETE RESTRICT, append-only supersession)",
+    "created_at": "timestamptz not null default now()"
+  },
+  "allowed_values": {
+    "classification": "INSUFFICIENT_EVIDENCE",
+    "correction_mode": "EXCEPTION_RECORD_ONLY",
+    "founder_decision": "NO_FINANCIAL_CHANGE",
+    "reviewer_actor": ["FOUNDER", "AUTHORIZED_ADMIN"]
+  },
+  "required_false_flags": {
+    "balance_mutation": false,
+    "package_mutation": false,
+    "vendor_credit_logs_backfill": false
+  },
+  "constraints": [
+    "clre_pkey PRIMARY KEY (id)",
+    "clre_idempotency_key_unique UNIQUE (idempotency_key)",
+    "clre_classification_locked CHECK (classification = 'INSUFFICIENT_EVIDENCE')",
+    "clre_correction_mode_locked CHECK (correction_mode = 'EXCEPTION_RECORD_ONLY')",
+    "clre_decision_locked CHECK (founder_decision = 'NO_FINANCIAL_CHANGE')",
+    "clre_balance_mutation_false CHECK (balance_mutation = false)",
+    "clre_package_mutation_false CHECK (package_mutation = false)",
+    "clre_no_ledger_backfill CHECK (vendor_credit_logs_backfill = false)",
+    "clre_reviewer_actor_check CHECK (reviewer_actor in ('FOUNDER','AUTHORIZED_ADMIN'))",
+    "clre_reason_nonempty CHECK (char_length(btrim(reason)) > 0)",
+    "clre_audit_run_id_nonempty CHECK (char_length(btrim(audit_run_id)) > 0)",
+    "clre_idempotency_nonempty CHECK (char_length(btrim(idempotency_key)) > 0)",
+    "clre_audit_sql_sha256_hex CHECK (audit_sql_sha256 ~ '^[0-9a-f]{64}$')",
+    "clre_manifest_sha256_hex CHECK (evidence_manifest_sha256 ~ '^[0-9a-f]{64}$')",
+    "clre_supersedes_self_fk FOREIGN KEY (supersedes_record_id) REFERENCES self(id) ON DELETE RESTRICT",
+    "clre_no_self_supersede CHECK (supersedes_record_id is null or supersedes_record_id <> id)"
+  ],
+  "privileges": {
+    "PUBLIC": "none",
+    "anon": "none",
+    "authenticated": "none",
+    "service_role": ["SELECT", "INSERT"],
+    "service_role_forbidden": ["UPDATE", "DELETE", "TRUNCATE"],
+    "owner_postgres": "inherent break-glass, documented, not an application path",
+    "rls_enabled": true,
+    "policies_for_untrusted_roles": "none"
+  },
+  "immutability": {
+    "update": "blocked for every role by trigger trg_clre_immutable (BEFORE UPDATE|DELETE FOR EACH ROW)",
+    "delete": "blocked for every role by trigger trg_clre_immutable",
+    "truncate": "blocked for every role by trigger trg_clre_no_truncate (BEFORE TRUNCATE FOR EACH STATEMENT)",
+    "trigger_functions": ["public.qf_prevent_credit_ledger_exception_mutation()", "public.qf_prevent_credit_ledger_exception_truncate()"],
+    "future_resolution": "append-only via a NEW superseding row (supersedes_record_id); existing decisions are never rewritten"
+  },
+  "fk_delete_behavior": {
+    "assignment_id": "plain UUID, NO foreign key — an operational delete cannot erase reconciliation history",
+    "vendor_id": "plain UUID, NO foreign key",
+    "supersedes_record_id": "self-FK ON DELETE RESTRICT — non-cascading; register rows are never deleted",
+    "rejected": "hard FK to lead_assignments/vendors: CASCADE would erase history (forbidden), RESTRICT would couple operational deletes to the immutable register"
+  },
+  "idempotency": {
+    "key": "idempotency_key",
+    "uniqueness": "UNIQUE constraint clre_idempotency_key_unique",
+    "purpose": "deterministic duplicate prevention for a later approved insertion plan"
+  },
+  "financial_effect": "NONE — this register records evidence only and carries no credit-mutation semantics; it never alters vendors.total_credits/remaining_credits, vendor_packages.total_leads/remaining_leads, lead_assignments or vendor_credit_logs"
+}

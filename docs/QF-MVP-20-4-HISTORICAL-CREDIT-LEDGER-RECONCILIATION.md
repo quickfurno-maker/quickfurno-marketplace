@@ -1,11 +1,68 @@
 # QF-MVP-20.4 — Historical Credit-Ledger Reconciliation (Design + SELECT-only Audit Contract)
 
-**Status: `PRODUCTION_LEDGER_EVIDENCE_AUDIT_COMPLETE_READY_FOR_FOUNDER_REVIEW`.**
+**Status: `HISTORICAL_LEDGER_EXCEPTION_REGISTER_GENERATED_REVIEWED_READY_FOR_PREFLIGHT`.**
 
-> **20.4A DESIGN + 20.4B PRODUCTION SELECT-ONLY AUDIT COMPLETE.** 20.4A built the audit pack; 20.4B
-> (founder-authorized) executed it read-only against production. **Facts only — no classification
-> approved, no correction authorized, no data changed.** Evidence lives outside Git; only aggregate,
+> **20.4A DESIGN + 20.4B PRODUCTION SELECT-ONLY AUDIT + 20.4C EXCEPTION-REGISTER MIGRATION COMPLETE.**
+> 20.4A built the audit pack; 20.4B (founder-authorized) executed it read-only against production and
+> found all **27** candidates `INSUFFICIENT_EVIDENCE`; on that evidence the **founder ruled
+> NO_FINANCIAL_CHANGE** (zero debit, zero refund, zero package change, no `vendor_credit_logs` backfill).
+> 20.4C then **generated** — but did **not apply** — a forward-only migration for an immutable,
+> append-only exception register that records those rulings as evidence with no credit-mutation
+> semantics. **Facts and a schema only — no classification changed, no correction executed, no data
+> written, no managed database accessed in 20.4C.** Evidence lives outside Git; only aggregate,
 > UUID-free facts are committed here.
+
+## 0-B. Immutable exception-register migration (QF-MVP-20.4C) — GENERATED, NOT APPLIED
+
+**Founder ruling (LOCKED).** On the 20.4B evidence — all **27** historical candidates
+`INSUFFICIENT_EVIDENCE`, zero canonical or legacy ledger evidence, zero conflicts, zero arithmetic
+violations — the **founder approved NO_FINANCIAL_CHANGE**: **zero debit, zero refund, zero package
+change, and no `vendor_credit_logs` backfill**. No candidate is corrected; each is recorded only as an
+unresolved evidence exception.
+
+**What 20.4C produced (schema only, unapplied).** A single forward-only migration
+`supabase/migrations/20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql` that
+creates one **immutable, append-only** table `public.credit_ledger_reconciliation_exceptions`. The
+register is **generated and reviewed but not applied**; **no managed database was accessed in 20.4C**,
+and **no candidate row, UUID or PII is embedded** — the migration ships **empty** (expected
+post-application state: **zero rows**), and populating it is a separate, founder-authorized insertion
+plan.
+
+**Register architecture (why it is safe).**
+
+- **Separate from `vendor_credit_logs`.** Per §8, the arithmetic ledger cannot honestly hold
+  evidence-only rows. The register is a distinct table carrying **no credit-mutation semantics** — it
+  never touches `vendors`, `vendor_packages`, `lead_assignments` or `vendor_credit_logs`. **No
+  `vendor_credit_logs` backfill** occurs or is implied.
+- **Financial outcome pinned in the schema.** CHECK constraints hard-lock
+  `classification = 'INSUFFICIENT_EVIDENCE'`, `correction_mode = 'EXCEPTION_RECORD_ONLY'`,
+  `founder_decision = 'NO_FINANCIAL_CHANGE'`, and `balance_mutation = package_mutation =
+  vendor_credit_logs_backfill = false`. A row can physically only encode "evidence recorded, nothing
+  changed."
+- **Immutable and append-only.** RLS is enabled; `UPDATE`, `DELETE` and `TRUNCATE` are blocked for
+  **every** role — including `service_role` — by a `BEFORE UPDATE OR DELETE` row trigger
+  (`trg_clre_immutable`) and a `BEFORE TRUNCATE` statement trigger (`trg_clre_no_truncate`), backed by
+  matching privilege revokes. Future resolution is **append-only** via a new superseding row
+  (`supersedes_record_id`, self-FK `ON DELETE RESTRICT`); existing rulings are never rewritten.
+- **Least privilege.** `PUBLIC`, `anon` and `authenticated` receive **nothing**; `service_role` is
+  granted **only `SELECT` and `INSERT`**. No policy targets an untrusted role.
+- **Evidence-preserving keys.** `assignment_id` and `vendor_id` are plain UUIDs with **no** foreign key
+  to operational tables — an operational delete can never erase reconciliation history, and no cascade
+  can. Each row carries `audit_run_id`, `audit_sql_sha256`, `evidence_manifest_sha256` (64-hex CHECK),
+  `reviewer_actor` (`FOUNDER`/`AUTHORIZED_ADMIN`), `reviewed_at`, `reason`, and a **unique**
+  `idempotency_key`.
+
+**Offline safety validator.** `scripts/mvp/reconciliation/validate-qf-mvp-20-4c.mjs` grades the
+migration, the SELECT-only staging verifier, the contract manifest and this document with one-defect
+fixtures for every financial/immutability rule — it rejects any INSERT/backfill, production UUID/PII,
+use of `vendor_credit_logs` as the register, balance/package/assignment mutation, `UPDATE`/`DELETE`/
+`TRUNCATE` grant to `service_role`, any `PUBLIC`/`anon`/`authenticated` privilege, missing RLS, missing
+immutability triggers, cascade delete, missing false-flag/classification/correction/decision locks,
+missing actor/reason/`reviewed_at`, missing evidence hashes, weak idempotency, a writable verifier, a
+broad/default-privilege change, owner-binding/`profiles`-grant/`admin_role` scope creep, or edits to an
+already-applied migration.
+
+**No financial change was executed by this phase.** 20.4C writes a schema, not money.
 
 ## 0-A. Production SELECT-only evidence audit (QF-MVP-20.4B) — COMPLETE
 
@@ -212,11 +269,12 @@ still (a) pollute the arithmetic sequence readers assume, (b) risk colliding wit
 future reference, and (c) be indistinguishable from a genuine mutation to any consumer. It also cannot
 be rolled back cleanly.
 
-**Recommendation (for a LATER, separately reviewed migration — NOT created here):** a dedicated,
-append-only, immutable `credit_ledger_reconciliation` table keyed by `(assignment_id)` with a unique
-idempotency reference, holding the evidence class, decision, approver, correction mode, references and
-audit id — **separate** from `vendor_credit_logs`, so evidence-only history never perturbs balance
-arithmetic. This design does not implement it.
+**Recommendation — now realized in QF-MVP-20.4C (generated, unapplied):** a dedicated, append-only,
+immutable `credit_ledger_reconciliation_exceptions` table with a unique `idempotency_key`, holding the
+evidence class, founder decision, reviewer actor, correction mode, audit references and evidence
+hashes — **separate** from `vendor_credit_logs`, so evidence-only history never perturbs balance
+arithmetic (see §0-B). The 20.4C migration implements exactly this and nothing more: it records the
+`NO_FINANCIAL_CHANGE` rulings as evidence and mutates no balance, package, assignment or ledger row.
 
 ## 9. SELECT-only production audit pack
 
@@ -283,7 +341,12 @@ canonical credit authority untouched).
 
 ## 13. Next phase
 
-A **separately founder-authorized production SELECT-only evidence audit** that runs
-`qf_mvp_20_4_historical_credit_ledger_audit.sql` under the §10 runbook, captures evidence outside Git,
-and populates the manifest for founder review. **No correction, no migration, no write** occurs until
-an approved manifest exists. Migrations A, A2, B1, G, B2, C, D and E remain applied and immutable.
+A **staging preflight** for the 20.4C exception-register migration: exactly one
+`supabase db push --linked --dry-run` against staging plus the SELECT-only verifier
+`supabase/staging-verification/verify_qf_mvp_20_4c.sql`, proving the register applies cleanly, is
+immutable and append-only, and grants nothing to untrusted roles — **before** any application. The
+migration is **generated and reviewed but not applied**; **no managed database was accessed in 20.4C**,
+and the register ships **empty** (zero rows). Any later population of the register is a separate,
+founder-authorized insertion plan gated on this design. `profiles`-GRANT, `admin_role` and owner
+binding remain separate follow-ups. Migrations A, A2, B1, G, B2, C, D and E remain applied and
+immutable.

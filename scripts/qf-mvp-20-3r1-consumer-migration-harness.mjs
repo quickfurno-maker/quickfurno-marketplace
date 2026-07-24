@@ -182,6 +182,7 @@ const DECLARED_LATER_MIGRATIONS = new Set([
   '20260723000600_qf_mvp_public_projection_privilege_hardening.sql', // QF-MVP-20.3C
   '20260723000700_qf_mvp_auth_user_onboarding_trigger.sql', // QF-MVP-20.3D
   '20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql', // QF-MVP-20.3E
+  '20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql', // QF-MVP-20.4C
 ]);
 
 const migrationFiles = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql'));

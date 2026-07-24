@@ -372,3 +372,54 @@ exit 0. Transcript + captures outside Git in `qf-staging-workspace/QF-MVP-30.1BA
 tables were **not** created (table count +6 exactly) and must be revalidated before reuse — QF-MVP-30.4 must
 not assume `audit_logs`/`admin_notifications` exist. **Next: QF-MVP-30.2 — Vendor CRM Directory and Combined
 Vendor Profile** (not started).
+
+## 18. QF-MVP-30.2 — Directory + combined profile (IMPLEMENTED, runtime/UI)
+
+**Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_IMPLEMENTED_REVIEWED_READY_FOR_STAGING_SMOKE`. Runtime/UI only —
+**no migration, no managed DB access, no RLS/grant/policy/function change, no `vendor_public_v` change, no
+Core authority change, no segments/campaigns.** Built on the applied 30.1B foundation.
+
+**Canonical routes (chosen).** `/admin/vendor-crm` (directory) and `/admin/vendor-crm/[vendorId]` (combined
+profile), as **static** App-Router segments that take precedence over the dynamic `/admin/[section]` router.
+A "Vendor CRM" entry was added to `adminConfig` (Command Center group, `AdminSectionKey` union + nav group);
+the `[section]` router keeps its `default` case so it stays typesafe and is never reached for this static
+route. **Rejected:** routing through `/admin/[section]` (would collide with the lead-ops `/admin/crm`
+dashboard and force CRM logic into the shared `AdminSectionPage`).
+
+**Reuse.** REUSE_AS_IS: `AdminShell`/`AdminPrimitives` (PageHeader/Toolbar/SelectFilter/DataTable/Tabs/
+SectionCard/InfoGrid/StatusBadge/EmptyState), `getAdminSession`, `adminClient`/`serverClient`, `lib/errors`.
+NEW: `lib/crm/crmAuth.ts` (guard), `services/vendorCrmService.ts`, `app/actions/vendorCrmActions.ts`,
+`lib/crm/vendorCrmValidation.ts`, `app/admin/vendor-crm/**`, `components/admin/crm/**`. RETIRED: none.
+
+**Authorization + service-role containment.** Routes self-guard (`getAdminSession()` → redirect unless
+`isSuperadmin`). Every server action → `requireCrmAdmin()` (canonical `profiles.role = 'admin'` **and**
+`app_metadata.admin_role = 'Superadmin'`, founder/admin only) **before** any `adminClient()`. The service is
+`import "server-only"`; client components import only **types** from it (erased at build) and never a
+service-role credential — enforced by the phase validator.
+
+**Canonical CRM service ops.** Reads: `listVendorCrmDirectory`, `getVendorCoreFacts`, `getVendorCrmProfile`,
+`listVendorContacts`, `listVendorTags`, `listVendorTagAssignments`, `listVendorNotes`, `listVendorTasks`.
+Mutations: `upsertVendorCrmProfile`, contact `create/update/archive`, tag `create/update/archive/assign/
+remove`, `createVendorNote` (append-only — **no update/delete**), task `create/update/complete/cancel`.
+Invariants: writes only the six CRM tables; **no Core write**; **no hard delete** (archive via `is_active`/
+`removed_at`/`status`); deterministic server-side tag normalization; normalized phone; task idempotency;
+**actor always from the session**.
+
+**Directory read model.** Server-paged (`.range`, bounded ≤ 100, deterministic `created_at desc, id` sort);
+CRM extensions (profile/tags/tasks/primary-contact) **batch-loaded per page** (a fixed handful of `in(...)`
+queries — **no N+1**); Core+CRM filters via URL params so all fetching stays server-side behind the guard.
+No public view, no RPC, no migration. Filters needing new schema/index are left visibly deferred.
+
+**Combined profile sections.** Overview (Core read-only + CRM relationship edit), Contacts (create/archive,
+primary, "a contact does not grant consent"), Tags (assign/remove/create, no duplicate active), Notes
+(chronological, **append-only — no edit/delete control**), Tasks (create/complete/cancel, overdue,
+idempotency), Core context (package/credit/lead/consent read-only, Core-owned). No CRM form edits any Core
+fact.
+
+**Migration-006 divergence honored.** No `audit_logs`/`admin_notifications` dependency — the CRM tables'
+actor/timestamp fields are the V1 mutation audit evidence.
+
+**Validator + gates.** `scripts/mvp/crm/validate-qf-mvp-30-2.mjs` **32/32** (7 service + 2 client one-defect
+fixtures). 30.1B 46/46, blueprint 36/36, all Marketplace gates, `verify:mvp` exit 0, typecheck/lint/build
+clean, `git diff --check` exit 0. **Next: a bounded QF-MVP-30.2 staging smoke/integration review, then
+QF-MVP-30.3 — Deterministic segments** (not started).

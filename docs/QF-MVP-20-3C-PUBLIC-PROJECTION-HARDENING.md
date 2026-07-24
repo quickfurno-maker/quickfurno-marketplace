@@ -1,18 +1,17 @@
 # QF-MVP-20.3C — Public Vendor Projection and Direct-Table Privilege Hardening
 
-**Status: `C_VERIFIER_CORRECTION_IMPLEMENTED_REVIEWED_READY_FOR_STAGING_REVERIFY` (QF-MVP-20.3CVR1).**
+**Status: `C_APPLIED_VERIFIED_COMPLETE_READY_FOR_DOCUMENTATION_PUSH` (QF-MVP-20.3CVR1V).**
 
-> **MIGRATION C IS APPLIED ON STAGING; VERIFICATION COMPLETION IS STILL PENDING.**
-> C was applied on **2026-07-24T02:16:04Z** (`npx supabase db push --linked`, **exit 0**),
-> is recorded remotely **exactly once**, and staging is **7 local / 7 remote**. Its own
-> self-verification reported *vendor_public_v (21 cols, 0 leaks), vendors/leads anon access
-> revoked, unsafe policies dropped, B1/B2/G/legacy intact, D absent*. The locked verifier then
-> returned **22 PASS / 1 FAIL** — a **false negative** in row **C03** caused by the verifier
-> comparing a DB-sorted array against a raw hand-ordered literal. **No migration, view, ACL,
-> policy or data defect exists.** QF-MVP-20.3CVR1 corrects the verifier to normalize both sides
-> symmetrically and hardens the validator against the whole defect class. **The staging verifier
-> has NOT yet been re-run — the next phase is a read-only staging re-verification, not Migration D.**
-> See section 14.
+> **MIGRATION C IS APPLIED, VERIFIED AND COMPLETE ON STAGING.** C was applied on
+> **2026-07-24T02:16:04Z** (exit 0) and is recorded remotely **exactly once** (7 local / 7 remote,
+> nothing pending). The first verifier run returned 22/23 because row **C03** compared a DB-sorted
+> array against a raw hand-ordered literal — a **false negative**, never a migration defect.
+> QF-MVP-20.3CVR1 corrected that comparison to normalize both sides in PostgreSQL, and the
+> read-only re-verification (QF-MVP-20.3CVR1V, 2026-07-24T02:44:46Z) returned **23 PASS / 0 FAIL**
+> with **C03 now PASS**. Staging application data remains **entirely empty**. Production
+> `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never contacted.
+> **Migration C is complete. The next phase is Migration D**, not E and not QF-MVP-20.4.
+> See sections 14 and 15.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `7d88519c86572a20538b4305469c900634bd8b73` (B2 applied), origin identical, ahead/behind 0/0,
@@ -499,3 +498,127 @@ re-run**.
 (`1f7bf9a5…`) against staging to reach **23 PASS / 0 FAIL**, then read advisors and complete the
 C record. **Not Migration D.** Migration C is applied and immutable; C is **not** marked fully
 complete until that re-verification passes.
+
+
+---
+
+## 15. QF-MVP-20.3CVR1V — read-only staging re-verification and C completion
+
+**Status: `C_APPLIED_VERIFIED_COMPLETE_READY_FOR_DOCUMENTATION_PUSH`. Migration C is COMPLETE.**
+
+Executed at repository HEAD `003f0190d698fb67cc786900e5248e5119079d82` (the verifier-correction
+commit), origin identical, ahead/behind 0/0, clean worktree. **Read-only phase**: no `db push`, no
+dry run, no migration applied, reapplied, repaired or reset, and no data mutation of any kind.
+
+### Locked hashes
+
+| Artifact | SHA-256 | State |
+|---|---|---|
+| Migration C | `0d3d871b0c6ab9de8d82eeb8499437f1f40a8a6c81561cf41cb8ade60b464da2` | **IMMUTABLE — unchanged** |
+| C verifier (corrected) | `1f7bf9a511eb77f37578ef92771fdddf85cd2aa0522ac4648a7041b56586a980` | re-hashed immediately before execution |
+| C validator (corrected) | `d632aa2584976cce1ac6058e782ac1910675c3cbaa70ccf6f30593f9c2c3725d` | 83/83 |
+
+baseline, A, A2, B1, G, B2 and the B1/G + B2 validators and verifiers are byte-unchanged. The
+correction commit `003f019` contains exactly its four approved paths and no migration.
+
+### Offline gates
+
+C validator **83/83** · B2 **61/61** · B1/G **165/165** · R1 **62/62** · `verify:mvp` exit 0 ·
+typecheck / lint / build exit 0 · `git diff --check` exit 0.
+
+**C03 symmetry re-proved independently from source**, and a mutation reverting C03 to the raw
+hand-ordered literal (all 21 names retained) made validator check 13 **FAIL** (83 → 82/83); the
+verifier was then restored **byte-identical**.
+
+### Migration history (read-only)
+
+**7 local / 7 remote**, C recorded **exactly once**, no pending migration, no unexpected version;
+`supabase_migrations.schema_migrations` holds 7 rows.
+
+### Corrected verifier — 23 PASS / 0 FAIL
+
+Executed **exactly once** at `2026-07-24T02:44:46Z UTC`, SELECT-only, against staging only.
+**All 23 rows PASS. Zero FAIL. None skipped. No expectation altered. No DML or DDL.**
+
+**Row 3 — the previously failing check — now PASSES:**
+
+| seq | check_name | expected | actual | status |
+|---|---|---|---|---|
+| **3** | **`C03_view_columns_match_allowlist`** | **21** | **21** | **PASS** |
+
+The full live posture proved by the 23 rows: C recorded once (1); `vendor_public_v` exists exactly
+once as a view (2) with **exactly** the reviewed 21-column allowlist (3) and **zero** forbidden
+columns (4); grants narrow — anon + authenticated + service_role only, PUBLIC excluded (5);
+owner-rights, `security_invoker` OFF as designed (6); **PUBLIC and anon hold no direct `vendors`
+privilege** (7); `authenticated` is exactly **SELECT-only** on `vendors` (8); **PUBLIC, anon and
+authenticated hold no direct `leads` privilege** (9); `service_role` authority preserved (10); all
+three unsafe policies absent (11); the safe vendor-own and admin policies remain (12); RLS still
+enabled on both tables (13); `get_public_eligible_vendors` keeps anon EXECUTE (14); 5 canonical B1
+functions intact (15); 4 B2 triggers intact (16); Migration G lineage boundary intact (17); 6
+legacy assignment RPCs **RETAINED** with EXECUTE untouched (18, 19) — E not started; Migration D
+auth trigger **absent** (20); owner binding still deferred (21); owner informational (22);
+application data `vendors=0 leads=0` (23).
+
+### Empty-state proof (SELECT-only)
+
+67 public application tables; **sum of all public-table rows = 0**; `auth.users` = 0;
+communication provider accounts = 0; active providers = 0; **public views = 1, named exactly
+`vendor_public_v`**, returning 0 rows; B2 functions = 4; **total public triggers = 4** (only B2's);
+migration history rows = 7. **No data mutation occurred** — every statement was SELECT-only.
+
+### Advisors (read-only, after 23/23 PASS)
+
+**Security — 44 lints.**
+
+| Count | Level | Lint | Classification |
+|---|---|---|---|
+| 37 | INFO | `rls_enabled_no_policy` | **pre-existing** — the deliberate fail-closed posture |
+| **1** | **ERROR** | **`security_definer_view` on `public.vendor_public_v`** | **C-related, EXPECTED, non-blocking** |
+| 2 | WARN | `anon_security_definer_function_executable` | pre-existing |
+| 4 | WARN | `authenticated_security_definer_function_executable` | pre-existing |
+
+**C-related improvement:** the pre-C `rls_policy_always_true` WARN on `public.leads` is **gone** —
+live confirmation that C dropped the always-true anonymous INSERT policy.
+
+The `security_definer_view` ERROR is **expected and non-blocking**, and each of the four acceptance
+conditions was verified live in the same run:
+
+1. **direct anon base-table access revoked** — rows 7 and 9 PASS (0 privileges on `vendors`, 0 on `leads`);
+2. **denied columns physically absent** — row 4 PASS (0 forbidden columns);
+3. **explicit allowlist + deterministic row filter intact** — row 3 PASS (exactly 21); the `WHERE`
+   clause lives inside the immutable, hash-verified migration;
+4. **anon has only the reviewed view access** — row 5 PASS (3 roles, PUBLIC excluded).
+
+The lint reflects Supabase's generic heuristic that an owner-rights view bypasses the querying
+user's RLS. That is precisely the reviewed design: the projection's safety comes from **column
+absence + a deterministic row filter + full base revocation**, all independently proved above, not
+from the invoker mode. Switching to `security_invoker` would **require re-granting anon
+base-table SELECT**, reopening the exact full-row monetization exposure C exists to close.
+
+**Performance — 227 lints. ZERO reference any C object.** 152 INFO `unused_index` (empty-DB
+artifact), 34 WARN `multiple_permissive_policies`, 30 INFO `unindexed_foreign_keys`, 7 WARN
+`auth_rls_initplan`, 3 WARN `duplicate_index`, 1 INFO platform. **C-related improvement:**
+`multiple_permissive_policies` fell **36 → 34** because C removed the two anonymous vendors
+policies and the always-true leads policy. C introduced **no** performance lint — it creates no
+index, policy or foreign key.
+
+**Nothing was auto-fixed. No finding is blocking**: none proves leakage, a missing revoke, an
+unexpected privilege or schema change, or a critical safety defect.
+
+### Safety confirmations
+
+No `db push`, no dry run, no `migration up`/`repair`/`reset`, no migration applied or reapplied, no
+hand-executed migration SQL, no migration/verifier/validator edited, no application data created or
+modified, no auth user, no provider activation, no link change. Production and QF-Jarvis were
+**never accessed**. No PR, no deployment, no push.
+
+**Transcript:** `qf-staging-workspace\QF-MVP-20.3CVR1V-REVERIFY-20260724T024446Z.txt` — outside Git.
+
+### Migration C is complete
+
+Applied · verified **23/23** · immutable. The public vendor projection is live with a 21-field
+allowlist and zero monetization/PII leakage; anonymous direct access to `vendors` and `leads` is
+fully revoked; the three unsafe anonymous policies are gone; and B1, B2, G, the legacy RPCs and the
+D/E/owner-binding boundaries are all intact.
+
+**Next phase: Migration D (auth trigger)** — not Migration E, not QF-MVP-20.4, not owner binding.

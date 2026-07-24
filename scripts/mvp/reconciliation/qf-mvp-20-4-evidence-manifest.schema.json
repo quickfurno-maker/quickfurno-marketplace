@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "qf-mvp-20-4-evidence-manifest",
+  "title": "QF-MVP-20.4 Historical Credit-Ledger Reconciliation — Evidence Manifest",
+  "description": "Machine-readable manifest populated LATER from a founder-authorized SELECT-only production audit. This file is the SCHEMA + an EMPTY template only: it contains NO live production rows, no balances, no PII. The audit SQL (supabase/reconciliation/qf_mvp_20_4_historical_credit_ledger_audit.sql) produces the facts; a reviewer/founder fills reviewer_decision, approval and correction fields. Confidence never replaces proof.",
+  "type": "object",
+  "required": ["manifest_version", "audit_run", "candidates"],
+  "additionalProperties": false,
+  "properties": {
+    "manifest_version": { "const": "20.4-v1" },
+    "audit_run": {
+      "type": "object",
+      "required": ["audit_run_id", "audit_query_sha256", "model_fingerprint", "environment", "observed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "audit_run_id": { "type": "string", "description": "opaque id for this audit execution; not a secret" },
+        "audit_query_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "sha256 of the exact audit SQL that was run" },
+        "model_fingerprint": { "type": "string", "description": "R00 model_fingerprint value proving the expected production model" },
+        "expected_schema_fingerprints": {
+          "type": "object",
+          "description": "R02 fingerprints captured at audit time (table/function md5s)",
+          "additionalProperties": { "type": "string" }
+        },
+        "environment": { "type": "string", "enum": ["PRODUCTION_PLACEHOLDER"], "description": "placeholder only; the real project ref is NEVER committed to Git" },
+        "recorded_migration_rows": { "type": ["integer", "null"] },
+        "observed_at": { "type": "string", "description": "ISO-8601 timestamp captured OUTSIDE Git; placeholder here" },
+        "previous_observation": {
+          "type": "object",
+          "description": "QF-MVP-10 historical observation (2026-07-22) — NOT an invariant",
+          "additionalProperties": false,
+          "properties": {
+            "credit_deducted_assignments": { "const": 46 },
+            "assignment_debit_logs": { "const": 19 },
+            "missing_evidence_total": { "const": 27 },
+            "missing_by_source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "admin": { "const": 5 }, "automatic": { "const": 16 }, "client_selected": { "const": 6 } }
+            }
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "description": "one entry per audited candidate assignment; EMPTY in this template",
+      "items": { "$ref": "#/definitions/candidate" }
+    }
+  },
+  "definitions": {
+    "evidence_class": {
+      "enum": [
+        "PROVEN_DEBIT_ALREADY_APPLIED_LEDGER_MISSING",
+        "PROVEN_NO_DEBIT",
+        "ALREADY_HAS_EQUIVALENT_LEDGER_EVIDENCE",
+        "DUPLICATE_OR_REFERENCE_CONFLICT",
+        "INSUFFICIENT_EVIDENCE",
+        "DATA_INVARIANT_VIOLATION",
+        "ALREADY_RECONCILED",
+        "OUT_OF_SCOPE_NON_CREDIT_ASSIGNMENT"
+      ]
+    },
+    "correction_mode": {
+      "enum": [
+        "EVIDENCE_ONLY",
+        "STATE_CORRECTION_DEBIT",
+        "STATE_CORRECTION_REFUND",
+        "EXCEPTION_RECORD_ONLY",
+        "LINK_EXISTING_LEGACY_EVIDENCE",
+        "NONE_PENDING_REVIEW"
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "candidate_assignment_id", "vendor_id", "assignment_source",
+        "evidence_facts", "prohibited_evidence_checks",
+        "sql_proposed_class", "reviewer_decision", "execution", "verification"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_assignment_id": { "type": "string", "description": "lead_assignments.id (uuid)" },
+        "vendor_id": { "type": ["string", "null"], "description": "lead_assignments.vendor_id (uuid) or null" },
+        "assignment_source": { "type": ["string", "null"] },
+        "assignment_type": { "type": ["string", "null"] },
+        "assigned_at": { "type": ["string", "null"] },
+        "evidence_facts": {
+          "type": "object",
+          "description": "RAW facts from the audit; never proof by themselves",
+          "additionalProperties": false,
+          "properties": {
+            "canonical_ledger_row_exists": { "type": "boolean" },
+            "unreferenced_debit_logs_same_vendor": { "type": ["integer", "null"] },
+            "reference_conflict": { "type": "boolean" },
+            "arithmetic_violation_touching_vendor": { "type": "boolean" },
+            "vendor_row_present": { "type": "boolean" }
+          }
+        },
+        "strong_evidence_references": {
+          "type": "array",
+          "description": "references to STRONG proof (exact ledger reference id, immutable event id, qf_apply_vendor_credit_delta idempotency ref, audited package-consumption ref). REQUIRED and non-empty before any PROVEN_* class is allowed.",
+          "items": { "type": "string" }
+        },
+        "supporting_evidence": {
+          "type": "array",
+          "description": "supporting-only signals (source, timestamp, vendor/package state, admin audit). NEVER sole proof.",
+          "items": { "type": "string" }
+        },
+        "prohibited_evidence_checks": {
+          "type": "object",
+          "description": "explicit acknowledgement that these were NOT used as proof",
+          "additionalProperties": false,
+          "properties": {
+            "credit_deducted_used_as_proof": { "const": false },
+            "current_remaining_credits_used_as_proof": { "const": false },
+            "current_package_remaining_used_as_proof": { "const": false },
+            "assignment_existence_used_as_proof": { "const": false },
+            "source_type_used_as_proof": { "const": false },
+            "timestamp_proximity_used_as_sole_link": { "const": false }
+          }
+        },
+        "sql_proposed_class": {
+          "description": "conservative HINT from the audit SQL (R11). Never PROVEN_*.",
+          "enum": ["DATA_INVARIANT_VIOLATION", "DUPLICATE_OR_REFERENCE_CONFLICT", "INSUFFICIENT_EVIDENCE"]
+        },
+        "reviewer_decision": {
+          "type": "object",
+          "required": ["evidence_class", "correction_mode", "balance_mutation", "package_mutation"],
+          "additionalProperties": false,
+          "properties": {
+            "evidence_class": { "$ref": "#/definitions/evidence_class" },
+            "correction_mode": { "$ref": "#/definitions/correction_mode" },
+            "balance_mutation": { "type": "boolean" },
+            "package_mutation": { "type": "boolean" },
+            "reason": { "type": ["string", "null"] },
+            "confidence_note": { "type": ["string", "null"], "description": "confidence is advisory; it NEVER substitutes for a strong proof path" }
+          }
+        },
+        "approval": {
+          "type": ["object", "null"],
+          "description": "required for any correction_mode other than EXCEPTION_RECORD_ONLY / NONE_PENDING_REVIEW",
+          "additionalProperties": false,
+          "properties": {
+            "approving_actor": { "type": "string", "enum": ["FOUNDER", "AUTHORIZED_ADMIN"] },
+            "approval_timestamp": { "type": "string" },
+            "idempotency_reference_key": { "type": "string", "description": "deterministic key so a correction can never double-apply" },
+            "rollback_strategy": { "type": "string" }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "required": ["status"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "enum": ["NOT_STARTED", "APPROVED_NOT_EXECUTED", "EXECUTED", "REJECTED", "PENDING_REVIEW"] },
+            "audit_record_id": { "type": ["string", "null"] }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "required": ["status"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "enum": ["NOT_VERIFIED", "VERIFIED", "FAILED"] },
+            "exception_or_rejection_reason": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  },
+  "example_empty_template": {
+    "manifest_version": "20.4-v1",
+    "audit_run": {
+      "audit_run_id": "<<fill from audit execution>>",
+      "audit_query_sha256": "<<sha256 of the audit SQL actually run>>",
+      "model_fingerprint": "<<R00 model_fingerprint>>",
+      "expected_schema_fingerprints": {},
+      "environment": "PRODUCTION_PLACEHOLDER",
+      "recorded_migration_rows": null,
+      "observed_at": "<<ISO-8601, captured outside Git>>",
+      "previous_observation": {
+        "credit_deducted_assignments": 46,
+        "assignment_debit_logs": 19,
+        "missing_evidence_total": 27,
+        "missing_by_source": { "admin": 5, "automatic": 16, "client_selected": 6 }
+      }
+    },
+    "candidates": []
+  }
+}

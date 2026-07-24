@@ -21,6 +21,26 @@ ahead/behind 0/0, clean tree. No collision for `20260723000700`; C was the highe
 
 ---
 
+## 0-B. Staging preflight (QF-MVP-20.3DP2) — COMPLETE
+
+The rerun preflight, on the synchronized HEAD `67ca73a`, passed end to end. **The verifier
+source-proof gate that stopped DP is now satisfied** (`evaluateDVerifier` → 0 findings; the installed
+body is proved from `pg_proc.prosrc`, rows 27 + 29–37). External apply workspace holds exactly the 8
+expected SQL files, baseline→C hash-exact and D byte-identical to the repo (`8fb3c28c…`). Linked
+target is **`uckafzuochmbvtiodmcl`** (staging); production and QF-Jarvis were not linked, connected
+or referenced.
+
+**Migration history before** the dry run: **8 local / 7 remote**, D (`20260723000700`) the sole
+pending migration. **The single authorized `npx supabase db push --linked --dry-run`** (2026-07-24
+05:21:45→05:21:51Z, **exit 0**) proposed **exactly one** migration —
+`20260723000700_qf_mvp_auth_user_onboarding_trigger.sql` — under an explicit `DRY RUN` banner, no
+earlier migration, no application claim. **History after** was **byte-identical** (7 remote, D still
+local-only): **zero** remote rows created, and since no migration SQL executed, no auth/profile/
+application row was created. Transcript in the external evidence workspace
+(`QF-MVP-20.3DP2-PREFLIGHT-…txt`), never committed. **Next: D staging application.**
+
+---
+
 ## 0-A. Why the first D preflight (DP) stopped, and what DVR1 fixed
 
 The QF-MVP-20.3DP staging preflight **correctly halted before any staging contact** with
@@ -514,9 +534,9 @@ set gained the D filename (its phase-progression guard). Both strictly strengthe
 
 ## 12. Next phase
 
-**QF-MVP-20.3D staging preflight (rerun)** — *not* application, and **only after this correction is
-accepted and all three local D commits are pushed** (the preflight's origin-sync gate requires it;
-DVR1 itself is forbidden from pushing). D is generated, corrected, hardened and reviewed only;
-nothing has been applied, no dry run has been executed, and no database has been contacted in any
-D phase. The rerun preflight's verifier source-proof gate — the gate that stopped DP — is now
-satisfied by rows 27 + 29–37. Migrations A, A2, B1, G, B2 and C remain applied and immutable.
+**QF-MVP-20.3D staging application** — the preflight (DP2, §0-B) is complete: the source-proof gate
+is satisfied, the dry run proposed exactly `20260723000700` at exit 0, and no write occurred. The
+application phase runs the single authorized non-dry-run `npx supabase db push --linked` to record
+exactly Migration D, then the SELECT-only verifier (`verify_qf_mvp_20_3d.sql`, 37 rows) confirms the
+installed body. **Not** E, **not** QF-MVP-20.4. Migrations A, A2, B1, G, B2 and C remain applied and
+immutable; Migration D and its DR1 runtime marker are unchanged.

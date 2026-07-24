@@ -401,3 +401,62 @@ Automated no-leak assertions (see §L): every public API payload is scanned for 
 ## Cross-cutting: what this phase does NOT do
 
 No runtime code, no migration file, no DB/staging/production access, no provider access, no deployment. All of A–L is design to be implemented in later QF-MVP-20 sub-phases, staging-first, per the migration plan.
+
+---
+
+## Z. QF-MVP-20.6 — Marketplace Engine V1 final staging closeout (2026-07-24)
+
+**Status: `MARKETPLACE_ENGINE_V1_STAGING_COMPLETE_READY_FOR_VENDOR_CRM`.** This design (A–L) is now
+implemented and applied on authorized staging `uckafzuochmbvtiodmcl` as the locked sequence
+A → A2 → B1 → G → R1 → B2 → C → D → E → 20.4 → 20.5A. A final fail-closed closeout audit (read-only, no
+migration/runtime/data change, no production access) confirmed every launch-critical contract. Full
+starting commit `19572eba5bdf3e138bf18a3ed3419228c73cfe35`.
+
+**Eleven staging migrations (all applied exactly once, 11 local / 11 remote paired):** baseline
+`20260722000100`; `…000100` marketplace authority foundation; `…000200` lineage backfill; `…000300`
+canonical assignment authority; `…000400` lineage append-only grants; `…000500` universal enforcement;
+`…000600` public projection hardening; `…000700` auth onboarding trigger; `…000800` legacy RPC EXECUTE
+revocation; `…000900` credit-ledger reconciliation exception register; `…001000` profiles privilege +
+admin_role cleanup.
+
+**Gates:** B1/G 165/165, R1 62/62, B2 61/61, C 83/83, D 110/110, E 51/51, 20.4A 39/39, 20.4C 42/42,
+20.5A 40/40, `verify:mvp` exit 0, typecheck/lint/build clean, `git diff --check` exit 0.
+
+**SELECT-only staging verifiers (each run once):** D 37/37, E 21/21, 20.4C 22/22, 20.5A 23/23 — all PASS.
+The B1/B2/C verifiers pass their launch-critical rows; a handful of forward-looking "later migration not
+yet applied" scope-fence rows correctly invert now that the full sequence is applied (self-documenting
+`details`, e.g. "Migration D not started"). These are phase-time preconditions, **not** defects, and are
+re-proved positively by the closeout state matrix below.
+
+**Final staging state matrix — 26/26 (affirmative):** 11 migrations applied; all public tables, `auth.users`,
+`profiles`, `lead_assignments`, `vendor_credit_logs`, `vendors`, `vendor_packages` and the exception
+register hold **0 rows**; assignment authority `qf_assign_lead_vendors_v2` exists **exactly once**; the
+credit-ledger writer `qf_apply_vendor_credit_delta` is present; the four B2 enforcement triggers exist;
+`vendor_public_v` is present with **no** private/credit columns; PUBLIC/anon hold no direct `vendors`
+privilege and PUBLIC/anon/authenticated hold no direct `leads` privilege; the D auth trigger +
+`handle_new_user()` + `is_admin()` are present; the six legacy assignment RPCs have **zero** untrusted
+EXECUTE; profiles RLS is on with `authenticated` **SELECT-only** and `service_role` **SELECT/INSERT/UPDATE
+only**; `profiles.admin_role` is absent; owner-binding columns are absent; the register carries its two
+immutability triggers.
+
+**Final authority map:** the sole executable assignment writer is
+`services/canonicalAssignmentAuthority.ts` → `qf_assign_lead_vendors_v2` (service_role); the sole credit
+writer is `services/vendorCreditWalletService.ts` → `qf_apply_vendor_credit_delta` (service_role), which
+writes `vendor_credit_logs`. Every legacy assignment/credit RPC has **zero** executable runtime call sites
+(comments confirm they are not called and not fallbacks). Jarvis/n8n appear only in the communication
+layer — no direct marketplace-Core write authority. **QuickFurno Core is the sole marketplace authority.**
+
+**Business invariants (all PASS):** one canonical assignment authority; max 3 active / 6 lifetime per lead;
+controlled append-only replacement; every credit mutation ledger-backed; historical ambiguous cases carry
+**no financial change** in an immutable, **empty** exception register (27 candidates recorded nowhere, not
+inserted); monetization-safe public projection; trusted auth-role source with no authenticated
+`profiles.role` escalation; service-role least privilege; untrusted legacy-RPC revocation; non-authoritative
+absent `admin_role`.
+
+**Deferred (fail-closed), non-blocking:** client-selected owner binding remains
+`R1_BLOCKED_PENDING_OWNER_BINDING` (no owner-binding columns, path not called); production rollout/cutover;
+historical exception population; destructive legacy-object cleanup (the six RPCs are retained but revoked
+from untrusted roles). **Production was not migrated by this branch** — every `db push` targeted staging.
+
+**Next authorized phase: QF-MVP-30 — Vendor CRM** (not started here). Evidence pack (outside Git):
+`qf-staging-workspace/QF-MVP-20.6-MARKETPLACE-CLOSEOUT-20260724T162126Z/`.

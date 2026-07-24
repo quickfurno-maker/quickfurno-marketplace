@@ -332,9 +332,11 @@ export function evaluateDMigration(sql, label = "D") {
       add("R08_role_is_trusted_constant",
         "role is derived from a metadata 'role' key — this is the self-signup admin escalation vector");
     }
-    if (/'admin'/.test(fnBody)) {
-      add("R08_role_is_trusted_constant",
-        "the function references the privileged role 'admin' — admin must be unreachable from onboarding");
+    for (const bad of ["'admin'", "'superadmin'", "admin_role", "is_admin"]) {
+      if (fnBody.includes(bad)) {
+        add("R08_role_is_trusted_constant",
+          `the executable function body references ${bad} — admin/superadmin must be unreachable from onboarding`);
+      }
     }
   }
 
@@ -648,8 +650,292 @@ for (const marker of ["20260723000700", FN, TRG, "auth", "users", "tgtype",
   "qf_assign_lead_vendors_v2", "vendor_public_v", "trg_lead_assignment_events_immutable"]) {
   record(`11 verifier asserts on ${marker}`, verRaw.includes(marker), "present");
 }
-record("12 verifier makes no lexical assertion over function source",
-  !/pg_get_functiondef|prosrc\b|routine_definition/.test(norm(verStripped)), "clean");
+
+/* ===========================================================================
+ * 4b. THE VERIFIER EVALUATOR (QF-MVP-20.3DVR1)
+ *
+ * QF-MVP-20.3DP stopped before staging contact because the verifier proved the
+ * classification contract only from the function COMMENT. `create or replace
+ * function` and `comment on function` are separate statements, so a replaced
+ * body with an intact COMMENT false-passed. These rules require the verifier to
+ * assert on the INSTALLED EXECUTABLE BODY (pg_proc.prosrc), comment-stripped so
+ * that neither a false-pass nor a false-fail is possible.
+ *
+ * One evaluator, used for the real verifier AND every mutated one.
+ * ========================================================================= */
+export function evaluateDVerifier(sql, label = "verifier") {
+  const findings = [];
+  const add = (rule, detail) => findings.push({ rule, detail });
+
+  let tok, stripped;
+  try { tok = tokenize(sql, label); } catch (e) { add("V00_parse", e.message); return findings; }
+  try { stripped = stripComments(sql, label); } catch (e) { add("V00_parse", e.message); return findings; }
+  // `code`  = comments AND string literals removed  -> structural SQL only.
+  // `exec`  = comments removed, literals kept       -> executable text.
+  const code = norm(tok.code);
+  const exec = norm(stripped);
+
+  // -- V01 SELECT-only, and it never fabricates a principal -------------------
+  if (/(^|;)\s*(insert\s+into|update\s+|delete\s+from|create\s+|alter\s+|drop\s+|truncate|grant\s+|revoke\s+|call\s+|do\s+\$)/.test(code)) {
+    add("V01_select_only", "the verifier performs DML or DDL");
+  }
+  for (const t of ["auth.users", "public.profiles", "public.client_accounts", "public.vendors"]) {
+    if (new RegExp(`insert\\s+into\\s+${t.replace(".", "\\.")}`).test(exec)) {
+      add("V01_select_only", `the verifier inserts into ${t}`);
+    }
+  }
+
+  // -- V02 no transaction control, no secrets --------------------------------
+  if (/(^|;|\s)(begin|commit|rollback|savepoint)\s*(;|$)/.test(code)) {
+    add("V02_hygiene", "transaction control in the verifier");
+  }
+  if (/https?:\/\/|supabase\.co|postgres(ql)?:\/\//i.test(exec)) {
+    add("V02_hygiene", "URL or connection string in the verifier");
+  }
+
+  // -- V03 prior defect classes ----------------------------------------------
+  for (const f of findNameArrayDefects(stripped)) add("V03_prior_defect_classes", f);
+  for (const f of findAsymmetricArrayComparisons(stripped)) add("V03_prior_defect_classes", f);
+
+  // -- V04 THE CORE RULE: the installed body is actually inspected ------------
+  //        `code` has comments stripped, so a source check that exists only
+  //        inside a comment cannot satisfy this.
+  if (!/\bprosrc\b/.test(code)) {
+    add("V04_installed_body_inspected",
+      "no pg_proc.prosrc inspection in EXECUTABLE SQL — the verifier cannot detect a drifted function body");
+  }
+  if (/pg_get_functiondef/.test(code)) {
+    add("V04_installed_body_inspected",
+      "pg_get_functiondef() is pretty-printed and volatile; prosrc is the narrower reviewed source");
+  }
+
+  // -- V05 no COMMENT-only proof ---------------------------------------------
+  if (/obj_description|shobj_description|col_description/.test(code)) {
+    add("V05_no_comment_only_proof",
+      "the verifier reads a COMMENT catalog object — a COMMENT survives a body replacement and cannot prove executable behaviour");
+  }
+
+  // -- V06 comments are stripped BEFORE any lexical policy check --------------
+  if (!/regexp_replace/.test(code)) {
+    add("V06_comment_stripping", "no regexp_replace normalisation of the installed body");
+  }
+  if (!/\/\\\*\.\*\?\\\*\//.test(exec) && !exec.includes("/\\*.*?\\*/")) {
+    add("V06_comment_stripping", "block comments (/* ... */) are not stripped from the body");
+  }
+  if (!exec.includes("'--.*$', ' ', 'gn'")) {
+    add("V06_comment_stripping", "line comments (-- ...) are not stripped with the newline-sensitive 'gn' flags");
+  }
+  if (!exec.includes("'\\s+', ' ', 'g'")) {
+    add("V06_comment_stripping", "whitespace is not normalised after stripping");
+  }
+
+  // -- V07 every required installed-body assertion is present ----------------
+  const REQUIRED_ROWS = [
+    ["D27_installed_body_obtainable_and_unique", "body obtainable and the function identity is unique"],
+    ["D29_body_trusted_classification_source", "A. trusted source"],
+    ["D30_body_vendor_marker_yields_vendor", "B. vendor marker -> vendor role"],
+    ["D31_body_neutral_null_default", "B. neutral NULL default"],
+    ["D32_body_insert_shape_role_not_literal", "B/C/E. exact insert shape, role is not a literal"],
+    ["D33_body_role_not_from_user_metadata", "C. user-metadata role boundary"],
+    ["D34_body_no_privileged_role_branch", "D. no executable admin/superadmin branch"],
+    ["D35_body_string_literal_allowlist_exact", "exhaustive constant allowlist"],
+    ["D36_body_idempotent_no_overwrite", "E. idempotency"],
+    ["D37_body_stable_behaviour", "F. stable behaviour"],
+  ];
+  for (const [row, why] of REQUIRED_ROWS) {
+    if (!exec.includes(row.toLowerCase())) {
+      add("V07_required_body_assertions", `missing installed-body assertion ${row} (${why})`);
+    }
+  }
+  for (const needle of ["raw_app_meta_data", "qf_principal", "on\\s+conflict", "do\\s+nothing"]) {
+    if (!new RegExp(needle).test(exec)) {
+      add("V07_required_body_assertions", `the verifier never asserts on ${needle}`);
+    }
+  }
+
+  // -- V08 no UNSTRIPPED whole-source negative regex (the B1R2 defect) --------
+  //        A negative assertion is only sound against the normalised body CTE.
+  const negatives = [...exec.matchAll(/([a-z0-9_]+)\s*!~\s*'/g)].map((m) => m[1]);
+  for (const operand of negatives) {
+    if (operand !== "body") {
+      add("V08_negatives_only_on_stripped_body",
+        `negative regex applied to '${operand}' instead of the comment-stripped body — this is the B1R2 false-fail defect`);
+    }
+  }
+  if (/prosrc\s*(~|!~|like|not\s+like)/.test(exec)) {
+    add("V08_negatives_only_on_stripped_body",
+      "a lexical assertion is applied to raw prosrc; it must run on the comment-stripped, normalised body");
+  }
+
+  return findings;
+}
+
+const realVerFindings = evaluateDVerifier(verRaw, "verify_qf_mvp_20_3d");
+record("12 real D verifier has zero findings", realVerFindings.length === 0,
+  realVerFindings.length === 0 ? "installed-body proof present and sound"
+    : realVerFindings.map((f) => `${f.rule}: ${f.detail}`).join(" | "));
+
+const VER_FIXTURES = [
+  { id: "VF1", rule: "V05_no_comment_only_proof", why: "COMMENT-only assertion restored",
+    mutate: (s) => s.replace("(select count(*) from d_body where body is not null and length(body) > 20) = 1",
+      "pg_catalog.obj_description(to_regprocedure('public.handle_new_user()'),'pg_proc') like '%qf_principal%'") },
+  { id: "VF2", rule: "V04_installed_body_inspected", why: "installed-body inspection removed",
+    mutate: (s) => s.replace("select p.oid as fnoid, p.prosrc as raw_src",
+      "select p.oid as fnoid, ''::text as raw_src") },
+  { id: "VF3", rule: "V04_installed_body_inspected", why: "prosrc demoted into a comment only",
+    mutate: (s) => s.replace("select p.oid as fnoid, p.prosrc as raw_src",
+      "-- select p.oid as fnoid, p.prosrc as raw_src\n  select p.oid as fnoid, ''::text as raw_src") },
+  { id: "VF4", rule: "V04_installed_body_inspected", why: "volatile pg_get_functiondef used instead",
+    mutate: (s) => s.replace("p.prosrc as raw_src", "pg_get_functiondef(p.oid) as raw_src") },
+  { id: "VF5", rule: "V06_comment_stripping", why: "line-comment stripping removed",
+    mutate: (s) => s.replace("regexp_replace(raw_src, '/\\*.*?\\*/', ' ', 'g'),\n                   '--.*$', ' ', 'gn'),",
+      "regexp_replace(raw_src, '/\\*.*?\\*/', ' ', 'g'),\n                   'ZZZNOOPZZZ', ' ', 'g'),") },
+  { id: "VF6", rule: "V07_required_body_assertions", why: "the NULL-default assertion is deleted",
+    mutate: (s) => s.replace("D31_body_neutral_null_default", "D31_body_disabled") },
+  { id: "VF7", rule: "V07_required_body_assertions", why: "the user-metadata role boundary is deleted",
+    mutate: (s) => s.replace("D33_body_role_not_from_user_metadata", "D33_body_disabled") },
+  { id: "VF8", rule: "V07_required_body_assertions", why: "the admin/superadmin branch rejection is deleted",
+    mutate: (s) => s.replace("D34_body_no_privileged_role_branch", "D34_body_disabled") },
+  { id: "VF9", rule: "V07_required_body_assertions", why: "the idempotency assertion is deleted",
+    mutate: (s) => s.replace("D36_body_idempotent_no_overwrite", "D36_body_disabled") },
+  { id: "VF10", rule: "V08_negatives_only_on_stripped_body", why: "negative regex moved onto raw prosrc",
+    mutate: (s) => s.replace("and body !~ 'do\\s+update'", "and raw_src !~ 'do\\s+update'") },
+  { id: "VF11", rule: "V01_select_only", why: "the verifier creates a test auth user",
+    mutate: (s) => `insert into auth.users (id) values (gen_random_uuid());\n${s}` },
+  { id: "VF12", rule: "V01_select_only", why: "the verifier inserts a test profile",
+    mutate: (s) => `insert into public.profiles (id, role) values (gen_random_uuid(), 'vendor');\n${s}` },
+];
+for (const fx of VER_FIXTURES) {
+  const mutated = fx.mutate(verRaw);
+  const changed = mutated !== verRaw;
+  const f = changed ? evaluateDVerifier(mutated, `verfix-${fx.id}`) : [];
+  const tripped = f.some((x) => x.rule === fx.rule);
+  record(`13 verifier fixture ${fx.id} trips ${fx.rule} :: ${fx.why}`, changed && tripped,
+    !changed ? "MUTATION WAS A NO-OP — the fixture is vacuous"
+      : tripped ? `tripped (${f.length} finding(s))`
+      : `did NOT trip; findings: ${f.map((x) => x.rule).join(",") || "none"}`);
+}
+record("13b every verifier rule has at least one fixture", (() => {
+  const covered = new Set(VER_FIXTURES.map((f) => f.rule));
+  const declared = [...new Set([...read("scripts/mvp/staging/validate-qf-mvp-20-3d.mjs")
+    .matchAll(/add\("(V\d\d_[a-z0-9_]+)"/g)].map((m) => m[1]))]
+    .filter((r) => !["V00_parse", "V02_hygiene", "V03_prior_defect_classes"].includes(r));
+  const missing = declared.filter((r) => !covered.has(r));
+  return missing.length === 0 ? true : missing;
+})() === true, "every enforced verifier rule is exercised");
+
+/* ===========================================================================
+ * 4c. OFFLINE SIMULATION OF THE INSTALLED-BODY PROOF
+ *
+ * Reproduces PostgreSQL's three normalisation steps in JS, extracts the
+ * verifier's OWN `body ~ '...'` / `body !~ '...'` patterns, and evaluates them
+ * against the REAL migration's prosrc. This proves — with no database — that
+ * the shipped regexes actually match the shipped function, and that they still
+ * behave correctly when the body drifts.
+ * ========================================================================= */
+function pgNormalizeBody(prosrc) {
+  const noBlock = prosrc.replace(/\/\*[\s\S]*?\*\//g, " ");            // 'g',  dot spans newlines
+  const noLine = noBlock.replace(/--.*$/gm, " ");                       // 'gn', line-anchored
+  return noLine.replace(/\s+/g, " ").toLowerCase();
+}
+function extractProsrc(migrationSql) {
+  const m = migrationSql.match(new RegExp(
+    `create\\s+or\\s+replace\\s+function\\s+public\\.${FN}\\s*\\(\\s*\\)[\\s\\S]*?as\\s*\\$\\$([\\s\\S]*?)\\$\\$`, "i"));
+  return m ? m[1] : null;
+}
+/** Translate a PostgreSQL regex literal (doubled quotes) into a JS RegExp. */
+const pgRe = (pat) => new RegExp(pat.replace(/''/g, "'"));
+
+const REAL_PROSRC = extractProsrc(dRaw);
+record("14 the real migration body is extractable as prosrc", REAL_PROSRC !== null,
+  REAL_PROSRC ? `${REAL_PROSRC.length} chars` : "not found");
+const REAL_BODY = REAL_PROSRC ? pgNormalizeBody(REAL_PROSRC) : "";
+
+record("14b comment stripping removes every explanatory comment from the body",
+  REAL_PROSRC !== null && /--/.test(REAL_PROSRC) && !/--/.test(REAL_BODY),
+  "the raw body has line comments; the normalised body has none");
+record("14c comment stripping preserves every executable string literal", (() => {
+  const lits = [...REAL_BODY.matchAll(/'([^']*)'/g)].map((m) => m[1]).sort();
+  const uniq = [...new Set(lits)];
+  return JSON.stringify(uniq) === JSON.stringify(["full_name", "phone", "qf_principal", "vendor"]);
+})(), "literal set is exactly {full_name, phone, qf_principal, vendor}");
+record("14d the stripped body still contains no '--' that could truncate a literal",
+  !REAL_BODY.includes("--"), "line-comment stripping cannot damage an executable literal here");
+
+// Pull the verifier's own positive patterns and run them against the real body.
+const POS_PATTERNS = [
+  ["D29 trusted source", "new\\\\.raw_app_meta_data\\\\s*->>\\\\s*''qf_principal''"],
+  ["D30 vendor gate", "if\\\\s+[a-z0-9_]+\\\\s*=\\\\s*''vendor''\\\\s+then\\\\s+[a-z0-9_]+\\\\s*:=\\\\s*''vendor''\\\\s*;"],
+  ["D31 neutral default", "else\\\\s+[a-z0-9_]+\\\\s*:=\\\\s*null\\\\s*;\\\\s*end\\\\s+if\\\\s*;"],
+  ["D36 conflict clause", "on\\\\s+conflict\\\\s*\\\\(\\\\s*id\\\\s*\\\\)\\\\s*do\\\\s+nothing"],
+  ["D37 returns new", "return\\\\s+new\\\\s*;"],
+];
+for (const [name, pat] of POS_PATTERNS) {
+  const inVerifier = verRaw.includes(pat.replace(/\\\\/g, "\\"));
+  const matches = pgRe(pat.replace(/\\\\/g, "\\")).test(REAL_BODY);
+  record(`15 ${name} :: shipped in the verifier AND matches the real body`, inVerifier && matches,
+    `in-verifier=${inVerifier} matches-real-body=${matches}`);
+}
+
+// Negative patterns must NOT match the real body.
+for (const [name, pat] of [
+  ["D33 no assignment from user metadata", ":=\\s*[^;]*raw_user_meta_data"],
+  ["D34 no executable 'admin'", "'admin'"],
+  ["D34 no executable 'superadmin'", "'superadmin'"],
+  ["D36 no DO UPDATE", "do\\s+update"],
+  ["D37 no dynamic SQL", "execute\\s"],
+]) {
+  record(`16 ${name} :: correctly absent from the real body`, !new RegExp(pat).test(REAL_BODY), "absent");
+}
+
+// And the whole proof must FAIL on each drifted body — the false-pass family
+// that QF-MVP-20.3DP exposed.
+function installedBodyProof(prosrc) {
+  const b = pgNormalizeBody(prosrc);
+  const lits = [...new Set([...b.matchAll(/'([^']*)'/g)].map((m) => m[1]))].sort();
+  return pgRe("new\\.raw_app_meta_data\\s*->>\\s*''qf_principal''").test(b)
+    && pgRe("if\\s+[a-z0-9_]+\\s*=\\s*''vendor''\\s+then\\s+[a-z0-9_]+\\s*:=\\s*''vendor''\\s*;").test(b)
+    && pgRe("else\\s+[a-z0-9_]+\\s*:=\\s*null\\s*;\\s*end\\s+if\\s*;").test(b)
+    && !/:=\s*[^;]*raw_user_meta_data/.test(b)
+    && !/'admin'|'superadmin'/.test(b)
+    && /on\s+conflict\s*\(\s*id\s*\)\s*do\s+nothing/.test(b)
+    && JSON.stringify(lits) === JSON.stringify(["full_name", "phone", "qf_principal", "vendor"]);
+}
+record("17 the installed-body proof accepts the real reviewed body",
+  REAL_PROSRC !== null && installedBodyProof(REAL_PROSRC), "accepted");
+
+const BODY_DRIFTS = [
+  { id: "BD1", why: "body reverted to an UNCONDITIONAL 'vendor' (COMMENT untouched)",
+    mutate: (s) => s.replace("  v_principal text := new.raw_app_meta_data ->> 'qf_principal';\n", "")
+      .replace(/  if v_principal = 'vendor' then[\s\S]*?  end if;\n/, "  v_role := 'vendor';\n") },
+  { id: "BD2", why: "role reverted to raw_user_meta_data ->> 'role' (COMMENT untouched)",
+    mutate: (s) => s.replace("new.raw_app_meta_data ->> 'qf_principal'", "new.raw_user_meta_data ->> 'role'") },
+  { id: "BD3", why: "unknown marker now defaults to vendor (COMMENT untouched)",
+    mutate: (s) => s.replace("    v_role := null;", "    v_role := 'vendor';") },
+  { id: "BD4", why: "an executable admin branch is added (COMMENT untouched)",
+    mutate: (s) => s.replace("  if v_principal = 'vendor' then",
+      "  if v_principal = 'superadmin' then\n    v_role := 'admin';\n  elsif v_principal = 'vendor' then") },
+  { id: "BD5", why: "ON CONFLICT changed to an overwrite (COMMENT untouched)",
+    mutate: (s) => s.replace("on conflict (id) do nothing", "on conflict (id) do update set role = excluded.role") },
+];
+for (const d of BODY_DRIFTS) {
+  const mutated = d.mutate(dRaw);
+  const changed = mutated !== dRaw;
+  const src = changed ? extractProsrc(mutated) : null;
+  const caught = src !== null && !installedBodyProof(src);
+  record(`18 body drift ${d.id} is caught :: ${d.why}`, changed && caught,
+    !changed ? "MUTATION WAS A NO-OP — the fixture is vacuous" : caught ? "rejected" : "NOT CAUGHT");
+}
+
+// The negative control: explanatory comments may name the forbidden terms.
+record("19 a comment naming admin/superadmin does NOT false-fail the proof", (() => {
+  const commented = dRaw.replace("  else\n",
+    "  else\n    -- never 'admin', never 'superadmin', never admin_role, never is_admin\n");
+  if (commented === dRaw) return false;
+  const src = extractProsrc(commented);
+  return src !== null && /admin/.test(src) && installedBodyProof(src)
+    && evaluateDMigration(commented, "control").length === 0;
+})(), "comment-stripping makes the negatives sound in BOTH the verifier proof and the migration validator");
 
 /* ===========================================================================
  * 5. Repository onboarding posture (runtime compatibility)

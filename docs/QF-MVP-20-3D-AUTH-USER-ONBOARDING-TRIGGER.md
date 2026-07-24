@@ -1,22 +1,41 @@
 # QF-MVP-20.3D — Auth-User Onboarding Trigger
 
-**Status: `D_PRINCIPAL_CLASSIFICATION_CORRECTED_REVIEWED_READY_FOR_PREFLIGHT`.**
+**Status: `D_VERIFIER_INSTALLED_BODY_PROOF_CORRECTED_READY_FOR_PREFLIGHT`.**
 
-> **GENERATED, CORRECTED AND REVIEWED — NOT APPLIED.** No database was accessed in this phase or
-> the one before it — not staging, not production, not QF-Jarvis. No dry run was executed.
+> **GENERATED, CORRECTED, HARDENED AND REVIEWED — NOT APPLIED.** No database was accessed in this
+> phase or any before it — not staging, not production, not QF-Jarvis. No dry run was executed.
 > Nothing was pushed.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `7161eea605fa6a7052f5ee63561a71873926c07f` (C applied and verified 23/23), origin identical,
 ahead/behind 0/0, clean tree. No collision for `20260723000700`; C was the highest migration.
-**Corrected in QF-MVP-20.3DR1** on top of the generation commit `e84b209`.
+**Corrected in QF-MVP-20.3DR1** (principal classification) and again in **QF-MVP-20.3DVR1**
+(verifier installed-body proof), on top of the generation commit `e84b209`.
 
-| Artifact | SHA-256 (corrected) |
+| Artifact | SHA-256 (current) |
 |---|---|
-| `supabase/migrations/20260723000700_qf_mvp_auth_user_onboarding_trigger.sql` | `8fb3c28c2c0e776d88d3c8163a895c5e108cb84b89ac95f41b86a521f50daecd` |
-| `scripts/mvp/staging/validate-qf-mvp-20-3d.mjs` | `a532aaac1f7f8c955a362cae8749f3aa87b4bc95a05db4cf00abc93dfde45a10` |
-| `supabase/staging-verification/verify_qf_mvp_20_3d.sql` | `2ca1e3127f4440fd2b1f6cd20df5d5f996236a056674966f441d78eeb4d64271` |
-| `lib/identity/authPrincipalMarker.ts` *(new runtime half)* | `fa278b6e3e29314fd03ca4226a3674520b18c3451c07e186370964d7fabc93a8` |
+| `supabase/migrations/20260723000700_qf_mvp_auth_user_onboarding_trigger.sql` *(immutable since DR1)* | `8fb3c28c2c0e776d88d3c8163a895c5e108cb84b89ac95f41b86a521f50daecd` |
+| `scripts/mvp/staging/validate-qf-mvp-20-3d.mjs` *(hardened in DVR1)* | `db94548135222e0dfb0f6cfadadb4cbb4ebdc72a1325fb9bc052638b4830fecd` |
+| `supabase/staging-verification/verify_qf_mvp_20_3d.sql` *(hardened in DVR1, 37 rows)* | `f0e87bfbfc715f9d1f25d003b45a77280f555f1131e9143ce3070df17822c26d` |
+| `lib/identity/authPrincipalMarker.ts` *(runtime half, since DR1)* | `fa278b6e3e29314fd03ca4226a3674520b18c3451c07e186370964d7fabc93a8` |
+
+---
+
+## 0-A. Why the first D preflight (DP) stopped, and what DVR1 fixed
+
+The QF-MVP-20.3DP staging preflight **correctly halted before any staging contact** with
+`D_PREFLIGHT_BLOCKED_VERIFIER_SOURCE_PROOF_INSUFFICIENT`. The verifier proved the classification
+contract only from the function **COMMENT** (row D27 read `obj_description()`), and executable SQL
+never inspected the installed body. Because `create or replace function` and `comment on function`
+are **separate statements**, a replaced body with an intact comment would drift undetected — proved
+offline against three separate drift mutations, all of which the old D27 **false-passed**.
+
+**QF-MVP-20.3DVR1 closes that hole.** The verifier now reads the actual installed executable body
+from `pg_proc.prosrc`, strips its comments in-SQL, and asserts the frozen contract structurally
+(rows 27, 29–37). This satisfies the QF-MVP-20.3B1R2 policy *and* the DP gate at once: B1R2 forbade
+an **unstripped** negative regex (which false-*fails* on body comments); DP forbade a **COMMENT-only**
+proof (which false-*passes* on drift). A **comment-stripped body** assertion is the one mechanism
+that is sound against both. Migration D itself needed no change and is byte-for-byte the DR1 artifact.
 
 ---
 
@@ -290,10 +309,12 @@ inserting a test auth user — including in the verifier.
 
 ## 8. Validator and verifier
 
-**Offline validator** — `scripts/mvp/staging/validate-qf-mvp-20-3d.mjs`, **76 checks, PASS**,
-21 rules (R01–R20) with **23 one-defect fixtures**, all mutations of the real migration run through
-the same `evaluateDMigration()`; a no-op mutation is reported vacuous and check 05 proves every
-rule has a fixture. Security-critical rules:
+**Offline validator** — `scripts/mvp/staging/validate-qf-mvp-20-3d.mjs`, **110 checks, PASS**. It
+now grades *three* things with one evaluator each: the migration (`evaluateDMigration`, 21 rules
+R01–R20, 23 one-defect fixtures), **the verifier itself** (`evaluateDVerifier`, rules V01–V08, 12
+verifier fixtures — new in DVR1), and an **offline simulation of the installed-body proof** (checks
+14–19). A no-op mutation is reported vacuous, and both "every rule has a fixture" guards hold.
+Migration-side security-critical rules:
 
 | Rule | Rejects |
 |---|---|
@@ -322,25 +343,60 @@ established row is preserved.
 4. adding `insert into auth.users` to the real verifier tripped checks **07 and 07b**.
 All artifacts were restored byte-identical.
 
-**SELECT-only verifier** — `supabase/staging-verification/verify_qf_mvp_20_3d.sql`, **28 rows**,
-one `SELECT … UNION ALL` chain with no DML/DDL, and it **never inserts a test auth user** — the
-trigger is proved structurally from catalog facts (`pg_proc.prosecdef`/`proconfig`,
+**SELECT-only verifier** — `supabase/staging-verification/verify_qf_mvp_20_3d.sql`, **37 rows**,
+one `WITH … SELECT … UNION ALL` chain with no DML/DDL, and it **never inserts a test auth user** —
+the trigger is proved structurally from catalog facts (`pg_proc.prosecdef`/`proconfig`/`prosrc`,
 `pg_trigger.tgtype`/`tgenabled`/`tgfoid`, `pg_constraint`, `has_function_privilege`,
-`has_table_privilege`). It carries forward every locked policy: no `pg_get_functiondef`/`prosrc`
-assertion, catalog `name` values compared as text, and no asymmetric array comparison.
+`has_table_privilege`). Catalog `name` values are compared as text and every set comparison
+normalises both sides (row **D35** deliberately keeps its expected literal hand-unordered so the
+PostgreSQL sort stays load-bearing).
 
-Rows **D26–D28** carry the catalog-decidable half of the corrected contract: `profiles.role` remains
-nullable (so the neutral principal is storable), the applied function **declares** its trusted
-source, and the client principal model (`client_accounts`) is intact.
+### The installed-body proof (DVR1, rows 27 + 29–37)
 
-> **Where the classification guarantee is enforced, and why.** The source-level guarantee lives in
-> the **offline validator**, which grades the migration text with a comment-aware tokenizer. It
-> *cannot* live in the verifier: `pg_proc.prosrc` retains the function's own inline comments, which
-> legitimately name `raw_user_meta_data` and `'admin'` while describing what is forbidden, so a
-> negative lexical assertion there would produce a **false FAIL** — the mirror image of the
-> QF-MVP-20.3B1R2 defect class. Proving the behaviour in-database would instead require inserting a
-> test auth user, which this phase forbids. Row **D27** is the one permitted positive assertion: it
-> reads the function's `COMMENT` catalog object (authored by D), not its source text.
+A `WITH` prelude binds `d_body` = the installed `pg_proc.prosrc`, comment-stripped in three ordered
+`regexp_replace` steps (block `/* */` with `.` spanning newlines, then line `--` with the
+newline-sensitive `gn` flags, then whitespace collapse + lower-case) and `d_lits` = the exact set of
+single-quoted literals in that body. Every row below asserts on `d_body`, never on the COMMENT:
+
+| Row | Proves (from the executable body) |
+|---|---|
+| D27 | exactly one `public.handle_new_user` (no overload) and its body was obtained |
+| D29 | **A. trusted source** — reads `new.raw_app_meta_data ->> 'qf_principal'` |
+| D30 | **B. output** — an exact `= 'vendor'` gate is the only thing assigning the vendor role |
+| D31 | **B. neutral default** — absent/unknown marker falls through to SQL `NULL` |
+| D32 | **B+C+E shape** — exact target/columns; the role position is an *identifier*, never a literal (no blanket role); `full_name`/`phone` are the only user-metadata reads; conflict is `DO NOTHING` |
+| D33 | **C. boundary** — no assignment is fed by `raw_user_meta_data`; no privileged key read from it |
+| D34 | **D. absence** — no executable `'admin'`/`'superadmin'`/`admin_role`/`is_admin` branch |
+| D35 | **exhaustive constants** — the body's literal set is exactly `{full_name, phone, qf_principal, vendor}` (positively proves the marker; negatively proves no other constant exists) |
+| D36 | **E. idempotency** — retains `ON CONFLICT (id) DO NOTHING`; no update/delete path |
+| D37 | **F. stability** — returns `NEW`; no dynamic SQL, external call, or business-state mutation |
+
+Rows **D26/D28** keep the catalog-decidable half: `profiles.role` stays nullable (so the neutral
+principal is storable) and the client principal model (`client_accounts`) is intact.
+
+> **How both locked policies are satisfied at once.** QF-MVP-20.3B1R2 forbade an **unstripped**
+> negative regex over function source (it false-*failed* on the body's own comments). QF-MVP-20.3DP
+> forbade a **COMMENT-only** proof (it false-*passed* on a drifted body). Asserting on the
+> **comment-stripped `prosrc`** is the single mechanism sound against both: after stripping, only
+> executable text remains, so a comment can neither cause a failure nor supply a pass.
+> `pg_get_functiondef()` is deliberately not used — `prosrc` is the narrower, non-pretty-printed
+> source of exactly the reviewed function. The stripping is fail-closed: if a string literal ever
+> contained `--`, D35's exact literal set would stop matching and the row would FAIL, never silently
+> pass.
+
+**Load-bearing, proved offline (DVR1):**
+- The old COMMENT-only D27 **false-passed** three separate drift mutations (unconditional `'vendor'`,
+  role from `raw_user_meta_data`, unknown→vendor); the new body proof **catches all three**, plus an
+  added executable `admin` branch and an `ON CONFLICT … DO UPDATE` overwrite (checks 17–18).
+- All ten shipped body patterns were run against the real normalised `prosrc`: six positives match,
+  and every negative — including `raw_user_meta_data`-fed assignment, `'admin'`, `'superadmin'`,
+  `DO UPDATE`, dynamic `EXECUTE` — is absent (checks 15–16).
+- A comment naming `admin`/`superadmin` **does not** false-fail either the verifier proof or the
+  migration validator (check 19).
+- The 12 verifier fixtures each restore a specific drift hole: COMMENT-only proof (V05), no body
+  inspection / `pg_get_functiondef` / prosrc-in-a-comment (V04), stripping removed (V06), any
+  required row deleted (V07), a negative moved onto raw `prosrc` (V08), and the verifier writing an
+  auth user or profile (V01) — all caught.
 
 ---
 
@@ -352,13 +408,24 @@ duplicate-initialisation races, overwriting existing profile data, OAuth/email/p
 inconsistency, trigger recursion, signup rollback, orphan/delete semantics, non-empty production
 compatibility, runtime type resolution and E/20.4 scope creep.
 
-**Two material defects were found and corrected:**
+**Three material defects were found and corrected across the D phases:**
 
-1. **The metadata-derived `role`** (§2) — the reason the trigger could not simply be re-attached as
-   written. Any anonymous visitor could have self-registered as an administrator.
-2. **Principal misclassification by the first fix** (§0) — the blanket `'vendor'` constant would
-   have classified every homeowner/client OTP auth user as a vendor. Found by the DR1 review and
-   corrected here.
+1. **The metadata-derived `role`** (§2, DR1) — the reason the trigger could not simply be re-attached
+   as written. Any anonymous visitor could have self-registered as an administrator.
+2. **Principal misclassification by the first fix** (§0, DR1) — the blanket `'vendor'` constant would
+   have classified every homeowner/client OTP auth user as a vendor.
+3. **A verifier that could not detect body drift** (§0-A, DVR1) — the post-application verifier
+   proved the classification contract only from the function COMMENT, so a replaced body with an
+   intact comment would have passed. Now proved from the comment-stripped `pg_proc.prosrc`.
+
+**DVR1 independent review also found and fixed a real runtime-SQL defect in the new verifier:** the
+literal-extraction regex `regexp_matches(body, '''([^'']*)''', 'g')` had **seven** single-quotes —
+an unbalanced SQL string literal that would have errored (or mis-parsed) at PostgreSQL execution,
+undetected by the offline validator (which computes literals in JS). It was rewritten with
+dollar-quoting — `regexp_matches(body, $lit$'([^']*)'$lit$, 'g')` — removing the quote-doubling
+hazard entirely. All ten shipped body patterns were then re-verified against the real `prosrc`, and
+the comment-strip → normalise pipeline was checked for line/block comments, whitespace, and
+literal-preservation (no `--` can truncate a literal in the real body).
 
 The DR1 review additionally checked, and found clean: vendor classified as client; admin/superadmin
 injection through either metadata namespace (unreachable — no `'admin'` branch exists); vendor RLS
@@ -416,7 +483,8 @@ D does **not**: revoke or drop any legacy assignment RPC (Migration E — all si
 posture are untouched and asserted); perform historical credit-ledger reconciliation (QF-MVP-20.4 —
 no ledger row is written); implement client-selected owner binding; change the Migration C
 projection, its ACLs or policies; or change assignment, credit, package, consent or campaign
-authority. Enforced by validator rules R14–R16, R18 and verifier rows 16–23.
+authority. Enforced by validator rules R14–R16, R18 and verifier rows 16–23. DVR1 changed **only**
+the D validator and verifier — Migration D and the DR1 runtime marker are byte-for-byte unchanged.
 
 ---
 
@@ -424,29 +492,31 @@ authority. Enforced by validator rules R14–R16, R18 and verifier rows 16–23.
 
 | Gate | Result |
 |---|---|
-| `npm run test:mvp:d` (D validator) | **76 passed, 0 failed** · 23 fixtures |
+| `npm run test:mvp:d` (D validator + verifier evaluator + body-proof sim) | **110 passed, 0 failed** |
+| Verifier fixtures (V01–V08) | **12/12** caught |
+| Installed-body drift simulations | **5/5** caught (incl. the 3 the old COMMENT-only proof false-passed) |
 | Focused client/vendor/admin classification scenarios | **9/9** as specified · admin unreachable |
 | Runtime↔trigger marker agreement mutations | **5/5** caught |
-| D real-artifact mutations | 4/4 caught, artifacts restored byte-identical |
 | `npm run test:mvp:c` | **83 passed, 0 failed** |
 | `npm run test:mvp:b2` | **61 passed, 0 failed** |
 | B1/G validator | **165 passed, 0 failed** |
 | `npm run test:mvp:r1` | **62 passed, 0 failed** |
-| `npm run verify:mvp` (now runs the D validator too) | **exit 0** |
+| `npm run verify:mvp` | **exit 0** |
 | typecheck / lint / build | clean, exit 0 |
 | `git diff --check` | exit 0 |
 
 No managed-database test was run. `test:supabase:lead` was **not** executed.
 
-**Deviation:** `verify:mvp` gained `test:mvp:d`, and the R1 harness's declared-later-migrations set
-gained the D filename (its phase-progression guard). Both strictly strengthen the gate.
+**Deviation:** `verify:mvp` gained `test:mvp:d` (in DG), and the R1 harness's declared-later-migrations
+set gained the D filename (its phase-progression guard). Both strictly strengthen the gate.
 
 ---
 
 ## 12. Next phase
 
-**QF-MVP-20.3D staging preflight** — *not* application, and **only after this correction is accepted
-and both local D commits are pushed** (the preflight's origin-sync gate requires it; DR1 itself is
-forbidden from pushing). D is generated, corrected and reviewed only; nothing has been applied, no
-dry run has been executed, and no database has been contacted in either phase. Migrations A, A2,
-B1, G, B2 and C remain applied and immutable.
+**QF-MVP-20.3D staging preflight (rerun)** — *not* application, and **only after this correction is
+accepted and all three local D commits are pushed** (the preflight's origin-sync gate requires it;
+DVR1 itself is forbidden from pushing). D is generated, corrected, hardened and reviewed only;
+nothing has been applied, no dry run has been executed, and no database has been contacted in any
+D phase. The rerun preflight's verifier source-proof gate — the gate that stopped DP — is now
+satisfied by rows 27 + 29–37. Migrations A, A2, B1, G, B2 and C remain applied and immutable.

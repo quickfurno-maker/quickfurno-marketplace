@@ -1,10 +1,11 @@
 # QF-MVP-20.3E — Legacy Assignment RPC EXECUTE Revocation
 
-**Status: `E_ACL_DURABILITY_CONTRACT_CORRECTED_READY_FOR_PREFLIGHT`.**
+**Status: `E_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.**
 
-> **GENERATED, CORRECTED AND REVIEWED — NOT APPLIED.** No database was accessed in this phase or the
-> one before it — not staging, not production, not QF-Jarvis. No dry run was executed. Nothing was
-> pushed.
+> **PREFLIGHT COMPLETE — NOT APPLIED.** The single authorized dry run (2026-07-24 11:01:33→11:01:38Z,
+> exit 0) proposed exactly Migration E and wrote nothing; the live pre-state proves E is an ACL no-op
+> (the six are already `service_role`-only). Production and QF-Jarvis were never accessed. E is not
+> applied; nothing pushed beyond the two already-pushed E commits.
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `2210ac71cac222b719613eb1b9c12c8e49ac5148` (D applied and verified 37/37), origin identical,
@@ -18,6 +19,41 @@ overclaim was retracted (see §2a); the executable REVOKE/GRANT design is unchan
 | `scripts/mvp/staging/validate-qf-mvp-20-3e.mjs` *(51/51, +R12)* | `2e9ef53a8e4fb6822bfc4b479cddcef7ebf5c14dcff1040b864baaa263960b0b` |
 | `supabase/staging-verification/verify_qf_mvp_20_3e.sql` *(21 rows, unchanged)* | `a4ab76fa5df9d4b23b64618976ab89e41178239c643cc65a381e01f9782f3115` |
 | `scripts/mvp/staging/qf-mvp-20-3e-manifest.json` *(definition-immutability manifest, unchanged)* | `8bfba9662e2a74a39c32e671419251d2db8ce233fc708cfad5540bdb90282c4a` |
+
+---
+
+## 0-B. Staging preflight (QF-MVP-20.3EP) — COMPLETE
+
+The preflight, on the synchronized HEAD `fc12992` (both E commits pushed; origin identical, 0/0),
+passed end to end. **Source-proof gate PASS:** the validator (51/51) structurally requires the six
+signature-qualified targets, PUBLIC/anon/authenticated revokes, service_role retention, safe/canonical
+exclusions, the no-DDL/no-broad/R12 current-object contract, and a SELECT-only verifier; the verifier
+reads **actual catalogs** (`to_regprocedure` ×31, `has_function_privilege` ×62, `pg_proc`/`pg_trigger`/
+`pg_get_function_result`) with **zero** `obj_description`/`prosrc`/`pg_get_functiondef` — not a
+COMMENT-only proof.
+
+External apply workspace held exactly 8 SQL files (baseline→D, hash-exact); E was **absent** (case A),
+so corrected E was copied in and proved **byte-identical** to the repo (`94c696cd…`, 16023 bytes) →
+9 SQL files. Linked target **`uckafzuochmbvtiodmcl`**; production/QF-Jarvis not linked, connected or
+referenced.
+
+**Live pre-state ACL matrix (SELECT-only, no RPC invoked) proves E is a no-op:** all six targets
+already have PUBLIC/anon/authenticated EXECUTE **absent** and service_role **present** (owner
+`postgres`, SECURITY DEFINER, `jsonb`, matching the manifest); `get_public_eligible_vendors` keeps
+anon/authenticated/service_role EXECUTE (STABLE, TABLE result); `qf_assign_lead_vendors_v2` is
+service_role-usable and never anon/authenticated-executable. The six therefore **already satisfy E's
+desired posture** — E's REVOKE/GRANT are idempotent no-ops; its value is the catalog-verification
+milestone and the explicit history checkpoint.
+
+**Migration history before** the dry run: **9 local / 8 remote**, E (`20260723000800`) the sole
+pending migration. **The single authorized `npx supabase db push --linked --dry-run`** (2026-07-24
+11:01:33→11:01:38Z, **exit 0**) proposed **exactly one** migration —
+`20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql` — under an explicit `DRY RUN`
+banner, no earlier migration, no application claim. **History after** was **byte-identical** (8 remote,
+E still local-only), and a repeated SELECT-only ACL snapshot was unchanged with `schema_migrations`
+rows for `20260723000800` = **0**: **zero** write, E not recorded, no RPC invoked. Transcript
+`QF-MVP-20.3EP-PREFLIGHT-…txt` in the external evidence workspace, never committed. **Next: E staging
+application.**
 
 ---
 
@@ -212,8 +248,11 @@ gained the E filename (its phase-progression guard). Both strictly strengthen th
 
 ## 12. Next phase
 
-**QF-MVP-20.3E staging preflight** — *not* application, and only after this EGR1 correction is
-accepted and both local E commits are pushed (the preflight's origin-sync gate requires it; EGR1 is
-forbidden from pushing). E is generated, corrected and reviewed only; nothing has been applied, no
-dry run has been executed, and no database has been contacted in either phase. Migrations A, A2, B1,
-G, B2, C and D remain applied and immutable.
+**QF-MVP-20.3E staging application** — the preflight (EP, §0-B) is complete: the source-proof gate is
+satisfied, the live pre-state proves E is an ACL no-op (the six are already `service_role`-only), the
+dry run proposed exactly `20260723000800` at exit 0, and no write occurred. The application phase runs
+the single authorized non-dry-run `npx supabase db push --linked` to record exactly Migration E, then
+the SELECT-only verifier (`verify_qf_mvp_20_3e.sql`, 21 rows) confirms the posture. **Not** QF-MVP-20.4,
+**not** owner binding. Migrations A, A2, B1, G, B2, C and D remain applied and immutable; the two
+disclosed follow-ups (`profiles` `authenticated` table-GRANT — mandatory before final closeout; inert
+`profiles.admin_role` drift) remain open and out of scope.

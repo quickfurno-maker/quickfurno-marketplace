@@ -1,8 +1,8 @@
 # QF-MVP-20.5A — Profiles Base-Table Privilege Hardening + admin_role Drift Cleanup
 
-**Status: `PROFILES_PRIVILEGE_AND_ADMIN_ROLE_CLEANUP_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.**
+**Status: `PROFILES_PRIVILEGE_AND_ADMIN_ROLE_CLEANUP_APPLIED_AND_VERIFIED_ON_STAGING`.**
 (QF-MVP-20.5A generated the migration; 20.5A1 corrected the service_role matrix — §10; 20.5AP ran the
-staging preflight — §11.)
+staging preflight — §11; 20.5AA applied + verified on staging — §12.)
 
 > Generation + offline-review only. **No managed database was accessed**; the migration is **generated
 > but not applied**. This closes the two mandatory profiles/auth follow-ups before Marketplace Engine
@@ -185,3 +185,48 @@ empty). Transcript + queries outside Git in `qf-staging-workspace/QF-MVP-20.5AP-
 
 **Next: application review** — one `db push --linked` applying exactly `20260723001000` (schema/ACL only),
 then the verifier `verify_qf_mvp_20_5a.sql`. Owner binding deferred; the 20.4 exception register stays empty.
+
+## 12. QF-MVP-20.5AA — staging application (APPLIED + VERIFIED)
+
+**Date:** 2026-07-24 (16:03–16:06 UTC) · **Linked target:** authorized staging `uckafzuochmbvtiodmcl`
+(production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` not the target, not contacted).
+**Migration `20260723001000` is APPLIED to staging** via exactly one `supabase db push --linked`
+(16:04:06→16:04:16 UTC, **exit 0**); exactly that migration, no earlier migration, no repair/reset, no
+second push. The in-transaction `$verify$` NOTICE fired (authenticated SELECT-only, no escalation surface;
+anon/PUBLIC zero; **service_role SELECT+INSERT+UPDATE only, no DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN**;
+admin_role drift removed; `profiles.role` + `is_admin()` + D auth trigger intact; 20.4C register +
+owner-binding deferral untouched). The `column "admin_role" … does not exist, skipping` NOTICE is the
+`drop column if exists` no-op on the staging squash; the trailing `pgdelta-target-ca.crt ENOENT` is the
+known non-blocking edge-runtime cache artifact — exit 0.
+
+**Identity:** applied at HEAD `e37d6d25565dcd866678232158d963051d2f27c2` (parent
+`a863c8beb722600b7285c6426ac4752179af3e96`, origin identical, **0/0**, clean). Locked hashes exact
+(migration `5cf12b72…`, validator `2458f7f8…`, verifier `fb582dbd…`); applied A/A2/B1/G/B2/C/D/E/20.4C
+byte-unchanged.
+
+**History:** before **11 local / 10 remote** (`20260723001000` sole pending) → after **11 local / 11
+remote**, all paired exactly once, applied once with no duplicate.
+
+**Locked verifier `verify_qf_mvp_20_5a.sql` (`fb582dbd…`) ran once against staging: 23 rows, 23 PASS / 0
+FAIL.** Proven live: profiles present, RLS on; **authenticated holds SELECT and NO
+INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN**; role-escalation impossible (no authenticated
+UPDATE); anon/PUBLIC zero; **service_role holds exactly SELECT/INSERT/UPDATE** (no
+DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN); `admin_role` absent; `profiles.role` present; the three
+own-row/admin policies preserved with no anon target; `is_admin()` + the D auth trigger + `handle_new_user()`
+preserved; the 20.4C register intact and empty; and A/A2/B1/G/B2/C/D/E + owner-binding deferral untouched.
+
+**Final privilege matrix (verified live):** PUBLIC none · anon none · authenticated **SELECT only** ·
+service_role **SELECT/INSERT/UPDATE only**.
+
+**No data write:** a post-application SELECT-only pass confirmed the ONLY change was the ACL of
+`20260723001000` — authenticated went 0 → SELECT and service_role went all-seven → SELECT/INSERT/UPDATE.
+Every data table remained **0 rows** (profiles, `auth.users`, all 68 public tables, the 20.4C register,
+`vendor_credit_logs`, `lead_assignments`); no role value changed; no assignment/package/credit/lead
+mutation; no historical exception inserted; no state-changing RPC.
+
+**Gates:** 20.5A **40/40**, 20.4C 42/42, 20.4A 39/39, E 51/51, D 110/110, C 83/83, B2 61/61, B1/G 165/165,
+R1 62/62, `verify:mvp` exit 0, typecheck/lint/build clean, `git diff --check` exit 0. Transcript + queries +
+before/after captures outside Git in `qf-staging-workspace/QF-MVP-20.5AA-APPLICATION-20260724T160323Z/`.
+
+**Next: Marketplace Engine final closeout review** — not another cleanup subphase. Owner binding remains
+deferred; the 20.4 historical exception register remains empty.

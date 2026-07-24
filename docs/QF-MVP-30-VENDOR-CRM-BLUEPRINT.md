@@ -299,3 +299,36 @@ bootstrap fixtures W/X/Y/Z/AA/BB); SELECT-only verifier `supabase/staging-verifi
 `scripts/mvp/crm/qf-mvp-30-1b-foundation-contract.json` (`notes_bootstrap_mode: CREATE_IF_ABSENT_THEN_CONVERGE`,
 `supported_start_states: [ABSENT, LEGACY_MINIMAL]`); blueprint validator 36/36; all Marketplace gates green;
 `verify:mvp` exit 0. **Next: a fresh QF-MVP-30.1B staging preflight.**
+
+## 16. QF-MVP-30.1BP2 — corrected staging preflight (COMPLETE, NOT applied)
+
+**Status:** `VENDOR_CRM_FOUNDATION_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`. **Date:** 2026-07-24
+(18:29–18:31 UTC) · **Linked target:** authorized staging `uckafzuochmbvtiodmcl` (production/QF-Jarvis not
+contacted). **Nothing applied** — one `supabase db push --linked --dry-run` + catalog-SAFE SELECT-only
+checks. **Identity:** correction commit HEAD `d5ee7cff70abdefc8651b0d666605b7a6d9020c7` (parent
+`6e3670b…`, grandparent `bf432800…`, origin identical, **0/0**, clean). Full hashes exact — migration
+`9212f746…`, validator `5935a881…`, verifier `e10caa56…`, manifest `26bd3ab3…`; applied 11 byte-unchanged.
+
+**Corrected source re-proved (both paths):** `create table if not exists public.vendor_internal_notes`
+precedes the first dependent ALTER; both ABSENT and LEGACY_MINIMAL converge to the one final contract;
+validator 46/46; verifier 25 rows.
+
+**Workspace:** outside Git, no seed/functions; 11 SQL (all repo-backed byte-identical) → 30.1B ABSENT →
+copied the corrected migration (byte-identical `9212f746…`) → **12**.
+
+**Safe live pre-state (to_regclass — no error on absent tables):** `20260723001100` absent; remote **11**;
+**all six CRM foundation tables ABSENT** (incl. `vendor_internal_notes` = ABSENT — the create-if-absent
+path); 006 omissions recorded (audit_logs/admin_notifications/lead_internal_notes absent, informational);
+all public rows 0; auth.users/profiles/vendors/lead_assignments/vendor_credit_logs = 0; 20.4C register
+present + empty; vendor_public_v present; A–E posture intact; admin_role absent; no segment/campaign; owner
+binding deferred; 68 public tables.
+
+**History:** **12 local / 11 remote**; `20260723001100` local-only, **sole pending**. **Dry run (once, exit
+0):** `DRY RUN: migrations will *not* be pushed`; exactly one proposed — `20260723001100_…foundation.sql`.
+**No-write proof:** re-listing history + re-running the safe pre-state returned **identical** results (remote
+11, six CRM objects still absent, all data 0). Transcript + captures outside Git in
+`qf-staging-workspace/QF-MVP-30.1BP2-CORRECTED-PREFLIGHT-20260724T182909Z/`.
+
+**Migration-006 divergence boundary:** only `vendor_internal_notes` is handled here; `audit_logs`/
+`admin_notifications`/other omitted 006 tables are NOT created/assumed — **QF-MVP-30.4 must revalidate them
+before reuse**. **Next: QF-MVP-30.1B staging application review.**

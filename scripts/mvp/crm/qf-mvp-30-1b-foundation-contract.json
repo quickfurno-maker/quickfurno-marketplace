@@ -1,0 +1,73 @@
+{
+  "$comment": "QF-MVP-30.1B Vendor CRM foundation CONTRACT MANIFEST. Schema/ACL contract only. NO production data or UUIDs. Access model = A (server-only via service_role). Canonical notes authority = vendor_internal_notes (evolved in place). All new tables expect ZERO rows on empty staging.",
+  "contract_version": "30.1B-v1",
+  "migration": "supabase/migrations/20260723001100_qf_mvp_vendor_crm_foundation.sql",
+  "access_model": "A_SERVER_ONLY",
+  "canonical_notes_authority": "public.vendor_internal_notes",
+  "rejected_notes_alternative": "a new public.vendor_notes table (would leave vendor_internal_notes as a competing writable notes authority)",
+  "foundation_tables": [
+    "public.vendor_crm_profiles",
+    "public.vendor_contacts",
+    "public.vendor_tags",
+    "public.vendor_tag_assignments",
+    "public.vendor_internal_notes",
+    "public.vendor_tasks"
+  ],
+  "expected_zero_rows_new_tables": [
+    "public.vendor_crm_profiles",
+    "public.vendor_contacts",
+    "public.vendor_tags",
+    "public.vendor_tag_assignments",
+    "public.vendor_tasks"
+  ],
+  "closed_value_sets": {
+    "onboarding_stage": ["new", "contacted", "onboarding", "active", "dormant", "churned"],
+    "relationship_status": ["prospect", "active", "at_risk", "inactive", "blacklisted"],
+    "residential_commercial_scope": ["residential", "commercial", "both"],
+    "contact_channel": ["phone", "whatsapp", "email"],
+    "note_category": ["general", "call", "meeting", "onboarding", "support", "payment", "complaint", "campaign"],
+    "task_type": ["onboarding", "documents", "verification", "package_renewal", "low_credit", "inactivity", "complaint", "campaign_response_followup", "general"],
+    "task_priority": ["low", "medium", "high", "urgent"],
+    "task_status": ["open", "in_progress", "blocked", "done", "cancelled"],
+    "task_source": ["manual", "suggested", "system"]
+  },
+  "uniqueness": {
+    "vendor_crm_profiles": "PK vendor_id (one profile per vendor)",
+    "vendor_tags": "vtg_normalized_unique (normalized_name UNIQUE)",
+    "vendor_tag_assignments": "uq_vendor_tag_active partial unique (vendor_id, tag_id) WHERE removed_at IS NULL",
+    "vendor_contacts": "uq_vendor_contacts_active_primary partial unique (vendor_id) WHERE is_primary AND is_active; uq_vendor_contacts_active_phone partial (vendor_id, lower(btrim(phone))) WHERE is_active AND phone IS NOT NULL",
+    "vendor_tasks": "uq_vendor_tasks_idempotency partial unique (idempotency_key) WHERE idempotency_key IS NOT NULL"
+  },
+  "fk_delete_behavior": {
+    "crm_to_vendors": "ON DELETE RESTRICT (evidence-preserving; vendors are soft-deleted by status)",
+    "actor_to_profiles": "ON DELETE SET NULL (removing an admin never erases CRM history)",
+    "tag_assignment_to_tags": "ON DELETE RESTRICT (archive tags via is_active; assignments via removed_at)",
+    "notes_supersedes_self": "ON DELETE RESTRICT (append-only; rows never deleted)"
+  },
+  "rls": "enabled on all six foundation tables",
+  "privileges": {
+    "PUBLIC": "none",
+    "anon": "none",
+    "authenticated": "none",
+    "service_role_notes": ["SELECT", "INSERT"],
+    "service_role_lifecycle": ["SELECT", "INSERT", "UPDATE"],
+    "service_role_forbidden": ["DELETE", "TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"],
+    "owner_postgres": "inherent break-glass, documented, not an application path"
+  },
+  "immutability": {
+    "vendor_internal_notes": "append-only: UPDATE/DELETE blocked by trg_vin_immutable (BEFORE UPDATE|DELETE ROW); TRUNCATE blocked by trg_vin_no_truncate (BEFORE TRUNCATE STATEMENT); corrections are NEW notes via supersedes_note_id",
+    "updated_at_maintenance": "trg_vcp_touch / trg_vco_touch / trg_vtg_touch / trg_vtk_touch via qf_crm_touch_updated_at()"
+  },
+  "prohibited_core_truth_columns": [
+    "is_verified", "verification_status", "verified", "is_enabled", "city", "service_area", "service_areas",
+    "areas_covered", "service_categories", "categories", "package", "package_name", "package_status",
+    "package_expires_at", "plan", "credits", "total_credits", "remaining_credits", "credit_balance",
+    "eligibility", "is_eligible", "assignment_eligibility", "consent", "consent_status", "is_suppressed",
+    "suppression", "suppressed", "communication_authorization"
+  ],
+  "not_created_out_of_scope": [
+    "public.vendor_segments", "public.vendor_campaigns", "public.vendor_campaign_audiences",
+    "public.vendor_campaign_events", "public.vendor_engagement_events"
+  ],
+  "authority_boundary": "QuickFurno Core stays authoritative for vendor identity/verification/enabled/city/service-area/categories/package/credits/eligibility/consent/suppression/communication-authorization/campaign-eligibility. Vendor CRM owns only relationship extensions and holds NO authoritative copy. Jarvis/n8n never write CRM directly; the service-role key never reaches the browser/Jarvis/n8n."
+}

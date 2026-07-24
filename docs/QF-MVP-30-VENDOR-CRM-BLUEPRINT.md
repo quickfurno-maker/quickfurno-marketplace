@@ -126,8 +126,13 @@ GST/PAN remain in Core `vendors.gst_number` (admin-only, never public via `vendo
 
 ## 7. Notes / tags / tasks contracts
 
-**NOTES (`vendor_notes`):** admin-visible, vendor-linked, author + timestamp, optional category,
-**append-only** (no update/delete; correction = new note) — an immutability trigger mirrors the 20.4C/B2 pattern.
+**NOTES — canonical authority `vendor_internal_notes` (evolved in place; QF-MVP-30.1B decision):** admin-visible,
+vendor-linked, author + timestamp, optional category, correction lineage via `supersedes_note_id`,
+**append-only** (no update/delete; correction = new note) — an immutability trigger mirrors the 20.4C/B2
+pattern. The existing `vendor_internal_notes` table (migration 006, **zero runtime call sites**) is evolved
+in place into the **single** canonical notes authority — **not** a new `vendor_notes` table — so there is no
+competing writable notes path and existing data is preserved (blueprint §7 supersedes the earlier
+"new `vendor_notes`" sketch in §1/§4; see the 30.1B foundation record).
 
 **TAGS (`vendor_tags` + `vendor_tag_assignments`):** normalized tag catalog, `normalized_name` unique,
 optional active/archive; assignment uniqueness `(vendor_id, tag_id)`; assigned_by audited.
@@ -237,3 +242,42 @@ second database; duplicated Core truth; public exposure of GST/PAN/contacts; QF-
 
 **QF-MVP-30.1B — CRM foundation schema and security** (one additive migration + validator + SELECT-only
 staging verifier, staging-first), per §11. No foundation implementation is started in this blueprint phase.
+
+## 15. QF-MVP-30.1B — Foundation schema GENERATED (not applied)
+
+**Status:** `VENDOR_CRM_FOUNDATION_GENERATED_REVIEWED_READY_FOR_PREFLIGHT` (offline; **no managed DB access**;
+migration **generated but unapplied**). One forward-only migration
+`supabase/migrations/20260723001100_qf_mvp_vendor_crm_foundation.sql` establishes the six foundation tables.
+
+**Canonical notes decision — evolve `vendor_internal_notes` in place (rejected: a new `vendor_notes`).**
+Inventory proved `vendor_internal_notes` (migration 006) exists with `id/created_at/vendor_id/note/created_by`,
+RLS + a legacy "vendor notes admin all" policy, and **zero** runtime readers/writers/types. It is evolved
+into the **single** canonical notes authority: add `category` + `supersedes_note_id`; a NOT-VALID non-empty
+body check (lossless on legacy rows); retarget the vendor FK to **RESTRICT**; drop the legacy authenticated
+policy (server-only); add append-only immutability triggers. No `vendor_notes` table is created; no note is
+rewritten. A new `vendor_notes` was rejected because it would leave `vendor_internal_notes` a competing
+writable notes path.
+
+**Access model — A (server-only).** PUBLIC/anon/authenticated hold **zero** direct privilege on every CRM
+table (RLS default-deny, no untrusted policy); `service_role` (which the existing `adminClient` admin path
+uses) is the only writer — **SELECT+INSERT** on notes (append-only), **SELECT+INSERT+UPDATE** on the five
+lifecycle tables, and **never** DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN. The service-role key never
+reaches the browser/Jarvis/n8n.
+
+**History preservation.** Every CRM→`vendors` FK is **ON DELETE RESTRICT** (vendors are soft-deleted anyway;
+confirmed no runtime hard-delete); every actor→`profiles` FK is **ON DELETE SET NULL**; tags/tasks/contacts/
+assignments archive via state, notes are append-only — **no hard delete** for application roles.
+
+**Core non-duplication.** A machine-checked prohibited-column list (verification/enabled/city/service-area/
+categories/package/credits/eligibility/consent/suppression/communication-authorization) is enforced by the
+migration self-verify, the validator and the verifier — CRM stores **zero** authoritative Core copies.
+
+**Contracts.** onboarding_stage/relationship_status/note-category/contact-channel/task-type/priority/status/
+source are closed CHECK sets mirrored in `lib/crm/vendorCrmContracts.ts`. Uniqueness: profile PK=vendor_id,
+`vendor_tags.normalized_name` unique, active tag-assignment partial unique, active-primary-contact partial
+unique, task `idempotency_key` partial unique. No segments/campaigns/AI/KYC/owner-binding.
+
+**Artifacts + gates:** migration `20260723001100`; validator `scripts/mvp/crm/validate-qf-mvp-30-1b.mjs`
+(22 migration + 3 verifier fixtures); SELECT-only verifier `supabase/staging-verification/verify_qf_mvp_30_1b.sql`
+(24 rows); contract manifest `scripts/mvp/crm/qf-mvp-30-1b-foundation-contract.json`; blueprint validator
+36/36; all Marketplace gates green; `verify:mvp` exit 0. **Next: QF-MVP-30.1B staging preflight.**

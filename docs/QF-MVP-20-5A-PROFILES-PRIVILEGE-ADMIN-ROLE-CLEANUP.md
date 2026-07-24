@@ -1,7 +1,8 @@
 # QF-MVP-20.5A — Profiles Base-Table Privilege Hardening + admin_role Drift Cleanup
 
-**Status: `PROFILES_SERVICE_ROLE_LEAST_PRIVILEGE_CORRECTION_COMPLETE_READY_FOR_PREFLIGHT`.**
-(QF-MVP-20.5A generated the migration; QF-MVP-20.5A1 corrected the service_role privilege matrix — see §10.)
+**Status: `PROFILES_PRIVILEGE_AND_ADMIN_ROLE_CLEANUP_PREFLIGHT_COMPLETE_READY_FOR_APPLICATION_REVIEW`.**
+(QF-MVP-20.5A generated the migration; 20.5A1 corrected the service_role matrix — §10; 20.5AP ran the
+staging preflight — §11.)
 
 > Generation + offline-review only. **No managed database was accessed**; the migration is **generated
 > but not applied**. This closes the two mandatory profiles/auth follow-ups before Marketplace Engine
@@ -126,11 +127,12 @@ C 83/83; B2 61/61; B1/G 165/165; R1 62/62; `verify:mvp` exit 0; typecheck/lint/b
 
 ## 9. Scope + next phase
 
-**No managed DB access.** Migration **generated but unapplied**. Canonical `profiles.role` authority, the
-`20260723000700` trusted-marker contract, and the `R1_BLOCKED_PENDING_OWNER_BINDING` owner-binding
-deferral are all unchanged. The 20.4 historical credit-ledger exceptions remain `NO_FINANCIAL_CHANGE` and
-are **not** inserted. **Next: staging preflight** (one `db push --linked --dry-run` + this verifier) before
-any application.
+Migration **generated, corrected (§10) and preflighted (§11) but still unapplied**. Canonical
+`profiles.role` authority, the `20260723000700` trusted-marker contract, and the
+`R1_BLOCKED_PENDING_OWNER_BINDING` owner-binding deferral are all unchanged. The 20.4 historical
+credit-ledger exceptions remain `NO_FINANCIAL_CHANGE` and are **not** inserted. **Next: staging application
+review** — one `db push --linked` applying exactly `20260723001000`, then the SELECT-only verifier
+`verify_qf_mvp_20_5a.sql`.
 
 ## 10. QF-MVP-20.5A1 — service_role least-privilege correction
 
@@ -152,3 +154,34 @@ migration remains **unapplied**; next phase remains staging preflight.
 
 **Final service_role matrix:** SELECT ✓ · INSERT ✓ · UPDATE ✓ · DELETE ✗ · TRUNCATE ✗ · REFERENCES ✗ ·
 TRIGGER ✗ · MAINTAIN ✗. (authenticated SELECT-only, anon/PUBLIC zero — unchanged.)
+
+## 11. QF-MVP-20.5AP — staging preflight (COMPLETE, NOT applied)
+
+**Date:** 2026-07-24 (15:32–15:35 UTC) · **Linked target:** authorized staging `uckafzuochmbvtiodmcl`
+(production `yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` not the target, not contacted).
+**Nothing applied** — one `supabase db push --linked --dry-run` + SELECT-only catalog checks + `migration
+list`. **Identity:** correction commit HEAD `a863c8beb722600b7285c6426ac4752179af3e96` (parent
+`3b2c51dcdb31be97a3412de4e1284121accf2c14`, grandparent `5fc5ba40909219e17c6a54e446e0c16f17d188a1`, origin
+identical, **0/0**, clean). Locked hashes exact (migration `5cf12b72…`, validator `2458f7f8…`, verifier
+`fb582dbd…`); applied A/A2/B1/G/B2/C/D/E/20.4C + profiles-source + 20.4A/20.4C artifacts byte-unchanged.
+
+**External apply workspace (`qf-staging-apply`, outside Git):** no seed/functions; 10 SQL (baseline + A…E +
+20.4C, byte-identical) → `20260723001000` absent → copied ONLY the locked migration (byte-identical,
+`5cf12b72…`) → **11** SQL.
+
+**Live pre-state (SELECT-only) — as expected:** `20260723001000` absent from remote (10 remote); profiles
+present, RLS on, **0 rows**; `auth.users` 0; **`profiles.admin_role` absent** on staging; `profiles.role`
+present; **`authenticated` holds 0 profiles privileges** (the drift the migration fixes by adding SELECT);
+anon/PUBLIC 0; **`service_role` currently holds all seven** (`DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,
+UPDATE`) via Supabase defaults — the migration tightens it to SELECT/INSERT/UPDATE only; 3 profiles policies
+present; D auth trigger + `handle_new_user()` + `is_admin()` present; no owner-binding columns; the 20.4C
+register present + **0 rows**; A/A2/B1/G/B2/C/D/E intact; 68 public tables → **0 rows**.
+
+**History:** **11 local / 10 remote**; `20260723001000` local-only, **sole pending**. **Dry run (once, exit
+0):** `DRY RUN: migrations will *not* be pushed`; exactly one proposed — `20260723001000_…cleanup.sql`; no
+earlier migration, no application claim. **No-write proof:** re-listing history + re-running the pre-state
+returned **identical** results (remote 10, 20.5A local-only, grants unchanged, admin_role absent, register
+empty). Transcript + queries outside Git in `qf-staging-workspace/QF-MVP-20.5AP-PREFLIGHT-20260724T153254Z/`.
+
+**Next: application review** — one `db push --linked` applying exactly `20260723001000` (schema/ACL only),
+then the verifier `verify_qf_mvp_20_5a.sql`. Owner binding deferred; the 20.4 exception register stays empty.

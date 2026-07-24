@@ -1,10 +1,41 @@
 # QF-MVP-20.3D — Auth-User Onboarding Trigger
 
-**Status: `D_VERIFIER_INSTALLED_BODY_PROOF_CORRECTED_READY_FOR_PREFLIGHT`.**
+**Status: `D_APPLIED_VERIFIED_ON_STAGING_READY_FOR_COMMIT_REVIEW`.**
 
-> **GENERATED, CORRECTED, HARDENED AND REVIEWED — NOT APPLIED.** No database was accessed in this
-> phase or any before it — not staging, not production, not QF-Jarvis. No dry run was executed.
-> Nothing was pushed.
+> **APPLIED AND VERIFIED ON STAGING.** Migration D was applied to the authorized staging project
+> (`uckafzuochmbvtiodmcl`) exactly once on 2026-07-24 06:47:46→06:47:57Z (exit 0); the locked 37-row
+> verifier returned **37 PASS / 0 FAIL**. Production and QF-Jarvis were never accessed. The
+> completion commit is **not** pushed.
+
+## 0-C. Staging application (QF-MVP-20.3DA) — COMPLETE
+
+Applied from the accepted preflight HEAD `4cc19ff`. The single authorized `npx supabase db push
+--linked` (exit 0) applied **exactly** `20260723000700`; the migration's own §4 self-verification
+NOTICE confirmed in-transaction that the function is *hardened (role from the app_metadata marker,
+neutral by default, admin unreachable), `profiles.role` nullable, `on_auth_user_created` AFTER
+INSERT on `auth.users` (tgtype 5, enabled, sole auth trigger), untrusted EXECUTE revoked,
+A/A2/B1/G/B2/C intact, E not started, no backfill*. The `drop trigger … skipping` NOTICE was
+expected (the trigger was absent pre-application); the trailing `pgdelta-target-ca.crt ENOENT` was a
+**local** edge-runtime catalog-cache artifact, non-blocking at exit 0.
+
+**Migration history:** 8 local / 7 remote → **8 local / 8 remote**, D recorded exactly once, no
+pending. **Locked verifier** (`verify_qf_mvp_20_3d.sql`, re-hashed `f0e87bfb…`, run byte-exact via
+`supabase db query --linked --file`): **37 rows, 37 PASS / 0 FAIL**, contiguous, no skips — including
+every installed-body row (D27, D29–D37). **Live catalog facts:** `handle_new_user/0`, SECURITY
+DEFINER, returns `trigger`, `search_path=pg_catalog, public, pg_temp`, owner `postgres`, **body is
+the D form** (`qf_principal` present, old `coalesce` gone), no dynamic/external calls; trigger
+`tgtype=5` enabled on `auth.users` bound to the function, no other auth trigger; anon/authenticated
+EXECUTE **false**, service_role **true**. **Empty state preserved:** 67 public tables, **0 total
+rows**, 0 auth users, 0 profiles — no data created, no backfill. **Advisors:** neither
+`handle_new_user` nor `on_auth_user_created` appears in any security or performance advisor (D's
+locked-down EXECUTE means it exposes no callable surface); the only ERROR is the **known, expected**
+`security_definer_view` on `vendor_public_v` (Migration C), and `multiple_permissive_policies` stays
+at 34 (unchanged from post-C). No unexpected D-related finding. Transcript
+`QF-MVP-20.3DA-APPLICATION-…txt` in the external evidence workspace, never committed.
+
+**Next after commit review: Migration E.**
+
+---
 
 Generated at branch `mvp/qf-mvp-20-marketplace-engine-v1`, from the synchronized HEAD
 `7161eea605fa6a7052f5ee63561a71873926c07f` (C applied and verified 23/23), origin identical,
@@ -534,9 +565,10 @@ set gained the D filename (its phase-progression guard). Both strictly strengthe
 
 ## 12. Next phase
 
-**QF-MVP-20.3D staging application** — the preflight (DP2, §0-B) is complete: the source-proof gate
-is satisfied, the dry run proposed exactly `20260723000700` at exit 0, and no write occurred. The
-application phase runs the single authorized non-dry-run `npx supabase db push --linked` to record
-exactly Migration D, then the SELECT-only verifier (`verify_qf_mvp_20_3d.sql`, 37 rows) confirms the
-installed body. **Not** E, **not** QF-MVP-20.4. Migrations A, A2, B1, G, B2 and C remain applied and
-immutable; Migration D and its DR1 runtime marker are unchanged.
+**Migration E** (legacy assignment-RPC EXECUTE revocation) — after this application commit is
+reviewed. Migration D is now **applied and verified on staging** (§0-C): 8/8 history, 37/37 verifier,
+live function/trigger/EXECUTE posture proved, empty state preserved. The two disclosed follow-ups
+remain open and out of scope: the `profiles` `authenticated` table-GRANT (**mandatory** before final
+marketplace closeout) and the inert `profiles.admin_role` drift (schema cleanup). Migrations A, A2,
+B1, G, B2 and C remain applied and immutable; Migration D and its DR1 runtime marker are unchanged;
+QF-MVP-20.4 and owner binding are not started.

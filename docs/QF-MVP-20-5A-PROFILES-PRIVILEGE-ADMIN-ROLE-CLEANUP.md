@@ -1,6 +1,7 @@
 # QF-MVP-20.5A — Profiles Base-Table Privilege Hardening + admin_role Drift Cleanup
 
-**Status: `PROFILES_PRIVILEGE_AND_ADMIN_ROLE_CLEANUP_GENERATED_REVIEWED_READY_FOR_PREFLIGHT`.**
+**Status: `PROFILES_SERVICE_ROLE_LEAST_PRIVILEGE_CORRECTION_COMPLETE_READY_FOR_PREFLIGHT`.**
+(QF-MVP-20.5A generated the migration; QF-MVP-20.5A1 corrected the service_role privilege matrix — see §10.)
 
 > Generation + offline-review only. **No managed database was accessed**; the migration is **generated
 > but not applied**. This closes the two mandatory profiles/auth follow-ups before Marketplace Engine
@@ -57,7 +58,9 @@ from the legitimate **`auth app_metadata.admin_role`** JWT claim (`grant-superad
 - **authenticated: no INSERT** — creation is trigger-controlled. **no UPDATE** — no self-edit exists.
   **no DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN.**
 - **anon / PUBLIC: nothing.**
-- **service_role: SELECT/INSERT/UPDATE/DELETE preserved** (admin bootstrap upsert + admin dashboard reads).
+- **service_role: SELECT/INSERT/UPDATE only** (admin bootstrap upsert + admin dashboard reads). DELETE had
+  no proved runtime need, so it — and TRUNCATE/REFERENCES/TRIGGER/MAINTAIN — are **not** granted
+  (corrected in QF-MVP-20.5A1 before staging preflight; see §10).
 
 The migration makes this explicit and deterministic (revoke-then-grant), fixing the drift in both
 directions: it **adds** the missing `authenticated` SELECT (staging) and **removes** any default write
@@ -89,7 +92,7 @@ constant `"Superadmin"`, preserving today's always-`Superadmin` behaviour). The 
 `supabase/migrations/20260723001000_qf_mvp_profiles_privilege_admin_role_cleanup.sql`:
 - re-asserts RLS enabled (idempotent);
 - `revoke all` on profiles from `public`, `anon`, `authenticated`; `grant select` to `authenticated`;
-  `grant select, insert, update, delete` to `service_role`;
+  `revoke all` from `service_role` then `grant select, insert, update` to `service_role` (no DELETE);
 - `drop column if exists admin_role`;
 - catalog-fact self-verification (`do $verify$`): RLS on; authenticated SELECT and **no** write/DDL
   privilege (escalation proof); anon/PUBLIC zero; service_role SELECT+INSERT+UPDATE; `admin_role` absent;
@@ -117,7 +120,7 @@ binding deferral untouched.
 
 ## 8. Offline gates
 
-20.5A validator (20 migration + 3 verifier fixtures) PASS; 20.4C 42/42; 20.4A 39/39; E 51/51; D 110/110;
+20.5A1 validator (23 migration + 3 verifier fixtures) PASS; 20.4C 42/42; 20.4A 39/39; E 51/51; D 110/110;
 C 83/83; B2 61/61; B1/G 165/165; R1 62/62; `verify:mvp` exit 0; typecheck/lint/build clean;
 `git diff --check` exit 0.
 
@@ -128,3 +131,24 @@ C 83/83; B2 61/61; B1/G 165/165; R1 62/62; `verify:mvp` exit 0; typecheck/lint/b
 deferral are all unchanged. The 20.4 historical credit-ledger exceptions remain `NO_FINANCIAL_CHANGE` and
 are **not** inserted. **Next: staging preflight** (one `db push --linked --dry-run` + this verifier) before
 any application.
+
+## 10. QF-MVP-20.5A1 — service_role least-privilege correction
+
+**Proved defect.** The as-generated 20.5A migration granted `select, insert, update, delete` on profiles to
+`service_role`, but no runtime path deletes profiles (the admin bootstrap only upserts; the dashboard only
+reads). The `delete` was an unnecessary privilege, and the migration self-verification / staging verifier /
+validator did not reject it — a report/verification inconsistency.
+
+**Correction (offline, no DB access).** The migration now `revoke all privileges … from service_role`
+first (version-safe — no explicit `MAINTAIN` keyword needed) and grants **only `select, insert, update`**.
+The `$verify$` block now proves the exact contract: `service_role` SELECT+INSERT+UPDATE **present** and
+DELETE/TRUNCATE/REFERENCES/TRIGGER **absent**, plus MAINTAIN absent on PostgreSQL 17+ (guarded by
+`server_version_num`), failing closed on any over-grant (including one leaked via role membership, since
+`has_table_privilege` is effective). The staging verifier row `Y16` now asserts the same exact matrix, and
+the offline validator adds rule **G19** (rejects a `service_role` DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN/
+ALL grant, a missing deterministic revoke, and a self-check that omits the DELETE-absence proof) with three
+one-defect fixtures. DELETE had **no proved runtime need** and was removed **before** staging preflight;
+migration remains **unapplied**; next phase remains staging preflight.
+
+**Final service_role matrix:** SELECT ✓ · INSERT ✓ · UPDATE ✓ · DELETE ✗ · TRUNCATE ✗ · REFERENCES ✗ ·
+TRIGGER ✗ · MAINTAIN ✗. (authenticated SELECT-only, anon/PUBLIC zero — unchanged.)

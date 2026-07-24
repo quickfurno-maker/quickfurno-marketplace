@@ -18,9 +18,10 @@
 --    RLS policy, so this migration makes the grant explicit and minimal:
 --      * authenticated: SELECT only (own row via the "profiles self read" policy);
 --      * anon / PUBLIC: nothing;
---      * service_role: SELECT/INSERT/UPDATE/DELETE preserved (the admin bootstrap
+--      * service_role: SELECT + INSERT + UPDATE only (the admin bootstrap
 --        `grant-superadmin.mjs` upserts profiles, and admin dashboard reads run
---        through service_role, which bypasses RLS).
+--        through service_role, which bypasses RLS). No runtime deletes profiles,
+--        so DELETE / TRUNCATE / REFERENCES / TRIGGER / MAINTAIN are NOT granted.
 --
 --    ROLE-ESCALATION NOTE (mandatory): the "profiles self update" policy checks
 --    only `id = auth.uid()` (not which columns change), so a table-level UPDATE
@@ -81,8 +82,12 @@ revoke all privileges on table public.profiles from authenticated;
 
 grant select on table public.profiles to authenticated;
 
--- Preserve service_role authority (admin bootstrap upsert + admin dashboard).
-grant select, insert, update, delete on table public.profiles to service_role;
+-- service_role: exactly SELECT + INSERT + UPDATE (admin bootstrap upsert + admin
+-- dashboard reads). DELETE is NOT needed by any runtime path, so revoke ALL first
+-- (version-safe: no explicit MAINTAIN keyword) and grant back only the three.
+-- This removes DELETE / TRUNCATE / REFERENCES / TRIGGER / MAINTAIN from service_role.
+revoke all privileges on table public.profiles from service_role;
+grant select, insert, update on table public.profiles to service_role;
 
 
 -- ---------------------------------------------------------------------------
@@ -143,11 +148,26 @@ begin
     raise exception 'QF-MVP-20.5A aborted: anon or PUBLIC holds a privilege on profiles.';
   end if;
 
-  -- 4.5 service_role bootstrap authority preserved (SELECT + INSERT + UPDATE).
+  -- 4.5 service_role: EXACTLY SELECT + INSERT + UPDATE. The bootstrap needs those
+  --     three; DELETE / TRUNCATE / REFERENCES / TRIGGER (+ MAINTAIN on PG17) must
+  --     be absent. has_table_privilege is effective, so it catches any privilege
+  --     that leaked via membership as well as any over-grant.
   if not (has_table_privilege('service_role', v_rel, 'SELECT')
           and has_table_privilege('service_role', v_rel, 'INSERT')
           and has_table_privilege('service_role', v_rel, 'UPDATE')) then
-    raise exception 'QF-MVP-20.5A aborted: service_role lost the authority the admin bootstrap requires.';
+    raise exception 'QF-MVP-20.5A aborted: service_role lost the SELECT/INSERT/UPDATE the admin bootstrap requires.';
+  end if;
+  if has_table_privilege('service_role', v_rel, 'DELETE')
+     or has_table_privilege('service_role', v_rel, 'TRUNCATE')
+     or has_table_privilege('service_role', v_rel, 'REFERENCES')
+     or has_table_privilege('service_role', v_rel, 'TRIGGER') then
+    raise exception 'QF-MVP-20.5A aborted: service_role holds an unneeded write/DDL privilege (DELETE/TRUNCATE/REFERENCES/TRIGGER) on profiles.';
+  end if;
+  -- MAINTAIN exists only on PostgreSQL 17+, so guard the check by server version
+  -- (revoke all already removed it where present; this proves the absence).
+  if current_setting('server_version_num')::int >= 170000
+     and has_table_privilege('service_role', v_rel, 'MAINTAIN') then
+    raise exception 'QF-MVP-20.5A aborted: service_role holds MAINTAIN on profiles.';
   end if;
 
   -- 4.6 the three own-row / admin policies are preserved (boundaries unchanged).
@@ -194,6 +214,6 @@ begin
     raise exception 'QF-MVP-20.5A aborted: an owner-binding column exists on public.leads (a later phase).';
   end if;
 
-  raise notice 'QF-MVP-20.5A verified: profiles RLS on; authenticated SELECT-only (no write/escalation surface); anon/PUBLIC zero privilege; service_role bootstrap authority preserved; admin_role drift column removed; profiles.role authority + is_admin() + D auth trigger intact; 20.4C register and owner-binding deferral untouched.';
+  raise notice 'QF-MVP-20.5A verified: profiles RLS on; authenticated SELECT-only (no write/escalation surface); anon/PUBLIC zero privilege; service_role SELECT+INSERT+UPDATE only (no DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN); admin_role drift column removed; profiles.role authority + is_admin() + D auth trigger intact; 20.4C register and owner-binding deferral untouched.';
 end;
 $verify$;

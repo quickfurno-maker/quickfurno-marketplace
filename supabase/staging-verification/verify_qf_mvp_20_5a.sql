@@ -151,16 +151,28 @@ select 15, 'Y15_d_auth_trigger_and_fn_preserved', '1',
        'the Migration D auth trigger + handle_new_user() are preserved (trusted-marker contract; body remains the 20.3D verifier''s scope)'
 
 union all
-select 16, 'Y16_service_role_bootstrap_authority', '1',
+select 16, 'Y16_service_role_select_insert_update_only', '1',
        (select case when has_table_privilege('service_role', to_regclass('public.profiles'),'SELECT')
                      and has_table_privilege('service_role', to_regclass('public.profiles'),'INSERT')
                      and has_table_privilege('service_role', to_regclass('public.profiles'),'UPDATE')
+                     and not has_table_privilege('service_role', to_regclass('public.profiles'),'DELETE')
+                     and not has_table_privilege('service_role', to_regclass('public.profiles'),'TRUNCATE')
+                     and not has_table_privilege('service_role', to_regclass('public.profiles'),'REFERENCES')
+                     and not has_table_privilege('service_role', to_regclass('public.profiles'),'TRIGGER')
+                     and (current_setting('server_version_num')::int < 170000
+                          or not has_table_privilege('service_role', to_regclass('public.profiles'),'MAINTAIN'))
                     then '1' else '0' end),
        case when has_table_privilege('service_role', to_regclass('public.profiles'),'SELECT')
              and has_table_privilege('service_role', to_regclass('public.profiles'),'INSERT')
              and has_table_privilege('service_role', to_regclass('public.profiles'),'UPDATE')
+             and not has_table_privilege('service_role', to_regclass('public.profiles'),'DELETE')
+             and not has_table_privilege('service_role', to_regclass('public.profiles'),'TRUNCATE')
+             and not has_table_privilege('service_role', to_regclass('public.profiles'),'REFERENCES')
+             and not has_table_privilege('service_role', to_regclass('public.profiles'),'TRIGGER')
+             and (current_setting('server_version_num')::int < 170000
+                  or not has_table_privilege('service_role', to_regclass('public.profiles'),'MAINTAIN'))
             then 'PASS' else 'FAIL' end,
-       'service_role keeps SELECT+INSERT+UPDATE so the explicit admin bootstrap still works'
+       'service_role holds EXACTLY SELECT+INSERT+UPDATE (bootstrap) — no DELETE/TRUNCATE/REFERENCES/TRIGGER/MAINTAIN'
 
 union all
 select 17, 'Y17_register_20_4c_present_and_empty', '1',

@@ -199,9 +199,26 @@ export function evaluateMigration(sql, label = "20.5A") {
     add("G16_escalation_selfcheck", "self-verification does not assert authenticated lacks UPDATE (escalation proof)");
   }
 
-  // -- G17 service_role authority preserved ---------------------------------
-  if (!/grant\s+[a-z, ]*\binsert\b[a-z, ]*\s+on\s+table\s+public\.profiles\s+to\s+[a-z, ]*service_role/.test(exec)) {
-    add("G17_service_role_preserved", "does not preserve service_role INSERT (admin bootstrap)");
+  // -- G17 service_role keeps EXACTLY SELECT + INSERT + UPDATE ---------------
+  for (const need of ["select", "insert", "update"]) {
+    if (!new RegExp(`grant\\s+[a-z, ]*\\b${need}\\b[a-z, ]*\\s+on\\s+table\\s+public\\.profiles\\s+to\\s+[a-z, ]*service_role`).test(exec)) {
+      add("G17_service_role_preserved", `does not grant ${need} to service_role (admin bootstrap)`);
+    }
+  }
+
+  // -- G19 service_role least privilege: no DELETE / TRUNCATE / REFERENCES /
+  //        TRIGGER / MAINTAIN / ALL over-grant, deterministic revoke, and a
+  //        self-verification that proves the DELETE absence. ------------------
+  for (const bad of ["delete", "truncate", "references", "trigger", "maintain", "all", "all privileges"]) {
+    if (new RegExp(`grant\\s+[a-z, ]*\\b${bad}\\b[a-z, ]*\\s+on\\s+table\\s+public\\.profiles\\s+to\\s+[a-z, ]*service_role`).test(exec)) {
+      add("G19_service_role_no_delete", `grants ${bad} to service_role (over-privilege)`);
+    }
+  }
+  if (!/revoke\s+all\s+privileges\s+on\s+table\s+public\.profiles\s+from\s+[a-z, ]*service_role/.test(exec)) {
+    add("G19_service_role_no_delete", "does not deterministically revoke ALL from service_role before granting");
+  }
+  if (!/has_table_privilege\(\s*'service_role'[^)]*'delete'/.test(bodies)) {
+    add("G19_service_role_no_delete", "self-verification does not assert service_role lacks DELETE");
   }
 
   // -- G18 hygiene: no txn control / history write / secret -----------------
@@ -295,11 +312,18 @@ const FIXTURES = [
   { id: "Q", rule: "G16_escalation_selfcheck", why: "the authenticated-no-UPDATE self-check is removed",
     mutate: (s) => s.replace(/or has_table_privilege\('authenticated', v_rel, 'UPDATE'\)\n/, "") },
   { id: "R", rule: "G17_service_role_preserved", why: "the service_role grant is removed",
-    mutate: (s) => s.replace("grant select, insert, update, delete on table public.profiles to service_role;", "-- removed") },
+    mutate: (s) => s.replace("grant select, insert, update on table public.profiles to service_role;", "-- removed") },
   { id: "S", rule: "G18_hygiene", why: "transaction control is added",
     mutate: (s) => `begin;\n${s}\ncommit;\n` },
   { id: "T", rule: "G12_no_financial_scope", why: "profiles roles are rewritten",
     mutate: (s) => `${s}\nupdate public.profiles set role = 'admin';\n` },
+  { id: "U", rule: "G19_service_role_no_delete", why: "service_role is granted DELETE",
+    mutate: (s) => s.replace("grant select, insert, update on table public.profiles to service_role;",
+      "grant select, insert, update, delete on table public.profiles to service_role;") },
+  { id: "V", rule: "G19_service_role_no_delete", why: "the deterministic service_role revoke is removed",
+    mutate: (s) => s.replace("revoke all privileges on table public.profiles from service_role;\n", "") },
+  { id: "W", rule: "G19_service_role_no_delete", why: "the self-check for service_role DELETE absence is removed",
+    mutate: (s) => s.replace(/if has_table_privilege\('service_role', v_rel, 'DELETE'\)/, "if false and has_table_privilege('service_role', v_rel, 'xDELETE')") },
 ];
 for (const fx of FIXTURES) {
   const mutated = fx.mutate(migRaw);

@@ -565,6 +565,55 @@ second version-history table, which is why one table is sufficient.
 migration is generated and offline-validated only. No runtime implementation (routes, actions,
 services, UI, preview queries) exists yet — that is QF-MVP-30.3C.**
 
+## 21. QF-MVP-30.3B — segment foundation staging application (APPLIED + VERIFIED)
+
+**Status:** `VENDOR_SEGMENT_FOUNDATION_APPLIED_AND_VERIFIED_ON_STAGING`
+
+Applied from foundation commit `63f1adeaf0ced585228b7c5ce10bac80c80d0c84`
+(`feat(mvp): add deterministic vendor segment foundation`, parent `e8b2e738…`, origin identical,
+**0/0**, clean). **This record is documentation only — it contains no runtime implementation.**
+
+**Authorized staging project `uckafzuochmbvtiodmcl`.** Production `yqpgcsduqbxulrlzwzap` and
+QF-Jarvis `coilipywdvxklewquqvv` were never contacted; no provider call was made.
+
+**Application.** Pre-application **12** migrations, latest `20260723001100 qf_mvp_vendor_crm_foundation`.
+Applied exactly one migration — **`20260723001200 qf_mvp_vendor_segment_foundation`** — recorded
+**exactly once**, giving a post-application count of **13**.
+
+**Application method (recorded transparently).** The locked migration was applied **transactionally
+through the authorized Supabase Management API**, with a fail-closed preflight and exact
+migration-history version/name preservation. This route was used because the available generic
+migration action could not pin the repository's locked numeric migration version. The resulting
+history is exact — `20260723001200 qf_mvp_vendor_segment_foundation`. This is **not** an application
+defect; the migration must not be reapplied.
+
+**Post-state.** `public.vendor_segments` exists with RLS enabled and **0 rows before fixtures**. The
+six prior CRM foundation tables remain intact. `vendor_credit_logs` **0** and `lead_assignments` **0**
+— no Core financial or assignment mutation. **No membership, segment-member, version-history,
+campaign, campaign-audience, engagement or provider table was created.** The public/vendor projection
+exposes no segment or private CRM field. No fixture was created.
+
+**Verifier.** `supabase/staging-verification/verify_qf_mvp_30_3.sql` executed **exactly once, after
+application and before fixtures** — **22/22 PASS** (S01–S22): migration history; table existence;
+RLS/default-deny; zero untrusted privileges; `service_role` SELECT+INSERT+UPDATE only with **no
+DELETE/TRUNCATE**; expected columns, constraints, FKs, indexes and trigger; zero segment rows; zero
+Core financial/assignment mutation; no public projection exposure; Core assignment authority intact.
+The zero-row verifier **must not be re-run once segment fixtures exist**.
+`verify_qf_mvp_30_1b.sql` remains the locked historical pre-segments verifier and is not used for the
+post-30.3 state.
+
+**Security-advisor posture (intentional).** Supabase may report `rls_enabled_no_policy` for
+`vendor_segments` at INFO level. That is the designed posture for this server-only table: RLS enabled,
+**no untrusted-role policy**, `anon`/`authenticated` hold zero privileges, and `service_role` is the
+only runtime data-access role. **No `anon`/`authenticated` policy may be added merely to silence the
+advisor** — doing so would break the access model.
+
+**Migration-006 divergence** unchanged: `audit_logs`/`admin_notifications` are absent on staging,
+neither created nor referenced; provenance lives on `vendor_segments` itself.
+
+**Next: QF-MVP-30.3C — deterministic segment admin runtime (routes, actions, service, UI, dynamic
+preview). No runtime code is included in this staging-application record.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

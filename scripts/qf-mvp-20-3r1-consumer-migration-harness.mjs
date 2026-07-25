@@ -187,6 +187,7 @@ const DECLARED_LATER_MIGRATIONS = new Set([
   '20260723001100_qf_mvp_vendor_crm_foundation.sql', // QF-MVP-30.1B
   '20260723001200_qf_mvp_vendor_segment_foundation.sql', // QF-MVP-30.3A
   '20260723001300_qf_mvp_vendor_campaign_foundation.sql', // QF-MVP-30.4A
+  '20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql', // QF-MVP-30.4C1
 ]);
 
 const migrationFiles = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql'));

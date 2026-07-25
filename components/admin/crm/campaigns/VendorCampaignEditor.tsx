@@ -47,6 +47,7 @@ interface CampaignShape {
   prepared_snapshot_id: string | null; prepared_snapshot_revision: number | null;
   prepared_segment_version: number | null; prepared_segment_fingerprint: string | null;
   prepared_template_version: string | null; prepared_template_category: string | null;
+  prepared_template_fingerprint: string | null;
   audience_evaluated_at: string | null; prepared_recipient_count: number | null;
   snapshot_fingerprint: string | null; exclusion_summary: Record<string, number>;
   created_at: string; updated_at: string; approved_at: string | null;
@@ -294,6 +295,9 @@ export function VendorCampaignEditor({
             ["Template pinned", campaign.prepared_template_version
               ? `${campaign.template_key} · v${campaign.prepared_template_version} · ${campaign.prepared_template_category}`
               : "—"],
+            // QF-MVP-30.4C1: both fingerprints are computed by the database at
+            // prepare and recomputed at approval, so they are shown as evidence.
+            ["Template fingerprint", <code key="tf" className="text-xs">{campaign.prepared_template_fingerprint ?? "—"}</code>],
             ["Snapshot fingerprint", <code key="nf" className="text-xs">{campaign.snapshot_fingerprint ?? "—"}</code>],
             ["Audience evaluated", campaign.audience_evaluated_at
               ? new Date(campaign.audience_evaluated_at).toLocaleString() : "—"],

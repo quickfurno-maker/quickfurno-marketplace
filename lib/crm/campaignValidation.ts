@@ -25,8 +25,11 @@ import {
   CAMPAIGN_PROHIBITED_FIELDS, CAMPAIGN_MAX_NAME_LENGTH, CAMPAIGN_MAX_DESCRIPTION_LENGTH,
   CAMPAIGN_MAX_AUDIENCE, CAMPAIGN_MAX_EXCLUSION_SUMMARY_BYTES,
   CAMPAIGN_MAX_TEMPLATE_KEY_LENGTH, CAMPAIGN_MAX_TEMPLATE_VERSION_LENGTH,
+  SNAPSHOT_CANONICAL_HEADER, TEMPLATE_CANONICAL_HEADER,
+  CANONICAL_RECORD_SEPARATOR, CANONICAL_UNIT_SEPARATOR,
+  CANONICAL_CODE_PATTERN, CANONICAL_UUID_PATTERN, TEMPLATE_FINGERPRINT_FIELDS,
   type CampaignStatus, type CampaignPurpose, type CampaignChannel,
-  type CampaignConsentScope, type TemplateCategory,
+  type CampaignConsentScope, type TemplateCategory, type TemplateFingerprintField,
 } from "./campaignContracts";
 
 export class CampaignValidationError extends Error {
@@ -64,6 +67,18 @@ function reqText(v: unknown, label: string, max: number): string {
   if (t.length === 0) return bad(`${label} is required`);
   if (t.length > max) return bad(`${label} is too long (max ${max})`);
   return t;
+}
+/**
+ * A closed-charset code that will be fed to a canonical fingerprint stream.
+ * Refuses anything a separator-delimited encoding could not represent
+ * unambiguously — the same fence the SQL authority applies.
+ */
+function reqCode(v: unknown, label: string): string {
+  if (typeof v !== "string") return bad(`${label} is required`);
+  if (!CANONICAL_CODE_PATTERN.test(v)) {
+    return bad(`${label} must match ${String(CANONICAL_CODE_PATTERN)}`);
+  }
+  return v;
 }
 function inSet<T extends readonly string[]>(v: unknown, set: T, label: string): T[number] {
   return typeof v === "string" && (set as readonly string[]).includes(v)
@@ -192,29 +207,148 @@ export function validateCampaignRecipients(input: unknown): CampaignRecipient[] 
     return {
       vendor_id: vendorId,
       consent_disposition: inSet(raw.consent_disposition, INCLUDABLE_CONSENT_DISPOSITIONS, `recipients[${i}].consent_disposition`),
-      consent_reason_code: reqText(raw.consent_reason_code, `recipients[${i}].consent_reason_code`, 64),
-      consent_policy_version: reqText(raw.consent_policy_version, `recipients[${i}].consent_policy_version`, 40),
+      // QF-MVP-30.4C1: these two are fingerprinted, so they must satisfy the
+      // canonical charset here rather than failing later as an opaque
+      // fingerprint mismatch against the database authority.
+      consent_reason_code: reqCode(raw.consent_reason_code, `recipients[${i}].consent_reason_code`),
+      consent_policy_version: reqCode(raw.consent_policy_version, `recipients[${i}].consent_policy_version`),
       suppression_reason: raw.suppression_reason === undefined
         ? "none" : inSet(raw.suppression_reason, SUPPRESSION_REASONS, `recipients[${i}].suppression_reason`),
     };
   });
 }
 
+// -- QF-MVP-30.4C1 canonical fingerprints (SQL-mirrored) -----------------------
+//
+// These functions are the TypeScript MIRROR of the database authorities
+// `qf_campaign_snapshot_fingerprint_v1` and
+// `qf_communication_template_fingerprint_v1` (migration 20260723001400). The
+// DATABASE remains authoritative: the runtime supplies its value only as an
+// EXPECTATION that the RPC independently recomputes and compares.
+//
+// A fixed-position tuple encoding is used deliberately — the previous JSON-object
+// form made the identity depend on object key ordering, which no schema
+// guarantees. Any change here changes the fingerprint and requires a new forward
+// migration plus a new version tag, never an in-place edit.
+
+/** Rows carrying an explicit ordinal, as the frozen audience table stores them. */
+export interface CampaignSnapshotRow extends CampaignRecipient {
+  readonly ordinal: number;
+}
+
+/**
+ * Canonical stream for one frozen audience.
+ *
+ * Refuses — rather than silently hashing something meaningless — an empty set,
+ * ordinals that are not dense 0..n-1, a duplicated ordinal, or any field outside
+ * the closed charset the separator encoding assumes. The SQL authority returns
+ * NULL in exactly the same situations.
+ */
+export function canonicalSnapshotStream(rows: readonly CampaignSnapshotRow[]): string {
+  if (!Array.isArray(rows) || rows.length === 0) bad("a snapshot fingerprint needs at least one row");
+
+  const seen = new Set<number>();
+  for (const r of rows) {
+    if (!Number.isInteger(r.ordinal) || r.ordinal < 0 || r.ordinal > rows.length - 1) {
+      bad(`snapshot ordinals must be dense 0..${rows.length - 1} (saw ${String(r.ordinal)})`);
+    }
+    if (seen.has(r.ordinal)) bad(`snapshot ordinal ${r.ordinal} is duplicated`);
+    seen.add(r.ordinal);
+    if (!CANONICAL_UUID_PATTERN.test(r.vendor_id)) bad("snapshot vendor_id must be a lowercase canonical uuid");
+    for (const [field, value] of [
+      ["consent_disposition", r.consent_disposition],
+      ["consent_reason_code", r.consent_reason_code],
+      ["consent_policy_version", r.consent_policy_version],
+      ["suppression_reason", r.suppression_reason],
+    ] as const) {
+      if (!CANONICAL_CODE_PATTERN.test(String(value))) {
+        bad(`snapshot ${field} falls outside the canonical charset`);
+      }
+    }
+  }
+  // dense: n distinct ordinals, each within 0..n-1, implies exactly 0..n-1.
+  if (seen.size !== rows.length) bad("snapshot ordinals must be dense and unique");
+
+  const US = CANONICAL_UNIT_SEPARATOR;
+  const RS = CANONICAL_RECORD_SEPARATOR;
+  return SNAPSHOT_CANONICAL_HEADER + [...rows]
+    .sort((a, b) => a.ordinal - b.ordinal)
+    .map((r) => RS + [
+      String(r.ordinal),
+      r.vendor_id,
+      r.consent_disposition,
+      r.consent_reason_code,
+      r.consent_policy_version,
+      r.suppression_reason,
+    ].join(US))
+    .join("");
+}
+
+/** sha256 hex over {@link canonicalSnapshotStream}. Mirrors the SQL authority. */
+export function fingerprintCampaignSnapshotRows(rows: readonly CampaignSnapshotRow[]): string {
+  return createHash("sha256").update(canonicalSnapshotStream(rows), "utf8").digest("hex");
+}
+
 /**
  * Snapshot fingerprint over the ORDERED recipient set.
  * Order is part of the identity: the frozen audience has a fixed ordinal, so a
  * reordering is a different snapshot and must produce a different fingerprint.
+ * Position in the array IS the ordinal, exactly as the prepare RPC assigns it
+ * from `jsonb_array_elements(...) with ordinality`.
  */
 export function fingerprintCampaignSnapshot(recipients: readonly CampaignRecipient[]): string {
-  const canonical = JSON.stringify(recipients.map((r, i) => ({
-    ordinal: i,
-    vendor_id: r.vendor_id,
-    consent_disposition: r.consent_disposition,
-    consent_reason_code: r.consent_reason_code,
-    consent_policy_version: r.consent_policy_version,
-    suppression_reason: r.suppression_reason,
-  })));
-  return createHash("sha256").update(canonical, "utf8").digest("hex");
+  return fingerprintCampaignSnapshotRows(recipients.map((r, ordinal) => ({ ...r, ordinal })));
+}
+
+/**
+ * Length-prefixed canonical field encoder. NULL -> '-1:', present ->
+ * '<octets>:<value>'. Mirrors `qf_canonical_text_field_v1` byte for byte, and
+ * keeps the encoding unambiguous for free-text values such as a template
+ * description that may itself contain separator characters.
+ */
+export function canonicalTextField(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "-1:";
+  return `${Buffer.byteLength(value, "utf8")}:${value}`;
+}
+
+/** The dispatch-critical template-catalog row this fingerprint covers. */
+export interface CommunicationTemplateCatalogRow {
+  readonly template_key: string | null;
+  readonly version: string | null;
+  readonly channel: string | null;
+  readonly category: string | null;
+  readonly language: string | null;
+  readonly readiness_status: string | null;
+  readonly is_active: boolean | null;
+  readonly provider_template_name: string | null;
+  readonly provider_template_id: string | null;
+  readonly description: string | null;
+}
+
+/** Canonical stream for one template-catalog row, in the locked field order. */
+export function canonicalTemplateStream(row: CommunicationTemplateCatalogRow): string {
+  const bag = row as unknown as Record<string, unknown>;
+  if (!isPlainObject(bag)) bad("template row must be an object");
+  const US = CANONICAL_UNIT_SEPARATOR;
+  // `is_active` is a boolean; String(true) === 'true' matches PostgreSQL's
+  // boolean::text, so one projection covers every field.
+  const value = (f: TemplateFingerprintField): string | null => {
+    const v = bag[f];
+    return v === null || v === undefined ? null : String(v);
+  };
+  return TEMPLATE_CANONICAL_HEADER
+    + TEMPLATE_FINGERPRINT_FIELDS.map((f) => US + canonicalTextField(value(f))).join("");
+}
+
+/**
+ * sha256 hex over {@link canonicalTemplateStream}.
+ *
+ * This is the fingerprint of the template CATALOG authority only. It is NOT a
+ * provider-mapping fingerprint and NOT a message-body fingerprint — this schema
+ * stores neither, and QF-MVP-30.5 owns those.
+ */
+export function fingerprintCommunicationTemplate(row: CommunicationTemplateCatalogRow): string {
+  return createHash("sha256").update(canonicalTemplateStream(row), "utf8").digest("hex");
 }
 
 /** Sanitized exclusion summary: closed reason codes -> non-negative counts. */
@@ -288,6 +422,8 @@ export interface ApprovalCheckInput {
   readonly prepared_segment_fingerprint: string;
   readonly prepared_template_version: string;
   readonly prepared_template_category: string;
+  /** QF-MVP-30.4C1: mandatory frozen evidence; a null here is incomplete evidence. */
+  readonly prepared_template_fingerprint: string | null;
   readonly prepared_recipient_count: number;
   readonly snapshot_fingerprint: string;
   readonly current_segment_status: string | null;
@@ -296,16 +432,36 @@ export interface ApprovalCheckInput {
   readonly current_template_version: string | null;
   readonly current_template_category: string | null;
   readonly current_template_readiness: string | null;
+  /** QF-MVP-30.4C1: recomputed from the live template row; null = unavailable. */
+  readonly current_template_fingerprint: string | null;
   readonly actual_member_count: number;
-  readonly actual_snapshot_fingerprint: string;
+  /** QF-MVP-30.4C1: RECOMPUTED from the immutable rows; null = unfingerprintable. */
+  readonly actual_snapshot_fingerprint: string | null;
+  /** QF-MVP-30.4C1: rows sharing this snapshot id under another campaign/revision. */
+  readonly foreign_snapshot_rows?: number;
+  /** QF-MVP-30.4C1: true when the frozen ordinals are dense 0..count-1. */
+  readonly ordinals_dense?: boolean;
 }
 
 /**
- * The locked fail-closed approval matrix. Returns a stable failure code, or null
- * when approval may proceed. Every divergence REFUSES — never "approve the best
- * available set".
+ * The locked fail-closed approval matrix, mirroring
+ * `qf_approve_vendor_campaign_v1` after the QF-MVP-30.4C1 hardening. Returns a
+ * stable failure code, or null when approval may proceed. Every divergence
+ * REFUSES — never "approve the best available set".
  */
 export function checkCampaignApproval(input: ApprovalCheckInput): string | null {
+  // -- frozen evidence completeness (30.4C1: the template fingerprint is now
+  //    mandatory, so a prepared row lacking it can never be approved) ---------
+  if (input.prepared_template_fingerprint === null
+      || input.prepared_template_fingerprint === undefined) return "PREPARED_EVIDENCE_INCOMPLETE";
+
+  // -- snapshot integrity, checked before any downstream evidence ------------
+  if (input.actual_member_count !== input.prepared_recipient_count) return "SNAPSHOT_COUNT_MISMATCH";
+  if ((input.foreign_snapshot_rows ?? 0) > 0) return "SNAPSHOT_OWNERSHIP_MISMATCH";
+  if (input.ordinals_dense === false) return "SNAPSHOT_ORDINAL_INVALID";
+  if (input.actual_snapshot_fingerprint === null
+      || input.actual_snapshot_fingerprint === undefined) return "SNAPSHOT_ORDINAL_INVALID";
+
   if (input.current_segment_status === null || input.current_segment_version === null
       || input.current_segment_fingerprint === null) return "SEGMENT_MISSING";
   if (input.current_segment_status === "archived") return "SEGMENT_ARCHIVED";
@@ -318,7 +474,11 @@ export function checkCampaignApproval(input: ApprovalCheckInput): string | null 
   if (input.current_template_version !== input.prepared_template_version) return "TEMPLATE_VERSION_MISMATCH";
   if (input.current_template_category !== input.prepared_template_category) return "TEMPLATE_CATEGORY_MISMATCH";
 
-  if (input.actual_member_count !== input.prepared_recipient_count) return "SNAPSHOT_COUNT_MISMATCH";
+  // -- 30.4C1: the fingerprint catches drift in EVERY dispatch-critical catalog
+  //    field, including a change made without a version bump -----------------
   if (input.actual_snapshot_fingerprint !== input.snapshot_fingerprint) return "SNAPSHOT_FINGERPRINT_MISMATCH";
+  if (input.current_template_fingerprint === null
+      || input.current_template_fingerprint === undefined) return "TEMPLATE_FINGERPRINT_UNAVAILABLE";
+  if (input.current_template_fingerprint !== input.prepared_template_fingerprint) return "TEMPLATE_FINGERPRINT_MISMATCH";
   return null;
 }

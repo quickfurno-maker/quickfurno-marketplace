@@ -19,6 +19,57 @@
 /** The MVP campaign contract version. A bump is an explicit migration. */
 export const CAMPAIGN_SCHEMA_VERSION = 1 as const;
 
+// -- QF-MVP-30.4C1 canonical fingerprint contract ------------------------------
+// These constants are the SHARED contract between the pure TypeScript
+// canonicalizers and the SQL authorities `qf_campaign_snapshot_fingerprint_v1`
+// and `qf_communication_template_fingerprint_v1` in migration 20260723001400.
+// Changing any of them changes the fingerprint and REQUIRES a new forward
+// migration plus a new version tag — never an in-place edit.
+
+/** Version tag prefixed to the canonical frozen-audience stream. */
+export const SNAPSHOT_CANONICAL_HEADER = "qf-campaign-snapshot-v1" as const;
+/** Version tag prefixed to the canonical template-catalog stream. */
+export const TEMPLATE_CANONICAL_HEADER = "qf-template-catalog-v1" as const;
+/** ASCII record separator (0x1E) — SQL `chr(30)`. Separates recipient tuples. */
+export const CANONICAL_RECORD_SEPARATOR = "\u001e" as const;
+/** ASCII unit separator (0x1F) — SQL `chr(31)`. Separates fields within a tuple. */
+export const CANONICAL_UNIT_SEPARATOR = "\u001f" as const;
+
+/**
+ * The closed charset every fingerprinted recipient code field must match.
+ *
+ * The separator encoding is only unambiguous while no value can contain a
+ * separator. Every one of these values comes from a closed Core vocabulary, so
+ * this is an assertion rather than a transformation — and both the TypeScript
+ * canonicalizer and the SQL authority refuse a value outside it.
+ */
+export const CANONICAL_CODE_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+/** Lowercase canonical UUID, matching PostgreSQL's `uuid::text` output. */
+export const CANONICAL_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The dispatch-critical `communication_templates` fields the canonical template
+ * fingerprint covers, in the EXACT order the SQL authority concatenates them.
+ *
+ * Deliberately excluded: the row id and created_at/updated_at. This is the
+ * fingerprint of the template CATALOG authority only — it is not a
+ * provider-mapping fingerprint and not a message-body fingerprint, because this
+ * schema stores neither. QF-MVP-30.5 owns those.
+ */
+export const TEMPLATE_FINGERPRINT_FIELDS = [
+  "template_key",
+  "version",
+  "channel",
+  "category",
+  "language",
+  "readiness_status",
+  "is_active",
+  "provider_template_name",
+  "provider_template_id",
+  "description",
+] as const;
+export type TemplateFingerprintField = (typeof TEMPLATE_FINGERPRINT_FIELDS)[number];
+
 /**
  * Locked lifecycle. The five execution states from blueprint §9
  * (EXECUTION_REQUESTED / RUNNING / PAUSED / COMPLETED / FAILED) are deliberately
@@ -124,6 +175,15 @@ export const CAMPAIGN_FAILURE_CODES = [
   "INVALID_SNAPSHOT_FINGERPRINT",
   "INVALID_EXCLUSION_SUMMARY",
   "ILLEGAL_TRANSITION",
+  // -- QF-MVP-30.4C1 approval-evidence hardening -----------------------------
+  // The snapshot fingerprint is now computed BY THE DATABASE at prepare and
+  // RECOMPUTED at approval, so a divergence between the stored evidence and the
+  // immutable rows is reachable and refuses. The template-catalog fingerprint is
+  // likewise database-computed, mandatory, and re-checked at approval.
+  "SNAPSHOT_ORDINAL_INVALID",
+  "SNAPSHOT_OWNERSHIP_MISMATCH",
+  "TEMPLATE_FINGERPRINT_MISMATCH",
+  "TEMPLATE_FINGERPRINT_UNAVAILABLE",
 ] as const;
 export type CampaignFailureCode = (typeof CAMPAIGN_FAILURE_CODES)[number];
 

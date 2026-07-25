@@ -165,7 +165,10 @@ record("03 locked 30.1B verifier unchanged (historical, pre-segments)",
 record("04 segment migration present exactly once, later phases allowed", (() => {
   const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((x) => x.endsWith(".sql")).sort();
   const mine = "20260723001200_qf_mvp_vendor_segment_foundation.sql";
-  const DECLARED_LATER = ["20260723001300_qf_mvp_vendor_campaign_foundation.sql"]; // QF-MVP-30.4A
+  const DECLARED_LATER = [
+    "20260723001300_qf_mvp_vendor_campaign_foundation.sql",      // QF-MVP-30.4A
+    "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql", // QF-MVP-30.4C1
+  ];
   const onlyOnce = files.filter((x) => x.startsWith("20260723001200")).length === 1;
   const later = files.filter((x) => x > mine);
   return files.includes(mine) && onlyOnce && later.every((f) => DECLARED_LATER.includes(f));

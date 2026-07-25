@@ -1026,6 +1026,126 @@ the service — and each was negative-controlled to confirm it still discriminat
 
 **Next: QF-MVP-30.4D — campaign staging smoke. Not started.**
 
+> **SUPERSEDED IN PART BY §27.** The 30.4C runtime was **blocked from push and staging smoke** by an audit
+> that found two real approval-evidence defects in the applied `20260723001300`. §26 remains the accurate
+> record of what 30.4C built; §27 records what was wrong with its approval evidence and how QF-MVP-30.4C1
+> corrected it forward. In particular, §26's statement that `p_template_fingerprint` is passed as `null`
+> "because the applied `communication_templates` authority exposes no content fingerprint column" was a
+> **real defect, not an acceptable limitation** — see §27, Defect 2.
+
+## 27. QF-MVP-30.4C1 — campaign approval-evidence hardening (GENERATED, NOT APPLIED)
+
+**Status:** `QF_MVP_30_4C1_CAMPAIGN_EVIDENCE_HARDENING_GENERATED_READY_FOR_STAGING_APPLICATION_REVIEW`
+
+QF-MVP-30.4C was **not** authorised for push or staging smoke. A governing audit found two
+**approval-integrity** defects — not UX gaps — in the applied foundation. Both were reproduced against the
+accepted code before any correction was written, and both are now corrected by **one forward migration**.
+`20260723001300` remains **immutable and applied**; nothing about it was edited, rewritten, renamed or
+re-applied.
+
+**Defect 1 — the snapshot fingerprint was never database-verified.** `20260723001300` accepted
+`p_snapshot_fingerprint` from the caller, stored it verbatim after only a `^[0-9a-f]{64}$` shape check, and
+approval compared row **count** alone. Neither RPC contained a single `sha256`/`digest` call, so a
+shape-valid but semantically unrelated fingerprint survived prepare **and** approval with the row count
+still matching. The declared `SNAPSHOT_FINGERPRINT_MISMATCH` failure code was **unreachable from SQL**, and
+the column comment already claimed "Recomputed and re-checked at approval; a mismatch fails closed" — a
+claim the executable SQL did not honour.
+
+**Defect 2 — the template fingerprint was missing entirely.** `prepared_template_fingerprint` was
+nullable, **absent from the prepared-evidence completeness CHECK**, written from an unverified caller value,
+and **never read at approval**. The 30.4C runtime passed `null` on every prepare. Approval compared only
+version / category / readiness / is_active, so any of `template_key`, `channel`, `description`, `language`,
+`provider_template_name` or `provider_template_id` could change **with the version unchanged** and go
+undetected — for example, repointing `provider_template_name` at a different approved provider template
+would silently re-target an already-approved frozen audience.
+
+**Correction — forward migration `20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql`.**
+
+| Object | Role |
+| --- | --- |
+| `qf_canonical_text_field_v1(text)` | length-prefixed field encoder; `NULL → '-1:'`, present → `'<octets>:<value>'` |
+| `qf_campaign_snapshot_fingerprint_v1(uuid, uuid, integer)` | **the** database authority for a frozen audience |
+| `qf_communication_template_fingerprint_v1(text)` | **the** database authority for the template-catalog row |
+
+No table, no second audience header, no provider table, no communication-intent state, no frequency policy,
+no dispatch state, no destination column, no `audit_logs`/`admin_notifications`. The two existing RPC
+**bodies** are replaced through `create or replace`; both signatures and parameter names are unchanged.
+
+**Canonical snapshot contract.** `'qf-campaign-snapshot-v1'`, then per row, in strict ordinal order,
+`RS(0x1E)` followed by `ordinal US vendor_id US consent_disposition US consent_reason_code US
+consent_policy_version US suppression_reason` with `US = 0x1F`; lowercase sha256 hex. A **fixed-position
+tuple** encoding replaces the previous JSON-object form precisely because object key ordering is not a
+guaranteed property. Deliberately excluded: the generated row id, `created_at`/`evaluated_at` wall-clock
+values, mutable campaign metadata, PII (none exists) and provider payloads. The authority returns **NULL**,
+never a partial hash, when the set is empty, when ordinals are not dense `0..count-1`, when the snapshot id
+is contaminated by a row belonging to another campaign or revision, or when a field falls outside the
+closed charset the separator encoding assumes.
+
+**Canonical template-catalog contract.** `'qf-template-catalog-v1'`, then each of ten fields in a locked
+order — `template_key, version, channel, category, language, readiness_status, is_active,
+provider_template_name, provider_template_id, description` — preceded by `US` and **length-prefixed**, so
+free text such as a description cannot forge a field boundary. Excluded: the row id and
+`created_at`/`updated_at`. **This is the fingerprint of the template CATALOG authority and nothing more.**
+It is explicitly **not** a provider-mapping fingerprint and **not** a message-body fingerprint — this schema
+stores neither, and inventing one would be fabricated evidence. **Provider-mapping fingerprinting and
+send-time rechecks remain QF-MVP-30.5 concerns.**
+
+**Prepare is now database-authoritative.** The RPC inserts the immutable rows, then — inside an explicit
+subtransaction — verifies the persisted row count, snapshot ownership and dense ordinals, computes the
+canonical fingerprint **from the inserted rows**, and compares it with the server-supplied *expectation*.
+Any mismatch raises a dedicated `QFC01` SQLSTATE so the subtransaction **rolls every inserted audience row
+back**, and the stable code is returned. Only `QFC01` is caught, so a genuine constraint or trigger error
+still aborts the whole transaction rather than being mis-reported. The head stores **only** the
+database-computed values; `p_snapshot_fingerprint` and `p_template_fingerprint` are expectations, never the
+authority. The template fingerprint is likewise computed in the database and required to be non-null.
+
+**Approval now recomputes both.** Under the existing row lock, approval counts the exact rows for
+(campaign id, snapshot id, snapshot revision), refuses a snapshot id contaminated by another campaign or
+revision, refuses non-dense ordinals, **recomputes** the canonical snapshot fingerprint from the immutable
+rows and compares it with the stored evidence, and **recomputes** the canonical template fingerprint and
+compares it with the pinned evidence. Four codes that were previously unreachable are now reachable:
+`SNAPSHOT_FINGERPRINT_MISMATCH`, `SNAPSHOT_OWNERSHIP_MISMATCH`, `SNAPSHOT_ORDINAL_INVALID`,
+`TEMPLATE_FINGERPRINT_MISMATCH` (plus `TEMPLATE_FINGERPRINT_UNAVAILABLE`). Approval still never resolves
+recipients, never alters audience rows, creates no intent and calls no provider.
+
+**Prepared evidence completeness** now requires a non-null `prepared_template_fingerprint` for
+`ready_for_review` and `approved`. Draft rows are unaffected. A fail-closed preflight **refuses to run** —
+with an explicit count and remedy — if any pre-existing prepared row would violate it, rather than
+fabricating a fingerprint. Staging currently holds zero campaign rows, but the migration is written to be
+production-safe regardless.
+
+**Runtime.** The service now reads the full dispatch-critical template field set, computes the canonical
+template fingerprint in pure TypeScript and passes it as the expected value — **it no longer passes null**.
+Both fingerprints are cross-checked by the database. The four new stable codes are mapped to fixed
+admin-facing text, and the review UI now displays the frozen **template fingerprint** alongside the snapshot
+fingerprint.
+
+**Cross-language parity** is proven three ways: the field order is parsed out of the migration and compared
+to the TypeScript contract; the header and separator literals are compared; and **pinned golden vectors**
+fix the exact bytes both sides must hash — `f6807a63…` for the snapshot and `d9af14ec…` for the template.
+The TypeScript side asserts them in `test:crm:30-4c`; the SQL side asserts the **same** hexes in
+`verify_qf_mvp_30_4c1.sql` (rows C13/C14), which rebuilds the identical literal streams with
+`chr(30)`/`chr(31)`. Honest limit: PostgreSQL is not executed offline, so the SQL half of that parity is
+proved on staging, not here.
+
+**Gates.** 30.4A **143/143** (13 migration + 2 contract + **12 hardening** one-defect fixtures, all proven
+to trip), 30.4C **101/101** (15 service + 3 action + 2 route + 1 client fixtures), 30.3C 64/64, 30.3
+120/120, 30.2 62/62, 30.1B 46/46, blueprint 36/36. The 30.4A migration ceiling ("`20260723001300` is the
+highest") was a phase-scoped trap that this authorised forward migration would have tripped; it is re-based
+onto "appears once, and every later migration is a declared later phase", with a regression assertion
+proving the old ceiling would indeed have failed.
+
+**New verifier** `supabase/staging-verification/verify_qf_mvp_30_4c1.sql` — 28 SELECT-only rows, intended to
+run **exactly once** after `20260723001400` is applied and **before any campaign fixture**. It was **not**
+run in this phase. `verify_qf_mvp_30_4.sql`, `verify_qf_mvp_30_3.sql` and `verify_qf_mvp_30_1b.sql` are
+**byte-for-byte unchanged** and remain point-in-time evidence; their hashes are asserted by the 30.4A
+validator.
+
+**No staging or production access, no fixture, no migration application, and no push occurred in
+QF-MVP-30.4C1.**
+
+**Next: controlled staging application of `20260723001400`, then QF-MVP-30.4D. Not started.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

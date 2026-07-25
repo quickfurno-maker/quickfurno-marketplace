@@ -43,7 +43,9 @@ import { previewVendorSegment } from "./vendorSegmentService";
 import {
   validateCampaignDraft, requireEditableCampaign, requireCampaignTransition,
   requireTemplateMatchesConsentScope, validateCampaignRecipients,
-  fingerprintCampaignSnapshot, normalizeCampaignNameKey,
+  fingerprintCampaignSnapshot, fingerprintCommunicationTemplate,
+  normalizeCampaignNameKey,
+  type CommunicationTemplateCatalogRow,
 } from "../lib/crm/campaignValidation";
 import {
   buildBatchConsentDeps, isIncludableDisposition, exclusionReasonFor,
@@ -51,7 +53,10 @@ import {
   INCLUDED_SUPPRESSION_REASON,
   type BatchPreferenceRow, type BatchSuppressionRow, type PlannedRecipient,
 } from "../lib/crm/campaignAudiencePlan";
-import { CAMPAIGN_MAX_AUDIENCE, CAMPAIGN_STATUSES, CAMPAIGN_CHANNELS } from "../lib/crm/campaignContracts";
+import {
+  CAMPAIGN_MAX_AUDIENCE, CAMPAIGN_STATUSES, CAMPAIGN_CHANNELS,
+  TEMPLATE_FINGERPRINT_FIELDS,
+} from "../lib/crm/campaignContracts";
 
 const CAMPAIGNS = "vendor_campaigns" as const;
 const EVENTS = "vendor_campaign_events" as const;
@@ -93,6 +98,11 @@ export const CAMPAIGN_CODE_MESSAGES: Record<string, string> = {
   PREPARED_EVIDENCE_INCOMPLETE: "This campaign's prepared evidence is incomplete. Return to draft and prepare again.",
   SNAPSHOT_COUNT_MISMATCH: "The frozen audience no longer matches its recorded size. Return to draft and prepare again.",
   SNAPSHOT_FINGERPRINT_MISMATCH: "The frozen audience no longer matches its recorded fingerprint. Return to draft and prepare again.",
+  // -- QF-MVP-30.4C1 approval-evidence hardening -----------------------------
+  SNAPSHOT_ORDINAL_INVALID: "The frozen audience is not internally consistent and cannot be trusted. Return to draft and prepare again.",
+  SNAPSHOT_OWNERSHIP_MISMATCH: "The frozen audience does not belong to this campaign revision. Return to draft and prepare again.",
+  TEMPLATE_FINGERPRINT_MISMATCH: "The selected template changed after this audience was frozen. Return to draft and prepare again.",
+  TEMPLATE_FINGERPRINT_UNAVAILABLE: "The selected template could not be fingerprinted, so this campaign cannot be verified.",
   EMPTY_AUDIENCE: "No vendor currently qualifies for this campaign.",
   AUDIENCE_TOO_LARGE: "This audience is too large to freeze. Narrow the segment and try again.",
   DUPLICATE_RECIPIENT: "The resolved audience contained a duplicate vendor.",
@@ -137,6 +147,7 @@ export interface VendorCampaignRow {
   prepared_segment_version: number | null;
   prepared_segment_fingerprint: string | null;
   prepared_template_version: string | null;
+  prepared_template_fingerprint: string | null;
   prepared_template_category: string | null;
   audience_evaluated_at: string | null;
   prepared_recipient_count: number | null;
@@ -652,15 +663,22 @@ export async function prepareCampaignForReview(
   const segment = await loadLiveSegment(campaign.segment_id);
 
   // 2. the template. The marketing rule is enforced here AND in the RPC.
+  //    QF-MVP-30.4C1: every dispatch-critical catalog field is read, because the
+  //    canonical template fingerprint is computed over all of them.
   const { data: template, error: templateError } = await db().from("communication_templates")
-    .select("template_key, version, category, readiness_status, is_active")
-    .eq("template_key", campaign.template_key).maybeSingle();
+    .select(TEMPLATE_FINGERPRINT_FIELDS.join(", "))
+    .eq("template_key", campaign.template_key).maybeSingle<CommunicationTemplateCatalogRow>();
   if (templateError) throw serviceError("CAMPAIGN_READ_FAILED");
   if (!template) throw serviceError("TEMPLATE_MISSING");
   if (template.is_active !== true || template.readiness_status === "disabled") {
     throw serviceError("TEMPLATE_NOT_USABLE");
   }
   requireTemplateMatchesConsentScope(campaign.consent_scope, template.category);
+
+  // QF-MVP-30.4C1: the EXPECTED canonical template fingerprint. The database
+  // recomputes its own from the authoritative row and refuses on divergence, so
+  // this value is a cross-check — never the authority.
+  const expectedTemplateFingerprint = fingerprintCommunicationTemplate(template);
 
   // 3. candidates from the deterministic segment engine (bounded, paged).
   const { vendorIds, duplicates } = await resolveAllCandidates(segment.definition);
@@ -782,7 +800,11 @@ export async function prepareCampaignForReview(
     p_segment_version: segment.definition_version,
     p_segment_fingerprint: segment.definition_fingerprint,
     p_template_version: template.version,
-    p_template_fingerprint: null,
+    // QF-MVP-30.4C1: both fingerprints are EXPECTATIONS. The RPC recomputes each
+    // one inside the database — from the inserted audience rows and from the
+    // authoritative template row — stores only its own values, and rolls the
+    // freeze back on any divergence.
+    p_template_fingerprint: expectedTemplateFingerprint,
     p_recipients: recipients,
     p_snapshot_fingerprint: snapshotFingerprint,
     p_exclusion_summary: exclusionSummary,

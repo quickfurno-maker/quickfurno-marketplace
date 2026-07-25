@@ -195,12 +195,32 @@ record("03 locked 30.3 verifier unchanged (historical, pre-campaign)",
 record("04 segment foundation migration unchanged",
   sha256(read(SEGMENT_MIGRATION)) === "e5f05be8d1ae856056158772f9cc492643d550af85751ac987451e4ca6729f77",
   "20260723001200 byte-identical to the accepted 30.3A hash");
-record("05 migration version is monotonic and collision-free", (() => {
+/* This slot previously asserted that 20260723001300 was the HIGHEST migration.
+ * That is a PHASE-SCOPED ceiling that expires the moment an authorized later
+ * migration lands — QF-MVP-30.4C1's forward correction 20260723001400 is exactly
+ * such a migration. It is re-based onto the enduring invariants: this phase's
+ * migration exists exactly once, its version is collision-free, and every LATER
+ * migration belongs to an explicitly declared later phase. */
+const DECLARED_LATER_MIGRATIONS = [
+  "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql", // QF-MVP-30.4C1
+];
+record("05 migration version is collision-free; later migrations are declared", (() => {
   const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((x) => x.endsWith(".sql")).sort();
   const mine = "20260723001300_qf_mvp_vendor_campaign_foundation.sql";
-  return files[files.length - 1] === mine
-    && files.filter((x) => x.startsWith("20260723001300")).length === 1;
-})(), "20260723001300 is the highest and appears once");
+  const later = files.filter((x) => x > mine);
+  return files.includes(mine)
+    && files.filter((x) => x.startsWith("20260723001300")).length === 1
+    && later.every((f) => DECLARED_LATER_MIGRATIONS.includes(f));
+})(), "20260723001300 appears once; every later migration is a declared later phase");
+record("05a the removed ceiling would have failed on the authorized 30.4C1 correction", (() => {
+  const simulated = ["20260723001300_qf_mvp_vendor_campaign_foundation.sql",
+    "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql"];
+  const oldCeilingWouldHaveFailed =
+    simulated[simulated.length - 1] !== "20260723001300_qf_mvp_vendor_campaign_foundation.sql";
+  return oldCeilingWouldHaveFailed
+    && simulated.every((f) => f === "20260723001300_qf_mvp_vendor_campaign_foundation.sql"
+      || DECLARED_LATER_MIGRATIONS.includes(f));
+})(), "the ceiling was a real trap; the phase-scoped rule is not");
 
 /* ===========================================================================
  * 2. Migration — zero findings + one-defect fixtures
@@ -528,15 +548,22 @@ rejects(() => buildPreparedEvidence(preparedInput({ template: tmpl({ template_ca
   "a marketing campaign prepared against a business template");
 rejects(() => buildPreparedEvidence(preparedInput({ recipients: [] })), "a prepared bundle with no recipients");
 
-// -- approval fail-closed matrix ---------------------------------------------
+// -- approval fail-closed matrix (QF-MVP-30.4C1 hardened) ---------------------
+// The matrix now mirrors the hardened qf_approve_vendor_campaign_v1: the frozen
+// template fingerprint is MANDATORY evidence, the snapshot fingerprint is
+// RECOMPUTED from the immutable rows rather than trusted, and snapshot ownership
+// and ordinal density are checked before any downstream evidence.
+const TMPL_FP = "d".repeat(64);
 const approvalBase = {
   prepared_segment_version: 3, prepared_segment_fingerprint: FP,
   prepared_template_version: "1.0.0", prepared_template_category: "marketing",
+  prepared_template_fingerprint: TMPL_FP,
   prepared_recipient_count: 2, snapshot_fingerprint: prepared?.snapshot_fingerprint ?? FP,
   current_segment_status: "active", current_segment_version: 3, current_segment_fingerprint: FP,
   current_template_version: "1.0.0", current_template_category: "marketing",
-  current_template_readiness: "provider_ready",
+  current_template_readiness: "provider_ready", current_template_fingerprint: TMPL_FP,
   actual_member_count: 2, actual_snapshot_fingerprint: prepared?.snapshot_fingerprint ?? FP,
+  foreign_snapshot_rows: 0, ordinals_dense: true,
 };
 record("33 approval proceeds when every piece of evidence agrees",
   checkCampaignApproval(approvalBase) === null, "null = may approve");
@@ -551,6 +578,15 @@ const MATRIX = [
   ["template category drift", { current_template_category: "business" }, "TEMPLATE_CATEGORY_MISMATCH"],
   ["snapshot count mismatch", { actual_member_count: 1 }, "SNAPSHOT_COUNT_MISMATCH"],
   ["snapshot fingerprint mismatch", { actual_snapshot_fingerprint: "c".repeat(64) }, "SNAPSHOT_FINGERPRINT_MISMATCH"],
+  // -- QF-MVP-30.4C1 additions: each is UNREACHABLE in the pre-correction code
+  ["prepared template fingerprint absent", { prepared_template_fingerprint: null }, "PREPARED_EVIDENCE_INCOMPLETE"],
+  ["template fingerprint drift under an UNCHANGED version",
+    { current_template_fingerprint: "e".repeat(64) }, "TEMPLATE_FINGERPRINT_MISMATCH"],
+  ["template fingerprint unavailable", { current_template_fingerprint: null }, "TEMPLATE_FINGERPRINT_UNAVAILABLE"],
+  ["snapshot unfingerprintable", { actual_snapshot_fingerprint: null }, "SNAPSHOT_ORDINAL_INVALID"],
+  ["snapshot ordinals not dense", { ordinals_dense: false }, "SNAPSHOT_ORDINAL_INVALID"],
+  ["snapshot id contaminated by another campaign/revision",
+    { foreign_snapshot_rows: 1 }, "SNAPSHOT_OWNERSHIP_MISMATCH"],
 ];
 for (const [label, over, code] of MATRIX) {
   record(`34 approval fails closed :: ${label}`,
@@ -579,6 +615,263 @@ record("39 prohibited-field registry covers destination, provider, execution and
 })(), "each refusal carries an explicit reason");
 
 /* ===========================================================================
+ * 8. QF-MVP-30.4C1 — APPROVAL-EVIDENCE HARDENING (forward migration 001400)
+ *
+ * QF-MVP-30.4C was blocked from push and staging smoke by two real
+ * approval-evidence defects in the APPLIED 20260723001300:
+ *   1. the snapshot fingerprint was caller-supplied, stored unverified, and
+ *      approval compared row COUNT only — no SQL ever hashed the frozen rows;
+ *   2. the template fingerprint was absent entirely — nullable, omitted from the
+ *      completeness CHECK, and never read at approval, so any dispatch-critical
+ *      catalog field could drift under an unchanged version undetected.
+ *
+ * 20260723001300 stays IMMUTABLE and applied. The correction is the forward
+ * migration 20260723001400, graded here. Every rule below is backed by a
+ * one-defect fixture that reverts the migration to the exact pre-correction
+ * behaviour and must trip.
+ * ========================================================================= */
+const HARDENING = "supabase/migrations/20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql";
+record("40 the forward correction migration exists", existsSync(path.join(ROOT, HARDENING)), HARDENING);
+
+const hardeningSrc = read(HARDENING);
+const fnBody = (src, fn) => {
+  const m = new RegExp(`create or replace function public\\.${fn}\\(([\\s\\S]*?)\\n\\$\\$;`, "m").exec(src);
+  return m ? m[0] : "";
+};
+
+export function evaluateHardening(src) {
+  const f = [];
+  const add = (rule, detail) => f.push({ rule, detail });
+  const exec = execSql(src);
+  const prepare = fnBody(src, "qf_prepare_vendor_campaign_v1");
+  const approve = fnBody(src, "qf_approve_vendor_campaign_v1");
+
+  // H01 forward-only: it replaces BODIES, it never drops or recreates an applied object.
+  if (/drop\s+(table|function)\s+(if\s+exists\s+)?public\.(vendor_campaign|qf_prepare_vendor_campaign|qf_approve_vendor_campaign)/i.test(exec)) {
+    add("H01_forward_only", "drops an applied campaign object instead of replacing its body");
+  }
+  if (/create\s+table\s+(if\s+not\s+exists\s+)?public\.vendor_campaign/i.test(exec)) {
+    add("H01_forward_only", "recreates a campaign table");
+  }
+
+  // H02 the snapshot fingerprint AUTHORITY exists in SQL and is defensible.
+  if (!/create or replace function public\.qf_campaign_snapshot_fingerprint_v1/.test(src)) {
+    add("H02_snapshot_authority", "no canonical snapshot fingerprint function");
+  }
+  const snapFn = fnBody(src, "qf_campaign_snapshot_fingerprint_v1");
+  if (!/encode\(sha256\(convert_to\(/.test(snapFn)) add("H02_snapshot_authority", "does not sha256 a canonical stream");
+  if (!/chr\(30\)/.test(snapFn) || !/chr\(31\)/.test(snapFn)) {
+    add("H02_snapshot_authority", "does not use the fixed-position separator encoding");
+  }
+  if (!/count\(distinct m\.ordinal\)/.test(snapFn) || !/v_max <> v_count - 1/.test(snapFn)) {
+    add("H02_snapshot_authority", "does not require dense 0..count-1 ordinals");
+  }
+  if (!/m\.campaign_id is distinct from p_campaign_id/.test(snapFn)) {
+    add("H02_snapshot_authority", "does not reject a contaminated snapshot id");
+  }
+  if (!/order by m\.ordinal/.test(snapFn)) add("H02_snapshot_authority", "the stream is not ordinal-ordered");
+  if (/created_at|evaluated_at|m\.id\b/.test(snapFn.replace(/--[^\n]*/g, ""))) {
+    add("H02_snapshot_authority", "fingerprints a row id or a wall-clock value");
+  }
+
+  // H03 the DATABASE is the authority: the caller value is never stored.
+  if (!/snapshot_fingerprint\s+=\s+v_snap_actual/.test(prepare)) {
+    add("H03_db_authoritative", "prepare does not store the database-computed snapshot fingerprint");
+  }
+  if (/snapshot_fingerprint\s+=\s+p_snapshot_fingerprint/.test(prepare)) {
+    add("H03_db_authoritative", "prepare stores the CALLER-supplied snapshot fingerprint");
+  }
+  if (!/prepared_template_fingerprint\s+=\s+v_tmpl_actual/.test(prepare)) {
+    add("H03_db_authoritative", "prepare does not store the database-computed template fingerprint");
+  }
+  if (/prepared_template_fingerprint\s+=\s+p_template_fingerprint/.test(prepare)) {
+    add("H03_db_authoritative", "prepare stores the CALLER-supplied template fingerprint");
+  }
+
+  // H04 a verification failure must ROLL BACK the inserted rows.
+  if (!/errcode = 'QFC01'/.test(prepare) || !/when sqlstate 'QFC01'/.test(prepare)) {
+    add("H04_rollback_on_mismatch", "no dedicated subtransaction rollback for a verification failure");
+  }
+  if (!/qf_campaign_snapshot_fingerprint_v1\(p_campaign_id, v_snapshot_id, v_revision\)/.test(prepare)) {
+    add("H04_rollback_on_mismatch", "prepare does not fingerprint the INSERTED rows");
+  }
+
+  // H05 approval RECOMPUTES the snapshot fingerprint and compares it.
+  if (!/qf_campaign_snapshot_fingerprint_v1/.test(approve)) {
+    add("H05_approve_recomputes_snapshot", "approval never recomputes the snapshot fingerprint");
+  }
+  if (!/v_snap_actual <> v_campaign\.snapshot_fingerprint/.test(approve)) {
+    add("H05_approve_recomputes_snapshot", "approval never compares the recomputed hash with the stored evidence");
+  }
+  if (!/'SNAPSHOT_FINGERPRINT_MISMATCH'/.test(approve)) {
+    add("H05_approve_recomputes_snapshot", "SNAPSHOT_FINGERPRINT_MISMATCH is unreachable from approval");
+  }
+  if (!/'SNAPSHOT_OWNERSHIP_MISMATCH'/.test(approve) || !/'SNAPSHOT_ORDINAL_INVALID'/.test(approve)) {
+    add("H05_approve_recomputes_snapshot", "approval does not check snapshot ownership and ordinal density");
+  }
+
+  // H06 the template fingerprint AUTHORITY covers the exact dispatch-critical set.
+  const tmplFn = fnBody(src, "qf_communication_template_fingerprint_v1");
+  if (!/create or replace function public\.qf_communication_template_fingerprint_v1/.test(src)) {
+    add("H06_template_authority", "no canonical template fingerprint function");
+  }
+  for (const col of ["template_key", "version", "channel", "category", "language",
+    "readiness_status", "is_active", "provider_template_name", "provider_template_id", "description"]) {
+    if (!new RegExp(`t\\.${col}\\b`).test(tmplFn)) add("H06_template_authority", `omits ${col}`);
+  }
+  if (/t\.id\b|t\.created_at|t\.updated_at/.test(tmplFn)) {
+    add("H06_template_authority", "fingerprints a row id or a timestamp");
+  }
+  if (!/encode\(sha256\(convert_to\(/.test(tmplFn)) add("H06_template_authority", "does not sha256 a canonical stream");
+
+  // H07 approval RECOMPUTES the template fingerprint and fails closed on drift.
+  if (!/qf_communication_template_fingerprint_v1/.test(approve)) {
+    add("H07_approve_template_drift", "approval never recomputes the template fingerprint");
+  }
+  if (!/v_tmpl_actual <> v_campaign\.prepared_template_fingerprint/.test(approve)) {
+    add("H07_approve_template_drift", "approval never compares it with the pinned evidence");
+  }
+  if (!/'TEMPLATE_FINGERPRINT_MISMATCH'/.test(approve)) {
+    add("H07_approve_template_drift", "TEMPLATE_FINGERPRINT_MISMATCH is unreachable from approval");
+  }
+
+  // H08 prepared evidence now REQUIRES the template fingerprint.
+  const constraint = /add constraint vcm_prepared_evidence_complete check \(([\s\S]*?)\n  \);/.exec(src)?.[1] ?? "";
+  if (!constraint.includes("prepared_template_fingerprint is not null")) {
+    add("H08_evidence_complete", "the replaced completeness constraint does not require the template fingerprint");
+  }
+  // the production-safety preflight must REFUSE loudly rather than fabricate a
+  // fingerprint for a pre-existing prepared row. Matched on its own text, not on
+  // a positional slice of the file.
+  if (!/aborted: % campaign row\(s\) are ready_for_review\/approved with a NULL prepared_template_fingerprint/.test(src)) {
+    add("H08_evidence_complete", "no production-safety preflight for incompatible pre-existing prepared rows");
+  }
+  if (/update public\.vendor_campaigns\s+set[^;]*prepared_template_fingerprint\s*=\s*'/i.test(execSql(src))) {
+    add("H08_evidence_complete", "backfills a fabricated template fingerprint");
+  }
+
+  // H09 minimal object model: nothing new beyond the fingerprint helpers.
+  for (const t of ["vendor_campaign_snapshots", "vendor_campaign_templates", "campaign_frequency_policies",
+    "communication_intents", "vendor_campaign_dispatches", "audit_logs", "admin_notifications"]) {
+    if (new RegExp(`create\\s+table\\s+(if\\s+not\\s+exists\\s+)?public\\.${t}\\b`, "i").test(exec)) {
+      add("H09_no_new_object", `creates ${t}`);
+    }
+  }
+  if (/create\s+table\s/i.test(exec)) add("H09_no_new_object", "creates a table");
+  for (const c of ["phone", "email", "destination", "recipient_ref", "frequency_cap", "send_status"]) {
+    if (new RegExp(`add column[^;]*\\b${c}\\b`, "i").test(exec)) add("H09_no_new_object", `adds column ${c}`);
+  }
+
+  // H10 execute posture: the helpers are not externally callable.
+  for (const fn of ["qf_canonical_text_field_v1", "qf_campaign_snapshot_fingerprint_v1",
+    "qf_communication_template_fingerprint_v1"]) {
+    if (!new RegExp(`revoke all on function public\\.${fn}[\\s\\S]{0,120}?service_role`).test(src)) {
+      add("H10_execute_posture", `${fn} is not revoked from service_role`);
+    }
+    if (new RegExp(`grant execute on function public\\.${fn}`).test(src)) {
+      add("H10_execute_posture", `${fn} is granted EXECUTE`);
+    }
+  }
+  if (!/grant execute on function public\.qf_prepare_vendor_campaign_v1[\s\S]{0,200}?to service_role/.test(src)) {
+    add("H10_execute_posture", "the prepare RPC lost its service_role grant");
+  }
+  return f;
+}
+
+const hardFindings = evaluateHardening(hardeningSrc);
+record("41 hardening migration has zero findings", hardFindings.length === 0,
+  hardFindings.map((x) => `${x.rule}: ${x.detail}`).join(" | ")
+  || "DB-authoritative fingerprints, rollback on mismatch, approval recomputation, mandatory template evidence, minimal objects");
+
+/* Each fixture reverts the migration to the EXACT pre-correction behaviour the
+ * audit found. If any of these stops tripping, the defect has come back. */
+const HARD_FIX = [
+  { id: "U", rule: "H03_db_authoritative", why: "prepare stores the caller fingerprint without recomputing",
+    mutate: (s) => s.replace("snapshot_fingerprint          = v_snap_actual", "snapshot_fingerprint          = p_snapshot_fingerprint") },
+  { id: "V", rule: "H05_approve_recomputes_snapshot", why: "approval checks count only, as before",
+    mutate: (s) => s.replace("  if v_snap_actual <> v_campaign.snapshot_fingerprint then\n    return jsonb_build_object('ok', false, 'code', 'SNAPSHOT_FINGERPRINT_MISMATCH');\n  end if;", "") },
+  { id: "W", rule: "H08_evidence_complete", why: "prepared_template_fingerprint is nullable for ready/approved again",
+    mutate: (s) => s.replace("        and prepared_template_fingerprint is not null\n", "") },
+  { id: "X", rule: "H03_db_authoritative", why: "prepare stores the caller template fingerprint",
+    mutate: (s) => s.replace("prepared_template_fingerprint = v_tmpl_actual", "prepared_template_fingerprint = p_template_fingerprint") },
+  { id: "Y", rule: "H07_approve_template_drift", why: "approval checks version/category only, as before",
+    mutate: (s) => s.replace("  if v_tmpl_actual <> v_campaign.prepared_template_fingerprint then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_FINGERPRINT_MISMATCH');\n  end if;", "") },
+  { id: "Z", rule: "H04_rollback_on_mismatch", why: "a verification failure no longer rolls the freeze back",
+    mutate: (s) => s.replace("errcode = 'QFC01'", "errcode = 'P0001'") },
+  { id: "AA", rule: "H02_snapshot_authority", why: "the snapshot fingerprint stops requiring dense ordinals",
+    mutate: (s) => s.replace("if v_distinct <> v_count or v_min <> 0 or v_max <> v_count - 1 then return null; end if;", "") },
+  { id: "AB", rule: "H02_snapshot_authority", why: "a contaminated snapshot id is silently filtered instead of refused",
+    mutate: (s) => s.replace("or m.snapshot_revision is distinct from p_snapshot_revision)", "or false)")
+      .replace("m.campaign_id is distinct from p_campaign_id", "false") },
+  { id: "AC", rule: "H06_template_authority", why: "a dispatch-critical template field drops out of the canonical set",
+    mutate: (s) => s.replace("    || chr(31) || public.qf_canonical_text_field_v1(t.provider_template_name)\n", "") },
+  { id: "AD", rule: "H09_no_new_object", why: "the correction grows a new table",
+    mutate: (s) => `${s}\ncreate table public.vendor_campaign_snapshots (id uuid primary key);\n` },
+  { id: "AE", rule: "H10_execute_posture", why: "a fingerprint helper becomes externally callable",
+    mutate: (s) => `${s}\ngrant execute on function public.qf_campaign_snapshot_fingerprint_v1(uuid, uuid, integer) to service_role;\n` },
+  { id: "AF", rule: "H01_forward_only", why: "the correction drops an applied object instead of replacing its body",
+    mutate: (s) => `${s}\ndrop function if exists public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text);\n` },
+];
+for (const fx of HARD_FIX) {
+  const mutated = fx.mutate(hardeningSrc);
+  const changed = mutated !== hardeningSrc;
+  const ff = changed ? evaluateHardening(mutated) : [];
+  const tripped = ff.some((x) => x.rule === fx.rule);
+  record(`42 hardening fixture ${fx.id} trips ${fx.rule} :: ${fx.why}`, changed && tripped,
+    !changed ? "NO-OP (the anchor no longer exists)" : tripped ? "tripped" : ff.map((x) => x.rule).join(",") || "none");
+}
+
+record("43 the applied 20260723001300 is byte-identical to what was applied on staging",
+  sha256(migrationSrc) === "3a92fd063bf222230578532ae2df1bb602ceb9fe625363650d33a7bcd54fc268",
+  "the correction is forward-only; the applied migration was not edited");
+
+/* -- historical verifiers are point-in-time evidence and must never be edited */
+const HISTORICAL_VERIFIERS = {
+  "supabase/staging-verification/verify_qf_mvp_30_4.sql":
+    "ba67395f368ad9310a8eab6ee84647c54d7b2665ecd25550733403a7300835a8",
+  "supabase/staging-verification/verify_qf_mvp_30_3.sql":
+    "62818d27f9d009a1357152ad05ec71df58bf72bf9434a4d3fcaf896bd3d90349",
+  "supabase/staging-verification/verify_qf_mvp_30_1b.sql":
+    "e10caa5699ff67346a700c6bd8a69c0a7ff0e0e5d48eeb76dcf2a24e7e633799",
+};
+for (const [rel, want] of Object.entries(HISTORICAL_VERIFIERS)) {
+  record(`44 historical verifier unchanged :: ${path.basename(rel)}`,
+    sha256(read(rel)) === want, `expected ${want.slice(0, 16)}…, got ${sha256(read(rel)).slice(0, 16)}…`);
+}
+
+/* -- the NEW post-correction verifier -------------------------------------- */
+const VERIFIER_30_4C1 = "supabase/staging-verification/verify_qf_mvp_30_4c1.sql";
+record("45 the post-correction verifier exists", existsSync(path.join(ROOT, VERIFIER_30_4C1)), VERIFIER_30_4C1);
+const v4c1 = read(VERIFIER_30_4C1);
+record("46 the post-correction verifier is SELECT-only", (() => {
+  const exec = execSql(v4c1);
+  return !/\b(insert|update|delete|truncate|create|alter|drop|grant|revoke|call|merge|do)\b/i.test(exec)
+    && /^\s*select\b/im.test(exec);
+})(), "no mutating keyword outside string literals; begins with SELECT");
+record("47 the post-correction verifier covers the hardened contract", (() => {
+  const need = ["20260723001300", "20260723001400",
+    "qf_campaign_snapshot_fingerprint_v1", "qf_communication_template_fingerprint_v1",
+    "qf_canonical_text_field_v1", "prepared_template_fingerprint IS NOT NULL",
+    "SNAPSHOT_FINGERPRINT_MISMATCH", "TEMPLATE_FINGERPRINT_MISMATCH",
+    "C26_zero_campaign_rows_before_fixtures", "C27_no_core_mutation",
+    "C28_public_projection_unchanged", "has_function_privilege", "relrowsecurity"];
+  return need.every((n) => v4c1.includes(n));
+})(), "migrations, both authorities, mandatory evidence, posture, zero rows, projection");
+record("48 the post-correction verifier proves EXECUTED cross-language parity", (() => {
+  return /encode\(sha256\(convert_to\(/.test(v4c1)
+    && v4c1.includes("chr(30)") && v4c1.includes("chr(31)")
+    && /C13_snapshot_golden_vector_parity/.test(v4c1)
+    && /C14_template_golden_vector_parity/.test(v4c1);
+})(), "the SQL side hashes the same pinned canonical bytes as the TypeScript mirror");
+record("49 every verifier row reports (check_id, passed, detail)", (() => {
+  const ids = [...v4c1.matchAll(/'(C\d+_[a-z0-9_]+)' as check_id/g)].map((m) => m[1]);
+  const passedCols = (v4c1.match(/ as passed/g) || []).length;
+  const detailCols = (v4c1.match(/ as detail/g) || []).length;
+  return ids.length >= 28 && new Set(ids).size === ids.length
+    && passedCols === ids.length && detailCols === ids.length;
+})(), `${[...v4c1.matchAll(/'(C\d+_[a-z0-9_]+)' as check_id/g)].length} uniquely-named rows, each with passed + detail`);
+
+/* ===========================================================================
  * Report
  * ========================================================================= */
 const passed = results.filter((r) => r.ok).length;
@@ -586,6 +879,6 @@ console.log("== QF-MVP-30.4A vendor campaign foundation validator ==");
 for (const r of results) { console.log(`   ${r.ok ? "ok  " : "FAIL"}  ${r.name}`); if (!r.ok) console.log(`         ${r.detail}`); }
 console.log("");
 console.log(`checks: ${passed} passed, ${results.length - passed} failed (of ${results.length})`);
-console.log(`fixtures: ${MIG_FIX.length} migration + ${CON_FIX.length} contract one-defect mutations`);
+console.log(`fixtures: ${MIG_FIX.length} migration + ${CON_FIX.length} contract + ${HARD_FIX.length} hardening one-defect mutations`);
 console.log(`RESULT: ${failed ? "FAIL" : "PASS"}`);
 process.exit(failed ? 1 : 0);

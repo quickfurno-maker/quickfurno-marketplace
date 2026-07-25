@@ -165,6 +165,24 @@ export function evaluateService(src) {
   if (!/previewVendorSegment/.test(exec)) add("W14_segment_engine_reused", "does not use the segment engine");
   if (/planSegmentQuery|\.or\(\s*`/.test(exec)) add("W14_segment_engine_reused", "builds its own segment query");
 
+  // W16 (QF-MVP-30.4C1) the runtime must supply a REAL template fingerprint.
+  // Passing null was the exact pre-correction defect: prepared evidence carried
+  // no template fingerprint at all, so approval could not detect catalog drift.
+  if (/p_template_fingerprint:\s*null/.test(exec)) {
+    add("W16_template_fingerprint_supplied", "passes a NULL template fingerprint to prepare");
+  }
+  if (!/fingerprintCommunicationTemplate/.test(exec)) {
+    add("W16_template_fingerprint_supplied", "never computes the canonical template fingerprint");
+  }
+  if (!/p_template_fingerprint:\s*expectedTemplateFingerprint/.test(exec)) {
+    add("W16_template_fingerprint_supplied", "does not pass the computed fingerprint as the expected value");
+  }
+  // the fingerprint is computed over the whole dispatch-critical field set, so
+  // the read must select all of them rather than a convenient subset.
+  if (!/TEMPLATE_FINGERPRINT_FIELDS/.test(exec)) {
+    add("W16_template_fingerprint_supplied", "does not read the full dispatch-critical template field set");
+  }
+
   return f;
 }
 
@@ -277,6 +295,8 @@ const SVC_FIX = [
     mutate: (s) => s.replace('.in("principal_id", batch)', '.in("principal_id", vendorIds)') },
   { id: "T", rule: "W15_explicit_clear", why: "a draft patch collapses null into omitted",
     mutate: (s) => s.replace("name: patched(input.name, current.name),", "name: input.name ?? current.name,") },
+  { id: "U", rule: "W16_template_fingerprint_supplied", why: "the runtime reverts to passing a NULL template fingerprint",
+    mutate: (s) => s.replace("p_template_fingerprint: expectedTemplateFingerprint,", "p_template_fingerprint: null,") },
   { id: "L", rule: "W07_no_destination_leak", why: "a phone is logged",
     mutate: (s) => s.replace("if (hash) hashes.push(hash);", "console.error(\"dbg\", v.phone);\n    if (hash) hashes.push(hash);") },
 ];
@@ -615,6 +635,204 @@ record("50 the planner is pure and safely importable", (() => {
   return !/import\s+["']server-only["']/.test(p) && !/adminClient|@supabase|createClient\(/.test(p)
     && !/Math\.random|Date\.now/.test(p);
 })(), "no DB, no clock, no randomness");
+
+/* ===========================================================================
+ * 8b. QF-MVP-30.4C1 — SQL <-> TypeScript canonical fingerprint parity
+ *
+ * The DATABASE is authoritative: the runtime supplies each fingerprint only as
+ * an EXPECTATION that the RPC independently recomputes and compares. That makes
+ * parity load-bearing — a divergence would block every prepare — so it is proven
+ * three ways: the field ORDER is read out of the migration and compared to the
+ * TypeScript contract; the separator/header literals are compared; and pinned
+ * GOLDEN VECTORS fix the exact bytes both sides must hash.
+ *
+ * Honest limit: Postgres is not executed here (the MVP loader refuses I/O
+ * modules and no database is reachable offline). The SQL side of the golden
+ * vectors is re-proved on staging by verify_qf_mvp_30_4c1.sql, which recomputes
+ * the same literal streams with chr(30)/chr(31) and compares the same hashes.
+ * ========================================================================= */
+const HARDENING = "supabase/migrations/20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql";
+record("54 the forward correction migration exists", existsSync(path.join(ROOT, HARDENING)), HARDENING);
+const hardeningSrc = read(HARDENING);
+
+/** Field order the SQL template fingerprint concatenates, in source order. */
+const sqlTemplateFields = (src) => {
+  const fn = /create or replace function public\.qf_communication_template_fingerprint_v1[\s\S]*?\n\$\$;/.exec(src)?.[0] ?? "";
+  return [...fn.matchAll(/qf_canonical_text_field_v1\(\s*(?:case when )?t\.(\w+)/g)].map((m) => m[1]);
+};
+/** Field order the SQL snapshot fingerprint concatenates, in source order. */
+const sqlSnapshotFields = (src) => {
+  const fn = /create or replace function public\.qf_campaign_snapshot_fingerprint_v1[\s\S]*?\n\$\$;/.exec(src)?.[0] ?? "";
+  const stream = /select 'qf-campaign-snapshot-v1'[\s\S]*?into v_canonical/.exec(fn)?.[0] ?? "";
+  // the final field is followed by a comma (string_agg's delimiter argument),
+  // so the trailing comma must be optional or the last field is silently lost.
+  return [...stream.matchAll(/m\.(\w+)(?:::text)?,?\n/g)].map((m) => m[1]);
+};
+
+record("55 SQL and TypeScript agree on the template field ORDER", (() => {
+  const sql = sqlTemplateFields(hardeningSrc);
+  return sql.length === contracts.TEMPLATE_FINGERPRINT_FIELDS.length
+    && sql.every((f, i) => f === contracts.TEMPLATE_FINGERPRINT_FIELDS[i]);
+})(), `SQL order: ${sqlTemplateFields(hardeningSrc).join(", ")}`);
+
+record("56 a divergent field order is DETECTED (parity is load-bearing)", (() => {
+  const swapped = hardeningSrc.replace(
+    "    || chr(31) || public.qf_canonical_text_field_v1(t.template_key)\n    || chr(31) || public.qf_canonical_text_field_v1(t.version)",
+    "    || chr(31) || public.qf_canonical_text_field_v1(t.version)\n    || chr(31) || public.qf_canonical_text_field_v1(t.template_key)");
+  if (swapped === hardeningSrc) return false;      // the anchor must still exist
+  const sql = sqlTemplateFields(swapped);
+  return !sql.every((f, i) => f === contracts.TEMPLATE_FINGERPRINT_FIELDS[i]);
+})(), "swapping two SQL fields breaks the parity check");
+
+record("57 SQL and TypeScript agree on the snapshot tuple ORDER", (() => {
+  const sql = sqlSnapshotFields(hardeningSrc);
+  const want = ["ordinal", "vendor_id", "consent_disposition", "consent_reason_code",
+    "consent_policy_version", "suppression_reason"];
+  return sql.length === want.length && sql.every((f, i) => f === want[i]);
+})(), `SQL tuple: ${sqlSnapshotFields(hardeningSrc).join(", ")}`);
+
+record("58 SQL and TypeScript agree on the header and separator literals", (() => {
+  return hardeningSrc.includes(`'${contracts.SNAPSHOT_CANONICAL_HEADER}'`)
+    && hardeningSrc.includes(`'${contracts.TEMPLATE_CANONICAL_HEADER}'`)
+    && contracts.CANONICAL_RECORD_SEPARATOR.charCodeAt(0) === 30
+    && contracts.CANONICAL_UNIT_SEPARATOR.charCodeAt(0) === 31
+    && hardeningSrc.includes("chr(30)") && hardeningSrc.includes("chr(31)");
+})(), "same version tags; RS=chr(30), US=chr(31)");
+
+/* -- pinned golden vectors -------------------------------------------------
+ * These exact hexes are also asserted by verify_qf_mvp_30_4c1.sql against the
+ * SQL side. If either language's canonicalizer changes, one of the two fails. */
+const GOLDEN_SNAPSHOT_HEX = "f6807a63ddd99798eb0e40857c23265a91d6ee1f6572f7eea187b2dc2095a2cd";
+const GOLDEN_TEMPLATE_HEX = "d9af14ec95590c4650506133dc59b8855f2534ae653b6c34d8183fcb3bc5e308";
+const gRow = (id, ordinal) => ({
+  ordinal, vendor_id: id,
+  consent_disposition: "marketing_opted_in",
+  consent_reason_code: "preference_marketing_opted_in",
+  consent_policy_version: "2026-07-01",
+  suppression_reason: "none",
+});
+const GOLDEN_ROWS = [gRow(UUID_A, 0), gRow(UUID_B, 1)];
+const GOLDEN_TEMPLATE = {
+  template_key: "qf_parity_probe", version: "1.0.0", channel: "whatsapp",
+  category: "marketing", language: "en", readiness_status: "provider_ready",
+  is_active: true, provider_template_name: null, provider_template_id: null,
+  description: "",
+};
+
+record("59 TypeScript reproduces the pinned SNAPSHOT golden vector",
+  rules.fingerprintCampaignSnapshotRows(GOLDEN_ROWS) === GOLDEN_SNAPSHOT_HEX,
+  rules.fingerprintCampaignSnapshotRows(GOLDEN_ROWS));
+record("60 TypeScript reproduces the pinned TEMPLATE golden vector",
+  rules.fingerprintCommunicationTemplate(GOLDEN_TEMPLATE) === GOLDEN_TEMPLATE_HEX,
+  rules.fingerprintCommunicationTemplate(GOLDEN_TEMPLATE));
+record("61 the staging verifier pins the SAME golden vectors", (() => {
+  const v = read("supabase/staging-verification/verify_qf_mvp_30_4c1.sql");
+  return v.includes(GOLDEN_SNAPSHOT_HEX) && v.includes(GOLDEN_TEMPLATE_HEX);
+})(), "the SQL side is proved against identical bytes on staging");
+
+record("62 the canonical field encoder distinguishes NULL from empty", (() => {
+  return rules.canonicalTextField(null) === "-1:"
+    && rules.canonicalTextField(undefined) === "-1:"
+    && rules.canonicalTextField("") === "0:"
+    && rules.canonicalTextField("ab") === "2:ab"
+    // multi-byte: the prefix counts OCTETS, matching SQL octet_length()
+    && rules.canonicalTextField("é") === "2:é";
+})(), "length-prefixed, octet-counted, NULL never collides with empty");
+
+record("63 reordered INPUT canonicalises to the same fingerprint", (() => {
+  const a = rules.fingerprintCampaignSnapshotRows([gRow(UUID_A, 0), gRow(UUID_B, 1)]);
+  const b = rules.fingerprintCampaignSnapshotRows([gRow(UUID_B, 1), gRow(UUID_A, 0)]);
+  return a === b && a === GOLDEN_SNAPSHOT_HEX;
+})(), "the stream is sorted by ordinal before hashing");
+
+record("64 a different ordinal ASSIGNMENT is a different fingerprint", (() => {
+  const swapped = rules.fingerprintCampaignSnapshotRows([gRow(UUID_A, 1), gRow(UUID_B, 0)]);
+  return swapped !== GOLDEN_SNAPSHOT_HEX;
+})(), "order is part of the frozen identity");
+
+record("65 changed evidence changes the fingerprint", (() => {
+  const changedVendor = rules.fingerprintCampaignSnapshotRows(
+    [gRow("33333333-3333-4333-8333-333333333333", 0), gRow(UUID_B, 1)]);
+  const changedEvidence = rules.fingerprintCampaignSnapshotRows(
+    [{ ...gRow(UUID_A, 0), consent_disposition: "unknown" }, gRow(UUID_B, 1)]);
+  return changedVendor !== GOLDEN_SNAPSHOT_HEX && changedEvidence !== GOLDEN_SNAPSHOT_HEX
+    && changedVendor !== changedEvidence;
+})(), "vendor identity and consent evidence are both inside the canonical input");
+
+const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+record("66 sparse ordinals are REJECTED, not silently hashed",
+  throws(() => rules.fingerprintCampaignSnapshotRows([gRow(UUID_A, 0), gRow(UUID_B, 5)])),
+  "mirrors the SQL authority returning NULL");
+record("67 duplicate ordinals are REJECTED",
+  throws(() => rules.fingerprintCampaignSnapshotRows([gRow(UUID_A, 0), gRow(UUID_B, 0)])),
+  "an ambiguous order has no fingerprint");
+record("68 an empty set is REJECTED",
+  throws(() => rules.fingerprintCampaignSnapshotRows([])), "no rows, no fingerprint");
+record("69 an out-of-charset field is REJECTED", (() => {
+  const bad = { ...gRow(UUID_A, 0), consent_reason_code: "has\u001fseparator" };
+  return throws(() => rules.fingerprintCampaignSnapshotRows([bad]));
+})(), "a separator inside a value could otherwise forge a tuple boundary");
+record("70 an uppercase / non-canonical uuid is REJECTED", (() => {
+  // UUID_A is digits-only, so .toUpperCase() on it would be a no-op and the
+  // assertion would pass vacuously. Use a uuid that actually contains hex letters.
+  const HEXY = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const upper = HEXY.toUpperCase();
+  return upper !== HEXY
+    && !throws(() => rules.fingerprintCampaignSnapshotRows([{ ...gRow(HEXY, 0) }]))
+    && throws(() => rules.fingerprintCampaignSnapshotRows([{ ...gRow(HEXY, 0), vendor_id: upper }]));
+})(), "PostgreSQL renders uuid::text lowercase; the mirror must agree");
+
+record("71 the template fingerprint changes when a dispatch-critical field changes", (() => {
+  const changed = contracts.TEMPLATE_FINGERPRINT_FIELDS
+    .filter((f) => f !== "is_active")
+    .map((f) => rules.fingerprintCommunicationTemplate({ ...GOLDEN_TEMPLATE, [f]: "qf-mutated" }));
+  const boolFlip = rules.fingerprintCommunicationTemplate({ ...GOLDEN_TEMPLATE, is_active: false });
+  return changed.every((h) => h !== GOLDEN_TEMPLATE_HEX) && boolFlip !== GOLDEN_TEMPLATE_HEX
+    && new Set([...changed, boolFlip]).size === contracts.TEMPLATE_FINGERPRINT_FIELDS.length;
+})(), "every one of the 10 fields is genuinely inside the canonical input");
+
+record("72 a NULL provider field is distinguishable from an empty one", (() => {
+  const asNull = rules.fingerprintCommunicationTemplate({ ...GOLDEN_TEMPLATE, provider_template_name: null });
+  const asEmpty = rules.fingerprintCommunicationTemplate({ ...GOLDEN_TEMPLATE, provider_template_name: "" });
+  return asNull !== asEmpty && asNull === GOLDEN_TEMPLATE_HEX;
+})(), "length prefixing keeps NULL and '' distinct");
+
+record("73 the pure approval matrix mirrors the hardened SQL", (() => {
+  const base = {
+    prepared_segment_version: 1, prepared_segment_fingerprint: "a".repeat(64),
+    prepared_template_version: "1.0.0", prepared_template_category: "marketing",
+    prepared_template_fingerprint: GOLDEN_TEMPLATE_HEX,
+    prepared_recipient_count: 2, snapshot_fingerprint: GOLDEN_SNAPSHOT_HEX,
+    current_segment_status: "active", current_segment_version: 1,
+    current_segment_fingerprint: "a".repeat(64),
+    current_template_version: "1.0.0", current_template_category: "marketing",
+    current_template_readiness: "provider_ready", current_template_fingerprint: GOLDEN_TEMPLATE_HEX,
+    actual_member_count: 2, actual_snapshot_fingerprint: GOLDEN_SNAPSHOT_HEX,
+    foreign_snapshot_rows: 0, ordinals_dense: true,
+  };
+  return rules.checkCampaignApproval(base) === null
+    && rules.checkCampaignApproval({ ...base, prepared_template_fingerprint: null }) === "PREPARED_EVIDENCE_INCOMPLETE"
+    && rules.checkCampaignApproval({ ...base, current_template_fingerprint: "b".repeat(64) }) === "TEMPLATE_FINGERPRINT_MISMATCH"
+    && rules.checkCampaignApproval({ ...base, actual_snapshot_fingerprint: "b".repeat(64) }) === "SNAPSHOT_FINGERPRINT_MISMATCH"
+    && rules.checkCampaignApproval({ ...base, foreign_snapshot_rows: 1 }) === "SNAPSHOT_OWNERSHIP_MISMATCH"
+    && rules.checkCampaignApproval({ ...base, ordinals_dense: false }) === "SNAPSHOT_ORDINAL_INVALID";
+})(), "every hardened SQL branch has a reachable pure-mirror equivalent");
+
+record("74 every new failure code is in the closed contract vocabulary", (() => {
+  return ["SNAPSHOT_ORDINAL_INVALID", "SNAPSHOT_OWNERSHIP_MISMATCH",
+    "TEMPLATE_FINGERPRINT_MISMATCH", "TEMPLATE_FINGERPRINT_UNAVAILABLE"]
+    .every((c) => contracts.CAMPAIGN_FAILURE_CODES.includes(c));
+})(), "no invented code");
+
+record("75 the runtime maps every new code to fixed admin text", (() => {
+  return ["SNAPSHOT_ORDINAL_INVALID", "SNAPSHOT_OWNERSHIP_MISMATCH",
+    "TEMPLATE_FINGERPRINT_MISMATCH", "TEMPLATE_FINGERPRINT_UNAVAILABLE"]
+    .every((c) => new RegExp(`^\\s{2}${c}:\\s*"`, "m").test(serviceSrc));
+})(), "no new code can fall through to a raw payload");
+
+record("76 the review UI displays the frozen template fingerprint", (() => {
+  return /prepared_template_fingerprint/.test(editUi) && /Template fingerprint/.test(editUi);
+})(), "the evidence an approver relies on is visible");
 
 /* ===========================================================================
  * 9. Enduring cross-phase regressions

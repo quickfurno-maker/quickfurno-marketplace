@@ -424,6 +424,147 @@ fixtures). 30.1B 46/46, blueprint 36/36, all Marketplace gates, `verify:mvp` exi
 clean, `git diff --check` exit 0. **Next: a bounded QF-MVP-30.2 staging smoke/integration review, then
 QF-MVP-30.3 — Deterministic segments** (not started).
 
+## 20. QF-MVP-30.3A — deterministic segment foundation (GENERATED, NOT APPLIED)
+
+**Status:** `QF_MVP_30_3A_DETERMINISTIC_SEGMENT_FOUNDATION_GENERATED_READY_FOR_STAGING_APPLICATION_REVIEW`
+
+Architecture source: `qf-staging-workspace/QF-MVP-30.3-ARCHITECTURE-PREFLIGHT-20260725T073538Z/QF-MVP-30.3-ARCHITECTURE-PREFLIGHT-REPORT.md`
+(SHA-256 `D0E535590345C0D50339F5E2E6DC603647B86339469AA1EFCFCB621531F409D7`). Generated at HEAD
+`e8b2e738…`. **Nothing applied to staging; no runtime implementation started.**
+
+### 20.1 Owner decisions (LOCKED)
+
+1. **Dynamic definition evaluation. No membership persistence.** No `vendor_segment_memberships`,
+   no audience-member table, no cached membership truth, no recipient list, no campaign audience
+   snapshot, no provider execution table. QF-MVP-30.4 owns immutable frozen campaign audience
+   evidence and send-approval separation.
+2. **The 30.2 validator's global "no migration newer than `20260723001100`" ceiling is removed** —
+   it was only ever true before 30.3 and would break every future phase. Replaced by phase-scoped
+   invariants (§20.6).
+3. **`verify_qf_mvp_30_1b.sql` is NOT edited.** It is a locked, point-in-time, pre-segments verifier;
+   its W18 "no segment tables" assertion is intentionally historical. A new
+   `verify_qf_mvp_30_3.sql` supersedes it for the post-30.3 schema state.
+4. **No package-expiry / package-order predicate.** No expires-before/after, days-to-expiry, active
+   package order, package-order status, or inferred current-package expiry — and no invented "active
+   package" definition. `core.remaining_credits` and `core.total_credits` ARE permitted: the preflight
+   (§15) explicitly allows them because Core denormalizes them onto `vendors`, so they need no join
+   and are read-only here.
+5. **No free-text predicate**, which removes PostgREST pattern-filter injection from the segment
+   evaluation path structurally rather than defending against it.
+6. **No AI or provider authority** — no scoring, embeddings, semantic matching, ranking, prediction,
+   Jarvis decision, campaign send, Meta/n8n/provider execution, consent grant, suppression bypass,
+   owner binding, assignment, package or credit mutation.
+
+**A segment is a saved question, never an authorization. 30.3 never authorizes sending.**
+
+### 20.2 Migration `20260723001200_qf_mvp_vendor_segment_foundation.sql`
+
+**One table: `public.vendor_segments`** — deterministic saved segment DEFINITIONS. No members, no
+recipients, no eligibility decision.
+
+Columns: `id`, `name`, `description`, `status`, `schema_version`, `definition` (jsonb),
+`definition_version`, `definition_fingerprint`, `created_at`, `updated_at`, `archived_at`,
+`created_by`, `updated_by`, `archived_by`.
+
+Constraints: `vsg_pkey`; three actor FKs → `profiles` **ON DELETE SET NULL / ON UPDATE RESTRICT**
+(never CASCADE); `vsg_name_nonempty`, `vsg_name_len` (≤120), `vsg_description_len` (≤2000);
+`vsg_status_check` (`draft|active|archived`); `vsg_archived_consistency`
+(`(status='archived') = (archived_at is not null)`); `vsg_schema_version_check` (= 1);
+`vsg_definition_version_check` (≥ 1); `vsg_definition_is_object`; `vsg_definition_size` (≤ 8 KB);
+`vsg_fingerprint_shape` (`^[0-9a-f]{64}$`).
+
+Indexes: `uq_vendor_segments_live_name` — **partial unique** on `lower(btrim(name))`
+`where status <> 'archived'`; `ix_vendor_segments_status_updated`; `ix_vendor_segments_fingerprint`.
+
+Trigger `trg_vsg_touch` reuses the existing `qf_crm_touch_updated_at()` helper.
+
+**RLS + grants (identical posture to the six 30.1B tables):** RLS enabled, no untrusted-role policy;
+`revoke all … from public, anon, authenticated, service_role`; then
+`grant select, insert, update … to service_role` — **never DELETE, never TRUNCATE**. Hard delete is
+impossible at the privilege layer; segments are archived, never removed.
+
+**Prohibited columns** (machine-checked by the migration's own `$verify$` block and the validator):
+any Core-truth copy (`vendor_id`, verification, `is_active`, `city`, `service_categories`,
+`areas_covered`, package, credits, eligibility, consent, suppression, communication authorization)
+and any membership smuggling (`member_count`, `members`, `recipient_count`, `recipients`,
+`approved_audience`).
+
+**Migration-006 divergence handled explicitly:** `audit_logs` and `admin_notifications` are absent on
+staging and are neither created nor referenced. Provenance lives on the table's own actor/timestamp
+columns plus `definition_version`/`definition_fingerprint` — the QF-MVP-30.2 evidence model.
+
+The migration alters no Core table, backfills no data, performs no destructive DDL, and creates no row.
+
+### 20.3 Typed rule AST
+
+`lib/crm/segmentRuleContracts.ts` (closed registries) and `lib/crm/segmentRuleValidation.ts`
+(validate → normalize → canonicalize → fingerprint). Both **pure**: no DB, no `server-only`, no
+secret — so the rule engine is executed directly by the offline validator.
+
+**Permitted Core fields (read-only, no join, never copied):** `core.status`, `core.is_active`,
+`core.city`, `core.service_categories`, `core.areas_covered`, `core.covers_full_city`,
+`core.remaining_credits`, `core.total_credits`, `core.last_assigned_at`, `core.created_at`.
+
+**Permitted CRM fields:** `crm.onboarding_stage`, `crm.relationship_status`,
+`crm.residential_commercial_scope`, `crm.travel_radius_km`, `crm.years_in_business`,
+`crm.next_follow_up_at`, `crm.last_interaction_at`, `crm.tag_id` (active assignments, by id),
+`crm.has_open_task`, `crm.has_overdue_task`, `crm.has_active_primary_contact` (existence only).
+
+**Prohibited inputs** (refused with an explicit reason, not a generic "unknown field"): package
+expiry/order fields; consent, suppression, communication authorization, campaign eligibility;
+lead/assignment content; contact name/phone/email; note bodies; unbounded free text
+(`capability_notes`, `campaign_notes`); `gst_number`; any AI score.
+
+**Operators:** `eq`, `neq`, `in`, `not_in`, `lt`, `lte`, `gt`, `gte`, `between`, `is_null`,
+`is_not_null`, `is_true`, `is_false`, `array_contains_any`, `array_contains_all`,
+`within_last_days`, `older_than_days`. **Value kinds:** enum, enum array, integer, integer pair,
+boolean, uuid, uuid array, bounded day window, none. A `field` is always a **registry key**, never a
+raw column name; there is no free-text/LIKE operator.
+
+### 20.4 Canonical JSON, version and fingerprint
+
+Canonical form emits fixed key order (`schema_version, combinator, groups` /
+`combinator, predicates` / `field, op, value`), sorts and de-duplicates array values, sorts
+predicates and groups deterministically, and collapses exact duplicate predicates.
+**Fingerprint = sha256 hex of the canonical JSON**, matching the DB `vsg_fingerprint_shape` check.
+Semantically identical rules always produce the same fingerprint; any semantic change always produces
+a different one. `schema_version` is locked to **1**; a bump is an explicit migration.
+
+**Bounds:** ≤ 3 groups, ≤ 8 predicates per group, ≤ 24 total, ≤ 25 array values, ≤ 8 KB canonical,
+name ≤ 120, description ≤ 2000, day windows 1…3650.
+
+**Semantics:** AND within a group, explicit AND/OR between groups. A predicate over NULL evaluates
+**false** — it never matches and never throws; only `is_null` matches NULL ("unknown" excludes). All
+relative windows resolve against a **single `evaluatedAt`** (never a per-predicate `now()`) in
+**Asia/Kolkata**, compared against absolute UTC `timestamptz`. Stable output order is
+`created_at DESC, id ASC`, identical to the directory read model.
+
+### 20.5 Lifecycle and QF-MVP-30.4 handoff
+
+`draft → active → archived`; create/update/archive only; **no hard delete**. One live segment per
+case-insensitive name; archived names are reusable. A duplicate *definition* (same fingerprint under
+a different name) is surfaced, not blocked. Actor and timestamps are always server-derived.
+
+30.4 records `segment_id` + `definition_version` + `definition_fingerprint` at approval and freezes
+recipients separately. Editing a segment changes the fingerprint, so an approved campaign fails
+closed on mismatch — **an approved audience can never silently change**. That guarantee needs no
+second version-history table, which is why one table is sufficient.
+
+### 20.6 Validators and verifier
+
+- **New** `scripts/mvp/crm/validate-qf-mvp-30-3.mjs` (`npm run test:crm:30-3`) — **118 checks**,
+  10 migration + 2 contract one-defect fixtures, and the real rule engine executed.
+- **Corrected** `validate-qf-mvp-30-2.mjs` — the invalid ceiling is replaced by 02a (foundation
+  migration present), 02b (30.2 declares no migration of its own), 02c (regression: a valid later
+  migration no longer breaks the validator), 02d (30.2 runtime references no segment/campaign
+  object). All previous security/runtime assertions retained; **62 checks**.
+- **New** `supabase/staging-verification/verify_qf_mvp_30_3.sql` — 22 SELECT-only rows, for exactly
+  one pre-fixture run after 30.3B. `verify_qf_mvp_30_1b.sql` is **unchanged**.
+
+**Next: QF-MVP-30.3B — staging preflight and application of `20260723001200`. Not started; the
+migration is generated and offline-validated only. No runtime implementation (routes, actions,
+services, UI, preview queries) exists yet — that is QF-MVP-30.3C.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

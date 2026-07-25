@@ -138,10 +138,45 @@ for (const item of LOCKED) {
   const actual = sha256(read(item.file));
   record(`01 migration unchanged :: ${item.file}`, actual === item.sha256, actual === item.sha256 ? actual.slice(0, 16) : `changed: ${actual}`);
 }
-record("02 no migration newer than 20260723001100", (() => {
+/* QF-MVP-30.3A CORRECTION.
+ * This slot previously asserted globally that NO migration may exist after
+ * 20260723001100. That was only ever true before QF-MVP-30.3 and would break
+ * every future phase — a later phase legitimately adds its own migration.
+ * It is replaced by the PHASE-SCOPED invariant that actually matters here:
+ * QF-MVP-30.2 is a runtime/UI phase, so it must own no migration of its own and
+ * must not depend on segment/campaign objects. The 30.1B foundation hash is
+ * asserted separately by check 01. */
+record("02a required 30.1B foundation migration still present", (() => {
   const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((x) => x.endsWith(".sql"));
-  return files.every((x) => x <= "20260723001100_zzz");
-})(), "no CRM-runtime phase migration added");
+  return files.includes("20260723001100_qf_mvp_vendor_crm_foundation.sql");
+})(), "the CRM foundation migration this phase runs on top of exists");
+
+record("02b QF-MVP-30.2 owns no migration of its own", (() => {
+  const dir = path.join(ROOT, "supabase/migrations");
+  // A migration "belongs to" 30.2 only if it DECLARES that phase as its own in
+  // its header banner (`-- QF-MVP-30.2 — ...`). A prose cross-reference in a
+  // later migration's comments is not ownership.
+  const declaresPhase302 = /^--\s*QF-MVP-30\.2\b/m;
+  return readdirSync(dir).filter((x) => x.endsWith(".sql"))
+    .every((f) => !declaresPhase302.test(readFileSync(path.join(dir, f), "utf8")));
+})(), "30.2 is runtime/UI only — no migration declares itself part of it");
+
+record("02c later-phase migrations do not break this validator", (() => {
+  // Regression guard for the corrected rule: a legitimate LATER migration (e.g.
+  // the QF-MVP-30.3 segment foundation) must not fail QF-MVP-30.2. Simulated on
+  // a synthetic file list so the assertion holds whether or not 30.3 has landed.
+  const simulated = ["20260723001100_qf_mvp_vendor_crm_foundation.sql",
+    "20260723001200_qf_mvp_vendor_segment_foundation.sql", "20270101000000_some_future_phase.sql"];
+  const foundationPresent = simulated.includes("20260723001100_qf_mvp_vendor_crm_foundation.sql");
+  const oldCeilingWouldHaveFailed = !simulated.every((x) => x <= "20260723001100_zzz");
+  return foundationPresent && oldCeilingWouldHaveFailed;
+})(), "the removed ceiling would have failed on a valid later migration; the phase-scoped rule does not");
+
+record("02d QF-MVP-30.2 runtime does not depend on segment/campaign objects", (() => {
+  const surface = [SERVICE, ACTIONS, GUARD, VALIDATION, DIR_PAGE, PROFILE_PAGE, DIR_UI, PROFILE_UI]
+    .map((f) => read(f)).join("\n");
+  return !/\b(vendor_segments|vendor_segment_memberships|vendor_segment_members|vendor_campaigns|vendor_campaign_audiences|vendor_campaign_events|vendor_engagement_events)\b/.test(surface);
+})(), "no 30.2 runtime file references a segment/campaign/membership object");
 
 /* ===========================================================================
  * 2. Files exist

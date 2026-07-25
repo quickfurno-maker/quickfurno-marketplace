@@ -21,7 +21,8 @@ export type AdminSectionKey =
   | "settings"
   | "audit-logs"
   | "vendor-crm"
-  | "vendor-segments";
+  | "vendor-segments"
+  | "vendor-campaigns";
 
 export type AdminIconName =
   | "dashboard"
@@ -66,6 +67,7 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "vendors", href: "/admin/vendors", label: "Vendors", description: "Studios, vendors, verification", icon: "vendors", addLabel: "Add Vendor" },
   { key: "vendor-crm", href: "/admin/vendor-crm", label: "Vendor CRM", description: "Vendor relationships, contacts, tags, notes, tasks", icon: "vendors", addLabel: "" },
   { key: "vendor-segments", href: "/admin/vendor-crm/segments", label: "Vendor Segments", description: "Deterministic saved rules — preview only, never send authorization", icon: "vendors", addLabel: "" },
+  { key: "vendor-campaigns", href: "/admin/vendor-crm/campaigns", label: "Vendor Campaigns", description: "Freeze an audience, review it, approve it — approval never sends", icon: "vendors", addLabel: "" },
   { key: "packages", href: "/admin/packages", label: "Packages", description: "Lead packs, pricing, visibility", icon: "packages", addLabel: "Add Package" },
   { key: "categories", href: "/admin/categories", label: "Categories", description: "Services and subcategories", icon: "categories", addLabel: "Add Category" },
   { key: "cities", href: "/admin/cities", label: "Cities & Locations", description: "Cities, localities, launch status", icon: "cities", addLabel: "Add City" },
@@ -89,7 +91,7 @@ export const adminSections: AdminSectionConfig[] = [
 export const adminNavGroups: AdminNavGroup[] = [
   {
     title: "Command Center",
-    sections: ["dashboard", "crm", "leads", "vendors", "vendor-crm", "vendor-segments"],
+    sections: ["dashboard", "crm", "leads", "vendors", "vendor-crm", "vendor-segments", "vendor-campaigns"],
   },
   {
     title: "Business Setup",

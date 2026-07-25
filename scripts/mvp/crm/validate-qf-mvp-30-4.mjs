@@ -286,16 +286,57 @@ record("11 validation module is pure", (() => {
 })(), "safely importable and directly testable");
 
 /* ===========================================================================
- * 4. No runtime implementation has leaked into this phase
+ * 4. The 30.4A FOUNDATION BOUNDARY holds against the runtime
+ *
+ * These three checks originally asserted that no campaign runtime existed yet,
+ * which was true only until QF-MVP-30.4C shipped one. A ceiling that expires is
+ * not an invariant, so they are re-based onto the enduring property they were
+ * really protecting: the foundation layer stays offline-testable and the runtime,
+ * WHENEVER it exists, may only reach the schema through the locked RPCs and the
+ * server-only service. Each check is meaningful whether or not the runtime is
+ * present; QF-MVP-30.4C grades the runtime itself in depth.
  * ========================================================================= */
-record("12 no campaign route exists yet", !existsSync(path.join(ROOT, "app/admin/vendor-crm/campaigns")),
-  "routes belong to QF-MVP-30.4C");
-record("13 no campaign service/actions exist yet",
-  !existsSync(path.join(ROOT, "services/vendorCampaignService.ts"))
-  && !existsSync(path.join(ROOT, "app/actions/vendorCampaignActions.ts")),
-  "service + actions belong to QF-MVP-30.4C");
-record("14 no campaign UI component exists yet",
-  !existsSync(path.join(ROOT, "components/admin/crm/campaigns")), "UI belongs to QF-MVP-30.4C");
+const RUNTIME_ROUTE_DIR = "app/admin/vendor-crm/campaigns";
+const RUNTIME_SERVICE = "services/vendorCampaignService.ts";
+const RUNTIME_ACTIONS = "app/actions/vendorCampaignActions.ts";
+const RUNTIME_UI_DIR = "components/admin/crm/campaigns";
+const has = (rel) => existsSync(path.join(ROOT, rel));
+const listTs = (rel) => {
+  const dir = path.join(ROOT, rel);
+  if (!existsSync(dir)) return [];
+  const walk = (d) => readdirSync(d, { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+  return walk(dir).filter((p) => /\.(ts|tsx)$/.test(p)).map((p) => readFileSync(p, "utf8"));
+};
+
+record("12 campaign routes never reach the schema directly", (() => {
+  const routes = listTs(RUNTIME_ROUTE_DIR);
+  if (routes.length === 0) return true; // no runtime yet — vacuously intact
+  return routes.every((s) => !/adminClient\(|createClient\(|@supabase\/supabase-js/.test(s))
+    && routes.every((s) => /getAdminSession\(\)/.test(s) && /isSuperadmin/.test(s));
+})(), "every campaign route is admin-guarded and holds no service-role client");
+
+record("13 the campaign service/actions boundary is server-only and RPC-mediated", (() => {
+  if (!has(RUNTIME_SERVICE) && !has(RUNTIME_ACTIONS)) return true; // no runtime yet
+  if (!has(RUNTIME_SERVICE) || !has(RUNTIME_ACTIONS)) return false; // half a runtime is a defect
+  const svc = read(RUNTIME_SERVICE);
+  const act = read(RUNTIME_ACTIONS);
+  return /import\s+["']server-only["']/.test(svc)
+    // the frozen audience is only ever written by the locked prepare RPC.
+    && /qf_prepare_vendor_campaign_v1/.test(svc)
+    && !/from\(["']vendor_campaign_audience_members["']\)[\s\S]{0,200}?\.(insert|update|upsert|delete)\b/.test(svc)
+    // actions are guarded wrappers, never a database client.
+    && /requireCrmAdmin\(\)/.test(act)
+    && !/adminClient|createClient|@supabase/.test(act);
+})(), "server-only service, audience frozen only via the RPC, guarded actions");
+
+record("14 campaign UI carries no service-role or execution capability", (() => {
+  const ui = listTs(RUNTIME_UI_DIR);
+  if (ui.length === 0) return true; // no runtime yet
+  return ui.every((s) => /^\s*["']use client["']/.test(s))
+    && ui.every((s) => !/adminClient|serverClient|["']server-only["']|SERVICE_ROLE|@supabase\/supabase-js/.test(s))
+    && ui.every((s) => !/^\s*import\s+(?!type\b)[^;]*from\s+["'][^"']*services\/vendorCampaignService["']/m.test(s));
+})(), "client components hold no credential and never value-import the service");
 
 /* ===========================================================================
  * 5. Staging verifier contract (not executed here)

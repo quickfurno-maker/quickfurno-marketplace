@@ -919,6 +919,113 @@ data-access role. **No untrusted policy may be added to silence the advisor.**
 **Next: QF-MVP-30.4C — admin campaign management runtime. No runtime code is included in this
 staging-application record.**
 
+## 26. QF-MVP-30.4C — admin campaign management runtime (IMPLEMENTED, runtime/UI)
+
+**Status:** `VENDOR_CAMPAIGN_RUNTIME_IMPLEMENTED_NOT_SMOKED`
+
+Built on the applied `20260723001300` foundation. **No migration was added, edited or re-applied, no
+staging project was contacted and no campaign fixture exists.** Local implementation + offline gates only;
+the staging smoke is QF-MVP-30.4D.
+
+**Surface.** Admin-only, under the existing Vendor CRM area:
+
+| Artifact | Role |
+| --- | --- |
+| `services/vendorCampaignService.ts` | server-only campaign boundary (the single writer) |
+| `app/actions/vendorCampaignActions.ts` | guarded server actions; actor from the session only |
+| `app/admin/vendor-crm/campaigns/page.tsx` | server-paged campaign directory route |
+| `app/admin/vendor-crm/campaigns/[campaignId]/page.tsx` | campaign editor + frozen-audience review route |
+| `components/admin/crm/campaigns/VendorCampaignDirectory.tsx` | client shell (list) |
+| `components/admin/crm/campaigns/VendorCampaignEditor.tsx` | client shell (edit / review / approve) |
+| `lib/crm/campaignAudiencePlan.ts` | **pure** batch-consent boundary + inclusion rule |
+
+There is **no** public route, **no** vendor route and **no** API route: campaign mutation is server-action
+only, and every action passes `requireCrmAdmin()` before any service-role client is created.
+
+**Freeze at prepare.** `prepareCampaignForReview` resolves the source segment through the existing
+deterministic engine, applies consent, and then calls **only** `qf_prepare_vendor_campaign_v1`. The head,
+the audience rows and the `prepared` event are written in **one transaction inside that RPC**; the service
+never inserts an audience row itself, and the grant withholds UPDATE/DELETE on that table from every role.
+`approveVendorCampaign` delegates entirely to `qf_approve_vendor_campaign_v1` and **never resolves or alters
+recipients**.
+
+**Consent is read from the sole authority, batched.** `decideCommunicationConsent` is reused unchanged —
+its rules are never reimplemented — but its default dependencies issue one suppression query and one
+preference query *per call*, which per vendor would be a textbook N+1. `buildBatchConsentDeps` therefore
+backs those same dependencies with maps loaded in **two** batched reads, so each per-vendor decision performs
+**zero** database I/O while suppression precedence, re-consent and policy-version handling run untouched. A
+single frozen `evaluatedAt` is shared by the whole freeze; row cardinality is preserved verbatim so the
+authority can still detect a duplicate-row integrity violation, and a NULL vocabulary field is projected as
+the literal `"null"` — outside every closed vocabulary — so corruption **fails closed** instead of being
+repaired into permission.
+
+**Inclusion rule (locked).** `blocked` is never included. A **marketing** campaign includes **only**
+`marketing_opted_in`; `unknown` and `no_consent_objection` are absence of objection, not marketing
+permission. A **transactional** campaign may additionally include those two. Every excluded vendor is
+reduced to a sanitized reason **count** (`consent_blocked`, `suppressed`, `vendor_disabled`,
+`vendor_unverified`, `missing_contact_channel`, `duplicate`) — no excluded identity is ever stored.
+
+**Destination handling.** A vendor phone is read **only in memory**, only to derive the canonical
+`hashPhoneE164` destination hash the authority requires, and is discarded with the request. It is never
+stored, returned to the browser or logged. Reusing the one canonical hasher is a correctness requirement,
+not a style preference: a second implementation would silently fail to match stored suppression rows and
+make a suppressed vendor look eligible.
+
+**Bounded work.** Candidate resolution pages the segment engine at **≤100** per page under a hard page cap,
+so the query count is `ceil(candidates / 100)` — never per vendor. Ids are de-duplicated across pages and
+counted as `duplicate` exclusions; an audience above **5000** is **refused**, never silently truncated.
+
+**Event provenance — stated honestly.** `prepare` and `approve` write head **and** event atomically inside
+their SECURITY DEFINER RPCs. `create`, `update`, `return_to_draft`, `cancel` and `archive` have no RPC and
+PostgREST cannot span two statements in one transaction, so they write the **head first** — which carries the
+authoritative status, revision and actor/timestamp provenance — and then append a best-effort event. **No
+atomicity is claimed that the schema cannot provide.** Head-first ordering means a failure can lose a trail
+line but can never produce an event asserting a transition that did not happen.
+
+**Return to draft retains prepared evidence.** The prepare RPC derives the next snapshot revision as
+`coalesce(prepared_snapshot_revision, 0) + 1`, so clearing those pointers would reset the numbering and let a
+new snapshot reuse an existing revision. They are therefore kept. The single exception is
+`prepared_template_category`, cleared when a draft edit changes the consent scope or the template, because a
+stale value would otherwise trip `vcm_marketing_requires_marketing_template` on an otherwise legal edit.
+
+**Optimistic concurrency.** Every non-RPC transition carries an expected `revision` and predicates its
+UPDATE on the observed value, so a concurrent editor loses rather than overwrites; both RPCs enforce the same
+token server-side under a row lock.
+
+**Still out of scope, deliberately.** No communication intent, no provider call, no message rendering, no
+delivery state, no test-send — and **no frequency authority**, because none exists. **Until QF-MVP-30.5 adds
+a fail-closed frequency gate, no campaign may send.** Both admin surfaces state "approval is not a send" and
+name that gate explicitly. No Core table is written: no vendor, package, credit, assignment, eligibility,
+consent, preference or suppression mutation of any kind.
+
+**Self-review corrections (made before commit).** Four real defects were found and fixed. (1) **An
+unchunked `in()` would have failed at scale** — a PostgREST select travels as a GET query string, so one
+`in()` carrying a 5000-strong audience would have built a ~325 KB URL and been rejected outright; every
+evidence read is now chunked at **200** ids, so the request count scales with audience/200 and stays
+batched. (2) **`??` collapsed “omitted” into “explicit null”** in the draft patch, so a segment or template
+could never be de-selected once chosen; an omitted field now keeps its stored value while an explicit
+`null` clears it. (3) **The channel had two sources** — the evidence batches used `campaign.channel` while
+the consent call hardcoded `whatsapp`; they now share one validated variable so they cannot diverge if the
+vocabulary widens. (4) **A returned-to-draft campaign showed its retained snapshot as if current** — it is
+now labelled “Last frozen audience” with an explicit note that it reflects the previous definition. Rules
+`W11_bounded_reads` (chunking) and `W15_explicit_clear` were added with fixtures S and T so neither can
+regress.
+
+**Validator.** `npm run test:crm:30-4c` — **77/77**, with 14 service + 3 action + 2 route + 1 client
+one-defect fixtures (all proven to trip, none a no-op) and the real pure planner executed. The consent
+authority itself is graded **statically** — its disposition vocabulary and injected-dependency contract are
+read from its source and asserted against what the runtime relies on — because the MVP loader deliberately
+refuses to resolve Supabase/service modules; a behavioural end-to-end consent proof belongs to the 30.4D
+staging smoke.
+
+**Foundation validator re-based.** 30.4A checks 12/13/14 asserted "no campaign runtime exists yet", a ceiling
+that expires the moment 30.4C ships. They now assert the enduring property they were protecting — campaign
+routes hold no service-role client and are admin-guarded; the service is server-only and freezes the audience
+only via the RPC while actions stay guarded wrappers; campaign UI holds no credential and never value-imports
+the service — and each was negative-controlled to confirm it still discriminates. 30.4A remains **113/113**.
+
+**Next: QF-MVP-30.4D — campaign staging smoke. Not started.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

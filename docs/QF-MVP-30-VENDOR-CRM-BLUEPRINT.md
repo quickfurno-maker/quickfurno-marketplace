@@ -681,6 +681,81 @@ clean; clean `.next` rebuild with a zero-hit prohibited-ref scan; `git diff --ch
 
 **Next: QF-MVP-30.3D — staging runtime smoke (not started). No segment fixture has been created.**
 
+## 23. QF-MVP-30.3D — deterministic segment staging smoke (COMPLETE)
+
+**Status:** `QF_MVP_30_3_DETERMINISTIC_VENDOR_SEGMENTS_COMPLETE_READY_FOR_CAMPAIGNS`
+
+Pushed commits under test: **`3b15bb00f651150c6bca1702ac7de0e7ca652ea3`** (30.3B staging-application
+record) and **`73b913a71a355e26bd2575e3284d56e080713058`** (30.3C runtime). Authorized staging
+`uckafzuochmbvtiodmcl` only; production and QF-Jarvis never contacted; no provider call.
+
+**Smoke: 122/122 checks PASS**, fixture namespace `QF_STAGING_VENDOR_SEGMENT_SMOKE_V1` (no ids
+recorded), driving the **real Next.js server actions** over HTTP with a genuine `@supabase/ssr`
+session against the clean production build on a non-default local port.
+
+**Authorization.** Unauthenticated → `/admin/login` on both the directory and the editor; a live
+`profiles.role` downgrade → `?error=unauthorized`; Superadmin allowed; a state-changing action
+independently refused while demoted, proving each action rechecks authority rather than trusting the
+route guard.
+
+**Directory.** Loads; every lifecycle-status filter, an invalid status, a negative page and a page
+past the last row all return HTTP 200 with **no raw database detail** rendered.
+
+**Create.** Draft created through the real action; status `draft`, `definition_version` 1,
+`schema_version` 1, actor server-derived, timestamps server-maintained, fingerprint a server-computed
+sha256. A duplicate live name is refused (mapped from the DB unique index) and an invalid definition
+is rejected. **A client-supplied `definition_fingerprint`/`definition_version` is ignored — the server
+recomputes both**, verified by creating with deliberately spoofed values and reading back the
+server-derived fingerprint and version 1.
+
+**Version and fingerprint.** A metadata-only edit does **not** burn a version (stays v1, fingerprint
+unchanged); a reordered but semantically equivalent definition keeps the **same** fingerprint and
+version; a semantic change increments the version exactly once and changes the fingerprint; reverting
+the rule yields **v3 with the original fingerprint**, proving the version never decreases or reuses an
+earlier value.
+
+**Activate / archive / name reuse.** A valid draft activates. Archive sets `status`, `archived_at` and
+`archived_by`, and the row remains — **not a hard delete**. An archived segment can be neither edited
+nor activated, so it can never silently become campaign authority. An archived name is reusable, per
+the partial-unique contract. The built server-action manifest contains **no delete, send, dispatch or
+campaign action**.
+
+**Rules.** All 12 representative permitted predicates evaluate (8 Core read-only, 4 CRM). **25
+prohibited inputs refused**: unknown field/operator, wrong value type, too many groups/rules,
+excessive token length, free-text-shaped operator, raw PostgREST grammar, comma, parentheses, double
+quote, backslash, percent, underscore, star, package expiry, package-order activity, consent,
+suppression, communication authorization, assignment eligibility, campaign field, AI/ranking field,
+contact PII and note content.
+
+**Open-vocabulary proof.** `Modular Kitchen & Wardrobe` remains usable while **six injection-shaped
+payloads are refused**, confirming the charset restriction closes the last path by which raw filter
+grammar could reach PostgREST.
+
+**Dynamic count and preview.** Count and rows come from the same canonical definition; a matching rule
+returns the synthetic vendor with a consistent total, a non-matching rule safely returns zero. Page
+size clamps to **100**, invalid paging clamps to page 1, page 2 is stable under the id tie-breaker.
+Preview exposes **only** `vendor_id, business_name, city, status, is_active` — no phone, email, note,
+consent or service-role field — and carries a server `evaluatedAt` stamp.
+
+**Dynamic, not persisted.** Previewing on the vendor's *current* CRM `onboarding_stage` includes it,
+and previewing a different stage excludes it — evaluated live against CRM facts with **no membership
+row written**. `vendor_segments` holds no `vendor_id`, member, recipient or audience column, and all
+six membership/campaign/audience/engagement tables remain **absent (PGRST205)** after the smoke.
+
+**Containment.** All **15** authoritative Core vendor fields byte-identical before and after. Zero
+rows in `vendor_package_orders`, `vendor_credit_logs`, `lead_assignments`,
+`communication_consent_events` and `communication_suppressions`. No segment data on any public or
+vendor surface. Clean build: zero prohibited project refs, and **zero** `service_role`,
+`SUPABASE_SERVICE`, `vendor_segments` or JWT-shaped strings across all 52 client bundles.
+
+**Cumulative fixture posture.** Segments are archive-only, so smoke rows accumulate by design: **7
+namespace segments (6 archived, 1 active)** after this run. Prior-run leftovers were retired through
+the application's own archive action — never a hard delete. Rows created by Core/financial/consent
+tables during this run: **0**. Core authoritative field changes: **0**.
+
+**QF-MVP-30.3 is complete. Next: QF-MVP-30.4 — Campaign Management (frozen audiences and send
+approval). Not started; no campaign, audience, recipient or provider artifact exists.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

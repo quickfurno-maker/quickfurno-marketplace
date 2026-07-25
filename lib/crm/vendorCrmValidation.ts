@@ -85,6 +85,38 @@ export function rejectUnknownKeys(input: Record<string, unknown>, allowed: reado
   }
 }
 
+/** Hard cap on a directory search term, applied after normalization. */
+export const CRM_SEARCH_MAX_LENGTH = 80;
+
+/**
+ * Normalize a directory search term so it can NEVER alter PostgREST filter
+ * grammar or SQL LIKE semantics.
+ *
+ * The search feeds a PostgREST `or=(...)` expression, whose grammar is delimited
+ * by commas, parentheses, dots and quotes; the `ilike` value is additionally a
+ * SQL LIKE pattern in which `%` and `_` are wildcards. Rather than escape each of
+ * those — which means stacking PostgREST string-quoting on top of SQL LIKE
+ * escaping, and is easy to get subtly wrong — we allow-list the characters that
+ * actually occur in business names, owner names and phone numbers and drop
+ * everything else. Stripping is strictly stronger than escaping here: a
+ * structural character cannot survive to be mis-escaped downstream.
+ *
+ * Kept:    Unicode letters/marks/digits (any script), space, ' - . + @ &
+ * Dropped: , ( ) " \ % _ * and every control/format character.
+ */
+export function sanitizeDirectorySearch(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const stripped = raw
+    .normalize("NFKC")
+    .replace(/\p{C}/gu, " ")                      // control + format characters
+    .replace(/[^\p{L}\p{M}\p{N} '\-.+@&]/gu, " ") // structural + wildcard characters
+    .replace(/\s+/g, " ")
+    .trim();
+  if (stripped.length === 0) return null;
+  const capped = stripped.slice(0, CRM_SEARCH_MAX_LENGTH).trim();
+  return capped.length === 0 ? null : capped;
+}
+
 /** Deterministic tag normalization — the SERVER owns this, never the client.
  *  Mirrors the DB uniqueness intent (vendor_tags.normalized_name unique). */
 export function normalizeTagName(name: string): string {
@@ -276,7 +308,8 @@ export function validateDirectoryQuery(input: Record<string, unknown> = {}): Ven
   return {
     page,
     pageSize,
-    search: optText(input.search, "search", MAX_SHORT),
+    // sanitized, never raw: see sanitizeDirectorySearch.
+    search: sanitizeDirectorySearch(input.search),
     category: optText(input.category, "category", MAX_SHORT),
     city: optText(input.city, "city", MAX_SHORT),
     verification: optText(input.verification, "verification", MAX_SHORT),

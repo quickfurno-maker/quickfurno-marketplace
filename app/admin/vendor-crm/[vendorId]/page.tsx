@@ -8,6 +8,24 @@ import { VendorCrmProfile } from "@/components/admin/crm/VendorCrmProfile";
 
 export const dynamic = "force-dynamic";
 
+// Fixed administrator-facing text. A raw exception/database/provider message is
+// NEVER rendered: it can embed SQL, column names, row values or connection
+// detail. The operator gets a stable string; the detail stays server-side.
+const CRM_PROFILE_LOAD_ERROR =
+  "This vendor's CRM profile could not be loaded. Please retry — if this persists, contact engineering.";
+
+/** Server-side diagnostic. Logs the error CLASS only — never `message`, which is
+ *  the field that carries SQL, identifiers, values and PII. Never logs the
+ *  vendor id. */
+function logCrmRouteFailure(scope: string, e: unknown) {
+  const err = e as { name?: string; code?: string } | null;
+  console.error("[crm-route] load failed", {
+    scope,
+    name: err?.name ?? "Error",
+    code: err?.code ?? "UNKNOWN",
+  });
+}
+
 // Admin-only combined Vendor CRM profile (Core read-only + CRM extensions).
 export default async function VendorCrmProfilePage({ params }: { params: { vendorId: string } }) {
   const session = await getAdminSession();
@@ -30,7 +48,8 @@ export default async function VendorCrmProfilePage({ params }: { params: { vendo
       listVendorTasks(vendorId),
     ]);
   } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to load the vendor CRM profile.";
+    logCrmRouteFailure("vendor-crm/profile", e);
+    error = CRM_PROFILE_LOAD_ERROR;
   }
 
   if (!error && !core) notFound();

@@ -101,7 +101,15 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
   let vq = c.from("vendors")
     .select("id, business_name, owner_name, phone, city, service_categories, status, is_active, remaining_credits, total_credits, created_at", { count: "exact" });
   if (crmIdFilter) vq = vq.in("id", crmIdFilter);
-  if (q.search) vq = vq.or(`business_name.ilike.%${q.search}%,owner_name.ilike.%${q.search}%,phone.ilike.%${q.search}%`);
+  // q.search arrives sanitized (sanitizeDirectorySearch): it can contain no
+  // PostgREST grammar (, ( ) " \) and no LIKE wildcard (% _). The value is ALSO
+  // double-quoted here so the or() expression stays structurally fixed even if
+  // the allow-list is ever widened — two independent defences, not one.
+  if (q.search) {
+    vq = vq.or(
+      `business_name.ilike."%${q.search}%",owner_name.ilike."%${q.search}%",phone.ilike."%${q.search}%"`,
+    );
+  }
   if (q.category) vq = vq.contains("service_categories", [q.category]);
   if (q.city) vq = vq.ilike("city", `%${q.city}%`);
   if (q.verification) vq = vq.eq("status", q.verification);

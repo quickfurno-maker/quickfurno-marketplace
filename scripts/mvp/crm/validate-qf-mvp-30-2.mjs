@@ -9,7 +9,12 @@
  * vendor_public_v / migration / audit_logs-dependency / segment / campaign /
  * owner-binding scope. Real files are graded directly; fixtures mutate copies.
  *
- * Usage:  node scripts/mvp/crm/validate-qf-mvp-30-2.mjs   (exit 0 = PASS)
+ * Mostly static, but section 5b EXECUTES the real search sanitizer, so the `.ts`
+ * resolution hook must be registered.
+ *
+ * Usage:  npm run test:crm:30-2                                  (exit 0 = PASS)
+ *   or:   node --import ./scripts/mvp/loader/register.mjs \
+ *              scripts/mvp/crm/validate-qf-mvp-30-2.mjs
  */
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
@@ -77,6 +82,37 @@ export function evaluateService(rawSrc, label = "service") {
   // S08 no segment/campaign / vendor_public_v / owner-binding
   if (/vendor_segments|vendor_campaigns|vendor_campaign_|vendor_engagement_events/.test(src)) add("S08_no_scope_creep", "references a segment/campaign table");
   if (/vendor_public_v/.test(src)) add("S08_no_scope_creep", "touches vendor_public_v");
+  // S09 the directory search must never be interpolated raw into PostgREST or()
+  // grammar: the value must be sanitized upstream AND double-quoted in the filter.
+  for (const m of src.matchAll(/\.or\(\s*`([^`]*)`/g)) {
+    const expr = m[1];
+    if (/ilike\.%\$\{/.test(expr)) add("S09_safe_search", "interpolates the search term into an UNQUOTED ilike value");
+    if (/\$\{/.test(expr) && !/ilike\."%\$\{/.test(expr)) add("S09_safe_search", "or() interpolates a value that is not double-quoted");
+  }
+  if (/\.or\(/.test(src) && !/sanitizeDirectorySearch|validateDirectoryQuery/.test(src)) {
+    add("S09_safe_search", "builds an or() filter without the sanitized/validated query");
+  }
+  return f;
+}
+
+/* ===========================================================================
+ * ROUTE evaluator (no raw exception text may reach the rendered admin UI)
+ * ========================================================================= */
+export function evaluateRoute(src, label = "route") {
+  const f = [];
+  const add = (rule, detail) => f.push({ rule, detail });
+  // R01 a raw exception/DB message must never become the rendered error state.
+  if (/\berror\s*=\s*[^;]*\.message/.test(src)) add("R01_no_raw_route_error", "assigns a raw exception message to the rendered error state");
+  if (/\b(e|err|error)\s+instanceof\s+Error\s*\?\s*\1\.message/.test(src)) add("R01_no_raw_route_error", "renders e.message when the throwable is an Error");
+  // the rendered value must be a fixed constant declared in the module.
+  if (!/const\s+CRM_[A-Z_]*LOAD_ERROR\s*=\s*$/m.test(src) && !/const\s+CRM_[A-Z_]*LOAD_ERROR\s*=/.test(src)) {
+    add("R01_no_raw_route_error", "no fixed CRM_*_LOAD_ERROR constant is declared");
+  }
+  // R02 the route module must not touch `.message` AT ALL — not to render it and
+  // not to log it. A blanket ban is used deliberately: a narrower "inside a
+  // console call" pattern is defeated by any nested parenthesis, e.g.
+  // `console.error(x, (e as Error).message)`.
+  if (/\.message\b/.test(src)) add("R02_no_message_logging", "references the raw error message field");
   return f;
 }
 
@@ -129,6 +165,7 @@ const SVC_FIX = [
   { id: "E", rule: "S07_no_006_dependency", why: "an audit_logs dependency is added", mutate: (s) => `${s}\nexport async function audit(){ return db().from("audit_logs").insert({}); }\n` },
   { id: "F", rule: "S08_no_scope_creep", why: "a campaign table is referenced", mutate: (s) => `${s}\nexport async function camp(){ return db().from("vendor_campaigns").select("*"); }\n` },
   { id: "G", rule: "S05_bounded_pagination", why: "the range/pagination is removed", mutate: (s) => s.replace(/\.range\([^)]*\)/, ".limit(100000)") },
+  { id: "H", rule: "S09_safe_search", why: "the search term is interpolated unquoted into or()", mutate: (s) => s.replace(/`business_name\.ilike\."%\$\{q\.search\}%"[^`]*`/, "`business_name.ilike.%${q.search}%,owner_name.ilike.%${q.search}%`") },
 ];
 for (const fx of SVC_FIX) {
   const mutated = fx.mutate(serviceSrc); const changed = mutated !== serviceSrc;
@@ -180,6 +217,27 @@ for (const [pg, label] of [[DIR_PAGE, "directory"], [PROFILE_PAGE, "profile"]]) 
   const s = read(pg);
   record(`12 route admin-guarded :: ${label}`, /getAdminSession\(\)/.test(s) && /isSuperadmin/.test(s) && /redirect\(/.test(s) && !/adminClient/.test(s), "getAdminSession + isSuperadmin redirect");
 }
+/* -- QF-MVP-30.2C1 defect 2: no raw exception text in a rendered route error -- */
+for (const [pg, label] of [[DIR_PAGE, "directory"], [PROFILE_PAGE, "profile"]]) {
+  const ff = evaluateRoute(read(pg), label);
+  record(`12b route error state is safe :: ${label}`, ff.length === 0,
+    ff.map((x) => `${x.rule}: ${x.detail}`).join(" | ") || "fixed CRM_*_LOAD_ERROR constant; no e.message rendered or logged");
+}
+const ROUTE_FIX = [
+  { id: "RF1", rule: "R01_no_raw_route_error", why: "the route renders e.message again",
+    mutate: (s) => s.replace(/error = CRM_[A-Z_]*LOAD_ERROR;/, 'error = e instanceof Error ? e.message : "x";') },
+  { id: "RF2", rule: "R02_no_message_logging", why: "the diagnostic log leaks the raw message",
+    mutate: (s) => s.replace(/code: err\?\.code \?\? "UNKNOWN",/, 'code: err?.code ?? "UNKNOWN", detail: (e as Error).message,') },
+];
+const dirPageSrc = read(DIR_PAGE);
+for (const fx of ROUTE_FIX) {
+  const mutated = fx.mutate(dirPageSrc); const changed = mutated !== dirPageSrc;
+  const ff = changed ? evaluateRoute(mutated, `rfx-${fx.id}`) : [];
+  const tripped = ff.some((x) => x.rule === fx.rule);
+  record(`12c route fixture ${fx.id} trips ${fx.rule} :: ${fx.why}`, changed && tripped,
+    !changed ? "NO-OP" : tripped ? "tripped" : ff.map((x) => x.rule).join(",") || "none");
+}
+
 record("13 directory UI has empty + error states", /EmptyState/.test(dirUi) && /error/.test(dirUi), "EmptyState + error");
 record("14 profile UI has empty state + notes append-only (no edit/delete control)", (() => {
   const p = read(PROFILE_UI);
@@ -189,6 +247,60 @@ record("15 validation bounds page size + rejects unknown keys", (() => {
   const v = read(VALIDATION);
   return /CRM_DIRECTORY_MAX_PAGE_SIZE/.test(v) && /Math\.min\(/.test(v) && /rejectUnknownKeys/.test(v);
 })(), "MAX page + Math.min + rejectUnknownKeys");
+
+/* ===========================================================================
+ * 5b. BEHAVIOURAL tests — the real sanitizer, executed (QF-MVP-30.2C1 defect 1)
+ *
+ * Imported through Node's native `.ts` type-stripping (see
+ * scripts/mvp/loader/register.mjs). vendorCrmValidation.ts is pure — no DB, no
+ * server-only import — so it can be executed directly here.
+ * ========================================================================= */
+const { sanitizeDirectorySearch, CRM_SEARCH_MAX_LENGTH, validateDirectoryQuery } =
+  await import("../../../lib/crm/vendorCrmValidation.ts");
+
+/** The filter expression the service builds, so we assert on the real shape. */
+const buildOr = (term) =>
+  `business_name.ilike."%${term}%",owner_name.ilike."%${term}%",phone.ilike."%${term}%"`;
+/** An or() expression is intact when it has exactly 3 terms and 6 quotes. */
+const orIsIntact = (expr) =>
+  (expr.match(/ilike\./g) || []).length === 3 && (expr.match(/"/g) || []).length === 6;
+
+const SEARCH_CASES = [
+  { id: "T1  ordinary business name survives", input: "Sharma Interiors", expect: (out) => out === "Sharma Interiors" },
+  { id: "T2  digits, spaces and hyphens survive", input: "A-1 Modular 24", expect: (out) => out === "A-1 Modular 24" },
+  { id: "T3  apostrophe / period / plus / at survive", input: "O'Brien Co. +91 a@b", expect: (out) => out === "O'Brien Co. +91 a@b" },
+  { id: "T4  comma cannot inject a second filter", input: 'x,is_active.eq.true', expect: (out) => !out.includes(",") && orIsIntact(buildOr(out)) },
+  { id: "T5  parentheses cannot open a filter group", input: "x,or(status.eq.approved)", expect: (out) => !/[(),]/.test(out) && orIsIntact(buildOr(out)) },
+  { id: "T6  double quote cannot break out of the quoted value", input: 'x"y', expect: (out) => !out.includes('"') && orIsIntact(buildOr(out)) },
+  { id: "T7  backslash cannot escape the closing quote", input: 'x\\"y', expect: (out) => !/["\\]/.test(out) && orIsIntact(buildOr(out)) },
+  { id: "T8  percent cannot become an uncontrolled wildcard", input: "100%", expect: (out) => !out.includes("%") },
+  { id: "T9  underscore cannot become a single-char wildcard", input: "a_b", expect: (out) => !out.includes("_") },
+  { id: "T10 asterisk cannot become a PostgREST wildcard", input: "a*b", expect: (out) => !out.includes("*") },
+  { id: "T11 excessive length is bounded", input: "z".repeat(5000), expect: (out) => out !== null && out.length === CRM_SEARCH_MAX_LENGTH },
+  { id: "T12 empty input is null, not an empty filter", input: "", expect: (out) => out === null },
+  { id: "T13 whitespace-only input is null", input: "   \t  ", expect: (out) => out === null },
+  { id: "T14 fully-stripped input is null, never an empty match-all", input: "(),%_*\"\\", expect: (out) => out === null },
+  { id: "T15 control characters are removed", input: "a\u0000b\u200Bc", expect: (out) => !/\p{C}/u.test(out) },
+  { id: "T16 non-string input is rejected", input: { toString: () => "x,y" }, expect: (out) => out === null },
+  { id: "T17 Unicode letters remain usable (Devanagari)", input: "शर्मा इंटीरियर", expect: (out) => out === "शर्मा इंटीरियर" },
+  { id: "T18 Unicode letters remain usable (Latin accents)", input: "Café Móveis", expect: (out) => out === "Café Móveis" },
+  { id: "T19 newline cannot split the filter expression", input: "a\nis_active.eq.true", expect: (out) => !/[\r\n]/.test(out) },
+  { id: "T20 the built or() stays exactly 3 quoted terms", input: 'a",x.eq.1,"b', expect: (out) => orIsIntact(buildOr(out)) },
+];
+for (const c of SEARCH_CASES) {
+  let out, ok, detail;
+  try { out = sanitizeDirectorySearch(c.input); ok = c.expect(out); detail = JSON.stringify(out); }
+  catch (e) { ok = false; detail = `threw: ${e.name}`; }
+  record(`17 search sanitizer :: ${c.id}`, ok === true, detail);
+}
+record("18 sanitizer is wired into validateDirectoryQuery", (() => {
+  const q = validateDirectoryQuery({ search: 'x,is_active.eq.true', page: 1, pageSize: 25 });
+  return typeof q.search === "string" && !/[,()"\\%_*]/.test(q.search);
+})(), "validateDirectoryQuery returns a sanitized search term");
+record("19 page size stays hard-bounded after the correction", (() => {
+  const q = validateDirectoryQuery({ pageSize: 100000 });
+  return q.pageSize <= 100 && q.page >= 1;
+})(), "pageSize clamped, page floored");
 
 /* ===========================================================================
  * 6. Docs

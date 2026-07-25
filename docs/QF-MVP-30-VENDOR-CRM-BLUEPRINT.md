@@ -870,6 +870,55 @@ scan; `git diff --check` exit 0. New verifier `supabase/staging-verification/ver
 is generated and offline-validated only. No routes, actions, services or UI exist — that is
 QF-MVP-30.4C.**
 
+## 25. QF-MVP-30.4B — campaign foundation staging application (APPLIED + VERIFIED)
+
+**Status:** `VENDOR_CAMPAIGN_FOUNDATION_APPLIED_AND_VERIFIED_ON_STAGING`
+
+Applied from foundation commit `4e7c80b1b2987d8f69bf82fc493107592fc680bc`
+(`feat(mvp): add vendor campaign management foundation`, parent `b742d3ff…`, origin identical, **0/0**,
+clean). **This record is documentation only — it contains no runtime implementation.**
+
+**Authorized staging project `uckafzuochmbvtiodmcl`.** Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis
+`coilipywdvxklewquqvv` were never contacted; no provider call was made; no fixture was created.
+
+**Application.** Pre-application **13** migrations, latest `20260723001200 qf_mvp_vendor_segment_foundation`.
+Applied exactly one migration — **`20260723001300 qf_mvp_vendor_campaign_foundation`** — recorded
+**exactly once**, giving a final count of **14**. Applied **transactionally through the authorised
+Supabase Management API** with a fail-closed preflight, exact version/name preservation and the
+migration's own self-verification.
+
+**Post-state.** The three campaign objects now exist — `public.vendor_campaigns`,
+`public.vendor_campaign_audience_members`, `public.vendor_campaign_events` — all with **RLS enabled and
+no untrusted policy**. `service_role` holds SELECT+INSERT+UPDATE on the head and **SELECT+INSERT only**
+on the audience and event tables, with **no DELETE or TRUNCATE anywhere**. Both RPCs exist and are
+service_role-only: `qf_prepare_vendor_campaign_v1`, `qf_approve_vendor_campaign_v1`.
+`communication_templates.category` now permits `authentication`, `business`, **`marketing`**;
+`communication_intents.aggregate_type` was **not** widened. Campaign/audience/event rows before
+fixtures: **0**. No provider activation, no campaign communication intent, and no Core financial,
+assignment, consent, suppression or package mutation.
+
+**Verifier.** `supabase/staging-verification/verify_qf_mvp_30_4.sql` executed **exactly once, after
+application and before fixtures** — **32/32 PASS** (C01–C32). This zero-row verifier **must not be
+re-run once campaign fixtures exist**, and `verify_qf_mvp_30_3.sql` is likewise not re-run.
+
+**Corrected bookkeeping incident (recorded transparently).** After the successful 32/32 verification,
+an accidental connector invocation briefly created one migration-history entry — version
+`20260725134825`, name `noop_do_not_apply`, whose sole statement was `select 1;`. It produced **no
+schema or data change**. The exact row was removed only after proving that exactly one matching record
+existed, that it contained exactly one statement, and that the statement was exactly `select 1;`.
+Final verified state: migration count **14**, accidental no-op count **0**, campaign migration count
+**1**, three campaign tables present, campaign/audience/event rows **0**, `vendor_credit_logs` **0**,
+`lead_assignments` **0**. This is a corrected tooling/bookkeeping incident, **not** an application or
+architecture defect.
+
+**Security-advisor posture (intentional).** Supabase may report `rls_enabled_no_policy` at INFO level
+for all three server-only tables. That is the designed posture — RLS enabled, **no anon/authenticated
+policy**, untrusted roles hold zero privileges, and `service_role` is the only application
+data-access role. **No untrusted policy may be added to silence the advisor.**
+
+**Next: QF-MVP-30.4C — admin campaign management runtime. No runtime code is included in this
+staging-application record.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

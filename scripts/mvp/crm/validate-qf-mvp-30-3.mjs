@@ -243,14 +243,32 @@ record("11 no raw PostgREST filter grammar is constructed anywhere",
 /* ===========================================================================
  * 5. No runtime/UI implementation has leaked into this phase
  * ========================================================================= */
-record("12 no segment route exists yet", !existsSync(path.join(ROOT, "app/admin/vendor-crm/segments")),
-  "routes belong to QF-MVP-30.3C");
-record("13 no segment service/actions exist yet",
-  !existsSync(path.join(ROOT, "services/vendorSegmentService.ts"))
-  && !existsSync(path.join(ROOT, "app/actions/vendorSegmentActions.ts")),
-  "service + actions belong to QF-MVP-30.3C");
-record("14 no segment UI component exists yet",
-  !existsSync(path.join(ROOT, "components/admin/crm/segments")), "UI belongs to QF-MVP-30.3C");
+/* QF-MVP-30.3C RE-BASE.
+ * These three slots previously asserted that NO segment runtime existed. That was
+ * correct for 30.3A alone and became false the moment 30.3C legitimately shipped
+ * routes, a service and UI — the same phase-scoped "not yet" trap as the old 30.2
+ * migration ceiling. They are re-based onto the invariant that still matters: the
+ * FOUNDATION layer stays pure and the runtime, wherever it exists, stays admin-only.
+ * The 30.3C runtime itself is graded by validate-qf-mvp-30-3c.mjs. */
+record("12 segment runtime, if present, is admin-only", (() => {
+  const publicRoute = existsSync(path.join(ROOT, "app/segments"))
+    || existsSync(path.join(ROOT, "app/vendor/segments"))
+    || existsSync(path.join(ROOT, "app/admin/../segments"));
+  return !publicRoute;
+})(), "no public or vendor-self segment route may exist in any phase");
+record("13 foundation modules stay free of runtime/DB code", (() => {
+  const c = read(CONTRACTS), v = read(VALIDATION);
+  const dirty = (s) => /import\s+["']server-only["']|@supabase\/supabase-js|adminClient|next\/headers|next\/cache|vendorSegmentService/.test(s);
+  return !dirty(c) && !dirty(v);
+})(), "contracts + validation remain pure and independently testable");
+record("14 the 30.3A contract survives the 30.3C runtime landing", (() => {
+  // regression: shipping runtime must not alter the locked migration this phase
+  // owns. Pinned to the SHA-256 recorded in the accepted QF-MVP-30.3A report.
+  const migrationLocked =
+    sha256(read(MIGRATION)) === "e5f05be8d1ae856056158772f9cc492643d550af85751ac987451e4ca6729f77";
+  const foundationStillPure = !/import\s+["']server-only["']/.test(read(VALIDATION));
+  return migrationLocked && foundationStillPure;
+})(), "migration byte-identical to the accepted 30.3A hash; foundation still pure");
 
 /* ===========================================================================
  * 6. BEHAVIOURAL — the real rule engine, executed

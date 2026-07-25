@@ -614,6 +614,73 @@ neither created nor referenced; provenance lives on `vendor_segments` itself.
 **Next: QF-MVP-30.3C — deterministic segment admin runtime (routes, actions, service, UI, dynamic
 preview). No runtime code is included in this staging-application record.**
 
+## 22. QF-MVP-30.3C — deterministic segment runtime (IMPLEMENTED, runtime/UI)
+
+**Status:** `QF_MVP_30_3C_DETERMINISTIC_SEGMENTS_IMPLEMENTED_READY_FOR_STAGING_SMOKE`
+
+Runtime/UI only — **no migration created or modified**, no new table, no membership persistence, no
+campaign/provider code, no Core mutation, no `audit_logs`/`admin_notifications` dependency, and **no
+staging or production access during implementation**.
+
+**Routes (preflight-locked).** `/admin/vendor-crm/segments` (directory) and
+`/admin/vendor-crm/segments/[segmentId]` (definition editor + dynamic preview; `new` creates). Both
+static routes sit under the existing `/admin/vendor-crm` tree so they win over the `[section]`
+catch-all. A "Vendor Segments" entry is added to the Command Center nav group. **No public route, no
+vendor-self route, and no segment field on any public/vendor projection.**
+
+**Authorization.** Routes call `getAdminSession()` + `isSuperadmin` and redirect otherwise; every
+server action independently calls `requireCrmAdmin()` (canonical `profiles.role='admin'` **AND**
+server-owned `app_metadata.admin_role='Superadmin'`) before any service-role client exists. The actor
+id always comes from the session — never from input, never from client metadata.
+
+**Modules.** `services/vendorSegmentService.ts` (server-only, `import "server-only"` + `adminClient`),
+`app/actions/vendorSegmentActions.ts` (7 guarded actions), `lib/crm/segmentQueryPlan.ts` (pure
+planner), `components/admin/crm/segments/VendorSegmentDirectory.tsx` and `VendorSegmentEditor.tsx`
+(client shells), `scripts/mvp/crm/validate-qf-mvp-30-3c.mjs`.
+
+**Lifecycle.** List (bounded page ≤100, `updated_at desc, id asc`, status filter) · create draft ·
+update name/description/definition · activate · archive. **No hard delete** — no delete method, no
+delete action, no delete control, and `service_role` holds no `DELETE`/`TRUNCATE` anyway. An archived
+segment cannot be edited or activated. Invalid/unknown ids return `notFound()`; empty, loading and
+error states are explicit, and route failures render a fixed `SEGMENT_*_ERROR` constant while logging
+only the error **class** (`name` + `code`) server-side.
+
+**Provenance and versioning.** Canonical definition, fingerprint and version are computed **server-side**
+from the locked parser; a client-supplied fingerprint or version is ignored. `definition_version`
+increments **only when the canonical fingerprint changes** — a metadata-only edit never burns a
+version, and the version never decreases or reuses a value. Activation re-parses the stored definition
+and refuses on fingerprint drift. A duplicate live name fails safely; a duplicate *definition* is
+surfaced, not blocked.
+
+**Dynamic evaluation.** A preview compiles the canonical AST at request time against current Core/CRM
+facts and is then discarded. **No membership row, no vendor id written back into `vendor_segments`, no
+recipient list, no campaign object, no communication authorization inferred, no Core fact copied.**
+Count and rows come from the **same** query and the **same** canonical definition, so they cannot
+disagree. Every relative window resolves from **one** `evaluatedAt`.
+
+**Query strategy (no N+1).** Each distinct CRM predicate becomes **exactly one batched pre-resolution**
+to a bounded vendor-id set (cap 2000 — exceeding it fails closed with a "narrow the rule" message,
+never a silent truncation); core predicates compile to terms directly on `vendors`. The result is one
+paged `vendors` query plus a small constant number of pre-resolutions — **constant in vendor count**.
+Ordering is `created_at desc, id asc`; preview page size is clamped to **≤100**.
+
+**Injection posture.** Every column name comes from the closed registry and every literal is
+enum-bound, a uuid, an integer or an ISO instant the planner generated — all double-quoted. Fields
+whose vocabulary is data-driven (`service_categories`, `areas_covered`) are additionally
+**charset-restricted** at validation time, closing the one remaining path by which raw PostgREST
+grammar could have entered the expression.
+
+**Privacy.** Preview returns only minimum admin-safe context — vendor id, business name, city,
+verification status, enabled flag. No contact PII, no note content, no consent/suppression internals,
+no service key, no raw database error. Contact and note predicates remain prohibited.
+
+**Gates.** New 30.3C runtime validator **64 checks** (7 service + 2 action + 2 route + 1 client
+one-defect fixtures, planner executed); 30.3A foundation validator **119/119** unchanged; 30.2
+**62/62**; 30.1B 46/46; blueprint 36/36; all Marketplace suites; `verify:mvp` exit 0; typecheck/lint
+clean; clean `.next` rebuild with a zero-hit prohibited-ref scan; `git diff --check` exit 0.
+
+**Next: QF-MVP-30.3D — staging runtime smoke (not started). No segment fixture has been created.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

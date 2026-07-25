@@ -59,14 +59,33 @@ function requireInteger(v: unknown, label: string): number {
   return n;
 }
 
+/**
+ * Safe token charset for fields whose vocabulary is DATA-driven rather than a
+ * frozen literal list (service categories, covered areas). Those values cannot be
+ * membership-checked against a constant, so they are constrained instead:
+ * Unicode letters/marks/digits, space, and & - ' . / + only.
+ *
+ * This is a security boundary, not cosmetics. Such a value is later embedded in
+ * a PostgREST logic expression, whose grammar is delimited by , ( ) " and \ —
+ * without this restriction an open-vocabulary value would be the one place raw
+ * grammar could still enter the segment path.
+ */
+const SAFE_TOKEN_RE = /^[\p{L}\p{M}\p{N} &\-'./+]+$/u;
+export const SEGMENT_MAX_TOKEN_LENGTH = 80;
+
 function requireEnumValue(spec: { values?: readonly string[] }, v: unknown, field: string): string {
   if (typeof v !== "string") bad(`${field}: value must be a string`);
   const s = v as string;
-  if (spec.values && !spec.values.includes(s)) {
-    bad(`${field}: "${s}" is not in the closed vocabulary`);
+  if (spec.values) {
+    if (!spec.values.includes(s)) bad(`${field}: "${s}" is not in the closed vocabulary`);
+    return s;
   }
-  if (!spec.values && s.trim().length === 0) bad(`${field}: value must not be empty`);
-  return s;
+  // open vocabulary (data-driven): constrain the charset instead of the list.
+  const t = s.trim().replace(/\s+/g, " ");
+  if (t.length === 0) bad(`${field}: value must not be empty`);
+  if (t.length > SEGMENT_MAX_TOKEN_LENGTH) bad(`${field}: value is too long`);
+  if (!SAFE_TOKEN_RE.test(t)) bad(`${field}: value contains an unsupported character`);
+  return t;
 }
 
 /** Which value kind an (operator, field) pair expects. */

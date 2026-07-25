@@ -756,6 +756,120 @@ tables during this run: **0**. Core authoritative field changes: **0**.
 **QF-MVP-30.3 is complete. Next: QF-MVP-30.4 — Campaign Management (frozen audiences and send
 approval). Not started; no campaign, audience, recipient or provider artifact exists.**
 
+## 24. QF-MVP-30.4A — campaign management foundation (GENERATED, NOT APPLIED)
+
+**Status:** `QF_MVP_30_4A_VENDOR_CAMPAIGN_FOUNDATION_GENERATED_READY_FOR_STAGING_APPLICATION_REVIEW`
+
+Architecture source: `qf-staging-workspace/QF-MVP-30.4-ARCHITECTURE-PREFLIGHT-20260725T124958Z/QF-MVP-30.4-ARCHITECTURE-PREFLIGHT-REPORT.md`
+(SHA-256 `4A886CD212D606447DAFD3227C3684822CF012CE391FE2DF9BDC4B0C84D1A509`). Generated at HEAD
+`b742d3ff…`. **Nothing applied to staging; no runtime implementation; no campaign fixture.**
+
+**This section supersedes §9's Core-recheck wording on one point: 30.4 performs NO frequency-cap
+enforcement, because no frequency authority exists (see owner decision 6).**
+
+### 24.1 Owner decisions (LOCKED)
+
+1. **Freeze at PREPARE, not at approval.** `prepare_for_review` evaluates the current segment against
+   current Core/CRM facts, resolves an immutable recipient set, writes immutable audience rows, stores
+   segment id/version/fingerprint, evaluation timestamp, recipient count, snapshot fingerprint and a
+   sanitized exclusion summary, and atomically moves `draft → ready_for_review`. The approver
+   authorises an **already-frozen** audience; approval never resolves or alters recipients. Editing a
+   ready campaign requires an explicit **return to draft**; earlier snapshots and events are never
+   rewritten — a later prepare creates a **new snapshot revision**.
+2. **Approval fails closed** on: segment missing/archived, segment `definition_version` or
+   `definition_fingerprint` drift, missing/incomplete prepared snapshot, snapshot count or fingerprint
+   mismatch, or missing/changed template evidence. The remedy is return-to-draft and re-prepare. After
+   approval the **frozen audience — not a later dynamic segment result — is the campaign audience
+   authority**; later segment changes never expand or rewrite it.
+3. **Atomic prepare and approval via narrow SECURITY DEFINER RPCs** —
+   `qf_prepare_vendor_campaign_v1` and `qf_approve_vendor_campaign_v1`: `service_role`-only EXECUTE,
+   fixed `search_path`, no dynamic SQL, no provider call, no communication intent, no Core write,
+   deterministic idempotent replay, fail-closed optimistic revision/fingerprint checks and sanitized
+   stable error codes. **No generic transition RPC exists.**
+4. **`communication_intents.aggregate_type` is NOT widened in 30.4.** 30.4 creates no communication
+   intent and performs no dispatch. **QF-MVP-30.5** owns the separately reviewed widening to
+   `campaign`, intent creation, the dispatch boundary, delivery outcomes and uncertain-outcome handling.
+5. **Marketing template category.** `communication_templates.category` is minimally widened to
+   `('authentication','business','marketing')` — existing values preserved, no row rewritten, no
+   template inserted, no provider mapping activated. A `consent_scope='marketing'` campaign may only
+   pin a **marketing**-category template, enforced by CHECK, by both RPCs and by the pure validator.
+   `communication_automation_catalog` already recognises `marketing` and is unchanged. **This is the
+   only authorised alteration to an existing communication authority in 30.4A.**
+6. **Frequency policy is OUT of 30.4.** No frequency authority exists anywhere in this codebase and
+   none is created. Preview, prepare and approval perform **no** frequency-cap enforcement and make no
+   such claim. **QF-MVP-30.5 must define and enforce a minimal fail-closed frequency rule before any
+   campaign dispatch is enabled; until that gate exists, no campaign may send.**
+7. **Exactly three tables** (§24.2). No second head/version table, no separate audience header, no
+   provider/delivery/intent/AI table, no `audit_logs`/`admin_notifications`.
+8. **No plaintext destination.** Audience rows carry vendor identity plus enum-coded evidence only.
+
+### 24.2 Migration `20260723001300_qf_mvp_vendor_campaign_foundation.sql`
+
+**`public.vendor_campaigns`** — mutable head; evidence frozen at prepare, immutable after approval.
+Identity/description/purpose/channel/`consent_scope`; `status ∈ (draft, ready_for_review, approved,
+cancelled, archived)`; monotonic `revision`; `segment_id` → `vendor_segments` **RESTRICT**;
+`template_key`/`template_version`; frozen evidence (`prepared_snapshot_id`,
+`prepared_snapshot_revision`, `prepared_segment_version`, `prepared_segment_fingerprint`,
+`prepared_template_version`, `prepared_template_fingerprint`, `prepared_template_category`,
+`audience_evaluated_at`, `prepared_recipient_count`, `snapshot_fingerprint`, sanitized
+`exclusion_summary`); full create/update/prepare/approve/cancel/archive provenance;
+`idempotency_key`; `supersedes_campaign_id`. Six actor FKs → `profiles` **ON DELETE SET NULL**
+(never cascade). Checks include lifecycle-timestamp consistency, sha256 evidence shapes,
+`vcm_prepared_evidence_complete` (a prepared/approved campaign must carry the full frozen set) and
+`vcm_marketing_requires_marketing_template`.
+
+**`public.vendor_campaign_audience_members`** — **immutable** frozen recipient snapshot. One row per
+**included** vendor per snapshot revision: `snapshot_id`, `campaign_id`, `snapshot_revision`,
+`vendor_id`, deterministic `ordinal`, `consent_disposition`, `consent_reason_code`,
+`consent_policy_version`, `suppression_reason`, `evaluated_at`. Unique `(snapshot_id, vendor_id)` and
+`(snapshot_id, ordinal)`. **Excluded vendors are NOT stored as identities** — only as sanitized
+reason-code counts on the head/event.
+
+**`public.vendor_campaign_events`** — **append-only** provenance: campaign id, event type, campaign
+revision, snapshot id/revision, actor, reason code, bounded sanitized metadata, timestamps and a
+unique `event_idempotency_key`.
+
+**RLS + grants:** RLS enabled on all three, **no untrusted-role policy**, `revoke all … from public,
+anon, authenticated, service_role`; then `select, insert, update` on the head and **`select, insert`
+only** on the snapshot and the event log. **No role receives DELETE or TRUNCATE anywhere.**
+Immutability triggers block UPDATE/DELETE on the snapshot and events for **every** role including
+`service_role`; a lifecycle guard enforces the legal transition table, monotonic revisions and
+post-approval evidence immutability; a delete guard makes campaign hard-delete impossible.
+
+The migration alters no Core table, backfills nothing, inserts no template row, creates no row, and
+neither creates nor references `audit_logs`/`admin_notifications`. `length(x::text)` is used for size
+CHECKs — `pg_column_size()` is STABLE and is rejected inside a CHECK constraint.
+
+### 24.3 Typed contracts
+
+`lib/crm/campaignContracts.ts` and `lib/crm/campaignValidation.ts` are **pure** (no DB, no
+`server-only`), so the campaign rules are executed directly by the offline validator. They lock the
+lifecycle transition table, purpose/channel/consent-scope/template/suppression/exclusion vocabularies,
+the sanitized failure-code set, the bounds, the ordered-snapshot fingerprint (a **reordering changes
+the fingerprint**, because ordinal is part of the frozen identity), and a prohibited-field registry
+that refuses destination, provider, execution-state, frequency-policy and AI fields **with an explicit
+reason**.
+
+### 24.4 Boundaries
+
+Preview stays dynamic and consent-free (a segment is a saved question). The **Core recheck runs at
+prepare** via the existing `decideCommunicationConsent` authority and its result is frozen as
+evidence; approval re-asserts completeness and fails closed. 30.4 **never writes** any consent,
+suppression, preference, provider, intent, message or delivery table, and creates no campaign intent.
+**QF-MVP-30.5 must re-check time-sensitive prohibitions immediately before dispatch** — a frozen
+snapshot is the *maximum* permitted audience, never a guarantee.
+
+**Gates.** New 30.4 validator **113 checks** (13 migration + 2 contract one-defect fixtures, campaign
+rules executed); 30.3C 64/64; 30.3A 119/119; 30.2 62/62; 30.1B 46/46; blueprint 36/36; all Marketplace
+suites; `verify:mvp` exit 0; typecheck/lint clean; clean `.next` rebuild with a zero-hit prohibited-ref
+scan; `git diff --check` exit 0. New verifier `supabase/staging-verification/verify_qf_mvp_30_4.sql`
+(32 SELECT-only rows, one pre-fixture run after 30.4B); `verify_qf_mvp_30_3.sql` and
+`verify_qf_mvp_30_1b.sql` are **unchanged**.
+
+**Next: QF-MVP-30.4B — controlled staging application of `20260723001300`. Not started; the migration
+is generated and offline-validated only. No routes, actions, services or UI exist — that is
+QF-MVP-30.4C.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

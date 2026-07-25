@@ -156,12 +156,31 @@ record("02 locked 30.1B foundation migration unchanged",
 record("03 locked 30.1B verifier unchanged (historical, pre-segments)",
   sha256(read(VERIFIER_30_1B)) === "e10caa5699ff67346a700c6bd8a69c0a7ff0e0e5d48eeb76dcf2a24e7e633799",
   "verify_qf_mvp_30_1b.sql is NOT edited by this phase");
-record("04 migration version is monotonic and collision-free", (() => {
+/* QF-MVP-30.4A RE-BASE.
+ * This slot previously asserted that 20260723001200 was the HIGHEST migration.
+ * True for 30.3A alone, false the moment QF-MVP-30.4A legitimately added
+ * 20260723001300 — the same phase-scoped ceiling trap as the old 30.2 rule. It
+ * now asserts what still matters: this phase's migration exists exactly once and
+ * every later migration belongs to a declared later phase. */
+record("04 segment migration present exactly once, later phases allowed", (() => {
   const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((x) => x.endsWith(".sql")).sort();
   const mine = "20260723001200_qf_mvp_vendor_segment_foundation.sql";
-  return files[files.length - 1] === mine
-    && files.filter((x) => x.startsWith("20260723001200")).length === 1;
-})(), "20260723001200 is the highest and appears once");
+  const DECLARED_LATER = ["20260723001300_qf_mvp_vendor_campaign_foundation.sql"]; // QF-MVP-30.4A
+  const onlyOnce = files.filter((x) => x.startsWith("20260723001200")).length === 1;
+  const later = files.filter((x) => x > mine);
+  return files.includes(mine) && onlyOnce && later.every((f) => DECLARED_LATER.includes(f));
+})(), "20260723001200 appears once; every later migration is a declared later phase");
+
+record("04b later-phase migrations do not break this validator", (() => {
+  // Regression guard for the corrected rule: the removed ceiling WOULD have
+  // failed on a valid later migration; the phase-scoped rule does not.
+  const simulated = ["20260723001200_qf_mvp_vendor_segment_foundation.sql",
+    "20260723001300_qf_mvp_vendor_campaign_foundation.sql"];
+  const oldCeilingWouldHaveFailed =
+    simulated[simulated.length - 1] !== "20260723001200_qf_mvp_vendor_segment_foundation.sql";
+  return oldCeilingWouldHaveFailed
+    && simulated.includes("20260723001200_qf_mvp_vendor_segment_foundation.sql");
+})(), "the removed ceiling would have failed on 20260723001300; the phase-scoped rule does not");
 
 /* ===========================================================================
  * 2. Migration — zero findings + one-defect fixtures

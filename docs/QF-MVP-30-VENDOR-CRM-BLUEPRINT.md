@@ -423,3 +423,74 @@ actor/timestamp fields are the V1 mutation audit evidence.
 fixtures). 30.1B 46/46, blueprint 36/36, all Marketplace gates, `verify:mvp` exit 0, typecheck/lint/build
 clean, `git diff --check` exit 0. **Next: a bounded QF-MVP-30.2 staging smoke/integration review, then
 QF-MVP-30.3 — Deterministic segments** (not started).
+
+## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
+
+**Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`
+
+**Commits.** Implementation `d11a3482e751c340355e8326063205ab24a9f43e` (13 paths, unchanged); bounded
+correction `fc81103ec368f8b195bb8a4a8dce5829d99c732d` (6 paths, parent = implementation SHA). No migration,
+no environment file, no Supabase SQL touched by either.
+
+**Two real defects corrected (source review, nothing else in scope).**
+
+1. **Unsafe PostgREST `.or()` search interpolation.** `listVendorCrmDirectory` interpolated the raw search
+   term into an `or=(...)` expression whose grammar is delimited by commas, parentheses, dots and quotes,
+   and whose `ilike` value is a SQL LIKE pattern — a crafted term could append an OR condition and widen an
+   admin's result set. `sanitizeDirectorySearch()` (in `lib/crm/vendorCrmValidation.ts`) now normalizes
+   NFKC, strips control/format characters, allow-lists Unicode letters/marks/digits plus space `' - . + @ &`,
+   collapses whitespace and caps the term at **80** characters; structural characters (`, ( ) " \`) and LIKE
+   wildcards (`% _ *`) cannot survive. Stripping was chosen over escaping deliberately: it removes the
+   double-escaping ambiguity between PostgREST string-quoting and SQL LIKE escaping, so a structural
+   character can never reach a downstream escaper to be mis-escaped. The service **additionally** double-quotes
+   each `ilike` value, so the expression stays structurally fixed even if the allow-list is later widened.
+   *Consequence recorded:* `_` and `%` are not searchable literals — a name containing them is not findable
+   by typing them.
+2. **Raw error message exposure in the admin route UI.** Both route files assigned `e.message` to the
+   rendered error state, so a Postgres/PostgREST message could surface SQL, identifiers or row values in the
+   admin UI. Both now render a fixed `CRM_*_LOAD_ERROR` constant and log only the error **class**
+   (`name` + `code`) server-side; neither module references `.message` at all. The server-action path already
+   mapped everything through `fail()` and is unchanged.
+
+**Correction lock.** The 30.2 validator grew **32 → 59** checks: a new `S09_safe_search` service rule with
+fixture H, `R01_no_raw_route_error` / `R02_no_message_logging` route rules with fixtures RF1/RF2, and **20
+executed** sanitizer cases plus 2 wiring assertions. Section 5b runs the real `.ts` sanitizer, so
+`test:crm:30-2` registers the type-stripping loader.
+
+**Foundation baseline (inherited, not re-executed).** Per governance the prior block is classified a
+**procedural access block**; the locked 25/25 verifier was not re-run. Baseline cited from
+`qf-staging-workspace/QF-MVP-30.1BA-APPLICATION-20260724T185637Z/`: authorized staging
+`uckafzuochmbvtiodmcl`, **12** applied migrations (all `local == remote`) ending `20260723001100`, locked
+verifier **25 PASS / 0 FAIL** (machine-counted from the raw JSON), six CRM tables live, no Core mutation.
+The link to today's tree is asserted mechanically: verifier SHA `e10caa56…` and migration SHA `9212f746…`
+both still match, and no migration newer than `20260723001100` exists.
+
+**Live runtime contract (re-proved this phase).** Through wrapper-mediated service-role HTTP: all six CRM
+tables reachable; the exact application column contract accepted on each (7/11/6/7/7/14 columns); and
+`service_role` **cannot DELETE** any of the six (zero-row probes all refused `42501`) nor UPDATE
+`vendor_internal_notes` — hard delete is impossible at the privilege layer, not merely unused by the code.
+
+**Staging smoke — 127/127 checks PASS**, fixture namespace `QF_STAGING_VENDOR_CRM_SMOKE_V1`, one synthetic
+Superadmin and one synthetic disabled/unverified vendor (both `@example.invalid`, no real PII). Journeys ran
+against the built app on a non-default local port, driving the **real Next.js server actions** over HTTP with
+a genuine `@supabase/ssr` session. Covered: authorization (unauthenticated → `/admin/login`; non-admin →
+`error=unauthorized`; Superadmin allowed); directory load, search by name/owner/phone, bounded pagination,
+filter state; **10 injection-shaped search payloads proved unable to widen results** and 4 wildcard-only
+terms proved to degrade to *no filter* rather than a wildcard match; profile load, invalid and unknown
+vendor id → 404, and **no database/secret detail rendered** on any page; CRM profile create/update with
+server-derived actor; contact create → primary → update → archive with **no consent row created**; tag
+create, normalized_name, duplicate-variant rejection, assign, duplicate-active protection, lifecycle
+removal; append-only notes (count grew by exactly 2, nothing replaced, no note mutation action exists);
+task idempotency-key dedupe, allowed update, forced-`done` rejected, complete with result/actor/time, cancel
+without hard delete. **All 15 Core vendor facts byte-identical before and after.** Zero rows in
+`vendor_package_orders`, `vendor_credit_logs`, `lead_assignments`, `communication_consent_events`,
+`communication_suppressions`, and no segment/campaign object exists. No Meta/n8n/Jarvis/WhatsApp/SMS/email
+or webhook request; no production or QF-Jarvis contact.
+
+**Migration-006 divergence** continues to be honored via the inherited baseline — no `audit_logs` /
+`admin_notifications` dependency was introduced or assumed.
+
+**Gates.** 30.2 **59/59**, 30.1B 46/46, blueprint 36/36, marketplace R1 62 · B2 61 · C 83 · D 110 · E 51 ·
+20.4A 39 · 20.4C 42 · 20.5A 40, `test:mvp` 66/66, `verify:mvp` exit 0, typecheck/lint clean, clean
+`.next` rebuild with a **zero-hit** prohibited-ref scan across cache/static/server/manifests/maps, and
+`git diff --check` exit 0. **Next: QF-MVP-30.3 — Deterministic segments (not started).**

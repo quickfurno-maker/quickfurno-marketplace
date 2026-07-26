@@ -296,8 +296,100 @@ select 'C27_no_core_mutation' as check_id,
        'vendor_credit_logs=' || (select count(*) from public.vendor_credit_logs)
        || ' lead_assignments=' || (select count(*) from public.lead_assignments) as detail;
 
--- C28 the public/vendor projection is unchanged and exposes no campaign object.
-select 'C28_public_projection_unchanged' as check_id,
+-- ============================================================================
+-- QF-MVP-30.4C2 — SOURCE-EVIDENCE ROW-LOCK CONTRACT (C28–C33)
+--
+-- Locking the campaign head alone left a real race: approval could verify the
+-- segment and template, a concurrent transaction could then commit a non-key
+-- UPDATE to a dispatch-critical field, and approval would still commit — thereby
+-- approving evidence that was ALREADY STALE. Both RPCs must hold BOTH source
+-- rows under a lock that conflicts with a plain UPDATE, in one deterministic
+-- order, until the transaction ends.
+--
+-- Every row below reads the INSTALLED definition via pg_get_functiondef and
+-- STRIPS COMMENTS FIRST, so a comment that merely mentions FOR SHARE can never
+-- satisfy a lock assertion.
+-- ============================================================================
+
+-- C28 PREPARE holds both source evidence rows FOR SHARE.
+select 'C28_prepare_locks_evidence_rows' as check_id,
+       (d ~* 'from\s+public\.vendor_segments[^;]*\sfor\s+share\s*;'
+        and d ~* 'from\s+public\.communication_templates[^;]*\sfor\s+share\s*;'
+        and d ~* 'from\s+public\.vendor_campaigns\s+where\s+id\s*=\s*p_campaign_id\s+for\s+update') as passed,
+       'prepare locks campaign FOR UPDATE and both evidence rows FOR SHARE' as detail
+  from (select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text)')),
+          '--[^\n]*', ' ', 'g')) as d) s;
+
+-- C29 APPROVE holds both source evidence rows FOR SHARE.
+select 'C29_approve_locks_evidence_rows' as check_id,
+       (d ~* 'from\s+public\.vendor_segments[^;]*\sfor\s+share\s*;'
+        and d ~* 'from\s+public\.communication_templates[^;]*\sfor\s+share\s*;'
+        and d ~* 'from\s+public\.vendor_campaigns\s+where\s+id\s*=\s*p_campaign_id\s+for\s+update') as passed,
+       'approve locks campaign FOR UPDATE and both evidence rows FOR SHARE' as detail
+  from (select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)')),
+          '--[^\n]*', ' ', 'g')) as d) s;
+
+-- C30 NEITHER RPC uses FOR KEY SHARE, which does not conflict with FOR NO KEY
+--     UPDATE and therefore cannot protect a non-key evidence field.
+select 'C30_no_for_key_share' as check_id,
+       (p !~* 'for\s+key\s+share' and a !~* 'for\s+key\s+share') as passed,
+       'FOR KEY SHARE is absent from both campaign RPCs' as detail
+  from (select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text)')),
+          '--[^\n]*', ' ', 'g')) as p,
+               lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)')),
+          '--[^\n]*', ' ', 'g')) as a) s;
+
+-- C31 DETERMINISTIC LOCK ORDER campaign -> segment -> template in BOTH RPCs, so
+--     prepare and approve can never deadlock against one another. Anchored on
+--     'from public.<table>' — the locking READS — never on the bare table name,
+--     which also appears in each DECLARE block as %rowtype and would make this
+--     pass vacuously whatever the real order was.
+select 'C31_deterministic_lock_order' as check_id,
+       (position('from public.vendor_campaigns' in p) > 0
+        and position('from public.vendor_segments' in p) > position('from public.vendor_campaigns' in p)
+        and position('from public.communication_templates' in p) > position('from public.vendor_segments' in p)
+        and position('from public.vendor_campaigns' in a) > 0
+        and position('from public.vendor_segments' in a) > position('from public.vendor_campaigns' in a)
+        and position('from public.communication_templates' in a) > position('from public.vendor_segments' in a)) as passed,
+       'both RPCs lock campaign -> segment -> template' as detail
+  from (select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text)')),
+          '--[^\n]*', ' ', 'g')) as p,
+               lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)')),
+          '--[^\n]*', ' ', 'g')) as a) s;
+
+-- C32 APPROVE acquires both evidence locks BEFORE its first evidence check and
+--     still holds them at the approving UPDATE and the event INSERT.
+select 'C32_approve_locks_before_checks_and_held' as check_id,
+       (position('for share' in a) > 0
+        and position('for share' in a) < position('from public.vendor_campaign_audience_members' in a)
+        and position('from public.communication_templates' in a) < position('update public.vendor_campaigns set' in a)
+        and position('update public.vendor_campaigns set' in a) < position('insert into public.vendor_campaign_events' in a)) as passed,
+       'locks precede every evidence check and are still held at the approving UPDATE + event INSERT' as detail
+  from (select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+          'public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)')),
+          '--[^\n]*', ' ', 'g')) as a) s;
+
+-- C33 SELECT ... FOR SHARE requires UPDATE privilege in addition to SELECT.
+--     Both RPCs are SECURITY DEFINER, so the OWNER must hold it — not
+--     service_role. Without it every prepare and approve would fail at runtime.
+select 'C33_definer_owner_may_lock_evidence_rows' as check_id,
+       coalesce(bool_and(has_table_privilege(r.rolname, 'public.vendor_segments', 'UPDATE')
+                     and has_table_privilege(r.rolname, 'public.communication_templates', 'UPDATE')), false) as passed,
+       'RPC owner ' || coalesce(max(r.rolname), '(unknown)') || ' may take a row lock on both evidence tables' as detail
+  from pg_proc p
+  join pg_roles r on r.oid = p.proowner
+ where p.oid in (
+   to_regprocedure('public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text)'),
+   to_regprocedure('public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)'));
+
+-- C34 the public/vendor projection is unchanged and exposes no campaign object.
+select 'C34_public_projection_unchanged' as check_id,
        (to_regclass('public.vendor_public_v') is not null
         and (select count(*) from pg_attribute a
               where a.attrelid = to_regclass('public.vendor_public_v')

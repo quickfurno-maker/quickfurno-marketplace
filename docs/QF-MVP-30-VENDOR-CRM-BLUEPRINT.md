@@ -1146,6 +1146,88 @@ QF-MVP-30.4C1.**
 
 **Next: controlled staging application of `20260723001400`, then QF-MVP-30.4D. Not started.**
 
+> **AMENDED BY §28.** A follow-up audit found that §27's correction, while right about the fingerprints,
+> still left a **concurrency** hole: both RPCs locked the campaign head but read the source
+> `vendor_segments` and `communication_templates` rows **without any lock**. §28 records that defect and
+> its correction, applied to the *same unapplied* `20260723001400`.
+
+## 28. QF-MVP-30.4C2 — campaign evidence-source row locking (GENERATED, NOT APPLIED)
+
+**Status:** `QF_MVP_30_4C2_CAMPAIGN_EVIDENCE_LOCKING_COMPLETE_READY_FOR_STAGING_APPLICATION_REVIEW`
+
+QF-MVP-30.4C1 correctly made both fingerprints database-authoritative, but it was **not** authorised for
+push or staging application: one concurrency defect remained.
+
+**The defect.** Both RPCs locked the campaign head `FOR UPDATE`, then read the two authoritative evidence
+rows — `public.vendor_segments` and `public.communication_templates` — with **no locking clause at all**.
+Reproduced structurally: exactly two `FOR UPDATE` clauses existed in the whole migration (the two campaign
+heads) and **zero** `FOR SHARE` / `FOR NO KEY UPDATE` / `FOR KEY SHARE` anywhere. That permits this
+interleaving:
+
+```
+T1 approve  lock campaign FOR UPDATE
+T1 approve  read segment      (NO LOCK) -> version/fingerprint match
+T1 approve  read template     (NO LOCK) -> version/category/fingerprint match
+T2          UPDATE communication_templates SET provider_template_name = '…'   -- FOR NO KEY UPDATE
+T2          COMMIT                                                            -- nothing conflicts
+T1 approve  UPDATE vendor_campaigns SET status='approved' … ; INSERT event
+T1          COMMIT                                       -- approves ALREADY-STALE evidence
+```
+
+**Lock mode: `FOR SHARE` — the minimum sufficient mode.** From the PostgreSQL row-lock conflict matrix: a
+plain non-key `UPDATE` takes `FOR NO KEY UPDATE`, and a `DELETE` takes `FOR UPDATE`. `FOR SHARE` conflicts
+with **both**, so every UPDATE and DELETE of a locked row blocks until the transaction ends.
+**`FOR KEY SHARE` is insufficient** — it does *not* conflict with `FOR NO KEY UPDATE`, which is exactly the
+class of change at issue (`provider_template_name`, `definition_fingerprint`, …). `FOR NO KEY UPDATE` and
+`FOR UPDATE` would also work but are stronger than needed: they block other *readers* taking `FOR SHARE`,
+needlessly serialising two campaigns that merely pin the same segment.
+
+**Deterministic lock order: campaign → segment → template**, identical in both RPCs, so prepare and approve
+can never deadlock against one another. In **approve** both evidence locks are acquired **before the first
+evidence check** and are still held at the approving `UPDATE` and the event `INSERT`. In **prepare** the
+locks sit in the same order around the same evidence checks. Both RPCs evaluate their idempotent-replay
+short-circuit *before* taking evidence locks, because a replay changes nothing and must not block a
+concurrent segment or template edit.
+
+**Everything else is preserved exactly:** a locking clause does not change which rows match, so
+`SEGMENT_MISSING` / `TEMPLATE_MISSING` behave identically; database-authoritative snapshot and template
+fingerprints, the `QFC01` subtransaction rollback, idempotent replay, privacy, no-Core-write and
+no-provider rules are untouched. `SELECT … FOR SHARE` additionally requires `UPDATE` privilege alongside
+`SELECT`; both RPCs are `SECURITY DEFINER`, so it is the **owner** that must hold it, not `service_role` —
+asserted by migration self-verification §9.13(f) and verifier row **C33**.
+
+**Enforcement.** The migration re-asserts the whole contract in its own self-verification against the
+**installed** definitions via `pg_get_functiondef`, with comments stripped first so a comment mentioning
+`FOR SHARE` can never satisfy a lock assertion. Validator rules `H11_evidence_row_locks`,
+`H12_deterministic_lock_order` and `H13_lock_contract_selfcheck` add **7** one-defect fixtures (AG–AM) that
+each restore the exact race or a plausible half-fix — missing segment lock in prepare, missing template
+lock in prepare, missing segment lock in approve, missing template lock in approve, `FOR KEY SHARE`
+substituted, template locked before segment, and a lock surviving only as a comment. All 7 trip. 30.4A is
+**151/151** with **19** hardening fixtures.
+
+**Verifier.** `verify_qf_mvp_30_4c1.sql` — still unapplied and unrun, so updated in place — grows from 28
+to **34** SELECT-only rows: C28/C29 (both RPCs lock both evidence rows), C30 (no `FOR KEY SHARE`), C31
+(deterministic order), C32 (locks precede every evidence check and are held through the approving UPDATE
+and event INSERT), C33 (definer owner may take the lock), with the projection check renumbered to C34.
+
+### Planned QF-MVP-30.4D concurrency smoke (NOT performed)
+
+QF-MVP-30.4D must additionally exercise the lock behaviourally on staging:
+
+1. **Connection A** begins a transaction and calls approval, holding the campaign, segment and template
+   row locks.
+2. **Connection B** attempts an `UPDATE` of the source segment row, and separately of the source template
+   row.
+3. **B must BLOCK** until A completes — proving the lock conflicts with a real non-key UPDATE rather than
+   merely appearing in the source.
+4. After A commits, a later edit to either source row must be **detected** by the approved-evidence
+   recheck (and, in QF-MVP-30.5, by the future execution-time recheck) rather than silently accepted.
+5. **No send or provider path is involved at any point** — approval still authorises an audience and
+   never dispatches.
+
+**No staging or production access, no fixture, no migration application and no push occurred in
+QF-MVP-30.4C2.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

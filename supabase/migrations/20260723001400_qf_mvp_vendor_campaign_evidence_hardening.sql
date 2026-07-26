@@ -361,6 +361,7 @@ begin
     return jsonb_build_object('ok', false, 'code', 'INVALID_EXCLUSION_SUMMARY');
   end if;
 
+  -- QF-MVP-30.4C2: LOCK ORDER 1 of 3 — the campaign head.
   select * into v_campaign from public.vendor_campaigns where id = p_campaign_id for update;
   if not found then
     return jsonb_build_object('ok', false, 'code', 'CAMPAIGN_NOT_FOUND');
@@ -368,6 +369,8 @@ begin
 
   -- deterministic idempotent replay: the same key on an already-prepared
   -- campaign returns the existing snapshot instead of creating a second one.
+  -- Evaluated BEFORE the evidence locks: a replay changes nothing, so it must
+  -- not block a concurrent segment/template edit.
   if p_idempotency_key is not null
      and v_campaign.idempotency_key is not distinct from p_idempotency_key
      and v_campaign.status = 'ready_for_review'
@@ -389,8 +392,25 @@ begin
     return jsonb_build_object('ok', false, 'code', 'CAMPAIGN_INCOMPLETE');
   end if;
 
-  -- segment must exist, be live, and match the evaluated evidence exactly.
-  select * into v_segment from public.vendor_segments where id = v_campaign.segment_id;
+  -- ---------------------------------------------------------------------
+  -- QF-MVP-30.4C2: LOCK ORDER 2 of 3 — the source SEGMENT row.
+  --
+  -- FOR SHARE, not a bare read: a bare read leaves the pinned evidence free to
+  -- change between this check and COMMIT, so the freeze could persist evidence
+  -- that was already stale when it was written. FOR SHARE conflicts with both
+  -- FOR NO KEY UPDATE (what a plain non-key UPDATE takes) and FOR UPDATE (what
+  -- a DELETE takes), so every UPDATE and DELETE of this row blocks until this
+  -- transaction ends. FOR KEY SHARE would NOT conflict with FOR NO KEY UPDATE
+  -- and is therefore insufficient. FOR SHARE is the MINIMUM sufficient mode: it
+  -- still permits another reader to take FOR SHARE, so two campaigns pinning the
+  -- same segment do not serialise against each other.
+  --
+  -- `not found` behaviour is unchanged — a locking clause does not alter which
+  -- rows match, so an absent segment still returns SEGMENT_MISSING.
+  -- ---------------------------------------------------------------------
+  select * into v_segment from public.vendor_segments
+   where id = v_campaign.segment_id
+     for share;
   if not found then
     return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');
   end if;
@@ -402,9 +422,15 @@ begin
     return jsonb_build_object('ok', false, 'code', 'SEGMENT_EVIDENCE_MISMATCH');
   end if;
 
-  -- template must exist, be active, not disabled, and satisfy the consent scope.
+  -- ---------------------------------------------------------------------
+  -- QF-MVP-30.4C2: LOCK ORDER 3 of 3 — the source TEMPLATE row.
+  -- Same reasoning and same mode. Acquired AFTER the segment so that prepare
+  -- and approve take campaign -> segment -> template in the identical order and
+  -- can never deadlock against one another.
+  -- ---------------------------------------------------------------------
   select * into v_template from public.communication_templates
-   where template_key = v_campaign.template_key;
+   where template_key = v_campaign.template_key
+     for share;
   if not found then
     return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');
   end if;
@@ -594,12 +620,15 @@ begin
     return jsonb_build_object('ok', false, 'code', 'INVALID_INPUT');
   end if;
 
+  -- QF-MVP-30.4C2: LOCK ORDER 1 of 3 — the campaign head.
   select * into v_campaign from public.vendor_campaigns where id = p_campaign_id for update;
   if not found then
     return jsonb_build_object('ok', false, 'code', 'CAMPAIGN_NOT_FOUND');
   end if;
 
-  -- deterministic idempotent replay.
+  -- deterministic idempotent replay. Evaluated BEFORE the evidence locks: an
+  -- already-approved campaign changes nothing, so a replay must not block a
+  -- concurrent segment/template edit.
   if v_campaign.status = 'approved' then
     return jsonb_build_object('ok', true, 'replayed', true, 'revision', v_campaign.revision);
   end if;
@@ -612,7 +641,8 @@ begin
   end if;
 
   -- frozen evidence must be complete. 30.4C1 additionally requires the
-  -- template fingerprint, which was previously absent entirely.
+  -- template fingerprint, which was previously absent entirely. This reads only
+  -- the ALREADY-LOCKED head, so it is a precondition, not an evidence check.
   if v_campaign.prepared_snapshot_id is null
      or v_campaign.prepared_snapshot_revision is null
      or v_campaign.prepared_recipient_count is null
@@ -621,6 +651,51 @@ begin
      or v_campaign.prepared_template_version is null
      or v_campaign.prepared_template_fingerprint is null then
     return jsonb_build_object('ok', false, 'code', 'PREPARED_EVIDENCE_INCOMPLETE');
+  end if;
+
+  -- =====================================================================
+  -- QF-MVP-30.4C2: ACQUIRE BOTH SOURCE-EVIDENCE LOCKS **BEFORE** ANY
+  -- EVIDENCE CHECK, and hold them through the approval UPDATE and the event
+  -- INSERT until this transaction commits.
+  --
+  -- Without them the head lock alone left a real race: approval could verify
+  -- the segment and template, a concurrent transaction could then commit a
+  -- non-key UPDATE to a dispatch-critical field (e.g. provider_template_name,
+  -- definition_fingerprint), and this transaction would still commit — thereby
+  -- approving evidence that was ALREADY STALE at commit time.
+  --
+  -- FOR SHARE is the MINIMUM sufficient mode. It conflicts with FOR NO KEY
+  -- UPDATE (taken by a plain non-key UPDATE) and with FOR UPDATE (taken by a
+  -- DELETE or key-changing UPDATE), so every UPDATE and DELETE of these rows
+  -- blocks until we finish. FOR KEY SHARE does NOT conflict with FOR NO KEY
+  -- UPDATE and would leave exactly the field class at issue unprotected.
+  --
+  -- The order campaign -> segment -> template is IDENTICAL to the order
+  -- qf_prepare_vendor_campaign_v1 uses, so prepare and approve can never
+  -- deadlock against each other.
+  --
+  -- A locking clause does not change which rows match, so the stable
+  -- SEGMENT_MISSING / TEMPLATE_MISSING behaviour is preserved exactly.
+  --
+  -- These locks require UPDATE privilege on the locked tables in addition to
+  -- SELECT. That holds because this function is SECURITY DEFINER and runs as
+  -- its owner, not as service_role — §9.13 asserts the owner really has it.
+  -- =====================================================================
+
+  -- LOCK ORDER 2 of 3 — the source SEGMENT row.
+  select * into v_segment from public.vendor_segments
+   where id = v_campaign.segment_id
+     for share;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');
+  end if;
+
+  -- LOCK ORDER 3 of 3 — the source TEMPLATE row.
+  select * into v_template from public.communication_templates
+   where template_key = v_campaign.template_key
+     for share;
+  if not found then
+    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');
   end if;
 
   -- (1) exact rows for campaign id + snapshot id + snapshot revision.
@@ -666,11 +741,9 @@ begin
     return jsonb_build_object('ok', false, 'code', 'SNAPSHOT_FINGERPRINT_MISMATCH');
   end if;
 
-  -- segment must still exist, be live, and match the prepared evidence.
-  select * into v_segment from public.vendor_segments where id = v_campaign.segment_id;
-  if not found then
-    return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');
-  end if;
+  -- segment must still be live and match the prepared evidence. The row was
+  -- already loaded UNDER FOR SHARE above, so no concurrent transaction can have
+  -- changed it since, and none can change it before we commit.
   if v_segment.status = 'archived' then
     return jsonb_build_object('ok', false, 'code', 'SEGMENT_ARCHIVED');
   end if;
@@ -679,12 +752,8 @@ begin
     return jsonb_build_object('ok', false, 'code', 'SEGMENT_EVIDENCE_MISMATCH');
   end if;
 
-  -- template must still exist, be usable, and match the pinned evidence.
-  select * into v_template from public.communication_templates
-   where template_key = v_campaign.template_key;
-  if not found then
-    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');
-  end if;
+  -- template must still be usable and match the pinned evidence. Likewise
+  -- already loaded UNDER FOR SHARE above.
   if v_template.is_active is not true or v_template.readiness_status = 'disabled' then
     return jsonb_build_object('ok', false, 'code', 'TEMPLATE_NOT_USABLE');
   end if;
@@ -942,6 +1011,100 @@ begin
     raise exception 'QF-MVP-30.4C1 aborted: a destination/secret column exists on a campaign table.';
   end if;
 
-  raise notice 'QF-MVP-30.4C1: campaign approval evidence hardened — snapshot and template fingerprints are now database-computed at prepare and recomputed at approval.';
+  -- =====================================================================
+  -- 9.13 QF-MVP-30.4C2 — THE EXECUTABLE SOURCE-EVIDENCE LOCK CONTRACT.
+  --
+  -- Asserted against the INSTALLED definitions via pg_get_functiondef, with
+  -- comments stripped first, so a comment mentioning FOR SHARE can never
+  -- satisfy this check while the executable SQL stays unlocked.
+  -- =====================================================================
+  declare
+    v_prep text;
+    v_appr text;
+    v_cam  integer;
+    v_seg  integer;
+    v_tpl  integer;
+  begin
+    -- Comment-stripped, lower-cased executable text of each installed function.
+    -- Stripping comments FIRST is the whole point: a comment that merely
+    -- mentions FOR SHARE must never satisfy a lock assertion.
+    select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+             'public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text)')),
+           '--[^\n]*', ' ', 'g')) into v_prep;
+    select lower(regexp_replace(pg_get_functiondef(to_regprocedure(
+             'public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)')),
+           '--[^\n]*', ' ', 'g')) into v_appr;
+
+    -- (a) the campaign head is still locked FOR UPDATE in both RPCs.
+    if v_prep !~* 'from\s+public\.vendor_campaigns\s+where\s+id\s*=\s*p_campaign_id\s+for\s+update'
+       or v_appr !~* 'from\s+public\.vendor_campaigns\s+where\s+id\s*=\s*p_campaign_id\s+for\s+update' then
+      raise exception 'QF-MVP-30.4C2 aborted: a campaign RPC no longer locks the campaign head FOR UPDATE.';
+    end if;
+
+    -- (b) BOTH source evidence rows are locked in BOTH RPCs, with a mode that
+    --     conflicts with a plain UPDATE. FOR KEY SHARE does not and is refused.
+    if v_prep !~* 'from\s+public\.vendor_segments[^;]*\sfor\s+share\s*;' then
+      raise exception 'QF-MVP-30.4C2 aborted: prepare does not lock the source vendor_segments row FOR SHARE.';
+    end if;
+    if v_prep !~* 'from\s+public\.communication_templates[^;]*\sfor\s+share\s*;' then
+      raise exception 'QF-MVP-30.4C2 aborted: prepare does not lock the source communication_templates row FOR SHARE.';
+    end if;
+    if v_appr !~* 'from\s+public\.vendor_segments[^;]*\sfor\s+share\s*;' then
+      raise exception 'QF-MVP-30.4C2 aborted: approve does not lock the source vendor_segments row FOR SHARE.';
+    end if;
+    if v_appr !~* 'from\s+public\.communication_templates[^;]*\sfor\s+share\s*;' then
+      raise exception 'QF-MVP-30.4C2 aborted: approve does not lock the source communication_templates row FOR SHARE.';
+    end if;
+
+    -- (c) FOR KEY SHARE is insufficient for a non-key UPDATE and must not appear.
+    if v_prep ~* 'for\s+key\s+share' or v_appr ~* 'for\s+key\s+share' then
+      raise exception 'QF-MVP-30.4C2 aborted: FOR KEY SHARE does not conflict with FOR NO KEY UPDATE and cannot protect a non-key evidence field.';
+    end if;
+
+    -- (d) DETERMINISTIC LOCK ORDER campaign -> segment -> template in BOTH RPCs,
+    --     so prepare and approve can never deadlock against one another.
+    --
+    --     Anchored on 'from public.<table>' — the LOCKING READS — never on the
+    --     bare table name, because every one of these tables also appears in the
+    --     DECLARE block as `public.<table>%rowtype`, in declare order. Anchoring
+    --     on the bare name would measure the declarations and pass vacuously
+    --     whatever the real lock order turned out to be.
+    v_cam := position('from public.vendor_campaigns' in v_prep);
+    v_seg := position('from public.vendor_segments' in v_prep);
+    v_tpl := position('from public.communication_templates' in v_prep);
+    if v_cam = 0 or v_seg = 0 or v_tpl = 0 or v_cam > v_seg or v_seg > v_tpl then
+      raise exception 'QF-MVP-30.4C2 aborted: prepare does not acquire locks in the order campaign -> segment -> template.';
+    end if;
+    v_cam := position('from public.vendor_campaigns' in v_appr);
+    v_seg := position('from public.vendor_segments' in v_appr);
+    v_tpl := position('from public.communication_templates' in v_appr);
+    if v_cam = 0 or v_seg = 0 or v_tpl = 0 or v_cam > v_seg or v_seg > v_tpl then
+      raise exception 'QF-MVP-30.4C2 aborted: approve does not acquire locks in the order campaign -> segment -> template.';
+    end if;
+
+    -- (e) approval must acquire BOTH evidence locks BEFORE its first evidence
+    --     check, and still hold them at the approving UPDATE.
+    if position('for share' in v_appr) > position('snapshot_count_mismatch' in v_appr) then
+      raise exception 'QF-MVP-30.4C2 aborted: approve performs an evidence check before acquiring the source-evidence locks.';
+    end if;
+    if v_tpl > position('update public.vendor_campaigns set' in v_appr) then
+      raise exception 'QF-MVP-30.4C2 aborted: approve does not hold the source-evidence locks through the approving UPDATE.';
+    end if;
+
+    -- (f) SELECT ... FOR SHARE needs UPDATE privilege in addition to SELECT.
+    --     Both RPCs are SECURITY DEFINER, so the OWNER must hold it — not
+    --     service_role. A missing owner privilege would make every prepare and
+    --     approve fail at runtime, so it is asserted here rather than assumed.
+    if not exists (
+      select 1 from pg_proc p join pg_roles r on r.oid = p.proowner
+       where p.oid = to_regprocedure('public.qf_approve_vendor_campaign_v1(uuid, integer, uuid, text)')
+         and has_table_privilege(r.rolname, 'public.vendor_segments', 'UPDATE')
+         and has_table_privilege(r.rolname, 'public.communication_templates', 'UPDATE')
+    ) then
+      raise exception 'QF-MVP-30.4C2 aborted: the campaign RPC owner lacks the UPDATE privilege that SELECT ... FOR SHARE requires on an evidence table.';
+    end if;
+  end;
+
+  raise notice 'QF-MVP-30.4C1/C2: campaign approval evidence hardened — fingerprints are database-computed at prepare and recomputed at approval, and both source evidence rows are held FOR SHARE in the deterministic order campaign -> segment -> template.';
 end;
 $verify$;

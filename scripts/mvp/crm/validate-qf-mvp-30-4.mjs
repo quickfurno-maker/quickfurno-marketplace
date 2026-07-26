@@ -41,8 +41,47 @@ const record = (name, ok, detail) => { results.push({ name, ok: !!ok, detail });
 const read = (rel) => readFileSync(path.join(ROOT, rel), "utf8");
 const sha256 = (t) => createHash("sha256").update(t, "utf8").digest("hex");
 
-/** Executable SQL only: strip comments AND single-quoted literals. */
-const execSql = (src) => src.replace(/--[^\n]*/g, " ").replace(/'(?:[^']|'')*'/g, "''");
+/**
+ * Executable SQL only: blank out line comments AND single-quoted literals.
+ *
+ * ONE left-to-right scan, not two independent regex passes. Two passes are
+ * genuinely wrong in both directions:
+ *   • comments-first eats the closing quote of any literal that CONTAINS `--`
+ *     (a verifier that strips SQL comments legitimately needs the literal
+ *     `'--[^\n]*'`), desynchronising every literal after it on that line;
+ *   • literals-first mis-parses any comment containing an apostrophe.
+ * Either desynchronisation can leave a real mutating keyword exposed — a false
+ * positive — or swallow one — a FALSE NEGATIVE in a safety rule. A scanner that
+ * knows a `--` inside a literal is not a comment, and a `'` inside a comment is
+ * not a literal, has neither failure mode.
+ *
+ * Dollar-quoted bodies are deliberately left intact: they ARE the function
+ * source these rules grade.
+ */
+function execSql(src) {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    if (src[i] === "'") {                       // single-quoted literal, '' escapes
+      i += 1;
+      while (i < src.length) {
+        if (src[i] === "'" && src[i + 1] === "'") { i += 2; continue; }
+        if (src[i] === "'") { i += 1; break; }
+        i += 1;
+      }
+      out += "''";
+      continue;
+    }
+    if (src[i] === "-" && src[i + 1] === "-") {  // line comment
+      while (i < src.length && src[i] !== "\n") i += 1;
+      out += " ";
+      continue;
+    }
+    out += src[i];
+    i += 1;
+  }
+  return out;
+}
 
 /* ===========================================================================
  * MIGRATION evaluator
@@ -775,6 +814,101 @@ export function evaluateHardening(src) {
   if (!/grant execute on function public\.qf_prepare_vendor_campaign_v1[\s\S]{0,200}?to service_role/.test(src)) {
     add("H10_execute_posture", "the prepare RPC lost its service_role grant");
   }
+
+  // -------------------------------------------------------------------------
+  // H11 (QF-MVP-30.4C2) THE SOURCE-EVIDENCE LOCK CONTRACT.
+  //
+  // Locking the campaign head alone left a real race: approval could verify the
+  // segment and template, a concurrent transaction could commit a non-key UPDATE
+  // to a dispatch-critical field, and approval would still commit — approving
+  // evidence that was already stale. Both RPCs must hold BOTH source rows under
+  // a lock that conflicts with a plain UPDATE, in one deterministic order.
+  //
+  // Graded on COMMENT-STRIPPED executable SQL, so a comment that merely mentions
+  // FOR SHARE can never satisfy a lock rule.
+  // -------------------------------------------------------------------------
+  const lockRead = (fnSrc, table) => {
+    const m = new RegExp(`select \\* into \\w+ from public\\.${table}[\\s\\S]*?;`, "m").exec(fnSrc);
+    return m ? m[0] : "";
+  };
+  /** Conflicts with FOR NO KEY UPDATE (a plain UPDATE) and FOR UPDATE (a DELETE). */
+  const SUFFICIENT_LOCK = /\bfor\s+(share|no\s+key\s+update|update)\b/i;
+
+  for (const [label, fnSrc] of [["prepare", prepare], ["approve", approve]]) {
+    const stripped = execSql(fnSrc);
+    for (const table of ["vendor_segments", "communication_templates"]) {
+      const stmt = lockRead(stripped, table);
+      if (!stmt) {
+        add("H11_evidence_row_locks", `${label} does not read public.${table} at all`);
+      } else if (!SUFFICIENT_LOCK.test(stmt)) {
+        add("H11_evidence_row_locks", `${label} reads public.${table} WITHOUT a lock that conflicts with UPDATE`);
+      }
+    }
+    // FOR KEY SHARE does not conflict with FOR NO KEY UPDATE, so it cannot
+    // protect a non-key evidence field. It is refused outright.
+    if (/\bfor\s+key\s+share\b/i.test(stripped)) {
+      add("H11_evidence_row_locks", `${label} uses FOR KEY SHARE, which a non-key UPDATE does not block`);
+    }
+    // the campaign head must still be locked FOR UPDATE.
+    if (!SUFFICIENT_LOCK.test(lockRead(stripped, "vendor_campaigns"))) {
+      add("H11_evidence_row_locks", `${label} no longer locks the campaign head`);
+    }
+  }
+
+  // H12 DETERMINISTIC LOCK ORDER campaign -> segment -> template in BOTH RPCs.
+  // Anchored on `from public.<table>` — the locking READS — never on the bare
+  // table name, which also appears in each DECLARE block as `%rowtype` and would
+  // make the assertion pass vacuously whatever the real order was.
+  for (const [label, fnSrc] of [["prepare", prepare], ["approve", approve]]) {
+    const s = execSql(fnSrc);
+    const at = (t) => s.indexOf(`from public.${t}`);
+    const [cam, seg, tpl] = ["vendor_campaigns", "vendor_segments", "communication_templates"].map(at);
+    if (cam < 0 || seg < 0 || tpl < 0) {
+      add("H12_deterministic_lock_order", `${label} is missing one of the three locking reads`);
+    } else if (!(cam < seg && seg < tpl)) {
+      add("H12_deterministic_lock_order", `${label} lock order is not campaign -> segment -> template`);
+    }
+  }
+  // approval must lock BOTH evidence rows BEFORE its first evidence check and
+  // still hold them at the approving UPDATE.
+  {
+    const s = execSql(approve);
+    const firstShare = s.search(/\bfor\s+share\b/i);
+    // Anchor the first evidence check on the audience-member read, NOT on the
+    // 'SNAPSHOT_COUNT_MISMATCH' literal: execSql() strips quoted literals, so a
+    // literal anchor would always be -1 and the rule would fire on clean source.
+    const firstCheck = s.indexOf("from public.vendor_campaign_audience_members");
+    const tplRead = s.indexOf("from public.communication_templates");
+    const approvingUpdate = s.indexOf("update public.vendor_campaigns set");
+    if (firstShare < 0 || firstCheck < 0 || firstShare > firstCheck) {
+      add("H12_deterministic_lock_order", "approve performs an evidence check before acquiring the source-evidence locks");
+    }
+    if (tplRead < 0 || approvingUpdate < 0 || tplRead > approvingUpdate) {
+      add("H12_deterministic_lock_order", "approve does not hold the source-evidence locks through the approving UPDATE");
+    }
+  }
+
+  // H13 the lock contract is re-asserted in the migration's OWN self-verification,
+  // against the INSTALLED definitions, with comments stripped there too.
+  if (!/pg_get_functiondef/.test(src)) {
+    add("H13_lock_contract_selfcheck", "the self-verification does not read installed definitions");
+  }
+  if (!/regexp_replace\([\s\S]{0,200}?'--\[\^\\n\]\*'/.test(src)) {
+    add("H13_lock_contract_selfcheck", "the self-verification does not strip comments before asserting locks");
+  }
+  for (const needle of [
+    "prepare does not lock the source vendor_segments row FOR SHARE",
+    "prepare does not lock the source communication_templates row FOR SHARE",
+    "approve does not lock the source vendor_segments row FOR SHARE",
+    "approve does not lock the source communication_templates row FOR SHARE",
+    "FOR KEY SHARE does not conflict with FOR NO KEY UPDATE",
+    "does not acquire locks in the order campaign -> segment -> template",
+  ]) {
+    if (!src.includes(needle)) {
+      add("H13_lock_contract_selfcheck", `the self-verification never raises on: ${needle.slice(0, 56)}…`);
+    }
+  }
+
   return f;
 }
 
@@ -811,6 +945,35 @@ const HARD_FIX = [
     mutate: (s) => `${s}\ngrant execute on function public.qf_campaign_snapshot_fingerprint_v1(uuid, uuid, integer) to service_role;\n` },
   { id: "AF", rule: "H01_forward_only", why: "the correction drops an applied object instead of replacing its body",
     mutate: (s) => `${s}\ndrop function if exists public.qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text);\n` },
+
+  /* -- QF-MVP-30.4C2: each of these restores the exact concurrency race the
+   *    audit found, or a plausible half-fix for it. Every one must trip. ---- */
+  { id: "AG", rule: "H11_evidence_row_locks", why: "prepare loses the source SEGMENT lock",
+    mutate: (s) => s.replace(
+      "  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id\n     for share;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');\n  end if;\n  if v_segment.status = 'archived' then\n    return jsonb_build_object('ok', false, 'code', 'SEGMENT_ARCHIVED');\n  end if;\n  if v_segment.definition_version is distinct from p_segment_version",
+      "  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');\n  end if;\n  if v_segment.status = 'archived' then\n    return jsonb_build_object('ok', false, 'code', 'SEGMENT_ARCHIVED');\n  end if;\n  if v_segment.definition_version is distinct from p_segment_version") },
+  { id: "AH", rule: "H11_evidence_row_locks", why: "prepare loses the source TEMPLATE lock",
+    mutate: (s) => s.replace(
+      "  select * into v_template from public.communication_templates\n   where template_key = v_campaign.template_key\n     for share;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');\n  end if;\n  if v_template.is_active is not true or v_template.readiness_status = 'disabled' then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_NOT_USABLE');\n  end if;\n  if v_template.version is distinct from p_template_version then",
+      "  select * into v_template from public.communication_templates\n   where template_key = v_campaign.template_key;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');\n  end if;\n  if v_template.is_active is not true or v_template.readiness_status = 'disabled' then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_NOT_USABLE');\n  end if;\n  if v_template.version is distinct from p_template_version then") },
+  { id: "AI", rule: "H11_evidence_row_locks", why: "approve loses the source SEGMENT lock",
+    mutate: (s) => s.replace(
+      "  -- LOCK ORDER 2 of 3 — the source SEGMENT row.\n  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id\n     for share;",
+      "  -- LOCK ORDER 2 of 3 — the source SEGMENT row.\n  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id;") },
+  { id: "AJ", rule: "H11_evidence_row_locks", why: "approve loses the source TEMPLATE lock",
+    mutate: (s) => s.replace(
+      "  -- LOCK ORDER 3 of 3 — the source TEMPLATE row.\n  select * into v_template from public.communication_templates\n   where template_key = v_campaign.template_key\n     for share;",
+      "  -- LOCK ORDER 3 of 3 — the source TEMPLATE row.\n  select * into v_template from public.communication_templates\n   where template_key = v_campaign.template_key;") },
+  { id: "AK", rule: "H11_evidence_row_locks", why: "FOR KEY SHARE is substituted for FOR SHARE",
+    mutate: (s) => s.replace(/\n     for share;/g, "\n     for key share;") },
+  { id: "AL", rule: "H12_deterministic_lock_order", why: "approve locks the template BEFORE the segment",
+    mutate: (s) => s.replace(
+      "  -- LOCK ORDER 2 of 3 — the source SEGMENT row.\n  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id\n     for share;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');\n  end if;\n\n  -- LOCK ORDER 3 of 3 — the source TEMPLATE row.\n  select * into v_template from public.communication_templates\n   where template_key = v_campaign.template_key\n     for share;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');\n  end if;",
+      "  select * into v_template from public.communication_templates\n   where template_key = v_campaign.template_key\n     for share;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'TEMPLATE_MISSING');\n  end if;\n\n  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id\n     for share;\n  if not found then\n    return jsonb_build_object('ok', false, 'code', 'SEGMENT_MISSING');\n  end if;") },
+  { id: "AM", rule: "H11_evidence_row_locks", why: "the lock survives only as a COMMENT while the SQL is unlocked",
+    mutate: (s) => s.replace(
+      "  -- LOCK ORDER 2 of 3 — the source SEGMENT row.\n  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id\n     for share;",
+      "  -- LOCK ORDER 2 of 3 — the source SEGMENT row, held for share until commit.\n  select * into v_segment from public.vendor_segments\n   where id = v_campaign.segment_id;") },
 ];
 for (const fx of HARD_FIX) {
   const mutated = fx.mutate(hardeningSrc);
@@ -854,9 +1017,23 @@ record("47 the post-correction verifier covers the hardened contract", (() => {
     "qf_canonical_text_field_v1", "prepared_template_fingerprint IS NOT NULL",
     "SNAPSHOT_FINGERPRINT_MISMATCH", "TEMPLATE_FINGERPRINT_MISMATCH",
     "C26_zero_campaign_rows_before_fixtures", "C27_no_core_mutation",
-    "C28_public_projection_unchanged", "has_function_privilege", "relrowsecurity"];
+    "C34_public_projection_unchanged", "has_function_privilege", "relrowsecurity"];
   return need.every((n) => v4c1.includes(n));
 })(), "migrations, both authorities, mandatory evidence, posture, zero rows, projection");
+record("47a the post-correction verifier asserts the QF-MVP-30.4C2 lock contract", (() => {
+  const need = ["C28_prepare_locks_evidence_rows", "C29_approve_locks_evidence_rows",
+    "C30_no_for_key_share", "C31_deterministic_lock_order",
+    "C32_approve_locks_before_checks_and_held", "C33_definer_owner_may_lock_evidence_rows"];
+  // it must read the INSTALLED definitions and strip comments before asserting,
+  // so a comment mentioning FOR SHARE can never satisfy a lock row.
+  return need.every((n) => v4c1.includes(n))
+    && /pg_get_functiondef/.test(v4c1)
+    // strips comments before asserting — `\\` matches ONE literal backslash, so
+    // this looks for the SQL text `'--[^` , not for a regex metacharacter.
+    && /regexp_replace\([\s\S]{0,240}?'--\[\^/.test(v4c1)
+    // looks for the SQL text `for\s+share` inside the verifier's own regexes.
+    && /for\\s\+share/.test(v4c1);
+})(), "both RPCs, both evidence rows, no FOR KEY SHARE, deterministic order, locks held, owner privilege");
 record("48 the post-correction verifier proves EXECUTED cross-language parity", (() => {
   return /encode\(sha256\(convert_to\(/.test(v4c1)
     && v4c1.includes("chr(30)") && v4c1.includes("chr(31)")
@@ -867,7 +1044,7 @@ record("49 every verifier row reports (check_id, passed, detail)", (() => {
   const ids = [...v4c1.matchAll(/'(C\d+_[a-z0-9_]+)' as check_id/g)].map((m) => m[1]);
   const passedCols = (v4c1.match(/ as passed/g) || []).length;
   const detailCols = (v4c1.match(/ as detail/g) || []).length;
-  return ids.length >= 28 && new Set(ids).size === ids.length
+  return ids.length === 34 && new Set(ids).size === ids.length
     && passedCols === ids.length && detailCols === ids.length;
 })(), `${[...v4c1.matchAll(/'(C\d+_[a-z0-9_]+)' as check_id/g)].length} uniquely-named rows, each with passed + detail`);
 

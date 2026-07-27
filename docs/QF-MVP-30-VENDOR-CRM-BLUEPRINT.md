@@ -1228,6 +1228,78 @@ QF-MVP-30.4D must additionally exercise the lock behaviourally on staging:
 **No staging or production access, no fixture, no migration application and no push occurred in
 QF-MVP-30.4C2.**
 
+> **APPLIED BY §29.** `20260723001400` was subsequently applied to staging and verified 34/34. §28 remains
+> the accurate record of *what was built and why*; §29 records the controlled application.
+
+## 29. QF-MVP-30.4C3 — campaign evidence hardening staging application (APPLIED + VERIFIED)
+
+**Status:** `QF_MVP_30_4C3_CAMPAIGN_EVIDENCE_HARDENING_APPLIED_VERIFIED_READY_FOR_STAGING_SMOKE`
+
+Applied from pushed source commit **`907906d5661c3c454472ffd459f0e17b5d86298b`**
+(`fix(mvp): lock campaign evidence sources`), which is the branch tip on
+`origin/mvp/qf-mvp-30-vendor-crm-v1`. **This record is documentation only — it contains no runtime,
+migration, validator or verifier change.**
+
+**Authorized staging project `uckafzuochmbvtiodmcl`.** Production `yqpgcsduqbxulrlzwzap` and QF-Jarvis
+`coilipywdvxklewquqvv` were never contacted; no provider call was made; **no fixture was created**.
+
+**Application.** Pre-application **14** migrations, latest `20260723001300 qf_mvp_vendor_campaign_foundation`.
+Applied exactly one migration — **`20260723001400 qf_mvp_vendor_campaign_evidence_hardening`**
+(SHA-256 `C554704378E4D673273344C797A3B68EB875ACE766553C3F5AB5BB81CF30E31A`, **57,619 bytes**) — recorded
+**exactly once**, giving a final count of **15** with `20260723001400` as the latest version.
+
+**Method — version-preserving and byte-exact.** The migration file was transferred to staging as base64
+chunks and reconstructed server-side to its exact 57,619 bytes; a **database-side SHA-256 guard** confirmed
+the reconstruction matched the locked migration hash before anything executed. One transaction then
+re-checked the 14-migration / zero-row pre-state, executed the exact migration together with its embedded
+`$preflight$` and `$verify$` self-verification, and inserted the migration-history row carrying the **exact
+version and name** — no auto-generated timestamp, no partial DDL, no migration-repair command. The
+transaction proved 15 migrations and zero campaign rows before committing, the temporary transfer object was
+removed, and **no residue remains**.
+
+**Post-state (verified read-only).** The three campaign objects are unchanged in shape and the hardening is
+live:
+
+| Fact | Value |
+| --- | --- |
+| Migration count | **15** (`20260723001300` once, `20260723001400` once) |
+| `qf_canonical_text_field_v1` | present |
+| `qf_campaign_snapshot_fingerprint_v1` | present |
+| `qf_communication_template_fingerprint_v1` | present |
+| `qf_prepare_vendor_campaign_v1` / `qf_approve_vendor_campaign_v1` | signatures **unchanged**; bodies replaced |
+| Lock contract, **both** RPCs | campaign `FOR UPDATE` → segment `FOR SHARE` → template `FOR SHARE` |
+| `FOR KEY SHARE` | **absent from both RPCs** |
+| Database-authoritative fingerprints | live in **both** prepare and approve |
+| `vcm_prepared_evidence_complete` | now requires a non-null `prepared_template_fingerprint` |
+| RLS | enabled on all three campaign tables; **0** untrusted policies |
+| Campaign / audience / event rows | **0 / 0 / 0** |
+
+Both QF-MVP-30.4C1 fingerprint defects and the QF-MVP-30.4C2 concurrency defect are therefore **closed on
+staging**: the database now recomputes the canonical snapshot fingerprint from the immutable rows and the
+canonical template-catalog fingerprint from the authoritative template row, and holds both source evidence
+rows under `FOR SHARE` in one deterministic order through the approving UPDATE and event INSERT.
+
+**Verifier.** `supabase/staging-verification/verify_qf_mvp_30_4c1.sql`
+(SHA-256 `99F07CC28787832E41D8F8BB6F4330F67B4BF6F33B9CB4CD28B1DD6C6A7069A1`, **24,496 bytes**) executed
+**exactly once, after application and before any fixture** — **34/34 PASS (C01–C34)**, every statement run
+exactly once. This zero-row verifier **must not be re-run once campaign fixtures exist**, and
+`verify_qf_mvp_30_4.sql`, `verify_qf_mvp_30_3.sql` and `verify_qf_mvp_30_1b.sql` remain historical
+point-in-time evidence and were **not** re-run.
+
+**Zero mutation.** Campaign, audience and event rows **0**; `vendor_credit_logs` **0**; `lead_assignments`
+**0**; `vendor_package_orders` **0**; `communication_consent_events` **0**; `communication_suppressions`
+**0**; `communication_intents` **0**. No package, credit, assignment, consent, suppression or provider
+mutation; no campaign communication intent; no provider canary activation; no outbound request.
+
+**Security-advisor posture (intentional).** The campaign tables report `rls_enabled_no_policy` at **INFO**.
+That is the designed server-only default-deny posture — RLS enabled, **no anon/authenticated policy**,
+untrusted roles hold zero privileges, and `service_role` is the only application data-access role. **No
+policy may be added to silence the INFO.** No new campaign-related ERROR or WARN appeared, and unrelated
+pre-existing advisor findings were left untouched rather than auto-fixed.
+
+**Next: QF-MVP-30.4D — full campaign staging workflow plus the two-connection concurrency smoke. No fixture,
+no smoke and no QF-MVP-30.5 work occurred in this phase.**
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

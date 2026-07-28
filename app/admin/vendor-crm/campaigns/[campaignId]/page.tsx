@@ -5,6 +5,8 @@ import {
   listUsableSegments, listUsableTemplates,
 } from "@/services/vendorCampaignService";
 import { VendorCampaignEditor } from "@/components/admin/crm/campaigns/VendorCampaignEditor";
+import { getHandoffReadiness, getCampaignIntentSummary } from "@/services/campaignHandoffService";
+import { CampaignHandoffPanel } from "@/components/admin/crm/campaigns/CampaignHandoffPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,10 @@ export default async function VendorCampaignEditorPage({ params }: { params: { c
   let events: unknown[] = [];
   let segments: unknown[] = [];
   let templates: unknown[] = [];
+  // Handoff is a SEPARATE explicit step: approving a campaign never creates an
+  // intent, so this data only drives a control the operator must still press.
+  let readiness: unknown = null;
+  let intents: unknown = null;
   let error: string | null = null;
 
   try {
@@ -53,6 +59,12 @@ export default async function VendorCampaignEditorPage({ params }: { params: { c
         if (campaign.prepared_snapshot_id) {
           audience = await getCampaignAudience(campaignId, campaign.prepared_snapshot_id, { page: 1 });
         }
+        if (campaign.status === "approved") {
+          [readiness, intents] = await Promise.all([
+            getHandoffReadiness(campaignId),
+            getCampaignIntentSummary(campaignId),
+          ]);
+        }
       }
     }
   } catch (e) {
@@ -62,14 +74,24 @@ export default async function VendorCampaignEditorPage({ params }: { params: { c
   if (!isNew && !error && !campaign) notFound();
 
   return (
-    <VendorCampaignEditor
-      campaignId={isNew ? null : campaignId}
-      campaign={campaign}
-      audience={audience}
-      events={events as never[]}
-      segments={segments as never[]}
-      templates={templates as never[]}
-      error={error}
-    />
+    <>
+      <VendorCampaignEditor
+        campaignId={isNew ? null : campaignId}
+        campaign={campaign}
+        audience={audience}
+        events={events as never[]}
+        segments={segments as never[]}
+        templates={templates as never[]}
+        error={error}
+      />
+      {campaign && campaign.status === "approved" ? (
+        <CampaignHandoffPanel
+          campaignId={campaignId}
+          revision={Number(campaign.revision)}
+          readiness={readiness as never}
+          intents={intents as never}
+        />
+      ) : null}
+    </>
   );
 }

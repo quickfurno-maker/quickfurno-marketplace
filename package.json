@@ -30,6 +30,7 @@
     "test:crm:30-4c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-4c.mjs",
     "test:crm:30-5a": "node scripts/mvp/crm/validate-qf-mvp-30-5a.mjs",
     "test:crm:30-5b2b": "node scripts/mvp/crm/validate-qf-mvp-30-5b2b.mjs",
+    "test:crm:30-5c1": "node scripts/mvp/crm/validate-qf-mvp-30-5c1.mjs",
     "test:mvp:communication": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs communication",
     "verify:mvp": "npm run test:mvp && npm run test:mvp:r1 && npm run test:mvp:b2 && npm run test:mvp:c && npm run test:mvp:d && npm run test:mvp:e && npm run test:mvp:20-4a && npm run test:mvp:20-4c && npm run test:mvp:20-5a && npm run test:mvp:build-gate && npm run typecheck && npm run lint && npm run build",
     "inventory:mvp": "node scripts/mvp/inventory/run.mjs",

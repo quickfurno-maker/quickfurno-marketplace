@@ -1300,6 +1300,112 @@ pre-existing advisor findings were left untouched rather than auto-fixed.
 **Next: QF-MVP-30.4D — full campaign staging workflow plus the two-connection concurrency smoke. No fixture,
 no smoke and no QF-MVP-30.5 work occurred in this phase.**
 
+## 30. QF-MVP-30.4D — vendor campaign management staging validation (COMPLETE)
+
+**Status:** `QF_MVP_30_4_VENDOR_CAMPAIGN_MANAGEMENT_COMPLETE_READY_FOR_EXECUTION_HANDOFF`
+
+Two halves, both against authorized staging `uckafzuochmbvtiodmcl` only. Production `yqpgcsduqbxulrlzwzap`
+and QF-Jarvis `coilipywdvxklewquqvv` were never contacted in either. No provider, Meta, n8n, WhatsApp, SMS,
+email or webhook request occurred; `communication_intents` was **0 before and 0 after**, and no
+frequency/dispatch/delivery authority was added — QF-MVP-30.5 still owns all of it.
+
+### 30.4D-A — application workflow smoke (64/64)
+
+The full draft → prepare → approve workflow driven through the **real Next.js server actions over HTTP**
+with a genuine `@supabase/ssr` admin session, not through direct SQL. **64/64 checks pass.**
+
+**Two harness defects were found and corrected before any result was trusted**, both of which would have
+produced confidently false evidence:
+
+1. **Action-ID mis-mapping.** A proximity heuristic assigned three different server actions the *same*
+   40-hex action id, so three journeys would have exercised one action while reporting three. Replaced with
+   a deterministic parse of the `.next/server/app/**/page.js` action registry plus a **two-way uniqueness
+   assertion** (no id maps to two actions, no action maps to two ids).
+2. **`head:true` masking a missing table.** A PostgREST count with `head:true` returns `204`/`null` for an
+   absent relation — indistinguishable from a genuine zero. Counting *without* `head` surfaces `PGRST205`
+   instead, so "zero rows" now means the table exists and is empty.
+
+A third defect was environmental: a bare `npm run build` **baked production environment values** into
+`.next`, after which every request `307`'d before authentication and no action ran at all. That produced the
+standing rule hardened by 30.4D-A1 (§ below) and the build was redone under the staging wrapper.
+
+### 30.4D-A1 — staging build environment gate (43/43)
+
+Commit `40c4bee`. Codifies: **a staging build is acceptable only when it is started through the safe staging
+environment gate and its output is rescanned after the build.** `scripts/mvp/build/stagingBuildGate.mjs` is a
+pure decision layer (no fs, spawn, exit or clock); `runStagingBuild.mjs` orchestrates; `build-staging-safe.mjs`
+is the CLI. `npm run build` is **unchanged** — the normal production build neither gains staging markers nor
+is replaced. The validator is **43/43 including 4 mutants** proving the effective-ref check, the post-build
+scan, the outbound-flag check and the child-failure check are each load-bearing; a child process that could
+not be *started* is a failure, never a pass.
+
+### 30.4D-B — two-connection behavioural lock smoke (46/46)
+
+Executed over the Supabase **session pooler** (port 5432) with two genuinely independent `pg.Client`
+sessions on **distinct backend PIDs**, each transaction proven to persist across separate round trips. This
+is the concurrency proof §28 planned but could not perform.
+
+**Four blocking proofs, all confirmed from server-side wait evidence rather than timing.** For each, A ran
+the **real** RPC inside an open transaction and B attempted a concurrent non-key `UPDATE` of the locked
+evidence row. In every case `pg_stat_activity.wait_event_type = 'Lock'` (`wait_event = transactionid`) and
+`pg_locks` showed an **ungranted** `ShareLock`, B had not completed while A held the lock, and B completed
+**only after A committed** (waits 620–657 ms):
+
+| # | RPC | Row held `FOR SHARE` | B blocked | RPC result |
+|---|-----|----------------------|-----------|------------|
+| 1 | `qf_prepare_vendor_campaign_v1` | `vendor_segments` | yes | `ok:true` |
+| 2 | `qf_prepare_vendor_campaign_v1` | `communication_templates` | yes | `ok:true` |
+| 3 | `qf_approve_vendor_campaign_v1` | `vendor_segments` | yes | `ok:true` |
+| 4 | `qf_approve_vendor_campaign_v1` | `communication_templates` | yes | `ok:true` |
+
+**`FOR SHARE` is proven to be the MINIMUM sufficient mode, not an arbitrary choice**, by two controls:
+
+- *Shared-mode control.* While A held `FOR SHARE`, a second `FOR SHARE` on the same row was re-acquired in
+  174–194 ms — two campaigns pinning the same segment do **not** serialise against each other.
+- *`FOR KEY SHARE` insufficiency control.* With A holding `FOR KEY SHARE`, the same non-key `UPDATE`
+  completed in **64 ms unblocked** — confirming `FOR KEY SHARE` would have left exactly the dispatch-critical
+  non-key field class unprotected.
+
+**Evidence freeze and immutability.** The approved campaign's `snapshot_fingerprint` equalled a value
+computed **independently of the database** in the harness from the canonical tuple stream, and its segment
+and template fingerprints matched their sources. Both source rows were then drifted after approval: the
+approved evidence stayed **byte-identical**, an approve replay returned `replayed:true` without
+re-validating the drifted sources, and a fresh prepare on the drifted segment was refused
+`SEGMENT_EVIDENCE_MISMATCH`. Frozen audience rows refused `UPDATE` and `DELETE`, campaigns refused `DELETE`
+and campaign events refused `DELETE` — all `P0001`.
+
+**A real evidence-drift refusal was observed incidentally.** A first pass blocked on
+`communication_templates.description`, which **is** an input to the canonical template fingerprint; approval
+correctly refused with `TEMPLATE_FINGERPRINT_MISMATCH`. The pass was redone blocking on `updated_at` — still
+a genuine non-key `UPDATE`, but not an evidence field. The refusal is recorded because it is the hardening
+working, not a defect.
+
+**Fixture retirement is archival by design.** `trg_vcm_no_delete`, `trg_vcam_immutable` and
+`trg_vce_immutable` make campaigns, frozen audience rows and events **append-only**, so fixtures cannot be
+deleted. All seven `qf_30_4d_b_*` campaigns were archived, the fixture segment archived and the fixture
+template `is_active=false, readiness_status='disabled'`; a prepare against the retired fixtures is refused
+`SEGMENT_ARCHIVED`. The permanent, honestly-reported staging delta is campaigns 29→36, audience members
+28→36, events 114→120, segments 8→10, templates 2→4. **`vendors` (5) and `lead_assignments` (0) are
+untouched.** No session was left idle in transaction, no lock left waiting, and a scan of 1,501 files across
+the workspace and repository found **zero** occurrences of the connection string or password.
+
+**Direct-database capability.** The smoke required a session-pooler connection string held in a
+DPAPI-encrypted vault outside Git and injected only by the staging wrapper. Three runs were **blocked on
+`28P01`** before the credential resolved; the blocked reports are retained unaltered. Two Supavisor
+topology facts were established and are load-bearing for any future pooled test: `application_name` is
+**rewritten by the pooler**, so sessions must be correlated by backend PID; and `pg_stat_ssl` describes the
+**pooler→Postgres** leg, reporting `ssl=false` for a pooled session whose client leg is nonetheless
+encrypted. Client-leg TLS was therefore asserted at the socket — **TLSv1.3 / TLS_AES_256_GCM_SHA384** — and
+corroborated by the same credentials on the direct host reporting `pg_stat_ssl.ssl = true`.
+
+**Gates.** 30.4D-B **46/46**, 30.4D-A 64/64, build gate **43/43** (4 mutants), 30.4A 151/151, marketplace
+R1 · B2 · C · D · E, 20.4A · 20.4C · 20.5A, `test:mvp` 110/110, **`verify:mvp` exit 0**, typecheck and lint
+clean.
+
+**Next: QF-MVP-30.5 — execution handoff. Not started.** It must own provider mapping, a fail-closed
+frequency rule, and a send-time recheck of both fingerprints, since approval authorises an audience and
+never dispatches.
+
 ## 19. QF-MVP-30.2C1 + 30.2S4 — bounded security correction + direct staging smoke
 
 **Status:** `VENDOR_CRM_DIRECTORY_AND_PROFILE_STAGING_SMOKE_COMPLETE_READY_FOR_SEGMENTS`

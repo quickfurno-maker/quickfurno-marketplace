@@ -127,6 +127,69 @@ comment on table public.communication_frequency_policies is
 alter table public.communication_frequency_policies enable row level security;
 
 -- ---------------------------------------------------------------------------
+-- 3b. SEGMENT EVIDENCE PAIR — made a DATABASE-ENFORCED authority
+-- ---------------------------------------------------------------------------
+-- QF-MVP-30.5A1 review finding. The handoff RPC (and qf_approve_vendor_campaign_v1
+-- before it) trusts vendor_segments.definition_fingerprint as evidence that the
+-- approved rule is still the current rule. That trust was NOT enforced:
+--
+--   * service_role holds UPDATE on public.vendor_segments (migration 1200);
+--   * the only trigger there is trg_vsg_touch, which just stamps updated_at;
+--   * so a supported PostgREST/SQL write could change `definition` while leaving
+--     `definition_fingerprint` untouched — and every downstream evidence check
+--     would still "match" while the stored rule had silently changed.
+--
+-- This does NOT add a second canonicaliser: the segment service remains the sole
+-- producer of the fingerprint. It only makes the pair inseparable, which is
+-- exactly the invariant services/vendorSegmentService.ts already maintains
+-- (it writes definition + definition_fingerprint + definition_version in one
+-- patch, and touches none of them for a metadata-only edit).
+create or replace function public.qf_enforce_segment_definition_pair()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  -- A stored-definition change MUST carry a new fingerprint and a higher version.
+  if new.definition is distinct from old.definition then
+    if new.definition_fingerprint is not distinct from old.definition_fingerprint then
+      raise exception
+        'QF-MVP-30.5A1: vendor_segments.definition changed without a new definition_fingerprint (segment %)', old.id
+        using errcode = 'check_violation';
+    end if;
+    if new.definition_version is null or new.definition_version <= old.definition_version then
+      raise exception
+        'QF-MVP-30.5A1: vendor_segments.definition changed without increasing definition_version (segment %)', old.id
+        using errcode = 'check_violation';
+    end if;
+  end if;
+
+  -- And the converse: a fingerprint may not move on its own, which would claim a
+  -- different rule than the one actually stored.
+  if new.definition_fingerprint is distinct from old.definition_fingerprint
+     and new.definition is not distinct from old.definition then
+    raise exception
+      'QF-MVP-30.5A1: vendor_segments.definition_fingerprint changed without a definition change (segment %)', old.id
+      using errcode = 'check_violation';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_vsg_definition_pair on public.vendor_segments;
+create trigger trg_vsg_definition_pair
+  before update on public.vendor_segments
+  for each row execute function public.qf_enforce_segment_definition_pair();
+
+comment on function public.qf_enforce_segment_definition_pair() is
+  'QF-MVP-30.5A1: makes vendor_segments.(definition, definition_fingerprint, definition_version) an inseparable, database-enforced pair. Adds NO canonicalisation — the segment service remains the sole fingerprint producer — but no supported path may now change one without the others.';
+
+revoke all on function public.qf_enforce_segment_definition_pair() from public;
+revoke all on function public.qf_enforce_segment_definition_pair() from anon;
+revoke all on function public.qf_enforce_segment_definition_pair() from authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 4. qf_handoff_vendor_campaign_intents_v1 — the canonical handoff authority
 -- ---------------------------------------------------------------------------
 create or replace function public.qf_handoff_vendor_campaign_intents_v1(
@@ -156,6 +219,8 @@ declare
   v_pref_state   text;
   v_suppressed   boolean;
   v_recent       integer;
+  v_policy_n     integer;
+  v_lock         record;
   v_last_at      timestamptz;
   v_key          text;
   v_intent_id    uuid;
@@ -288,18 +353,68 @@ begin
   end if;
 
   -- ---- frequency policy gate — BEFORE any insert ---------------------------
+  -- Exactly ONE active policy may match. The partial unique index already makes
+  -- two active rows per (channel, scope) unrepresentable; this counts anyway and
+  -- fails closed, because a silent "pick the first row" would let an ambiguous
+  -- configuration decide how much a recipient may be contacted.
+  select count(*) into v_policy_n from public.communication_frequency_policies
+   where channel = v_campaign.channel
+     and scope   = v_campaign.consent_scope
+     and is_active
+     and effective_from <= now()
+     and (effective_to is null or effective_to > now());
+  if v_policy_n = 0 then
+    return jsonb_build_object(
+      'ok', false, 'code', 'FREQUENCY_POLICY_NOT_CONFIGURED',
+      'channel', v_campaign.channel, 'scope', v_campaign.consent_scope,
+      'created', 0);
+  end if;
+  if v_policy_n > 1 then
+    return jsonb_build_object(
+      'ok', false, 'code', 'FREQUENCY_POLICY_AMBIGUOUS',
+      'channel', v_campaign.channel, 'scope', v_campaign.consent_scope,
+      'matches', v_policy_n, 'created', 0);
+  end if;
+
   select * into v_policy from public.communication_frequency_policies
    where channel = v_campaign.channel
      and scope   = v_campaign.consent_scope
      and is_active
      and effective_from <= now()
      and (effective_to is null or effective_to > now());
-  if not found then
-    return jsonb_build_object(
-      'ok', false, 'code', 'FREQUENCY_POLICY_NOT_CONFIGURED',
-      'channel', v_campaign.channel, 'scope', v_campaign.consent_scope,
-      'created', 0);
-  end if;
+
+  -- The selected policy is PINNED for the whole batch: every recipient below is
+  -- judged against this row, so a concurrent policy edit cannot change the rule
+  -- midway through one handoff.
+
+  -- ---- CROSS-CAMPAIGN RECIPIENT SERIALIZATION ------------------------------
+  -- Same-campaign idempotency is NOT sufficient. Two DIFFERENT approved
+  -- campaigns handing off to the same recipient+channel could otherwise both
+  -- read the same below-limit count and both insert, exceeding the policy.
+  --
+  -- Every recipient in this batch is therefore locked with a transaction-scoped
+  -- advisory lock keyed by recipient + channel + policy, acquired BEFORE any
+  -- frequency count and held until commit.
+  --
+  -- The locks are taken up front in ascending KEY order, not audience order. Two
+  -- overlapping batches therefore always request shared keys in the same global
+  -- sequence, so they queue instead of deadlocking.
+  for v_lock in
+    select distinct
+           pg_catalog.hashtextextended(
+             'qf_campaign_freq:' || v_campaign.channel || ':' ||
+             v_policy.id::text || ':' || b.vendor_id::text, 0) as k
+      from (select m.vendor_id
+              from public.vendor_campaign_audience_members m
+             where m.campaign_id = p_campaign_id
+               and m.snapshot_id = v_campaign.prepared_snapshot_id
+               and m.snapshot_revision = v_campaign.prepared_snapshot_revision
+             order by m.ordinal
+             limit v_limit) b
+     order by 1
+  loop
+    perform pg_catalog.pg_advisory_xact_lock(v_lock.k);
+  end loop;
 
   -- ---- bounded batch over the IMMUTABLE frozen audience --------------------
   for v_member in
@@ -367,6 +482,11 @@ begin
     v_key := 'vendor_campaign_handoff:' || p_campaign_id::text || ':'
              || v_member.vendor_id::text || ':' || v_campaign.channel;
 
+    -- COUNTED STATUSES: deliberately ALL of them. An intent that was authorised
+    -- counts whether it is pending, claimed, dispatched, delivered, failed or
+    -- uncertain — a failed or uncertain send may still have reached the person,
+    -- and a cancellation or retry must never buy extra contact budget. No status,
+    -- cancellation flag or retry counter can subtract from this count.
     select count(*), max(i.created_at) into v_recent, v_last_at
       from public.communication_intents i
      where i.recipient_ref = encode(sha256(('vendor:' || v_member.vendor_id::text)::bytea), 'hex')

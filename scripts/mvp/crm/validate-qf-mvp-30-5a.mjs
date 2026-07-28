@@ -56,6 +56,12 @@ function executableSql(src) {
   }
   return out;
 }
+/** Blank single-quoted literals as well, for keyword scans where a word such as
+ *  'insert' legitimately appears as DATA (e.g. has_table_privilege(...,'insert')). */
+function sqlKeywordSurface(src) {
+  return executableSql(src).replace(/'(?:[^']|'')*'/g, "''");
+}
+
 const results = [];
 const record = (name, ok, detail = "") => results.push({ name, ok: Boolean(ok), detail });
 
@@ -153,10 +159,16 @@ record("21 the absence of a DB segment-fingerprint function is documented, not p
   /deliberately NO database function/.test(fn)
   && /canonicalisation that could silently disagree/.test(fn),
   "the migration states the boundary explicitly");
-record("21b no second segment-fingerprint implementation was introduced",
-  !/qf_[a-z_]*segment[a-z_]*fingerprint/i.test(exec)
-  && !/create (or replace )?function[^;]*segment[^;]*fingerprint/i.test(exec),
-  "re-deriving it here could silently disagree with the segment service");
+{
+  // A second canonicaliser would DIGEST the definition. Comparing or naming a
+  // fingerprint — as the enforcement trigger and the handoff RPC both do — is
+  // not canonicalisation, and the RPC legitimately digests a PHONE, never a
+  // definition.
+  const digestsDefinition = /(sha256|md5|digest)\s*\([^)]*definition/i.test(exec);
+  record("21b no second segment-fingerprint implementation was introduced",
+    !digestsDefinition,
+    "nothing digests vendor_segments.definition; the segment service stays sole producer");
+}
 
 /* ===========================================================================
  * 5. Lifecycle gate
@@ -286,9 +298,10 @@ const mutate = (source, find, replace, label) => {
     "the real source refuses on drift; the mutant no longer can");
 }
 {
-  const m = mutate(fn, /if not found then\s*\n\s*return jsonb_build_object\(\s*\n?\s*'ok', false, 'code', 'FREQUENCY_POLICY_NOT_CONFIGURED'/, "if false then\n    return jsonb_build_object(\n      'ok', false, 'code', 'X'", "frequency gate");
-  record("M2 removing the frequency gate changes the guard (load-bearing)",
-    m.changed && /FREQUENCY_POLICY_NOT_CONFIGURED/.test(fn));
+  const m = mutate(fn, /if v_policy_n = 0 then/, "if false then", "no-policy gate");
+  record("M2 removing the no-policy gate changes the guard (load-bearing)",
+    m.changed && /if v_policy_n = 0 then/.test(fn) && /FREQUENCY_POLICY_NOT_CONFIGURED/.test(fn),
+    "without it a campaign could hand off with no policy configured at all");
 }
 {
   const m = mutate(fn, /on conflict \(idempotency_key\) do nothing\s*\n\s*returning id into v_intent_id;/, "returning id into v_intent_id;", "idempotency");
@@ -329,6 +342,115 @@ record("49 the success path returns deterministic counts",
 record("50 bounded non-PII audit evidence is appended to the append-only event log",
   /insert into public\.vendor_campaign_events[\s\S]{0,600}'execution_handoff'/.test(fn));
 
+
+/* ===========================================================================
+ * 13. QF-MVP-30.5A1 — segment authority, serialization, policy ambiguity
+ * ========================================================================= */
+record("51 the segment (definition, fingerprint, version) triple is DB-enforced",
+  /create trigger trg_vsg_definition_pair[\s\S]{0,160}before update on public\.vendor_segments/.test(exec)
+  && /qf_enforce_segment_definition_pair/.test(exec),
+  "service_role holds UPDATE on vendor_segments, so a trigger is the only real fence");
+record("52 a definition change without a new fingerprint is refused",
+  /new\.definition is distinct from old\.definition[\s\S]{0,400}definition_fingerprint is not distinct from old\.definition_fingerprint[\s\S]{0,200}raise exception/.test(exec));
+record("53 a definition change without a higher version is refused",
+  /definition_version is null or new\.definition_version <= old\.definition_version[\s\S]{0,200}raise exception/.test(exec));
+record("54 a fingerprint change without a definition change is refused",
+  /definition_fingerprint is distinct from old\.definition_fingerprint\s*\n\s*and new\.definition is not distinct from old\.definition[\s\S]{0,200}raise exception/.test(exec));
+record("55 the enforcement adds NO second canonicaliser",
+  !/jsonb_build|canonical|sha256/i.test(
+    (/create or replace function public\.qf_enforce_segment_definition_pair[\s\S]*?\$\$;/.exec(exec) || [""])[0]),
+  "it compares old/new only; the segment service stays the sole fingerprint producer");
+
+record("56 an ambiguous active policy fails closed",
+  /'FREQUENCY_POLICY_AMBIGUOUS'/.test(fn) && /v_policy_n > 1/.test(fn));
+record("57 the ambiguity count runs before the policy row is used",
+  fn.indexOf("v_policy_n > 1") < fn.indexOf("select * into v_policy"));
+record("58 the selected policy is pinned for the whole batch",
+  /PINNED for the whole batch/.test(fn));
+
+record("59 cross-campaign recipients are serialized by an advisory xact lock",
+  /pg_catalog\.pg_advisory_xact_lock\(/.test(fn)
+  && /qf_campaign_freq:/.test(fn));
+record("60 the lock key is recipient + channel + policy",
+  /'qf_campaign_freq:' \|\| v_campaign\.channel \|\| ':' \|\|\s*\n?\s*v_policy\.id::text \|\| ':' \|\| b\.vendor_id::text/.test(fn));
+record("61 the lock is acquired BEFORE the frequency count",
+  fn.indexOf("pg_advisory_xact_lock") < fn.indexOf("into v_recent, v_last_at"));
+record("62 locks are taken in ascending KEY order, so overlapping batches cannot deadlock",
+  /order by 1\s*\n\s*loop\s*\n\s*perform pg_catalog\.pg_advisory_xact_lock/.test(fn));
+record("63 the frequency count narrows on NO status (conservative)",
+  !/i\.status\s*(=|in)/.test(fn) && /COUNTED STATUSES/.test(fn),
+  "failed/uncertain/cancelled must never buy extra contact budget");
+
+/* ===========================================================================
+ * 14. Staging verifier contract
+ * ========================================================================= */
+{
+  const VER = "supabase/staging-verification/verify_qf_mvp_30_5a.sql";
+  const present = existsSync(path.join(ROOT, VER));
+  record("64 the 30.5A staging verifier exists", present, VER);
+  if (present) {
+    const v = read(VER);
+    const vexec = sqlKeywordSurface(v);
+    const mutating = /\b(insert|update|delete|alter|create|drop|grant|revoke|truncate|copy)\b/i.exec(vexec);
+    record("65 the verifier is SELECT-only", mutating === null,
+      mutating ? `found: ${mutating[0]}` : "no mutating keyword in executable SQL");
+    record("66 the verifier never calls the handoff RPC",
+      !/qf_handoff_vendor_campaign_intents_v1\s*\(/.test(vexec.replace(/'[^']*'/g, "")),
+      "running the verifier must create no intent");
+    const ids = [...v.matchAll(/'(C\d{2}_[a-z0-9_]+)' as check_id/g)].map((m) => m[1]);
+    record("67 every verifier row reports check_id, passed and detail",
+      ids.length >= 28
+      && (v.match(/as passed/g) || []).length === ids.length
+      && (v.match(/as detail/g) || []).length === ids.length,
+      `${ids.length} checks`);
+    for (const [id, label] of [
+      ["C01", "migration once and latest"], ["C02", "aggregate_type compatibility"],
+      ["C08", "no default policy seeded"], ["C11", "RPC execute fail-closed"],
+      ["C14", "campaign->segment->template lock order"], ["C16", "fingerprints recomputed"],
+      ["C17", "segment pair enforced"], ["C18", "no second canonicaliser"],
+      ["C19", "policy fail-closed codes"], ["C20", "recipient serialization before count"],
+      ["C22", "idempotency uniqueness"], ["C23", "consent/suppression rechecked"],
+      ["C24", "provider-neutral pending only"], ["C25", "no provider/network path"],
+      ["C26", "no prohibited refs"], ["C27", "zero intents after application"],
+    ]) {
+      record(`68 verifier asserts ${label} (${id})`, ids.some((x) => x.startsWith(id + "_")));
+    }
+  }
+}
+
+{
+  const dataOnly = sqlKeywordSurface("select has_table_privilege('x','insert');");
+  const realDml  = sqlKeywordSurface("insert into t values (1);");
+  record("69 the keyword surface blanks literals but still sees real SQL",
+    !/insert/i.test(dataOnly) && /insert/i.test(realDml),
+    `dataOnly=${JSON.stringify(dataOnly)} realDml=${JSON.stringify(realDml)}`);
+}
+
+/* ===========================================================================
+ * 15. QF-MVP-30.5A1 mutation controls
+ * ========================================================================= */
+{
+  const m = fn.replace(/perform pg_catalog\.pg_advisory_xact_lock\(v_lock\.k\);/, "null;");
+  record("M6 removing recipient serialization changes the guard (load-bearing)",
+    m !== fn && /pg_advisory_xact_lock\(v_lock\.k\)/.test(fn),
+    "without it two campaigns can both read a below-limit count");
+}
+{
+  const m = exec.replace(/create trigger trg_vsg_definition_pair/, "-- removed");
+  record("M7 removing the segment pair trigger changes the guard (load-bearing)",
+    m !== exec && /create trigger trg_vsg_definition_pair/.test(exec));
+}
+{
+  const m = fn.replace(/if v_policy_n > 1 then/, "if false then");
+  record("M8 removing the ambiguous-policy guard changes the guard (load-bearing)",
+    m !== fn && /if v_policy_n > 1 then/.test(fn));
+}
+{
+  const m = fn.replace(/'pending'\)/, "'dispatched')");
+  record("M9 a non-pending intent status would be a different contract (load-bearing)",
+    m !== fn && /'pending'\)/.test(fn));
+}
+
 /* ===========================================================================
  * Report
  * ========================================================================= */
@@ -340,7 +462,8 @@ for (const r of results) {
 }
 console.log("");
 console.log(`checks: ${results.length - failed.length} passed, ${failed.length} failed (of ${results.length})`);
-console.log("mutants: 5 (snapshot recheck, frequency gate, idempotency, suppression, consent)");
+console.log("mutants: 9 (snapshot recheck, frequency gate, idempotency, suppression, consent,");
+console.log("            recipient serialization, segment pair trigger, ambiguous policy, pending status)");
 console.log("offline: no database, no network, no provider call");
 console.log(`RESULT: ${failed.length ? "FAIL" : "PASS"}`);
 process.exit(failed.length ? 1 : 0);

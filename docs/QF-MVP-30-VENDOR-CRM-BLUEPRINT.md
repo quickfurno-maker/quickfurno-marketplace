@@ -1484,6 +1484,76 @@ and campaign-event rows preserved and counted.
 single-ref post-build scan and zero client secrets, and `git diff --check` exit 0.
 
 **QF-MVP-30.5 is NOT complete. Next: QF-MVP-30.5C — application integration and Vendor CRM closeout.**
+## 32. QF-MVP-30 VENDOR CRM — COMPLETE (30.5C1/C2 application integration and final workflow smoke)
+
+**Status: `QF_MVP_30_VENDOR_CRM_COMPLETE_READY_FOR_PRIVATE_SERVER_STAGING_DEPLOYMENT`.**
+QF-MVP-30.1 through 30.5 are complete. Authorized staging `uckafzuochmbvtiodmcl` only; production
+`yqpgcsduqbxulrlzwzap` and QF-Jarvis `coilipywdvxklewquqvv` were never contacted at any point in
+MVP-30. **Server deployment remained deferred throughout and has still not occurred.**
+
+**Migrations through 1600 applied and verified.** Staging carries 17 migrations, `20260728001500`
+(execution handoff foundation) and `20260728001600` (frequency policy history hardening) each
+applied exactly once, 1600 latest. Both committed SELECT-only verifiers were re-run in
+`READ ONLY` transactions at closeout: `verify_qf_mvp_30_5b2b.sql` **18/18**, and
+`verify_qf_mvp_30_5a.sql` **24/24 in scope** — four of its checks are point-in-time assertions
+whose documented precondition ("1500 latest, before any fixture exists") legitimately expired once
+1600 was applied and fixtures were exercised. Rather than weaken committed evidence, each was
+classified and its durable invariant re-proven: 1500 still applied exactly once; **no ACTIVE policy
+exists**; **no campaign intent is sendable**; and every campaign intent and handoff event belongs to
+a retired test campaign, so migration application itself created none.
+
+**Final real application workflow smoke — 56/56.** Driven through a genuine `next start` process on
+127.0.0.1 with a real `@supabase/ssr` Superadmin session and the ACTUAL content-hashed server
+actions over HTTP; no mocked Supabase and no direct service call substituted for the workflow.
+Create → preview → prepare → approve → handoff all ran as the application. Unauthenticated callers
+were redirected (307) and a forged session failed closed, while the genuine CRM admin succeeded.
+
+**Admin boundary.** The existing strongest privileged authority is reused, not replaced: canonical
+`profiles.role = 'admin'` AND server-owned `app_metadata.admin_role = 'Superadmin'`, enforced by
+`requireCrmAdmin()` on every action and separately at the route. No new role was invented.
+
+**Approval and handoff are separate, explicitly.** Approving a campaign was proven on staging to
+create **zero** communication intents. Handoff is a distinct operator action, available only for an
+approved campaign with an active matching policy, and fail-closed on both.
+
+**Operator frequency-policy workflow.** An administrator can list history, publish a new explicit
+version and retire an active one — and nothing else. Proven through the real application: a
+duplicate active policy is refused (`POLICY_DUPLICATE_ACTIVE`), an empty threshold is rejected
+rather than defaulted (`POLICY_THRESHOLD_INVALID`), a retired policy remains in history with its
+threshold/window/scope unchanged, and reactivation is refused by the database.
+
+**There is NO active production frequency policy, and campaign handoff remains fail-closed without
+one.** Proven end to end: with no active policy the application reported
+`FREQUENCY_POLICY_NOT_CONFIGURED` and created zero intents. The threshold and window remain an owner
+decision; nothing in the codebase supplies, suggests or falls back to a value.
+
+**Provider-neutral only.** Handoff created exactly one `pending`, provider-neutral intent with an
+opaque sha256 `recipient_ref`, no provider id, no delivery claim, `attempt_count = 0`. Counts
+reconciled exactly (`examined = created + existing + excluded`). Replay created zero duplicates and
+returned a deterministic `existing` count. Segment drift failed closed with
+`SEGMENT_EVIDENCE_MISMATCH`, mapped to safe operator text carrying no SQL or row detail. Consent
+revoked after approval excluded the recipient (`skippedConsent = 1`) with no PII.
+
+**Dispatch-time recheck remains mandatory.** Consent and suppression are re-read at handoff, but can
+change afterwards. Whatever eventually dispatches MUST revalidate consent and suppression
+immediately before contacting a provider. **No Meta, WhatsApp, n8n, SMS, email or webhook transport
+exists anywhere in MVP-30** — QF-MVP-40 owns Meta transport and QF-MVP-50 owns n8n execution.
+
+**All test fixtures retired.** Every `qf_30_5*` fixture was retired through canonical lifecycle with
+**no DELETE anywhere**: campaigns and segments archived, templates disabled, vendors deactivated,
+policies retired one-way, intents moved to terminal `failed`. Staging holds zero active campaigns,
+segments, templates, vendors or policies and zero sendable intents; append-only audience, campaign
+event and policy-history rows are preserved and counted as evidence.
+
+**Gates at closeout.** 30.5C1 55/55, 30.5B2B 52/52, 30.5A 98/98, 30.4 / 30.4C / 30.3 / 30.3C /
+blueprint / build-gate / `test:mvp` / typecheck / lint all green, staging-safe build with a
+single-ref post-build scan (84 client / 264 server files, 0 prohibited-ref, 0 client secrets), and
+`git diff --check` clean.
+
+**Next: private server staging deployment.** After deployment the sequence continues to QF-MVP-40
+(Meta transport), QF-MVP-50 (n8n execution workflows), QF-MVP-70 (operations dashboard), QF-MVP-60
+and QF-MVP-80.
+
 It owns the admin/vendor surface for handoff, the operator path that inserts the first real frequency
 policy (still an owner decision), and the closeout. Provider transport stays with QF-MVP-40/50, and
 deployment stays deferred until MVP-30 is complete.

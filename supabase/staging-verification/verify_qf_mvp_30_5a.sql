@@ -78,15 +78,20 @@ select 'C08_no_default_policy_seeded' as check_id,
   from public.communication_frequency_policies;
 
 -- C09 — the handoff RPC exists with the exact signature and is SECURITY DEFINER.
+--       to_regprocedure pins the signature by TYPE, which is the canonical test.
+--       (pg_get_function_identity_arguments returns NAMED arguments —
+--        "p_campaign_id uuid, ..." — so comparing it to a bare type list is wrong.)
 select 'C09_rpc_signature_and_secdef' as check_id,
-       (count(*) = 1) as passed,
-       'matching functions=' || count(*) as detail
-  from pg_proc p
-  join pg_namespace n on n.oid = p.pronamespace
- where n.nspname = 'public'
-   and p.proname = 'qf_handoff_vendor_campaign_intents_v1'
-   and pg_get_function_identity_arguments(p.oid) = 'uuid, integer, uuid, integer, text'
-   and p.prosecdef;
+       (to_regprocedure('public.qf_handoff_vendor_campaign_intents_v1(uuid,integer,uuid,integer,text)') is not null
+        and (select count(*) = 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public'
+                and p.proname = 'qf_handoff_vendor_campaign_intents_v1'
+                and p.prosecdef
+                and p.pronargs = 5)) as passed,
+       'signature=' || coalesce(
+          pg_get_function_identity_arguments(
+            to_regprocedure('public.qf_handoff_vendor_campaign_intents_v1(uuid,integer,uuid,integer,text)')::oid),
+          '(absent)') as detail;
 
 -- C10 — the RPC has a fixed, safe search_path.
 select 'C10_rpc_fixed_search_path' as check_id,
@@ -142,7 +147,8 @@ select 'C14_lock_order_campaign_segment_template' as check_id,
        'campaign@' || position('from public.vendor_campaigns' in src)
          || ' segment@' || position('from public.vendor_segments' in src)
          || ' template@' || position('from public.communication_templates' in src) as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C15 — the evidence rows are locked FOR SHARE, and the head FOR UPDATE.
@@ -154,7 +160,8 @@ select 'C15_evidence_row_locks' as check_id,
        'for_update=' || (src like '%for update%')::text
          || ' segment_for_share=' || (src like '%v_campaign.segment_id for share%')::text
          || ' template_for_share=' || (src like '%v_campaign.template_key for share%')::text as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C16 — snapshot and template fingerprints are RECOMPUTED from canonical functions.
@@ -165,7 +172,8 @@ select 'C16_fingerprints_recomputed' as check_id,
         and src like '%TEMPLATE_FINGERPRINT_MISMATCH%') as passed,
        'snapshot_fn=' || (src like '%qf_campaign_snapshot_fingerprint_v1(%')::text
          || ' template_fn=' || (src like '%qf_communication_template_fingerprint_v1(%')::text as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C17 — SEGMENT AUTHORITY RESOLUTION: the stored (definition, fingerprint,
@@ -197,7 +205,8 @@ select 'C19_policy_fail_closed_codes' as check_id,
         and src like '%FREQUENCY_POLICY_AMBIGUOUS%') as passed,
        'not_configured=' || (src like '%FREQUENCY_POLICY_NOT_CONFIGURED%')::text
          || ' ambiguous=' || (src like '%FREQUENCY_POLICY_AMBIGUOUS%')::text as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C20 — cross-campaign recipient serialization is acquired BEFORE the count.
@@ -207,14 +216,16 @@ select 'C20_recipient_serialization_before_count' as check_id,
               < position('into v_recent, v_last_at' in src)) as passed,
        'lock@' || position('pg_advisory_xact_lock' in src)
          || ' count@' || position('into v_recent, v_last_at' in src) as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C21 — the frequency count is status-inclusive (conservative).
 select 'C21_frequency_counts_all_statuses' as check_id,
        (src not like '%i.status =%' and src not like '%i.status in%') as passed,
        'no status filter narrows the frequency count' as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C22 — recipient idempotency is database-enforced and NOT nullable.
@@ -235,17 +246,22 @@ select 'C23_consent_suppression_rechecked' as check_id,
         and src like '%''global''%') as passed,
        'preferences=' || (src like '%public.communication_preferences%')::text
          || ' suppressions=' || (src like '%public.communication_suppressions%')::text as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C24 — only provider-neutral 'pending' intents are creatable by this RPC.
+--       Graded on COMMENT-STRIPPED body text: the function documents that the
+--       frequency count includes delivered/failed/uncertain statuses, and that
+--       prose must not read as a delivery claim.
 select 'C24_provider_neutral_pending_only' as check_id,
        (src like '%''pending''%'
         and src not like '%provider_message_id%'
         and src not like '%dispatched_at%'
         and src not like '%delivered%') as passed,
        'pending_only=' || (src like '%''pending''%')::text as detail
-  from (select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  from (select regexp_replace(prosrc, '--[^
+]*', '', 'g') as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = 'qf_handoff_vendor_campaign_intents_v1') t;
 
 -- C25 — no provider/network path exists in the RPC or as an extension.

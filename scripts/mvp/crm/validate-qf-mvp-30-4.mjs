@@ -242,6 +242,7 @@ record("04 segment foundation migration unchanged",
  * migration belongs to an explicitly declared later phase. */
 const DECLARED_LATER_MIGRATIONS = [
   "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql", // QF-MVP-30.4C1
+  "20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql", // QF-MVP-30.5A
 ];
 record("05 migration version is collision-free; later migrations are declared", (() => {
   const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((x) => x.endsWith(".sql")).sort();

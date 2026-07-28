@@ -168,6 +168,7 @@ record("04 segment migration present exactly once, later phases allowed", (() =>
   const DECLARED_LATER = [
     "20260723001300_qf_mvp_vendor_campaign_foundation.sql",      // QF-MVP-30.4A
     "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql", // QF-MVP-30.4C1
+    "20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql", // QF-MVP-30.5A
   ];
   const onlyOnce = files.filter((x) => x.startsWith("20260723001200")).length === 1;
   const later = files.filter((x) => x > mine);

@@ -1402,7 +1402,92 @@ corroborated by the same credentials on the direct host reporting `pg_stat_ssl.s
 R1 · B2 · C · D · E, 20.4A · 20.4C · 20.5A, `test:mvp` 110/110, **`verify:mvp` exit 0**, typecheck and lint
 clean.
 
-**Next: QF-MVP-30.5 — execution handoff. Not started.** It must own provider mapping, a fail-closed
+**Next: QF-MVP-30.5 — execution handoff. Not started.**
+## 31. QF-MVP-30.5A/B — campaign execution handoff, applied and validated on staging (COMPLETE)
+
+**Status: `QF_MVP_30_5B_CAMPAIGN_HANDOFF_STAGING_VALIDATED_READY_FOR_APPLICATION_INTEGRATION`.**
+Authorized staging `uckafzuochmbvtiodmcl` only; production `yqpgcsduqbxulrlzwzap` and QF-Jarvis
+`coilipywdvxklewquqvv` were never contacted. **No Meta/n8n/WhatsApp/SMS/email/webhook request, no provider
+message id, no delivery claim, no outbound flag** — QF-MVP-40 owns Meta transport and QF-MVP-50 owns n8n
+execution. **Server deployment remains deferred until all of MVP-30 is complete.**
+
+**Migrations applied.** `20260728001500` (execution handoff foundation) and `20260728001600` (frequency
+policy history hardening) — each applied **exactly once, latest**, in a single transaction together with its
+history row, leaving the prior migration rows byte-identical and in order. Staging migration count 15 -> 16 ->
+**17**. Applying either created **zero** communication intents and **zero** policy rows. Verifiers
+`verify_qf_mvp_30_5a.sql` **28/28** and `verify_qf_mvp_30_5b2b.sql` **18/18**, each run once in a
+`BEGIN TRANSACTION READ ONLY` before any fixture, so the SELECT-only claim is enforced by PostgreSQL rather
+than asserted.
+
+**Approval is not permission to send.** Under the already-proven campaign -> segment -> template lock order
+(`FOR UPDATE`, then `FOR SHARE` on both evidence rows) the handoff RPC re-proves, at handoff time, that the
+campaign is still approved, the frozen snapshot still recomputes to its fingerprint, the segment evidence
+still matches and the template still recomputes to its pinned fingerprint. Behaviourally confirmed on
+staging: segment drift -> `SEGMENT_EVIDENCE_MISMATCH`, template drift -> `TEMPLATE_FINGERPRINT_MISMATCH`,
+each with **zero** new intents.
+
+**Segment evidence is now a database-enforced authority.** There is deliberately **no** database function
+that recomputes a segment definition fingerprint — the segment service is the single canonicaliser, and a
+second one could silently disagree. Instead `trg_vsg_definition_pair` makes the stored triple inseparable.
+Proven on staging: definition-only, fingerprint-only, and definition+fingerprint-without-a-higher-version are
+all **refused**; the legitimate atomic update succeeds (v1 -> v2) and the already-approved campaign then fails
+closed.
+
+**Frequency policy is Core-owned, explicit and unseeded.** Migration 1300 recorded that no frequency
+authority existed anywhere; `communication_frequency_policies` now provides one and **ships empty**. No
+duration and no count was invented — the value stays an owner decision, and with no active policy the RPC
+returns `FREQUENCY_POLICY_NOT_CONFIGURED` with zero intents. Two competing active policies for one
+`(channel, scope)` are **structurally impossible** (`23505` on the partial unique index), so
+`FREQUENCY_POLICY_AMBIGUOUS` is genuine defence in depth.
+
+**Frequency counting is conservative.** Every canonical intent status — `pending`, `claimed`, `dispatched`,
+`delivered`, `failed`, `uncertain` — keeps a recipient blocked; status cycling and retry metadata buy no
+extra contact budget.
+
+**Policy history is durable (30.5B2B).** 30.5B2A's one real finding was that `service_role` could DELETE and
+TRUNCATE the policy table: migration 1500 revoked only `public`/`anon`/`authenticated`, its grant was
+additive, and Supabase's `pg_default_acl` already grants `arwdDxtm` to `service_role` on every new public
+table. Migration 1600 resets the ACL (revoking from `service_role` first, then re-granting only
+select/insert/update), freezes historical meaning via `trg_cfp_history_immutable`, and refuses DELETE and
+TRUNCATE **by trigger** — grants are not consulted for the table owner. Proven on staging: DELETE refused,
+`max_per_window`/`window_length`/`scope` rewrites refused, re-activating a retired policy refused, while
+canonical retirement and inserting a **new** policy version both still succeed.
+
+**Concurrency, proven with two independent sessions and an observer — never timing alone.**
+*Same-campaign:* two sessions with distinct backend PIDs call handoff concurrently; the database unique
+constraint `uq_communication_intents_idempotency` yields **exactly one** intent, one `created` and one
+`existing`, no error. *Cross-campaign serialization:* session A holds its transaction open after handoff;
+session B, a **different approved campaign** targeting the same recipient, blocks with
+`wait_event_type = Lock`, `wait_event = advisory` and one **ungranted** advisory lock, and `pg_locks` shows
+**the same advisory object** (`classid` 2856129618 / `objid` 2159876212 — the high and low halves of the
+recipient+channel+policy key) granted to A and ungranted for B. After A commits, B resumes, counts A's
+intent and is frequency-blocked (`skipped_frequency = 1`), leaving exactly **one** live intent against a
+threshold of one. *Overlapping batches:* two campaigns sharing two recipients in **reversed** audience order
+run concurrently with **no deadlock**, because locks are acquired in ascending key order rather than audience
+order; counts reconcile and no overrun occurs.
+
+**Consent and suppression are rechecked at handoff, and that is not sufficient for dispatch.** Revoked
+consent and a committed STOP each excluded the recipient with a deterministic non-PII counter, and a
+non-canonical destination was excluded rather than treated as unsuppressed. **A residual race remains by
+design:** consent can change after an intent is created, so any later execution/transport phase **must
+revalidate consent and suppression immediately before provider dispatch**. Intents are records of intent,
+never delivery authority.
+
+**Fixture retirement.** All `qf_30_5b2a_*` and `qf_30_5b2b_*` fixtures were retired through canonical
+lifecycle only — campaigns and segments archived, templates disabled, vendors deactivated, policies retired
+one-way (`is_active = false` + `effective_to`), intents moved to terminal `failed`. **No DELETE anywhere.**
+Zero active campaigns, segments, templates, vendors or policies; zero sendable intents; append-only audience
+and campaign-event rows preserved and counted.
+
+**Gates.** 30.5A validator 98/98 (9 mutants), 30.5B2B validator 52/52 (7 mutants), 30.4 / 30.4C / 30.3 /
+30.3C / blueprint / build-gate / `test:mvp` / typecheck / lint all green, staging-safe build with a
+single-ref post-build scan and zero client secrets, and `git diff --check` exit 0.
+
+**QF-MVP-30.5 is NOT complete. Next: QF-MVP-30.5C — application integration and Vendor CRM closeout.**
+It owns the admin/vendor surface for handoff, the operator path that inserts the first real frequency
+policy (still an owner decision), and the closeout. Provider transport stays with QF-MVP-40/50, and
+deployment stays deferred until MVP-30 is complete.
+ It must own provider mapping, a fail-closed
 frequency rule, and a send-time recheck of both fingerprints, since approval authorises an audience and
 never dispatches.
 

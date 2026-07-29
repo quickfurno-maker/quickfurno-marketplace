@@ -59,6 +59,14 @@ const REGISTRY: Readonly<Record<string, RegistryEntry>> = Object.freeze({
   lead_assignment_alert: { templateKey: "lead_assignment_alert", lane: "business", scope: "transactional" },
   low_credit_warning: { templateKey: "low_credit_warning", lane: "business", scope: "transactional" },
   recharge_reminder: { templateKey: "recharge_reminder", lane: "business", scope: "transactional" },
+  // ---- QF-MVP-40.6 ordinary additions ---------------------------------------------------------
+  // Reviewed transactional types from the QF-MVP-40.4 catalogue. Each is listed EXPLICITLY by exact
+  // key, exactly like the admin alerts above — no prefix, no pattern, no wildcard.
+  client_lead_status_update: { templateKey: "client_lead_status_update", lane: "business", scope: "transactional" },
+  client_matching_update: { templateKey: "client_matching_update", lane: "business", scope: "transactional" },
+  vendor_response_reminder: { templateKey: "vendor_response_reminder", lane: "business", scope: "transactional" },
+  vendor_onboarding_reminder: { templateKey: "vendor_onboarding_reminder", lane: "business", scope: "transactional" },
+  vendor_package_expiry_warning: { templateKey: "vendor_package_expiry_warning", lane: "business", scope: "transactional" },
   // NOTE: each admin alert is listed EXPLICITLY. `admin_*` is NOT a pattern — a prefix rule would
   // silently classify any future `admin_`-prefixed type without review.
   admin_policy_block_alert: { templateKey: "admin_policy_block_alert", lane: "business", scope: "transactional" },
@@ -71,6 +79,24 @@ const REGISTRY: Readonly<Record<string, RegistryEntry>> = Object.freeze({
   // EXACT identity is required, and absence of a preference is NEVER an opt-in.
   client_nurture_followup: { templateKey: "client_nurture_followup", lane: "business", scope: "marketing" },
   dormant_requirement_reactivation: { templateKey: "dormant_requirement_reactivation", lane: "business", scope: "marketing" },
+  // Admin-approved CRM campaign message. Marketing, so the same default-deny rule applies. Campaign
+  // ORCHESTRATION (batching, claiming, the per-recipient loop) remains QF-MVP-50 — classifying the
+  // message type here does not create a dispatcher and does not authorise a campaign send.
+  vendor_crm_promotion: { templateKey: "vendor_crm_promotion", lane: "business", scope: "marketing" },
+
+  // ---- DELIBERATELY ABSENT: the consent acknowledgement types ----------------------------------
+  // The three acknowledgement message types (STOP / START / HELP responses, enumerated as
+  // ConsentAckType in lib/communication/consentCommandResponse.ts) are NOT registered here, and must
+  // never be. Their absence IS the mechanism: an ordinary resolveOutboundConsentScope call for any of
+  // them returns UNCLASSIFIED_MESSAGE_TYPE and DENIES, so the STOP-acknowledgement exception cannot
+  // be reused by an arbitrary caller. They are authorised ONLY by the evidence-bound, one-shot
+  // enforcer in services/consentCommandResponseService.ts, which requires a validated binding to the
+  // exact inbound command. A future approved provider mapping must never create ordinary authority
+  // here. See the header of lib/communication/consentCommandResponse.ts for the full rationale.
+  //
+  // NOTE FOR EDITORS: their literal key strings are deliberately NOT written in this file. The D4-B
+  // and D4-C harnesses assert their absence by scanning this source for each key, so even a comment
+  // mentioning one would trip that guard — which is exactly the sensitivity we want to keep.
 });
 
 /** Every approved outbound message type. Exported for tests + the coordinator's own fences. */

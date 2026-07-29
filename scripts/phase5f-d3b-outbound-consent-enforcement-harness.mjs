@@ -868,8 +868,20 @@ const TRANSACTIONAL_TYPES = [
   "lead_assignment_alert", "low_credit_warning", "recharge_reminder",
   "admin_policy_block_alert", "admin_assignment_failure_alert",
   "admin_provider_outage_alert", "admin_automation_failure_alert",
+  // ---- QF-MVP-40.6 AUTHORITY TRANSFER -------------------------------------------------------
+  // Five reviewed TRANSACTIONAL types from the QF-MVP-40.4 catalogue. Each was added to the
+  // registry by exact key (no prefix, no pattern) and is asserted here so the "exactly the
+  // approved set" invariant keeps its full strength rather than being loosened to a minimum.
+  "client_lead_status_update", "client_matching_update", "vendor_response_reminder",
+  "vendor_onboarding_reminder", "vendor_package_expiry_warning",
 ];
-const MARKETING_TYPES = ["client_nurture_followup", "dormant_requirement_reactivation"];
+// QF-MVP-40.6 AUTHORITY TRANSFER — vendor_crm_promotion is the admin-approved CRM campaign
+// message. It is MARKETING, so marketing default-deny applies exactly as for the two
+// founder-ratified re-engagement types. Classifying the type creates no dispatcher: campaign
+// orchestration and the per-recipient loop remain QF-MVP-50.
+const MARKETING_TYPES = [
+  "client_nurture_followup", "dormant_requirement_reactivation", "vendor_crm_promotion",
+];
 
 check("R1. all 3 authentication message types resolve to the authentication scope (lane: authentication)", () => {
   for (const t of AUTH_TYPES) {
@@ -879,15 +891,15 @@ check("R1. all 3 authentication message types resolve to the authentication scop
   assert(AUTH_TYPES.length === 3, "exactly three authentication types");
 });
 
-check("R2. all 11 transactional message types resolve to the transactional scope (lane: business)", () => {
+check("R2. all 16 transactional message types resolve to the transactional scope (lane: business)", () => {
   for (const t of TRANSACTIONAL_TYPES) {
     const r = M.Scope.resolveOutboundConsentScope({ messageType: t, templateKey: t, lane: "business" });
     assert(r.ok && r.scope === "transactional", `${t} → transactional`);
   }
-  assert(TRANSACTIONAL_TYPES.length === 11, "exactly eleven transactional types");
+  assert(TRANSACTIONAL_TYPES.length === 16, "exactly sixteen transactional types");
 });
 
-check("R3. FOUNDER-RATIFIED: both re-engagement types are MARKETING (not transactional)", () => {
+check("R3. FOUNDER-RATIFIED: every marketing type is MARKETING (not transactional)", () => {
   for (const t of MARKETING_TYPES) {
     const r = M.Scope.resolveOutboundConsentScope({ messageType: t, templateKey: t, lane: "business" });
     assert(r.ok && r.scope === "marketing", `${t} → marketing`);
@@ -897,10 +909,10 @@ check("R3. FOUNDER-RATIFIED: both re-engagement types are MARKETING (not transac
   assert(MARKETING_TYPES.includes("dormant_requirement_reactivation"), "dormant_requirement_reactivation is marketing");
 });
 
-check("R4. the registry is EXACTLY the 16 approved types and its lane⟷scope invariant holds", () => {
+check("R4. the registry is EXACTLY the 22 approved types and its lane⟷scope invariant holds", () => {
   const all = [...AUTH_TYPES, ...TRANSACTIONAL_TYPES, ...MARKETING_TYPES];
   const registered = [...M.Scope.REGISTERED_MESSAGE_TYPES].sort();
-  assert(JSON.stringify(registered) === JSON.stringify([...all].sort()), `registry must be exactly the 16 approved types (got ${registered.length})`);
+  assert(JSON.stringify(registered) === JSON.stringify([...all].sort()), `registry must be exactly the 22 approved types (got ${registered.length})`);
   assert(M.Scope.assertRegistryInvariants().length === 0, "authentication⟺auth lane, transactional/marketing⟺business lane");
 });
 

@@ -1,0 +1,274 @@
+{
+  "manifest_version": "1.0",
+  "phase": "QF-MVP-40.3",
+  "channel": "whatsapp",
+  "provider_key": "meta_whatsapp_cloud",
+  "purpose": "Canonical, NON-SECRET inventory of the environment variables the Meta WhatsApp Cloud integration reads. Variable NAMES only. No value, sample value, token, secret or identifier appears here or ever may.",
+  "authority_note": "This manifest documents the loaders in lib/communication/providers/metaCloudWhatsAppConfig.ts. It is a description, not a second configuration system: nothing reads this file at runtime, and adding a name here does not create a variable.",
+  "warnings": [
+    "Values are never stored in the repository. They live only in the deployment environment.",
+    "Configuration readiness is NOT activation, and activation is NOT business authorisation.",
+    "A build must require no Meta credential. Provider selection is resolved lazily at runtime.",
+    "In production an absent or invalid WHATSAPP_PROVIDER_MODE fails closed and never falls back to mock."
+  ],
+  "operations": {
+    "webhook_get": {
+      "description": "Meta subscription verification. Echoes hub.challenge after a constant-time verify-token comparison.",
+      "requires": ["WHATSAPP_WEBHOOK_VERIFY_TOKEN"],
+      "loader": "resolveWebhookVerifyConfig"
+    },
+    "webhook_post": {
+      "description": "Inbound/delivery webhook signature verification over the exact raw bytes.",
+      "requires": ["WHATSAPP_APP_SECRET"],
+      "loader": "resolveWebhookSignatureConfig"
+    },
+    "callback_identity": {
+      "description": "Proves a callback belongs to our WABA and phone number before any database effect.",
+      "requires": ["WHATSAPP_WABA_ID", "WHATSAPP_PHONE_NUMBER_ID"],
+      "loader": "resolveWebhookIdentityConfig"
+    },
+    "outbound": {
+      "description": "Approved-template send.",
+      "requires": [
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_WABA_ID",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_GRAPH_API_VERSION",
+        "WHATSAPP_AUTH_HTTP_TIMEOUT_MS",
+        "WHATSAPP_HTTP_TIMEOUT_MS"
+      ],
+      "loader": "resolveOutboundMetaConfig"
+    },
+    "health": {
+      "description": "Read-only phone-number lookup used for provider health.",
+      "requires": [
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_GRAPH_API_VERSION",
+        "WHATSAPP_HEALTH_HTTP_TIMEOUT_MS"
+      ],
+      "loader": "resolveHealthConfig"
+    },
+    "consent_ack_worker": {
+      "description": "Cron-triggered acknowledgement delivery worker. Transport-agnostic; gated by a shared secret, not by Meta credentials.",
+      "requires": ["QF_CRON_SECRET"],
+      "loader": "route-level constant-time comparison"
+    },
+    "build": {
+      "description": "Production build.",
+      "requires": [],
+      "loader": "none — a build must never require a Meta credential"
+    }
+  },
+  "variables": [
+    {
+      "name": "WHATSAPP_PROVIDER_MODE",
+      "purpose": "Selects the WhatsApp provider adapter.",
+      "operations": ["webhook_get", "webhook_post", "callback_identity", "outbound", "health"],
+      "secret": false,
+      "validation": "one of: mock | meta_cloud",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": "mock outside production only; NO default in production",
+      "absence_fails_closed": true,
+      "storage": "deployment environment variables",
+      "activation_dependency": "Selecting meta_cloud is not activation; the runtime policy still gates every operation."
+    },
+    {
+      "name": "WHATSAPP_ACCESS_TOKEN",
+      "purpose": "Bearer token for Graph API calls. Sent only in the Authorization header.",
+      "operations": ["outbound", "health"],
+      "secret": true,
+      "validation": "non-empty string",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment secret store; never in the repository",
+      "activation_dependency": "Presence enables the possibility of a send, never the permission."
+    },
+    {
+      "name": "WHATSAPP_WABA_ID",
+      "purpose": "WhatsApp Business Account identifier used for outbound and callback identity.",
+      "operations": ["callback_identity", "outbound"],
+      "secret": false,
+      "validation": "META_CALLBACK_ID_GRAMMAR (digit/identifier grammar enforced by the loader)",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment environment variables",
+      "activation_dependency": "Must match the provider account row before outbound can pass its gate."
+    },
+    {
+      "name": "WHATSAPP_PHONE_NUMBER_ID",
+      "purpose": "Meta phone-number identifier used for outbound, health and callback identity.",
+      "operations": ["callback_identity", "outbound", "health"],
+      "secret": false,
+      "validation": "META_CALLBACK_ID_GRAMMAR",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment environment variables",
+      "activation_dependency": "Must match the provider account row before outbound can pass its gate."
+    },
+    {
+      "name": "WHATSAPP_GRAPH_API_VERSION",
+      "purpose": "Graph API version segment in every request URL.",
+      "operations": ["outbound", "health"],
+      "secret": false,
+      "validation": "matches /^v\\d{1,3}\\.\\d{1,3}$/",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment environment variables",
+      "activation_dependency": "none"
+    },
+    {
+      "name": "WHATSAPP_APP_SECRET",
+      "purpose": "HMAC key for verifying the webhook signature over exact raw bytes.",
+      "operations": ["webhook_post"],
+      "secret": true,
+      "validation": "non-empty string",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment secret store",
+      "activation_dependency": "Absent app secret makes every signature verification fail closed."
+    },
+    {
+      "name": "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+      "purpose": "Shared token Meta echoes during subscription verification.",
+      "operations": ["webhook_get"],
+      "secret": true,
+      "validation": "non-empty string",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment secret store",
+      "activation_dependency": "Independent of outbound; verification can be configured before sending is possible."
+    },
+    {
+      "name": "WHATSAPP_AUTH_HTTP_TIMEOUT_MS",
+      "purpose": "Request timeout for the authentication lane, sized to fit inside the auth hook budget.",
+      "operations": ["outbound"],
+      "secret": false,
+      "validation": "integer between 500 and 4000 inclusive",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": "3000",
+      "absence_fails_closed": true,
+      "storage": "deployment environment variables",
+      "activation_dependency": "none"
+    },
+    {
+      "name": "WHATSAPP_HTTP_TIMEOUT_MS",
+      "purpose": "Request timeout for the business lane.",
+      "operations": ["outbound", "health"],
+      "secret": false,
+      "validation": "integer between 1000 and 30000 inclusive",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": "10000",
+      "absence_fails_closed": true,
+      "storage": "deployment environment variables",
+      "activation_dependency": "none"
+    },
+    {
+      "name": "WHATSAPP_HEALTH_HTTP_TIMEOUT_MS",
+      "purpose": "Request timeout for the health check. Falls back to the business timeout when unset.",
+      "operations": ["health"],
+      "secret": false,
+      "validation": "integer between 1000 and 30000 inclusive",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": false,
+      "required_production": false,
+      "safe_default": "10000, or the business timeout when unset",
+      "absence_fails_closed": false,
+      "storage": "deployment environment variables",
+      "activation_dependency": "none"
+    },
+    {
+      "name": "QF_CRON_SECRET",
+      "purpose": "Shared secret protecting the acknowledgement-worker cron trigger. Compared in constant time and never logged.",
+      "operations": ["consent_ack_worker"],
+      "secret": true,
+      "validation": "non-empty string",
+      "server_only": true,
+      "phase": "runtime",
+      "required_local": false,
+      "required_staging": true,
+      "required_production": true,
+      "safe_default": null,
+      "absence_fails_closed": true,
+      "storage": "deployment secret store; also held by whatever schedules the cron",
+      "activation_dependency": "Knowing the secret permits triggering a bounded batch. It selects no recipient and authorises no send."
+    }
+  ],
+  "staging_configuration_packet": {
+    "note": "Operator checklist for QF-MVP-40.10. NOT executed by this phase. No seed statement is included and no value appears.",
+    "runtime_policy_starting_state": {
+      "activation_status": "disabled",
+      "outbound_enabled": false,
+      "webhook_processing_enabled": false,
+      "health_check_enabled": false,
+      "reason": "Staging currently has NO runtime policy row at all, so the canary must create one. It starts fully closed and is opened one gate at a time."
+    },
+    "provider_account_starting_state": {
+      "phone_number_reference": "supplied by the operator at configuration time",
+      "business_account_reference": "supplied by the operator at configuration time",
+      "readiness_status": "not provider_ready until independently verified",
+      "configuration_status": "incomplete until every configuration check passes",
+      "business_verification_status": "unverified until Meta confirms",
+      "phone_number_status": "not connected until verified",
+      "webhook_status": "unverified until the GET subscription check succeeds",
+      "health_status": "unknown or unhealthy until a health check succeeds"
+    },
+    "canary_destination": {
+      "destination_hash": "hash only — a plaintext number must never be stored",
+      "is_active": false,
+      "expires_at": "required, or explicitly reviewed and recorded if omitted",
+      "note": "Inactive until the canary step."
+    },
+    "provider_mappings": {
+      "rule": "No mapping row may exist until the template is externally approved by Meta.",
+      "fields": "exact provider template name, language and category, matching the approved submission",
+      "fingerprint": "content fingerprint is recomputed and compared with exact equality at the network boundary",
+      "is_active": false,
+      "note": "Inactive until the canary step. Every catalogue entry remains DRAFT_NOT_SUBMITTED today."
+    }
+  }
+}

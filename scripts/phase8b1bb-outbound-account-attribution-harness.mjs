@@ -1,7 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 /**
  * Phase 8B-1B-B — OUTBOUND PROVIDER-ACCOUNT ATTRIBUTION harness.
@@ -37,6 +40,142 @@ const COMM_SRC = "services/communicationService.ts";
 const RUNTIME_SRC = "services/runtimeCommunicationService.ts";
 const TYPES_SRC = "lib/communication/types.ts";
 const ENTRY_FILES = [ATTR_SRC, COMM_SRC, RUNTIME_SRC];
+
+// ============================================================================
+// QF-MVP-40.1-R2 — CRASH-SAFE MUTATION GUARD
+//
+// THE RISK THIS CLOSES. `evaluateMutation` rewrites REAL product files and relies
+// on a `finally` to put them back. `finally` covers a throw, an assertion failure
+// and a TypeScript failure — but NOT a signal. A tool timeout sent SIGTERM during
+// a run and left a FORGED OWNERSHIP implementation
+// (`resolveOwnership: async () => ({kind:"owned", account:{id:"forged-account"…}})`)
+// committed to nothing but sitting in services/runtimeCommunicationService.ts,
+// plus `.phase8b1bb-build-main/` and a `.phase8b1bb-mut-N.tsconfig.json`.
+// A corrupted product file surviving a test run is far worse than a failed test.
+//
+// WHY SIGNAL HANDLERS ALONE ARE NOT ENOUGH. This harness spends most of its life
+// inside synchronous execFileSync(tsc); Node cannot service a signal while the
+// event loop is blocked, and nothing at all runs under SIGKILL. So the originals
+// are ALSO written to a sidecar OUTSIDE the repository before any mutation, and
+// every run begins by replaying a sidecar left by an interrupted predecessor.
+// Recovery therefore does not depend on this process getting to run any code.
+//
+// Originals are captured as EXACT BYTES (Buffer, never a utf8 round-trip) with
+// the file mode, so a restored file is byte- and mode-identical.
+// ============================================================================
+const RECOVERY_DIR = join(tmpdir(), "qf-phase8b1bb-recovery");
+const RECOVERY_MANIFEST = join(RECOVERY_DIR, "manifest.json");
+const ARTIFACT_PREFIX = ".phase8b1bb-";
+
+const MUTATION_BACKUPS = new Map();   // absolute path -> { bytes: Buffer, mode: number }
+let cleanupDone = false;
+/** Reported separately from the test verdict, so recovery never masks a result. */
+const recoveryReport = { recoveredFiles: 0, sweptArtifacts: 0, restoreFailures: 0 };
+
+const sidecarNameFor = (abs) => abs.replace(/[^A-Za-z0-9]/g, "_") + ".bak";
+
+function rememberOriginal(absPath) {
+  if (MUTATION_BACKUPS.has(absPath)) return;
+  const bytes = readFileSync(absPath);
+  const mode = statSync(absPath).mode;
+  MUTATION_BACKUPS.set(absPath, { bytes, mode });
+  try {
+    mkdirSync(RECOVERY_DIR, { recursive: true });
+    writeFileSync(join(RECOVERY_DIR, sidecarNameFor(absPath)), bytes);
+    const manifest = existsSync(RECOVERY_MANIFEST)
+      ? JSON.parse(readFileSync(RECOVERY_MANIFEST, "utf8")) : {};
+    manifest[absPath] = { sidecar: sidecarNameFor(absPath), mode };
+    writeFileSync(RECOVERY_MANIFEST, JSON.stringify(manifest, null, 2));
+  } catch (e) {
+    // A sidecar we cannot write is a safety regression, not a detail.
+    throw new Error(`Cannot write mutation recovery sidecar for ${absPath}: ${e && e.message}`);
+  }
+}
+
+function restoreOne(absPath) {
+  const backup = MUTATION_BACKUPS.get(absPath);
+  if (!backup) return;
+  try {
+    writeFileSync(absPath, backup.bytes);   // exact bytes
+    chmodSync(absPath, backup.mode);        // exact mode
+  } catch (e) {
+    recoveryReport.restoreFailures += 1;
+    console.error(`RESTORE FAILED for ${absPath}: ${e && e.message}`);
+  }
+}
+
+/** Remove only artefacts THIS harness creates; never a broad delete. */
+function sweepOwnArtifacts() {
+  try {
+    for (const f of readdirSync(process.cwd())) {
+      if (!f.startsWith(ARTIFACT_PREFIX)) continue;
+      try { rmSync(resolve(f), { recursive: true, force: true }); recoveryReport.sweptArtifacts += 1; }
+      catch { /* best effort */ }
+    }
+  } catch { /* best effort */ }
+}
+
+function clearRecoveryState() {
+  try { rmSync(RECOVERY_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
+}
+
+/** Idempotent; safe from finally, a signal handler and process exit. */
+function restoreAllAndCleanup() {
+  if (cleanupDone) return;
+  cleanupDone = true;
+  for (const p of MUTATION_BACKUPS.keys()) restoreOne(p);
+  sweepOwnArtifacts();
+  clearRecoveryState();
+}
+
+/** Replay a sidecar left by an interrupted predecessor, BEFORE mutating anything. */
+function recoverFromPreviousRun() {
+  if (!existsSync(RECOVERY_MANIFEST)) return;
+  let manifest = {};
+  try { manifest = JSON.parse(readFileSync(RECOVERY_MANIFEST, "utf8")); } catch { manifest = {}; }
+  for (const [absPath, meta] of Object.entries(manifest)) {
+    const sidecar = join(RECOVERY_DIR, meta.sidecar);
+    if (!existsSync(sidecar) || !existsSync(absPath)) continue;
+    const original = readFileSync(sidecar);
+    if (!readFileSync(absPath).equals(original)) {
+      writeFileSync(absPath, original);
+      if (typeof meta.mode === "number") { try { chmodSync(absPath, meta.mode); } catch { /* best effort */ } }
+      recoveryReport.recoveredFiles += 1;
+      console.error(`RECOVERED ${absPath} from an interrupted previous run.`);
+    }
+  }
+  // A manifest proves a previous run of THIS harness was interrupted, so its
+  // orphaned build/tsconfig artefacts are ours to clear.
+  sweepOwnArtifacts();
+  clearRecoveryState();
+}
+
+process.on("exit", restoreAllAndCleanup);
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  process.on(sig, () => {
+    restoreAllAndCleanup();
+    console.error(`\n${sig} received — source files restored and artefacts removed before exit.`);
+    process.exit(130);
+  });
+}
+process.on("uncaughtException", (e) => {
+  restoreAllAndCleanup();
+  console.error("uncaughtException — source files restored.", e);
+  process.exit(1);
+});
+process.on("unhandledRejection", (e) => {
+  restoreAllAndCleanup();
+  console.error("unhandledRejection — source files restored.", e);
+  process.exit(1);
+});
+
+// Self-heal a killed predecessor, then snapshot every mutable target up front so
+// restoration never depends on how far this run got.
+recoverFromPreviousRun();
+for (const rel of [ATTR_SRC, COMM_SRC, RUNTIME_SRC, TYPES_SRC]) {
+  const abs = resolve(rel);
+  if (existsSync(abs)) rememberOriginal(abs);
+}
 
 const ACCOUNT_A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 const ACCOUNT_B = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
@@ -498,7 +637,13 @@ async function evaluateMutation(mut) {
   const tsTouched = mut.edits.some((e) => e[0].endsWith(".ts"));
   const dir = resolve(`.phase8b1bb-mut-${seq++}`);
   const originals = new Map();
-  for (const e of mut.edits) { const p = resolve(e[0]); if (!originals.has(p)) originals.set(p, readFileSync(p, "utf8")); }
+  for (const e of mut.edits) {
+    const p = resolve(e[0]);
+    if (!originals.has(p)) originals.set(p, readFileSync(p, "utf8"));
+    // Byte-exact + sidecar backup, so a signal between here and the finally
+    // still leaves a recoverable original on disk.
+    rememberOriginal(p);
+  }
   try {
     for (const e of mut.edits) {
       const p = resolve(e[0]);
@@ -518,7 +663,11 @@ async function evaluateMutation(mut) {
     if (detected) return "killed";
     return (await suiteGoesRed()) ? "killed" : "survived";
   } finally {
-    for (const [p, o] of originals) writeFileSync(p, o);
+    // Fast path: restore from the byte-exact backup, not the utf8 string, so mode
+    // and bytes are preserved. restoreAllAndCleanup() remains the backstop for
+    // signal / uncaughtException exits, and the next run's sidecar replay is the
+    // backstop for SIGKILL.
+    for (const p of originals.keys()) restoreOne(p);
     rmSync(dir, { recursive: true, force: true });
     installStubs(M);
   }
@@ -712,7 +861,12 @@ const fFail = functional.failed + infraSelf.failed;
 const mFail = mutants.survived + mutants.infra;
 const passed = fPass + mutants.killed;
 const failed = fFail + mFail;
-console.log(`\nSummary: ${passed} passed, ${failed} failed ` +
+// Recovery is reported SEPARATELY from the verdict: a clean recovery must never
+// look like a passing test, and a restore failure must never be hidden by one.
+console.log(`\nRecovery: ${recoveryReport.recoveredFiles} file(s) recovered from an interrupted run, ` +
+  `${recoveryReport.sweptArtifacts} artefact(s) swept, ${recoveryReport.restoreFailures} restore failure(s).`);
+console.log(`Summary: ${passed} passed, ${failed} failed ` +
   `(functional: ${fPass}/${fPass + fFail}, mutation killed: ${mutants.killed}/${mutations.length}, ` +
   `survived: ${mutants.survived}, infra: ${mutants.infra}).`);
-process.exit(failed > 0 ? 1 : 0);
+// A restore failure is a harness failure even when every assertion passed.
+process.exit(failed > 0 || recoveryReport.restoreFailures > 0 ? 1 : 0);

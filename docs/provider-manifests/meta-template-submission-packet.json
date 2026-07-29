@@ -1,0 +1,1027 @@
+{
+  "artifact": "meta-template-submission-packet",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.10A",
+  "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
+  "note": "NON-SECRET. Nothing here has been submitted to Meta. No template is approved and no provider_template_id is real.",
+  "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
+  "source_manifest_fingerprint": "e920be22f4514784cf46a131a55db85eb7ecb054891fe0f387949c0696336bb9",
+  "external_contract_references": [
+    "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
+    "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
+    "https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages/"
+  ],
+  "waves": {
+    "0": "API-contract canary — ONE no-variable utility template. Proves token/WABA/endpoint/name/language/category/response handling. No send, no mapping activation.",
+    "1": "QF-MVP-40 launch transport templates (consent acknowledgements + client/vendor transactional).",
+    "2": "Authentication templates. submit_now is FALSE until AUTH_OTP_COPY_CODE compatibility is green end to end.",
+    "3": "QF-MVP-50 marketing. May absorb approval latency but stays unusable without explicit marketing consent, a frequency policy, an approved active mapping and QF-MVP-50 orchestration.",
+    "4": "QF-MVP-70 admin alerts. Payloads prepared but DEFERRED — not part of the MVP-40 activation track."
+  },
+  "wave_counts": {
+    "0": 1,
+    "1": 14,
+    "2": 3,
+    "3": 3,
+    "4": 4
+  },
+  "total_templates": 25,
+  "templates": [
+    {
+      "internal_template_key": "admin_assignment_failure_alert",
+      "provider_template_name": "qf_admin_assignment_failure_alert_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 4,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_admin_assignment_failure_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno admin alert: lead assignment failed for {{1}}.",
+            "example": {
+              "body_text": [
+                [
+                  "assignment"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "18007f0749bd2bac357c47968a9a8c10cca0f9308018bd9a7a46e482a66a4f7d"
+    },
+    {
+      "internal_template_key": "admin_automation_failure_alert",
+      "provider_template_name": "qf_admin_automation_failure_alert_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 4,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_admin_automation_failure_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno admin alert: automation {{1}} failed.",
+            "example": {
+              "body_text": [
+                [
+                  "automation"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "89110e4a45dc7525fe8293d60ac03d4410e57172b8b0ed255d00d5378e4f0ad2"
+    },
+    {
+      "internal_template_key": "admin_policy_block_alert",
+      "provider_template_name": "qf_admin_policy_block_alert_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 4,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_admin_policy_block_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno admin alert: a policy blocked lead {{1}}.",
+            "example": {
+              "body_text": [
+                [
+                  "policy"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "b281c8c0849d8d0451da5078f53a80a0ed9e15aa34e9f323421845c1c8f875e8"
+    },
+    {
+      "internal_template_key": "admin_provider_outage_alert",
+      "provider_template_name": "qf_admin_provider_outage_alert_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 4,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_admin_provider_outage_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno admin alert: communication provider {{1}} appears to be down.",
+            "example": {
+              "body_text": [
+                [
+                  "provider"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "9721da70cedd47de973601f17b596c703c96f7963c90613760a57cd5032fc983"
+    },
+    {
+      "internal_template_key": "clarification_reminder",
+      "provider_template_name": "qf_clarification_reminder_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_clarification_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "1e7dddd0df8ea054c19e048bf0892eca2078473a46449a4b0b516a91dc145789"
+    },
+    {
+      "internal_template_key": "clarification_request",
+      "provider_template_name": "qf_clarification_request_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_clarification_request_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "preferred budget range"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "9c484b4d7e54929a2ab52b08093e1e719d3dfdb7b7c1741fa8b5e8e1daf85e4b"
+    },
+    {
+      "internal_template_key": "client_lead_status_update",
+      "provider_template_name": "qf_client_lead_status_update_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_client_lead_status_update_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, the status of your QuickFurno enquiry is now: {{2}}. Reply here if you have any questions.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "Vendors matched"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac"
+    },
+    {
+      "internal_template_key": "client_login_otp",
+      "provider_template_name": "qf_client_login_otp_v1",
+      "provider_language": "en",
+      "category": "authentication",
+      "component_profile": "AUTH_OTP_COPY_CODE",
+      "submission_wave": 2,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_client_login_otp_v1",
+        "language": "en",
+        "category": "authentication",
+        "components": [
+          {
+            "type": "body",
+            "add_security_recommendation": true
+          },
+          {
+            "type": "footer",
+            "code_expiration_minutes": 10
+          },
+          {
+            "type": "buttons",
+            "buttons": [
+              {
+                "type": "otp",
+                "otp_type": "copy_code",
+                "text": "Copy code"
+              }
+            ]
+          }
+        ]
+      },
+      "send_contract": {
+        "components": [
+          {
+            "type": "body",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<OTP>"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "sub_type": "url",
+            "index": "0",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<OTP>"
+              }
+            ]
+          }
+        ],
+        "note": "Meta requires the one-time code to appear TWICE — once in the body and once in the button. The renderer permits that single reuse ONLY under AUTH_OTP_COPY_CODE; duplicate-source protection remains in force for every other profile."
+      },
+      "payload_fingerprint": "8fb2e5a966d5a5ebd76b2d9bc1035b5d18dcf4ecc6ad1e24c531e185a9621821"
+    },
+    {
+      "internal_template_key": "client_matching_update",
+      "provider_template_name": "qf_client_matching_update_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_client_matching_update_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "3"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c"
+    },
+    {
+      "internal_template_key": "client_nurture_followup",
+      "provider_template_name": "qf_client_nurture_followup_v1",
+      "provider_language": "en",
+      "category": "MARKETING",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 3,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_client_nurture_followup_v1",
+        "language": "en",
+        "category": "MARKETING",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, still planning your project? QuickFurno can reconnect you with professionals. Reply STOP to opt out.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "deec11cbbc27bc10a10dd471391f5b02d765185915ffaf598ee3527ddcb1ca7f"
+    },
+    {
+      "internal_template_key": "consent_help_response",
+      "provider_template_name": "qf_consent_help_response_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 0,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_consent_help_response_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno connects you with verified furniture and interior vendors. Reply STOP to stop messages, or START to resume. For support, visit quickfurno.in."
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "2a0b7a168320a35003e824fd88d7763e8238e5ed1202a0c45f001698625e6154"
+    },
+    {
+      "internal_template_key": "consent_start_acknowledgement",
+      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_consent_start_acknowledgement_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help."
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"
+    },
+    {
+      "internal_template_key": "consent_stop_acknowledgement",
+      "provider_template_name": "qf_consent_stop_acknowledgement_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_consent_stop_acknowledgement_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: you have been unsubscribed. We will not send you further updates or promotional messages. Reply START to resume, or HELP for help."
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "850a4c01a48b78e237a85e186a448d8395abfb1e5049aaf6d8176b8628747268"
+    },
+    {
+      "internal_template_key": "dormant_requirement_reactivation",
+      "provider_template_name": "qf_dormant_requirement_reactivation_v1",
+      "provider_language": "en",
+      "category": "MARKETING",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 3,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_dormant_requirement_reactivation_v1",
+        "language": "en",
+        "category": "MARKETING",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, your QuickFurno requirement is still open. Reply to reactivate matching. Reply STOP to opt out.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "547992e14f29c940d4891a4ca7ed01e30138b438f761305a788fabcb4f3a0ee5"
+    },
+    {
+      "internal_template_key": "lead_assignment_alert",
+      "provider_template_name": "qf_lead_assignment_alert_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_lead_assignment_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
+            "example": {
+              "body_text": [
+                [
+                  "LEAD-DEMO-0001"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "3f7997be7b8e1b019ba306a058b96f2d68aa84b7a014ea96407510030bb02453"
+    },
+    {
+      "internal_template_key": "lead_received",
+      "provider_template_name": "qf_lead_received_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_lead_received_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c4739af640e16"
+    },
+    {
+      "internal_template_key": "low_credit_warning",
+      "provider_template_name": "qf_low_credit_warning_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_low_credit_warning_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your credit balance is low ({{1}}). Recharge to keep receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "4"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "e6158d328586d1c5366afdb8de5763a5d8733936b203652aa2eeb28fe0645589"
+    },
+    {
+      "internal_template_key": "recharge_reminder",
+      "provider_template_name": "qf_recharge_reminder_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_recharge_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno reminder: recharge your credits to continue receiving matched leads."
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "fabc95abf66d8e71f598313de4ec8e568999223777c43d360e3eb292e862ce01"
+    },
+    {
+      "internal_template_key": "vendor_crm_promotion",
+      "provider_template_name": "qf_vendor_crm_promotion_v1",
+      "provider_language": "en",
+      "category": "MARKETING",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 3,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_crm_promotion_v1",
+        "language": "en",
+        "category": "MARKETING",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno update for partners: {{1}}. Reply STOP to opt out of promotional messages.",
+            "example": {
+              "body_text": [
+                [
+                  "New interior categories are now live in Pune"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "ea9ac92d66861fbdccbc26d3bfcb58f7acdb3163fb76aa0ab9f79b0029a2dc46"
+    },
+    {
+      "internal_template_key": "vendor_new_lead",
+      "provider_template_name": "qf_vendor_new_lead_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "QUICK_REPLY",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_new_lead_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "New QuickFurno lead OFFER in {{1}} for {{2}}. This is an offer, not an assignment. Open your dashboard to accept or decline.",
+            "example": {
+              "body_text": [
+                [
+                  "Pune",
+                  "Modular kitchen"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "buttons",
+            "buttons": [
+              {
+                "type": "QUICK_REPLY",
+                "text": "Accept lead"
+              },
+              {
+                "type": "QUICK_REPLY",
+                "text": "Decline lead"
+              }
+            ]
+          }
+        ]
+      },
+      "send_contract": {
+        "components": [
+          {
+            "type": "body",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<CITY>"
+              },
+              {
+                "type": "text",
+                "text": "<CATEGORY>"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "sub_type": "quick_reply",
+            "index": "0",
+            "parameters": [
+              {
+                "type": "payload",
+                "payload": "lead_offer_accept"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "sub_type": "quick_reply",
+            "index": "1",
+            "parameters": [
+              {
+                "type": "payload",
+                "payload": "lead_offer_decline"
+              }
+            ]
+          }
+        ],
+        "note": "Payloads are opaque, bounded action tokens matching ^[a-z0-9_:-]{1,64}$ — they carry no destination, lead id or vendor identity. A quick reply is NOT authority: Core re-validates any resulting action through its ordinary assignment path."
+      },
+      "payload_fingerprint": "64e1e629d71a394843949ebe9ae1fb3e0a0c81187d7868c330dfb4bc19541fe1"
+    },
+    {
+      "internal_template_key": "vendor_onboarding_reminder",
+      "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_onboarding_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your vendor profile is not yet complete. Outstanding item: {{1}}. Complete it in your dashboard to start receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "GST certificate"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a"
+    },
+    {
+      "internal_template_key": "vendor_package_expiry_warning",
+      "provider_template_name": "qf_vendor_package_expiry_warning_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_package_expiry_warning_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your vendor package expires on {{1}}. Renew in your dashboard to keep receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "12 August 2026"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "91767b9a3214f06915fd2eb688b57ccc90db1a7fa9570db8aa9631c582f7b404"
+    },
+    {
+      "internal_template_key": "vendor_password_reset",
+      "provider_template_name": "qf_vendor_password_reset_v1",
+      "provider_language": "en",
+      "category": "authentication",
+      "component_profile": "AUTH_OTP_COPY_CODE",
+      "submission_wave": 2,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_password_reset_v1",
+        "language": "en",
+        "category": "authentication",
+        "components": [
+          {
+            "type": "body",
+            "add_security_recommendation": true
+          },
+          {
+            "type": "footer",
+            "code_expiration_minutes": 10
+          },
+          {
+            "type": "buttons",
+            "buttons": [
+              {
+                "type": "otp",
+                "otp_type": "copy_code",
+                "text": "Copy code"
+              }
+            ]
+          }
+        ]
+      },
+      "send_contract": {
+        "components": [
+          {
+            "type": "body",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<OTP>"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "sub_type": "url",
+            "index": "0",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<OTP>"
+              }
+            ]
+          }
+        ],
+        "note": "Meta requires the one-time code to appear TWICE — once in the body and once in the button. The renderer permits that single reuse ONLY under AUTH_OTP_COPY_CODE; duplicate-source protection remains in force for every other profile."
+      },
+      "payload_fingerprint": "675a00037f4cf90efea6a2a446f9093960d4365d3d148a98df7d44ad54f28ce3"
+    },
+    {
+      "internal_template_key": "vendor_response_reminder",
+      "provider_template_name": "qf_vendor_response_reminder_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": true,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_response_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Reminder from QuickFurno: a lead in {{1}} is still awaiting your response. Open your dashboard to accept or decline.",
+            "example": {
+              "body_text": [
+                [
+                  "Pune"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "a3833a69b3699f8750152350ec7ca877861d46d33a173168b54ba895633b8743"
+    },
+    {
+      "internal_template_key": "vendor_whatsapp_verify",
+      "provider_template_name": "qf_vendor_whatsapp_verify_v1",
+      "provider_language": "en",
+      "category": "authentication",
+      "component_profile": "AUTH_OTP_COPY_CODE",
+      "submission_wave": 2,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null
+      },
+      "creation_payload": {
+        "name": "qf_vendor_whatsapp_verify_v1",
+        "language": "en",
+        "category": "authentication",
+        "components": [
+          {
+            "type": "body",
+            "add_security_recommendation": true
+          },
+          {
+            "type": "footer",
+            "code_expiration_minutes": 10
+          },
+          {
+            "type": "buttons",
+            "buttons": [
+              {
+                "type": "otp",
+                "otp_type": "copy_code",
+                "text": "Copy code"
+              }
+            ]
+          }
+        ]
+      },
+      "send_contract": {
+        "components": [
+          {
+            "type": "body",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<OTP>"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "sub_type": "url",
+            "index": "0",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "<OTP>"
+              }
+            ]
+          }
+        ],
+        "note": "Meta requires the one-time code to appear TWICE — once in the body and once in the button. The renderer permits that single reuse ONLY under AUTH_OTP_COPY_CODE; duplicate-source protection remains in force for every other profile."
+      },
+      "payload_fingerprint": "f8e9a083b13ab7d66a7ce4091e0ffb02d4e53466028bf6f675850dff59f9bbc1"
+    }
+  ]
+}

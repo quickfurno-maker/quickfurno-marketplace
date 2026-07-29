@@ -1,0 +1,391 @@
+{
+  "artifact": "qf-mvp-40-2-schema-matrix",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.2",
+  "generated_from": "read-only SELECT measurement of the authorised staging and production projects",
+  "measurement_note": "History records and object presence are recorded INDEPENDENTLY. Neither is inferred from the other.",
+  "environments": {
+    "staging": {
+      "project_ref": "uckafzuochmbvtiodmcl",
+      "history_total_rows": 17,
+      "history_latest_version": "20260728001600",
+      "history_shape": "squash baseline 20260722000100_qf_mvp_staging_baseline_269c9265 + 16 of the 17 cumulative migrations",
+      "communication_versions_recorded": 0
+    },
+    "production": {
+      "project_ref": "yqpgcsduqbxulrlzwzap",
+      "history_total_rows": 4,
+      "history_latest_version": "20260720000100",
+      "communication_versions_recorded": 3,
+      "meta_runtime_policy": "activation=disabled; outbound_enabled=false; webhook_processing_enabled=false; health_check_enabled=false",
+      "provider_accounts": 0,
+      "provider_template_mappings": 0
+    }
+  },
+  "known_drift": [
+    {
+      "id": "D1",
+      "summary": "Staging never applied 20260721000100; its ack-intent account constraint is absent on staging.",
+      "evidence": "staging history = baseline + 16 of 17 (20260721000100 missing); constraint communication_consent_ack_intents_provider_account_req_check ABSENT",
+      "impact": "The Wave 2A-R2 constraint has NEVER been validated on staging, although it ships as marker 01/17 of the production cutover.",
+      "action": "Owner decision: validate on staging before the production cutover, or accept it as cutover-only risk."
+    },
+    {
+      "id": "D2",
+      "summary": "Staging pins a search_path on two consent-receipt validators; the repository and production do not.",
+      "evidence": "staging: search_path=pg_catalog, public — production and migration 20260712000300: unset (language sql, immutable)",
+      "impact": "Benign hardening, but staging is not a faithful reproduction of the repository schema. Production MATCHES the repository.",
+      "action": "Record only. Do not 'fix' production to match staging."
+    },
+    {
+      "id": "D3",
+      "summary": "communication_templates row counts differ: production 16 active, staging 13.",
+      "evidence": "read-only counts",
+      "impact": "Internal template catalogue seed drift. Distinct from communication_provider_template_mappings, which is 0 in BOTH — no approved Meta mapping exists anywhere.",
+      "action": "Reconcile seed rows during 40.4 submission, not now."
+    },
+    {
+      "id": "D4",
+      "summary": "Production has 1 Meta runtime policy row (fully disabled); staging has none.",
+      "evidence": "production activation=disabled/out=false/wh=false; staging 0 rows",
+      "impact": "Production is correctly fail-closed. Staging has no policy row at all, so the staging canary in 40.10 must create one before any gate can be evaluated.",
+      "action": "40.3/40.10 configuration input."
+    }
+  ],
+  "migrations": [
+    {
+      "version": "20260708000170",
+      "filename": "20260708000170_unified_communication_core.sql",
+      "git_blob_sha256": "a50f54c88dd3a2e64d9dceb8b0a4372eb370a60287f71e88f31afd0addf7e493",
+      "purpose": "Unified communication core: templates, messages, delivery events, webhook receipts, automation catalogue.",
+      "depends_on": [],
+      "repository_expected_objects": [
+        "communication_templates",
+        "communication_messages",
+        "communication_delivery_events",
+        "communication_webhook_receipts",
+        "communication_automation_catalog"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Outbound ledger and delivery-event substrate for 40.6/40.7.",
+      "blocks_40_3": false,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260708000190",
+      "filename": "20260708000190_client_whatsapp_otp_login_readiness.sql",
+      "git_blob_sha256": "a286b19f52a136afd554f0d072e83d8bba3e39fc75d2086c47780340402cd84e",
+      "purpose": "Client WhatsApp OTP login readiness (client_accounts attestation column + index).",
+      "depends_on": [
+        "20260708000170"
+      ],
+      "repository_expected_objects": [
+        "client_accounts.login_attestation",
+        "idx_comm_messages_client_login_attestation"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Authentication lane only; not on the Meta business path.",
+      "blocks_40_3": false,
+      "blocks_40_6": false,
+      "blocks_staging_canary": false,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260708000200",
+      "filename": "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+      "git_blob_sha256": "e232b17f087940308a0487218fbcb9a20343c2aa489646a612f42d56aaea2572",
+      "purpose": "Vendor WhatsApp verification and password reset: challenges, grants, 5 atomic SQL functions.",
+      "depends_on": [
+        "20260708000170"
+      ],
+      "repository_expected_objects": [
+        "verification_challenges",
+        "password_reset_grants",
+        "vendor_auth_* functions"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Authentication lane only; not on the Meta business path.",
+      "blocks_40_3": false,
+      "blocks_40_6": false,
+      "blocks_staging_canary": false,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260709000100",
+      "filename": "20260709000100_messaging_channel_provider_foundation.sql",
+      "git_blob_sha256": "32f3bd3c5cec1ce2188eb3e631f358d188d3dc084b1f21853140a0f635ea17f0",
+      "purpose": "Messaging channel/provider foundation: provider accounts, template mappings, preferences, suppressions, capabilities, auth transport.",
+      "depends_on": [
+        "20260708000170"
+      ],
+      "repository_expected_objects": [
+        "communication_provider_accounts",
+        "communication_provider_template_mappings",
+        "communication_preferences",
+        "communication_suppressions",
+        "communication_channel_capabilities",
+        "authentication_delivery_attempts",
+        "authentication_transport_policies"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Provider-account identity and approved template mappings — the core of 40.3/40.4/40.6.",
+      "blocks_40_3": true,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260709000200",
+      "filename": "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+      "git_blob_sha256": "161f8f51009bf1c1bca127e01ed6ce6d068dcbe34eadaa2d866402aa4033e0f5",
+      "purpose": "WhatsApp Cloud API runtime control: runtime policies, canary destinations, message status and fingerprint checks.",
+      "depends_on": [
+        "20260709000100"
+      ],
+      "repository_expected_objects": [
+        "communication_provider_runtime_policies",
+        "communication_provider_canary_destinations",
+        "communication_messages_mapping_fingerprint_chk",
+        "communication_messages_status_chk"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "The runtime gates and canary allowlist 40.3 configures and 40.10 exercises.",
+      "blocks_40_3": true,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260711000100",
+      "filename": "20260711000100_whatsapp_inbound_message_foundation.sql",
+      "git_blob_sha256": "5c95c6a270988e26ed1c70d778f0420b84663a30037949f5898503079a858d3a",
+      "purpose": "WhatsApp inbound message foundation.",
+      "depends_on": [
+        "20260709000100"
+      ],
+      "repository_expected_objects": [
+        "communication_inbound_messages",
+        "uq_comm_inbound_provider_message"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Inbound persistence and replay protection for 40.5.",
+      "blocks_40_3": false,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260711000200",
+      "filename": "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+      "git_blob_sha256": "80cb049231d347ebd52fd628bd9b99be1f6c5a79f24b380be844fba951fcba90",
+      "purpose": "Consent evidence and state hardening: consent events plus 12 integrity constraints on preferences/suppressions.",
+      "depends_on": [
+        "20260709000100"
+      ],
+      "repository_expected_objects": [
+        "communication_consent_events",
+        "chk_comm_preference_*",
+        "chk_comm_suppression_*"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "CONSTRAINT_ONLY",
+      "qf_mvp_40_dependency": "Consent/suppression integrity that 40.6 dispatch-time rechecks rely on.",
+      "blocks_40_3": false,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260712000300",
+      "filename": "20260712000300_communication_consent_command_writer_rpc.sql",
+      "git_blob_sha256": "0fbc02fa87a64ca41a9f2018116ee954a6f433d86b0c99385edee1146d7d71fb",
+      "purpose": "Transactional consent command writer RPC plus receipt table and scope-result validators.",
+      "depends_on": [
+        "20260711000200"
+      ],
+      "repository_expected_objects": [
+        "communication_consent_command_receipts",
+        "apply_communication_consent_command",
+        "communication_consent_receipt_results_valid",
+        "communication_consent_receipt_scope_result_valid"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "ABSENT",
+      "production_object_state": "PRESENT",
+      "production_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "cumulative_release_treatment": "OBJECT_PRESENT_HISTORY_DRIFT_REQUIRES_CUTOVER_RECONCILIATION",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "The sole STOP/START writer behind 40.5 inbound command handling.",
+      "blocks_40_3": false,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "Objects exist in production but history has no row. Do NOT re-apply and do NOT insert a history row; reconcile as part of the existing cutover evidence."
+    },
+    {
+      "version": "20260713000100",
+      "filename": "20260713000100_communication_consent_ack_intents.sql",
+      "git_blob_sha256": "28e17928287964b03ca1ccdb50e8c0dfb69a87422cc2f262d6ecfe3c0e53affe",
+      "purpose": "Consent acknowledgement intents plus the five ack-worker RPCs.",
+      "depends_on": [
+        "20260712000300",
+        "20260711000100"
+      ],
+      "repository_expected_objects": [
+        "communication_consent_ack_intents",
+        "qf_claim_consent_ack_intents",
+        "qf_expire_consent_ack_intents",
+        "qf_recover_stale_dispatching_consent_ack_intents",
+        "qf_reserve_consent_ack_provider_attempt",
+        "qf_terminalize_consent_ack_intent"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "RECORDED",
+      "production_object_state": "PRESENT",
+      "production_classification": "APPLIED_RECORDED_AND_MATCHING",
+      "cumulative_release_treatment": "ALREADY_PRODUCTION_MATCHING",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Asynchronous STOP/START/HELP acknowledgement delivery for 40.5.",
+      "blocks_40_3": false,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "None. Recorded and objects present in production."
+    },
+    {
+      "version": "20260716000100",
+      "filename": "20260716000100_communication_provider_account_binding.sql",
+      "git_blob_sha256": "db73a23ca8e1bac86d023a72f920828b103aa8cafe4278be5664a11b40c0518a",
+      "purpose": "Provider-account binding: provider_account_id lineage columns and per-account uniqueness across messages, delivery events, inbound and receipts. NO data backfill.",
+      "depends_on": [
+        "20260709000100",
+        "20260711000100",
+        "20260713000100"
+      ],
+      "repository_expected_objects": [
+        "*.provider_account_id",
+        "uq_comm_delivery_event_account_event",
+        "uq_comm_inbound_account_message",
+        "uq_comm_message_account_provider_message",
+        "uq_comm_webhook_receipt_account_event"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "RECORDED",
+      "production_object_state": "PRESENT",
+      "production_classification": "APPLIED_RECORDED_AND_MATCHING",
+      "cumulative_release_treatment": "ALREADY_PRODUCTION_MATCHING",
+      "rollback_class": "REVERSIBLE_DDL",
+      "qf_mvp_40_dependency": "Account lineage and foreign-callback zero-effect enforcement for 40.6/40.7.",
+      "blocks_40_3": true,
+      "blocks_40_6": true,
+      "blocks_staging_canary": true,
+      "required_action": "None. Recorded and objects present in production."
+    },
+    {
+      "version": "20260720000100",
+      "filename": "20260720000100_communication_delivery_event_provider_account_required.sql",
+      "git_blob_sha256": "df951f3788f02545fe31e517753f419b1f9e9f14b8142dd0bd58d8db22be33d7",
+      "purpose": "Wave 1: delivery events require a bound provider account (CHECK).",
+      "depends_on": [
+        "20260716000100"
+      ],
+      "repository_expected_objects": [
+        "communication_delivery_events_provider_account_required_check"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "PRESENT",
+      "staging_classification": "OBJECTS_PRESENT_UNRECORDED",
+      "production_history_state": "RECORDED",
+      "production_object_state": "PRESENT",
+      "production_classification": "APPLIED_RECORDED_AND_MATCHING",
+      "cumulative_release_treatment": "ALREADY_PRODUCTION_MATCHING",
+      "rollback_class": "CONSTRAINT_ONLY",
+      "qf_mvp_40_dependency": "Guarantees every delivery callback carries account lineage (40.7).",
+      "blocks_40_3": false,
+      "blocks_40_6": false,
+      "blocks_staging_canary": true,
+      "required_action": "None. Recorded and objects present in production."
+    },
+    {
+      "version": "20260721000100",
+      "filename": "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+      "git_blob_sha256": "056696790cfdf2c55ab187dc58e211eab0aa232b47d131abd9009cebf5e831a0",
+      "purpose": "Wave 2A-R2: consent acknowledgement intents require a bound provider account (CHECK).",
+      "depends_on": [
+        "20260716000100",
+        "20260713000100",
+        "20260720000100"
+      ],
+      "repository_expected_objects": [
+        "communication_consent_ack_intents_provider_account_req_check"
+      ],
+      "staging_history_state": "ABSENT",
+      "staging_object_state": "ABSENT",
+      "staging_classification": "ABSENT_EXPECTED_PENDING",
+      "production_history_state": "ABSENT",
+      "production_object_state": "ABSENT",
+      "production_classification": "ABSENT_EXPECTED_PENDING",
+      "cumulative_release_treatment": "INCLUDED_IN_CUMULATIVE_17",
+      "rollback_class": "CONSTRAINT_ONLY",
+      "qf_mvp_40_dependency": "Guarantees every acknowledgement carries account lineage (40.5).",
+      "blocks_40_3": false,
+      "blocks_40_6": false,
+      "blocks_staging_canary": true,
+      "required_action": "Ships as marker 01/17 of the existing cumulative QF-MVP-20/30 cutover. NOT applied to staging either, so its constraint is unvalidated on staging."
+    }
+  ]
+}

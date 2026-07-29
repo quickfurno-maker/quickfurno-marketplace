@@ -23,6 +23,7 @@ import { revalidatePath } from "next/cache";
 import { requireCrmAdmin } from "@/lib/crm/crmAuth";
 import { fail, type Result } from "@/lib/errors";
 import * as handoff from "@/services/campaignHandoffService";
+import * as results from "@/services/campaignCommunicationResultService";
 import * as policies from "@/services/communicationFrequencyPolicyService";
 
 const CAMPAIGN_LIST_PATH = "/admin/vendor-crm/campaigns";
@@ -65,6 +66,21 @@ export async function campaignHandoffReadiness(campaignId: string) {
 
 export async function campaignIntentSummary(campaignId: string) {
   return run(() => handoff.getCampaignIntentSummary(String(campaignId)));
+}
+
+/**
+ * QF-MVP-40.8 — the richer read-only campaign result projection: intent statuses
+ * PLUS the canonical communication-message lifecycle behind them, so delivered and
+ * read stay distinguishable and uncertain outcomes stay visible instead of being
+ * collapsed into failure.
+ *
+ * Read-only and aggregate-only. It exposes no `recipient_ref`, destination, phone,
+ * email, message body or provider payload, and there is deliberately still NO
+ * status-override, retry or send action here — reconciliation derives the intent
+ * status from the canonical message, and QF-MVP-70 owns operations controls.
+ */
+export async function campaignResultProjection(campaignId: string) {
+  return run(() => results.getCampaignResultProjection(String(campaignId)));
 }
 
 /**

@@ -1,6 +1,6 @@
 {
-  "manifest_version": "1.2",
-  "phase": "QF-MVP-40.4",
+  "manifest_version": "1.3",
+  "phase": "QF-MVP-40.4-R",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
   "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
@@ -10,8 +10,9 @@
     "body_spec placeholders use {{n}} positional variables; final approved copy is fixed at submission time.",
     "provider_template_id remains null until Meta assigns one after approval.",
     "binding_contract.binding_readiness='resolved' only where source_key is proven in repository code; 'unresolved' entries are NOT guessed.",
-    "META CATEGORY is not the same as INTERNAL CONSENT SCOPE. The consent acknowledgements are Meta category 'utility' (Meta reserves 'authentication' for OTP-shaped templates) but internal consent scope 'authentication', which is the only scope evaluated against global suppression alone.",
-    "A template appearing here grants no send permission. lib/communication/outboundConsentScope.ts must register the key and an approved provider mapping must exist before any send is possible; both are QF-MVP-40.6 work."
+    "META CATEGORY is not the same as INTERNAL CONSENT SCOPE. The consent acknowledgements are Meta category 'utility' (Meta reserves 'authentication' for OTP-shaped templates) but are persisted on the authentication lane for STORAGE COMPATIBILITY ONLY, because live DB constraints fence an ephemeral destination to that lane. ACK_TEMPLATE_CATEGORY in consentCommandResponse.ts is storage terminology and must NEVER be wired to Meta's submission category.",
+    "NOT every key enters the ordinary consent registry. Templates marked registry_expectation=ORDINARY_REGISTRY must be registered in lib/communication/outboundConsentScope.ts before they can send. The three consent acknowledgements are marked SPECIAL_EVIDENCE_BOUND_ACK and MUST NEVER be added there: their absence is what makes the STOP-acknowledgement exception non-reusable by an arbitrary caller.",
+    "A template appearing here grants no send permission. An approved provider mapping is also required, and for ordinary types a registry entry as well."
   ],
   "binding_contract_notes": {
     "binding_version": 1,
@@ -61,7 +62,10 @@
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
             "otp": "<redacted-at-submission>"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -102,7 +106,10 @@
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
             "otp": "<redacted-at-submission>"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -143,7 +150,10 @@
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
             "otp": "<redacted-at-submission>"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       }
     ],
@@ -153,7 +163,7 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno connects you with verified furniture and interior vendors. Reply STOP to stop messages, or START to resume. For support, visit quickfurno.com/contact.",
+        "body_spec": "QuickFurno connects you with verified furniture and interior vendors. Reply STOP to stop messages, or START to resume. For support, visit quickfurno.in.",
         "variables_schema": {},
         "binding_contract": {
           "binding_readiness": "unresolved",
@@ -172,7 +182,10 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {},
-          "notes": "Informational only. No offer, discount, campaign or promotional content."
+          "notes": "Informational only. No offer, discount, campaign or promotional content. SUPPORT DESTINATION: domain-level quickfurno.in only. No app/contact or app/support route exists in the repository, so no path is claimed.",
+          "registry_expectation": "SPECIAL_EVIDENCE_BOUND_ACK",
+          "ordinary_registry_entry": false,
+          "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority."
         }
       },
       {
@@ -199,7 +212,10 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {},
-          "notes": "Copy must NOT promise promotional messages resume: writer P1 states START never creates marketing consent."
+          "notes": "Copy must NOT promise promotional messages resume: writer P1 states START never creates marketing consent.",
+          "registry_expectation": "SPECIAL_EVIDENCE_BOUND_ACK",
+          "ordinary_registry_entry": false,
+          "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority."
         }
       },
       {
@@ -226,11 +242,88 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {},
-          "notes": "Body states both scopes stop, matching writer P1 (marketing AND transactional). No promotional content."
+          "notes": "Body states both scopes stop, matching writer P1 (marketing AND transactional). No promotional content.",
+          "registry_expectation": "SPECIAL_EVIDENCE_BOUND_ACK",
+          "ordinary_registry_entry": false,
+          "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority."
         }
       }
     ],
     "marketing": [
+      {
+        "internal_template_key": "client_nurture_followup",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "marketing",
+        "body_spec": "Hi {{1}}, still planning your project? QuickFurno can reconnect you with professionals. Reply STOP to opt out.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
+        "approval_status": "draft",
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Re-engagement follow-up on an open enquiry. MARKETING, not transactional.",
+          "consent_scope": "marketing",
+          "suppression_rule": "Requires explicit marketing consent AND absence of any suppression. A generic STOP blocks it. Frequency policy applies.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha"
+          },
+          "notes": "FOUNDER-RATIFIED MARKETING. lib/communication/outboundConsentScope.ts classifies this as scope 'marketing' on the business lane. Marketing default-deny applies: an explicit, policy-current opt-in on an EXACT identity is required and absence of a preference is never an opt-in. There is NO transactional fallback.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
+        }
+      },
+      {
+        "internal_template_key": "dormant_requirement_reactivation",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "marketing",
+        "body_spec": "Hi {{1}}, your QuickFurno requirement is still open. Reply to reactivate matching. Reply STOP to opt out.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
+        "approval_status": "draft",
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Re-engagement of a dormant enquiry. MARKETING, not transactional.",
+          "consent_scope": "marketing",
+          "suppression_rule": "Requires explicit marketing consent AND absence of any suppression. A generic STOP blocks it. Frequency policy applies.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha"
+          },
+          "notes": "FOUNDER-RATIFIED MARKETING. Same registry classification and same default-deny rule as client_nurture_followup. Reactivation outreach is promotional even though it references an existing enquiry.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
+        }
+      },
       {
         "internal_template_key": "vendor_crm_promotion",
         "provider_template_name": null,
@@ -262,7 +355,10 @@
           "example_fixture": {
             "1": "New interior categories are now live in Pune"
           },
-          "notes": "The ONLY marketing-category template. Campaign orchestration and per-recipient execution are QF-MVP-50, per the locked campaign-ownership decision; QF-MVP-40 supplies transport, template resolution and the result-ingestion contract only."
+          "notes": "The ONLY marketing-category template. Campaign orchestration and per-recipient execution are QF-MVP-50, per the locked campaign-ownership decision; QF-MVP-40 supplies transport, template resolution and the result-ingestion contract only.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       }
     ],
@@ -297,7 +393,10 @@
           "owning_subphase": "QF-MVP-70",
           "example_fixture": {
             "1": "assignment"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -330,7 +429,10 @@
           "owning_subphase": "QF-MVP-70",
           "example_fixture": {
             "1": "automation"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -363,7 +465,10 @@
           "owning_subphase": "QF-MVP-70",
           "example_fixture": {
             "1": "policy"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -396,7 +501,10 @@
           "owning_subphase": "QF-MVP-70",
           "example_fixture": {
             "1": "provider"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -429,7 +537,10 @@
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
             "1": "Asha"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -467,7 +578,10 @@
           "example_fixture": {
             "1": "Asha",
             "2": "preferred budget range"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -506,31 +620,38 @@
             "1": "Asha",
             "2": "Vendors matched"
           },
-          "notes": "KEPT SEPARATE from lead_assignment_alert: 'we matched N vendors' and 'your status is now X' are different facts, and merging them behind one variable would hide which event actually occurred."
+          "notes": "KEPT SEPARATE from lead_assignment_alert: 'we matched N vendors' and 'your status is now X' are different facts, and merging them behind one variable would hide which event actually occurred.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
-        "internal_template_key": "client_nurture_followup",
+        "internal_template_key": "client_matching_update",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, still planning your project? QuickFurno can reconnect you with professionals.",
+        "body_spec": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
         "variables_schema": {
           "1": {
             "type": "text",
             "description": "client name"
+          },
+          "2": {
+            "type": "text",
+            "description": "count of matched vendors, pre-formatted"
           }
         },
         "binding_contract": {
           "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+          "note": "source keys not proven from repository call sites; registration and mapping are QF-MVP-40.6 work"
         },
         "approval_status": "draft",
-        "provider_template_id": null,
         "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client",
-          "purpose": "Transactional follow-up on an open enquiry.",
+          "purpose": "Tells a client their enquiry has been matched with vendors.",
           "consent_scope": "transactional",
           "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
           "outside_customer_service_window": true,
@@ -538,41 +659,13 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
-            "1": "Asha"
-          }
-        }
-      },
-      {
-        "internal_template_key": "dormant_requirement_reactivation",
-        "provider_template_name": null,
-        "language": "en",
-        "category": "utility",
-        "body_spec": "Hi {{1}}, your QuickFurno requirement is still open. Reply to reactivate matching.",
-        "variables_schema": {
-          "1": {
-            "type": "text",
-            "description": "client name"
-          }
-        },
-        "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
-        },
-        "approval_status": "draft",
-        "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "qf_mvp_40": {
-          "recipient_type": "client",
-          "purpose": "Asks whether a dormant enquiry is still active.",
-          "consent_scope": "transactional",
-          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
-          "outside_customer_service_window": true,
-          "provider_account_required": true,
-          "external_approval_required": true,
-          "owning_subphase": "QF-MVP-40.6",
-          "example_fixture": {
-            "1": "Asha"
-          }
+            "1": "Asha",
+            "2": "3"
+          },
+          "notes": "ADDED IN QF-MVP-40.4-R. The roadmap's client 'matching update' family had no template once lead_assignment_alert was proved vendor-facing. Deliberately states vendors MAY contact the client — it never claims an assignment or a guaranteed response.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -595,8 +688,8 @@
         "provider_template_id": null,
         "submission_state": "DRAFT_NOT_SUBMITTED",
         "qf_mvp_40": {
-          "recipient_type": "client",
-          "purpose": "Tells the client that matching vendors have been identified.",
+          "recipient_type": "vendor",
+          "purpose": "Confirms to a vendor that a lead assignment is FINAL. Distinct from vendor_new_lead, which is the offer that precedes acceptance.",
           "consent_scope": "transactional",
           "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
           "outside_customer_service_window": true,
@@ -604,8 +697,12 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
-            "1": "3"
-          }
+            "1": "LEAD-DEMO-0001"
+          },
+          "notes": "EVIDENCE-RESOLVED (QF-MVP-40.4-R). Committed migration 20260708000170 seeds this key as 'Assignment alert sent to vendor' / 'Vendor final lead assignment confirmation', so it is vendor-facing. The body and its lead-reference variable were already correct; the manifest metadata wrongly said recipient=client with purpose 'matching vendors identified' and a count fixture of '3'. OFFER-VS-ASSIGNMENT TRUTH IS PRESERVED: vendor_new_lead is the offer and states so explicitly; this template fires only once assignment is final.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -638,7 +735,10 @@
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
             "1": "Asha"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -671,7 +771,10 @@
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
             "1": "4"
-          }
+          },
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -697,7 +800,10 @@
           "provider_account_required": true,
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
-          "example_fixture": {}
+          "example_fixture": {},
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -736,7 +842,10 @@
             "1": "Pune",
             "2": "Modular kitchen"
           },
-          "notes": "CONSOLIDATED: the roadmap's 'new lead offer' and 'accept/reject request' are one message at one moment. Splitting them would send the vendor two messages saying the same thing. Copy states the lead is an OFFER, never an assignment."
+          "notes": "CONSOLIDATED: the roadmap's 'new lead offer' and 'accept/reject request' are one message at one moment. Splitting them would send the vendor two messages saying the same thing. Copy states the lead is an OFFER, never an assignment.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         },
         "buttons_spec": [
           {
@@ -780,7 +889,10 @@
           "example_fixture": {
             "1": "GST certificate"
           },
-          "notes": "CONSOLIDATED: the roadmap's 'onboarding reminder' and 'document reminder' are the same message with a different outstanding item. One REQUIRED variable names the item, so there is no optional-variable ambiguity and the sentence is complete for both cases."
+          "notes": "CONSOLIDATED: the roadmap's 'onboarding reminder' and 'document reminder' are the same message with a different outstanding item. One REQUIRED variable names the item, so there is no optional-variable ambiguity and the sentence is complete for both cases.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -814,7 +926,10 @@
           "example_fixture": {
             "1": "12 August 2026"
           },
-          "notes": "KEPT SEPARATE from low_credit_warning: expiry is time-based, credits are balance-based; they fire independently and a merged template could not state the correct remedy."
+          "notes": "KEPT SEPARATE from low_credit_warning: expiry is time-based, credits are balance-based; they fire independently and a merged template could not state the correct remedy.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       },
       {
@@ -848,7 +963,10 @@
           "example_fixture": {
             "1": "Pune"
           },
-          "notes": "KEPT SEPARATE from vendor_new_lead: a reminder sent as the original offer copy would misrepresent a second contact as a new lead."
+          "notes": "KEPT SEPARATE from vendor_new_lead: a reminder sent as the original offer copy would misrepresent a second contact as a new lead.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)"
         }
       }
     ]
@@ -857,6 +975,8 @@
     "campaign_ownership": "QF-MVP-40 owns Meta transport, provider-account binding, template resolution, dispatch-time consent/suppression/frequency validation primitives, provider outcome normalization, provider message-id persistence, delivery callbacks and the result-ingestion contract. QF-MVP-50 owns campaign job orchestration, n8n execution, recipient claiming/batching, bounded dispatch scheduling, dead-letter, pause/resume and aggregation. No temporary Core campaign queue consumer is built in QF-MVP-40.",
     "minimum_template_strategy": "Smallest catalogue that satisfies the locked 40.4 families. Two deliberate consolidations (vendor lead offer carries accept/reject; onboarding reminder carries document reminder via one required variable). Marketing and transactional purposes are never merged.",
     "no_active_mapping_before_approval": "No provider mapping row is created and no template is marked approved. approval_status stays 'draft' and submission_state stays DRAFT_NOT_SUBMITTED until Meta approves and an operator seeds the mapping in a later subphase.",
-    "no_real_submission": "No Meta Graph API call, no template submission and no message send occurred in QF-MVP-40.4."
+    "no_real_submission": "No Meta Graph API call, no template submission and no message send occurred in QF-MVP-40.4.",
+    "template_registry_boundary": "Ordinary outbound types are authorised by lib/communication/outboundConsentScope.ts. The three consent acknowledgements are authorised ONLY by the evidence-bound one-shot enforcer bound to a verified inbound command, and are deliberately absent from that registry so the exception cannot be reused. Mapping existence never creates ordinary consent authority.",
+    "founder_ratified_marketing": "client_nurture_followup and dormant_requirement_reactivation are MARKETING on the business lane, per the founder-ratified registry. They require explicit marketing opt-in, are blocked by any suppression and by a generic STOP, and have no transactional fallback."
   }
 }

@@ -94,10 +94,22 @@ carries `approval_status: "draft"` and `submission_state: "DRAFT_NOT_SUBMITTED"`
 Appearing in the manifest grants **no send permission**. Two further things must happen first, both
 QF-MVP-40.6 work:
 
-1. `lib/communication/outboundConsentScope.ts` must register the template key — its registry blocks
-   any unknown message type, so an unregistered template cannot send;
+1. For an **ordinary** outbound type, `lib/communication/outboundConsentScope.ts` must register the
+   template key — its registry blocks any unknown message type, so an unregistered template cannot
+   send;
 2. an approved provider mapping row must exist, which the outbound coordinator re-resolves by id and
    re-fingerprints at the network boundary.
+
+> **Corrected in QF-MVP-40.4-R.** Point 1 previously read as though *every* catalogue key must enter
+> that registry. That is false, and the exception is deliberate. The three consent acknowledgements
+> — `consent_stop_acknowledgement`, `consent_start_acknowledgement`, `consent_help_response` — are
+> **deliberately absent** from `outboundConsentScope.ts`, so an ordinary `resolveOutboundConsentScope`
+> call for any of them returns `UNCLASSIFIED_MESSAGE_TYPE` and denies. Their absence *is* the
+> mechanism that stops an arbitrary caller reusing the STOP-acknowledgement exception; they are
+> authorised only by the evidence-bound, one-shot enforcer in
+> `services/consentCommandResponseService.ts`, bound to a verified inbound command. A future approved
+> provider mapping must never create ordinary consent authority for them. Adding one of these keys to
+> the registry would be a security regression, and `npm run test:mvp:40-6` fails if anyone does.
 
 ---
 

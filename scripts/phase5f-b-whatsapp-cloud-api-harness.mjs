@@ -557,8 +557,13 @@ check("53-61. strict binding: order by position not object keys; strict validati
     { component: "body", position: 1, sourceKey: "a", parameterType: "text" },
     { component: "body", position: 2, sourceKey: "a", parameterType: "text" },
   ] }, { a: "1" }).ok, "duplicate source binding rejected");
-  // malformed schema / wrong version rejected
-  assert(!B.renderWhatsAppTemplateComponents({ bindingVersion: 2, bindings: [] }, {}).ok, "wrong version rejected");
+  // malformed schema / wrong version rejected.
+  // QF-MVP-40.6-R2: binding schema v2 is now a REVIEWED, supported version (component
+  // profiles for quick-reply and authentication OTP sends), so v2 is no longer "wrong".
+  // The invariant here — an UNKNOWN version must fail closed — is preserved by asserting
+  // v3, and v2 is asserted to be accepted so the support cannot silently disappear.
+  assert(!B.renderWhatsAppTemplateComponents({ bindingVersion: 3, bindings: [] }, {}).ok, "wrong version rejected");
+  assert(B.renderWhatsAppTemplateComponents({ bindingVersion: 2, bindings: [] }, {}).ok, "reviewed v2 accepted");
   assert(!B.renderWhatsAppTemplateComponents(null, {}).ok, "malformed schema rejected");
   // unsupported component / parameter type rejected
   assert(!B.renderWhatsAppTemplateComponents({ bindingVersion: 1, bindings: [{ component: "footer", position: 1, sourceKey: "a", parameterType: "text" }] }, { a: "1" }).ok, "unsupported component rejected");
@@ -2366,8 +2371,8 @@ tsMutation("MUT: allow a draft mapping",
     { templateKey: "client_login_otp", providerKey: "meta_whatsapp_cloud", language: "en" }).ok === true);
 tsMutation("MUT: infer parameter order from binding-array order (drop position sort)",
   [[BINDING_SRC,
-    "    const positions = [...compMap.keys()].sort((a, b) => a - b);",
-    "    const positions = [...compMap.keys()];"]],
+    "    const positions = [...group.params.keys()].sort((a, b) => a - b);",
+    "    const positions = [...group.params.keys()];"]],
   (mm) => {
     const schema = { bindingVersion: 1, bindings: [
       { component: "body", position: 2, sourceKey: "b", parameterType: "text" },

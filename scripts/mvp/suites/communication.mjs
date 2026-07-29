@@ -341,7 +341,13 @@ export const suite = {
         );
         assertDeepEqual(ordered.components[0].parameters, [{ type: 'text', text: 'A' }, { type: 'text', text: 'B' }], 'ordered by position');
         assertEqual(renderWhatsAppTemplateComponents(null, {}).reason, 'malformed_schema');
-        assertEqual(renderWhatsAppTemplateComponents({ bindingVersion: 2, bindings: [] }, {}).reason, 'unsupported_binding_version');
+        // QF-MVP-40.6-R2: binding schema v2 is now a REVIEWED, supported version
+        // (component profiles for quick-reply and authentication OTP templates), so
+        // v2 is no longer "unsupported". The invariant this line protects — an
+        // UNKNOWN version must fail closed — is preserved by asserting v3 instead,
+        // and v2 is asserted to be accepted.
+        assertEqual(renderWhatsAppTemplateComponents({ bindingVersion: 3, bindings: [] }, {}).reason, 'unsupported_binding_version');
+        assertEqual(renderWhatsAppTemplateComponents({ bindingVersion: 2, bindings: [] }, {}).ok, true);
         assertEqual(
           renderWhatsAppTemplateComponents({ bindingVersion: 1, bindings: [{ component: 'body', position: 1, sourceKey: 'x', parameterType: 'text' }] }, {}).reason,
           'missing_source_key',

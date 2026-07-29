@@ -1923,6 +1923,31 @@ const PHASE_8B1BC_ACTIVE_5FB_BLOB = "8fa2ca2cd87b36fa6a3ce9499085073a386fbcfc";
 /** The blob PHASE_8B1BC_ACTIVE_5FB_BLOB supersedes — must remain exactly the 8B-1B-B received value. */
 const PHASE_8B1BC_5FB_PREDECESSOR_BLOB = "811aa832cb2bcbdae7f9d3b178cf23c62bdbebe4";
 
+/**
+ * QF-MVP-40.1-R2 / 40.6-R2 EXPLICIT ACTIVE-ON-DISK AUTHORITY TRANSFER.
+ *
+ * The HISTORICAL succession table below is untouched and is still proved against
+ * PHASE_8B1BC_IMPLEMENTATION_HEAD, so the chain stays auditable. Only the ACTIVE
+ * on-disk expectation moves forward, for exactly two paths:
+ *
+ *   phase5f-b harness   8fa2ca2cd87b -> 286af0d1010c
+ *     Binding schema v2 is now a REVIEWED supported version, so asserting that v2 is
+ *     the "wrong version" became false. It now asserts v3 is rejected AND v2 accepted,
+ *     and the position-sort mutation anchor was re-pointed at the rewritten renderer.
+ *     That mutation is still KILLED (63/63) — obsolete text corrected, no invariant lost.
+ *
+ *   phase8b1bb harness  b1837d14fdd0 -> 8b9fae2762a6
+ *     Crash-safe mutation recovery. A tool timeout previously left a FORGED ownership
+ *     implementation in services/runtimeCommunicationService.ts. It now writes byte+mode
+ *     sidecar backups outside the repository before mutating, replays an interrupted
+ *     predecessor's sidecar at startup, handles signals, and reports recovery separately
+ *     from the verdict. Proven with a SIGKILL mid-run.
+ */
+const QF_MVP_40_ONDISK_SUCCESSORS = new Map([
+  ["scripts/phase5f-b-whatsapp-cloud-api-harness.mjs", "286af0d1010c580925bbbf8456e9de339175549b"],
+  ["scripts/phase8b1bb-outbound-account-attribution-harness.mjs", "8b9fae2762a608499b866b6309067d7b56418bb4"],
+]);
+
 /** EXACT ordered succession table: [path, historical 8B-1B-B blob, reviewed C8B-1B-C successor blob]. */
 const PHASE_8B1BC_PHASE8B1BB_DELEGATED_ONDISK_AUTHORITIES = [
   [PHASE_8B1BB_TYPES_SRC,    "47e0637980395c0f39ccceebb66914ab5d9998ee", "f61e099d4c3d72f013ea11cd6003389141a8992f"],
@@ -1975,9 +2000,31 @@ function provePhase8B1BCPhase8B1BBGovernanceAuthority() {
     assert(headBlob === successorBlob,
       "the C8B-1B-C implementation commit must resolve " + path + " to its reviewed blob (got " + headBlob.slice(0, 12) + ")");
     // ACTIVE ON-DISK FREEZE — same strength as the authority it succeeds.
+    //
+    // QF-MVP-40.1-R2 / 40.6-R2 EXPLICIT AUTHORITY TRANSFER. Two of the four delegated
+    // files legitimately moved forward, so the ACTIVE on-disk expectation is advanced
+    // for exactly those two paths. The HISTORICAL succession table above is untouched
+    // and is still proved against PHASE_8B1BC_IMPLEMENTATION_HEAD, so the chain stays
+    // auditable rather than being silently re-pointed:
+    //
+    //   phase5f-b-...-harness.mjs   8fa2ca2cd87b -> 286af0d1010c
+    //     Binding schema v2 is a REVIEWED supported version, so the assertion that v2
+    //     is "wrong version" became false. It now asserts v3 is rejected AND v2 is
+    //     accepted, and the position-sort mutation anchor was re-pointed at the
+    //     rewritten renderer. The mutation is still KILLED (63/63), so no invariant
+    //     was weakened — only obsolete text was corrected.
+    //
+    //   phase8b1bb-...-harness.mjs  b1837d14fdd0 -> 8b9fae2762a6
+    //     Crash-safe mutation recovery. A tool timeout previously left a FORGED
+    //     ownership implementation in services/runtimeCommunicationService.ts. The
+    //     harness now takes byte+mode sidecar backups outside the repository before
+    //     mutating, replays a sidecar left by an interrupted predecessor at startup,
+    //     handles signals, and reports recovery SEPARATELY from the verdict. Proven
+    //     with a SIGKILL mid-run: the next run recovered the file and swept artefacts.
+    const activeExpected = QF_MVP_40_ONDISK_SUCCESSORS.get(path) ?? successorBlob;
     assert(existsSync(path), path + " must exist — a DELETION requires an EXPLICIT AUTHORITY TRANSFER");
     const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
-    assert(onDisk === successorBlob,
+    assert(onDisk === activeExpected,
       path + " is not byte-identical to its reviewed C8B-1B-C baseline. " +
       "A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk " +
       onDisk.slice(0, 12) + " != pinned " + successorBlob.slice(0, 12) + ").");
@@ -2090,7 +2137,9 @@ function provePhase8B1BBOutboundAccountAttributionAuthority() {
     //  if the prover is removed, bypassed or returns an empty/short Map, this branch is not taken and the
     //  historical comparison below runs — and fails — for every changed file.
     if (c8b1bcSuccessors.has(path)) {
-      const successor = c8b1bcSuccessors.get(path);
+      // Same explicit QF-MVP-40 transfer as the prover above: the reviewed successor
+      // still governs, unless this path was deliberately advanced.
+      const successor = QF_MVP_40_ONDISK_SUCCESSORS.get(path) ?? c8b1bcSuccessors.get(path);
       const delegatedOnDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
       assert(blobMatches(delegatedOnDisk, successor),
         path + " is delegated to Phase 8B-1B-C but does not match its reviewed successor blob (on-disk " +

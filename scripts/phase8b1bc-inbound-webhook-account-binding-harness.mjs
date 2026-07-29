@@ -10,13 +10,192 @@
 // ============================================================================
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, statSync, chmodSync, readdirSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { createRequire } from "node:module";
 import { createHmac } from "node:crypto";
 
 const ROOT = process.cwd();
+
+// ============================================================================
+// QF-MVP-40.1-R — CRASH-SAFE MUTATION GUARD
+//
+// This harness mutates REAL source files in place to prove each mutation is killed. A `finally`
+// block covers a thrown exception, an assertion failure and a TypeScript failure — but it does NOT
+// cover a signal. A SIGTERM/SIGINT (CI timeout, Ctrl-C, a supervising tool's deadline) killed the
+// process mid-mutation and left `services/consentCommandResponseService.ts` mutated plus a stray
+// `.phase8b1bc-tsc-*.json` in the repository root. A corrupted product file surviving a test run is
+// far more dangerous than the test failing.
+//
+// The registry below makes restoration idempotent and reachable from every exit path: normal
+// return, throw, assertion failure, compile failure, signal, and uncaughtException. Originals are
+// captured as EXACT BYTES (Buffer, never a utf8 round-trip) together with the file mode, so the
+// restored file is byte-identical and mode-identical to what was read. Only paths this run created
+// are ever removed. Nothing here suppresses a genuine mutation result — restoration and reporting
+// are independent.
+// ============================================================================
+// WHY AN ON-DISK SIDECAR AND NOT JUST A SIGNAL HANDLER
+//   A first attempt kept originals in memory and restored them from `finally` plus SIGINT/SIGTERM
+//   handlers. Testing disproved the signal half: this harness spends most of its life inside
+//   SYNCHRONOUS execFileSync(tsc) calls, and Node cannot service a signal while the event loop is
+//   blocked. `timeout --signal=TERM 47` reproduced it exactly — exit 124, handler never ran, and
+//   services/consentCommandResponseService.ts was left mutated in the worktree.
+//
+//   In-memory state cannot survive SIGKILL either. So the original bytes are ALSO written to a
+//   sidecar outside the repository BEFORE the file is mutated, and every run begins by replaying
+//   any sidecar left behind by an interrupted predecessor. Recovery therefore does not depend on
+//   this process getting a chance to run any code at all.
+const RECOVERY_DIR = join(tmpdir(), "qf-phase8b1bc-recovery");
+const RECOVERY_MANIFEST = join(RECOVERY_DIR, "manifest.json");
+
+const MUTATION_BACKUPS = new Map();   // absolute path -> { bytes: Buffer, mode: number }
+const RUN_TEMP_PATHS = new Set();     // only paths THIS run created
+let cleanupDone = false;
+
+function sidecarNameFor(absPath) {
+  return absPath.replace(/[^A-Za-z0-9]/g, "_") + ".bak";
+}
+
+function writeSidecar(absPath, bytes, mode) {
+  try {
+    mkdirSync(RECOVERY_DIR, { recursive: true });
+    writeFileSync(join(RECOVERY_DIR, sidecarNameFor(absPath)), bytes);
+    const manifest = existsSync(RECOVERY_MANIFEST)
+      ? JSON.parse(readFileSync(RECOVERY_MANIFEST, "utf8"))
+      : {};
+    manifest[absPath] = { sidecar: sidecarNameFor(absPath), mode };
+    writeFileSync(RECOVERY_MANIFEST, JSON.stringify(manifest, null, 2));
+  } catch (e) {
+    // A sidecar we cannot write is a safety regression, not a detail — fail loudly.
+    throw new Error(`Cannot write mutation recovery sidecar for ${absPath}: ${e && e.message}`);
+  }
+}
+
+/**
+ * Replay any sidecar left by an interrupted previous run. Runs BEFORE this run mutates anything, so
+ * a SIGKILLed predecessor self-heals on the next invocation instead of leaving a corrupted worktree.
+ */
+function recoverFromPreviousRun() {
+  if (!existsSync(RECOVERY_MANIFEST)) return;
+  let manifest = {};
+  try { manifest = JSON.parse(readFileSync(RECOVERY_MANIFEST, "utf8")); } catch { manifest = {}; }
+  let recovered = 0;
+  for (const [absPath, meta] of Object.entries(manifest)) {
+    const sidecar = join(RECOVERY_DIR, meta.sidecar);
+    if (!existsSync(sidecar) || !existsSync(absPath)) continue;
+    const original = readFileSync(sidecar);
+    if (!readFileSync(absPath).equals(original)) {
+      writeFileSync(absPath, original);
+      if (typeof meta.mode === "number") { try { chmodSync(absPath, meta.mode); } catch { /* best effort */ } }
+      console.error(`RECOVERED ${absPath} from an interrupted previous run.`);
+      recovered++;
+    }
+  }
+  if (recovered > 0) console.error(`Recovered ${recovered} file(s) before starting.\n`);
+
+  // A recovery manifest is proof that a previous run of THIS harness was interrupted. Its scratch
+  // tsconfig fragments are therefore ours to clean up — adopt them so orphans cannot accumulate.
+  // Without this the startup snapshot would classify them as "pre-existing" and protect them
+  // forever. Files are matched only by this harness's unique prefix; nothing else is touched.
+  try {
+    for (const f of readdirSync(ROOT)) {
+      if (!f.startsWith(".phase8b1bc-tsc-")) continue;
+      const abs = resolve(ROOT, f);
+      PRE_EXISTING_TEMP.delete(abs);
+      try { rmSync(abs, { force: true }); } catch { /* best effort */ }
+    }
+  } catch { /* best effort */ }
+
+  try { rmSync(RECOVERY_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
+}
+
+function clearRecoveryState() {
+  try { rmSync(RECOVERY_DIR, { recursive: true, force: true }); } catch { /* best effort */ }
+}
+
+function rememberOriginal(absPath) {
+  if (MUTATION_BACKUPS.has(absPath)) return;
+  const bytes = readFileSync(absPath);
+  const mode = statSync(absPath).mode;
+  MUTATION_BACKUPS.set(absPath, { bytes, mode });
+  writeSidecar(absPath, bytes, mode);   // durable copy BEFORE any mutation can occur
+}
+
+function restoreOne(absPath) {
+  const backup = MUTATION_BACKUPS.get(absPath);
+  if (!backup) return;
+  try {
+    writeFileSync(absPath, backup.bytes);      // exact bytes, no encoding round-trip
+    chmodSync(absPath, backup.mode);           // exact mode
+  } catch (e) {
+    console.error(`RESTORE FAILED for ${absPath}: ${e && e.message}`);
+  }
+}
+
+/** Idempotent. Safe to call from finally, a signal handler and process exit. */
+function restoreAllAndCleanup() {
+  if (cleanupDone) return;
+  cleanupDone = true;
+  for (const p of MUTATION_BACKUPS.keys()) restoreOne(p);
+  for (const p of RUN_TEMP_PATHS) { try { rmSync(p, { recursive: true, force: true }); } catch { /* best effort */ } }
+  sweepOwnTempFiles();
+  clearRecoveryState();
+}
+
+/**
+ * Eagerly snapshot EVERY file this harness is capable of mutating, before a single mutation runs.
+ *
+ * Registering lazily (only when a file is about to be mutated) leaves a window: if the process dies
+ * between the write and the registration — or dies on a path that never reached the lazy register —
+ * there is no backup to restore from. A SIGTERM test proved that window real: it left
+ * services/metaWhatsAppWebhookService.ts modified in the worktree. Snapshotting all targets up front
+ * removes the window entirely: restoration no longer depends on how far the run got.
+ */
+function snapshotAllMutableTargets(paths) {
+  for (const rel of paths) {
+    const abs = resolve(ROOT, rel);
+    if (existsSync(abs)) rememberOriginal(abs);
+  }
+}
+
+/** Temp files this harness creates are uniquely prefixed. Anything matching that was NOT present at
+ *  startup was created by THIS run, so removing it cannot disturb a concurrent or earlier run. */
+const PRE_EXISTING_TEMP = new Set(
+  existsSync(ROOT)
+    ? readdirSync(ROOT).filter((f) => f.startsWith(".phase8b1bc-tsc-")).map((f) => resolve(ROOT, f))
+    : []
+);
+
+function sweepOwnTempFiles() {
+  try {
+    for (const f of readdirSync(ROOT)) {
+      if (!f.startsWith(".phase8b1bc-tsc-")) continue;
+      const abs = resolve(ROOT, f);
+      if (PRE_EXISTING_TEMP.has(abs)) continue;   // not ours — leave it alone
+      try { rmSync(abs, { force: true }); } catch { /* best effort */ }
+    }
+  } catch { /* best effort */ }
+}
+
+process.on("exit", restoreAllAndCleanup);
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  process.on(sig, () => {
+    restoreAllAndCleanup();
+    console.error(`\n${sig} received — source files restored and temp files removed before exit.`);
+    process.exit(130);
+  });
+}
+process.on("uncaughtException", (e) => {
+  restoreAllAndCleanup();
+  console.error("uncaughtException — source files restored.", e);
+  process.exit(1);
+});
+process.on("unhandledRejection", (e) => {
+  restoreAllAndCleanup();
+  console.error("unhandledRejection — source files restored.", e);
+  process.exit(1);
+});
 const tsc = resolve("node_modules/typescript/bin/tsc");
 if (!existsSync(tsc)) throw new Error("TypeScript compiler not found. Run npm install first.");
 
@@ -29,12 +208,22 @@ const COMM_SRC = "services/communicationService.ts";
 const WH_SRC = "services/metaWhatsAppWebhookService.ts";
 const ACK_SRC = "services/consentCommandResponseService.ts";
 
+// Every file below is mutated in place by the mutation runner. Snapshot them ALL now, before any
+// mutation, so restoration is guaranteed from every exit path — including a signal that arrives
+// between a write and its lazy registration.
+const MUTABLE_TARGETS = Object.freeze([
+  ATTR_SRC, EXTRACT_SRC, GATE_SRC, OWNERSHIP_SRC, SERVICE_SRC, COMM_SRC, WH_SRC, ACK_SRC,
+]);
+recoverFromPreviousRun();          // self-heal a SIGKILLed predecessor first
+snapshotAllMutableTargets(MUTABLE_TARGETS);
+
 // A swappable holder so the stubbed adminClient returns the current test's fake client.
 const COMM_HOLDER = { client: () => { throw new Error("no fake comm client set"); } };
 
 function compile(files, outDir) {
   rmSync(outDir, { recursive: true, force: true });
   const tsconfigPath = resolve(ROOT, `.phase8b1bc-tsc-${Math.random().toString(36).slice(2, 10)}.json`);
+  RUN_TEMP_PATHS.add(tsconfigPath);   // only this run's temp file is ever removed
   writeFileSync(tsconfigPath, JSON.stringify({
     compilerOptions: {
       module: "commonjs", target: "ES2020", moduleResolution: "node",
@@ -44,7 +233,7 @@ function compile(files, outDir) {
     files,
   }, null, 2));
   try { execFileSync(process.execPath, [tsc, "-p", tsconfigPath], { stdio: "pipe" }); }
-  finally { rmSync(tsconfigPath, { force: true }); }
+  finally { rmSync(tsconfigPath, { force: true }); RUN_TEMP_PATHS.delete(tsconfigPath); }
   return outDir;
 }
 
@@ -922,7 +1111,11 @@ async function runMutations(list, label) {
     const p = resolve(ROOT, m.file);
     const cur = readFileSync(p, "utf8");
     if (!cur.includes(m.from)) { console.log(`INFRA    ${m.name} (anchor)`); infra++; continue; }
+    // Capture exact original bytes + mode BEFORE the first mutation of this file, so a signal
+    // arriving at any point below still restores it byte-for-byte.
+    rememberOriginal(p);
     const dir = mkdtempSync(join(tmpdir(), "phase8b1bc-mut-"));
+    RUN_TEMP_PATHS.add(dir);
     try {
       writeFileSync(p, cur.replace(m.from, m.to));
       let build;
@@ -932,7 +1125,13 @@ async function runMutations(list, label) {
       const stillCorrect = await m.scenario(build);
       if (stillCorrect) { console.log(`SURVIVED ${m.name}`); survived++; }
       else { console.log(`KILLED   ${m.name}`); killed++; }
-    } finally { writeFileSync(p, cur); rmSync(dir, { recursive: true, force: true }); }
+    } finally {
+      // Fast path: restore from the byte-exact backup (not the utf8 string), then drop the temp dir.
+      // restoreAllAndCleanup() remains the backstop for signal / uncaughtException exits.
+      restoreOne(p);
+      rmSync(dir, { recursive: true, force: true });
+      RUN_TEMP_PATHS.delete(dir);
+    }
   }
   return { killed, survived, infra };
 }

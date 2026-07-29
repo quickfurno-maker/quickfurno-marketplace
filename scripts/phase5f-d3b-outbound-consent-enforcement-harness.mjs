@@ -238,6 +238,22 @@ const PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB = "81175f6e19af1d09f1485ad9762626323e28
  * Both earlier blobs above remain recorded and asserted: history is preserved, never rewritten.
  */
 const PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB = "8c514f7a19403272ee9c87b4b64439a99e64ab35";
+
+/**
+ * QF-MVP-40.1-R - the CURRENT on-disk D4-B authority.
+ *
+ * WHY IT MOVED AGAIN. D4-B carries an exact blob pin for the Wave 2A-R1 successor harness. That
+ * successor proved a HISTORICAL narrowness claim over a range ending at a moving `HEAD`, so it
+ * re-asserted the claim against every later phase and began failing once QF-MVP-20/30 landed.
+ * QF-MVP-40.1-R pinned both range endpoints to literals and added an ancestry assertion, which
+ * changed the successor's bytes and therefore D4-B's pin of it - so this delegated pin advances too.
+ *
+ * NOTHING WAS WEAKENED. No assertion was deleted, downgraded or made conditional; D4-B's
+ * anti-vacuity content checks are unchanged and still enforced independently of any blob value.
+ *
+ * Every earlier blob above remains recorded and asserted: history is preserved, never rewritten.
+ */
+const PHASE_QFMVP401R_D4B_HARNESS_BLOB = "dd6956d0fe740121fbc8aca095d5ff55c2d1f56d";
 /** EXACTLY the paths whose 8B-1A on-disk comparison is delegated to this layer. Exactly one, by identity. */
 const PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES = [PHASE5FD4B_SRC];
 
@@ -290,6 +306,15 @@ function provePhase8B1BCD4BGovernanceAuthority() {
     assert(PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB !== prior,
       "the evidence-repair pin is not a silent revert to " + label);
   }
+  for (const [prior, label] of [
+    [PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB, "the evidence-repair blob"],
+    [PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB, "the Wave 2A-R1 reviewed blob"],
+    [PHASE_8B1BC_D4B_HARNESS_BLOB, "the C8B-1B-C reviewed blob"],
+    [PHASE_8B1BC_D4B_HISTORICAL_BLOB, "the 8B-1A historical blob"],
+  ]) {
+    assert(PHASE_QFMVP401R_D4B_HARNESS_BLOB !== prior,
+      "the QF-MVP-40.1-R pin is not a silent revert to " + label);
+  }
 
   // Fixed-literal self-proof, following the 8B-1B-A / 8B-1B-B convention. EVERY generation of the
   // pin - historical, C8B-1B-C, Wave 2A-R1 and the evidence repair - stays an exact fixed literal.
@@ -299,6 +324,7 @@ function provePhase8B1BCD4BGovernanceAuthority() {
     PHASE_8B1BC_D4B_HARNESS_BLOB,
     PHASE_8B1BD6W2AR1_D4B_HARNESS_BLOB,
     PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB,
+    PHASE_QFMVP401R_D4B_HARNESS_BLOB,
   ]) {
     assert(selfSrc.includes('"' + blob + '"'), "the pinned blob " + blob.slice(0, 12) + " is an exact fixed literal");
   }
@@ -307,12 +333,12 @@ function provePhase8B1BCD4BGovernanceAuthority() {
   // The CURRENT authority is the Wave 2A-R1 successor; the C8B-1B-C blob above remains the verified
   // predecessor record.
   const onDisk = execFileSync("git", ["hash-object", PHASE5FD4B_SRC], { encoding: "utf8" }).trim();
-  assert(onDisk === PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB,
-    PHASE5FD4B_SRC + " is not byte-identical to its reviewed C8B-1B-D6 Wave 2A-R1 EVIDENCE-REPAIR blob. " +
+  assert(onDisk === PHASE_QFMVP401R_D4B_HARNESS_BLOB,
+    PHASE5FD4B_SRC + " is not byte-identical to its reviewed QF-MVP-40.1-R blob. " +
     "A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER " +
-    "(on-disk " + onDisk.slice(0, 12) + " != pinned " + PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB.slice(0, 12) + ").");
+    "(on-disk " + onDisk.slice(0, 12) + " != pinned " + PHASE_QFMVP401R_D4B_HARNESS_BLOB.slice(0, 12) + ").");
 
-  phase8B1BCD4BAuthorityToken = PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB;   // set ONLY after every assertion passed
+  phase8B1BCD4BAuthorityToken = PHASE_QFMVP401R_D4B_HARNESS_BLOB;   // set ONLY after every assertion passed
   return phase8B1BCD4BAuthorityToken;
 }
 
@@ -434,6 +460,26 @@ const PHASE_8B1BD6W1_FROZEN_BLOBS = [
   [PHASE_8B1BD6W1_MIGRATION_SRC, "f2b4b8c9620e1805760c8bf45fb4bafa138df201"],
   [PHASE_8B1BD6W1_HARNESS_SRC, "414295cd787157a8d656f8edc4d95fc1122a7e30"],
 ];
+/**
+ * QF-MVP-40.1-R AUTHORITY TRANSFER — the CURRENT on-disk Wave 1 bytes.
+ *
+ * Until now the historical blob and the on-disk blob were the same value, so one table served both
+ * assertions. They must now diverge, and the HISTORICAL record above is deliberately left untouched:
+ * `git rev-parse <implementation-head>:<path>` is a fact about a past commit and rewriting it would
+ * be falsifying history, which this harness explicitly forbids.
+ *
+ * WHAT MOVED, AND WHY. Only the Wave 1 HARNESS. The Wave 1 MIGRATION blob is unchanged, and the
+ * enforced table, constraint name and predicate are unchanged. Wave 1 assertion 5.5 read "no Wave 2
+ * / Wave 3 constraint migration present" — written while Wave 1 was the newest wave. Wave 2A-R2 has
+ * since been reviewed and merged, so that fence rejected an APPROVED successor. It was re-expressed
+ * as an exact-identity invariant: exactly the one approved Wave 2A-R2 migration may exist, matched
+ * by full filename. An unapproved Wave 2B/Wave 3 sibling still fails — the property the original
+ * fence actually protected. Verified by negative test: adding an unapproved sibling fails 5.5.
+ */
+const PHASE_8B1BD6W1_ACTIVE_BLOBS = [
+  [PHASE_8B1BD6W1_MIGRATION_SRC, "f2b4b8c9620e1805760c8bf45fb4bafa138df201"],
+  [PHASE_8B1BD6W1_HARNESS_SRC, "4698c68584de0c0b0f5d6276bab774a5257e4f9a"],
+];
 /** The EXACT enforced object. A rename, a re-table or a re-predicate is an authority change. */
 const PHASE_8B1BD6W1_TARGET_TABLE = "communication_delivery_events";
 const PHASE_8B1BD6W1_CONSTRAINT_NAME = "communication_delivery_events_provider_account_required_check";
@@ -477,18 +523,28 @@ function provePhase8B1BD6W1DeliveryEventConstraintAuthority() {
   // 4) BYTE-FREEZE — historical commit blobs AND the active on-disk bytes. Fixed literals, so a
   //    STALE or SUCCESSOR-MISMATCHED pin cannot be smuggled in by computing it at runtime.
   const selfSrc = readFileSync(resolve(HARNESS_SRC), "utf8");
+  // 4a-i) HISTORICAL record — a fact about the implementation-head commit. Never rewritten.
   for (const [path, expected] of PHASE_8B1BD6W1_FROZEN_BLOBS) {
     assert(selfSrc.includes('"' + expected + '"'), "the Wave 1 blob " + expected.slice(0, 12) + " is an exact fixed literal");
     const historical = execFileSync("git", ["rev-parse", PHASE_8B1BD6W1_IMPLEMENTATION_HEAD + ":" + path], { encoding: "utf8" }).trim();
     assert(historical === expected,
       `the Wave 1 historical blob for ${path} must be permanently unchanged (got ${historical.slice(0, 12)}, expected ${expected.slice(0, 12)}).`);
+  }
+  // 4a-ii) ACTIVE on-disk freeze — same strength, but re-pinned by an EXPLICIT authority transfer.
+  for (const [path, expected] of PHASE_8B1BD6W1_ACTIVE_BLOBS) {
+    assert(selfSrc.includes('"' + expected + '"'), "the active Wave 1 blob " + expected.slice(0, 12) + " is an exact fixed literal");
     const onDisk = execFileSync("git", ["hash-object", path], { encoding: "utf8" }).trim();
     assert(onDisk === expected,
-      `${path} is not byte-identical to its reviewed C8B-1B-D6 Wave 1 blob. This is an AUTHORITY TRANSFER, ` +
+      `${path} is not byte-identical to its reviewed QF-MVP-40.1-R Wave 1 blob. This is an AUTHORITY TRANSFER, ` +
       `not a routine edit (on-disk ${onDisk.slice(0, 12)} != pinned ${expected.slice(0, 12)}).`);
   }
   assert(PHASE_8B1BD6W1_FROZEN_BLOBS[0][1] !== PHASE_8B1BD6W1_FROZEN_BLOBS[1][1],
     "the migration and the harness must not share a blob (a duplicate pin is a stale-authority smell)");
+  assert(PHASE_8B1BD6W1_ACTIVE_BLOBS[0][1] !== PHASE_8B1BD6W1_ACTIVE_BLOBS[1][1],
+    "the active migration and harness pins must not share a blob");
+  // The Wave 1 MIGRATION must NOT have moved — only the harness was re-pinned.
+  assert(PHASE_8B1BD6W1_ACTIVE_BLOBS[0][1] === PHASE_8B1BD6W1_FROZEN_BLOBS[0][1],
+    "the Wave 1 migration blob must be identical in the historical and active records");
 
   // 4b) RAW-BYTE LINE-ENDING FREEZE. `git hash-object` NORMALISES CRLF to LF, so a CRLF-only
   //     rewrite of a Wave 1 file yields an IDENTICAL blob and slips past the freeze above. Read the
@@ -1593,7 +1649,7 @@ function provePhase8B1AMetaAuthority() {
     if (PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES.length === 1 && path === PHASE_8B1BC_DELEGATED_ONDISK_AUTHORITIES[0]) {
       // The token now carries the C8B-1B-D6 Wave 2A-R1 successor blob (the C8B-1B-C record above is still
       // verified as the predecessor). Comparing against the superseded blob would void a valid delegation.
-      assert(phase8B1BCD4BAuthorityToken === PHASE_8B1BD6W2AR1R_D4B_HARNESS_BLOB,
+      assert(phase8B1BCD4BAuthorityToken === PHASE_QFMVP401R_D4B_HARNESS_BLOB,
         path + " is delegated to Phase 8B-1B-C/D6-W2A-R1, but that authority did not prove itself — the delegation is void");
       continue;
     }

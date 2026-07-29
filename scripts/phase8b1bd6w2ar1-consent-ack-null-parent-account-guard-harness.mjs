@@ -38,6 +38,11 @@ const SVC_SRC = "services/consentCommandResponseService.ts";
 const HARNESS_SELF = "scripts/phase8b1bd6w2ar1-consent-ack-null-parent-account-guard-harness.mjs";
 const MIGRATIONS_DIR = "supabase/migrations";
 const EXPECTED_BASE = "fc639cf5b86f10b3fa3c814684b97c42b578322a";
+// QF-MVP-40.1-R — the literal Wave 2A-R2 implementation head. The scope proof below is a claim
+// about a FIXED historical range (EXPECTED_BASE..R2_IMPLEMENTATION_HEAD), never about whatever
+// HEAD happens to be today. Both endpoints are literal so the proof cannot drift as later,
+// unrelated phases land. Ancestry is asserted at run time (SC0.1).
+const R2_IMPLEMENTATION_HEAD = "6fc9a927c4f3ec4e87bd4308e25a85642efbd2ce";
 const MISSING_OUTCOME = "provider_account_context_missing";
 
 const tsc = resolve("node_modules/typescript/bin/tsc");
@@ -625,6 +630,17 @@ function stringEvidenceSelfTests() {
 // ============================================================================
 // SCOPE PROOFS — R1 runtime invariant + the reviewed R2 schema successor
 // ============================================================================
+/** True when `sha` exists and is a real ancestor of HEAD. Never throws. */
+function isAncestor(sha) {
+  try {
+    if (execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim() !== "commit") return false;
+    execFileSync("git", ["merge-base", "--is-ancestor", sha, "HEAD"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function scopeChecks() {
   // Wave 2A-R2 is now the approved schema successor. R1 remains the runtime guard; this proof
   // requires exactly one named R2 migration rather than silently deleting the predecessor check.
@@ -640,8 +656,23 @@ function scopeChecks() {
     ackConstraintMigrations.join(", "));
 
   // The only schema delta after the R1 base is the exact reviewed R2 migration.
-  const changed = execFileSync("git", ["diff", "--name-only", `${EXPECTED_BASE}..HEAD`], { encoding: "utf8" })
-    .split("\n").map((s) => s.trim()).filter(Boolean);
+  // QF-MVP-40.1-R — RANGE END PINNED. This range previously ended at a moving `HEAD`, so it
+  // re-asserted the R1/R2 narrowness claim against every later phase and began failing the moment
+  // QF-MVP-20/30 landed. The claim being proved is historical — "the R1→R2 implementation itself
+  // touched only the reviewed set" — so BOTH endpoints are now literal. The assertion is unchanged
+  // in strength; it simply stops drifting. SC0.1 keeps it anchored to real history, so the pinned
+  // end can never be a fabricated or detached commit.
+  const pinnedHeadOk = isAncestor(R2_IMPLEMENTATION_HEAD);
+  add("SC0.1 the pinned R2 implementation head is an ancestor of HEAD", pinnedHeadOk);
+  // A bad pin must be REPORTED, not thrown. Without this guard `git diff <bogus>..` raises and the
+  // harness dies before printing SC0.1, turning a clear failure into an opaque crash.
+  let changed = [];
+  if (pinnedHeadOk) {
+    changed = execFileSync("git", ["diff", "--name-only", `${EXPECTED_BASE}..${R2_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
+      .split("\n").map((s) => s.trim()).filter(Boolean);
+  } else {
+    add("SC0.2 scope diff skipped because the pinned head is unusable", false);
+  }
   const changedMigrations = changed.filter((f) => f.startsWith(MIGRATIONS_DIR));
   add("SC2.1 the only migration changed since the R1 base is the approved Wave 2A-R2 migration",
     changedMigrations.length === 1 && changedMigrations[0] === r2,

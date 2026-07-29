@@ -1062,7 +1062,26 @@ check("B5. Phase 8A authority transfer is BOUNDED; D4-B's own authorities stay f
   // import were accepted. Content assertions alone did not catch that — the checks were present,
   // they simply did nothing. So the successor is now pinned by EXACT BLOB as well as by content,
   // and the specific properties that were vacuous are asserted directly.
-  const W2AR1_HARNESS_BLOB = "2ab3a76ea8e9a42f25b55f72990b33575e618859";
+  // ── EXPLICIT AUTHORITY TRANSFER — QF-MVP-40.1-R ────────────────────────────────────────────────
+  // The pin has moved TWICE since the evidence-repair freeze. Both hops were reviewed before the
+  // pin was touched; neither relaxed a successor property.
+  //
+  //   2ab3a76e  (commit 32b640c, evidence repair — the originally frozen blob)
+  //     ↓ commit 6fc9a92 "Phase 8B-1B-D6 Wave 2A-R2: add consent-ack account constraint"
+  //   5c5f5ec9  Wave 2A-R2 TIGHTENED the successor's own scope fence: "NO Wave 2A-R2 ack-intent
+  //             constraint migration exists yet" became "exactly one approved Wave 2A-R2 migration
+  //             exists, matched by full path". An obsolete must-not-exist fence became an
+  //             exact-identity invariant — strictly stronger, not weaker.
+  //     ↓ QF-MVP-40.1-R (this task)
+  //   3cc0b409  The successor's scope diff ended at a moving `HEAD`, so it re-asserted a HISTORICAL
+  //             narrowness claim against every later phase and failed once QF-MVP-20/30 landed.
+  //             Both range endpoints are now literal, and a new SC0.1 asserts the pinned end is a
+  //             real ancestor of HEAD. No assertion was deleted, downgraded or made conditional.
+  //
+  // The anti-vacuity properties this freeze exists to protect are ALSO asserted directly below
+  // (the string-PRESERVING detector block) and above (the zero-insert invariant count), so they
+  // remain enforced by content regardless of the blob value.
+  const W2AR1_HARNESS_BLOB = "3cc0b409ea9f63b5ed3e1ada475c5a4092061cfb";
   const onDiskW2AR1 = execFileSync("git", ["hash-object", w2ar1Harness], { encoding: "utf8" }).trim();
   assert(onDiskW2AR1 === W2AR1_HARNESS_BLOB,
     `${w2ar1Harness} is not byte-identical to its reviewed Wave 2A-R1 evidence-repair blob. ` +

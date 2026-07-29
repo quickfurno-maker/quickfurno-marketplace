@@ -165,7 +165,18 @@ function scopeChecks() {
   // failure (and, worse, would not see an unauthorised sibling migration that is also uncommitted).
   const listed = readdirSync(resolve("supabase/migrations")).filter((f) => f.endsWith(".sql"));
   const w23 = listed.filter((f) => /ack_intent|inbound_message|webhook_receipt/.test(f) && /constraint|required|not_null/.test(f));
-  add("5.5 no Wave 2 / Wave 3 constraint migration present", w23.length === 0);
+  // QF-MVP-40.1-R — this was "no Wave 2 / Wave 3 constraint migration present", written while Wave 1
+  // was the newest wave. Wave 2A-R2 has since been reviewed and merged, so the original fence now
+  // rejects an APPROVED successor. The check is not removed and not loosened to a count: it is
+  // re-expressed as an exact-identity invariant. Exactly the one approved R2 migration may exist,
+  // matched by full filename — an unauthorised Wave 2B/Wave 3 sibling still fails here, which is
+  // the property the original fence actually protected.
+  const APPROVED_W2_MIGRATIONS = Object.freeze([
+    "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+  ]);
+  const unapproved = w23.filter((f) => !APPROVED_W2_MIGRATIONS.includes(f));
+  add("5.5 only approved Wave 2A-R2 constraint migrations present (no unapproved Wave 2B/3 sibling)",
+    unapproved.length === 0 && w23.length === APPROVED_W2_MIGRATIONS.length);
   add("5.6 exactly one 20260720 migration", listed.filter((f) => f.includes("20260720")).length === 1);
   return results;
 }

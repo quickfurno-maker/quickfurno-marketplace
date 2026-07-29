@@ -41,6 +41,12 @@ const CONSTRAINT_NAME =
   "communication_consent_ack_intents_provider_account_req_check";
 const COLUMN = "provider_account_id";
 const EXPECTED_BASE = "86255583798fc25c58468fdf6ba657243e37d5be";
+// QF-MVP-40.1-R — the literal Wave 2A-R2 implementation head. G6/G8 assert that the R2 change
+// ITSELF was narrow, which is a claim about a fixed historical range. Ending the range at a moving
+// `HEAD` re-asserted that claim against every later phase and began failing once QF-MVP-20/30
+// landed. Both endpoints are now literal; the allowlist is unchanged and no file was added to it.
+// Ancestry is asserted at run time (G5.1) so the pinned end cannot be fabricated or detached.
+const R2_IMPLEMENTATION_HEAD = "6fc9a927c4f3ec4e87bd4308e25a85642efbd2ce";
 
 const FORBIDDEN_TABLES = Object.freeze([
   "communication_messages",
@@ -264,11 +270,22 @@ function scopeChecks() {
   add("G5 no Wave 2B or Wave 3 constraint migration exists yet",
     laterWave.length === 0, laterWave.join(", "));
 
+  // The pinned end must be a genuine ancestor of HEAD, otherwise the fixed range proves nothing.
+  let ancestorOk = false;
+  try {
+    ancestorOk =
+      execFileSync("git", ["cat-file", "-t", R2_IMPLEMENTATION_HEAD], { encoding: "utf8" }).trim() === "commit";
+    if (ancestorOk) execFileSync("git", ["merge-base", "--is-ancestor", R2_IMPLEMENTATION_HEAD, "HEAD"]);
+  } catch {
+    ancestorOk = false;
+  }
+  add("G5.1 the pinned R2 implementation head is an ancestor of HEAD", ancestorOk);
+
   let changed = [];
   try {
     changed = execFileSync(
       "git",
-      ["diff", "--name-only", `${EXPECTED_BASE}..HEAD`],
+      ["diff", "--name-only", `${EXPECTED_BASE}..${R2_IMPLEMENTATION_HEAD}`],
       { encoding: "utf8" }
     ).split("\n").map((s) => s.trim()).filter(Boolean);
   } catch {

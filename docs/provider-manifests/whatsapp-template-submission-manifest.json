@@ -1,19 +1,23 @@
 {
-  "manifest_version": "1.1",
-  "phase": "5F-B",
+  "manifest_version": "1.2",
+  "phase": "QF-MVP-40.4",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
-  "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED WhatsApp Cloud API mappings. This is NOT an API submission and grants NO approval. Every entry stays approval_status='draft' with provider_template_name=null and provider_template_id=null. Phase 5F-B adds binding_contract READINESS ONLY where the source keys are proven from repository call sites; it submits no template and creates no mapping row.",
+  "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
   "warnings": [
-    "No template here is submitted or approved.",
-    "No secrets, tokens, or real OTP examples are stored.",
-    "body_spec placeholders use {{n}} positional variables; actual approved copy is defined at submission time.",
+    "No template here is submitted or approved. Every entry is DRAFT_NOT_SUBMITTED.",
+    "No secrets, tokens, or real OTP examples are stored. All example fixtures are fake.",
+    "body_spec placeholders use {{n}} positional variables; final approved copy is fixed at submission time.",
     "provider_template_id remains null until Meta assigns one after approval.",
-    "binding_contract.binding_readiness='resolved' only where source_key is proven in repository code; 'unresolved' entries are NOT guessed."
+    "binding_contract.binding_readiness='resolved' only where source_key is proven in repository code; 'unresolved' entries are NOT guessed.",
+    "META CATEGORY is not the same as INTERNAL CONSENT SCOPE. The consent acknowledgements are Meta category 'utility' (Meta reserves 'authentication' for OTP-shaped templates) but internal consent scope 'authentication', which is the only scope evaluated against global suppression alone.",
+    "A template appearing here grants no send permission. lib/communication/outboundConsentScope.ts must register the key and an approved provider mapping must exist before any send is possible; both are QF-MVP-40.6 work."
   ],
   "binding_contract_notes": {
     "binding_version": 1,
-    "proven_source_keys": ["otp"],
+    "proven_source_keys": [
+      "otp"
+    ],
     "proof": "The only CommunicationIntent variable built by live callers is { otp } (services/supabaseSendSmsHookService.ts, services/vendorVerificationService.ts, services/vendorPasswordResetService.ts). Business-template source keys are not wired to any live caller, so their bindings remain unresolved.",
     "component_semantics": "component + 1-based position <- source_key (parameter_type). Positions are deterministic; order is NEVER inferred from object key order."
   },
@@ -25,29 +29,40 @@
         "language": "en",
         "category": "authentication",
         "body_spec": "Your QuickFurno login code is {{1}}. It expires shortly. Do not share it.",
-        "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "variables_schema": {
+          "1": {
+            "type": "otp",
+            "example": "<redacted-at-submission>"
+          }
+        },
         "binding_contract": {
           "binding_readiness": "resolved",
           "binding_version": 1,
-          "bindings": [{ "component": "body", "position": 1, "source_key": "otp", "parameter_type": "text" }]
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "otp",
+              "parameter_type": "text"
+            }
+          ]
         },
         "approval_status": "draft",
-        "provider_template_id": null
-      },
-      {
-        "internal_template_key": "vendor_whatsapp_verify",
-        "provider_template_name": null,
-        "language": "en",
-        "category": "authentication",
-        "body_spec": "Your QuickFurno verification code is {{1}}. It expires shortly. Do not share it.",
-        "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
-        "binding_contract": {
-          "binding_readiness": "resolved",
-          "binding_version": 1,
-          "bindings": [{ "component": "body", "position": 1, "source_key": "otp", "parameter_type": "text" }]
-        },
-        "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "One-time login code for client WhatsApp OTP sign-in.",
+          "consent_scope": "authentication",
+          "suppression_rule": "Global suppression only. Authentication is deliberately not blocked by a user STOP, because the code is requested by the user at that moment.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "otp": "<redacted-at-submission>"
+          }
+        }
       },
       {
         "internal_template_key": "vendor_password_reset",
@@ -55,49 +70,334 @@
         "language": "en",
         "category": "authentication",
         "body_spec": "Your QuickFurno password reset code is {{1}}. It expires shortly. Do not share it.",
-        "variables_schema": { "1": { "type": "otp", "example": "<redacted-at-submission>" } },
+        "variables_schema": {
+          "1": {
+            "type": "otp",
+            "example": "<redacted-at-submission>"
+          }
+        },
         "binding_contract": {
           "binding_readiness": "resolved",
           "binding_version": 1,
-          "bindings": [{ "component": "body", "position": 1, "source_key": "otp", "parameter_type": "text" }]
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "otp",
+              "parameter_type": "text"
+            }
+          ]
         },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "One-time code authorising a vendor password reset.",
+          "consent_scope": "authentication",
+          "suppression_rule": "Global suppression only.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "otp": "<redacted-at-submission>"
+          }
+        }
+      },
+      {
+        "internal_template_key": "vendor_whatsapp_verify",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "authentication",
+        "body_spec": "Your QuickFurno verification code is {{1}}. It expires shortly. Do not share it.",
+        "variables_schema": {
+          "1": {
+            "type": "otp",
+            "example": "<redacted-at-submission>"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "otp",
+              "parameter_type": "text"
+            }
+          ]
+        },
+        "approval_status": "draft",
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "One-time code verifying a vendor's WhatsApp number.",
+          "consent_scope": "authentication",
+          "suppression_rule": "Global suppression only.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "otp": "<redacted-at-submission>"
+          }
+        }
+      }
+    ],
+    "consent_service": [
+      {
+        "internal_template_key": "consent_help_response",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno connects you with verified furniture and interior vendors. Reply STOP to stop messages, or START to resume. For support, visit quickfurno.com/contact.",
+        "variables_schema": {},
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "template key is fixed by ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
+        },
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "client_or_vendor",
+          "purpose": "Answers an inbound HELP command.",
+          "consent_scope": "authentication",
+          "suppression_rule": "Sent under the authentication scope; global suppression still blocks it.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {},
+          "notes": "Informational only. No offer, discount, campaign or promotional content."
+        }
+      },
+      {
+        "internal_template_key": "consent_start_acknowledgement",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help.",
+        "variables_schema": {},
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "template key is fixed by ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
+        },
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "client_or_vendor",
+          "purpose": "Confirms an inbound START was applied.",
+          "consent_scope": "authentication",
+          "suppression_rule": "Sent under the authentication scope; global suppression still blocks it.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {},
+          "notes": "Copy must NOT promise promotional messages resume: writer P1 states START never creates marketing consent."
+        }
+      },
+      {
+        "internal_template_key": "consent_stop_acknowledgement",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno: you have been unsubscribed. We will not send you further updates or promotional messages. Reply START to resume, or HELP for help.",
+        "variables_schema": {},
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "template key is fixed by lib/communication/consentCommandResponse.ts ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
+        },
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "client_or_vendor",
+          "purpose": "Confirms an inbound STOP was applied.",
+          "consent_scope": "authentication",
+          "suppression_rule": "Sent under the authentication scope so a genuine STOP can still be acknowledged; global suppression still blocks it.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {},
+          "notes": "Body states both scopes stop, matching writer P1 (marketing AND transactional). No promotional content."
+        }
+      }
+    ],
+    "marketing": [
+      {
+        "internal_template_key": "vendor_crm_promotion",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "marketing",
+        "body_spec": "QuickFurno update for partners: {{1}}. Reply STOP to opt out of promotional messages.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "admin-approved campaign message body"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+        },
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Delivers an admin-approved CRM campaign message to a vendor audience.",
+          "consent_scope": "marketing",
+          "suppression_rule": "Requires explicit marketing consent AND absence of any suppression. A user STOP blocks it. Frequency policy applies.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-50.4",
+          "example_fixture": {
+            "1": "New interior categories are now live in Pune"
+          },
+          "notes": "The ONLY marketing-category template. Campaign orchestration and per-recipient execution are QF-MVP-50, per the locked campaign-ownership decision; QF-MVP-40 supplies transport, template resolution and the result-ingestion contract only."
+        }
       }
     ],
     "transactional_business": [
       {
-        "internal_template_key": "lead_received",
+        "internal_template_key": "admin_assignment_failure_alert",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
-        "variables_schema": { "1": { "type": "text", "description": "client name" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "QuickFurno admin alert: lead assignment failed for {{1}}.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "lead reference"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "admin",
+          "purpose": "Internal operations alert: lead assignment failed.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Internal operator recipient. Never sent to a client or vendor.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-70",
+          "example_fixture": {
+            "1": "assignment"
+          }
+        }
       },
       {
-        "internal_template_key": "vendor_new_lead",
+        "internal_template_key": "admin_automation_failure_alert",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "New QuickFurno lead in {{1}} for {{2}}. Open your dashboard to view details.",
-        "variables_schema": { "1": { "type": "text", "description": "city" }, "2": { "type": "text", "description": "category" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "QuickFurno admin alert: automation {{1}} failed.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "automation key"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "admin",
+          "purpose": "Internal operations alert: an automation job failed.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Internal operator recipient.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-70",
+          "example_fixture": {
+            "1": "automation"
+          }
+        }
       },
       {
-        "internal_template_key": "clarification_request",
+        "internal_template_key": "admin_policy_block_alert",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
-        "variables_schema": { "1": { "type": "text", "description": "client name" }, "2": { "type": "text", "description": "clarification prompt" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "QuickFurno admin alert: a policy blocked lead {{1}}.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "lead reference"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "admin",
+          "purpose": "Internal operations alert: a policy block occurred.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Internal operator recipient.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-70",
+          "example_fixture": {
+            "1": "policy"
+          }
+        }
+      },
+      {
+        "internal_template_key": "admin_provider_outage_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno admin alert: communication provider {{1}} appears to be down.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "provider key"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
+        "approval_status": "draft",
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "admin",
+          "purpose": "Internal operations alert: a provider outage was detected.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Internal operator recipient.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-70",
+          "example_fixture": {
+            "1": "provider"
+          }
+        }
       },
       {
         "internal_template_key": "clarification_reminder",
@@ -105,21 +405,109 @@
         "language": "en",
         "category": "utility",
         "body_spec": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
-        "variables_schema": { "1": { "type": "text", "description": "clarification prompt" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "clarification prompt"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Reminds a client that requested information is still missing.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha"
+          }
+        }
       },
       {
-        "internal_template_key": "lead_assignment_alert",
+        "internal_template_key": "clarification_request",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
-        "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          },
+          "2": {
+            "type": "text",
+            "description": "clarification prompt"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Asks the client a specific question needed to qualify the enquiry.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha",
+            "2": "preferred budget range"
+          }
+        }
+      },
+      {
+        "internal_template_key": "client_lead_status_update",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Hi {{1}}, the status of your QuickFurno enquiry is now: {{2}}. Reply here if you have any questions.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          },
+          "2": {
+            "type": "text",
+            "description": "human-readable lead status"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+        },
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Tells a client their enquiry status changed.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha",
+            "2": "Vendors matched"
+          },
+          "notes": "KEPT SEPARATE from lead_assignment_alert: 'we matched N vendors' and 'your status is now X' are different facts, and merging them behind one variable would hide which event actually occurred."
+        }
       },
       {
         "internal_template_key": "client_nurture_followup",
@@ -127,10 +515,32 @@
         "language": "en",
         "category": "utility",
         "body_spec": "Hi {{1}}, still planning your project? QuickFurno can reconnect you with professionals.",
-        "variables_schema": { "1": { "type": "text", "description": "client name" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Transactional follow-up on an open enquiry.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha"
+          }
+        }
       },
       {
         "internal_template_key": "dormant_requirement_reactivation",
@@ -138,10 +548,98 @@
         "language": "en",
         "category": "utility",
         "body_spec": "Hi {{1}}, your QuickFurno requirement is still open. Reply to reactivate matching.",
-        "variables_schema": { "1": { "type": "text", "description": "client name" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Asks whether a dormant enquiry is still active.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha"
+          }
+        }
+      },
+      {
+        "internal_template_key": "lead_assignment_alert",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "lead reference"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
+        "approval_status": "draft",
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Tells the client that matching vendors have been identified.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "3"
+          }
+        }
+      },
+      {
+        "internal_template_key": "lead_received",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "client name"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
+        "approval_status": "draft",
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Confirms QuickFurno received a client enquiry.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Asha"
+          }
+        }
       },
       {
         "internal_template_key": "low_credit_warning",
@@ -149,10 +647,32 @@
         "language": "en",
         "category": "utility",
         "body_spec": "QuickFurno: your credit balance is low ({{1}}). Recharge to keep receiving leads.",
-        "variables_schema": { "1": { "type": "text", "description": "remaining credits" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "remaining credits"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Warns a vendor that the lead-credit balance is low.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "4"
+          }
+        }
       },
       {
         "internal_template_key": "recharge_reminder",
@@ -161,54 +681,182 @@
         "category": "utility",
         "body_spec": "QuickFurno reminder: recharge your credits to continue receiving matched leads.",
         "variables_schema": {},
-        "binding_contract": { "binding_readiness": "unresolved", "note": "no variables; binding deferred to Phase 5F-D governance" },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "no variables; binding deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Reminds a vendor to recharge lead credits.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {}
+        }
       },
       {
-        "internal_template_key": "admin_assignment_failure_alert",
+        "internal_template_key": "vendor_new_lead",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno admin alert: lead assignment failed for {{1}}.",
-        "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "New QuickFurno lead OFFER in {{1}} for {{2}}. This is an offer, not an assignment. Open your dashboard to accept or decline.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "city"
+          },
+          "2": {
+            "type": "text",
+            "description": "category"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "provider_template_id": null,
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Offers a new lead to a vendor and invites accept or reject. This template CARRIES the accept/reject request; no separate accept/reject template exists.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Pune",
+            "2": "Modular kitchen"
+          },
+          "notes": "CONSOLIDATED: the roadmap's 'new lead offer' and 'accept/reject request' are one message at one moment. Splitting them would send the vendor two messages saying the same thing. Copy states the lead is an OFFER, never an assignment."
+        },
+        "buttons_spec": [
+          {
+            "type": "quick_reply",
+            "text": "Accept lead"
+          },
+          {
+            "type": "quick_reply",
+            "text": "Decline lead"
+          }
+        ]
       },
       {
-        "internal_template_key": "admin_automation_failure_alert",
+        "internal_template_key": "vendor_onboarding_reminder",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno admin alert: automation {{1}} failed.",
-        "variables_schema": { "1": { "type": "text", "description": "automation key" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "QuickFurno: your vendor profile is not yet complete. Outstanding item: {{1}}. Complete it in your dashboard to start receiving leads.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "outstanding onboarding or document item"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Reminds a vendor to complete onboarding, including outstanding documents.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "GST certificate"
+          },
+          "notes": "CONSOLIDATED: the roadmap's 'onboarding reminder' and 'document reminder' are the same message with a different outstanding item. One REQUIRED variable names the item, so there is no optional-variable ambiguity and the sentence is complete for both cases."
+        }
       },
       {
-        "internal_template_key": "admin_policy_block_alert",
+        "internal_template_key": "vendor_package_expiry_warning",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno admin alert: a policy blocked lead {{1}}.",
-        "variables_schema": { "1": { "type": "text", "description": "lead reference" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "QuickFurno: your vendor package expires on {{1}}. Renew in your dashboard to keep receiving leads.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "expiry date, pre-formatted"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Warns a vendor that the package is close to expiry.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "12 August 2026"
+          },
+          "notes": "KEPT SEPARATE from low_credit_warning: expiry is time-based, credits are balance-based; they fire independently and a merged template could not state the correct remedy."
+        }
       },
       {
-        "internal_template_key": "admin_provider_outage_alert",
+        "internal_template_key": "vendor_response_reminder",
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno admin alert: communication provider {{1}} appears to be down.",
-        "variables_schema": { "1": { "type": "text", "description": "provider key" } },
-        "binding_contract": { "binding_readiness": "unresolved", "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance" },
+        "body_spec": "Reminder from QuickFurno: a lead in {{1}} is still awaiting your response. Open your dashboard to accept or decline.",
+        "variables_schema": {
+          "1": {
+            "type": "text",
+            "description": "city"
+          }
+        },
+        "binding_contract": {
+          "binding_readiness": "unresolved",
+          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+        },
         "approval_status": "draft",
-        "provider_template_id": null
+        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "provider_template_id": null,
+        "qf_mvp_40": {
+          "recipient_type": "vendor",
+          "purpose": "Reminds a vendor that a lead offer is still unanswered.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.6",
+          "example_fixture": {
+            "1": "Pune"
+          },
+          "notes": "KEPT SEPARATE from vendor_new_lead: a reminder sent as the original offer copy would misrepresent a second contact as a new lead."
+        }
       }
     ]
+  },
+  "qf_mvp_40_decisions": {
+    "campaign_ownership": "QF-MVP-40 owns Meta transport, provider-account binding, template resolution, dispatch-time consent/suppression/frequency validation primitives, provider outcome normalization, provider message-id persistence, delivery callbacks and the result-ingestion contract. QF-MVP-50 owns campaign job orchestration, n8n execution, recipient claiming/batching, bounded dispatch scheduling, dead-letter, pause/resume and aggregation. No temporary Core campaign queue consumer is built in QF-MVP-40.",
+    "minimum_template_strategy": "Smallest catalogue that satisfies the locked 40.4 families. Two deliberate consolidations (vendor lead offer carries accept/reject; onboarding reminder carries document reminder via one required variable). Marketing and transactional purposes are never merged.",
+    "no_active_mapping_before_approval": "No provider mapping row is created and no template is marked approved. approval_status stays 'draft' and submission_state stays DRAFT_NOT_SUBMITTED until Meta approves and an operator seeds the mapping in a later subphase.",
+    "no_real_submission": "No Meta Graph API call, no template submission and no message send occurred in QF-MVP-40.4."
   }
 }

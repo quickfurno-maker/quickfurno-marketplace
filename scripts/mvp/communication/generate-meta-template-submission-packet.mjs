@@ -111,7 +111,7 @@ const packet = {
   waves: {
     "0": "API-contract canary — ONE no-variable utility template. Proves token/WABA/endpoint/name/language/category/response handling. No send, no mapping activation.",
     "1": "QF-MVP-40 launch transport templates (consent acknowledgements + client/vendor transactional).",
-    "2": "Authentication templates. submit_now is FALSE until AUTH_OTP_COPY_CODE compatibility is green end to end.",
+    "2": "Authentication templates. submit_now is FALSE because Wave 2 is HELD FROM THE WAVE 0 EXECUTION TASK — not because it depends on a send that cannot happen yet. Correct order: (1) component create/send shape proved offline [done]; (2) real WABA create API proved by Wave 0; (3) Wave 2 submitted under a separate explicit authorisation; (4) Meta approval; (5) approved INACTIVE mappings seeded; (6) one controlled OTP send AFTER approval; (7) authentication activation stays disabled until that send succeeds.",
     "3": "QF-MVP-50 marketing. May absorb approval latency but stays unusable without explicit marketing consent, a frequency policy, an approved active mapping and QF-MVP-50 orchestration.",
     "4": "QF-MVP-70 admin alerts. Payloads prepared but DEFERRED — not part of the MVP-40 activation track.",
   },

@@ -9,6 +9,10 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  API_VERSION_PATTERN, KNOWN_TEMPLATE_STATUSES, USABLE_EXISTING_STATUSES,
+  canonicaliseTemplate, templatesAreIdentical, validateEnvironment,
+} from "./submit-meta-templates.mjs";
 
 const MANIFEST = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
@@ -124,6 +128,72 @@ const R = {
     !/console\.(log|error)\([^;]*\$\{\s*(TOKEN|WABA_ID|auth)\b/.test(submitExec)
     && !/console\.(log|error)\([^;]*\b(TOKEN|auth)\s*[,)]/.test(submitExec),
 
+
+  // ---- QF-MVP-40.10A-R operator hardening --------------------------------
+  noHardcodedApiVersion: () =>
+    !/API_VERSION\s*=\s*["']v[0-9]+\.[0-9]+["']/.test(submitExec)
+    && /QF_META_GRAPH_API_VERSION/.test(submitExec),
+  apiVersionRequiredNoDefault: () => {
+    const r = validateEnvironment({ QF_META_WABA_ID: "12345678901234", QF_META_ACCESS_TOKEN: "t" });
+    return r.ok === false && r.missing.includes("QF_META_GRAPH_API_VERSION");
+  },
+  apiVersionGrammarEnforced: () => {
+    const bad = validateEnvironment({ QF_META_GRAPH_API_VERSION: "21", QF_META_WABA_ID: "12345678901234", QF_META_ACCESS_TOKEN: "t" });
+    const good = validateEnvironment({ QF_META_GRAPH_API_VERSION: "v23.0", QF_META_WABA_ID: "12345678901234", QF_META_ACCESS_TOKEN: "t" });
+    return bad.ok === false && bad.invalid.includes("QF_META_GRAPH_API_VERSION")
+      && good.ok === true && API_VERSION_PATTERN.test("v23.0");
+  },
+  wabaIdGrammarEnforced: () => {
+    const r = validateEnvironment({ QF_META_GRAPH_API_VERSION: "v23.0", QF_META_WABA_ID: "not-digits", QF_META_ACCESS_TOKEN: "t" });
+    return r.ok === false && r.invalid.includes("QF_META_WABA_ID");
+  },
+  identityIsSemanticNotCategoryOnly: () => {
+    const a = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "Hello world." }] };
+    const b = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "Hello WORLD." }] };
+    return templatesAreIdentical(a, a) === true && templatesAreIdentical(a, b) === false;
+  },
+  whitespaceChangeIsCollision: () => {
+    const a = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "Hi there." }] };
+    const b = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "Hi  there." }] };
+    return templatesAreIdentical(a, b) === false;
+  },
+  casingNormalisedButTextNot: () => {
+    const a = { name: "n", language: "en", category: "utility", components: [{ type: "body", text: "X" }] };
+    const b = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "X" }] };
+    return templatesAreIdentical(a, b) === true;
+  },
+  buttonOrderSignificant: () => {
+    const mk = (o) => ({ name: "n", language: "en", category: "UTILITY", components: [
+      { type: "BUTTONS", buttons: o.map((x) => ({ type: "QUICK_REPLY", text: x })) }] });
+    return templatesAreIdentical(mk(["A", "B"]), mk(["B", "A"])) === false;
+  },
+  malformedTemplateNeverIdentical: () =>
+    canonicaliseTemplate(null) === null && canonicaliseTemplate({}) === null
+    && templatesAreIdentical(null, null) === false,
+  exactNameLookupUsed: () => /message_templates\?name=/.test(submitExec)
+    && /fields=id,name,language,status,category,components/.test(submitExec),
+  duplicateExactRowsRejected: () => /rows\.length > 1/.test(submitExec)
+    && /DUPLICATE_EXACT_ROWS/.test(submitExec),
+  unknownExistingStatusRejected: () => /EXISTING_UNKNOWN_STATUS/.test(submitExec)
+    && /EXISTING_NOT_USABLE/.test(submitExec)
+    && USABLE_EXISTING_STATUSES.length === 2
+    && KNOWN_TEMPLATE_STATUSES.includes("REJECTED") && !USABLE_EXISTING_STATUSES.includes("REJECTED"),
+  ambiguousCreateIssuesExactlyOnePost: () => {
+    const posts = (submitExec.match(/method:\s*["']POST["']/g) ?? []).length;
+    return posts === 1 && /RECOVERED_AFTER_AMBIGUOUS_CREATE/.test(submitExec)
+      && /MANUAL_RECONCILIATION_REQUIRED/.test(submitExec);
+  },
+  wabaIdentityPreflight: () => /identity_match/.test(submitExec)
+    && /WABA_IDENTITY_MISMATCH/.test(submitExec),
+  recategorisationStops: () => /META_RECATEGORISED/.test(submitExec),
+  evidenceCarriesNoWabaOrToken: () => {
+    const rec = submitExec.slice(submitExec.indexOf("const record = {"), submitExec.indexOf("const finish"));
+    return rec.length > 0 && !/waba|token|secret|raw_body/i.test(rec);
+  },
+  waveTwoSequencingCorrected: (p) => {
+    const w2 = String(p.waves["2"] ?? "");
+    return /HELD FROM THE WAVE 0/.test(w2) && !/until .*end to end/i.test(w2);
+  },
   // ---- boundary ----------------------------------------------------------
   noMigrationOnBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only",
@@ -164,6 +234,23 @@ const RULES = [
   ["P28 submission script never echoes a secret", R.submitScriptNeverEchoesSecret, packet],
   ["P29 no migration added on this branch", R.noMigrationOnBranch, packet],
   ["P30 readiness document exists", R.docExists, packet],
+  ["P31 no hardcoded Graph API version remains", R.noHardcodedApiVersion, packet],
+  ["P32 API version is REQUIRED with no default", R.apiVersionRequiredNoDefault, packet],
+  ["P33 API version grammar is enforced", R.apiVersionGrammarEnforced, packet],
+  ["P34 WABA id grammar is enforced", R.wabaIdGrammarEnforced, packet],
+  ["P35 identity is SEMANTIC, not category-only", R.identityIsSemanticNotCategoryOnly, packet],
+  ["P36 a whitespace-only body change is a collision", R.whitespaceChangeIsCollision, packet],
+  ["P37 enum casing normalised but text never is", R.casingNormalisedButTextNot, packet],
+  ["P38 button order is significant", R.buttonOrderSignificant, packet],
+  ["P39 a malformed template is never identical", R.malformedTemplateNeverIdentical, packet],
+  ["P40 exact-name lookup with comparison fields is used", R.exactNameLookupUsed, packet],
+  ["P41 duplicate exact rows are rejected", R.duplicateExactRowsRejected, packet],
+  ["P42 unknown/unusable existing status is rejected", R.unknownExistingStatusRejected, packet],
+  ["P43 an ambiguous create can never issue a second POST", R.ambiguousCreateIssuesExactlyOnePost, packet],
+  ["P44 WABA identity preflight exists and fails closed", R.wabaIdentityPreflight, packet],
+  ["P45 Meta recategorisation stops for owner review", R.recategorisationStops, packet],
+  ["P46 sanitized evidence carries no WABA id or token", R.evidenceCarriesNoWabaOrToken, packet],
+  ["P47 Wave 2 sequencing no longer circular", R.waveTwoSequencingCorrected, packet],
 ];
 for (const [n, fn, arg] of RULES) add(n, fn(arg));
 
@@ -203,6 +290,21 @@ const MUT = [
     p.templates.find((t) => t.submission_wave === 0).creation_payload.components[0].text = "Hi {{1}}"; }],
   ["M15 a wrong category on an auth template is rejected", R.authBodyNotAuthored, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "client_login_otp").creation_payload.category = "UTILITY"; }],
+  ["M16 a hardcoded API version is rejected", R.waveTwoSequencingCorrected, packet, (p) => {
+    p.waves["2"] = "submit_now FALSE until an end to end approved-template send"; }],
+  // Proves the rule is MEANINGFUL rather than vacuous: the old name+language+category
+  // comparison accepts a template whose body changed, which is exactly the defect
+  // QF-MVP-40.10A-R closed. The real comparator must reject that same pair.
+  ["M17 the old category-only comparison would wrongly accept a changed body",
+    () => {
+      const a = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "Original." }] };
+      const b = { name: "n", language: "en", category: "UTILITY", components: [{ type: "BODY", text: "TAMPERED." }] };
+      const categoryOnly = (x, y) => x.name === y.name && x.language === y.language && x.category === y.category;
+      // Vacuity check: the weak comparator says "identical" (true) while the real one
+      // says "different" (false). Returning `true` here means the weak comparison is
+      // unsafe AND the real comparison catches it — so the rule below must see FALSE.
+      return categoryOnly(a, b) === true && templatesAreIdentical(a, b) === false ? false : true;
+    }, packet, () => {}],
 ];
 for (const [n, fn, base, mutate] of MUT) {
   const copy = clone(base);

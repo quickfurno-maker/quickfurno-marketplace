@@ -135,11 +135,30 @@ stay null until Meta assigns them. Everything remains `draft` / `DRAFT_NOT_SUBMI
 |---|---|---|---|
 | **0** | **1** | `consent_help_response` — no-variable utility API-contract canary | ✅ |
 | **1** | **14** | Launch transport: consent acks + client/vendor transactional | ✅ |
-| **2** | **3** | Authentication templates | ❌ held until end-to-end auth compatibility is green |
+| **2** | **3** | Authentication templates | ❌ **held from the Wave 0 task** — see §8.1 |
 | **3** | **3** | Marketing (QF-MVP-50) — may absorb approval latency; unusable without consent, frequency policy, active mapping and orchestration | ✅ |
 | **4** | **4** | QF-MVP-70 admin alerts — **deferred, not part of the MVP-40 track** | ❌ |
 
 Total **1 + 14 + 3 + 3 + 4 = 25**. Submittable now: 18. Held: 7.
+
+### 8.1 Wave 2 sequencing — corrected
+
+An earlier revision of this document said Wave 2 was held "until an end-to-end real approved-template
+send". **That was circular**: a template cannot be sent before it is approved, and it cannot be
+approved before it is submitted. The dependency was impossible to satisfy and has been removed.
+
+The correct order is:
+
+1. Prove component creation/send shape **offline** — ✅ complete (40.6-R2).
+2. Prove the **real WABA template-create API** with Wave 0.
+3. Submit the three authentication templates under a **separate explicit authorisation**.
+4. Wait for Meta approval.
+5. Seed approved **inactive** mappings.
+6. Perform **one controlled authentication send** — only after approval.
+7. Keep authentication activation **disabled** until that send succeeds.
+
+Wave 2 therefore remains `submit_now: false` for now simply because **this task is scoped to Wave 0**.
+That is an authorisation boundary, not a technical blocker.
 
 ## 9. Operator script — dry run by default
 
@@ -155,8 +174,8 @@ different-category collision, stops on the first ambiguous response, and records
 
 ## 10. Is real submission safe now?
 
-**Waves 0, 1 and 3 — YES, pending owner approval of copy.** Wave 2 (authentication) stays
-`submit_now: false` until an end-to-end auth send is exercised against a real approved template.
+**Waves 0, 1 and 3 — YES, pending owner approval of copy.** Wave 2 stays `submit_now: false`
+because it is **held from the Wave 0 execution task**, not because of a send precondition — see §8.1.
 Wave 4 remains deferred to QF-MVP-70.
 
 Remaining blockers before any activation: Meta credentials configured; provider account seeded and

@@ -7,12 +7,23 @@
 // ============================================================================
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  API_VERSION_PATTERN, KNOWN_TEMPLATE_STATUSES, USABLE_EXISTING_STATUSES,
-  canonicaliseTemplate, templatesAreIdentical, validateEnvironment,
+  API_VERSION_PATTERN, CreateClassification, KNOWN_TEMPLATE_STATUSES, MAX_ERROR_TYPE_LENGTH,
+  USABLE_EXISTING_STATUSES, canonicaliseTemplate, classifyCreateResponse, safeMetaError,
+  templatesAreIdentical, validateEnvironment,
 } from "./submit-meta-templates.mjs";
+
+/** The exact, owner-approved Wave 0 recovery contract. */
+const WAVE0_KEY = "consent_help_response";
+const WAVE0_NAME = "qf_consent_help_response_v2";
+const WAVE0_RETIRED_NAME = "qf_consent_help_response_v1";
+const WAVE0_FINGERPRINT = "afa6f9c310dc98c54440c1b4e6c3521b4963ea306a615f2788474c2f07c17a73";
+const WAVE0_BODY = "QuickFurno connects you with verified furniture and interior vendors. "
+  + "Reply STOP to stop messages, or START to resume. For support, visit quickfurno.in.";
+const sha256 = (x) => createHash("sha256").update(x).digest("hex");
 
 const MANIFEST = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
@@ -194,6 +205,105 @@ const R = {
     const w2 = String(p.waves["2"] ?? "");
     return /HELD FROM THE WAVE 0/.test(w2) && !/until .*end to end/i.test(w2);
   },
+
+  // ---- QF-MVP-40.10A-R2: EXACT, load-bearing checks ----------------------
+  // Format-only fingerprint checks proved too weak: a stale packet would still
+  // look "well formed". These recompute the real values.
+  everyFingerprintExact: (p) => p.templates.every((t) =>
+    t.payload_fingerprint === sha256(JSON.stringify(t.creation_payload))),
+  sourceManifestFingerprintExact: (p) =>
+    p.source_manifest_fingerprint === sha256(readFileSync(resolve(MANIFEST))),
+  wave0RecoveryContractExact: (p) => {
+    const w0 = p.templates.filter((t) => t.submission_wave === 0);
+    if (w0.length !== 1) return false;
+    const t = w0[0];
+    const c = t.creation_payload;
+    const body = c.components.find((x) => x.type === "body");
+    return t.internal_template_key === WAVE0_KEY
+      && t.provider_template_name === WAVE0_NAME
+      && c.name === WAVE0_NAME
+      && t.provider_language === "en" && c.language === "en"
+      && t.category === "UTILITY" && c.category === "UTILITY"
+      && !!body && body.text === WAVE0_BODY
+      && t.payload_fingerprint === WAVE0_FINGERPRINT
+      && !/\{\{\d+\}\}/.test(JSON.stringify(c));
+  },
+  retiredV1AbsentFromCandidates: (p) => {
+    const m = JSON.parse(readFileSync(resolve(MANIFEST), "utf8"));
+    const candidates = Object.values(m.groups).flat().map((t) => t.provider_template_name_candidate);
+    // v1 may still be NAMED in the historical note; it must never be a CANDIDATE.
+    return !candidates.includes(WAVE0_RETIRED_NAME)
+      && !JSON.stringify(p.templates).includes(WAVE0_RETIRED_NAME);
+  },
+
+  // ---- safeMetaError -----------------------------------------------------
+  safeErrorExtractsStructuredFields: () => {
+    const r = safeMetaError({ error: { code: 100, error_subcode: 2388042, type: "OAuthException", is_transient: false } });
+    return r.code === 100 && r.subcode === 2388042 && r.type === "OAuthException" && r.is_transient === false;
+  },
+  safeErrorNormalisesMalformed: () => {
+    const r = safeMetaError({ error: { code: "100", error_subcode: 1.5, type: 42, is_transient: "no" } });
+    const empty = safeMetaError(null);
+    const arr = safeMetaError({ error: [] });
+    return r.code === null && r.subcode === null && r.type === null && r.is_transient === null
+      && empty.code === null && arr.code === null;
+  },
+  safeErrorBoundsType: () => {
+    const r = safeMetaError({ error: { type: "X".repeat(5000) } });
+    return typeof r.type === "string" && r.type.length === MAX_ERROR_TYPE_LENGTH;
+  },
+  safeErrorDropsUnsafeFields: () => {
+    const r = safeMetaError({ error: {
+      code: 1, message: "SECRET-MESSAGE", error_data: { x: 1 }, error_user_title: "T",
+      error_user_msg: "M", fbtrace_id: "TRACE", authorization: "Bearer x",
+    }});
+    const raw = JSON.stringify(r);
+    return Object.keys(r).length === 4
+      && !/SECRET-MESSAGE|TRACE|Bearer|error_data|error_user/.test(raw);
+  },
+
+  // ---- create classification --------------------------------------------
+  classify4xxDeterministic: () => [400, 401, 403, 429].every((st) =>
+    classifyCreateResponse({ httpStatus: st, body: { error: { code: 100 } } }).classification
+      === CreateClassification.DETERMINISTIC_4XX_REJECTION),
+  classify5xxAmbiguous: () =>
+    classifyCreateResponse({ httpStatus: 500, body: null }).classification === CreateClassification.AMBIGUOUS,
+  classifyThrowAmbiguous: () =>
+    classifyCreateResponse({ threw: true }).classification === CreateClassification.AMBIGUOUS,
+  classifyMalformed2xxAmbiguous: () =>
+    classifyCreateResponse({ httpStatus: 200, body: null }).classification === CreateClassification.AMBIGUOUS
+    && classifyCreateResponse({ httpStatus: 200, body: { id: "x" } }).classification === CreateClassification.AMBIGUOUS
+    && classifyCreateResponse({ httpStatus: 200, body: { status: "PENDING" } }).classification === CreateClassification.AMBIGUOUS,
+  classifyUnknownStatusNotSuccess: () =>
+    classifyCreateResponse({ httpStatus: 200, body: { id: "x", status: "WAT" } }).classification
+      !== CreateClassification.SUCCESS,
+  classifySuccess: () =>
+    classifyCreateResponse({ httpStatus: 200, body: { id: "123", status: "PENDING" } }).classification
+      === CreateClassification.SUCCESS,
+  classify4xxCarriesSafeError: () => {
+    const v = classifyCreateResponse({ httpStatus: 400, body: { error: { code: 132000, type: "OAuthException" } } });
+    return v.error.code === 132000 && v.error.type === "OAuthException";
+  },
+
+  // ---- operator wiring ---------------------------------------------------
+  exactlyOnePostCallSite: () => (submitExec.match(/method:\s*["']POST["']/g) ?? []).length === 1,
+  deterministic4xxHasDistinctOutcome: () => /CREATE_REJECTED_4XX/.test(submitExec),
+  evidenceHasSafeErrorFields: () => /meta_error_code/.test(submitExec) && /meta_error_subcode/.test(submitExec)
+    && /meta_error_type/.test(submitExec) && /meta_error_is_transient/.test(submitExec),
+  evidenceHasNoRawBodyOrMessage: () => {
+    const rec = submitExec.slice(submitExec.indexOf("const record = {"), submitExec.indexOf("const finish"));
+    return rec.length > 0 && !/raw_body|error_message|response_body|\bmessage\b/i.test(rec);
+  },
+  createPostCountTracked: () => /create_post_count: 0/.test(submitExec)
+    && /create_post_count = 1/.test(submitExec)
+    && (submitExec.match(/create_post_count\s*=\s*\d/g) ?? []).length === 1,
+  evidenceFilenameUsesWave: () => /QF-MVP-40-WAVE\$\{WAVE\}/.test(submitExec)
+    && !/QF-MVP-40-WAVE0-META-SUBMISSION-\$\{/.test(submitExec),
+  lookupCatchesTransportException: () => {
+    const fn = submitExec.slice(submitExec.indexOf("async function lookupExact"),
+                                submitExec.indexOf("const pre = await lookupExact"));
+    return /try\s*{/.test(fn) && /catch/.test(fn) && /ok: false/.test(fn);
+  },
   // ---- boundary ----------------------------------------------------------
   noMigrationOnBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only",
@@ -251,6 +361,28 @@ const RULES = [
   ["P45 Meta recategorisation stops for owner review", R.recategorisationStops, packet],
   ["P46 sanitized evidence carries no WABA id or token", R.evidenceCarriesNoWabaOrToken, packet],
   ["P47 Wave 2 sequencing no longer circular", R.waveTwoSequencingCorrected, packet],
+  ["P48 every payload fingerprint is EXACT sha256(creation_payload)", R.everyFingerprintExact, packet],
+  ["P49 source manifest fingerprint is EXACT sha256(manifest bytes)", R.sourceManifestFingerprintExact, packet],
+  ["P50 Wave 0 v2 recovery contract is exact", R.wave0RecoveryContractExact, packet],
+  ["P51 retired v1 is absent from every candidate", R.retiredV1AbsentFromCandidates, packet],
+  ["P52 safeMetaError extracts the four structured fields", R.safeErrorExtractsStructuredFields, packet],
+  ["P53 safeMetaError normalises malformed values to null", R.safeErrorNormalisesMalformed, packet],
+  ["P54 safeMetaError bounds the type length", R.safeErrorBoundsType, packet],
+  ["P55 safeMetaError drops message/error_data/fbtrace_id and unknown fields", R.safeErrorDropsUnsafeFields, packet],
+  ["P56 HTTP 400/401/403/429 are DETERMINISTIC_4XX_REJECTION", R.classify4xxDeterministic, packet],
+  ["P57 HTTP 500 is AMBIGUOUS", R.classify5xxAmbiguous, packet],
+  ["P58 a fetch throw is AMBIGUOUS", R.classifyThrowAmbiguous, packet],
+  ["P59 malformed 2xx is AMBIGUOUS", R.classifyMalformed2xxAmbiguous, packet],
+  ["P60 an unknown status is never SUCCESS", R.classifyUnknownStatusNotSuccess, packet],
+  ["P61 a well-formed 2xx is SUCCESS", R.classifySuccess, packet],
+  ["P62 a 4xx carries safe structured error fields", R.classify4xxCarriesSafeError, packet],
+  ["P63 exactly one executable POST call site", R.exactlyOnePostCallSite, packet],
+  ["P64 deterministic 4xx has a distinct CREATE_REJECTED_4XX outcome", R.deterministic4xxHasDistinctOutcome, packet],
+  ["P65 evidence carries the safe Meta error fields", R.evidenceHasSafeErrorFields, packet],
+  ["P66 evidence carries no raw body or error message", R.evidenceHasNoRawBodyOrMessage, packet],
+  ["P67 create_post_count is initialised and set exactly once", R.createPostCountTracked, packet],
+  ["P68 evidence filename is wave-parameterised", R.evidenceFilenameUsesWave, packet],
+  ["P69 lookupExact returns a closed failure on transport exception", R.lookupCatchesTransportException, packet],
 ];
 for (const [n, fn, arg] of RULES) add(n, fn(arg));
 
@@ -305,6 +437,19 @@ const MUT = [
       // unsafe AND the real comparison catches it — so the rule below must see FALSE.
       return categoryOnly(a, b) === true && templatesAreIdentical(a, b) === false ? false : true;
     }, packet, () => {}],
+  ["M18 a stale v1 Wave 0 name is rejected", R.wave0RecoveryContractExact, packet, (p) => {
+    const w0 = p.templates.find((t) => t.submission_wave === 0);
+    w0.provider_template_name = "qf_consent_help_response_v1";
+    w0.creation_payload.name = "qf_consent_help_response_v1"; }],
+  ["M19 a stale payload fingerprint is rejected", R.everyFingerprintExact, packet, (p) => {
+    p.templates[0].payload_fingerprint = "0".repeat(64); }],
+  ["M20 a stale source-manifest fingerprint is rejected", R.sourceManifestFingerprintExact, packet, (p) => {
+    p.source_manifest_fingerprint = "0".repeat(64); }],
+  ["M21 a changed body keeping the old fingerprint is rejected", R.wave0RecoveryContractExact, packet, (p) => {
+    const w0 = p.templates.find((t) => t.submission_wave === 0);
+    w0.creation_payload.components[0].text = "TAMPERED COPY."; }],
+  ["M22 a retired v1 candidate is rejected", R.retiredV1AbsentFromCandidates, packet, (p) => {
+    p.templates[0].provider_template_name = "qf_consent_help_response_v1"; }],
 ];
 for (const [n, fn, base, mutate] of MUT) {
   const copy = clone(base);

@@ -1,6 +1,6 @@
 {
-  "manifest_version": "1.4",
-  "phase": "QF-MVP-40.6-R2",
+  "manifest_version": "1.5",
+  "phase": "QF-MVP-40.10A-R2",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
   "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
@@ -324,7 +324,7 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {},
-          "notes": "Informational only. No offer, discount, campaign or promotional content. SUPPORT DESTINATION: domain-level quickfurno.in only. No app/contact or app/support route exists in the repository, so no path is claimed.",
+          "notes": "Informational only. No offer, discount, campaign or promotional content. SUPPORT DESTINATION: domain-level quickfurno.in only. No app/contact or app/support route exists in the repository, so no path is claimed. RECOVERY (QF-MVP-40.10A-R2, 2026-07-30): provider name v1 was created on the QuickFurno WABA and returned PENDING, then was DELETED by the former AiSensy partner — proven by the Meta WhatsApp Manager Activity Log. AiSensy partner access has since been removed by the owner. v1 is RETIRED and must not be reused. v2 is the controlled recovery candidate: identical copy, language and category. v2 has NOT been submitted by this repair.",
           "registry_expectation": "SPECIAL_EVIDENCE_BOUND_ACK",
           "ordinary_registry_entry": false,
           "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority.",
@@ -332,7 +332,7 @@
           "submission_wave": 0,
           "submit_now": true
         },
-        "provider_template_name_candidate": "qf_consent_help_response_v1"
+        "provider_template_name_candidate": "qf_consent_help_response_v2"
       },
       {
         "internal_template_key": "consent_start_acknowledgement",

@@ -100,7 +100,7 @@ const packet = {
   schema_version: "1.0",
   phase: "QF-MVP-40.10A",
   generator: "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  note: "NON-SECRET. Nothing here has been submitted to Meta. No template is approved and no provider_template_id is real.",
+  note: "NON-SECRET. Every entry here is a LOCAL CANDIDATE: none is claimed approved, mapped or active, and no provider_template_id is real. HISTORY: the Wave 0 provider name qf_consent_help_response_v1 WAS created on the QuickFurno WABA on 2026-07-30 and returned PENDING, then was DELETED by the former AiSensy partner (proven by the Meta WhatsApp Manager Activity Log); AiSensy partner access has since been removed. v1 is retired and the Wave 0 candidate is now v2, which has NOT been submitted.",
   source_manifest: MANIFEST,
   source_manifest_fingerprint: manifestFingerprint,
   external_contract_references: [

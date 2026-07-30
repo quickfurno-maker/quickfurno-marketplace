@@ -48,6 +48,71 @@ export const KNOWN_TEMPLATE_STATUSES = Object.freeze([
 /** Statuses an EXISTING exact template may hold and still be treated as usable. */
 export const USABLE_EXISTING_STATUSES = Object.freeze(["APPROVED", "PENDING"]);
 
+export const MAX_ERROR_TYPE_LENGTH = 128;
+
+/** Closed create-response classifications. */
+export const CreateClassification = Object.freeze({
+  SUCCESS: "SUCCESS",
+  DETERMINISTIC_4XX_REJECTION: "DETERMINISTIC_4XX_REJECTION",
+  AMBIGUOUS: "AMBIGUOUS",
+});
+
+/**
+ * SAFE Meta error extraction.
+ *
+ * The 2026-07-30 incident lost the reason for an HTTP 400 because the operator kept
+ * only the HTTP status and request id. These four STRUCTURED fields are enough to
+ * diagnose a rejection, and none of them is free text.
+ *
+ * DELIBERATELY NEVER COPIED: error.message, error_data, error_user_title,
+ * error_user_msg, fbtrace_id, the raw body, headers, the authorization header, the
+ * token, the WABA id or a phone number. Unknown error objects are never stringified,
+ * and `type` is length-bounded, so an attacker-influenced or oversized value cannot
+ * become unbounded evidence.
+ */
+export function safeMetaError(body) {
+  const empty = { code: null, subcode: null, type: null, is_transient: null };
+  if (!body || typeof body !== "object") return empty;
+  const e = body.error;
+  if (!e || typeof e !== "object" || Array.isArray(e)) return empty;
+
+  const int = (v) => (typeof v === "number" && Number.isInteger(v) ? v : null);
+  const type = typeof e.type === "string" && e.type.length > 0
+    ? e.type.slice(0, MAX_ERROR_TYPE_LENGTH)
+    : null;
+  const transient = typeof e.is_transient === "boolean" ? e.is_transient : null;
+
+  return { code: int(e.code), subcode: int(e.error_subcode), type, is_transient: transient };
+}
+
+/**
+ * PURE classification of a create attempt. No network, no side effects.
+ *
+ * `threw` covers "fetch rejected / no HTTP response at all". A 4xx is DETERMINISTIC —
+ * it must never be laundered into a generic ambiguous/manual-reconciliation outcome
+ * merely because `res.ok` was false, which is exactly what hid the 400 reason before.
+ * Meta's error.message text is never interpreted.
+ */
+export function classifyCreateResponse({ threw = false, httpStatus = null, body = null } = {}) {
+  if (threw || typeof httpStatus !== "number") {
+    return { classification: CreateClassification.AMBIGUOUS, error: safeMetaError(body) };
+  }
+  if (httpStatus >= 200 && httpStatus < 300) {
+    const ok = body && typeof body === "object" && !Array.isArray(body)
+      && typeof body.id === "string" && body.id.length > 0
+      && typeof body.status === "string"
+      && KNOWN_TEMPLATE_STATUSES.includes(body.status.toUpperCase());
+    return ok
+      ? { classification: CreateClassification.SUCCESS, error: safeMetaError(body) }
+      : { classification: CreateClassification.AMBIGUOUS, error: safeMetaError(body) };
+  }
+  if (httpStatus >= 400 && httpStatus < 500) {
+    return { classification: CreateClassification.DETERMINISTIC_4XX_REJECTION, error: safeMetaError(body) };
+  }
+  // 5xx, unexpected 3xx and anything else non-2xx.
+  return { classification: CreateClassification.AMBIGUOUS, error: safeMetaError(body) };
+}
+
 // ---------------------------------------------------------------------------
 // PURE CANONICALISER — the semantic identity of a template.
 //
@@ -224,11 +289,21 @@ async function main() {
     request_id: null,
     identity_match: null,
     readback_semantic_match: null,
+    // QF-MVP-40.10A-R2 — STRUCTURED Meta error fields only. The 2026-07-30 incident
+    // lost an HTTP 400 reason because only status + request id were kept. There is
+    // deliberately NO raw body and NO error message field here.
+    meta_error_code: null,
+    meta_error_subcode: null,
+    meta_error_type: null,
+    meta_error_is_transient: null,
+    // Hard evidence of the one-POST invariant. Set to 1 immediately before the sole
+    // attempt and never incremented again.
+    create_post_count: 0,
   };
 
   const finish = (outcome, code) => {
     record.outcome = outcome;
-    const path = `QF-MVP-40-WAVE0-META-SUBMISSION-${stamp().replace(/[:.]/g, "-")}.json`;
+    const path = `QF-MVP-40-WAVE${WAVE}-META-SUBMISSION-${stamp().replace(/[:.]/g, "-")}.json`;
     writeFileSync(path, JSON.stringify(record, null, 2) + "\n", "utf8");
     console.log(`\nOutcome: ${outcome}`);
     console.log(`Sanitized evidence: ${path}`);
@@ -259,7 +334,14 @@ async function main() {
   async function lookupExact() {
     const url = `${base}/message_templates?name=${encodeURIComponent(t.provider_template_name)}`
       + `&fields=id,name,language,status,category,components`;
-    const res = await fetch(url, { headers: auth });
+    let res;
+    try {
+      res = await fetch(url, { headers: auth });
+    } catch {
+      // A transport exception must become a CLOSED failure result, never an
+      // exception that escapes before the sanitized evidence is written.
+      return { ok: false, httpStatus: null, requestId: null };
+    }
     const body = await res.json().catch(() => null);
     if (!res.ok || !body || !Array.isArray(body.data)) {
       return { ok: false, httpStatus: res.status, requestId: reqId(res) };
@@ -308,24 +390,40 @@ async function main() {
 
   // --- G. EXACTLY ONE create POST ----------------------------------------
   record.request_utc = stamp();
-  let createRes = null;
+  record.create_post_count = 1;          // set BEFORE the sole attempt; never incremented again
   let createBody = null;
-  let ambiguous = false;
+  let threw = false;
+  let httpStatus = null;
   try {
-    createRes = await fetch(`${base}/message_templates`, {
+    const createRes = await fetch(`${base}/message_templates`, {
       method: "POST", headers: auth, body: JSON.stringify(t.creation_payload),
     });
-    record.http_status = createRes.status;
+    httpStatus = createRes.status;
+    record.http_status = httpStatus;
     record.request_id = reqId(createRes);
     createBody = await createRes.json().catch(() => null);
-    if (!createRes.ok || !createBody || typeof createBody !== "object") ambiguous = true;
   } catch {
-    ambiguous = true;
+    threw = true;
   }
   record.response_utc = stamp();
 
+  const verdict = classifyCreateResponse({ threw, httpStatus, body: createBody });
+  record.meta_error_code = verdict.error.code;
+  record.meta_error_subcode = verdict.error.subcode;
+  record.meta_error_type = verdict.error.type;
+  record.meta_error_is_transient = verdict.error.is_transient;
+
+  // --- DETERMINISTIC 4xx: a real rejection, never "ambiguous" -------------
+  if (verdict.classification === CreateClassification.DETERMINISTIC_4XX_REJECTION) {
+    console.error(`Meta rejected the create: http=${httpStatus}`
+      + ` code=${verdict.error.code ?? "null"} subcode=${verdict.error.subcode ?? "null"}`
+      + ` type=${verdict.error.type ?? "null"} transient=${verdict.error.is_transient ?? "null"}`);
+    console.error("No template was created. No retry is attempted and no second POST is issued.");
+    finish("CREATE_REJECTED_4XX", 6);
+  }
+
   // --- H. Ambiguity: ONE read-only lookup, NEVER a second POST -----------
-  if (ambiguous) {
+  if (verdict.classification === CreateClassification.AMBIGUOUS) {
     console.error("The create response was ambiguous. Performing ONE read-only exact-name lookup. A second POST is never issued.");
     const post = await lookupExact();
     if (post.ok && post.rows.length === 1 && templatesAreIdentical(post.rows[0], t.creation_payload)) {

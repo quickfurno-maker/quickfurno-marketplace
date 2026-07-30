@@ -3,9 +3,9 @@
   "schema_version": "1.0",
   "phase": "QF-MVP-40.10A",
   "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  "note": "NON-SECRET. Nothing here has been submitted to Meta. No template is approved and no provider_template_id is real.",
+  "note": "NON-SECRET. Every entry here is a LOCAL CANDIDATE: none is claimed approved, mapped or active, and no provider_template_id is real. HISTORY: the Wave 0 provider name qf_consent_help_response_v1 WAS created on the QuickFurno WABA on 2026-07-30 and returned PENDING, then was DELETED by the former AiSensy partner (proven by the Meta WhatsApp Manager Activity Log); AiSensy partner access has since been removed. v1 is retired and the Wave 0 candidate is now v2, which has NOT been submitted.",
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "e920be22f4514784cf46a131a55db85eb7ecb054891fe0f387949c0696336bb9",
+  "source_manifest_fingerprint": "e0c28b5e77f67b783ae0a43ccbbcf50dea77987f3a28904a6dff14a25fee5a4b",
   "external_contract_references": [
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
@@ -413,7 +413,7 @@
     },
     {
       "internal_template_key": "consent_help_response",
-      "provider_template_name": "qf_consent_help_response_v1",
+      "provider_template_name": "qf_consent_help_response_v2",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
@@ -426,7 +426,7 @@
         "provider_template_id": null
       },
       "creation_payload": {
-        "name": "qf_consent_help_response_v1",
+        "name": "qf_consent_help_response_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
@@ -437,7 +437,7 @@
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "2a0b7a168320a35003e824fd88d7763e8238e5ed1202a0c45f001698625e6154"
+      "payload_fingerprint": "afa6f9c310dc98c54440c1b4e6c3521b4963ea306a615f2788474c2f07c17a73"
     },
     {
       "internal_template_key": "consent_start_acknowledgement",

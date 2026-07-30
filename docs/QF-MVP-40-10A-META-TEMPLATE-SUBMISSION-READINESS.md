@@ -3,8 +3,12 @@
 Records the provider-component compatibility correction (40.6-R2) and the exact, non-secret
 submission packet and wave plan (40.10A).
 
-**No template was submitted. No Meta API call was made. No message was sent. No mapping, account,
-policy or canary was seeded. No migration.**
+> **HISTORY NOTICE (QF-MVP-40.10A-R2, 2026-07-30).** An earlier revision of this document said no
+> template had ever been submitted and no Meta API call had ever been made. That is no longer true —
+> see §0. It remains true that **no WhatsApp message has ever been sent**, and that **no provider
+> mapping, provider account, runtime policy, webhook or canary has been activated**.
+
+**The current Wave 0 candidate (v2) has NOT been submitted. No migration. No deployment.**
 
 Artefacts: [`meta-template-submission-packet.json`](provider-manifests/meta-template-submission-packet.json) ·
 [generator](../scripts/mvp/communication/generate-meta-template-submission-packet.mjs) ·
@@ -12,6 +16,51 @@ Artefacts: [`meta-template-submission-packet.json`](provider-manifests/meta-temp
 [operator script](../scripts/mvp/communication/submit-meta-templates.mjs)
 
 ---
+
+## 0. Wave 0 incident and recovery (2026-07-30)
+
+Recorded because the earlier "nothing was ever submitted" claim is now historical.
+
+**What is proven:**
+
+1. Provider name `qf_consent_help_response_v1` **was created** on the QuickFurno WABA by `qfcloud`
+   and Meta initially returned **PENDING**.
+2. The operator's immediate semantic readback **succeeded**.
+3. The Meta WhatsApp Manager **Activity Log proves the former AiSensy partner DELETED that
+   template**.
+4. AiSensy partner access to the QuickFurno WABA was subsequently **removed by the owner**.
+5. One later create attempt for the same v1 name reached Meta and returned **HTTP 400**.
+6. The post-create exact-name lookup found **no template**.
+7. The Activity Log shows **no second creation event** — so the 400 did not silently create anything.
+8. The operator of the day preserved only the HTTP status and request id, **not** Meta's structured
+   error fields, so **the exact reason for that HTTP 400 is unknown and is not reconstructable**.
+
+**What is deliberately NOT claimed:** that Meta recategorised the template as Marketing, and that any
+specific deleted-name retention period applies. Neither is proven, so neither is asserted.
+
+**Recovery decision.** Provider name **v1 is retired**. The Wave 0 candidate is now
+`qf_consent_help_response_v2`, with the **approved copy, language and category unchanged**. Retiring
+the name avoids depending on unproven deleted-name reuse behaviour.
+
+| | |
+|---|---|
+| Wave 0 provider name | `qf_consent_help_response_v2` |
+| Language / category | `en` / `UTILITY` |
+| Payload fingerprint | `afa6f9c310dc98c54440c1b4e6c3521b4963ea306a615f2788474c2f07c17a73` |
+| State | **NOT SUBMITTED** — owner review required before any new `--execute` |
+
+**Operator repair driven by the incident.** The lost 400 reason was a real evidence gap. The operator
+now extracts Meta's **structured** error fields only — `code`, `error_subcode`, `type` (length-bounded)
+and `is_transient` — and never `message`, `error_data`, `error_user_title`, `error_user_msg`,
+`fbtrace_id`, the raw body or any header. A **4xx is now classified `DETERMINISTIC_4XX_REJECTION`**
+with outcome `CREATE_REJECTED_4XX`, instead of being laundered into a generic ambiguous/manual
+outcome merely because `res.ok` was false — which is exactly what hid the reason before. 5xx, an
+unexpected 3xx, a fetch throw and a malformed 2xx remain `AMBIGUOUS`. The evidence record now carries
+`create_post_count`, set to 1 immediately before the sole POST and never incremented, and the
+filename is wave-parameterised rather than hardcoded to `WAVE0`.
+
+Sanitized evidence for the incident exists locally at the repository root and is deliberately **not
+committed**.
 
 ## 1. Why this correction was required
 
@@ -124,16 +173,19 @@ resulting action through its ordinary assignment path.
 
 ## 7. Provider template naming
 
-Grammar `qf_<internal_template_key>_v1` — lowercase ASCII, letters/digits/underscore, deterministic,
-unique, version-suffixed, and carrying no environment name, WABA id, secret or client/vendor data.
-Recorded as `provider_template_name_candidate`; `provider_template_name` and `provider_template_id`
-stay null until Meta assigns them. Everything remains `draft` / `DRAFT_NOT_SUBMITTED`.
+Grammar `qf_<internal_template_key>_v<n>` — lowercase ASCII, letters/digits/underscore,
+deterministic, unique, version-suffixed, and carrying no environment name, WABA id, secret or
+client/vendor data. The version suffix is what makes a controlled retirement possible: Wave 0 moved
+from `_v1` to `_v2` after the incident in §0 without touching the approved copy.
+
+Recorded as `provider_template_name_candidate`; `provider_template_id` stays null until Meta assigns
+one. Every entry remains `draft` / `DRAFT_NOT_SUBMITTED`.
 
 ## 8. Wave plan — reconciles to 25
 
 | Wave | Count | Contents | `submit_now` |
 |---|---|---|---|
-| **0** | **1** | `consent_help_response` — no-variable utility API-contract canary | ✅ |
+| **0** | **1** | `consent_help_response` → **`qf_consent_help_response_v2`** — no-variable utility API-contract canary (v1 retired, §0) | ✅ |
 | **1** | **14** | Launch transport: consent acks + client/vendor transactional | ✅ |
 | **2** | **3** | Authentication templates | ❌ **held from the Wave 0 task** — see §8.1 |
 | **3** | **3** | Marketing (QF-MVP-50) — may absorb approval latency; unusable without consent, frequency policy, active mapping and orchestration | ✅ |
@@ -169,14 +221,18 @@ different-category collision, stops on the first ambiguous response, and records
 (internal key, provider name, status, category, template id, UTC). Secrets come from
 `QF_META_WABA_ID` / `QF_META_ACCESS_TOKEN` and are never printed.
 
-**Dry run executed for Wave 0** — 1 selected, 1 submittable, 0 held; payload printed with fingerprint
-`2a0b7a16…`; nothing submitted, sent, edited or deleted.
+**Dry run executed for Wave 0 (v2)** — 1 selected, 1 submittable, 0 held; payload printed with
+fingerprint `afa6f9c3…`; nothing submitted, sent, edited or deleted.
 
 ## 10. Is real submission safe now?
 
-**Waves 0, 1 and 3 — YES, pending owner approval of copy.** Wave 2 stays `submit_now: false`
-because it is **held from the Wave 0 execution task**, not because of a send precondition — see §8.1.
-Wave 4 remains deferred to QF-MVP-70.
+**Current status: IMPLEMENTATION COMPLETE — OFFLINE REPAIR ONLY. WAVE 0 v2 NOT SUBMITTED. OWNER
+REVIEW REQUIRED BEFORE A NEW `--execute`. NO DEPLOYMENT.**
+
+No Meta approval and no staging verification is claimed. Wave 2 stays `submit_now: false` because it
+is **held from the Wave 0 execution task**, not because of a send precondition — see §8.1. Wave 4
+remains deferred to QF-MVP-70. Waves 1 and 3 remain owner-reviewable but unauthorised until Wave 0 v2
+is proven.
 
 Remaining blockers before any activation: Meta credentials configured; provider account seeded and
 independently verified; staging runtime policy created in a **disabled** state; approved provider

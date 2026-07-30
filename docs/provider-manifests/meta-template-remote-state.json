@@ -1,7 +1,7 @@
 {
   "artifact": "meta-template-remote-state",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10C",
+  "phase": "QF-MVP-40.10D",
   "contains_secrets": false,
   "authorizes_meta_calls": false,
   "authorizes_mapping": false,
@@ -44,6 +44,29 @@
         "QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T13-31-55-439Z.json"
       ],
       "notes": "Created and returned PENDING; a read-only reconciliation later proved the remote template is APPROVED but classified by Meta as MARKETING rather than the requested UTILITY. It is QUARANTINED and left UNMAPPED because the internal HELP response is an evidence-bound reply to an inbound HELP command: a marketing classification must never silently grant marketing send authority or bypass QuickFurno consent and suppression rules. IMPORTANT NON-CLAIM: readback_semantic_match is false, and because the semantic comparison INCLUDES category, this evidence does NOT separately prove that the remote body and components were otherwise identical. No body or component equality is asserted either way. The remote template is deliberately NOT deleted and NOT appealed in this phase."
+    },
+    {
+      "internal_template_key": "consent_help_response",
+      "provider_template_name": "qf_consent_help_response_v3",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE0-META-SUBMISSION-2026-07-30T17-24-12-392Z.json",
+        "QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T17-48-51-026Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled read-only to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. This closes the Wave 0 Utility-category contract: the provider lifecycle — create, readback, approval and read-only reconciliation — is proven end to end. IMPORTANT: a Utility approval proves the PROVIDER CONTRACT ONLY. It does not create ordinary consent authority, mapping authority, runtime activation or send authority. The template remains APPROVED_UNMAPPED and unsendable, the HELP reply stays evidence-bound and outside the ordinary outbound registry, and no remote template id is stored anywhere in this repository. Mapping, activation and sending require a later, separately authorized phase."
     }
   ]
 }

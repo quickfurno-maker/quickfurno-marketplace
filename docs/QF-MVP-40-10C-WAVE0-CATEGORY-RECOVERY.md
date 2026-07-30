@@ -69,7 +69,7 @@ Quarantine is the only option that is fully reversible and costs nothing to hold
 | provider name | `qf_consent_help_response_v3` |
 | language / category | `en` / `UTILITY` |
 | component profile | `STANDARD_TEXT` |
-| wave / `submit_now` | `0` / `true` |
+| wave / `submit_now` | `0` / `true` at the time of this phase — **now `false`**, held after approval (40.10D) |
 | fingerprint | `12f98c8b9504194ef9d983a606c9edd1c083dab1ba187915bdbea85fbc3e6c87` |
 
 Exact body:
@@ -96,13 +96,15 @@ suppression rules are untouched.
 
 ## 5. v3 submission requires separate owner authorization
 
-**v3 has not been submitted.** It is `draft` / `DRAFT_NOT_SUBMITTED` with a null provider template id,
-like every other candidate. Submitting it requires a separate, explicit owner authorization and a
-fresh `--execute` run. Nothing in this phase authorizes that.
+**As of this phase, v3 had not been submitted** — it was `draft` / `DRAFT_NOT_SUBMITTED` with a null
+provider template id, and submitting it required a separate, explicit owner authorization and a fresh
+`--execute` run. That authorization was subsequently given: v3 was created with exactly one POST and
+reconciled read-only to **APPROVED as UTILITY**. It is now `approved` / `APPROVED_UNMAPPED` and held
+from creation, still with a null provider template id. See
+[QF-MVP-40.10D](QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md).
 
-Should v3 also come back as MARKETING, the correct next step is an owner decision — appeal, or accept
-that a Utility HELP acknowledgement is not achievable under the current WABA and redesign the
-acknowledgement path — **not** another silent name bump.
+The contingency planned here — that v3 might also come back as MARKETING, requiring an owner decision
+to appeal or redesign rather than another silent name bump — **did not arise**: Meta returned UTILITY.
 
 ## 6. Status
 
@@ -110,7 +112,7 @@ acknowledgement path — **not** another silent name bump.
 QF-MVP-40.10C IMPLEMENTATION COMPLETE — OFFLINE ONLY
 WAVE 0 v2 APPROVED AS MARKETING — QUARANTINED UNMAPPED
 WAVE 0 v3 STRICT UTILITY CANDIDATE READY
-WAVE 0 v3 NOT SUBMITTED
+WAVE 0 v3 SUBSEQUENTLY SUBMITTED AND APPROVED AS UTILITY — SEE QF-MVP-40.10D
 WAVE 1 META SUBMISSION NOT AUTHORIZED
 WAVE 2/3 NOT AUTHORIZED
 NO MAPPING, SEND, CANARY OR DEPLOYMENT

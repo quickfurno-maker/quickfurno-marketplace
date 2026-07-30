@@ -21,6 +21,10 @@ const SUBMIT_SCRIPT = "scripts/mvp/communication/submit-meta-templates.mjs";
 const SOURCE_PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
 const REVIEW = "docs/provider-manifests/meta-wave1-owner-review.json";
 const DOC = "docs/QF-MVP-40-10B-WAVE1-OWNER-REVIEW.md";
+const CANARY = "docs/provider-manifests/meta-wave1-canary-review.json";
+const CANARY_KEY = "lead_received";
+const CANARY_NAME = "qf_lead_received_v1";
+const CANARY_FINGERPRINT = "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c4739af640e16";
 const BRANCH_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
 
 const ROOT = process.cwd();
@@ -35,6 +39,7 @@ const submitExec = submitSrc.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.tes
 const sourcePacketRaw = readFileSync(resolve(SOURCE_PACKET));
 const sourcePacket = JSON.parse(sourcePacketRaw.toString("utf8"));
 const review = JSON.parse(readFileSync(resolve(REVIEW), "utf8"));
+const canary = JSON.parse(readFileSync(resolve(CANARY), "utf8"));
 
 const GROUP_A = ["clarification_reminder", "clarification_request", "client_lead_status_update",
   "client_matching_update", "consent_start_acknowledgement", "consent_stop_acknowledgement",
@@ -192,19 +197,34 @@ const R = {
    * result (APPROVED **as MARKETING**) and must never present a proven Utility
    * approval or an authorized Wave 1.
    */
-  ownerApprovalNotMachineProven: () => {
-    const doc = readFileSync(resolve(DOC), "utf8");
+  /**
+   * QF-MVP-40.10D: a Utility approval IS now machine proven — but only for v3, and
+   * only as a provider contract. The blanket "never claim Utility" form of this rule
+   * is obsolete; deleting it would drop the guard entirely, so it is restated:
+   *
+   *   1. the v2 MARKETING mismatch and quarantine must still be recorded (a recovered
+   *      failure is never erased from the audited record);
+   *   2. v2 must never be described as Utility-approved;
+   *   3. any Utility-approval claim must carry the qualifier that it grants no
+   *      consent, mapping, activation or send authority;
+   *   4. Wave 1 must still be blocked.
+   *
+   * Accepts doc text so mutation tests can prove it bites; falls back to the file.
+   */
+  ownerApprovalNotMachineProven: (docText) => {
+    const doc = typeof docText === "string" ? docText : readFileSync(resolve(DOC), "utf8");
     const recordsReconciledResult = /RECONCILED_CATEGORY_MISMATCH/.test(doc)
       && /MARKETING/.test(doc) && /QUARANTINED_UNMAPPED/.test(doc);
-    // Target an actual CLAIM, not any mention of the outcome vocabulary: the doc
-    // legitimately enumerates every possible reconciliation outcome (including
-    // RECONCILED_APPROVED) when describing the read-only mode. What must never
-    // appear is an assertion that THIS template was approved as Utility.
-    const claimsUtilityProven =
-      /\bUTILITY\b[^.\n]{0,80}\b(was |is )?(proven|approved|granted|confirmed)\b/i.test(doc)
-      || /\b(approved|reconciled)\b[^.\n]{0,40}\bas UTILITY\b/i.test(doc);
+    const miscreditsV2 = /\bv2\b[^.\n]{0,60}\b(approved|reconciled)\b[^.\n]{0,20}\bas UTILITY\b/i.test(doc)
+      || /\bv2\b[^.\n]{0,60}\bUTILITY[- ]APPROVED\b/i.test(doc);
+    const claimsUtilityApproval =
+      /\b(approved|reconciled)\b[^.\n]{0,40}\bas UTILITY\b/i.test(doc);
+    // An approval claim is only honest alongside an explicit grant-nothing qualifier.
+    const qualified = /PROVIDER CONTRACT ONLY/i.test(doc)
+      && /NO CONSENT, MAPPING, ACTIVATION OR SEND/i.test(doc);
     const wave1StillBlocked = /WAVE 1 META SUBMISSION NOT AUTHORIZED/i.test(doc);
-    return recordsReconciledResult && !claimsUtilityProven && wave1StillBlocked;
+    return recordsReconciledResult && !miscreditsV2 && wave1StillBlocked
+      && (!claimsUtilityApproval || qualified);
   },
   noMigrationInBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only", `${BRANCH_BASE}..HEAD`], { encoding: "utf8" });
@@ -214,6 +234,48 @@ const R = {
     const tracked = execFileSync("git", ["ls-files"], { encoding: "utf8" });
     return !/META-(SUBMISSION|RECONCILIATION)-/.test(tracked);
   },
+
+  // ---- QF-MVP-40.10D Wave 1 canary review --------------------------------
+  canaryIsExactlyOneEntry: (c) => !!c.recommended_canary
+    && !Array.isArray(c.recommended_canary)
+    && c.recommended_canary.internal_template_key === CANARY_KEY
+    && c.recommended_canary.provider_template_name === CANARY_NAME,
+  canaryFingerprintExact: (c) => c.recommended_canary.payload_fingerprint === CANARY_FINGERPRINT
+    && c.recommended_canary.payload_fingerprint
+       === sha256(JSON.stringify(c.recommended_canary.creation_payload)),
+  /** The canary may not rewrite the copy it recommends — it must quote the packet. */
+  canaryMatchesSourceVerbatim: (c) => {
+    const k = c.recommended_canary;
+    const src = byKey.get(k.internal_template_key);
+    return !!src && k.provider_template_name === src.provider_template_name
+      && k.provider_language === src.provider_language
+      && k.requested_category === src.category
+      && k.component_profile === src.component_profile
+      && k.payload_fingerprint === src.payload_fingerprint
+      && JSON.stringify(k.creation_payload) === JSON.stringify(src.creation_payload);
+  },
+  canarySourceFingerprintExact: (c) => c.source_packet_fingerprint === sha256(sourcePacketRaw),
+  /** A recommendation is not an authorization. */
+  canaryAuthorizesNothing: (c) => c.authorizes_meta_calls === false
+    && c.status === "OWNER_REVIEW_PENDING"
+    && c.recommended_canary.submission_authorization === "NOT_AUTHORIZED"
+    && c.recommended_canary.remote_submission_state === "NOT_SUBMITTED"
+    && c.recommended_canary.owner_copy_decision === "PENDING_OWNER_REVIEW"
+    && Array.isArray(c.explicit_non_authorizations)
+    && c.explicit_non_authorizations.length >= 4,
+  /** The canary must not silently promote the other 13 Wave 1 entries. */
+  canaryDoesNotUnblockWave1: () => review.templates.every((t) =>
+    t.submission_authorization === "NOT_AUTHORIZED" && t.remote_submission_state === "NOT_SUBMITTED"),
+  /** Wave 0 closed as UTILITY: the canary may state that, but may claim no more. */
+  canaryWave0PreconditionHonest: (c) => {
+    const w = c.wave0_precondition;
+    return !!w && w.provider_template_name === "qf_consent_help_response_v3"
+      && w.last_proven_status === "APPROVED" && w.last_proven_remote_category === "UTILITY"
+      && w.disposition === "APPROVED_UNMAPPED"
+      && /grants no send, mapping or activation authority/i.test(w.note);
+  },
+  canaryCarriesNoSecrets: (c) => R.noSecretsOrPii(c),
+  canaryDocExists: () => existsSync(resolve("docs/QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md")),
 };
 
 const RULES = [
@@ -256,6 +318,15 @@ const RULES = [
   ["W37 owner-reported approval is not shown as machine-proven", R.ownerApprovalNotMachineProven, review],
   ["W38 no migration in the branch delta", R.noMigrationInBranch, review],
   ["W39 no evidence JSON is tracked", R.noEvidenceTracked, review],
+  ["W40 canary review names exactly one template", R.canaryIsExactlyOneEntry, canary],
+  ["W41 canary fingerprint is exact and self-consistent", R.canaryFingerprintExact, canary],
+  ["W42 canary quotes the source packet verbatim", R.canaryMatchesSourceVerbatim, canary],
+  ["W43 canary pins the current source packet fingerprint", R.canarySourceFingerprintExact, canary],
+  ["W44 canary authorizes nothing and says so explicitly", R.canaryAuthorizesNothing, canary],
+  ["W45 canary does not unblock the other Wave 1 templates", R.canaryDoesNotUnblockWave1, canary],
+  ["W46 canary states the Wave 0 precondition honestly", R.canaryWave0PreconditionHonest, canary],
+  ["W47 canary carries no secrets, PII or provider ids", R.canaryCarriesNoSecrets, canary],
+  ["W48 the QF-MVP-40.10D closure document exists", R.canaryDocExists, canary],
 ];
 for (const [n, fn, arg] of RULES) add(n, fn(arg));
 
@@ -288,6 +359,30 @@ const MUT = [
     r.templates[0].remote_submission_state = "SUBMITTED_PENDING"; }],
   ["M13 a provider template id in the review packet is rejected", R.noSecretsOrPii, null, null, (r) => {
     r.templates[0].provider_template_id = "1234567890"; }],
+  ["M14 a second recommended canary is rejected", R.canaryIsExactlyOneEntry, canary, null, (c) => {
+    c.recommended_canary = [c.recommended_canary, c.recommended_canary]; }],
+  ["M15 a different canary template is rejected", R.canaryIsExactlyOneEntry, canary, null, (c) => {
+    c.recommended_canary.internal_template_key = "vendor_new_lead"; }],
+  ["M16 canary copy edited without a new fingerprint is rejected", R.canaryFingerprintExact, canary, null,
+    (c) => { c.recommended_canary.creation_payload.components[0].text = "Buy now, 50% off!"; }],
+  ["M17 canary copy drifting from the packet is rejected", R.canaryMatchesSourceVerbatim, canary, null,
+    (c) => { c.recommended_canary.requested_category = "MARKETING"; }],
+  ["M18 a stale canary source fingerprint is rejected", R.canarySourceFingerprintExact, canary, null,
+    (c) => { c.source_packet_fingerprint = "0".repeat(64); }],
+  ["M19 a canary pre-authorized for submission is rejected", R.canaryAuthorizesNothing, canary, null,
+    (c) => { c.recommended_canary.submission_authorization = "AUTHORIZED"; }],
+  ["M20 a canary claiming it authorizes Meta calls is rejected", R.canaryAuthorizesNothing, canary, null,
+    (c) => { c.authorizes_meta_calls = true; }],
+  ["M21 a canary overstating the Wave 0 grant is rejected", R.canaryWave0PreconditionHonest, canary, null,
+    (c) => { c.wave0_precondition.note = "Wave 0 approval authorizes sending and mapping."; }],
+  ["M22 crediting v2 with a Utility approval is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
+    (d) => d.replace(/WAVE 0 v2 RECONCILED:[^\n]*/, "WAVE 0 v2 RECONCILED: APPROVED AS UTILITY")],
+  ["M23 an unqualified Utility approval claim is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
+    (d) => d.replace(/WAVE 0 APPROVAL GRANTS[^\n]*\n/, "")],
+  ["M24 erasing the v2 MARKETING quarantine record is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
+    (d) => d.replace(/QUARANTINED_UNMAPPED/g, "OK")],
+  ["M25 unblocking Wave 1 in the doc is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
+    (d) => d.replace(/WAVE 1 META SUBMISSION NOT AUTHORIZED/g, "WAVE 1 META SUBMISSION AUTHORIZED")],
 ];
 for (const entry of MUT) {
   const [name, fn, , , mutate] = entry;
@@ -299,9 +394,11 @@ for (const entry of MUT) {
     add(name, !/finish\(/.test(fake));
     continue;
   }
-  const copy = clone(review);
-  mutate(copy);
-  add(name, fn(copy) === false);
+  const base = entry[2] === "DOC" ? readFileSync(resolve(DOC), "utf8") : (entry[2] ?? review);
+  const copy = typeof base === "string" ? base : clone(base);
+  // A mutator may edit in place (objects) or return a replacement (strings).
+  const mutated = mutate(copy);
+  add(name, fn(mutated ?? copy) === false);
 }
 
 const failed = results.filter((r) => !r.ok);

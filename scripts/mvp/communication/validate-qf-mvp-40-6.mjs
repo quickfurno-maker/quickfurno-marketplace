@@ -133,21 +133,48 @@ const RULES = {
     R.resolveOutboundConsentScope({ messageType: "totally_made_up", templateKey: "totally_made_up", lane: "business" }).ok === false,
 
   // --- catalogue hygiene ----------------------------------------------------
-  allDraft: (m) => [...Object.values(m.groups).flat()].every((t) =>
-    t.submission_state === "DRAFT_NOT_SUBMITTED" && t.approval_status === "draft" && t.provider_template_id === null),
+/**
+ * QF-MVP-40.10D: the catalogue is no longer uniformly draft. Wave 0
+ * consent_help_response was approved by Meta as UTILITY and is now
+ * approved / APPROVED_UNMAPPED / held from creation. Relaxing this to
+ * "anything may be approved" would delete the guard, so it becomes a CLOSED
+ * state model: Wave 0 must be EXACTLY that, every other entry must still be
+ * draft, and no entry may ever carry a provider template id.
+ */
+  allDraft: (m) => [...Object.values(m.groups).flat()].every((t) => {
+    if (t.provider_template_id !== null) return false;
+    if (t.internal_template_key === "consent_help_response") {
+      return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
+        && t.qf_mvp_40?.submit_now === false;
+    }
+    return t.submission_state === "DRAFT_NOT_SUBMITTED" && t.approval_status === "draft";
+  }),
 
   noActiveMapping: (m) => {
     const raw = JSON.stringify(m).toLowerCase();
-    return !/"(approval_status|submission_state)"\s*:\s*"(approved|active|submitted)"/.test(raw)
-      && [...Object.values(m.groups).flat()].every((t) => t.binding_contract?.binding_readiness !== "active");
+    if (/"(approval_status|submission_state)"\s*:\s*"(active|submitted)"/.test(raw)) return false;
+    // Exactly one approval is permitted, and only for the Wave 0 entry Meta approved.
+    const approved = [...Object.values(m.groups).flat()].filter((t) => t.approval_status === "approved");
+    if (approved.length > 1) return false;
+    if (approved.length === 1 && approved[0].internal_template_key !== "consent_help_response") return false;
+    return [...Object.values(m.groups).flat()].every((t) => t.binding_contract?.binding_readiness !== "active");
   },
 
+  /**
+   * QF-MVP-40.10D: this rule failed at HEAD 271c807 and the failure PRE-DATES this
+   * phase. QF-MVP-40.10C rewrote the HELP body to strict minimal Utility copy that
+   * names no domain at all, so "the domain must be present" contradicts the approved
+   * copy. The invariant that still matters is kept and NOT weakened: the wrong domain
+   * is never used, and any domain reference that IS present must be quickfurno.in and
+   * must not invent a route that does not exist on disk.
+   */
   helpUsesVerifiedDomain: (m) => {
     const t = m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response");
     if (!t) return false;
-    if (/quickfurno\.com/i.test(t.body_spec)) return false;          // wrong domain
-    if (!/quickfurno\.in/i.test(t.body_spec)) return false;          // must name the real domain
-    // No invented route: only a bare domain reference is allowed unless the route exists on disk.
+    if (/quickfurno\.com/i.test(t.body_spec)) return false;          // wrong domain, always
+    const hosts = [...t.body_spec.matchAll(/quickfurno\.[a-z]{2,}/gi)].map((x) => x[0].toLowerCase());
+    if (hosts.some((h) => h !== "quickfurno.in")) return false;      // no other TLD
+    // No invented route: a route reference must exist under app/.
     const paths = [...t.body_spec.matchAll(/quickfurno\.in(\/[A-Za-z0-9/_-]+)/g)].map((x) => x[1]);
     return paths.every((p) => existsSync(resolve(ROOT, "app" + p)));
   },
@@ -253,12 +280,21 @@ const MUTATIONS = [
   ["M7  an approved / provider-ID-bearing entry is rejected", RULES.allDraft, (m) => {
     m.groups.marketing[0].submission_state = "APPROVED";
     m.groups.marketing[0].provider_template_id = "meta-123"; }],
+  // These mutants used to string-replace "quickfurno.in" in the body. The approved
+  // Utility copy no longer names a domain, so the replace silently became a no-op and
+  // the mutants stopped proving anything. They now INJECT the defect outright.
   ["M8  the wrong support domain is rejected", RULES.helpUsesVerifiedDomain, (m) => {
     const t = m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response");
-    t.body_spec = t.body_spec.replace("quickfurno.in", "quickfurno.com"); }],
+    t.body_spec = `${t.body_spec} Visit quickfurno.com for help.`; }],
+  ["M8b any other quickfurno TLD is rejected", RULES.helpUsesVerifiedDomain, (m) => {
+    const t = m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response");
+    t.body_spec = `${t.body_spec} Visit quickfurno.net for help.`; }],
   ["M9  an invented support route is rejected", RULES.helpUsesVerifiedDomain, (m) => {
     const t = m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response");
-    t.body_spec = t.body_spec.replace("quickfurno.in.", "quickfurno.in/contact."); }],
+    t.body_spec = `${t.body_spec} Visit quickfurno.in/contact for help.`; }],
+  ["M9b a real on-disk route is accepted, proving the rule is not vacuous", RULES.helpUsesVerifiedDomain, (m) => {
+    const t = m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response");
+    t.body_spec = `${t.body_spec} Visit quickfurno.in/pricing for help.`; }, true],
   ["M10 a client-facing lead_assignment_alert is rejected", RULES.leadAssignmentAlertConsistent, (m) => {
     const t = [...Object.values(m.groups).flat()].find((x) => x.internal_template_key === "lead_assignment_alert");
     t.qf_mvp_40.recipient_type = "client"; }],
@@ -275,10 +311,12 @@ const MUTATIONS = [
   ["M15 an active binding readiness is rejected", RULES.noActiveMapping, (m) => {
     m.groups.marketing[0].binding_contract.binding_readiness = "active"; }],
 ];
-for (const [name, fn, mutate] of MUTATIONS) {
+// A 4th element `true` marks a POSITIVE control: the mutation must still PASS, which
+// proves the rule is discriminating rather than rejecting everything it is handed.
+for (const [name, fn, mutate, expectPass] of MUTATIONS) {
   const copy = clone(manifest);
   mutate(copy);
-  add(name, fn(copy) === false);
+  add(name, fn(copy) === (expectPass === true));
 }
 
 rmSync(outDir, { recursive: true, force: true });

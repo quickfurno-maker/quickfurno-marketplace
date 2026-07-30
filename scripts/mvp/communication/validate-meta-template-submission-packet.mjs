@@ -12,8 +12,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   API_VERSION_PATTERN, CreateClassification, KNOWN_TEMPLATE_STATUSES, MAX_ERROR_TYPE_LENGTH,
-  USABLE_EXISTING_STATUSES, canonicaliseTemplate, classifyCreateResponse, safeMetaError,
-  templatesAreIdentical, validateEnvironment,
+  USABLE_EXISTING_STATUSES, canonicaliseTemplate, classifyCreateResponse, modeLabel,
+  safeMetaError, templatesAreIdentical, validateEnvironment,
 } from "./submit-meta-templates.mjs";
 
 /**
@@ -29,6 +29,9 @@ const WAVE0_FINGERPRINT = "12f98c8b9504194ef9d983a606c9edd1c083dab1ba187915bdbea
 const WAVE0_BODY = "QuickFurno received your HELP request. Reply STOP to stop messages or "
   + "START to resume. Continue this chat for support.";
 const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
+const V3_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE0-META-SUBMISSION-2026-07-30T17-24-12-392Z.json";
+const V3_RECONCILIATION_EVIDENCE =
+  "QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T17-48-51-026Z.json";
 const sha256 = (x) => createHash("sha256").update(x).digest("hex");
 
 const MANIFEST = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
@@ -98,10 +101,26 @@ const R = {
     /(staging|prod|production|dev|test|\d{10,})/.test(t.provider_template_name)),
   deterministicPayloads: (p) => p.templates.every((t) =>
     typeof t.payload_fingerprint === "string" && /^[0-9a-f]{64}$/.test(t.payload_fingerprint)),
-  nothingApproved: (p) => p.templates.every((t) =>
-    t.local_state.approval_status === "draft"
-    && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
-    && t.local_state.provider_template_id === null),
+  /**
+   * QF-MVP-40.10D: the packet is no longer uniformly draft. Wave 0 closed as
+   * APPROVED_UNMAPPED and is HELD from creation; every OTHER template must still be
+   * draft. This is a CLOSED state model, not a relaxation — an unexpected approval
+   * anywhere else still fails, and no entry may ever carry a real provider id.
+   */
+  closedStateModel: (p) => p.templates.every((t) => {
+    const st = t.local_state;
+    if (st.provider_template_id !== null) return false;          // never a remote id
+    if (t.internal_template_key === WAVE0_KEY) {
+      return st.approval_status === "approved"
+        && st.submission_state === "APPROVED_UNMAPPED"
+        && t.submit_now === false;                                // create is HELD
+    }
+    return st.approval_status === "draft" && st.submission_state === "DRAFT_NOT_SUBMITTED";
+  }),
+  noRemoteIdAnywhere: (p) => {
+    const raw = JSON.stringify(p) + readFileSync(resolve(REMOTE_STATE), "utf8");
+    return !/"(provider_template_id|template_id)"\s*:\s*"/.test(raw);
+  },
   acksStayOutOfOrdinaryRegistry: () => ACKS.every((k) => !new RegExp(`^\\s*${k}\\s*:`, "m")
     .test(readFileSync(resolve("lib/communication/outboundConsentScope.ts"), "utf8"))),
   noSecretOrPii: (p) => {
@@ -324,11 +343,20 @@ const R = {
 
   // ---- QF-MVP-40.10C remote-state ledger ---------------------------------
   ledgerExists: () => existsSync(resolve(REMOTE_STATE)),
-  ledgerExactlyTwoEntries: () => {
+  /**
+   * QF-MVP-40.10D: the ledger now holds three entries (P81 pins the exact set), so
+   * "exactly two" is obsolete. The invariant this rule actually protects — the two
+   * HISTORICAL records must survive untouched and keep their dispositions — is
+   * restated directly, so a later phase cannot quietly rewrite the v1/v2 history.
+   */
+  ledgerHistoricalPairIntact: () => {
     const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
-    return Array.isArray(L.entries) && L.entries.length === 2
-      && L.entries.map((e) => e.provider_template_name).join(",")
-         === "qf_consent_help_response_v1,qf_consent_help_response_v2";
+    const v1 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v1");
+    const v2 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v2");
+    return !!v1 && !!v2
+      && v1.disposition === "RETIRED_DELETED_BY_FORMER_PARTNER"
+      && v2.disposition === "QUARANTINED_UNMAPPED"
+      && v2.last_proven_remote_category === "MARKETING";
   },
   ledgerV1Retired: () => {
     const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
@@ -380,6 +408,67 @@ const R = {
       && !/(EAA[A-Za-z0-9]{10,}|eyJ[A-Za-z0-9._-]{20,}|Bearer\s+[A-Za-z0-9._-]{12,}|\+\d[\d\s-]{8,})/.test(raw)
       && !/raw_body|response_body|error_message/i.test(raw);
   },
+
+  // ---- QF-MVP-40.10D Wave 0 closure --------------------------------------
+  ledgerHasThreeEntries: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    return L.entries.length === 3
+      && L.entries.map((e) => e.provider_template_name).join(",")
+         === "qf_consent_help_response_v1,qf_consent_help_response_v2,qf_consent_help_response_v3";
+  },
+  ledgerV3ApprovedUtility: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v3 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v3");
+    return !!v3 && v3.last_proven_status === "APPROVED"
+      && v3.last_proven_remote_category === "UTILITY"
+      && v3.requested_category === "UTILITY"
+      && v3.readback_semantic_match === true
+      && v3.create_post_count_at_submission === 1
+      && v3.create_post_count_at_reconciliation === 0
+      && v3.submission_outcome === "CREATED_PENDING"
+      && v3.reconciliation_outcome === "RECONCILED_APPROVED"
+      && v3.disposition === "APPROVED_UNMAPPED";
+  },
+  ledgerV3AuthoritiesDenied: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v3 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v3");
+    return !!v3 && v3.send_authority === "DENIED" && v3.mapping_authority === "DENIED"
+      && v3.activation_authority === "NOT_GRANTED" && v3.delete_authority === "NOT_GRANTED";
+  },
+  ledgerV3CitesBothEvidenceFiles: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v3 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v3");
+    return !!v3 && Array.isArray(v3.evidence) && v3.evidence.length === 2
+      && v3.evidence.includes(V3_SUBMISSION_EVIDENCE)
+      && v3.evidence.includes(V3_RECONCILIATION_EVIDENCE);
+  },
+  /** Approval must never be presented as consent/mapping/send authority. */
+  ledgerV3ApprovalGrantsNothing: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v3 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v3");
+    return !!v3 && /does not create ordinary consent authority/i.test(v3.notes)
+      && /PROVIDER CONTRACT ONLY/i.test(v3.notes);
+  },
+  modeLabelsAreHonest: () => modeLabel({}) === "DRY RUN (no network call)"
+    && modeLabel({ execute: true }) === "EXECUTE"
+    && modeLabel({ reconcileOnly: true }) === "RECONCILE ONLY (read-only network)"
+    && !/DRY RUN/.test(modeLabel({ reconcileOnly: true })),
+  heldDryRunNeverSaysWouldCreate: () => {
+    // The held branch must precede the WOULD CREATE loop and must exit.
+    const held = submitExec.indexOf("HELD / CREATE NOT AUTHORIZED");
+    const would = submitExec.indexOf("WOULD CREATE");
+    const body = held >= 0 ? submitExec.slice(held, would) : "";
+    return held >= 0 && would > held && /process\.exit\(0\)/.test(body)
+      && !/WOULD CREATE/.test(body);
+  },
+  executeRejectsHeldBeforeNetwork: () => {
+    const gate = submitExec.indexOf("EXECUTE && target.submit_now !== true");
+    const post = submitExec.indexOf('method: "POST"');
+    const fetchIdx = submitExec.indexOf("await fetch(");
+    return gate >= 0 && gate < post && gate < fetchIdx;
+  },
+  packetNoteNotUniformlyDraft: (p) => /NOT uniformly draft/i.test(p.note)
+    && /APPROVED_UNMAPPED/.test(p.note),
   // ---- boundary ----------------------------------------------------------
   noMigrationOnBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only",
@@ -404,7 +493,8 @@ const RULES = [
   ["P12 provider names valid and unique", R.namesValidAndUnique, packet],
   ["P13 provider names carry no environment name or long id", R.namesCarryNoEnvOrIds, packet],
   ["P14 every payload has a deterministic fingerprint", R.deterministicPayloads, packet],
-  ["P15 nothing is approved, submitted or given a provider template id", R.nothingApproved, packet],
+  ["P15 closed state model: Wave 0 approved+held, all others draft", R.closedStateModel, packet],
+  ["P80 no remote template id anywhere in packet or ledger", R.noRemoteIdAnywhere, packet],
   ["P16 consent acknowledgements remain outside the ordinary registry", R.acksStayOutOfOrdinaryRegistry, packet],
   ["P17 packet carries no secret, WABA id or PII", R.noSecretOrPii, packet],
   ["P18 official contract references are recorded", R.contractReferencesRecorded, packet],
@@ -443,7 +533,7 @@ const RULES = [
   ["P51 retired v1 and v2 are absent from every candidate", R.retiredNamesAbsentFromCandidates, packet],
   ["P70 Wave 0 body is a strict Utility rewrite (no URL, no promo surface)", R.wave0BodyIsStrictUtility, packet],
   ["P71 remote-state ledger exists", R.ledgerExists, packet],
-  ["P72 ledger holds exactly the two historical Wave 0 entries", R.ledgerExactlyTwoEntries, packet],
+  ["P72 the two historical ledger records survive untouched", R.ledgerHistoricalPairIntact, packet],
   ["P73 ledger records v1 as retired/deleted", R.ledgerV1Retired, packet],
   ["P74 ledger records v2 APPROVED as MARKETING and quarantined", R.ledgerV2QuarantinedMarketing, packet],
   ["P75 ledger denies v2 send/mapping and withholds delete/appeal", R.ledgerV2AuthoritiesDenied, packet],
@@ -451,6 +541,15 @@ const RULES = [
   ["P77 ledger cites the exact reconciliation evidence file", R.ledgerCitesReconciliationEvidence, packet],
   ["P78 ledger makes no body/component equality claim", R.ledgerMakesNoBodyEqualityClaim, packet],
   ["P79 ledger carries no template/WABA/request id, token or raw body", R.ledgerCarriesNoIdentifiers, packet],
+  ["P81 ledger holds exactly the three Wave 0 entries", R.ledgerHasThreeEntries, packet],
+  ["P82 ledger records v3 APPROVED as UTILITY with proven counts", R.ledgerV3ApprovedUtility, packet],
+  ["P83 ledger denies v3 send/mapping/activation/delete", R.ledgerV3AuthoritiesDenied, packet],
+  ["P84 ledger cites both v3 evidence files exactly", R.ledgerV3CitesBothEvidenceFiles, packet],
+  ["P85 ledger states approval grants no consent/mapping/send authority", R.ledgerV3ApprovalGrantsNothing, packet],
+  ["P86 mode labels are honest (reconcile-only is not DRY RUN)", R.modeLabelsAreHonest, packet],
+  ["P87 a held dry run never prints WOULD CREATE", R.heldDryRunNeverSaysWouldCreate, packet],
+  ["P88 execute rejects a held target before any network call", R.executeRejectsHeldBeforeNetwork, packet],
+  ["P89 packet note no longer claims all entries are draft", R.packetNoteNotUniformlyDraft, packet],
   ["P52 safeMetaError extracts the four structured fields", R.safeErrorExtractsStructuredFields, packet],
   ["P53 safeMetaError normalises malformed values to null", R.safeErrorNormalisesMalformed, packet],
   ["P54 safeMetaError bounds the type length", R.safeErrorBoundsType, packet],
@@ -496,8 +595,11 @@ const MUT = [
     p.templates[0].provider_template_name = "QF Bad Name!"; }],
   ["M9  an environment name in a provider name is rejected", R.namesCarryNoEnvOrIds, packet, (p) => {
     p.templates[0].provider_template_name = "qf_staging_thing_v1"; }],
-  ["M10 a template marked approved is rejected", R.nothingApproved, packet, (p) => {
-    p.templates[0].local_state.approval_status = "approved"; }],
+  // templates[0] is a Wave 1 entry (sorted by key), so an approval there must still
+  // be rejected even though Wave 0 is legitimately approved now.
+  ["M10 a non-Wave-0 template marked approved is rejected", R.closedStateModel, packet, (p) => {
+    const other = p.templates.find((t) => t.internal_template_key !== "consent_help_response");
+    other.local_state.approval_status = "approved"; }],
   ["M11 an embedded WABA id is rejected", R.noSecretOrPii, packet, (p) => {
     p.templates[0].waba_id = "123456789012345"; }],
   ["M12 an embedded phone number is rejected", R.noSecretOrPii, packet, (p) => {
@@ -547,6 +649,19 @@ const MUT = [
     w0.creation_payload.components[0].text = "TAMPERED COPY."; }],
   ["M22 a retired v1 candidate is rejected", R.retiredNamesAbsentFromCandidates, packet, (p) => {
     p.templates[0].provider_template_name = "qf_consent_help_response_v1"; }],
+  ["M27 v3 reverted to draft is rejected", R.closedStateModel, packet, (p) => {
+    const w0 = p.templates.find((t) => t.submission_wave === 0);
+    w0.local_state.approval_status = "draft";
+    w0.local_state.submission_state = "DRAFT_NOT_SUBMITTED"; }],
+  ["M28 v3 submit_now true is rejected", R.closedStateModel, packet, (p) => {
+    p.templates.find((t) => t.submission_wave === 0).submit_now = true; }],
+  ["M29 any other template pre-approved is rejected", R.closedStateModel, packet, (p) => {
+    const other = p.templates.find((t) => t.submission_wave === 1);
+    other.local_state.approval_status = "approved"; }],
+  ["M30 a committed provider template id is rejected", R.closedStateModel, packet, (p) => {
+    p.templates.find((t) => t.submission_wave === 0).local_state.provider_template_id = "1234567890"; }],
+  ["M31 a packet note claiming all entries draft is rejected", R.packetNoteNotUniformlyDraft, packet, (p) => {
+    p.note = "Every entry here is a LOCAL CANDIDATE: none is approved."; }],
 ];
 for (const [n, fn, base, mutate] of MUT) {
   const copy = clone(base);

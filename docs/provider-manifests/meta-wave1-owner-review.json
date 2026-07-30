@@ -6,7 +6,7 @@
   "authorizes_meta_calls": false,
   "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. No template here is submitted, approved, mapped or active.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "35833d189f31ca8ccf0df8de3ab8088cb7c1566e5f804fc08e360ee8815b04e1",
+  "source_packet_fingerprint": "e69ab3bb4f4c434bad424906255c8637cc2072a683af6d9bf1d263b615ca0dc6",
   "counts": {
     "total": 14,
     "WAVE1A_ORDINARY_LAUNCH": 11,

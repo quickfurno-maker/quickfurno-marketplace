@@ -1,0 +1,64 @@
+{
+  "artifact": "meta-wave1-canary-review",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.10D",
+  "status": "OWNER_REVIEW_PENDING",
+  "authorizes_meta_calls": false,
+  "contains_secrets": false,
+  "note": "NON-SECRET. Recommends ONE template as the first Wave 1 canary. It AUTHORIZES ZERO META CALLS and grants no blanket Wave 1 authorization. Copy, category, language, profile, payload and fingerprint are copied verbatim from the source submission packet and are never rewritten here. Submitting even this single template requires explicit owner authorization and a separate operator run.",
+  "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
+  "source_packet_fingerprint": "e69ab3bb4f4c434bad424906255c8637cc2072a683af6d9bf1d263b615ca0dc6",
+  "wave0_precondition": {
+    "provider_template_name": "qf_consent_help_response_v3",
+    "last_proven_status": "APPROVED",
+    "last_proven_remote_category": "UTILITY",
+    "disposition": "APPROVED_UNMAPPED",
+    "note": "The Wave 0 Utility contract is closed and machine proven, which is what makes a variable-bearing Wave 1 Utility canary the sensible next step. It grants no send, mapping or activation authority."
+  },
+  "recommended_canary": {
+    "internal_template_key": "lead_received",
+    "provider_template_name": "qf_lead_received_v1",
+    "provider_language": "en",
+    "requested_category": "UTILITY",
+    "component_profile": "STANDARD_TEXT",
+    "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+    "body_spec": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
+    "creation_payload": {
+      "name": "qf_lead_received_v1",
+      "language": "en",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "body",
+          "text": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
+          "example": {
+            "body_text": [
+              [
+                "Asha"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "payload_fingerprint": "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c4739af640e16",
+    "recommendation": "RECOMMENDED_FIRST_WAVE1_CANARY",
+    "rationale": [
+      "Direct acknowledgement of a specific user enquiry the client themselves submitted.",
+      "No promotion, discount, renewal, recharge or external URL.",
+      "Exactly one bounded name variable.",
+      "No button and no action payload.",
+      "Exercises a VARIABLE-BEARING Utility template, which the no-variable Wave 0 proof did not cover."
+    ],
+    "owner_copy_decision": "PENDING_OWNER_REVIEW",
+    "submission_authorization": "NOT_AUTHORIZED",
+    "remote_submission_state": "NOT_SUBMITTED"
+  },
+  "explicit_non_authorizations": [
+    "This artefact does not authorize submitting lead_received.",
+    "It does not authorize any other Wave 1 template.",
+    "It does not authorize Wave 2 or Wave 3.",
+    "It does not authorize a provider mapping, runtime activation, canary send or deployment.",
+    "The other 13 Wave 1 templates remain NOT_AUTHORIZED and NOT_SUBMITTED in meta-wave1-owner-review.json."
+  ]
+}

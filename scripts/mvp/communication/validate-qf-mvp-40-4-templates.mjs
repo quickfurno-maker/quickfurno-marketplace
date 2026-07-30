@@ -110,15 +110,34 @@ const R = {
     return !claimsAssignment && /offer/.test(body);
   },
 
+/**
+ * QF-MVP-40.10D: the catalogue is no longer uniformly draft. Wave 0
+ * consent_help_response was approved by Meta as UTILITY and is now
+ * approved / APPROVED_UNMAPPED / held from creation. Relaxing this to
+ * "anything may be approved" would delete the guard, so it becomes a CLOSED
+ * state model: Wave 0 must be EXACTLY that, every other entry must still be
+ * draft, and no entry may ever carry a provider template id.
+ */
   allDraft(m) {
-    return allEntries(m).every((t) =>
-      t.submission_state === DRAFT && t.approval_status === "draft" && t.provider_template_id === null);
+    return allEntries(m).every((t) => {
+      if (t.provider_template_id !== null) return false;
+      if (t.internal_template_key === "consent_help_response") {
+        return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
+          && t.qf_mvp_40?.submit_now === false;
+      }
+      return t.submission_state === DRAFT && t.approval_status === "draft";
+    });
   },
 
   /** Nothing in the manifest may assert an active/approved provider mapping. */
   noActiveMapping(m) {
     const raw = JSON.stringify(m).toLowerCase();
-    if (/"(approval_status|submission_state)"\s*:\s*"(approved|active|submitted)"/.test(raw)) return false;
+    // "active"/"submitted" remain forbidden outright. "approved" is now permitted for
+    // EXACTLY the one Wave 0 entry Meta approved; allDraft pins which one that is.
+    if (/"(approval_status|submission_state)"\s*:\s*"(active|submitted)"/.test(raw)) return false;
+    const approved = allEntries(m).filter((t) => t.approval_status === "approved");
+    if (approved.length > 1) return false;
+    if (approved.length === 1 && approved[0].internal_template_key !== "consent_help_response") return false;
     return allEntries(m).every((t) => t.binding_contract?.binding_readiness !== "active");
   },
 
@@ -230,7 +249,16 @@ const MUTATIONS = [
     const t = m.groups.transactional_business.find((x) => x.internal_template_key === "vendor_new_lead");
     t.body_spec = "This lead has been assigned to you."; }],
   ["M11 a non-draft entry is rejected", R.allDraft, (m) => {
-    m.groups.marketing[0].submission_state = "APPROVED"; }],
+    m.groups.marketing[0].submission_state = "APPROVED_UNMAPPED";
+    m.groups.marketing[0].approval_status = "approved"; }],
+  ["M11b Wave 0 reverted to draft is rejected", R.allDraft, (m) => {
+    const t = m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response");
+    t.approval_status = "draft"; t.submission_state = "DRAFT_NOT_SUBMITTED"; }],
+  ["M11c Wave 0 re-armed for creation is rejected", R.allDraft, (m) => {
+    m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response")
+      .qf_mvp_40.submit_now = true; }],
+  ["M11d an approval on a second entry is rejected", R.noActiveMapping, (m) => {
+    m.groups.marketing[0].approval_status = "approved"; }],
   ["M12 an active binding readiness is rejected", R.noActiveMapping, (m) => {
     m.groups.marketing[0].binding_contract.binding_readiness = "active"; }],
   ["M13 a phone number in a fixture is rejected", R.fixturesHaveNoPii, (m) => {

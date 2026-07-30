@@ -142,6 +142,22 @@ export const ReconcileOutcome = Object.freeze({
 export const MAX_FILENAME_KEY_LENGTH = 64;
 
 /**
+ * Human-readable mode label.
+ *
+ * QF-MVP-40.10D: --reconcile-only previously printed "DRY RUN (no network call)",
+ * which was false — it performs read-only GETs. A label that understates network
+ * contact is exactly the kind of thing an operator relies on when deciding whether a
+ * command is safe to run, so each mode now states precisely what it does.
+ */
+export function modeLabel({ execute = false, reconcileOnly = false } = {}) {
+  if (execute && reconcileOnly) return "INVALID (execute + reconcile-only)";
+  if (execute) return "EXECUTE";
+  if (reconcileOnly) return "RECONCILE ONLY (read-only network)";
+  return "DRY RUN (no network call)";
+}
+
+
+/**
  * Bounded, filename-safe transform of an INTERNAL key. Never copies provider or
  * remote input into a path: anything outside [a-z0-9_-] becomes "_" and the result
  * is length-capped, so a hostile or oversized value cannot shape a filename.
@@ -331,7 +347,7 @@ async function main() {
     process.exit(2);
   }
 
-  console.log(`Mode           : ${EXECUTE ? "EXECUTE" : "DRY RUN (no network call)"}`);
+  console.log(`Mode           : ${modeLabel({ execute: EXECUTE, reconcileOnly: RECONCILE_ONLY })}`);
   console.log(`Wave           : ${WAVE}`);
   console.log(`Selected       : ${selected.length}`);
   console.log(`Submittable    : ${submittable.length}`);
@@ -339,6 +355,24 @@ async function main() {
   console.log("");
 
   if (!EXECUTE && !RECONCILE_ONLY) {
+    // A HELD template (submit_now false) must NEVER be described as "WOULD CREATE".
+    // Wave 0 is now held after approval, and printing a create preview for it would
+    // suggest a create is still pending when it is deliberately closed.
+    if (selection.template && selection.template.submit_now !== true) {
+      const t = selection.template;
+      console.log(`HELD / CREATE NOT AUTHORIZED  ${t.internal_template_key}`);
+      console.log(`  name        ${t.provider_template_name}`);
+      console.log(`  language    ${t.provider_language}`);
+      console.log(`  category    ${t.category}`);
+      console.log(`  profile     ${t.component_profile}`);
+      console.log(`  fingerprint ${t.payload_fingerprint}`);
+      console.log(`  state       approval=${t.local_state?.approval_status ?? "unknown"} submission=${t.local_state?.submission_state ?? "unknown"}`);
+      console.log("");
+      console.log("This template is HELD (submit_now=false). No create is authorized for it and no");
+      console.log("payload preview is shown. NO NETWORK CALL WAS MADE.");
+      process.exit(0);
+    }
+
     const dryList = selection.template ? [selection.template] : submittable;
     for (const t of dryList) {
       console.log(`WOULD CREATE  ${t.internal_template_key}`);
@@ -350,7 +384,11 @@ async function main() {
       console.log(`  payload     ${JSON.stringify(t.creation_payload)}`);
       console.log("");
     }
-    console.log("DRY RUN COMPLETE. Nothing was submitted, sent, edited or deleted.");
+    if (dryList.length === 0) {
+      console.log(`No submittable template in wave ${WAVE}: all ${held.length} are HELD (submit_now=false).`);
+      console.log("");
+    }
+    console.log("DRY RUN COMPLETE. Nothing was submitted, sent, edited or deleted. NO NETWORK CALL WAS MADE.");
     console.log("To create these, re-run with --execute and QF_META_GRAPH_API_VERSION, QF_META_WABA_ID and QF_META_ACCESS_TOKEN exported.");
     process.exit(0);
   }

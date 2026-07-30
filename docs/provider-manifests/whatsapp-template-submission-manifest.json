@@ -1,6 +1,6 @@
 {
-  "manifest_version": "1.6",
-  "phase": "QF-MVP-40.10C",
+  "manifest_version": "1.7",
+  "phase": "QF-MVP-40.10D",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
   "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
@@ -311,8 +311,8 @@
           "binding_readiness": "unresolved",
           "note": "template key is fixed by ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client_or_vendor",
@@ -324,13 +324,13 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {},
-          "notes": "Answers an inbound HELP command; evidence-bound, never ordinary outbound. SUPPORT DESTINATION: no external URL and no path is claimed. RECOVERY HISTORY (QF-MVP-40.10C): v1 was created PENDING and then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta later APPROVED it as MARKETING rather than the requested UTILITY, proven by a read-only reconciliation (outcome RECONCILED_CATEGORY_MISMATCH, create_post_count 0). v2 is therefore QUARANTINED_UNMAPPED with send and mapping authority DENIED: a marketing classification must never silently grant marketing send authority to an evidence-bound HELP reply. The reconciliation proves a CATEGORY mismatch; it does NOT separately prove that the remote body and components were otherwise identical, and no such claim is made. v3 is the current strict Utility candidate — no product pitch, vendor-discovery description, offer, promotion, discount, engagement prompt or external URL. v3 has NOT been submitted.",
+          "notes": "Answers an inbound HELP command; evidence-bound, never ordinary outbound. SUPPORT DESTINATION: no external URL and no path is claimed. WAVE 0 HISTORY (QF-MVP-40.10D): v1 was created PENDING and then DELETED by the former AiSensy partner; AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY, so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 — this strict Utility rewrite — was submitted with exactly one POST (CREATED_PENDING) and then reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true. THE WAVE 0 UTILITY CONTRACT IS CLOSED. v3 is APPROVED but UNMAPPED and CANNOT BE SENT: approval proves the provider contract only and creates no ordinary consent authority, mapping authority, runtime activation or send authority. submit_now is now false so no further create can be attempted for this key. No remote template id is stored in this repository. Mapping, activation and sending require a later, separately authorized phase.",
           "registry_expectation": "SPECIAL_EVIDENCE_BOUND_ACK",
           "ordinary_registry_entry": false,
           "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority.",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 0,
-          "submit_now": true
+          "submit_now": false
         },
         "provider_template_name_candidate": "qf_consent_help_response_v3"
       },

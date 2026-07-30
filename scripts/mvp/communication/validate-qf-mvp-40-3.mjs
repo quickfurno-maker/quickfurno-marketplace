@@ -243,10 +243,23 @@ add("E5  readiness document exists", existsSync(resolve(DOC)));
 const templateManifest = JSON.parse(
   readFileSync(resolve("docs/provider-manifests/whatsapp-template-submission-manifest.json"), "utf8"));
 const allTemplates = Object.values(templateManifest.groups).flat();
-add("F1  every template remains DRAFT_NOT_SUBMITTED",
-  allTemplates.every((t) => t.submission_state === "DRAFT_NOT_SUBMITTED"));
-add("F2  no template is marked approved or active",
-  allTemplates.every((t) => t.approval_status === "draft" && t.provider_template_id === null));
+/**
+ * QF-MVP-40.10D: the catalogue is no longer uniformly draft. Wave 0
+ * consent_help_response was approved by Meta as UTILITY and is now
+ * approved / APPROVED_UNMAPPED / held from creation. Relaxing this to
+ * "anything may be approved" would delete the guard, so it becomes a CLOSED
+ * state model: Wave 0 must be EXACTLY that, every other entry must still be
+ * draft, and no entry may ever carry a provider template id.
+ */
+const WAVE0_CLOSED = "consent_help_response";
+const closedState = (t) => (t.internal_template_key === WAVE0_CLOSED
+  ? t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
+    && t.qf_mvp_40?.submit_now === false
+  : t.submission_state === "DRAFT_NOT_SUBMITTED" && t.approval_status === "draft");
+add("F1  submission state is closed: Wave 0 approved+held, all others draft",
+  allTemplates.every(closedState));
+add("F2  no template carries a provider template id, approved or not",
+  allTemplates.every((t) => t.provider_template_id === null));
 add("F3  acknowledgement Meta category candidate remains utility",
   allTemplates.filter((t) => t.internal_template_key.startsWith("consent_"))
     .every((t) => t.category === "utility"));

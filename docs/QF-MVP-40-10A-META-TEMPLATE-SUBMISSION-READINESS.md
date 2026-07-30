@@ -8,7 +8,7 @@ submission packet and wave plan (40.10A).
 > see §0. It remains true that **no WhatsApp message has ever been sent**, and that **no provider
 > mapping, provider account, runtime policy, webhook or canary has been activated**.
 
-**The current Wave 0 candidate (v2) has NOT been submitted. No migration. No deployment.**
+**Superseded by QF-MVP-40.10D:** Wave 0 `qf_consent_help_response_v3` was subsequently submitted and **approved by Meta as UTILITY**, closing the Wave 0 contract. It is `APPROVED_UNMAPPED` and **held from creation** (`submit_now: false`). Approval proves the provider contract only — it grants no consent, mapping, activation or send authority. See [QF-MVP-40.10D](QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md). No migration. No deployment.
 
 Artefacts: [`meta-template-submission-packet.json`](provider-manifests/meta-template-submission-packet.json) ·
 [generator](../scripts/mvp/communication/generate-meta-template-submission-packet.mjs) ·
@@ -207,14 +207,15 @@ deterministic, unique, version-suffixed, and carrying no environment name, WABA 
 client/vendor data. The version suffix is what makes a controlled retirement possible: Wave 0 moved
 from `_v1` to `_v2` after the incident in §0 without touching the approved copy.
 
-Recorded as `provider_template_name_candidate`; `provider_template_id` stays null until Meta assigns
-one. Every entry remains `draft` / `DRAFT_NOT_SUBMITTED`.
+Recorded as `provider_template_name_candidate`; `provider_template_id` stays null and **no remote template id is ever committed**, even after approval.
+
+Since QF-MVP-40.10D the packet follows a **closed state model** rather than a uniform draft claim: Wave 0 `consent_help_response` is `approved` / `APPROVED_UNMAPPED` / `submit_now: false`, and every **other** entry remains `draft` / `DRAFT_NOT_SUBMITTED`. An unexpected approval anywhere else still fails the gate.
 
 ## 8. Wave plan — reconciles to 25
 
 | Wave | Count | Contents | `submit_now` |
 |---|---|---|---|
-| **0** | **1** | `consent_help_response` → **`qf_consent_help_response_v3`** — no-variable utility API-contract canary (v1 retired, v2 quarantined as MARKETING, §0) | ✅ |
+| **0** | **1** | `consent_help_response` → **`qf_consent_help_response_v3`** — no-variable utility API-contract canary (v1 retired, v2 quarantined as MARKETING, §0) | ❌ **APPROVED as UTILITY, now held from creation** (40.10D) |
 | **1** | **14** | Launch transport: consent acks + client/vendor transactional | ✅ |
 | **2** | **3** | Authentication templates | ❌ **held from the Wave 0 task** — see §8.1 |
 | **3** | **3** | Marketing (QF-MVP-50) — may absorb approval latency; unusable without consent, frequency policy, active mapping and orchestration | ✅ |
@@ -255,16 +256,17 @@ fingerprint `12f98c8b…`; nothing submitted, sent, edited or deleted.
 
 ## 10. Is real submission safe now?
 
-**Current status: WAVE 0 PROVIDER LIFECYCLE PROVEN — create, readback, approval and read-only
-reconciliation all work end to end. The WAVE 0 UTILITY-CATEGORY CONTRACT IS NOT YET PROVEN: Meta
-approved v2 as MARKETING, so v2 is quarantined and unmapped and v3 is prepared but NOT SUBMITTED.
-v2's approval authorizes no marketing send. OWNER REVIEW REQUIRED BEFORE A NEW `--execute`.
-NO DEPLOYMENT.**
+**Current status (QF-MVP-40.10D): WAVE 0 PROVIDER LIFECYCLE AND UTILITY-CATEGORY CONTRACT BOTH
+PROVEN — v3 was created with exactly one POST and reconciled read-only to APPROVED with
+returned_category UTILITY. v3 is APPROVED_UNMAPPED and HELD FROM CREATION. v2 remains quarantined,
+neither deleted nor appealed, and authorizes no marketing send. Approval grants the PROVIDER
+CONTRACT ONLY — no consent authority, no mapping, no activation, no send. NO DEPLOYMENT.**
 
 No Meta approval and no staging verification is claimed. Wave 2 stays `submit_now: false` because it
 is **held from the Wave 0 execution task**, not because of a send precondition — see §8.1. Wave 4
-remains deferred to QF-MVP-70. Waves 1 and 3 remain owner-reviewable but unauthorised until Wave 0 v2
-is proven.
+remains deferred to QF-MVP-70. Waves 1 and 3 remain owner-reviewable but unauthorised; QF-MVP-40.10D
+recommends `lead_received` as the first Wave 1 canary, which is a recommendation only — submitting it
+still requires explicit owner authorization.
 
 Remaining blockers before any activation: Meta credentials configured; provider account seeded and
 independently verified; staging runtime policy created in a **disabled** state; approved provider

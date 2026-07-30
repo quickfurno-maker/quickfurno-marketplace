@@ -16,13 +16,19 @@ import {
   templatesAreIdentical, validateEnvironment,
 } from "./submit-meta-templates.mjs";
 
-/** The exact, owner-approved Wave 0 recovery contract. */
+/**
+ * The exact Wave 0 contract. QF-MVP-40.10C: v2 was APPROVED BY META AS MARKETING
+ * rather than the requested UTILITY, so it is quarantined and v3 is the strict
+ * Utility candidate. Both earlier names are retired and must never reappear as a
+ * CURRENT candidate — a historical note or the remote-state ledger may name them.
+ */
 const WAVE0_KEY = "consent_help_response";
-const WAVE0_NAME = "qf_consent_help_response_v2";
-const WAVE0_RETIRED_NAME = "qf_consent_help_response_v1";
-const WAVE0_FINGERPRINT = "afa6f9c310dc98c54440c1b4e6c3521b4963ea306a615f2788474c2f07c17a73";
-const WAVE0_BODY = "QuickFurno connects you with verified furniture and interior vendors. "
-  + "Reply STOP to stop messages, or START to resume. For support, visit quickfurno.in.";
+const WAVE0_NAME = "qf_consent_help_response_v3";
+const WAVE0_RETIRED_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2"];
+const WAVE0_FINGERPRINT = "12f98c8b9504194ef9d983a606c9edd1c083dab1ba187915bdbea85fbc3e6c87";
+const WAVE0_BODY = "QuickFurno received your HELP request. Reply STOP to stop messages or "
+  + "START to resume. Continue this chat for support.";
+const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
 const sha256 = (x) => createHash("sha256").update(x).digest("hex");
 
 const MANIFEST = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
@@ -228,12 +234,23 @@ const R = {
       && t.payload_fingerprint === WAVE0_FINGERPRINT
       && !/\{\{\d+\}\}/.test(JSON.stringify(c));
   },
-  retiredV1AbsentFromCandidates: (p) => {
+  retiredNamesAbsentFromCandidates: (p) => {
     const m = JSON.parse(readFileSync(resolve(MANIFEST), "utf8"));
     const candidates = Object.values(m.groups).flat().map((t) => t.provider_template_name_candidate);
-    // v1 may still be NAMED in the historical note; it must never be a CANDIDATE.
-    return !candidates.includes(WAVE0_RETIRED_NAME)
-      && !JSON.stringify(p.templates).includes(WAVE0_RETIRED_NAME);
+    // A retired name may still be NAMED in a historical note or the remote ledger;
+    // it must never be a CURRENT candidate or appear in a packet template entry.
+    return WAVE0_RETIRED_NAMES.every((n) =>
+      !candidates.includes(n) && !JSON.stringify(p.templates).includes(n));
+  },
+  /** The strict Utility rewrite must carry no promotional surface at all. */
+  wave0BodyIsStrictUtility: (p) => {
+    const w0 = p.templates.find((t) => t.submission_wave === 0);
+    const body = w0?.creation_payload?.components?.find((c) => c.type === "body")?.text ?? "";
+    if (body !== WAVE0_BODY) return false;
+    // No external URL, and none of the promotional/vendor-discovery phrasing that
+    // plausibly drew the MARKETING classification onto v2.
+    return !/https?:\/\/|www\.|\.in\b|\.com\b/i.test(body)
+      && !/verified|vendors|interior|furniture|connect|discover|offer|discount|promo/i.test(body);
   },
 
   // ---- safeMetaError -----------------------------------------------------
@@ -304,6 +321,65 @@ const R = {
                                 submitExec.indexOf("const pre = await lookupExact"));
     return /try\s*{/.test(fn) && /catch/.test(fn) && /ok: false/.test(fn);
   },
+
+  // ---- QF-MVP-40.10C remote-state ledger ---------------------------------
+  ledgerExists: () => existsSync(resolve(REMOTE_STATE)),
+  ledgerExactlyTwoEntries: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    return Array.isArray(L.entries) && L.entries.length === 2
+      && L.entries.map((e) => e.provider_template_name).join(",")
+         === "qf_consent_help_response_v1,qf_consent_help_response_v2";
+  },
+  ledgerV1Retired: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v1 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v1");
+    return !!v1 && v1.last_proven_status === "DELETED"
+      && v1.disposition === "RETIRED_DELETED_BY_FORMER_PARTNER"
+      && v1.send_authority === "DENIED" && v1.mapping_authority === "DENIED";
+  },
+  ledgerV2QuarantinedMarketing: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v2 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v2");
+    return !!v2
+      && v2.last_proven_status === "APPROVED"
+      && v2.last_proven_remote_category === "MARKETING"
+      && v2.requested_category === "UTILITY"
+      && v2.disposition === "QUARANTINED_UNMAPPED"
+      && v2.reconciliation_outcome === "RECONCILED_CATEGORY_MISMATCH"
+      && v2.create_post_count_at_reconciliation === 0
+      && v2.readback_semantic_match === false;
+  },
+  ledgerV2AuthoritiesDenied: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v2 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v2");
+    return !!v2 && v2.send_authority === "DENIED" && v2.mapping_authority === "DENIED"
+      && v2.delete_authority === "NOT_GRANTED" && v2.appeal_authority === "NOT_GRANTED";
+  },
+  ledgerAuthorizesNothing: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    return L.authorizes_meta_calls === false && L.authorizes_mapping === false
+      && L.authorizes_sending === false && L.contains_secrets === false;
+  },
+  ledgerCitesReconciliationEvidence: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const v2 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v2");
+    return !!v2 && Array.isArray(v2.evidence)
+      && v2.evidence.includes("QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T13-31-55-439Z.json");
+  },
+  /** The ledger must NOT claim body/component equality either way. */
+  ledgerMakesNoBodyEqualityClaim: () => {
+    const raw = readFileSync(resolve(REMOTE_STATE), "utf8");
+    const L = JSON.parse(raw);
+    const v2 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v2");
+    return /does NOT separately prove/i.test(v2.notes)
+      && !/only the category|body (is|was) identical|components (are|were) identical/i.test(raw);
+  },
+  ledgerCarriesNoIdentifiers: () => {
+    const raw = readFileSync(resolve(REMOTE_STATE), "utf8");
+    return !/"(template_id|waba_id|phone_number_id|request_id|access_token|app_secret|verify_token)"/i.test(raw)
+      && !/(EAA[A-Za-z0-9]{10,}|eyJ[A-Za-z0-9._-]{20,}|Bearer\s+[A-Za-z0-9._-]{12,}|\+\d[\d\s-]{8,})/.test(raw)
+      && !/raw_body|response_body|error_message/i.test(raw);
+  },
   // ---- boundary ----------------------------------------------------------
   noMigrationOnBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only",
@@ -364,7 +440,17 @@ const RULES = [
   ["P48 every payload fingerprint is EXACT sha256(creation_payload)", R.everyFingerprintExact, packet],
   ["P49 source manifest fingerprint is EXACT sha256(manifest bytes)", R.sourceManifestFingerprintExact, packet],
   ["P50 Wave 0 v2 recovery contract is exact", R.wave0RecoveryContractExact, packet],
-  ["P51 retired v1 is absent from every candidate", R.retiredV1AbsentFromCandidates, packet],
+  ["P51 retired v1 and v2 are absent from every candidate", R.retiredNamesAbsentFromCandidates, packet],
+  ["P70 Wave 0 body is a strict Utility rewrite (no URL, no promo surface)", R.wave0BodyIsStrictUtility, packet],
+  ["P71 remote-state ledger exists", R.ledgerExists, packet],
+  ["P72 ledger holds exactly the two historical Wave 0 entries", R.ledgerExactlyTwoEntries, packet],
+  ["P73 ledger records v1 as retired/deleted", R.ledgerV1Retired, packet],
+  ["P74 ledger records v2 APPROVED as MARKETING and quarantined", R.ledgerV2QuarantinedMarketing, packet],
+  ["P75 ledger denies v2 send/mapping and withholds delete/appeal", R.ledgerV2AuthoritiesDenied, packet],
+  ["P76 ledger authorizes no calls, mapping or sending", R.ledgerAuthorizesNothing, packet],
+  ["P77 ledger cites the exact reconciliation evidence file", R.ledgerCitesReconciliationEvidence, packet],
+  ["P78 ledger makes no body/component equality claim", R.ledgerMakesNoBodyEqualityClaim, packet],
+  ["P79 ledger carries no template/WABA/request id, token or raw body", R.ledgerCarriesNoIdentifiers, packet],
   ["P52 safeMetaError extracts the four structured fields", R.safeErrorExtractsStructuredFields, packet],
   ["P53 safeMetaError normalises malformed values to null", R.safeErrorNormalisesMalformed, packet],
   ["P54 safeMetaError bounds the type length", R.safeErrorBoundsType, packet],
@@ -437,10 +523,21 @@ const MUT = [
       // unsafe AND the real comparison catches it — so the rule below must see FALSE.
       return categoryOnly(a, b) === true && templatesAreIdentical(a, b) === false ? false : true;
     }, packet, () => {}],
-  ["M18 a stale v1 Wave 0 name is rejected", R.wave0RecoveryContractExact, packet, (p) => {
+  ["M18 a stale v2 Wave 0 name is rejected", R.wave0RecoveryContractExact, packet, (p) => {
     const w0 = p.templates.find((t) => t.submission_wave === 0);
-    w0.provider_template_name = "qf_consent_help_response_v1";
-    w0.creation_payload.name = "qf_consent_help_response_v1"; }],
+    w0.provider_template_name = "qf_consent_help_response_v2";
+    w0.creation_payload.name = "qf_consent_help_response_v2"; }],
+  ["M23 v2 remaining a current candidate is rejected", R.retiredNamesAbsentFromCandidates, packet, (p) => {
+    p.templates[0].provider_template_name = "qf_consent_help_response_v2"; }],
+  ["M24 the old vendor-discovery body is rejected", R.wave0BodyIsStrictUtility, packet, (p) => {
+    const w0 = p.templates.find((t) => t.submission_wave === 0);
+    w0.creation_payload.components[0].text =
+      "QuickFurno connects you with verified furniture and interior vendors. Reply STOP to stop messages, or START to resume."; }],
+  ["M25 an external URL in the Wave 0 body is rejected", R.wave0BodyIsStrictUtility, packet, (p) => {
+    const w0 = p.templates.find((t) => t.submission_wave === 0);
+    w0.creation_payload.components[0].text = WAVE0_BODY + " Visit https://quickfurno.in"; }],
+  ["M26 a stale v3 fingerprint is rejected", R.wave0RecoveryContractExact, packet, (p) => {
+    p.templates.find((t) => t.submission_wave === 0).payload_fingerprint = "0".repeat(64); }],
   ["M19 a stale payload fingerprint is rejected", R.everyFingerprintExact, packet, (p) => {
     p.templates[0].payload_fingerprint = "0".repeat(64); }],
   ["M20 a stale source-manifest fingerprint is rejected", R.sourceManifestFingerprintExact, packet, (p) => {
@@ -448,7 +545,7 @@ const MUT = [
   ["M21 a changed body keeping the old fingerprint is rejected", R.wave0RecoveryContractExact, packet, (p) => {
     const w0 = p.templates.find((t) => t.submission_wave === 0);
     w0.creation_payload.components[0].text = "TAMPERED COPY."; }],
-  ["M22 a retired v1 candidate is rejected", R.retiredV1AbsentFromCandidates, packet, (p) => {
+  ["M22 a retired v1 candidate is rejected", R.retiredNamesAbsentFromCandidates, packet, (p) => {
     p.templates[0].provider_template_name = "qf_consent_help_response_v1"; }],
 ];
 for (const [n, fn, base, mutate] of MUT) {

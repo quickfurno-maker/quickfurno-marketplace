@@ -100,7 +100,7 @@ const packet = {
   schema_version: "1.0",
   phase: "QF-MVP-40.10A",
   generator: "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  note: "NON-SECRET. Every entry here is a LOCAL CANDIDATE: none is claimed approved, mapped or active, and no provider_template_id is real. HISTORY: the Wave 0 provider name qf_consent_help_response_v1 WAS created on the QuickFurno WABA on 2026-07-30 and returned PENDING, then was DELETED by the former AiSensy partner (proven by the Meta WhatsApp Manager Activity Log); AiSensy partner access has since been removed. v1 is retired and the Wave 0 candidate is now v2, which has NOT been submitted.",
+  note: "NON-SECRET. Every entry here is a LOCAL CANDIDATE: none is claimed approved, mapped or active, and no provider_template_id is real. WAVE 0 HISTORY — v1 was created on the QuickFurno WABA and returned PENDING, then was DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access has since been removed and v1 is RETIRED. v2 was created and returned PENDING, and Meta later APPROVED it as MARKETING rather than the requested UTILITY — proven by a read-only reconciliation (RECONCILED_CATEGORY_MISMATCH, create_post_count 0). v2 is QUARANTINED_UNMAPPED with send and mapping authority DENIED, and is NOT deleted or appealed; see docs/provider-manifests/meta-template-remote-state.json. That reconciliation proves a CATEGORY mismatch and does NOT separately prove remote body/component equality. The current Wave 0 candidate is v3, a strict Utility rewrite that has NOT been submitted.",
   source_manifest: MANIFEST,
   source_manifest_fingerprint: manifestFingerprint,
   external_contract_references: [

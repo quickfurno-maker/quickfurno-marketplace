@@ -185,12 +185,26 @@ const R = {
 
   // ---- C. Documentation / boundary --------------------------------------
   docExists: () => existsSync(resolve(DOC)),
+  /**
+   * QF-MVP-40.10C: reconciliation has now RUN, so the old "must say reconciliation is
+   * pending" form is obsolete. The invariant it protected is unchanged and is
+   * restated against the current truth: the document must record the reconciled
+   * result (APPROVED **as MARKETING**) and must never present a proven Utility
+   * approval or an authorized Wave 1.
+   */
   ownerApprovalNotMachineProven: () => {
     const doc = readFileSync(resolve(DOC), "utf8");
-    // The document must name the owner report AND state reconciliation is pending;
-    // it must not assert a reconciled/proven approval for Wave 0.
-    return /OWNER[- ]REPORTED/i.test(doc) && /RECONCILIATION PENDING/i.test(doc)
-      && !/RECONCILED_APPROVED\b(?![^\n]*pending)/i.test(doc.replace(/`[^`]*`/g, ""));
+    const recordsReconciledResult = /RECONCILED_CATEGORY_MISMATCH/.test(doc)
+      && /MARKETING/.test(doc) && /QUARANTINED_UNMAPPED/.test(doc);
+    // Target an actual CLAIM, not any mention of the outcome vocabulary: the doc
+    // legitimately enumerates every possible reconciliation outcome (including
+    // RECONCILED_APPROVED) when describing the read-only mode. What must never
+    // appear is an assertion that THIS template was approved as Utility.
+    const claimsUtilityProven =
+      /\bUTILITY\b[^.\n]{0,80}\b(was |is )?(proven|approved|granted|confirmed)\b/i.test(doc)
+      || /\b(approved|reconciled)\b[^.\n]{0,40}\bas UTILITY\b/i.test(doc);
+    const wave1StillBlocked = /WAVE 1 META SUBMISSION NOT AUTHORIZED/i.test(doc);
+    return recordsReconciledResult && !claimsUtilityProven && wave1StillBlocked;
   },
   noMigrationInBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only", `${BRANCH_BASE}..HEAD`], { encoding: "utf8" });

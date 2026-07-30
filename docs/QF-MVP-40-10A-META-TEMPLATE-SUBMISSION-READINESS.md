@@ -44,10 +44,39 @@ the name avoids depending on unproven deleted-name reuse behaviour.
 
 | | |
 |---|---|
-| Wave 0 provider name | `qf_consent_help_response_v2` |
+| Wave 0 provider name | `qf_consent_help_response_v3` |
 | Language / category | `en` / `UTILITY` |
-| Payload fingerprint | `afa6f9c310dc98c54440c1b4e6c3521b4963ea306a615f2788474c2f07c17a73` |
+| Payload fingerprint | `12f98c8b9504194ef9d983a606c9edd1c083dab1ba187915bdbea85fbc3e6c87` |
 | State | **NOT SUBMITTED** — owner review required before any new `--execute` |
+
+### 0.1 v2 was submitted and APPROVED AS MARKETING — machine proven
+
+v2 was created and returned PENDING. A later **read-only** reconciliation proved the remote result:
+
+| Field | Value |
+|---|---|
+| `operation_mode` | `RECONCILE_ONLY` |
+| `requested_category` | `UTILITY` |
+| `returned_category` | **`MARKETING`** |
+| `status` | **`APPROVED`** |
+| template id | present (deliberately **not** recorded in the repository) |
+| `readback_semantic_match` | `false` |
+| `create_post_count` | **`0`** |
+| `outcome` | **`RECONCILED_CATEGORY_MISMATCH`** (exit 6) |
+
+**v2 is therefore `QUARANTINED_UNMAPPED`** — send authority DENIED, mapping authority DENIED, and it
+is deliberately **neither deleted nor appealed** in this phase. A Meta marketing classification must
+never silently grant marketing send authority to an evidence-bound HELP reply, nor bypass QuickFurno
+consent and suppression rules.
+
+**Non-claim:** `readback_semantic_match` is false and the semantic comparison *includes* category, so
+this evidence does **not** separately prove the remote body and components were otherwise identical.
+No body-equality claim is made in either direction.
+
+**v3** is the strict Utility replacement — no product pitch, vendor-discovery description, offer,
+promotion, discount, engagement prompt or external URL. Remote state is tracked in
+[`meta-template-remote-state.json`](provider-manifests/meta-template-remote-state.json).
+See [QF-MVP-40.10C](QF-MVP-40-10C-WAVE0-CATEGORY-RECOVERY.md).
 
 **Operator repair driven by the incident.** The lost 400 reason was a real evidence gap. The operator
 now extracts Meta's **structured** error fields only — `code`, `error_subcode`, `type` (length-bounded)
@@ -185,7 +214,7 @@ one. Every entry remains `draft` / `DRAFT_NOT_SUBMITTED`.
 
 | Wave | Count | Contents | `submit_now` |
 |---|---|---|---|
-| **0** | **1** | `consent_help_response` → **`qf_consent_help_response_v2`** — no-variable utility API-contract canary (v1 retired, §0) | ✅ |
+| **0** | **1** | `consent_help_response` → **`qf_consent_help_response_v3`** — no-variable utility API-contract canary (v1 retired, v2 quarantined as MARKETING, §0) | ✅ |
 | **1** | **14** | Launch transport: consent acks + client/vendor transactional | ✅ |
 | **2** | **3** | Authentication templates | ❌ **held from the Wave 0 task** — see §8.1 |
 | **3** | **3** | Marketing (QF-MVP-50) — may absorb approval latency; unusable without consent, frequency policy, active mapping and orchestration | ✅ |
@@ -221,13 +250,16 @@ different-category collision, stops on the first ambiguous response, and records
 (internal key, provider name, status, category, template id, UTC). Secrets come from
 `QF_META_WABA_ID` / `QF_META_ACCESS_TOKEN` and are never printed.
 
-**Dry run executed for Wave 0 (v2)** — 1 selected, 1 submittable, 0 held; payload printed with
-fingerprint `afa6f9c3…`; nothing submitted, sent, edited or deleted.
+**Dry run executed for Wave 0 (v3)** — 1 selected, 1 submittable, 0 held; payload printed with
+fingerprint `12f98c8b…`; nothing submitted, sent, edited or deleted.
 
 ## 10. Is real submission safe now?
 
-**Current status: IMPLEMENTATION COMPLETE — OFFLINE REPAIR ONLY. WAVE 0 v2 NOT SUBMITTED. OWNER
-REVIEW REQUIRED BEFORE A NEW `--execute`. NO DEPLOYMENT.**
+**Current status: WAVE 0 PROVIDER LIFECYCLE PROVEN — create, readback, approval and read-only
+reconciliation all work end to end. The WAVE 0 UTILITY-CATEGORY CONTRACT IS NOT YET PROVEN: Meta
+approved v2 as MARKETING, so v2 is quarantined and unmapped and v3 is prepared but NOT SUBMITTED.
+v2's approval authorizes no marketing send. OWNER REVIEW REQUIRED BEFORE A NEW `--execute`.
+NO DEPLOYMENT.**
 
 No Meta approval and no staging verification is claimed. Wave 2 stays `submit_now: false` because it
 is **held from the Wave 0 execution task**, not because of a send precondition — see §8.1. Wave 4

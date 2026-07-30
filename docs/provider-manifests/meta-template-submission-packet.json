@@ -3,9 +3,9 @@
   "schema_version": "1.0",
   "phase": "QF-MVP-40.10A",
   "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  "note": "NON-SECRET. Every entry here is a LOCAL CANDIDATE: none is claimed approved, mapped or active, and no provider_template_id is real. HISTORY: the Wave 0 provider name qf_consent_help_response_v1 WAS created on the QuickFurno WABA on 2026-07-30 and returned PENDING, then was DELETED by the former AiSensy partner (proven by the Meta WhatsApp Manager Activity Log); AiSensy partner access has since been removed. v1 is retired and the Wave 0 candidate is now v2, which has NOT been submitted.",
+  "note": "NON-SECRET. Every entry here is a LOCAL CANDIDATE: none is claimed approved, mapped or active, and no provider_template_id is real. WAVE 0 HISTORY — v1 was created on the QuickFurno WABA and returned PENDING, then was DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access has since been removed and v1 is RETIRED. v2 was created and returned PENDING, and Meta later APPROVED it as MARKETING rather than the requested UTILITY — proven by a read-only reconciliation (RECONCILED_CATEGORY_MISMATCH, create_post_count 0). v2 is QUARANTINED_UNMAPPED with send and mapping authority DENIED, and is NOT deleted or appealed; see docs/provider-manifests/meta-template-remote-state.json. That reconciliation proves a CATEGORY mismatch and does NOT separately prove remote body/component equality. The current Wave 0 candidate is v3, a strict Utility rewrite that has NOT been submitted.",
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "e0c28b5e77f67b783ae0a43ccbbcf50dea77987f3a28904a6dff14a25fee5a4b",
+  "source_manifest_fingerprint": "633c71d0923b13c2537cd361dafb73dc8b489a2f6fea38abf03430003c02aaa2",
   "external_contract_references": [
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
@@ -413,7 +413,7 @@
     },
     {
       "internal_template_key": "consent_help_response",
-      "provider_template_name": "qf_consent_help_response_v2",
+      "provider_template_name": "qf_consent_help_response_v3",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
@@ -426,18 +426,18 @@
         "provider_template_id": null
       },
       "creation_payload": {
-        "name": "qf_consent_help_response_v2",
+        "name": "qf_consent_help_response_v3",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "QuickFurno connects you with verified furniture and interior vendors. Reply STOP to stop messages, or START to resume. For support, visit quickfurno.in."
+            "text": "QuickFurno received your HELP request. Reply STOP to stop messages or START to resume. Continue this chat for support."
           }
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "afa6f9c310dc98c54440c1b4e6c3521b4963ea306a615f2788474c2f07c17a73"
+      "payload_fingerprint": "12f98c8b9504194ef9d983a606c9edd1c083dab1ba187915bdbea85fbc3e6c87"
     },
     {
       "internal_template_key": "consent_start_acknowledgement",

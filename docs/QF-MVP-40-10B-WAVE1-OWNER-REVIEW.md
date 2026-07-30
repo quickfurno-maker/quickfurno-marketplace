@@ -17,12 +17,22 @@ Companions: [`meta-wave1-owner-review.json`](provider-manifests/meta-wave1-owner
 | `qf_consent_help_response_v2` submitted | **Yes** — one create POST, WABA identity matched |
 | Meta response | **PENDING**, immediate semantic readback succeeded, outcome `CREATED_PENDING` |
 | Owner report | **Approved** |
-| Machine reconciliation | **PENDING — not yet proven** |
+| Machine reconciliation | **DONE — and it contradicted the requested category** |
+| Reconciled result | **`APPROVED` but `returned_category: MARKETING`** (requested `UTILITY`) |
+| Reconciliation outcome | `RECONCILED_CATEGORY_MISMATCH`, `create_post_count: 0` |
+| v2 disposition | **`QUARANTINED_UNMAPPED`** — send and mapping DENIED; not deleted, not appealed |
+| Replacement | **`qf_consent_help_response_v3`**, strict Utility, fingerprint `12f98c8b…`, **NOT SUBMITTED** |
 | Message sent / mapping / activation | **None** |
 
-**The owner report is not machine-readable evidence.** Wave 0 approval is therefore recorded as
-`OWNER_REPORTED_PENDING_RECONCILIATION`. This task adds a genuinely read-only reconciliation mode so
-that approval can be proven later with **zero** possibility of a create POST:
+**The owner report was not machine-readable evidence — and reconciling it mattered.** The read-only
+run proved the remote template is `APPROVED` but classified by Meta as **MARKETING**, not the
+requested `UTILITY`. Accepting the owner report at face value would have mapped a marketing-classified
+template as the evidence-bound HELP reply. v2 is now quarantined and unmapped, and the strict Utility
+`v3` candidate is prepared but **not submitted** — see
+[QF-MVP-40.10C](QF-MVP-40-10C-WAVE0-CATEGORY-RECOVERY.md).
+
+**Wave 1 submission remains NOT AUTHORIZED**, and the Wave 0 Utility-category contract is still
+unproven. The reconciliation command that produced this result:
 
 ```
 node scripts/mvp/communication/submit-meta-templates.mjs \
@@ -148,7 +158,7 @@ category review** before submission. `category_review_decision: HOLD_FOR_EXPLICI
 
 1. **Merge no code yet.**
 2. Owner reviews the exact Wave 1 packet above.
-3. Run the Wave 0 **read-only** reconciliation and prove `RECONCILED_APPROVED`.
+3. Wave 0 reconciliation has RUN and returned `RECONCILED_CATEGORY_MISMATCH` (approved, but as MARKETING). Before Wave 1, the strict Utility `v3` candidate must be separately authorized, submitted and reconciled to a Utility approval.
 4. Authorize a **specific subset** — never the whole wave.
 5. Submit **one exact template key at a time**.
 6. **Stop on the first non-success.**
@@ -160,8 +170,10 @@ category review** before submission. `category_review_decision: HOLD_FOR_EXPLICI
 ## 6. Current status
 
 ```
-QF-MVP-40.10B IMPLEMENTATION PENDING
-WAVE 0 APPROVAL OWNER-REPORTED, RECONCILIATION PENDING
+QF-MVP-40.10B IMPLEMENTATION COMPLETE
+WAVE 0 RECONCILED: APPROVED AS MARKETING, NOT UTILITY
+WAVE 0 v2 QUARANTINED UNMAPPED
+WAVE 0 v3 STRICT UTILITY CANDIDATE READY, NOT SUBMITTED
 WAVE 1 OWNER REVIEW PENDING
 WAVE 1 META SUBMISSION NOT AUTHORIZED
 WAVE 2/3 NOT AUTHORIZED

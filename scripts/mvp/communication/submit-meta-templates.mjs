@@ -114,6 +114,92 @@ export function classifyCreateResponse({ threw = false, httpStatus = null, body 
 }
 
 // ---------------------------------------------------------------------------
+// QF-MVP-40.10B — PURE CLI CONTRACT HELPERS.
+//
+// Exported so the validator can prove every invalid combination offline, with no
+// credentials and no network. `resolveMode` and `selectTemplate` are the single
+// source of truth for which template (if any) an invocation may touch.
+// ---------------------------------------------------------------------------
+
+/** Closed operation modes recorded in evidence. Dry run writes no evidence at all. */
+export const OperationMode = Object.freeze({
+  EXECUTE_CREATE: "EXECUTE_CREATE",
+  RECONCILE_ONLY: "RECONCILE_ONLY",
+});
+
+/** Closed read-only reconciliation outcomes. None may be inferred from a local file. */
+export const ReconcileOutcome = Object.freeze({
+  RECONCILED_APPROVED: "RECONCILED_APPROVED",
+  RECONCILED_PENDING: "RECONCILED_PENDING",
+  RECONCILED_NOT_FOUND: "RECONCILED_NOT_FOUND",
+  RECONCILED_COLLISION: "RECONCILED_COLLISION",
+  RECONCILED_UNUSABLE_STATUS: "RECONCILED_UNUSABLE_STATUS",
+  RECONCILED_UNKNOWN_STATUS: "RECONCILED_UNKNOWN_STATUS",
+  RECONCILED_LOOKUP_FAILED: "RECONCILED_LOOKUP_FAILED",
+  RECONCILED_CATEGORY_MISMATCH: "RECONCILED_CATEGORY_MISMATCH",
+});
+
+export const MAX_FILENAME_KEY_LENGTH = 64;
+
+/**
+ * Bounded, filename-safe transform of an INTERNAL key. Never copies provider or
+ * remote input into a path: anything outside [a-z0-9_-] becomes "_" and the result
+ * is length-capped, so a hostile or oversized value cannot shape a filename.
+ */
+export function filenameSafeKey(key) {
+  if (typeof key !== "string" || key.length === 0) return "unknown";
+  const safe = key.toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, MAX_FILENAME_KEY_LENGTH);
+  return safe.length > 0 ? safe : "unknown";
+}
+
+/**
+ * Resolve the invocation mode. --execute and --reconcile-only are MUTUALLY
+ * EXCLUSIVE: asking to both create and merely observe is a contradiction, and
+ * guessing which one was meant is exactly the kind of silent choice this operator
+ * must never make.
+ */
+export function resolveMode({ execute = false, reconcileOnly = false } = {}) {
+  if (execute && reconcileOnly) {
+    return { ok: false, reason: "MODE_CONFLICT_EXECUTE_AND_RECONCILE_ONLY" };
+  }
+  if (execute) return { ok: true, mode: OperationMode.EXECUTE_CREATE, network: true };
+  if (reconcileOnly) return { ok: true, mode: OperationMode.RECONCILE_ONLY, network: true };
+  return { ok: true, mode: null, network: false };   // dry run
+}
+
+/**
+ * EXACT template selection. Matching is by full internal_template_key equality
+ * only — never a prefix, substring, provider name or fuzzy match, so a typo can
+ * never silently resolve to a different template.
+ *
+ * `requireSingle` is true for execute and reconcile-only: when the wave holds more
+ * than one candidate and no --template was given, this fails BEFORE any network
+ * call rather than picking one.
+ */
+export function selectTemplate({ templates = [], wave, templateKey = null, requireSingle = false } = {}) {
+  const inWave = templates.filter((t) => t.submission_wave === wave);
+  if (inWave.length === 0) return { ok: false, reason: "WAVE_EMPTY" };
+
+  if (templateKey !== null && templateKey !== undefined) {
+    if (typeof templateKey !== "string" || templateKey.length === 0) {
+      return { ok: false, reason: "TEMPLATE_KEY_INVALID" };
+    }
+    const exact = inWave.filter((t) => t.internal_template_key === templateKey);
+    if (exact.length === 0) {
+      // Distinguish "not in THIS wave" from "not in the packet at all".
+      const elsewhere = templates.some((t) => t.internal_template_key === templateKey);
+      return { ok: false, reason: elsewhere ? "TEMPLATE_KEY_NOT_IN_WAVE" : "TEMPLATE_KEY_NOT_FOUND" };
+    }
+    if (exact.length > 1) return { ok: false, reason: "TEMPLATE_KEY_AMBIGUOUS" };
+    return { ok: true, template: exact[0], candidates: inWave };
+  }
+
+  if (!requireSingle) return { ok: true, template: null, candidates: inWave };
+  if (inWave.length > 1) return { ok: false, reason: "TEMPLATE_KEY_REQUIRED_MULTIPLE_IN_WAVE" };
+  return { ok: true, template: inWave[0], candidates: inWave };
+}
+
+// ---------------------------------------------------------------------------
 // PURE CANONICALISER — the semantic identity of a template.
 //
 // Normalises ONLY harmless representation differences: the casing of structural
@@ -207,10 +293,18 @@ if (isEntry) { await main(); }
 async function main() {
   const argv = process.argv.slice(2);
   const EXECUTE = argv.includes("--execute");            // default: DRY RUN
+  const RECONCILE_ONLY = argv.includes("--reconcile-only");
   const WAVE = argv.includes("--wave") ? Number(argv[argv.indexOf("--wave") + 1]) : NaN;
+  const TEMPLATE_KEY = argv.includes("--template") ? argv[argv.indexOf("--template") + 1] ?? null : null;
 
   if (!Number.isInteger(WAVE)) {
     console.error("Refusing to run: an explicit --wave <n> is required. There is no submit-everything mode.");
+    process.exit(2);
+  }
+
+  const modeResult = resolveMode({ execute: EXECUTE, reconcileOnly: RECONCILE_ONLY });
+  if (!modeResult.ok) {
+    console.error(`Refusing to run: ${modeResult.reason}. --execute creates; --reconcile-only only observes. Choose one.`);
     process.exit(2);
   }
 
@@ -223,6 +317,20 @@ async function main() {
   const held = selected.filter((t) => t.submit_now !== true);
   const submittable = selected.filter((t) => t.submit_now === true);
 
+  // EXACT selection. requireSingle for anything that touches the network, so a
+  // multi-template wave without --template fails BEFORE a single request.
+  const selection = selectTemplate({
+    templates: packet.templates, wave: WAVE, templateKey: TEMPLATE_KEY,
+    requireSingle: EXECUTE || RECONCILE_ONLY,
+  });
+  if (!selection.ok) {
+    console.error(`Refusing to run: ${selection.reason}.`);
+    if (selection.reason === "TEMPLATE_KEY_REQUIRED_MULTIPLE_IN_WAVE") {
+      console.error(`  Wave ${WAVE} holds ${selected.length} templates. Pass --template <internal_template_key> to choose exactly one.`);
+    }
+    process.exit(2);
+  }
+
   console.log(`Mode           : ${EXECUTE ? "EXECUTE" : "DRY RUN (no network call)"}`);
   console.log(`Wave           : ${WAVE}`);
   console.log(`Selected       : ${selected.length}`);
@@ -230,8 +338,9 @@ async function main() {
   console.log(`Held (submit_now=false): ${held.length}${held.length ? " -> " + held.map((t) => t.internal_template_key).join(", ") : ""}`);
   console.log("");
 
-  if (!EXECUTE) {
-    for (const t of submittable) {
+  if (!EXECUTE && !RECONCILE_ONLY) {
+    const dryList = selection.template ? [selection.template] : submittable;
+    for (const t of dryList) {
       console.log(`WOULD CREATE  ${t.internal_template_key}`);
       console.log(`  name        ${t.provider_template_name}`);
       console.log(`  language    ${t.provider_language}`);
@@ -247,7 +356,7 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // EXECUTE path.
+  // NETWORK PATH — reached only by --execute or --reconcile-only.
   // -------------------------------------------------------------------------
   const envCheck = validateEnvironment(process.env);
   if (!envCheck.ok) {
@@ -258,8 +367,16 @@ async function main() {
     console.error("  currently enabled for the QuickFurno Meta app/WABA. There is no default.");
     process.exit(2);
   }
-  if (submittable.length !== 1) {
-    console.error(`Refusing to execute: this operator creates ONE template per run; wave ${WAVE} has ${submittable.length} submittable.`);
+  // The selection above already guaranteed exactly one target. Creating additionally
+  // requires that target to be submittable; reconciling is read-only and may observe
+  // a held template.
+  const target = selection.template;
+  if (!target) {
+    console.error("Refusing to run: no exact template was selected.");
+    process.exit(2);
+  }
+  if (EXECUTE && target.submit_now !== true) {
+    console.error(`Refusing to execute: ${target.internal_template_key} is held (submit_now=false).`);
     process.exit(2);
   }
 
@@ -271,7 +388,8 @@ async function main() {
   const reqId = (res) => res.headers.get("x-fb-request-id") ?? res.headers.get("x-fb-trace-id") ?? null;
 
   console.log(`API version    : ${API_VERSION}`);   // version is not a secret
-  const t = submittable[0];
+  console.log(`Operation mode : ${modeResult.mode}`);
+  const t = target;
   const record = {
     internal_template_key: t.internal_template_key,
     provider_template_name: t.provider_template_name,
@@ -289,6 +407,8 @@ async function main() {
     request_id: null,
     identity_match: null,
     readback_semantic_match: null,
+    // Which mode produced this record. RECONCILE_ONLY can never carry a create.
+    operation_mode: modeResult.mode,
     // QF-MVP-40.10A-R2 — STRUCTURED Meta error fields only. The 2026-07-30 incident
     // lost an HTTP 400 reason because only status + request id were kept. There is
     // deliberately NO raw body and NO error message field here.
@@ -303,7 +423,11 @@ async function main() {
 
   const finish = (outcome, code) => {
     record.outcome = outcome;
-    const path = `QF-MVP-40-WAVE${WAVE}-META-SUBMISSION-${stamp().replace(/[:.]/g, "-")}.json`;
+    const ts = stamp().replace(/[:.]/g, "-");
+    const safeKey = filenameSafeKey(t.internal_template_key);
+    const path = modeResult.mode === OperationMode.RECONCILE_ONLY
+      ? `QF-MVP-40-WAVE${WAVE}-${safeKey}-META-RECONCILIATION-${ts}.json`
+      : `QF-MVP-40-WAVE${WAVE}-META-SUBMISSION-${ts}.json`;
     writeFileSync(path, JSON.stringify(record, null, 2) + "\n", "utf8");
     console.log(`\nOutcome: ${outcome}`);
     console.log(`Sanitized evidence: ${path}`);
@@ -349,6 +473,54 @@ async function main() {
     const rows = body.data.filter((r) => r && r.name === t.provider_template_name
       && r.language === t.provider_language);
     return { ok: true, rows, httpStatus: res.status, requestId: reqId(res) };
+  }
+
+  // --- RECONCILE-ONLY: read-only, closed, and it ALWAYS finishes here ------
+  //
+  // This branch performs the WABA identity GET (already done above) plus ONE
+  // exact-name GET, then exits through finish(). It is placed BEFORE any create
+  // logic and terminates unconditionally, so a create can never be reached in this
+  // mode and create_post_count stays 0. No outcome here is derived from the local
+  // packet or an owner report — only from what Meta actually returns.
+  if (modeResult.mode === OperationMode.RECONCILE_ONLY) {
+    record.request_utc = stamp();
+    const look = await lookupExact();
+    record.response_utc = stamp();
+    record.http_status = look.httpStatus;
+    record.request_id = look.requestId;
+
+    if (!look.ok) finish(ReconcileOutcome.RECONCILED_LOOKUP_FAILED, 3);
+    if (look.rows.length === 0) finish(ReconcileOutcome.RECONCILED_NOT_FOUND, 4);
+    if (look.rows.length > 1) finish(ReconcileOutcome.RECONCILED_COLLISION, 4);
+
+    const row = look.rows[0];
+    const status = typeof row.status === "string" ? row.status.toUpperCase() : null;
+    const remoteCategory = typeof row.category === "string" ? row.category.toUpperCase() : null;
+    record.status = status;
+    record.returned_category = remoteCategory;
+    record.template_id = typeof row.id === "string" ? row.id : null;
+
+    const semanticMatch = templatesAreIdentical(row, t.creation_payload);
+    record.readback_semantic_match = semanticMatch;
+
+    // Category is compared EXPLICITLY as well as semantically, so a recategorisation
+    // is reported as exactly that rather than as a vague collision.
+    if (remoteCategory !== null && remoteCategory !== String(t.category).toUpperCase()) {
+      finish(ReconcileOutcome.RECONCILED_CATEGORY_MISMATCH, 6);
+    }
+    if (!semanticMatch) finish(ReconcileOutcome.RECONCILED_COLLISION, 4);
+    if (status === null || !KNOWN_TEMPLATE_STATUSES.includes(status)) {
+      finish(ReconcileOutcome.RECONCILED_UNKNOWN_STATUS, 4);
+    }
+    if (status === "APPROVED") {
+      if (!record.template_id) finish(ReconcileOutcome.RECONCILED_UNKNOWN_STATUS, 4);
+      finish(ReconcileOutcome.RECONCILED_APPROVED, 0);
+    }
+    if (status === "PENDING") {
+      if (!record.template_id) finish(ReconcileOutcome.RECONCILED_UNKNOWN_STATUS, 4);
+      finish(ReconcileOutcome.RECONCILED_PENDING, 0);
+    }
+    finish(ReconcileOutcome.RECONCILED_UNUSABLE_STATUS, 4);
   }
 
   const pre = await lookupExact();

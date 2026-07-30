@@ -1,0 +1,457 @@
+{
+  "artifact": "meta-wave1-owner-review",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.10B",
+  "status": "OWNER_REVIEW_PENDING",
+  "authorizes_meta_calls": false,
+  "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. No template here is submitted, approved, mapped or active.",
+  "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
+  "source_packet_fingerprint": "4ae687b9eeb8436d12ff34df0569f43bfcdef873a8657d23a87e66b175a8cd71",
+  "counts": {
+    "total": 14,
+    "WAVE1A_ORDINARY_LAUNCH": 11,
+    "WAVE1B_COMMERCIAL_CATEGORY_REVIEW": 3
+  },
+  "submission_protocol": [
+    "Owner reviews every entry: exact copy, requested category and fingerprint.",
+    "Run Wave 0 read-only reconciliation and PROVE approval before touching Wave 1.",
+    "Authorize a specific subset explicitly — never the whole wave at once.",
+    "Submit ONE exact internal_template_key per operator run (--template).",
+    "Stop on the first non-success. No retries.",
+    "Reconcile each remote status read-only.",
+    "Seed provider mappings INACTIVE only in a later separately authorized step.",
+    "No send or canary until mappings and staging gates are ready."
+  ],
+  "templates": [
+    {
+      "internal_template_key": "clarification_reminder",
+      "provider_template_name": "qf_clarification_reminder_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_clarification_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "1e7dddd0df8ea054c19e048bf0892eca2078473a46449a4b0b516a91dc145789",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "clarification_request",
+      "provider_template_name": "qf_clarification_request_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_clarification_request_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "preferred budget range"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "9c484b4d7e54929a2ab52b08093e1e719d3dfdb7b7c1741fa8b5e8e1daf85e4b",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "client_lead_status_update",
+      "provider_template_name": "qf_client_lead_status_update_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_client_lead_status_update_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, the status of your QuickFurno enquiry is now: {{2}}. Reply here if you have any questions.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "Vendors matched"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "client_matching_update",
+      "provider_template_name": "qf_client_matching_update_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_client_matching_update_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "3"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "consent_start_acknowledgement",
+      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_consent_start_acknowledgement_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help."
+          }
+        ]
+      },
+      "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "consent_stop_acknowledgement",
+      "provider_template_name": "qf_consent_stop_acknowledgement_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_consent_stop_acknowledgement_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: you have been unsubscribed. We will not send you further updates or promotional messages. Reply START to resume, or HELP for help."
+          }
+        ]
+      },
+      "payload_fingerprint": "850a4c01a48b78e237a85e186a448d8395abfb1e5049aaf6d8176b8628747268",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "lead_assignment_alert",
+      "provider_template_name": "qf_lead_assignment_alert_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_lead_assignment_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
+            "example": {
+              "body_text": [
+                [
+                  "LEAD-DEMO-0001"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "3f7997be7b8e1b019ba306a058b96f2d68aa84b7a014ea96407510030bb02453",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "lead_received",
+      "provider_template_name": "qf_lead_received_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_lead_received_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno received your enquiry. We're matching you with verified professionals.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c4739af640e16",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "low_credit_warning",
+      "provider_template_name": "qf_low_credit_warning_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_low_credit_warning_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your credit balance is low ({{1}}). Recharge to keep receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "4"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "e6158d328586d1c5366afdb8de5763a5d8733936b203652aa2eeb28fe0645589",
+      "submission_group": "WAVE1B_COMMERCIAL_CATEGORY_REVIEW",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "recharge_reminder",
+      "provider_template_name": "qf_recharge_reminder_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_recharge_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno reminder: recharge your credits to continue receiving matched leads."
+          }
+        ]
+      },
+      "payload_fingerprint": "fabc95abf66d8e71f598313de4ec8e568999223777c43d360e3eb292e862ce01",
+      "submission_group": "WAVE1B_COMMERCIAL_CATEGORY_REVIEW",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "vendor_new_lead",
+      "provider_template_name": "qf_vendor_new_lead_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "QUICK_REPLY",
+      "creation_payload": {
+        "name": "qf_vendor_new_lead_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "New QuickFurno lead OFFER in {{1}} for {{2}}. This is an offer, not an assignment. Open your dashboard to accept or decline.",
+            "example": {
+              "body_text": [
+                [
+                  "Pune",
+                  "Modular kitchen"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "buttons",
+            "buttons": [
+              {
+                "type": "QUICK_REPLY",
+                "text": "Accept lead"
+              },
+              {
+                "type": "QUICK_REPLY",
+                "text": "Decline lead"
+              }
+            ]
+          }
+        ]
+      },
+      "payload_fingerprint": "64e1e629d71a394843949ebe9ae1fb3e0a0c81187d7868c330dfb4bc19541fe1",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "vendor_onboarding_reminder",
+      "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_vendor_onboarding_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your vendor profile is not yet complete. Outstanding item: {{1}}. Complete it in your dashboard to start receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "GST certificate"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "vendor_package_expiry_warning",
+      "provider_template_name": "qf_vendor_package_expiry_warning_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_vendor_package_expiry_warning_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your vendor package expires on {{1}}. Renew in your dashboard to keep receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "12 August 2026"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "91767b9a3214f06915fd2eb688b57ccc90db1a7fa9570db8aa9631c582f7b404",
+      "submission_group": "WAVE1B_COMMERCIAL_CATEGORY_REVIEW",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "vendor_response_reminder",
+      "provider_template_name": "qf_vendor_response_reminder_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "creation_payload": {
+        "name": "qf_vendor_response_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Reminder from QuickFurno: a lead in {{1}} is still awaiting your response. Open your dashboard to accept or decline.",
+            "example": {
+              "body_text": [
+                [
+                  "Pune"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "a3833a69b3699f8750152350ec7ca877861d46d33a173168b54ba895633b8743",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    }
+  ]
+}

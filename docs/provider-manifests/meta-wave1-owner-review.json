@@ -1,14 +1,16 @@
 {
   "artifact": "meta-wave1-owner-review",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10B",
-  "status": "OWNER_REVIEW_PENDING",
+  "phase": "QF-MVP-40.10E",
+  "status": "PARTIALLY_REVIEWED",
   "authorizes_meta_calls": false,
-  "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. No template here is submitted, approved, mapped or active.",
+  "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. lead_received was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot authorization is CONSUMED, and being approved grants no consent, mapping, activation or send authority. The other 13 entries authorize ZERO Meta calls and remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: each further submission needs its own explicit owner authorization.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "e69ab3bb4f4c434bad424906255c8637cc2072a683af6d9bf1d263b615ca0dc6",
+  "source_packet_fingerprint": "b78d7dbb0b52058a2dc7b203cc4528815a0af7b22fdced9bf538bd67454b7dbd",
   "counts": {
     "total": 14,
+    "approved_unmapped": 1,
+    "pending_owner_review": 13,
     "WAVE1A_ORDINARY_LAUNCH": 11,
     "WAVE1B_COMMERCIAL_CATEGORY_REVIEW": 3
   },
@@ -255,10 +257,10 @@
       },
       "payload_fingerprint": "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c4739af640e16",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
-      "owner_copy_decision": "PENDING_OWNER_REVIEW",
-      "category_review_decision": "REVIEW_REQUIRED",
-      "submission_authorization": "NOT_AUTHORIZED",
-      "remote_submission_state": "NOT_SUBMITTED"
+      "owner_copy_decision": "APPROVED_BY_OWNER",
+      "category_review_decision": "UTILITY_MACHINE_PROVEN",
+      "submission_authorization": "CONSUMED",
+      "remote_submission_state": "APPROVED_UNMAPPED"
     },
     {
       "internal_template_key": "low_credit_warning",

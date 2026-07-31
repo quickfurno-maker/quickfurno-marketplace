@@ -91,7 +91,8 @@ The packet validator's old `nothingApproved` rule would now fail, and the tempti
 it — would have silently removed the guard that stops an unexpected approval appearing anywhere.
 It was replaced with a **closed state model** (`P15`):
 
-- Wave 0 must be exactly `approved` + `APPROVED_UNMAPPED` + `submit_now: false`;
+- Wave 0 must be exactly `approved` + `APPROVED_UNMAPPED` + `submit_now: false` *(40.10E widened this
+  to a pinned SET, adding `lead_received`)*;
 - every other template must be exactly `draft` + `DRAFT_NOT_SUBMITTED`;
 - **no** entry may ever carry a non-null `provider_template_id`.
 
@@ -145,6 +146,12 @@ Wave 1 templates stay `NOT_AUTHORIZED` / `NOT_SUBMITTED`.
 **Submitting even this one template requires separate, explicit owner authorization.** This
 document does not provide it.
 
+> **Superseded by [QF-MVP-40.10E](QF-MVP-40-10E-WAVE1-CANARY-CLOSURE.md).** That authorization was
+> subsequently given: `lead_received` was submitted with exactly one POST and reconciled read-only to
+> **APPROVED as UTILITY**. It is now `APPROVED_UNMAPPED` and HELD, its one-shot authorization is
+> CONSUMED, and the canary review artefact is `CLOSED_APPROVED_UNMAPPED`. The other 13 Wave 1
+> templates remain unauthorised.
+
 ---
 
 ## 5. Verification
@@ -161,7 +168,8 @@ Dry-run proofs executed (no network in any of them):
 
 - `--wave 0` → reports the wave is fully held, no `WOULD CREATE`
 - `--wave 0 --template consent_help_response` → `HELD / CREATE NOT AUTHORIZED`
-- `--wave 1 --template lead_received` → `WOULD CREATE` preview only
+- `--wave 1 --template lead_received` → `WOULD CREATE` preview only *(as of 40.10E this template is
+  closed and the same command now prints `HELD / CREATE NOT AUTHORIZED`)*
 
 `QF_META_ACCESS_TOKEN`, `QF_META_WABA_ID` and `QF_META_GRAPH_API_VERSION` were verified **absent by
 presence check only** — no value was printed, read or cleared.

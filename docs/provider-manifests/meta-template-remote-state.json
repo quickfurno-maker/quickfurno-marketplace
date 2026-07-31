@@ -1,7 +1,7 @@
 {
   "artifact": "meta-template-remote-state",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10D",
+  "phase": "QF-MVP-40.10E",
   "contains_secrets": false,
   "authorizes_meta_calls": false,
   "authorizes_mapping": false,
@@ -67,6 +67,29 @@
         "QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T17-48-51-026Z.json"
       ],
       "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled read-only to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. This closes the Wave 0 Utility-category contract: the provider lifecycle — create, readback, approval and read-only reconciliation — is proven end to end. IMPORTANT: a Utility approval proves the PROVIDER CONTRACT ONLY. It does not create ordinary consent authority, mapping authority, runtime activation or send authority. The template remains APPROVED_UNMAPPED and unsendable, the HELP reply stays evidence-bound and outside the ordinary outbound registry, and no remote template id is stored anywhere in this repository. Mapping, activation and sending require a later, separately authorized phase."
+    },
+    {
+      "internal_template_key": "lead_received",
+      "provider_template_name": "qf_lead_received_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json",
+        "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json"
+      ],
+      "notes": "The Wave 1 canary. Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled read-only to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. This extends the proven provider contract from the no-variable Wave 0 template to a VARIABLE-BEARING Utility template — the dimension the Wave 0 proof could not cover. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Wave 1 submission. Mapping, activation and sending require a later, separately authorized phase."
     }
   ]
 }

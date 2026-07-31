@@ -23,6 +23,13 @@ const DOC = "docs/QF-MVP-40-5-6-7-TRANSPORT-COMPLETION.md";
 const ROOT = process.cwd();
 const ACK_KEYS = Object.freeze(["consent_stop_acknowledgement", "consent_start_acknowledgement", "consent_help_response"]);
 const FOUNDER_MARKETING = Object.freeze(["client_nurture_followup", "dormant_requirement_reactivation"]);
+/**
+ * QF-MVP-40.10E: the closed set is now TWO templates — Wave 0 consent_help_response and
+ * the Wave 1 canary lead_received, both APPROVED by Meta as UTILITY and both HELD from
+ * creation. It is expressed as a SET so that admitting a third approval must be a
+ * deliberate edit here, not something a per-key test silently tolerates.
+ */
+const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received"]);
 
 const results = [];
 const add = (name, ok, detail) => results.push({ name, ok: ok === true, detail: detail ?? "" });
@@ -141,22 +148,27 @@ const RULES = {
  * state model: Wave 0 must be EXACTLY that, every other entry must still be
  * draft, and no entry may ever carry a provider template id.
  */
-  allDraft: (m) => [...Object.values(m.groups).flat()].every((t) => {
-    if (t.provider_template_id !== null) return false;
-    if (t.internal_template_key === "consent_help_response") {
-      return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
-        && t.qf_mvp_40?.submit_now === false;
-    }
-    return t.submission_state === "DRAFT_NOT_SUBMITTED" && t.approval_status === "draft";
-  }),
+  allDraft: (m) => {
+    const all = [...Object.values(m.groups).flat()];
+    if (all.filter((t) => CLOSED_KEYS_40_10E.includes(t.internal_template_key)).length
+        !== CLOSED_KEYS_40_10E.length) return false;
+    return all.every((t) => {
+      if (t.provider_template_id !== null) return false;
+      if (CLOSED_KEYS_40_10E.includes(t.internal_template_key)) {
+        return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
+          && t.qf_mvp_40?.submit_now === false;
+      }
+      return t.submission_state === "DRAFT_NOT_SUBMITTED" && t.approval_status === "draft";
+    });
+  },
 
   noActiveMapping: (m) => {
     const raw = JSON.stringify(m).toLowerCase();
     if (/"(approval_status|submission_state)"\s*:\s*"(active|submitted)"/.test(raw)) return false;
     // Exactly one approval is permitted, and only for the Wave 0 entry Meta approved.
     const approved = [...Object.values(m.groups).flat()].filter((t) => t.approval_status === "approved");
-    if (approved.length > 1) return false;
-    if (approved.length === 1 && approved[0].internal_template_key !== "consent_help_response") return false;
+    if (approved.length > CLOSED_KEYS_40_10E.length) return false;
+    if (approved.some((t) => !CLOSED_KEYS_40_10E.includes(t.internal_template_key))) return false;
     return [...Object.values(m.groups).flat()].every((t) => t.binding_contract?.binding_readiness !== "active");
   },
 
@@ -310,6 +322,11 @@ const MUTATIONS = [
     delete m.groups.marketing[0].qf_mvp_40.recipient_type; }],
   ["M15 an active binding readiness is rejected", RULES.noActiveMapping, (m) => {
     m.groups.marketing[0].binding_contract.binding_readiness = "active"; }],
+  ["M16 the Wave 1 canary reverted to draft is rejected", RULES.allDraft, (m) => {
+    const t = [...Object.values(m.groups).flat()].find((x) => x.internal_template_key === "lead_received");
+    t.approval_status = "draft"; t.submission_state = "DRAFT_NOT_SUBMITTED"; }],
+  ["M17 an approval outside the closed set is rejected", RULES.noActiveMapping, (m) => {
+    m.groups.marketing[0].approval_status = "approved"; }],
 ];
 // A 4th element `true` marks a POSITIVE control: the mutation must still PASS, which
 // proves the rule is discriminating rather than rejecting everything it is handed.

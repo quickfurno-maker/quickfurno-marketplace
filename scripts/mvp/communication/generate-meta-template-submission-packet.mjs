@@ -95,12 +95,26 @@ const waveCounts = templates.reduce((acc, t) => {
   acc[t.submission_wave] = (acc[t.submission_wave] ?? 0) + 1; return acc;
 }, {});
 
+/**
+ * The approved/held set is DERIVED from state, never hard-coded. QF-MVP-40.10E added a
+ * second approval (lead_received) and a note naming only Wave 0 would have silently
+ * become false; a note that counts entries would go stale on the next approval. Naming
+ * whatever is actually approved keeps the packet self-describing as the set grows.
+ */
+const approvedHeld = templates
+  .filter((t) => t.local_state.approval_status === "approved")
+  .map((t) => `${t.internal_template_key} (wave ${t.submission_wave}, ${t.local_state.submission_state}${t.submit_now === false ? ", HELD FROM CREATION" : ""})`);
+const stateSummary = approvedHeld.length === 0
+  ? "Every entry is a LOCAL CANDIDATE: draft / DRAFT_NOT_SUBMITTED."
+  : `This packet is NOT uniformly draft. APPROVED AND UNMAPPED: ${approvedHeld.join("; ")}. `
+    + "Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED.";
+
 const packet = {
   artifact: "meta-template-submission-packet",
   schema_version: "1.0",
   phase: "QF-MVP-40.10A",
   generator: "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  note: "NON-SECRET local submission/control record. This packet is NOT uniformly draft: Wave 0 consent_help_response is APPROVED_UNMAPPED and HELD FROM CREATION (submit_now false), while every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
+  note: `NON-SECRET local submission/control record. ${stateSummary} No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 CANARY — lead_received was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template; it is APPROVED_UNMAPPED and HELD, and it authorizes no further Wave 1 submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.`,
   source_manifest: MANIFEST,
   source_manifest_fingerprint: manifestFingerprint,
   external_contract_references: [

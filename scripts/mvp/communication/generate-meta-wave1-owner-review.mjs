@@ -56,8 +56,20 @@ if (JSON.stringify(expected) !== JSON.stringify(actual)) {
   process.exit(2);
 }
 
+/**
+ * QF-MVP-40.10E: an entry that Meta has already APPROVED is no longer "pending review" —
+ * its authorization was CONSUMED by the single submission that produced the approval.
+ * The closed state is DERIVED from the packet, not hard-coded to a key, so the next
+ * approval closes itself and a template can never be reported as both approved-remote
+ * and awaiting-review. `CONSUMED` is deliberately not `AUTHORIZED`: it records that the
+ * one-shot authorization has been spent, and it re-authorizes nothing.
+ */
+const isClosed = (t) => t.local_state.approval_status === "approved"
+  && t.local_state.submission_state === "APPROVED_UNMAPPED";
+
 const templates = wave1.map((t) => {
   const inA = GROUP_A.includes(t.internal_template_key);
+  const closed = isClosed(t);
   return {
     internal_template_key: t.internal_template_key,
     provider_template_name: t.provider_template_name,
@@ -67,28 +79,41 @@ const templates = wave1.map((t) => {
     creation_payload: t.creation_payload,        // verbatim, never rewritten
     payload_fingerprint: t.payload_fingerprint,  // verbatim, never recomputed here
     submission_group: inA ? "WAVE1A_ORDINARY_LAUNCH" : "WAVE1B_COMMERCIAL_CATEGORY_REVIEW",
-    owner_copy_decision: "PENDING_OWNER_REVIEW",
-    category_review_decision: inA ? "REVIEW_REQUIRED" : "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW",
-    submission_authorization: "NOT_AUTHORIZED",
-    remote_submission_state: "NOT_SUBMITTED",
+    owner_copy_decision: closed ? "APPROVED_BY_OWNER" : "PENDING_OWNER_REVIEW",
+    category_review_decision: closed
+      ? "UTILITY_MACHINE_PROVEN"
+      : (inA ? "REVIEW_REQUIRED" : "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW"),
+    submission_authorization: closed ? "CONSUMED" : "NOT_AUTHORIZED",
+    remote_submission_state: closed ? "APPROVED_UNMAPPED" : "NOT_SUBMITTED",
   };
 });
+
+const closedEntries = templates.filter((t) => t.remote_submission_state === "APPROVED_UNMAPPED");
+const pendingEntries = templates.filter((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW");
 
 const review = {
   artifact: "meta-wave1-owner-review",
   schema_version: "1.0",
-  phase: "QF-MVP-40.10B",
-  status: "OWNER_REVIEW_PENDING",
+  phase: "QF-MVP-40.10E",
+  status: closedEntries.length === 0 ? "OWNER_REVIEW_PENDING"
+    : (pendingEntries.length === 0 ? "FULLY_REVIEWED" : "PARTIALLY_REVIEWED"),
   authorizes_meta_calls: false,
   note: "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied "
     + "verbatim from the source submission packet: copy, category, language, component profile, "
     + "payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and "
-    + "asserts nothing about whether its category is correct. No template here is submitted, "
-    + "approved, mapped or active.",
+    + "asserts nothing about whether its category is correct. "
+    + `${closedEntries.map((t) => t.internal_template_key).join(", ") || "No entry"} `
+    + "was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot "
+    + "authorization is CONSUMED, and being approved grants no consent, mapping, activation or "
+    + `send authority. The other ${pendingEntries.length} entries authorize ZERO Meta calls and `
+    + "remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: "
+    + "each further submission needs its own explicit owner authorization.",
   source_packet: SOURCE,
   source_packet_fingerprint: sourceFingerprint,
   counts: {
     total: templates.length,
+    approved_unmapped: closedEntries.length,
+    pending_owner_review: pendingEntries.length,
     WAVE1A_ORDINARY_LAUNCH: templates.filter((t) => t.submission_group === "WAVE1A_ORDINARY_LAUNCH").length,
     WAVE1B_COMMERCIAL_CATEGORY_REVIEW: templates.filter((t) => t.submission_group === "WAVE1B_COMMERCIAL_CATEGORY_REVIEW").length,
   },

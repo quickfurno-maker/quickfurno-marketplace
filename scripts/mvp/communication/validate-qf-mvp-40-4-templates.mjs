@@ -34,6 +34,14 @@ function bodyVars(body) {
   return [...String(body).matchAll(/\{\{(\d+)\}\}/g)].map((m) => Number(m[1]));
 }
 
+/**
+ * QF-MVP-40.10E: the closed set is now TWO templates — Wave 0 consent_help_response and
+ * the Wave 1 canary lead_received, both APPROVED by Meta as UTILITY and both HELD from
+ * creation. It is expressed as a SET so that admitting a third approval must be a
+ * deliberate edit here, not something a per-key test silently tolerates.
+ */
+const CLOSED_KEYS_40_10E = ["consent_help_response", "lead_received"];
+
 const R = {
   uniqueKeys(m) {
     const keys = allEntries(m).map((t) => t.internal_template_key);
@@ -119,9 +127,12 @@ const R = {
  * draft, and no entry may ever carry a provider template id.
  */
   allDraft(m) {
-    return allEntries(m).every((t) => {
+    const all = allEntries(m);
+    if (all.filter((t) => CLOSED_KEYS_40_10E.includes(t.internal_template_key)).length
+        !== CLOSED_KEYS_40_10E.length) return false;
+    return all.every((t) => {
       if (t.provider_template_id !== null) return false;
-      if (t.internal_template_key === "consent_help_response") {
+      if (CLOSED_KEYS_40_10E.includes(t.internal_template_key)) {
         return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
           && t.qf_mvp_40?.submit_now === false;
       }
@@ -136,8 +147,8 @@ const R = {
     // EXACTLY the one Wave 0 entry Meta approved; allDraft pins which one that is.
     if (/"(approval_status|submission_state)"\s*:\s*"(active|submitted)"/.test(raw)) return false;
     const approved = allEntries(m).filter((t) => t.approval_status === "approved");
-    if (approved.length > 1) return false;
-    if (approved.length === 1 && approved[0].internal_template_key !== "consent_help_response") return false;
+    if (approved.length > CLOSED_KEYS_40_10E.length) return false;
+    if (approved.some((t) => !CLOSED_KEYS_40_10E.includes(t.internal_template_key))) return false;
     return allEntries(m).every((t) => t.binding_contract?.binding_readiness !== "active");
   },
 
@@ -257,8 +268,13 @@ const MUTATIONS = [
   ["M11c Wave 0 re-armed for creation is rejected", R.allDraft, (m) => {
     m.groups.consent_service.find((x) => x.internal_template_key === "consent_help_response")
       .qf_mvp_40.submit_now = true; }],
-  ["M11d an approval on a second entry is rejected", R.noActiveMapping, (m) => {
+  ["M11d an approval outside the closed set is rejected", R.noActiveMapping, (m) => {
     m.groups.marketing[0].approval_status = "approved"; }],
+  ["M11e the Wave 1 canary reverted to draft is rejected", R.allDraft, (m) => {
+    const t = allEntries(m).find((x) => x.internal_template_key === "lead_received");
+    t.approval_status = "draft"; t.submission_state = DRAFT; }],
+  ["M11f the Wave 1 canary re-armed for creation is rejected", R.allDraft, (m) => {
+    allEntries(m).find((x) => x.internal_template_key === "lead_received").qf_mvp_40.submit_now = true; }],
   ["M12 an active binding readiness is rejected", R.noActiveMapping, (m) => {
     m.groups.marketing[0].binding_contract.binding_readiness = "active"; }],
   ["M13 a phone number in a fixture is rejected", R.fixturesHaveNoPii, (m) => {

@@ -1,19 +1,19 @@
 {
   "artifact": "meta-wave1-canary-review",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10D",
-  "status": "OWNER_REVIEW_PENDING",
+  "phase": "QF-MVP-40.10E",
+  "status": "CLOSED_APPROVED_UNMAPPED",
   "authorizes_meta_calls": false,
   "contains_secrets": false,
-  "note": "NON-SECRET. Recommends ONE template as the first Wave 1 canary. It AUTHORIZES ZERO META CALLS and grants no blanket Wave 1 authorization. Copy, category, language, profile, payload and fingerprint are copied verbatim from the source submission packet and are never rewritten here. Submitting even this single template requires explicit owner authorization and a separate operator run.",
+  "note": "NON-SECRET. This artefact recommended ONE template as the first Wave 1 canary (QF-MVP-40.10D) and is now CLOSED: the canary was submitted once, returned PENDING, and a read-only reconciliation proved it APPROVED as UTILITY. It AUTHORIZES ZERO META CALLS. Copy, category, language, profile, payload and fingerprint are copied verbatim from the source submission packet and are never rewritten here. Approval proves the PROVIDER CONTRACT ONLY and grants no consent, mapping, activation or send authority. No provider template id is recorded here or anywhere in this repository.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "e69ab3bb4f4c434bad424906255c8637cc2072a683af6d9bf1d263b615ca0dc6",
+  "source_packet_fingerprint": "b78d7dbb0b52058a2dc7b203cc4528815a0af7b22fdced9bf538bd67454b7dbd",
   "wave0_precondition": {
     "provider_template_name": "qf_consent_help_response_v3",
     "last_proven_status": "APPROVED",
     "last_proven_remote_category": "UTILITY",
     "disposition": "APPROVED_UNMAPPED",
-    "note": "The Wave 0 Utility contract is closed and machine proven, which is what makes a variable-bearing Wave 1 Utility canary the sensible next step. It grants no send, mapping or activation authority."
+    "note": "The Wave 0 Utility contract is closed and machine proven, which is what made a variable-bearing Wave 1 Utility canary the sensible next step. It grants no send, mapping or activation authority."
   },
   "recommended_canary": {
     "internal_template_key": "lead_received",
@@ -50,15 +50,30 @@
       "No button and no action payload.",
       "Exercises a VARIABLE-BEARING Utility template, which the no-variable Wave 0 proof did not cover."
     ],
-    "owner_copy_decision": "PENDING_OWNER_REVIEW",
-    "submission_authorization": "NOT_AUTHORIZED",
-    "remote_submission_state": "NOT_SUBMITTED"
+    "owner_copy_decision": "APPROVED_BY_OWNER",
+    "submission_authorization": "CONSUMED",
+    "remote_submission_state": "APPROVED_UNMAPPED",
+    "last_proven_status": "APPROVED",
+    "last_proven_remote_category": "UTILITY",
+    "readback_semantic_match": true,
+    "submission_outcome": "CREATED_PENDING",
+    "reconciliation_outcome": "RECONCILED_APPROVED",
+    "create_post_count_at_submission": 1,
+    "create_post_count_at_reconciliation": 0,
+    "identity_match": true,
+    "evidence": [
+      "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json",
+      "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json"
+    ]
   },
   "explicit_non_authorizations": [
-    "This artefact does not authorize submitting lead_received.",
-    "It does not authorize any other Wave 1 template.",
+    "This artefact does not authorize RESUBMITTING lead_received — its authorization is CONSUMED and creation is HELD (submit_now false).",
+    "It does not authorize submitting any other Wave 1 template; the other 13 remain NOT_AUTHORIZED and NOT_SUBMITTED in meta-wave1-owner-review.json.",
     "It does not authorize Wave 2 or Wave 3.",
-    "It does not authorize a provider mapping, runtime activation, canary send or deployment.",
-    "The other 13 Wave 1 templates remain NOT_AUTHORIZED and NOT_SUBMITTED in meta-wave1-owner-review.json."
+    "It does not authorize a provider mapping.",
+    "It does not authorize runtime activation of any account, policy, webhook or canary gate.",
+    "It does not authorize sending any WhatsApp message.",
+    "It does not authorize a staging canary or any deployment.",
+    "No provider template id is recorded here, and none may ever be committed."
   ]
 }

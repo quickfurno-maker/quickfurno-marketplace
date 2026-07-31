@@ -69,7 +69,7 @@ Ordinary transactional launch copy. `category_review_decision: REVIEW_REQUIRED`.
 | `consent_start_acknowledgement` | `qf_consent_start_acknowledgement_v1` | UTILITY | — | `70c0ce994180` | ☐ approve ☐ change |
 | `consent_stop_acknowledgement` | `qf_consent_stop_acknowledgement_v1` | UTILITY | — | `850a4c01a48b` | ☐ approve ☐ change |
 | `lead_assignment_alert` | `qf_lead_assignment_alert_v1` | UTILITY | — | `3f7997be7b8e` | ☐ approve ☐ change |
-| `lead_received` | `qf_lead_received_v1` | UTILITY | — | `dd818e01d293` | ☐ approve ☐ change |
+| `lead_received` | `qf_lead_received_v1` | UTILITY | — | `dd818e01d293` | ✅ **CLOSED — approved by Meta as UTILITY, unmapped, held (40.10E)** |
 | `vendor_new_lead` | `qf_vendor_new_lead_v1` | UTILITY | Accept lead, Decline lead | `64e1e629d71a` | ☐ approve ☐ change |
 | `vendor_onboarding_reminder` | `qf_vendor_onboarding_reminder_v1` | UTILITY | — | `c6e95a38dde8` | ☐ approve ☐ change |
 | `vendor_response_reminder` | `qf_vendor_response_reminder_v1` | UTILITY | — | `a3833a69b369` | ☐ approve ☐ change |
@@ -173,8 +173,9 @@ category review** before submission. `category_review_decision: HOLD_FOR_EXPLICI
 QF-MVP-40.10B IMPLEMENTATION COMPLETE
 WAVE 0 v2 RECONCILED: APPROVED AS MARKETING, NOT UTILITY — QUARANTINED UNMAPPED
 WAVE 0 v3 SUBMITTED AND APPROVED AS UTILITY (QF-MVP-40.10D) — APPROVED_UNMAPPED, HELD
-WAVE 0 APPROVAL GRANTS PROVIDER CONTRACT ONLY: NO CONSENT, MAPPING, ACTIVATION OR SEND
-WAVE 1 OWNER REVIEW PENDING — lead_received RECOMMENDED AS CANARY, NOT AUTHORIZED
+WAVE 1 lead_received SUBMITTED AND APPROVED AS UTILITY (QF-MVP-40.10E) — APPROVED_UNMAPPED, HELD
+APPROVAL GRANTS PROVIDER CONTRACT ONLY: NO CONSENT, MAPPING, ACTIVATION OR SEND
+WAVE 1 OWNER REVIEW PARTIALLY_REVIEWED — 1 CLOSED, 13 PENDING AND NOT AUTHORIZED
 WAVE 1 META SUBMISSION NOT AUTHORIZED
 WAVE 2/3 NOT AUTHORIZED
 NO DEPLOYMENT

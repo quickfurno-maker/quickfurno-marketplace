@@ -1,0 +1,162 @@
+{
+  "artifact": "meta-wave1-next-utility-subset-review",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.10E",
+  "status": "OWNER_REVIEW_PENDING",
+  "authorizes_meta_calls": false,
+  "contains_secrets": false,
+  "note": "NON-SECRET. Proposes the NEXT exact three-template Utility subset for owner review, after the lead_received canary closed as APPROVED / UTILITY / APPROVED_UNMAPPED. It AUTHORIZES ZERO META CALLS and is not a blanket Wave 1 authorization. Copy, category, language, profile, payload and fingerprint are copied verbatim from the source submission packet and are never rewritten here. Submitting any of these three requires separate, explicit owner authorization. No provider template id appears here, and none may ever be committed.",
+  "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
+  "source_packet_fingerprint": "b78d7dbb0b52058a2dc7b203cc4528815a0af7b22fdced9bf538bd67454b7dbd",
+  "prerequisite": {
+    "internal_template_key": "lead_received",
+    "provider_template_name": "qf_lead_received_v1",
+    "last_proven_status": "APPROVED",
+    "last_proven_remote_category": "UTILITY",
+    "disposition": "APPROVED_UNMAPPED",
+    "note": "The Wave 1 canary is machine proven: one create POST returned PENDING and a read-only reconciliation returned APPROVED with returned_category UTILITY and readback_semantic_match true. That proves the provider contract for a VARIABLE-BEARING Utility template, which is the precondition for proposing more variable-bearing Utility templates. It grants no consent, mapping, activation or send authority."
+  },
+  "selection_rationale": [
+    "Every entry reports a SPECIFIC existing enquiry or assignment event the recipient is already party to.",
+    "No promotion, discount, recharge, renewal or external URL in any body.",
+    "Standard Text only — no buttons, no quick replies, no action payloads.",
+    "Deliberately avoids the higher-risk families: consent acknowledgements (evidence-bound, outside the ordinary registry), clarification templates, quick-reply templates and the three commercial credit/recharge/expiry templates."
+  ],
+  "submission_protocol": [
+    "Submit ONE exact internal_template_key per operator run (--template). Never a wave, never a prefix.",
+    "Stop on the first non-success. No retry.",
+    "Reconcile each remote status READ-ONLY before proposing the next.",
+    "No provider mapping, no runtime activation, no staging canary, no send, no deployment.",
+    "Each of the three needs its own explicit owner authorization; this artefact grants none."
+  ],
+  "counts": {
+    "total": 3,
+    "pending_owner_review": 3,
+    "authorized": 0
+  },
+  "explicit_non_authorizations": [
+    "This artefact does not authorize submitting any of these three templates.",
+    "It does not authorize any of the remaining Wave 1 templates.",
+    "It does not authorize Wave 2 or Wave 3.",
+    "It does not authorize a provider mapping, runtime activation, canary send or deployment.",
+    "It does not re-authorize lead_received, whose authorization is CONSUMED and whose creation is HELD."
+  ],
+  "templates": [
+    {
+      "internal_template_key": "client_lead_status_update",
+      "provider_template_name": "qf_client_lead_status_update_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "body_spec": "Hi {{1}}, the status of your QuickFurno enquiry is now: {{2}}. Reply here if you have any questions.",
+      "creation_payload": {
+        "name": "qf_client_lead_status_update_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, the status of your QuickFurno enquiry is now: {{2}}. Reply here if you have any questions.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "Vendors matched"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac",
+      "rationale": [
+        "Reports the status of a specific enquiry the client themselves submitted.",
+        "No promotion, discount, recharge, renewal or external URL.",
+        "Standard Text only — no button and no action payload.",
+        "Two bounded variables: the client's name and the status value."
+      ],
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "client_matching_update",
+      "provider_template_name": "qf_client_matching_update_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "body_spec": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+      "creation_payload": {
+        "name": "qf_client_matching_update_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+            "example": {
+              "body_text": [
+                [
+                  "Asha",
+                  "3"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+      "rationale": [
+        "Reports progress on a specific enquiry the client themselves submitted.",
+        "No promotion, discount, recharge, renewal or external URL.",
+        "Standard Text only — no button and no action payload.",
+        "Two bounded variables: the client's name and a vendor count."
+      ],
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "lead_assignment_alert",
+      "provider_template_name": "qf_lead_assignment_alert_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "body_spec": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
+      "creation_payload": {
+        "name": "qf_lead_assignment_alert_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno assigned lead {{1}} to you. Please respond promptly.",
+            "example": {
+              "body_text": [
+                [
+                  "LEAD-DEMO-0001"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "3f7997be7b8e1b019ba306a058b96f2d68aa84b7a014ea96407510030bb02453",
+      "rationale": [
+        "Notifies a vendor about a specific lead assigned to them — an existing assignment event.",
+        "No promotion, discount, recharge, renewal or external URL.",
+        "Standard Text only — no button and no action payload.",
+        "One bounded variable: the lead reference."
+      ],
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    }
+  ]
+}

@@ -29,10 +29,42 @@ const WAVE0_FINGERPRINT = "12f98c8b9504194ef9d983a606c9edd1c083dab1ba187915bdbea
 const WAVE0_BODY = "QuickFurno received your HELP request. Reply STOP to stop messages or "
   + "START to resume. Continue this chat for support.";
 const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
+/**
+ * QF-MVP-40.10E: the closed set is now TWO templates, expressed as a SET so that adding a
+ * third approval has to be a deliberate edit here rather than something a per-key test
+ * silently tolerates.
+ */
+const CLOSED_KEYS = ["consent_help_response", "lead_received"];
+const WAVE1_CANARY_KEY = "lead_received";
+const WAVE1_CANARY_NAME = "qf_lead_received_v1";
+const V1C_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json";
+const V1C_RECONCILIATION_EVIDENCE =
+  "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json";
+const NEXT_SUBSET = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
+/** Exact keys in the exact reviewed order — order is part of the contract. */
+const NEXT_SUBSET_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
+const NEXT_SUBSET_NAMES = ["qf_client_lead_status_update_v1", "qf_client_matching_update_v1",
+  "qf_lead_assignment_alert_v1"];
+const NEXT_SUBSET_FINGERPRINTS = [
+  "ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac",
+  "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+  "3f7997be7b8e1b019ba306a058b96f2d68aa84b7a014ea96407510030bb02453",
+];
+/** A "next" candidate may never be a commercial-review or already-closed template. */
+const COMMERCIAL_KEYS = ["low_credit_warning", "recharge_reminder", "vendor_package_expiry_warning"];
 const V3_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE0-META-SUBMISSION-2026-07-30T17-24-12-392Z.json";
 const V3_RECONCILIATION_EVIDENCE =
   "QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T17-48-51-026Z.json";
 const sha256 = (x) => createHash("sha256").update(x).digest("hex");
+/**
+ * Rules that read a sibling artefact from disk cannot be mutation-tested by cloning the
+ * packet. Each takes an optional injected object and accepts it ONLY when its artifact
+ * field matches, so a mutation can corrupt exactly one artefact while the rest stay real.
+ */
+const asArtifact = (inj, name, path) =>
+  (inj && inj.artifact === name) ? inj : JSON.parse(readFileSync(resolve(path), "utf8"));
+const readLedger = (inj) => asArtifact(inj, "meta-template-remote-state", REMOTE_STATE);
+const readNext = (inj) => asArtifact(inj, "meta-wave1-next-utility-subset-review", NEXT_SUBSET);
 
 const MANIFEST = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
@@ -107,16 +139,27 @@ const R = {
    * draft. This is a CLOSED state model, not a relaxation — an unexpected approval
    * anywhere else still fails, and no entry may ever carry a real provider id.
    */
-  closedStateModel: (p) => p.templates.every((t) => {
-    const st = t.local_state;
-    if (st.provider_template_id !== null) return false;          // never a remote id
-    if (t.internal_template_key === WAVE0_KEY) {
-      return st.approval_status === "approved"
-        && st.submission_state === "APPROVED_UNMAPPED"
-        && t.submit_now === false;                                // create is HELD
-    }
-    return st.approval_status === "draft" && st.submission_state === "DRAFT_NOT_SUBMITTED";
-  }),
+  closedStateModel: (p) => {
+    const present = p.templates.filter((t) => CLOSED_KEYS.includes(t.internal_template_key));
+    if (present.length !== CLOSED_KEYS.length) return false;      // the set itself is pinned
+    return p.templates.every((t) => {
+      const st = t.local_state;
+      if (st.provider_template_id !== null) return false;         // never a remote id
+      if (CLOSED_KEYS.includes(t.internal_template_key)) {
+        return st.approval_status === "approved"
+          && st.submission_state === "APPROVED_UNMAPPED"
+          && t.submit_now === false;                               // create is HELD
+      }
+      return st.approval_status === "draft" && st.submission_state === "DRAFT_NOT_SUBMITTED";
+    });
+  },
+  /** Exactly two approvals, and exactly the expected two. A third is a failure. */
+  exactlyTwoApproved: (p) => {
+    const approved = p.templates.filter((t) => t.local_state.approval_status === "approved");
+    return approved.length === 2
+      && approved.map((t) => t.internal_template_key).sort().join(",")
+         === CLOSED_KEYS.slice().sort().join(",");
+  },
   noRemoteIdAnywhere: (p) => {
     const raw = JSON.stringify(p) + readFileSync(resolve(REMOTE_STATE), "utf8");
     return !/"(provider_template_id|template_id)"\s*:\s*"/.test(raw);
@@ -410,12 +453,93 @@ const R = {
   },
 
   // ---- QF-MVP-40.10D Wave 0 closure --------------------------------------
-  ledgerHasThreeEntries: () => {
-    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
-    return L.entries.length === 3
+  ledgerHasFourEntries: (inj) => {
+    const L = readLedger(inj);
+    return L.entries.length === 4
       && L.entries.map((e) => e.provider_template_name).join(",")
-         === "qf_consent_help_response_v1,qf_consent_help_response_v2,qf_consent_help_response_v3";
+         === "qf_consent_help_response_v1,qf_consent_help_response_v2,qf_consent_help_response_v3,"
+            + "qf_lead_received_v1";
   },
+
+  // ---- QF-MVP-40.10E Wave 1 canary closure --------------------------------
+  ledgerCanaryApprovedUtility: (inj) => {
+    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
+    return !!c && c.internal_template_key === WAVE1_CANARY_KEY
+      && c.requested_category === "UTILITY"
+      && c.last_proven_status === "APPROVED"
+      && c.last_proven_remote_category === "UTILITY"
+      && c.readback_semantic_match === true
+      && c.create_post_count_at_submission === 1
+      && c.create_post_count_at_reconciliation === 0
+      && c.submission_outcome === "CREATED_PENDING"
+      && c.reconciliation_outcome === "RECONCILED_APPROVED"
+      && c.disposition === "APPROVED_UNMAPPED";
+  },
+  ledgerCanaryAuthoritiesDenied: (inj) => {
+    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
+    return !!c && c.send_authority === "DENIED" && c.mapping_authority === "DENIED"
+      && c.activation_authority === "NOT_GRANTED" && c.delete_authority === "NOT_GRANTED"
+      && c.appeal_authority === "NOT_APPLICABLE";
+  },
+  ledgerCanaryCitesBothEvidenceFiles: (inj) => {
+    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
+    return !!c && Array.isArray(c.evidence) && c.evidence.length === 2
+      && c.evidence.includes(V1C_SUBMISSION_EVIDENCE)
+      && c.evidence.includes(V1C_RECONCILIATION_EVIDENCE);
+  },
+  ledgerCanaryApprovalGrantsNothing: (inj) => {
+    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
+    return !!c && /PROVIDER CONTRACT ONLY/i.test(c.notes)
+      && /no consent authority/i.test(c.notes)
+      && /authorizes no further Wave 1 submission/i.test(c.notes);
+  },
+  ledgerTopLevelAuthorizesNothing: (inj) => {
+    const L = readLedger(inj);
+    return L.authorizes_meta_calls === false && L.authorizes_mapping === false
+      && L.authorizes_sending === false;
+  },
+
+  // ---- QF-MVP-40.10E next Utility subset ----------------------------------
+  nextSubsetExactKeysInOrder: (inj) => {
+    const N = readNext(inj);
+    return N.templates.length === 3
+      && N.templates.map((t) => t.internal_template_key).join(",") === NEXT_SUBSET_KEYS.join(",")
+      && N.templates.map((t) => t.provider_template_name).join(",") === NEXT_SUBSET_NAMES.join(",");
+  },
+  nextSubsetMatchesPacketVerbatim: (inj) => {
+    const N = readNext(inj);
+    return N.templates.length === 3 && N.templates.every((t, i) => {
+      const src = packet.templates.find((x) => x.internal_template_key === t.internal_template_key);
+      return !!src && t.provider_template_name === src.provider_template_name
+        && t.provider_language === src.provider_language
+        && t.requested_category === src.category && src.category === "UTILITY"
+        && t.component_profile === src.component_profile && src.component_profile === "STANDARD_TEXT"
+        && t.payload_fingerprint === src.payload_fingerprint
+        && t.payload_fingerprint === NEXT_SUBSET_FINGERPRINTS[i]
+        && JSON.stringify(t.creation_payload) === JSON.stringify(src.creation_payload)
+        && t.payload_fingerprint === sha256(JSON.stringify(t.creation_payload));
+    });
+  },
+  nextSubsetAuthorizesNothing: (inj) => {
+    const N = readNext(inj);
+    return N.authorizes_meta_calls === false && N.status === "OWNER_REVIEW_PENDING"
+      && N.counts.authorized === 0 && N.counts.total === 3 && N.counts.pending_owner_review === 3
+      && N.templates.every((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW"
+        && t.category_review_decision === "REVIEW_REQUIRED"
+        && t.submission_authorization === "NOT_AUTHORIZED"
+        && t.remote_submission_state === "NOT_SUBMITTED")
+      && Array.isArray(N.explicit_non_authorizations) && N.explicit_non_authorizations.length >= 4;
+  },
+  /** Never propose a commercial template, an already-closed one, a button or a URL. */
+  nextSubsetLeaksNothing: (inj) => {
+    const N = readNext(inj);
+    const keys = N.templates.map((t) => t.internal_template_key);
+    return !keys.some((k) => COMMERCIAL_KEYS.includes(k) || CLOSED_KEYS.includes(k))
+      && !N.templates.some((t) => /"type"\s*:\s*"buttons"/i.test(JSON.stringify(t.creation_payload)))
+      && !N.templates.some((t) => /https?:\/\/|quickfurno\.[a-z]{2,}/i.test(t.body_spec));
+  },
+  nextSubsetPinsCurrentPacket: (inj) =>
+    readNext(inj).source_packet_fingerprint === sha256(readFileSync(resolve(PACKET))),
   ledgerV3ApprovedUtility: () => {
     const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
     const v3 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v3");
@@ -468,7 +592,10 @@ const R = {
     return gate >= 0 && gate < post && gate < fetchIdx;
   },
   packetNoteNotUniformlyDraft: (p) => /NOT uniformly draft/i.test(p.note)
-    && /APPROVED_UNMAPPED/.test(p.note),
+    && /APPROVED_UNMAPPED/.test(p.note)
+    // The note must NAME every approved entry, so it cannot go stale as the set grows.
+    && p.templates.filter((t) => t.local_state.approval_status === "approved")
+        .every((t) => p.note.includes(t.internal_template_key)),
   // ---- boundary ----------------------------------------------------------
   noMigrationOnBranch: () => {
     const changed = execFileSync("git", ["diff", "--name-only",
@@ -493,7 +620,8 @@ const RULES = [
   ["P12 provider names valid and unique", R.namesValidAndUnique, packet],
   ["P13 provider names carry no environment name or long id", R.namesCarryNoEnvOrIds, packet],
   ["P14 every payload has a deterministic fingerprint", R.deterministicPayloads, packet],
-  ["P15 closed state model: Wave 0 approved+held, all others draft", R.closedStateModel, packet],
+  ["P15 closed state model: the closed set is approved+held, all others draft", R.closedStateModel, packet],
+  ["P90 exactly two templates are approved, and they are the expected two", R.exactlyTwoApproved, packet],
   ["P80 no remote template id anywhere in packet or ledger", R.noRemoteIdAnywhere, packet],
   ["P16 consent acknowledgements remain outside the ordinary registry", R.acksStayOutOfOrdinaryRegistry, packet],
   ["P17 packet carries no secret, WABA id or PII", R.noSecretOrPii, packet],
@@ -541,7 +669,17 @@ const RULES = [
   ["P77 ledger cites the exact reconciliation evidence file", R.ledgerCitesReconciliationEvidence, packet],
   ["P78 ledger makes no body/component equality claim", R.ledgerMakesNoBodyEqualityClaim, packet],
   ["P79 ledger carries no template/WABA/request id, token or raw body", R.ledgerCarriesNoIdentifiers, packet],
-  ["P81 ledger holds exactly the three Wave 0 entries", R.ledgerHasThreeEntries, packet],
+  ["P81 ledger holds exactly the four historical entries", R.ledgerHasFourEntries, packet],
+  ["P91 ledger records the canary APPROVED as UTILITY with proven counts", R.ledgerCanaryApprovedUtility, packet],
+  ["P92 ledger denies canary send/mapping/activation/delete", R.ledgerCanaryAuthoritiesDenied, packet],
+  ["P93 ledger cites both canary evidence files exactly", R.ledgerCanaryCitesBothEvidenceFiles, packet],
+  ["P94 ledger states the canary approval grants nothing further", R.ledgerCanaryApprovalGrantsNothing, packet],
+  ["P95 ledger top level authorizes no call, mapping or send", R.ledgerTopLevelAuthorizesNothing, packet],
+  ["P96 next subset is the exact three keys in the exact order", R.nextSubsetExactKeysInOrder, packet],
+  ["P97 next subset quotes the packet verbatim (copy/category/profile/payload/fingerprint)", R.nextSubsetMatchesPacketVerbatim, packet],
+  ["P98 next subset authorizes zero Meta calls", R.nextSubsetAuthorizesNothing, packet],
+  ["P99 next subset leaks no commercial, closed, button or URL template", R.nextSubsetLeaksNothing, packet],
+  ["P100 next subset pins the current source packet fingerprint", R.nextSubsetPinsCurrentPacket, packet],
   ["P82 ledger records v3 APPROVED as UTILITY with proven counts", R.ledgerV3ApprovedUtility, packet],
   ["P83 ledger denies v3 send/mapping/activation/delete", R.ledgerV3AuthoritiesDenied, packet],
   ["P84 ledger cites both v3 evidence files exactly", R.ledgerV3CitesBothEvidenceFiles, packet],
@@ -662,8 +800,70 @@ const MUT = [
     p.templates.find((t) => t.submission_wave === 0).local_state.provider_template_id = "1234567890"; }],
   ["M31 a packet note claiming all entries draft is rejected", R.packetNoteNotUniformlyDraft, packet, (p) => {
     p.note = "Every entry here is a LOCAL CANDIDATE: none is approved."; }],
+
+  // ---- QF-MVP-40.10E ------------------------------------------------------
+  ["M32 the canary reverted to draft is rejected", R.closedStateModel, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === WAVE1_CANARY_KEY);
+    t.local_state.approval_status = "draft";
+    t.local_state.submission_state = "DRAFT_NOT_SUBMITTED"; }],
+  ["M33 the canary re-armed for creation is rejected", R.closedStateModel, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === WAVE1_CANARY_KEY).submit_now = true; }],
+  ["M34 a committed provider id on the canary is rejected", R.closedStateModel, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === WAVE1_CANARY_KEY)
+      .local_state.provider_template_id = "1234567890"; }],
+  ["M35 a THIRD approved template is rejected", R.exactlyTwoApproved, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "vendor_new_lead")
+      .local_state.approval_status = "approved"; }],
+  ["M36 a packet note omitting an approved key is rejected", R.packetNoteNotUniformlyDraft, packet, (p) => {
+    p.note = "NOT uniformly draft. APPROVED_UNMAPPED: consent_help_response only."; }],
+
+  ["M37 a canary ledger entry marked MARKETING is rejected", R.ledgerCanaryApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+      .last_proven_remote_category = "MARKETING"; return L; }],
+  ["M38 a canary semantic mismatch is rejected", R.ledgerCanaryApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+      .readback_semantic_match = false; return L; }],
+  ["M39 a second canary create POST is rejected", R.ledgerCanaryApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+      .create_post_count_at_reconciliation = 1; return L; }],
+  ["M40 an enabled canary send authority is rejected", R.ledgerCanaryAuthoritiesDenied, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+      .send_authority = "GRANTED"; return L; }],
+  ["M41 a changed canary evidence filename is rejected", R.ledgerCanaryCitesBothEvidenceFiles, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+      .evidence[0] = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-999Z.json"; return L; }],
+  ["M42 a ledger that authorizes sending is rejected", R.ledgerTopLevelAuthorizesNothing, null, null, () => {
+    const L = readLedger(); L.authorizes_sending = true; return L; }],
+  ["M43 a fifth ledger entry is rejected", R.ledgerHasFourEntries, null, null, () => {
+    const L = readLedger(); L.entries.push({ ...L.entries[3], provider_template_name: "qf_x_v1" }); return L; }],
+
+  ["M44 a fourth next-subset template is rejected", R.nextSubsetExactKeysInOrder, null, null, () => {
+    const N = readNext(); N.templates.push(N.templates[0]); return N; }],
+  ["M45 a reordered next subset is rejected", R.nextSubsetExactKeysInOrder, null, null, () => {
+    const N = readNext(); N.templates.reverse(); return N; }],
+  ["M46 a commercial template in the next subset is rejected", R.nextSubsetLeaksNothing, null, null, () => {
+    const N = readNext(); N.templates[0].internal_template_key = "recharge_reminder"; return N; }],
+  ["M47 an already-closed template in the next subset is rejected", R.nextSubsetLeaksNothing, null, null, () => {
+    const N = readNext(); N.templates[0].internal_template_key = WAVE1_CANARY_KEY; return N; }],
+  ["M48 a URL in next-subset copy is rejected", R.nextSubsetLeaksNothing, null, null, () => {
+    const N = readNext(); N.templates[0].body_spec += " See https://example.com"; return N; }],
+  ["M49 a pre-authorized next-subset entry is rejected", R.nextSubsetAuthorizesNothing, null, null, () => {
+    const N = readNext(); N.templates[0].submission_authorization = "AUTHORIZED"; return N; }],
+  ["M50 a next subset claiming it authorizes Meta calls is rejected", R.nextSubsetAuthorizesNothing, null, null, () => {
+    const N = readNext(); N.authorizes_meta_calls = true; return N; }],
+  ["M51 an edited next-subset payload with a stale fingerprint is rejected",
+    R.nextSubsetMatchesPacketVerbatim, null, null, () => {
+    const N = readNext(); N.templates[0].creation_payload.components[0].text = "Buy now, 50% off!"; return N; }],
+  ["M52 a MARKETING category in the next subset is rejected",
+    R.nextSubsetMatchesPacketVerbatim, null, null, () => {
+    const N = readNext(); N.templates[0].requested_category = "MARKETING"; return N; }],
+  ["M53 a stale next-subset source fingerprint is rejected", R.nextSubsetPinsCurrentPacket, null, null, () => {
+    const N = readNext(); N.source_packet_fingerprint = "0".repeat(64); return N; }],
 ];
-for (const [n, fn, base, mutate] of MUT) {
+// A mutant either corrupts a clone of `base` (packet rules) or supplies a corrupted
+// sibling artefact via `inject` (rules that otherwise read that artefact from disk).
+for (const [n, fn, base, mutate, inject] of MUT) {
+  if (typeof inject === "function") { add(n, fn(inject()) === false); continue; }
   const copy = clone(base);
   mutate(copy);
   add(n, fn(copy) === false);

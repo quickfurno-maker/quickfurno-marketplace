@@ -25,6 +25,17 @@ const CANARY = "docs/provider-manifests/meta-wave1-canary-review.json";
 const CANARY_KEY = "lead_received";
 const CANARY_NAME = "qf_lead_received_v1";
 const CANARY_FINGERPRINT = "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c4739af640e16";
+/**
+ * QF-MVP-40.10E: lead_received was submitted once and Meta APPROVED it as UTILITY, so it
+ * is no longer "pending review". Its one-shot authorization is CONSUMED — deliberately
+ * not "AUTHORIZED", which would read as permission to submit again. The closed set is
+ * pinned here so a second entry closing itself has to be an explicit edit.
+ */
+const CLOSED_WAVE1_KEYS = ["lead_received"];
+const isClosedKey = (k) => CLOSED_WAVE1_KEYS.includes(k);
+const V1C_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json";
+const V1C_RECONCILIATION_EVIDENCE =
+  "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json";
 const BRANCH_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
 
 const ROOT = process.cwd();
@@ -173,13 +184,33 @@ const R = {
   fingerprintsSelfConsistent: (r) => r.templates.every((t) =>
     t.payload_fingerprint === sha256(JSON.stringify(t.creation_payload))),
   sourceFingerprintExact: (r) => r.source_packet_fingerprint === sha256(sourcePacketRaw),
-  allDecisionsPending: (r) => r.templates.every((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW"),
-  allUnauthorized: (r) => r.templates.every((t) => t.submission_authorization === "NOT_AUTHORIZED"),
-  allNotSubmitted: (r) => r.templates.every((t) => t.remote_submission_state === "NOT_SUBMITTED"),
-  authorizesNoMetaCalls: (r) => r.authorizes_meta_calls === false && r.status === "OWNER_REVIEW_PENDING",
+  allDecisionsPending: (r) => r.templates.every((t) => t.owner_copy_decision
+    === (isClosedKey(t.internal_template_key) ? "APPROVED_BY_OWNER" : "PENDING_OWNER_REVIEW")),
+  allUnauthorized: (r) => r.templates.every((t) => t.submission_authorization
+    === (isClosedKey(t.internal_template_key) ? "CONSUMED" : "NOT_AUTHORIZED")),
+  allNotSubmitted: (r) => r.templates.every((t) => t.remote_submission_state
+    === (isClosedKey(t.internal_template_key) ? "APPROVED_UNMAPPED" : "NOT_SUBMITTED")),
+  /** Approving one entry must never flip the artefact into authorizing calls. */
+  authorizesNoMetaCalls: (r) => r.authorizes_meta_calls === false
+    && ["OWNER_REVIEW_PENDING", "PARTIALLY_REVIEWED", "FULLY_REVIEWED"].includes(r.status)
+    && (r.status === "PARTIALLY_REVIEWED") === (
+         r.templates.some((t) => t.remote_submission_state === "APPROVED_UNMAPPED")
+      && r.templates.some((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW")),
   categoryReviewDecisionsCorrect: (r) => r.templates.every((t) =>
-    t.category_review_decision === (GROUP_A.includes(t.internal_template_key)
-      ? "REVIEW_REQUIRED" : "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW")),
+    t.category_review_decision === (isClosedKey(t.internal_template_key)
+      ? "UTILITY_MACHINE_PROVEN"
+      : (GROUP_A.includes(t.internal_template_key)
+          ? "REVIEW_REQUIRED" : "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW"))),
+  /** Exactly one closed entry, exactly 13 still pending — counts must be self-consistent. */
+  reviewCountsExact: (r) => r.counts.total === 14 && r.counts.approved_unmapped === 1
+    && r.counts.pending_owner_review === 13
+    && r.counts.WAVE1A_ORDINARY_LAUNCH === 11 && r.counts.WAVE1B_COMMERCIAL_CATEGORY_REVIEW === 3
+    && r.counts.approved_unmapped === r.templates.filter((t) => t.remote_submission_state === "APPROVED_UNMAPPED").length
+    && r.counts.pending_owner_review === r.templates.filter((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW").length,
+  /** The note must say plainly that the other entries authorize nothing. */
+  reviewNoteDeniesBlanketAuthorization: (r) => /AUTHORIZES ZERO META CALLS/i.test(r.note)
+    && /(not|nothing here is) a blanket Wave 1 authorization/i.test(r.note)
+    && /explicit owner authorization/i.test(r.note),
   noSecretsOrPii: (r) => {
     const raw = JSON.stringify(r);
     return !/(EAA[A-Za-z0-9]{10,}|eyJ[A-Za-z0-9._-]{20,}|Bearer\s+[A-Za-z0-9._-]{12,}|\+\d[\d\s-]{8,}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/.test(raw)
@@ -255,17 +286,40 @@ const R = {
       && JSON.stringify(k.creation_payload) === JSON.stringify(src.creation_payload);
   },
   canarySourceFingerprintExact: (c) => c.source_packet_fingerprint === sha256(sourcePacketRaw),
-  /** A recommendation is not an authorization. */
+  /**
+   * QF-MVP-40.10E: the canary is CLOSED. A closed canary must still authorize nothing —
+   * and must additionally deny RESUBMISSION, since its authorization is spent, not renewed.
+   */
   canaryAuthorizesNothing: (c) => c.authorizes_meta_calls === false
-    && c.status === "OWNER_REVIEW_PENDING"
-    && c.recommended_canary.submission_authorization === "NOT_AUTHORIZED"
-    && c.recommended_canary.remote_submission_state === "NOT_SUBMITTED"
-    && c.recommended_canary.owner_copy_decision === "PENDING_OWNER_REVIEW"
+    && c.status === "CLOSED_APPROVED_UNMAPPED"
+    && c.recommended_canary.submission_authorization === "CONSUMED"
+    && c.recommended_canary.remote_submission_state === "APPROVED_UNMAPPED"
+    && c.recommended_canary.owner_copy_decision === "APPROVED_BY_OWNER"
     && Array.isArray(c.explicit_non_authorizations)
-    && c.explicit_non_authorizations.length >= 4,
-  /** The canary must not silently promote the other 13 Wave 1 entries. */
-  canaryDoesNotUnblockWave1: () => review.templates.every((t) =>
-    t.submission_authorization === "NOT_AUTHORIZED" && t.remote_submission_state === "NOT_SUBMITTED"),
+    && c.explicit_non_authorizations.length >= 6
+    && c.explicit_non_authorizations.some((x) => /RESUBMIT/i.test(x))
+    && c.explicit_non_authorizations.some((x) => /mapping/i.test(x))
+    && c.explicit_non_authorizations.some((x) => /sending any WhatsApp message/i.test(x))
+    && c.explicit_non_authorizations.some((x) => /deployment/i.test(x)),
+  /** The remote truth recorded on the canary must match the ledger and the evidence. */
+  canaryRemoteTruthExact: (c) => {
+    const k = c.recommended_canary;
+    return k.last_proven_status === "APPROVED" && k.last_proven_remote_category === "UTILITY"
+      && k.readback_semantic_match === true && k.identity_match === true
+      && k.submission_outcome === "CREATED_PENDING"
+      && k.reconciliation_outcome === "RECONCILED_APPROVED"
+      && k.create_post_count_at_submission === 1
+      && k.create_post_count_at_reconciliation === 0
+      && Array.isArray(k.evidence) && k.evidence.length === 2
+      && k.evidence.includes(V1C_SUBMISSION_EVIDENCE)
+      && k.evidence.includes(V1C_RECONCILIATION_EVIDENCE);
+  },
+  /** Closing the canary must not silently promote the other 13 Wave 1 entries. */
+  canaryDoesNotUnblockWave1: () => {
+    const others = review.templates.filter((t) => !isClosedKey(t.internal_template_key));
+    return others.length === 13 && others.every((t) =>
+      t.submission_authorization === "NOT_AUTHORIZED" && t.remote_submission_state === "NOT_SUBMITTED");
+  },
   /** Wave 0 closed as UTILITY: the canary may state that, but may claim no more. */
   canaryWave0PreconditionHonest: (c) => {
     const w = c.wave0_precondition;
@@ -276,6 +330,7 @@ const R = {
   },
   canaryCarriesNoSecrets: (c) => R.noSecretsOrPii(c),
   canaryDocExists: () => existsSync(resolve("docs/QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md")),
+  closureDocExists: () => existsSync(resolve("docs/QF-MVP-40-10E-WAVE1-CANARY-CLOSURE.md")),
 };
 
 const RULES = [
@@ -307,9 +362,9 @@ const RULES = [
   ["W26 every entry matches the source packet verbatim", R.matchesSourceVerbatim, review],
   ["W27 every fingerprint is self-consistent with its payload", R.fingerprintsSelfConsistent, review],
   ["W28 source packet fingerprint is exact sha256 of raw bytes", R.sourceFingerprintExact, review],
-  ["W29 every owner copy decision is pending", R.allDecisionsPending, review],
-  ["W30 every submission authorization is NOT_AUTHORIZED", R.allUnauthorized, review],
-  ["W31 every remote state is NOT_SUBMITTED", R.allNotSubmitted, review],
+  ["W29 owner copy decisions are closed-model correct (approved vs pending)", R.allDecisionsPending, review],
+  ["W30 submission authorization is CONSUMED for closed, NOT_AUTHORIZED otherwise", R.allUnauthorized, review],
+  ["W31 remote state is APPROVED_UNMAPPED for closed, NOT_SUBMITTED otherwise", R.allNotSubmitted, review],
   ["W32 the artefact authorizes zero Meta calls", R.authorizesNoMetaCalls, review],
   ["W33 category review decisions match the grouping", R.categoryReviewDecisionsCorrect, review],
   ["W34 no secrets, PII or provider ids", R.noSecretsOrPii, review],
@@ -318,6 +373,8 @@ const RULES = [
   ["W37 owner-reported approval is not shown as machine-proven", R.ownerApprovalNotMachineProven, review],
   ["W38 no migration in the branch delta", R.noMigrationInBranch, review],
   ["W39 no evidence JSON is tracked", R.noEvidenceTracked, review],
+  ["W49 review counts are exact and self-consistent", R.reviewCountsExact, review],
+  ["W50 review note denies any blanket Wave 1 authorization", R.reviewNoteDeniesBlanketAuthorization, review],
   ["W40 canary review names exactly one template", R.canaryIsExactlyOneEntry, canary],
   ["W41 canary fingerprint is exact and self-consistent", R.canaryFingerprintExact, canary],
   ["W42 canary quotes the source packet verbatim", R.canaryMatchesSourceVerbatim, canary],
@@ -327,6 +384,8 @@ const RULES = [
   ["W46 canary states the Wave 0 precondition honestly", R.canaryWave0PreconditionHonest, canary],
   ["W47 canary carries no secrets, PII or provider ids", R.canaryCarriesNoSecrets, canary],
   ["W48 the QF-MVP-40.10D closure document exists", R.canaryDocExists, canary],
+  ["W51 canary records the exact proven remote truth and both evidence files", R.canaryRemoteTruthExact, canary],
+  ["W52 the QF-MVP-40.10E closure document exists", R.closureDocExists, canary],
 ];
 for (const [n, fn, arg] of RULES) add(n, fn(arg));
 
@@ -377,12 +436,48 @@ const MUT = [
     (c) => { c.wave0_precondition.note = "Wave 0 approval authorizes sending and mapping."; }],
   ["M22 crediting v2 with a Utility approval is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
     (d) => d.replace(/WAVE 0 v2 RECONCILED:[^\n]*/, "WAVE 0 v2 RECONCILED: APPROVED AS UTILITY")],
+  // Targets the QUALIFIER the rule actually checks, not a line prefix. The earlier form
+  // matched "WAVE 0 APPROVAL GRANTS...", which stopped existing once QF-MVP-40.10E
+  // generalised the wording — turning the mutant into a silent no-op that proved nothing.
   ["M23 an unqualified Utility approval claim is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
-    (d) => d.replace(/WAVE 0 APPROVAL GRANTS[^\n]*\n/, "")],
+    (d) => d.replace(/PROVIDER CONTRACT ONLY/g, "FULL AUTHORITY")
+            .replace(/NO CONSENT, MAPPING, ACTIVATION OR SEND/g, "")],
   ["M24 erasing the v2 MARKETING quarantine record is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
     (d) => d.replace(/QUARANTINED_UNMAPPED/g, "OK")],
   ["M25 unblocking Wave 1 in the doc is rejected", R.ownerApprovalNotMachineProven, "DOC", null,
     (d) => d.replace(/WAVE 1 META SUBMISSION NOT AUTHORIZED/g, "WAVE 1 META SUBMISSION AUTHORIZED")],
+
+  // ---- QF-MVP-40.10E ------------------------------------------------------
+  ["M26 the closed entry reverted to pending is rejected", R.allDecisionsPending, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "lead_received")
+      .owner_copy_decision = "PENDING_OWNER_REVIEW"; }],
+  ["M27 a re-authorized closed entry is rejected", R.allUnauthorized, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "lead_received")
+      .submission_authorization = "AUTHORIZED"; }],
+  ["M28 a second entry marked approved-unmapped is rejected", R.allNotSubmitted, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "vendor_new_lead")
+      .remote_submission_state = "APPROVED_UNMAPPED"; }],
+  ["M29 a review artefact claiming it authorizes calls is rejected", R.authorizesNoMetaCalls, null, null, (r) => {
+    r.authorizes_meta_calls = true; }],
+  ["M30 a FULLY_REVIEWED status while entries are pending is rejected", R.authorizesNoMetaCalls, null, null, (r) => {
+    r.status = "FULLY_REVIEWED"; }],
+  ["M31 a drifted approved/pending count is rejected", R.reviewCountsExact, null, null, (r) => {
+    r.counts.pending_owner_review = 12; }],
+  ["M32 a note dropping the no-blanket-authorization clause is rejected",
+    R.reviewNoteDeniesBlanketAuthorization, null, null, (r) => {
+    r.note = "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS."; }],
+  ["M33 a closed canary that re-authorizes submission is rejected", R.canaryAuthorizesNothing, canary, null, (c) => {
+    c.recommended_canary.submission_authorization = "AUTHORIZED"; }],
+  ["M34 a canary dropping the no-resubmit denial is rejected", R.canaryAuthorizesNothing, canary, null, (c) => {
+    c.explicit_non_authorizations = c.explicit_non_authorizations.filter((x) => !/RESUBMIT/i.test(x)); }],
+  ["M35 a canary claiming MARKETING approval is rejected", R.canaryRemoteTruthExact, canary, null, (c) => {
+    c.recommended_canary.last_proven_remote_category = "MARKETING"; }],
+  ["M36 a canary semantic mismatch is rejected", R.canaryRemoteTruthExact, canary, null, (c) => {
+    c.recommended_canary.readback_semantic_match = false; }],
+  ["M37 a canary claiming a second create POST is rejected", R.canaryRemoteTruthExact, canary, null, (c) => {
+    c.recommended_canary.create_post_count_at_reconciliation = 1; }],
+  ["M38 a changed canary evidence filename is rejected", R.canaryRemoteTruthExact, canary, null, (c) => {
+    c.recommended_canary.evidence[1] = "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-999Z.json"; }],
 ];
 for (const entry of MUT) {
   const [name, fn, , , mutate] = entry;

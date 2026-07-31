@@ -1,6 +1,6 @@
 {
-  "manifest_version": "1.9",
-  "phase": "QF-MVP-40.10F",
+  "manifest_version": "2.0",
+  "phase": "QF-MVP-40.10G",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
   "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
@@ -345,8 +345,8 @@
           "binding_readiness": "unresolved",
           "note": "template key is fixed by ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client_or_vendor",
@@ -364,7 +364,8 @@
           "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority.",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.10G: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json. SCOPE: approval does NOT place this consent acknowledgement in the ordinary outbound registry. It stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
         },
         "provider_template_name_candidate": "qf_consent_start_acknowledgement_v1"
       },
@@ -379,8 +380,8 @@
           "binding_readiness": "unresolved",
           "note": "template key is fixed by lib/communication/consentCommandResponse.ts ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client_or_vendor",
@@ -398,7 +399,8 @@
           "authority_path": "services/consentCommandResponseService.ts — the evidence-bound, one-shot enforcer that requires a validated binding to the exact inbound command. These keys are DELIBERATELY absent from lib/communication/outboundConsentScope.ts, so an ordinary resolveOutboundConsentScope call returns UNCLASSIFIED_MESSAGE_TYPE and DENIES. A future approved provider mapping must never create ordinary consent authority.",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.10G: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json. SCOPE: approval does NOT place this consent acknowledgement in the ordinary outbound registry. It stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
         },
         "provider_template_name_candidate": "qf_consent_stop_acknowledgement_v1"
       }
@@ -1140,8 +1142,8 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "vendor",
@@ -1161,7 +1163,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.10G: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json."
         },
         "provider_template_name_candidate": "qf_vendor_onboarding_reminder_v1"
       },

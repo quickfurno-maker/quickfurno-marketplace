@@ -1,7 +1,7 @@
 {
   "artifact": "meta-template-remote-state",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10F",
+  "phase": "QF-MVP-40.10G",
   "contains_secrets": false,
   "authorizes_meta_calls": false,
   "authorizes_mapping": false,
@@ -157,6 +157,75 @@
       "evidence": [
         "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-970Z.json",
         "QF-MVP-40-WAVE1-lead_assignment_alert-META-RECONCILIATION-2026-07-31T06-13-53-155Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase."
+    },
+    {
+      "internal_template_key": "consent_stop_acknowledgement",
+      "provider_template_name": "qf_consent_stop_acknowledgement_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T07-17-16-909Z.json",
+        "QF-MVP-40-WAVE1-consent_stop_acknowledgement-META-RECONCILIATION-2026-07-31T08-36-22-769Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase. NOTE ON SCOPE: a Meta Utility approval for this consent acknowledgement does NOT add it to the ordinary outbound registry. It remains evidence-bound and outside lib/communication/outboundConsentScope.ts by design; that absence is the mechanism, and an approval must never be read as granting ordinary consent authority."
+    },
+    {
+      "internal_template_key": "consent_start_acknowledgement",
+      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
+        "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase. NOTE ON SCOPE: a Meta Utility approval for this consent acknowledgement does NOT add it to the ordinary outbound registry. It remains evidence-bound and outside lib/communication/outboundConsentScope.ts by design; that absence is the mechanism, and an approval must never be read as granting ordinary consent authority."
+    },
+    {
+      "internal_template_key": "vendor_onboarding_reminder",
+      "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T11-13-26-322Z.json",
+        "QF-MVP-40-WAVE1-vendor_onboarding_reminder-META-RECONCILIATION-2026-07-31T11-20-57-172Z.json"
       ],
       "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase."
     }

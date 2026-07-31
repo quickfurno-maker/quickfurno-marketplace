@@ -1,16 +1,16 @@
 {
   "artifact": "meta-wave1-owner-review",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10F",
+  "phase": "QF-MVP-40.10G",
   "status": "PARTIALLY_REVIEWED",
   "authorizes_meta_calls": false,
-  "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. client_lead_status_update, client_matching_update, lead_assignment_alert, lead_received was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot authorization is CONSUMED, and being approved grants no consent, mapping, activation or send authority. The other 10 entries authorize ZERO Meta calls and remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: each further submission needs its own explicit owner authorization.",
+  "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. client_lead_status_update, client_matching_update, consent_start_acknowledgement, consent_stop_acknowledgement, lead_assignment_alert, lead_received, vendor_onboarding_reminder was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot authorization is CONSUMED, and being approved grants no consent, mapping, activation or send authority. The other 7 entries authorize ZERO Meta calls and remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: each further submission needs its own explicit owner authorization.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "e75fae001456f1e9cf0862b4a1bc98582386af285faf8fc497a8987a78f7b872",
+  "source_packet_fingerprint": "189ecd895d7f08d64f544501ef22df79df6505a6d629091eaf3164f13f747c9d",
   "counts": {
     "total": 14,
-    "approved_unmapped": 4,
-    "pending_owner_review": 10,
+    "approved_unmapped": 7,
+    "pending_owner_review": 7,
     "WAVE1A_ORDINARY_LAUNCH": 11,
     "WAVE1B_COMMERCIAL_CATEGORY_REVIEW": 3
   },
@@ -171,10 +171,10 @@
       },
       "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
-      "owner_copy_decision": "PENDING_OWNER_REVIEW",
-      "category_review_decision": "REVIEW_REQUIRED",
-      "submission_authorization": "NOT_AUTHORIZED",
-      "remote_submission_state": "NOT_SUBMITTED"
+      "owner_copy_decision": "APPROVED_BY_OWNER",
+      "category_review_decision": "UTILITY_MACHINE_PROVEN",
+      "submission_authorization": "CONSUMED",
+      "remote_submission_state": "APPROVED_UNMAPPED"
     },
     {
       "internal_template_key": "consent_stop_acknowledgement",
@@ -195,10 +195,10 @@
       },
       "payload_fingerprint": "850a4c01a48b78e237a85e186a448d8395abfb1e5049aaf6d8176b8628747268",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
-      "owner_copy_decision": "PENDING_OWNER_REVIEW",
-      "category_review_decision": "REVIEW_REQUIRED",
-      "submission_authorization": "NOT_AUTHORIZED",
-      "remote_submission_state": "NOT_SUBMITTED"
+      "owner_copy_decision": "APPROVED_BY_OWNER",
+      "category_review_decision": "UTILITY_MACHINE_PROVEN",
+      "submission_authorization": "CONSUMED",
+      "remote_submission_state": "APPROVED_UNMAPPED"
     },
     {
       "internal_template_key": "lead_assignment_alert",
@@ -388,10 +388,10 @@
       },
       "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
-      "owner_copy_decision": "PENDING_OWNER_REVIEW",
-      "category_review_decision": "REVIEW_REQUIRED",
-      "submission_authorization": "NOT_AUTHORIZED",
-      "remote_submission_state": "NOT_SUBMITTED"
+      "owner_copy_decision": "APPROVED_BY_OWNER",
+      "category_review_decision": "UTILITY_MACHINE_PROVEN",
+      "submission_authorization": "CONSUMED",
+      "remote_submission_state": "APPROVED_UNMAPPED"
     },
     {
       "internal_template_key": "vendor_package_expiry_warning",

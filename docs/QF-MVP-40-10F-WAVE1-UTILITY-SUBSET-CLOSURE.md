@@ -1,7 +1,8 @@
 # QF-MVP-40.10F — Wave 1 Utility subset closed; next review set prepared
 
 **Status:** three more Wave 1 templates CLOSED (approved, unmapped, held). Second three-template
-Utility subset PROPOSED, **not authorized**.
+Utility subset PROPOSED, **not authorized** — *since superseded: that subset was approved and closed
+in [QF-MVP-40.10G](QF-MVP-40-10G-WAVE1-SUBSET2-CLOSURE.md), which also PAUSED further submission.*
 **Scope of this task:** offline only. No Meta API call, no submission, no message, no mapping,
 no activation, no staging canary, no migration, no deployment.
 
@@ -111,6 +112,12 @@ templates — `low_credit_warning`, `recharge_reminder`, `vendor_package_expiry_
 
 **Submitting any of these three requires separate, explicit owner authorization.** Neither this
 document nor the artefact provides it.
+
+> **Superseded by [QF-MVP-40.10G](QF-MVP-40-10G-WAVE1-SUBSET2-CLOSURE.md).** That authorization was
+> subsequently given: all three were submitted once and reconciled read-only to **APPROVED as
+> UTILITY**. They are now `APPROVED_UNMAPPED` and HELD, their authorizations are CONSUMED, and the
+> subset-2 artefact is `CLOSED_APPROVED_UNMAPPED`. Further template submission is now **PAUSED**:
+> no subset 3 exists, and the remaining 7 Wave 1 templates are deferred until required.
 
 ---
 

@@ -32,7 +32,8 @@ const CANARY_FINGERPRINT = "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c
  * pinned here so a second entry closing itself has to be an explicit edit.
  */
 const CLOSED_WAVE1_KEYS = ["lead_received", "client_lead_status_update",
-  "client_matching_update", "lead_assignment_alert"];
+  "client_matching_update", "lead_assignment_alert", "consent_stop_acknowledgement",
+  "consent_start_acknowledgement", "vendor_onboarding_reminder"];
 /** Subset 2 is the OPEN review set proposed in QF-MVP-40.10F. */
 const SUBSET2 = "docs/provider-manifests/meta-wave1-next-utility-subset-2-review.json";
 const SUBSET2_KEYS = ["consent_stop_acknowledgement", "consent_start_acknowledgement",
@@ -351,19 +352,38 @@ const R = {
   canaryDocExists: () => existsSync(resolve("docs/QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md")),
   closureDocExists: () => existsSync(resolve("docs/QF-MVP-40-10E-WAVE1-CANARY-CLOSURE.md")),
   subsetClosureDocExists: () => existsSync(resolve("docs/QF-MVP-40-10F-WAVE1-UTILITY-SUBSET-CLOSURE.md")),
-  /** Subset 2 must name only still-unsubmitted Wave 1 keys, and authorize nothing. */
+  subset2ClosureDocExists: () => existsSync(resolve("docs/QF-MVP-40-10G-WAVE1-SUBSET2-CLOSURE.md")),
+  /**
+   * QF-MVP-40.10G: subset 2 is CLOSED. Its keys must now be exactly the ones the owner
+   * review reports as approved-and-consumed, and it must still authorize nothing. The
+   * open-form check is kept for whenever a future subset is open again.
+   */
   subset2IsOpenAndUnauthorized: () => {
     const N = JSON.parse(readFileSync(resolve(SUBSET2), "utf8"));
     const keys = N.templates.map((t) => t.internal_template_key);
     if (keys.join(",") !== SUBSET2_KEYS.join(",")) return false;
-    if (N.authorizes_meta_calls !== false || N.status !== "OWNER_REVIEW_PENDING") return false;
-    // Every proposed key must still be pending in the owner review — never an approved one.
+    if (N.authorizes_meta_calls !== false) return false;
+    const closed = N.status === "CLOSED_APPROVED_UNMAPPED";
+    if (!closed && N.status !== "OWNER_REVIEW_PENDING") return false;
     return keys.every((k) => {
       const t = review.templates.find((x) => x.internal_template_key === k);
-      return !!t && t.owner_copy_decision === "PENDING_OWNER_REVIEW"
-        && t.submission_authorization === "NOT_AUTHORIZED"
-        && t.remote_submission_state === "NOT_SUBMITTED";
+      if (!t) return false;
+      return closed
+        ? t.owner_copy_decision === "APPROVED_BY_OWNER"
+          && t.submission_authorization === "CONSUMED"
+          && t.remote_submission_state === "APPROVED_UNMAPPED"
+        : t.owner_copy_decision === "PENDING_OWNER_REVIEW"
+          && t.submission_authorization === "NOT_AUTHORIZED"
+          && t.remote_submission_state === "NOT_SUBMITTED";
     });
+  },
+  /** Submission is PAUSED: no successor artefact, and the pause flags say so. */
+  submissionPausedNoSuccessor: () => {
+    const N = JSON.parse(readFileSync(resolve(SUBSET2), "utf8"));
+    const sp = N.submission_pause;
+    return !!sp && sp.status === "PAUSED"
+      && sp.successor_subset_proposed === false && sp.successor_subset_authorized === false
+      && !existsSync(resolve("docs/provider-manifests/meta-wave1-next-utility-subset-3-review.json"));
   },
   subset2PinsCurrentPacket: () =>
     JSON.parse(readFileSync(resolve(SUBSET2), "utf8")).source_packet_fingerprint
@@ -424,6 +444,8 @@ const RULES = [
   ["W51 canary records the exact proven remote truth and both evidence files", R.canaryRemoteTruthExact, canary],
   ["W52 the QF-MVP-40.10E closure document exists", R.closureDocExists, canary],
   ["W53 the QF-MVP-40.10F closure document exists", R.subsetClosureDocExists, canary],
+  ["W56 the QF-MVP-40.10G closure document exists", R.subset2ClosureDocExists, canary],
+  ["W57 submission is PAUSED and no successor subset artefact exists", R.submissionPausedNoSuccessor, canary],
   ["W54 subset 2 names only still-pending keys and authorizes nothing", R.subset2IsOpenAndUnauthorized, canary],
   ["W55 subset 2 pins the current source packet fingerprint", R.subset2PinsCurrentPacket, canary],
 ];
@@ -535,6 +557,15 @@ const MUT = [
     (c) => { c.source_packet_fingerprint = "not-a-hash"; }],
   ["M41 a drifted approved/pending split is rejected", R.reviewCountsExact, null, null, (r) => {
     r.counts.approved_unmapped = 3; }],
+  ["M42 a consent acknowledgement demoted to pending is rejected", R.allDecisionsPending, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "consent_stop_acknowledgement")
+      .owner_copy_decision = "PENDING_OWNER_REVIEW"; }],
+  ["M43 a re-authorized consent acknowledgement is rejected", R.allUnauthorized, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "consent_start_acknowledgement")
+      .submission_authorization = "AUTHORIZED"; }],
+  ["M44 a commercial template marked approved-unmapped is rejected", R.allNotSubmitted, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "recharge_reminder")
+      .remote_submission_state = "APPROVED_UNMAPPED"; }],
 ];
 for (const entry of MUT) {
   const [name, fn, , , mutate] = entry;

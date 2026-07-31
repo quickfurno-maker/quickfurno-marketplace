@@ -8,7 +8,7 @@ submission packet and wave plan (40.10A).
 > see §0. It remains true that **no WhatsApp message has ever been sent**, and that **no provider
 > mapping, provider account, runtime policy, webhook or canary has been activated**.
 
-**Superseded by QF-MVP-40.10D, 40.10E and 40.10F:** Wave 0 `qf_consent_help_response_v3` was subsequently submitted and **approved by Meta as UTILITY** (40.10D); the Wave 1 canary `qf_lead_received_v1` followed (40.10E); and `qf_client_lead_status_update_v1`, `qf_client_matching_update_v1` and `qf_lead_assignment_alert_v1` followed in 40.10F. All **five** are `APPROVED_UNMAPPED` and **held from creation** (`submit_now: false`). Approval proves the provider contract only — it grants no consent, mapping, activation or send authority. See [QF-MVP-40.10D](QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md) and [QF-MVP-40.10E](QF-MVP-40-10E-WAVE1-CANARY-CLOSURE.md) and [QF-MVP-40.10F](QF-MVP-40-10F-WAVE1-UTILITY-SUBSET-CLOSURE.md). No migration. No deployment.
+**Superseded by QF-MVP-40.10D, 40.10E, 40.10F and 40.10G:** Wave 0 `qf_consent_help_response_v3` was subsequently submitted and **approved by Meta as UTILITY** (40.10D); the Wave 1 canary `qf_lead_received_v1` followed (40.10E); and `qf_client_lead_status_update_v1`, `qf_client_matching_update_v1` and `qf_lead_assignment_alert_v1` followed in 40.10F; and `qf_consent_stop_acknowledgement_v1`, `qf_consent_start_acknowledgement_v1` and `qf_vendor_onboarding_reminder_v1` followed in 40.10G. All **eight** are `APPROVED_UNMAPPED` and **held from creation** (`submit_now: false`). Further template submission is now PAUSED. Approval proves the provider contract only — it grants no consent, mapping, activation or send authority. See [QF-MVP-40.10D](QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md) and [QF-MVP-40.10E](QF-MVP-40-10E-WAVE1-CANARY-CLOSURE.md) and [QF-MVP-40.10F](QF-MVP-40-10F-WAVE1-UTILITY-SUBSET-CLOSURE.md) and [QF-MVP-40.10G](QF-MVP-40-10G-WAVE1-SUBSET2-CLOSURE.md). No migration. No deployment.
 
 Artefacts: [`meta-template-submission-packet.json`](provider-manifests/meta-template-submission-packet.json) ·
 [generator](../scripts/mvp/communication/generate-meta-template-submission-packet.mjs) ·
@@ -209,7 +209,7 @@ from `_v1` to `_v2` after the incident in §0 without touching the approved copy
 
 Recorded as `provider_template_name_candidate`; `provider_template_id` stays null and **no remote template id is ever committed**, even after approval.
 
-Since QF-MVP-40.10D the packet follows a **closed state model** rather than a uniform draft claim. As of QF-MVP-40.10F the closed set is **five** templates — `consent_help_response` (wave 0) plus `lead_received`, `client_lead_status_update`, `client_matching_update` and `lead_assignment_alert` (wave 1) — each `approved` / `APPROVED_UNMAPPED` / `submit_now: false`, while every **other** entry remains `draft` / `DRAFT_NOT_SUBMITTED`. The set is pinned, so an unexpected approval anywhere else still fails the gate, and admitting a third requires a deliberate edit.
+Since QF-MVP-40.10D the packet follows a **closed state model** rather than a uniform draft claim. As of QF-MVP-40.10G the closed set is **eight** templates — `consent_help_response` (wave 0) plus seven Wave 1 templates (`lead_received`, `client_lead_status_update`, `client_matching_update`, `lead_assignment_alert`, `consent_stop_acknowledgement`, `consent_start_acknowledgement`, `vendor_onboarding_reminder`) — each `approved` / `APPROVED_UNMAPPED` / `submit_now: false`, while every **other** entry remains `draft` / `DRAFT_NOT_SUBMITTED`. The set is pinned, so an unexpected approval anywhere else still fails the gate, and admitting a third requires a deliberate edit.
 
 ## 8. Wave plan — reconciles to 25
 
@@ -256,21 +256,21 @@ fingerprint `12f98c8b…`; nothing submitted, sent, edited or deleted.
 
 ## 10. Is real submission safe now?
 
-**Current status (QF-MVP-40.10F): THE UTILITY CONTRACT IS PROVEN ACROSS FIVE TEMPLATES — Wave 0 v3
-and four Wave 1 templates (lead_received, client_lead_status_update, client_matching_update,
-lead_assignment_alert) were each created with exactly one POST and reconciled read-only to APPROVED
-with returned_category UTILITY. All five are APPROVED_UNMAPPED and HELD FROM CREATION. Wave 0 v2 remains quarantined, neither deleted nor
+**Current status (QF-MVP-40.10G): THE UTILITY CONTRACT IS PROVEN ACROSS EIGHT TEMPLATES — Wave 0 v3
+and seven Wave 1 templates were each created with exactly one POST and reconciled read-only to
+APPROVED with returned_category UTILITY. All eight are APPROVED_UNMAPPED and HELD FROM CREATION.
+FURTHER TEMPLATE SUBMISSION IS PAUSED; the next phase is QF-MVP-40.11 inactive provider mapping
+readiness. Wave 0 v2 remains quarantined, neither deleted nor
 appealed, and authorizes no marketing send. Approval grants the PROVIDER CONTRACT ONLY — no consent
 authority, no mapping, no activation, no send. NO DEPLOYMENT.**
 
 No Meta approval and no staging verification is claimed. Wave 2 stays `submit_now: false` because it
 is **held from the Wave 0 execution task**, not because of a send precondition — see §8.1. Wave 4
-remains deferred to QF-MVP-70. Wave 3 remains owner-reviewable but unauthorised. In Wave 1, four templates are closed
-(approved, unmapped, held) and the remaining 10 stay unauthorised; QF-MVP-40.10F proposes
-`consent_stop_acknowledgement`, `consent_start_acknowledgement` and `vendor_onboarding_reminder` as
-the next exact Utility subset, which is a proposal only — submitting any of them still requires
-explicit owner authorization. The three commercial templates stay separately held for category
-review.
+remains deferred to QF-MVP-70. Wave 3 remains owner-reviewable but unauthorised. In Wave 1, seven templates are closed
+(approved, unmapped, held) and the remaining 7 stay unauthorised. QF-MVP-40.10G PAUSES further
+template submission: no successor subset is proposed or authorized, and the remaining templates are
+deferred until an active implementation phase needs them. The three commercial templates stay
+separately held for explicit category review.
 
 Remaining blockers before any activation: Meta credentials configured; provider account seeded and
 independently verified; staging runtime policy created in a **disabled** state; approved provider

@@ -35,7 +35,8 @@ const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
  * silently tolerates.
  */
 const CLOSED_KEYS = ["consent_help_response", "lead_received",
-  "client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
+  "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
+  "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"];
 
 /**
  * Every remotely-CLOSED template, with the exact evidence that proves it. Table-driven so
@@ -58,7 +59,21 @@ const CLOSED_LEDGER = [
   { key: "lead_assignment_alert", name: "qf_lead_assignment_alert_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-970Z.json",
     rec: "QF-MVP-40-WAVE1-lead_assignment_alert-META-RECONCILIATION-2026-07-31T06-13-53-155Z.json" },
+  { key: "consent_stop_acknowledgement", name: "qf_consent_stop_acknowledgement_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T07-17-16-909Z.json",
+    rec: "QF-MVP-40-WAVE1-consent_stop_acknowledgement-META-RECONCILIATION-2026-07-31T08-36-22-769Z.json" },
+  { key: "consent_start_acknowledgement", name: "qf_consent_start_acknowledgement_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
+    rec: "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json" },
+  { key: "vendor_onboarding_reminder", name: "qf_vendor_onboarding_reminder_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T11-13-26-322Z.json",
+    rec: "QF-MVP-40-WAVE1-vendor_onboarding_reminder-META-RECONCILIATION-2026-07-31T11-20-57-172Z.json" },
 ];
+/** QF-MVP-40.10G: submission is PAUSED — no successor subset may exist. */
+const SUBSET3 = "docs/provider-manifests/meta-wave1-next-utility-subset-3-review.json";
+/** Lanes that must stay deferred; promoting one silently is the failure this guards. */
+const DEFERRED_LANES = ["WAVE1_REMAINING_ORDINARY", "WAVE1_COMMERCIAL", "WAVE2_AUTHENTICATION",
+  "WAVE3_MARKETING", "WAVE4_ADMIN_ALERTS"];
 /** Historical Wave 0 names that are NOT approved-and-closed but must stay in the ledger. */
 const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2"];
 /** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
@@ -583,7 +598,7 @@ const R = {
       && N.explicit_non_authorizations.some((x) => /deployment/i.test(x));
   },
 
-  // ---- Subset 2 (OPEN) ----------------------------------------------------
+  // ---- Subset 2 (CLOSED in QF-MVP-40.10G) --------------------------------
   subset2ExactKeysInOrder: (inj) => {
     const N = readSubset2(inj);
     return N.templates.length === 3
@@ -604,22 +619,110 @@ const R = {
         && t.payload_fingerprint === sha256(JSON.stringify(t.creation_payload));
     });
   },
+  /** Subset 2 is CLOSED: every entry approved, unmapped, consumed, with its own evidence. */
   subset2AuthorizesNothing: (inj) => {
     const N = readSubset2(inj);
-    return N.authorizes_meta_calls === false && N.status === "OWNER_REVIEW_PENDING"
-      && N.counts.authorized === 0 && N.counts.total === 3 && N.counts.pending_owner_review === 3
-      && N.templates.every((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW"
-        && t.category_review_decision === "REVIEW_REQUIRED"
-        && t.submission_authorization === "NOT_AUTHORIZED"
-        && t.remote_submission_state === "NOT_SUBMITTED")
-      && Array.isArray(N.explicit_non_authorizations) && N.explicit_non_authorizations.length >= 4;
+    if (N.authorizes_meta_calls !== false || N.status !== "CLOSED_APPROVED_UNMAPPED") return false;
+    if (N.counts.authorized !== 0 || N.counts.total !== 3 || N.counts.approved_unmapped !== 3
+        || N.counts.pending_owner_review !== 0) return false;
+    if (!Array.isArray(N.explicit_non_authorizations) || N.explicit_non_authorizations.length < 6) return false;
+    return N.templates.every((t) => {
+      const x = CLOSED_LEDGER.find((c) => c.key === t.internal_template_key);
+      return !!x
+        && t.owner_copy_decision === "APPROVED_BY_OWNER"
+        && t.category_review_decision === "UTILITY_MACHINE_PROVEN"
+        && t.submission_authorization === "CONSUMED"
+        && t.remote_submission_state === "APPROVED_UNMAPPED"
+        && t.last_proven_status === "APPROVED"
+        && t.last_proven_remote_category === "UTILITY"
+        && t.readback_semantic_match === true
+        && t.submission_outcome === "CREATED_PENDING"
+        && t.reconciliation_outcome === "RECONCILED_APPROVED"
+        && t.create_post_count_at_submission === 1
+        && t.create_post_count_at_reconciliation === 0
+        && Array.isArray(t.evidence) && t.evidence.length === 2
+        && t.evidence.includes(x.sub) && t.evidence.includes(x.rec);
+    });
   },
-  /** Never propose a commercial template, an already-closed one, a button or a URL. */
+  subset2DeniesResubmission: (inj) => {
+    const N = readSubset2(inj);
+    const xs = N.explicit_non_authorizations ?? [];
+    return xs.some((x) => /RESUBMIT/i.test(x)) && xs.some((x) => /mapping/i.test(x))
+      && xs.some((x) => /sending any WhatsApp message/i.test(x))
+      && xs.some((x) => /deployment/i.test(x)) && xs.some((x) => /canary/i.test(x));
+  },
+
+  // ---- QF-MVP-40.10G: submission PAUSED ----------------------------------
+  /**
+   * The pause is a machine-checkable FIELD, not prose. Flipping it, or proposing a
+   * successor subset, has to be a deliberate edit that this rule sees.
+   */
+  submissionIsPaused: (inj) => {
+    const sp = readSubset2(inj).submission_pause;
+    return !!sp && sp.status === "PAUSED"
+      && sp.successor_subset_proposed === false
+      && sp.successor_subset_authorized === false
+      && typeof sp.resume_condition === "string" && sp.resume_condition.length > 0
+      && /QF-MVP-40\.11/.test(sp.next_phase ?? "");
+  },
+  /** No successor-subset artefact may exist on disk. */
+  noSubset3Artifact: () => !existsSync(resolve(SUBSET3)),
+  /** Every deferred lane must still be recorded as deferred / unauthorized / held. */
+  deferredLanesIntact: (inj) => {
+    const lanes = readSubset2(inj).submission_pause?.deferred_lanes ?? [];
+    if (lanes.length !== DEFERRED_LANES.length) return false;
+    if (lanes.map((l) => l.lane).join(",") !== DEFERRED_LANES.join(",")) return false;
+    const OK = ["DEFERRED_UNTIL_REQUIRED", "HELD_FOR_EXPLICIT_CATEGORY_REVIEW", "NOT_AUTHORIZED", "DEFERRED"];
+    if (!lanes.every((l) => OK.includes(l.state))) return false;
+    // The commercial lane must name all three commercial keys and stay category-held.
+    const com = lanes.find((l) => l.lane === "WAVE1_COMMERCIAL");
+    return !!com && com.state === "HELD_FOR_EXPLICIT_CATEGORY_REVIEW"
+      && COMMERCIAL_KEYS.every((k) => (com.keys ?? []).includes(k));
+  },
+  /** A deferred lane's templates must actually still be draft in the packet. */
+  deferredLanesStillDraft: (p) => {
+    const lanes = readSubset2().submission_pause?.deferred_lanes ?? [];
+    const named = lanes.flatMap((l) => l.keys ?? []);
+    return named.length > 0 && named.every((k) => {
+      const t = p.templates.find((x) => x.internal_template_key === k);
+      return !!t && t.local_state.approval_status === "draft"
+        && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED";
+    });
+  },
+  /**
+   * Waves 2/3/4 must remain entirely UNAPPROVED while submission is paused.
+   *
+   * `submit_now` is a local arming flag, NOT an authorization: Wave 3 has carried
+   * submit_now true since the original wave plan (it may absorb approval latency) while
+   * still authorizing nothing. So rather than asserting a blanket false — which would be
+   * wrong about the design — the exact per-wave arming profile is pinned, and any change
+   * to it fails.
+   */
+  laterWavesUntouched: (p) => {
+    const later = p.templates.filter((t) => t.submission_wave >= 2);
+    const unapproved = later.every((t) => t.local_state.approval_status === "draft"
+      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
+      && t.local_state.provider_template_id === null);
+    const armingProfile = { 2: false, 3: true, 4: false };
+    const armingPinned = later.every((t) => t.submit_now === armingProfile[t.submission_wave]);
+    return unapproved && armingPinned;
+  },
+  /**
+   * QF-MVP-40.10G: subset 2 is now CLOSED, so its own keys are legitimately in
+   * CLOSED_KEYS — the old "must not be closed" clause would now reject the correct
+   * state. It is INVERTED rather than dropped: every key in a closed subset must be an
+   * approved key. The guards that still matter are unchanged — never a commercial
+   * template, never an explicitly excluded one, never a button, never a URL.
+   */
   subset2LeaksNothing: (inj) => {
     const N = readSubset2(inj);
     const keys = N.templates.map((t) => t.internal_template_key);
-    return !keys.some((k) => COMMERCIAL_KEYS.includes(k) || CLOSED_KEYS.includes(k)
-                          || SUBSET2_EXCLUDED.includes(k))
+    const closed = N.status === "CLOSED_APPROVED_UNMAPPED";
+    const membership = closed
+      ? keys.every((k) => CLOSED_KEYS.includes(k))     // closed => all must be approved
+      : keys.every((k) => !CLOSED_KEYS.includes(k));   // open   => none may be approved
+    return membership
+      && !keys.some((k) => COMMERCIAL_KEYS.includes(k) || SUBSET2_EXCLUDED.includes(k))
       && !N.templates.some((t) => /"type"\s*:\s*"buttons"/i.test(JSON.stringify(t.creation_payload)))
       && !N.templates.some((t) => /https?:\/\/|quickfurno\.[a-z]{2,}/i.test(t.body_spec));
   },
@@ -719,7 +822,7 @@ const RULES = [
   ["P13 provider names carry no environment name or long id", R.namesCarryNoEnvOrIds, packet],
   ["P14 every payload has a deterministic fingerprint", R.deterministicPayloads, packet],
   ["P15 closed state model: the closed set is approved+held, all others draft", R.closedStateModel, packet],
-  ["P90 the approved set is exactly the five expected templates", R.approvedSetIsExact, packet],
+  ["P90 the approved set is exactly the eight expected templates", R.approvedSetIsExact, packet],
   ["P80 no remote template id anywhere in packet or ledger", R.noRemoteIdAnywhere, packet],
   ["P16 consent acknowledgements remain outside the ordinary registry", R.acksStayOutOfOrdinaryRegistry, packet],
   ["P17 packet carries no secret, WABA id or PII", R.noSecretOrPii, packet],
@@ -777,7 +880,13 @@ const RULES = [
   ["P97 subset 1 explicitly denies resubmission, mapping, send and deployment", R.subset1DeniesResubmission, packet],
   ["P98 subset 2 is the exact three keys in the exact order", R.subset2ExactKeysInOrder, packet],
   ["P99 subset 2 quotes the packet verbatim (copy/category/profile/payload/fingerprint)", R.subset2MatchesPacketVerbatim, packet],
-  ["P100 subset 2 authorizes zero Meta calls", R.subset2AuthorizesNothing, packet],
+  ["P100 subset 2 is closed: approved / unmapped / consumed with exact evidence", R.subset2AuthorizesNothing, packet],
+  ["P105 subset 2 denies resubmission, mapping, send, canary and deployment", R.subset2DeniesResubmission, packet],
+  ["P106 template submission is PAUSED with no successor proposed or authorized", R.submissionIsPaused, packet],
+  ["P107 no subset-3 review artefact exists", R.noSubset3Artifact, packet],
+  ["P108 every deferred lane is recorded deferred / held / unauthorized", R.deferredLanesIntact, packet],
+  ["P109 templates named in a deferred lane are still draft", R.deferredLanesStillDraft, packet],
+  ["P110 waves 2/3/4 remain entirely unapproved and held", R.laterWavesUntouched, packet],
   ["P101 subset 2 leaks no commercial, closed, excluded, button or URL template", R.subset2LeaksNothing, packet],
   ["P102 subset 2 names the commercial templates as separately held", R.subset2NamesCommercialHold, packet],
   ["P103 subset 2 pins the current source packet fingerprint", R.subset2PinsCurrentPacket, packet],
@@ -917,8 +1026,26 @@ const MUT = [
     p.templates.find((x) => x.internal_template_key === "vendor_new_lead")
       .local_state.approval_status = "approved"; }],
   ["M35b the approved set LOSING a key is rejected", R.approvedSetIsExact, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === "lead_assignment_alert")
+    p.templates.find((x) => x.internal_template_key === "consent_start_acknowledgement")
       .local_state.approval_status = "draft"; }],
+  ["M35c a COMMERCIAL template promoted to approved is rejected", R.approvedSetIsExact, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "recharge_reminder")
+      .local_state.approval_status = "approved"; }],
+  ["M35d an AUTHENTICATION template promoted to approved is rejected", R.laterWavesUntouched, packet, (p) => {
+    const t = p.templates.find((x) => x.submission_wave === 2);
+    t.local_state.approval_status = "approved";
+    t.local_state.submission_state = "APPROVED_UNMAPPED"; }],
+  // Wave 3 is ALREADY armed by design, so "arm wave 3" was a no-op that proved nothing.
+  // The real defect the arming profile guards is Wave 2 — held from the Wave 0 task — or
+  // Wave 4 being armed, and Wave 3 being silently disarmed.
+  ["M35e a held AUTHENTICATION wave armed for creation is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.submission_wave === 2).submit_now = true; }],
+  ["M35g a deferred ADMIN wave armed for creation is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.submission_wave === 4).submit_now = true; }],
+  ["M35h the marketing arming profile silently changed is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.submission_wave === 3).submit_now = false; }],
+  ["M35f an ADMIN alert promoted to approved is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.submission_wave === 4).local_state.approval_status = "approved"; }],
   ["M36 a packet note omitting an approved key is rejected", R.packetNoteNotUniformlyDraft, packet, (p) => {
     p.note = "NOT uniformly draft. APPROVED_UNMAPPED: consent_help_response only."; }],
 
@@ -962,8 +1089,13 @@ const MUT = [
     const N = readSubset2(); N.templates.reverse(); return N; }],
   ["M46 a commercial template in subset 2 is rejected", R.subset2LeaksNothing, null, null, () => {
     const N = readSubset2(); N.templates[0].internal_template_key = "recharge_reminder"; return N; }],
-  ["M47 an already-closed template in subset 2 is rejected", R.subset2LeaksNothing, null, null, () => {
-    const N = readSubset2(); N.templates[0].internal_template_key = "lead_assignment_alert"; return N; }],
+  // Under the INVERTED membership rule a closed subset must contain only approved keys, so
+  // swapping in another approved key is legitimate and proved nothing. The real defect is
+  // the opposite: a CLOSED subset listing a template that was never approved.
+  ["M47 a still-draft template inside a CLOSED subset is rejected", R.subset2LeaksNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].internal_template_key = "clarification_request"; return N; }],
+  ["M47c an OPEN subset listing an already-approved template is rejected", R.subset2LeaksNothing, null, null, () => {
+    const N = readSubset2(); N.status = "OWNER_REVIEW_PENDING"; return N; }],
   ["M47b an explicitly excluded template in subset 2 is rejected", R.subset2LeaksNothing, null, null, () => {
     const N = readSubset2(); N.templates[0].internal_template_key = "vendor_new_lead"; return N; }],
   ["M48 a URL in subset-2 copy is rejected", R.subset2LeaksNothing, null, null, () => {
@@ -988,6 +1120,32 @@ const MUT = [
     const N = readSubset2();
     N.templates.find((t) => t.internal_template_key === "consent_start_acknowledgement")
       .body_spec = "QuickFurno: you have been resubscribed."; return N; }],
+  ["M60 an unpaused submission state is rejected", R.submissionIsPaused, null, null, () => {
+    const N = readSubset2(); N.submission_pause.status = "OPEN"; return N; }],
+  ["M61 a proposed successor subset is rejected", R.submissionIsPaused, null, null, () => {
+    const N = readSubset2(); N.submission_pause.successor_subset_proposed = true; return N; }],
+  ["M62 an authorized successor subset is rejected", R.submissionIsPaused, null, null, () => {
+    const N = readSubset2(); N.submission_pause.successor_subset_authorized = true; return N; }],
+  ["M63 a dropped deferred lane is rejected", R.deferredLanesIntact, null, null, () => {
+    const N = readSubset2(); N.submission_pause.deferred_lanes.pop(); return N; }],
+  ["M64 a commercial lane released from category review is rejected", R.deferredLanesIntact, null, null, () => {
+    const N = readSubset2();
+    N.submission_pause.deferred_lanes.find((l) => l.lane === "WAVE1_COMMERCIAL")
+      .state = "DEFERRED_UNTIL_REQUIRED"; return N; }],
+  ["M65 an authentication lane marked authorized is rejected", R.deferredLanesIntact, null, null, () => {
+    const N = readSubset2();
+    N.submission_pause.deferred_lanes.find((l) => l.lane === "WAVE2_AUTHENTICATION")
+      .state = "AUTHORIZED"; return N; }],
+  ["M66 subset 2 reopened for review is rejected", R.subset2AuthorizesNothing, null, null, () => {
+    const N = readSubset2(); N.status = "OWNER_REVIEW_PENDING"; return N; }],
+  ["M67 a subset-2 entry re-authorized for submission is rejected", R.subset2AuthorizesNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].submission_authorization = "AUTHORIZED"; return N; }],
+  ["M68 a changed subset-2 evidence filename is rejected", R.subset2AuthorizesNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].evidence[0] = "QF-MVP-40-WAVE1-META-SUBMISSION-9999.json"; return N; }],
+  ["M69 subset 2 dropping the no-resubmit denial is rejected", R.subset2DeniesResubmission, null, null, () => {
+    const N = readSubset2();
+    N.explicit_non_authorizations = N.explicit_non_authorizations.filter((x) => !/RESUBMIT/i.test(x));
+    return N; }],
   ["M56 subset 1 reverted to pending is rejected", R.subset1IsClosed, null, null, () => {
     const N = readSubset1(); N.status = "OWNER_REVIEW_PENDING"; return N; }],
   ["M57 a subset-1 entry re-authorized for submission is rejected", R.subset1IsClosed, null, null, () => {

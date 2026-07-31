@@ -1,6 +1,6 @@
 {
-  "manifest_version": "1.8",
-  "phase": "QF-MVP-40.10E",
+  "manifest_version": "1.9",
+  "phase": "QF-MVP-40.10F",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
   "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
@@ -794,8 +794,8 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client",
@@ -816,7 +816,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.10F: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json."
         },
         "provider_template_name_candidate": "qf_client_lead_status_update_v1"
       },
@@ -840,8 +841,8 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; registration and mapping are QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client",
@@ -862,7 +863,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.10F: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json."
         },
         "provider_template_name_candidate": "qf_client_matching_update_v1"
       },
@@ -882,9 +884,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
         },
-        "approval_status": "draft",
+        "approval_status": "approved",
         "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "submission_state": "APPROVED_UNMAPPED",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Confirms to a vendor that a lead assignment is FINAL. Distinct from vendor_new_lead, which is the offer that precedes acceptance.",
@@ -903,7 +905,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.10F: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json."
         },
         "provider_template_name_candidate": "qf_lead_assignment_alert_v1"
       },

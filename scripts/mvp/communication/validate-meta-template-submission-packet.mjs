@@ -34,22 +34,51 @@ const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
  * third approval has to be a deliberate edit here rather than something a per-key test
  * silently tolerates.
  */
-const CLOSED_KEYS = ["consent_help_response", "lead_received"];
-const WAVE1_CANARY_KEY = "lead_received";
-const WAVE1_CANARY_NAME = "qf_lead_received_v1";
-const V1C_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json";
-const V1C_RECONCILIATION_EVIDENCE =
-  "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json";
-const NEXT_SUBSET = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
-/** Exact keys in the exact reviewed order — order is part of the contract. */
-const NEXT_SUBSET_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
-const NEXT_SUBSET_NAMES = ["qf_client_lead_status_update_v1", "qf_client_matching_update_v1",
-  "qf_lead_assignment_alert_v1"];
-const NEXT_SUBSET_FINGERPRINTS = [
-  "ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac",
-  "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
-  "3f7997be7b8e1b019ba306a058b96f2d68aa84b7a014ea96407510030bb02453",
+const CLOSED_KEYS = ["consent_help_response", "lead_received",
+  "client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
+
+/**
+ * Every remotely-CLOSED template, with the exact evidence that proves it. Table-driven so
+ * closing another template is one row rather than a copied block of rules — and so a row
+ * that is silently dropped changes the pinned count and fails.
+ */
+const CLOSED_LEDGER = [
+  { key: "consent_help_response", name: "qf_consent_help_response_v3",
+    sub: "QF-MVP-40-WAVE0-META-SUBMISSION-2026-07-30T17-24-12-392Z.json",
+    rec: "QF-MVP-40-WAVE0-consent_help_response-META-RECONCILIATION-2026-07-30T17-48-51-026Z.json" },
+  { key: "lead_received", name: "qf_lead_received_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json",
+    rec: "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json" },
+  { key: "client_lead_status_update", name: "qf_client_lead_status_update_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T03-44-23-042Z.json",
+    rec: "QF-MVP-40-WAVE1-client_lead_status_update-META-RECONCILIATION-2026-07-31T03-50-23-839Z.json" },
+  { key: "client_matching_update", name: "qf_client_matching_update_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json",
+    rec: "QF-MVP-40-WAVE1-client_matching_update-META-RECONCILIATION-2026-07-31T04-22-20-119Z.json" },
+  { key: "lead_assignment_alert", name: "qf_lead_assignment_alert_v1",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-970Z.json",
+    rec: "QF-MVP-40-WAVE1-lead_assignment_alert-META-RECONCILIATION-2026-07-31T06-13-53-155Z.json" },
 ];
+/** Historical Wave 0 names that are NOT approved-and-closed but must stay in the ledger. */
+const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2"];
+/** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
+const SUBSET1 = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
+const SUBSET1_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
+/** Subset 2 — proposed in 40.10F, OPEN. Exact keys in the exact reviewed order. */
+const SUBSET2 = "docs/provider-manifests/meta-wave1-next-utility-subset-2-review.json";
+const SUBSET2_KEYS = ["consent_stop_acknowledgement", "consent_start_acknowledgement",
+  "vendor_onboarding_reminder"];
+const SUBSET2_NAMES = ["qf_consent_stop_acknowledgement_v1", "qf_consent_start_acknowledgement_v1",
+  "qf_vendor_onboarding_reminder_v1"];
+const SUBSET2_FINGERPRINTS = [
+  "850a4c01a48b78e237a85e186a448d8395abfb1e5049aaf6d8176b8628747268",
+  "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+  "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+];
+/** Named exclusions this round — sequencing, not rejection, but they must NOT leak in. */
+const SUBSET2_EXCLUDED = ["clarification_request", "clarification_reminder", "vendor_new_lead",
+  "vendor_response_reminder", "low_credit_warning", "recharge_reminder",
+  "vendor_package_expiry_warning"];
 /** A "next" candidate may never be a commercial-review or already-closed template. */
 const COMMERCIAL_KEYS = ["low_credit_warning", "recharge_reminder", "vendor_package_expiry_warning"];
 const V3_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE0-META-SUBMISSION-2026-07-30T17-24-12-392Z.json";
@@ -64,7 +93,8 @@ const sha256 = (x) => createHash("sha256").update(x).digest("hex");
 const asArtifact = (inj, name, path) =>
   (inj && inj.artifact === name) ? inj : JSON.parse(readFileSync(resolve(path), "utf8"));
 const readLedger = (inj) => asArtifact(inj, "meta-template-remote-state", REMOTE_STATE);
-const readNext = (inj) => asArtifact(inj, "meta-wave1-next-utility-subset-review", NEXT_SUBSET);
+const readSubset1 = (inj) => asArtifact(inj, "meta-wave1-next-utility-subset-review", SUBSET1);
+const readSubset2 = (inj) => asArtifact(inj, "meta-wave1-next-utility-subset-2-review", SUBSET2);
 
 const MANIFEST = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
@@ -153,10 +183,10 @@ const R = {
       return st.approval_status === "draft" && st.submission_state === "DRAFT_NOT_SUBMITTED";
     });
   },
-  /** Exactly two approvals, and exactly the expected two. A third is a failure. */
-  exactlyTwoApproved: (p) => {
+  /** The approved set is pinned EXACTLY — gaining or losing a key is a failure. */
+  approvedSetIsExact: (p) => {
     const approved = p.templates.filter((t) => t.local_state.approval_status === "approved");
-    return approved.length === 2
+    return approved.length === CLOSED_KEYS.length
       && approved.map((t) => t.internal_template_key).sort().join(",")
          === CLOSED_KEYS.slice().sort().join(",");
   },
@@ -453,45 +483,66 @@ const R = {
   },
 
   // ---- QF-MVP-40.10D Wave 0 closure --------------------------------------
-  ledgerHasFourEntries: (inj) => {
+  ledgerHasExactEntries: (inj) => {
     const L = readLedger(inj);
-    return L.entries.length === 4
-      && L.entries.map((e) => e.provider_template_name).join(",")
-         === "qf_consent_help_response_v1,qf_consent_help_response_v2,qf_consent_help_response_v3,"
-            + "qf_lead_received_v1";
+    const expected = [...LEDGER_HISTORY_NAMES, ...CLOSED_LEDGER.map((c) => c.name)].sort().join(",");
+    return L.entries.length === LEDGER_HISTORY_NAMES.length + CLOSED_LEDGER.length
+      && L.entries.map((e) => e.provider_template_name).sort().join(",") === expected;
   },
 
   // ---- QF-MVP-40.10E Wave 1 canary closure --------------------------------
-  ledgerCanaryApprovedUtility: (inj) => {
-    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
-    return !!c && c.internal_template_key === WAVE1_CANARY_KEY
-      && c.requested_category === "UTILITY"
-      && c.last_proven_status === "APPROVED"
-      && c.last_proven_remote_category === "UTILITY"
-      && c.readback_semantic_match === true
-      && c.create_post_count_at_submission === 1
-      && c.create_post_count_at_reconciliation === 0
-      && c.submission_outcome === "CREATED_PENDING"
-      && c.reconciliation_outcome === "RECONCILED_APPROVED"
-      && c.disposition === "APPROVED_UNMAPPED";
+  /** Every closed entry must record the same proven remote truth. */
+  ledgerClosedEntriesApprovedUtility: (inj) => {
+    const L = readLedger(inj);
+    return CLOSED_LEDGER.every((x) => {
+      const c = L.entries.find((e) => e.provider_template_name === x.name);
+      return !!c && c.internal_template_key === x.key
+        && c.requested_category === "UTILITY"
+        && c.last_proven_status === "APPROVED"
+        && c.last_proven_remote_category === "UTILITY"
+        && c.readback_semantic_match === true
+        && c.create_post_count_at_submission === 1
+        && c.create_post_count_at_reconciliation === 0
+        && c.submission_outcome === "CREATED_PENDING"
+        && c.reconciliation_outcome === "RECONCILED_APPROVED"
+        && c.disposition === "APPROVED_UNMAPPED";
+    });
   },
-  ledgerCanaryAuthoritiesDenied: (inj) => {
-    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
-    return !!c && c.send_authority === "DENIED" && c.mapping_authority === "DENIED"
-      && c.activation_authority === "NOT_GRANTED" && c.delete_authority === "NOT_GRANTED"
-      && c.appeal_authority === "NOT_APPLICABLE";
+  ledgerClosedAuthoritiesDenied: (inj) => {
+    const L = readLedger(inj);
+    return CLOSED_LEDGER.every((x) => {
+      const c = L.entries.find((e) => e.provider_template_name === x.name);
+      return !!c && c.send_authority === "DENIED" && c.mapping_authority === "DENIED"
+        && c.activation_authority === "NOT_GRANTED" && c.delete_authority === "NOT_GRANTED"
+        && c.appeal_authority === "NOT_APPLICABLE";
+    });
   },
-  ledgerCanaryCitesBothEvidenceFiles: (inj) => {
-    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
-    return !!c && Array.isArray(c.evidence) && c.evidence.length === 2
-      && c.evidence.includes(V1C_SUBMISSION_EVIDENCE)
-      && c.evidence.includes(V1C_RECONCILIATION_EVIDENCE);
+  /** Each closed entry cites EXACTLY its own two evidence filenames — no sharing, no drift. */
+  ledgerClosedCitesExactEvidence: (inj) => {
+    const L = readLedger(inj);
+    return CLOSED_LEDGER.every((x) => {
+      const c = L.entries.find((e) => e.provider_template_name === x.name);
+      return !!c && Array.isArray(c.evidence) && c.evidence.length === 2
+        && c.evidence.includes(x.sub) && c.evidence.includes(x.rec);
+    });
   },
-  ledgerCanaryApprovalGrantsNothing: (inj) => {
-    const c = readLedger(inj).entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME);
-    return !!c && /PROVIDER CONTRACT ONLY/i.test(c.notes)
-      && /no consent authority/i.test(c.notes)
-      && /authorizes no further Wave 1 submission/i.test(c.notes);
+  /**
+   * Every closed approval must make all three claims. They are matched by MEANING, not by
+   * one exact sentence: the Wave 0 entry is a historical record that must not be reworded
+   * to satisfy a later rule, so the rule accommodates its phrasing instead. All three
+   * claims are still required — this is a wording tolerance, not a weaker assertion.
+   */
+  ledgerClosedApprovalGrantsNothing: (inj) => {
+    const L = readLedger(inj);
+    return CLOSED_LEDGER.every((x) => {
+      const c = L.entries.find((e) => e.provider_template_name === x.name);
+      if (!c) return false;
+      const provesContractOnly = /PROVIDER CONTRACT ONLY/i.test(c.notes);
+      const grantsNoConsent = /(no|not create ordinary) consent authority/i.test(c.notes);
+      const needsLaterAuthorization = /authorizes no further/i.test(c.notes)
+        || /require[s]? a later, separately authorized phase/i.test(c.notes);
+      return provesContractOnly && grantsNoConsent && needsLaterAuthorization;
+    });
   },
   ledgerTopLevelAuthorizesNothing: (inj) => {
     const L = readLedger(inj);
@@ -500,14 +551,47 @@ const R = {
   },
 
   // ---- QF-MVP-40.10E next Utility subset ----------------------------------
-  nextSubsetExactKeysInOrder: (inj) => {
-    const N = readNext(inj);
-    return N.templates.length === 3
-      && N.templates.map((t) => t.internal_template_key).join(",") === NEXT_SUBSET_KEYS.join(",")
-      && N.templates.map((t) => t.provider_template_name).join(",") === NEXT_SUBSET_NAMES.join(",");
+  /** Subset 1 is CLOSED: every entry approved, unmapped, consumed, with its own evidence. */
+  subset1IsClosed: (inj) => {
+    const N = readSubset1(inj);
+    if (N.status !== "CLOSED_APPROVED_UNMAPPED" || N.authorizes_meta_calls !== false) return false;
+    if (N.templates.map((t) => t.internal_template_key).join(",") !== SUBSET1_KEYS.join(",")) return false;
+    return N.templates.every((t) => {
+      const x = CLOSED_LEDGER.find((c) => c.key === t.internal_template_key);
+      return !!x
+        && t.owner_copy_decision === "APPROVED_BY_OWNER"
+        && t.category_review_decision === "UTILITY_MACHINE_PROVEN"
+        && t.submission_authorization === "CONSUMED"
+        && t.remote_submission_state === "APPROVED_UNMAPPED"
+        && t.last_proven_status === "APPROVED"
+        && t.last_proven_remote_category === "UTILITY"
+        && t.readback_semantic_match === true
+        && t.submission_outcome === "CREATED_PENDING"
+        && t.reconciliation_outcome === "RECONCILED_APPROVED"
+        && t.create_post_count_at_submission === 1
+        && t.create_post_count_at_reconciliation === 0
+        && Array.isArray(t.evidence) && t.evidence.length === 2
+        && t.evidence.includes(x.sub) && t.evidence.includes(x.rec);
+    });
   },
-  nextSubsetMatchesPacketVerbatim: (inj) => {
-    const N = readNext(inj);
+  subset1DeniesResubmission: (inj) => {
+    const N = readSubset1(inj);
+    return Array.isArray(N.explicit_non_authorizations)
+      && N.explicit_non_authorizations.some((x) => /RESUBMIT/i.test(x))
+      && N.explicit_non_authorizations.some((x) => /mapping/i.test(x))
+      && N.explicit_non_authorizations.some((x) => /sending any WhatsApp message/i.test(x))
+      && N.explicit_non_authorizations.some((x) => /deployment/i.test(x));
+  },
+
+  // ---- Subset 2 (OPEN) ----------------------------------------------------
+  subset2ExactKeysInOrder: (inj) => {
+    const N = readSubset2(inj);
+    return N.templates.length === 3
+      && N.templates.map((t) => t.internal_template_key).join(",") === SUBSET2_KEYS.join(",")
+      && N.templates.map((t) => t.provider_template_name).join(",") === SUBSET2_NAMES.join(",");
+  },
+  subset2MatchesPacketVerbatim: (inj) => {
+    const N = readSubset2(inj);
     return N.templates.length === 3 && N.templates.every((t, i) => {
       const src = packet.templates.find((x) => x.internal_template_key === t.internal_template_key);
       return !!src && t.provider_template_name === src.provider_template_name
@@ -515,13 +599,13 @@ const R = {
         && t.requested_category === src.category && src.category === "UTILITY"
         && t.component_profile === src.component_profile && src.component_profile === "STANDARD_TEXT"
         && t.payload_fingerprint === src.payload_fingerprint
-        && t.payload_fingerprint === NEXT_SUBSET_FINGERPRINTS[i]
+        && t.payload_fingerprint === SUBSET2_FINGERPRINTS[i]
         && JSON.stringify(t.creation_payload) === JSON.stringify(src.creation_payload)
         && t.payload_fingerprint === sha256(JSON.stringify(t.creation_payload));
     });
   },
-  nextSubsetAuthorizesNothing: (inj) => {
-    const N = readNext(inj);
+  subset2AuthorizesNothing: (inj) => {
+    const N = readSubset2(inj);
     return N.authorizes_meta_calls === false && N.status === "OWNER_REVIEW_PENDING"
       && N.counts.authorized === 0 && N.counts.total === 3 && N.counts.pending_owner_review === 3
       && N.templates.every((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW"
@@ -531,15 +615,29 @@ const R = {
       && Array.isArray(N.explicit_non_authorizations) && N.explicit_non_authorizations.length >= 4;
   },
   /** Never propose a commercial template, an already-closed one, a button or a URL. */
-  nextSubsetLeaksNothing: (inj) => {
-    const N = readNext(inj);
+  subset2LeaksNothing: (inj) => {
+    const N = readSubset2(inj);
     const keys = N.templates.map((t) => t.internal_template_key);
-    return !keys.some((k) => COMMERCIAL_KEYS.includes(k) || CLOSED_KEYS.includes(k))
+    return !keys.some((k) => COMMERCIAL_KEYS.includes(k) || CLOSED_KEYS.includes(k)
+                          || SUBSET2_EXCLUDED.includes(k))
       && !N.templates.some((t) => /"type"\s*:\s*"buttons"/i.test(JSON.stringify(t.creation_payload)))
       && !N.templates.some((t) => /https?:\/\/|quickfurno\.[a-z]{2,}/i.test(t.body_spec));
   },
-  nextSubsetPinsCurrentPacket: (inj) =>
-    readNext(inj).source_packet_fingerprint === sha256(readFileSync(resolve(PACKET))),
+  /** The three commercial templates must be named as still separately held. */
+  subset2NamesCommercialHold: (inj) => {
+    const N = readSubset2(inj);
+    const excluded = (N.explicitly_excluded_this_round ?? []).map((x) => x.internal_template_key);
+    return SUBSET2_EXCLUDED.every((k) => excluded.includes(k))
+      && COMMERCIAL_KEYS.every((k) => JSON.stringify(N).includes(k));
+  },
+  subset2PinsCurrentPacket: (inj) =>
+    readSubset2(inj).source_packet_fingerprint === sha256(readFileSync(resolve(PACKET))),
+  /** The START acknowledgement must say promotional consent stays separate. */
+  subset2StartAckSeparatesPromotionalConsent: (inj) => {
+    const t = readSubset2(inj).templates.find(
+      (x) => x.internal_template_key === "consent_start_acknowledgement");
+    return !!t && /promotional messages need separate consent/i.test(t.body_spec);
+  },
   ledgerV3ApprovedUtility: () => {
     const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
     const v3 = L.entries.find((e) => e.provider_template_name === "qf_consent_help_response_v3");
@@ -621,7 +719,7 @@ const RULES = [
   ["P13 provider names carry no environment name or long id", R.namesCarryNoEnvOrIds, packet],
   ["P14 every payload has a deterministic fingerprint", R.deterministicPayloads, packet],
   ["P15 closed state model: the closed set is approved+held, all others draft", R.closedStateModel, packet],
-  ["P90 exactly two templates are approved, and they are the expected two", R.exactlyTwoApproved, packet],
+  ["P90 the approved set is exactly the five expected templates", R.approvedSetIsExact, packet],
   ["P80 no remote template id anywhere in packet or ledger", R.noRemoteIdAnywhere, packet],
   ["P16 consent acknowledgements remain outside the ordinary registry", R.acksStayOutOfOrdinaryRegistry, packet],
   ["P17 packet carries no secret, WABA id or PII", R.noSecretOrPii, packet],
@@ -669,17 +767,21 @@ const RULES = [
   ["P77 ledger cites the exact reconciliation evidence file", R.ledgerCitesReconciliationEvidence, packet],
   ["P78 ledger makes no body/component equality claim", R.ledgerMakesNoBodyEqualityClaim, packet],
   ["P79 ledger carries no template/WABA/request id, token or raw body", R.ledgerCarriesNoIdentifiers, packet],
-  ["P81 ledger holds exactly the four historical entries", R.ledgerHasFourEntries, packet],
-  ["P91 ledger records the canary APPROVED as UTILITY with proven counts", R.ledgerCanaryApprovedUtility, packet],
-  ["P92 ledger denies canary send/mapping/activation/delete", R.ledgerCanaryAuthoritiesDenied, packet],
-  ["P93 ledger cites both canary evidence files exactly", R.ledgerCanaryCitesBothEvidenceFiles, packet],
-  ["P94 ledger states the canary approval grants nothing further", R.ledgerCanaryApprovalGrantsNothing, packet],
+  ["P81 ledger holds exactly the expected entry set (history + closed)", R.ledgerHasExactEntries, packet],
+  ["P91 ledger records every closed entry APPROVED as UTILITY with proven counts", R.ledgerClosedEntriesApprovedUtility, packet],
+  ["P92 ledger denies send/mapping/activation/delete on every closed entry", R.ledgerClosedAuthoritiesDenied, packet],
+  ["P93 ledger cites the exact two evidence files for every closed entry", R.ledgerClosedCitesExactEvidence, packet],
+  ["P94 ledger states every closed approval grants nothing further", R.ledgerClosedApprovalGrantsNothing, packet],
   ["P95 ledger top level authorizes no call, mapping or send", R.ledgerTopLevelAuthorizesNothing, packet],
-  ["P96 next subset is the exact three keys in the exact order", R.nextSubsetExactKeysInOrder, packet],
-  ["P97 next subset quotes the packet verbatim (copy/category/profile/payload/fingerprint)", R.nextSubsetMatchesPacketVerbatim, packet],
-  ["P98 next subset authorizes zero Meta calls", R.nextSubsetAuthorizesNothing, packet],
-  ["P99 next subset leaks no commercial, closed, button or URL template", R.nextSubsetLeaksNothing, packet],
-  ["P100 next subset pins the current source packet fingerprint", R.nextSubsetPinsCurrentPacket, packet],
+  ["P96 subset 1 is closed: approved / unmapped / consumed with exact evidence", R.subset1IsClosed, packet],
+  ["P97 subset 1 explicitly denies resubmission, mapping, send and deployment", R.subset1DeniesResubmission, packet],
+  ["P98 subset 2 is the exact three keys in the exact order", R.subset2ExactKeysInOrder, packet],
+  ["P99 subset 2 quotes the packet verbatim (copy/category/profile/payload/fingerprint)", R.subset2MatchesPacketVerbatim, packet],
+  ["P100 subset 2 authorizes zero Meta calls", R.subset2AuthorizesNothing, packet],
+  ["P101 subset 2 leaks no commercial, closed, excluded, button or URL template", R.subset2LeaksNothing, packet],
+  ["P102 subset 2 names the commercial templates as separately held", R.subset2NamesCommercialHold, packet],
+  ["P103 subset 2 pins the current source packet fingerprint", R.subset2PinsCurrentPacket, packet],
+  ["P104 subset 2 START ack states promotional consent stays separate", R.subset2StartAckSeparatesPromotionalConsent, packet],
   ["P82 ledger records v3 APPROVED as UTILITY with proven counts", R.ledgerV3ApprovedUtility, packet],
   ["P83 ledger denies v3 send/mapping/activation/delete", R.ledgerV3AuthoritiesDenied, packet],
   ["P84 ledger cites both v3 evidence files exactly", R.ledgerV3CitesBothEvidenceFiles, packet],
@@ -802,63 +904,100 @@ const MUT = [
     p.note = "Every entry here is a LOCAL CANDIDATE: none is approved."; }],
 
   // ---- QF-MVP-40.10E ------------------------------------------------------
-  ["M32 the canary reverted to draft is rejected", R.closedStateModel, packet, (p) => {
-    const t = p.templates.find((x) => x.internal_template_key === WAVE1_CANARY_KEY);
+  ["M32 any approved key reverted to draft is rejected", R.closedStateModel, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "lead_assignment_alert");
     t.local_state.approval_status = "draft";
     t.local_state.submission_state = "DRAFT_NOT_SUBMITTED"; }],
-  ["M33 the canary re-armed for creation is rejected", R.closedStateModel, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === WAVE1_CANARY_KEY).submit_now = true; }],
-  ["M34 a committed provider id on the canary is rejected", R.closedStateModel, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === WAVE1_CANARY_KEY)
+  ["M33 any approved key re-armed for creation is rejected", R.closedStateModel, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "client_matching_update").submit_now = true; }],
+  ["M34 a committed provider id on an approved key is rejected", R.closedStateModel, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "client_lead_status_update")
       .local_state.provider_template_id = "1234567890"; }],
-  ["M35 a THIRD approved template is rejected", R.exactlyTwoApproved, packet, (p) => {
+  ["M35 the approved set GAINING a key is rejected", R.approvedSetIsExact, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "vendor_new_lead")
       .local_state.approval_status = "approved"; }],
+  ["M35b the approved set LOSING a key is rejected", R.approvedSetIsExact, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "lead_assignment_alert")
+      .local_state.approval_status = "draft"; }],
   ["M36 a packet note omitting an approved key is rejected", R.packetNoteNotUniformlyDraft, packet, (p) => {
     p.note = "NOT uniformly draft. APPROVED_UNMAPPED: consent_help_response only."; }],
 
-  ["M37 a canary ledger entry marked MARKETING is rejected", R.ledgerCanaryApprovedUtility, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+  ["M37 a closed ledger entry marked MARKETING is rejected", R.ledgerClosedEntriesApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_assignment_alert_v1")
       .last_proven_remote_category = "MARKETING"; return L; }],
-  ["M38 a canary semantic mismatch is rejected", R.ledgerCanaryApprovedUtility, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+  ["M38 a closed-entry semantic mismatch is rejected", R.ledgerClosedEntriesApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_client_matching_update_v1")
       .readback_semantic_match = false; return L; }],
-  ["M39 a second canary create POST is rejected", R.ledgerCanaryApprovedUtility, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+  ["M39 a second create POST on a closed entry is rejected", R.ledgerClosedEntriesApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_client_lead_status_update_v1")
       .create_post_count_at_reconciliation = 1; return L; }],
-  ["M40 an enabled canary send authority is rejected", R.ledgerCanaryAuthoritiesDenied, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
+  ["M39b a zero-POST submission claim on a closed entry is rejected", R.ledgerClosedEntriesApprovedUtility, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_received_v1")
+      .create_post_count_at_submission = 0; return L; }],
+  ["M40 an enabled send authority on a closed entry is rejected", R.ledgerClosedAuthoritiesDenied, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_client_matching_update_v1")
       .send_authority = "GRANTED"; return L; }],
-  ["M41 a changed canary evidence filename is rejected", R.ledgerCanaryCitesBothEvidenceFiles, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === WAVE1_CANARY_NAME)
-      .evidence[0] = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-999Z.json"; return L; }],
+  ["M40b a granted mapping authority on a closed entry is rejected", R.ledgerClosedAuthoritiesDenied, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_assignment_alert_v1")
+      .mapping_authority = "GRANTED"; return L; }],
+  ["M41 a changed closed-entry evidence filename is rejected", R.ledgerClosedCitesExactEvidence, null, null, () => {
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_assignment_alert_v1")
+      .evidence[0] = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-999Z.json"; return L; }],
+  ["M41b two closed entries sharing one evidence file is rejected", R.ledgerClosedCitesExactEvidence, null, null, () => {
+    const L = readLedger();
+    const a = L.entries.find((e) => e.provider_template_name === "qf_client_matching_update_v1");
+    a.evidence = L.entries.find((e) => e.provider_template_name === "qf_client_lead_status_update_v1").evidence;
+    return L; }],
   ["M42 a ledger that authorizes sending is rejected", R.ledgerTopLevelAuthorizesNothing, null, null, () => {
     const L = readLedger(); L.authorizes_sending = true; return L; }],
-  ["M43 a fifth ledger entry is rejected", R.ledgerHasFourEntries, null, null, () => {
+  ["M43 an extra ledger entry is rejected", R.ledgerHasExactEntries, null, null, () => {
     const L = readLedger(); L.entries.push({ ...L.entries[3], provider_template_name: "qf_x_v1" }); return L; }],
+  ["M43b a dropped ledger entry is rejected", R.ledgerHasExactEntries, null, null, () => {
+    const L = readLedger(); L.entries = L.entries.filter(
+      (e) => e.provider_template_name !== "qf_client_matching_update_v1"); return L; }],
 
-  ["M44 a fourth next-subset template is rejected", R.nextSubsetExactKeysInOrder, null, null, () => {
-    const N = readNext(); N.templates.push(N.templates[0]); return N; }],
-  ["M45 a reordered next subset is rejected", R.nextSubsetExactKeysInOrder, null, null, () => {
-    const N = readNext(); N.templates.reverse(); return N; }],
-  ["M46 a commercial template in the next subset is rejected", R.nextSubsetLeaksNothing, null, null, () => {
-    const N = readNext(); N.templates[0].internal_template_key = "recharge_reminder"; return N; }],
-  ["M47 an already-closed template in the next subset is rejected", R.nextSubsetLeaksNothing, null, null, () => {
-    const N = readNext(); N.templates[0].internal_template_key = WAVE1_CANARY_KEY; return N; }],
-  ["M48 a URL in next-subset copy is rejected", R.nextSubsetLeaksNothing, null, null, () => {
-    const N = readNext(); N.templates[0].body_spec += " See https://example.com"; return N; }],
-  ["M49 a pre-authorized next-subset entry is rejected", R.nextSubsetAuthorizesNothing, null, null, () => {
-    const N = readNext(); N.templates[0].submission_authorization = "AUTHORIZED"; return N; }],
-  ["M50 a next subset claiming it authorizes Meta calls is rejected", R.nextSubsetAuthorizesNothing, null, null, () => {
-    const N = readNext(); N.authorizes_meta_calls = true; return N; }],
-  ["M51 an edited next-subset payload with a stale fingerprint is rejected",
-    R.nextSubsetMatchesPacketVerbatim, null, null, () => {
-    const N = readNext(); N.templates[0].creation_payload.components[0].text = "Buy now, 50% off!"; return N; }],
-  ["M52 a MARKETING category in the next subset is rejected",
-    R.nextSubsetMatchesPacketVerbatim, null, null, () => {
-    const N = readNext(); N.templates[0].requested_category = "MARKETING"; return N; }],
-  ["M53 a stale next-subset source fingerprint is rejected", R.nextSubsetPinsCurrentPacket, null, null, () => {
-    const N = readNext(); N.source_packet_fingerprint = "0".repeat(64); return N; }],
+  ["M44 a fourth subset-2 template is rejected", R.subset2ExactKeysInOrder, null, null, () => {
+    const N = readSubset2(); N.templates.push(N.templates[0]); return N; }],
+  ["M45 a reordered subset 2 is rejected", R.subset2ExactKeysInOrder, null, null, () => {
+    const N = readSubset2(); N.templates.reverse(); return N; }],
+  ["M46 a commercial template in subset 2 is rejected", R.subset2LeaksNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].internal_template_key = "recharge_reminder"; return N; }],
+  ["M47 an already-closed template in subset 2 is rejected", R.subset2LeaksNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].internal_template_key = "lead_assignment_alert"; return N; }],
+  ["M47b an explicitly excluded template in subset 2 is rejected", R.subset2LeaksNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].internal_template_key = "vendor_new_lead"; return N; }],
+  ["M48 a URL in subset-2 copy is rejected", R.subset2LeaksNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].body_spec += " See https://example.com"; return N; }],
+  ["M49 a pre-authorized subset-2 entry is rejected", R.subset2AuthorizesNothing, null, null, () => {
+    const N = readSubset2(); N.templates[0].submission_authorization = "AUTHORIZED"; return N; }],
+  ["M50 a subset 2 claiming it authorizes Meta calls is rejected", R.subset2AuthorizesNothing, null, null, () => {
+    const N = readSubset2(); N.authorizes_meta_calls = true; return N; }],
+  ["M51 an edited subset-2 payload with a stale fingerprint is rejected",
+    R.subset2MatchesPacketVerbatim, null, null, () => {
+    const N = readSubset2(); N.templates[0].creation_payload.components[0].text = "Buy now, 50% off!"; return N; }],
+  ["M52 a MARKETING category in subset 2 is rejected",
+    R.subset2MatchesPacketVerbatim, null, null, () => {
+    const N = readSubset2(); N.templates[0].requested_category = "MARKETING"; return N; }],
+  ["M53 a stale subset-2 source fingerprint is rejected", R.subset2PinsCurrentPacket, null, null, () => {
+    const N = readSubset2(); N.source_packet_fingerprint = "0".repeat(64); return N; }],
+  ["M54 dropping the commercial-hold statement from subset 2 is rejected",
+    R.subset2NamesCommercialHold, null, null, () => {
+    const N = readSubset2(); N.explicitly_excluded_this_round = []; return N; }],
+  ["M55 a START ack that drops the promotional-consent carve-out is rejected",
+    R.subset2StartAckSeparatesPromotionalConsent, null, null, () => {
+    const N = readSubset2();
+    N.templates.find((t) => t.internal_template_key === "consent_start_acknowledgement")
+      .body_spec = "QuickFurno: you have been resubscribed."; return N; }],
+  ["M56 subset 1 reverted to pending is rejected", R.subset1IsClosed, null, null, () => {
+    const N = readSubset1(); N.status = "OWNER_REVIEW_PENDING"; return N; }],
+  ["M57 a subset-1 entry re-authorized for submission is rejected", R.subset1IsClosed, null, null, () => {
+    const N = readSubset1(); N.templates[0].submission_authorization = "AUTHORIZED"; return N; }],
+  ["M58 a changed subset-1 evidence filename is rejected", R.subset1IsClosed, null, null, () => {
+    const N = readSubset1(); N.templates[0].evidence[0] = "QF-MVP-40-WAVE1-META-SUBMISSION-9999.json"; return N; }],
+  ["M59 subset 1 dropping the no-resubmit denial is rejected", R.subset1DeniesResubmission, null, null, () => {
+    const N = readSubset1();
+    N.explicit_non_authorizations = N.explicit_non_authorizations.filter((x) => !/RESUBMIT/i.test(x));
+    return N; }],
 ];
 // A mutant either corrupts a clone of `base` (packet rules) or supplies a corrupted
 // sibling artefact via `inject` (rules that otherwise read that artefact from disk).

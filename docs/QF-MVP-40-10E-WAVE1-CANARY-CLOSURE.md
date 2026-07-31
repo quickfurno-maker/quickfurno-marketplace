@@ -1,7 +1,8 @@
 # QF-MVP-40.10E — Wave 1 canary closed; next Utility subset prepared
 
 **Status:** Wave 1 `lead_received` CLOSED (approved, unmapped, held). Next three-template Utility
-subset PROPOSED, **not authorized**.
+subset PROPOSED, **not authorized** — *since superseded: that subset was approved and closed in
+[QF-MVP-40.10F](QF-MVP-40-10F-WAVE1-UTILITY-SUBSET-CLOSURE.md).*
 **Scope of this task:** offline only. No Meta API call, no submission, no message, no mapping,
 no activation, no staging canary, no migration, no deployment.
 
@@ -98,6 +99,12 @@ retry, reconcile each read-only, and no mapping, activation, canary, send or dep
 
 **Submitting any of these three requires separate, explicit owner authorization.** This document
 does not provide it, and neither does the artefact.
+
+> **Superseded by [QF-MVP-40.10F](QF-MVP-40-10F-WAVE1-UTILITY-SUBSET-CLOSURE.md).** That
+> authorization was subsequently given: all three were submitted once and reconciled read-only to
+> **APPROVED as UTILITY**. They are now `APPROVED_UNMAPPED` and HELD, their authorizations are
+> CONSUMED, and the subset artefact is `CLOSED_APPROVED_UNMAPPED`. The remaining 10 Wave 1
+> templates stay unauthorised.
 
 ---
 

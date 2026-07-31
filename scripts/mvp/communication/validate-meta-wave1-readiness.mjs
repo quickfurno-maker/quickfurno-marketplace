@@ -31,7 +31,12 @@ const CANARY_FINGERPRINT = "dd818e01d293a683b3685f1f246f8cba6b1e4f8e6e106bcab72c
  * not "AUTHORIZED", which would read as permission to submit again. The closed set is
  * pinned here so a second entry closing itself has to be an explicit edit.
  */
-const CLOSED_WAVE1_KEYS = ["lead_received"];
+const CLOSED_WAVE1_KEYS = ["lead_received", "client_lead_status_update",
+  "client_matching_update", "lead_assignment_alert"];
+/** Subset 2 is the OPEN review set proposed in QF-MVP-40.10F. */
+const SUBSET2 = "docs/provider-manifests/meta-wave1-next-utility-subset-2-review.json";
+const SUBSET2_KEYS = ["consent_stop_acknowledgement", "consent_start_acknowledgement",
+  "vendor_onboarding_reminder"];
 const isClosedKey = (k) => CLOSED_WAVE1_KEYS.includes(k);
 const V1C_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json";
 const V1C_RECONCILIATION_EVIDENCE =
@@ -202,8 +207,9 @@ const R = {
       : (GROUP_A.includes(t.internal_template_key)
           ? "REVIEW_REQUIRED" : "HOLD_FOR_EXPLICIT_CATEGORY_REVIEW"))),
   /** Exactly one closed entry, exactly 13 still pending — counts must be self-consistent. */
-  reviewCountsExact: (r) => r.counts.total === 14 && r.counts.approved_unmapped === 1
-    && r.counts.pending_owner_review === 13
+  reviewCountsExact: (r) => r.counts.total === 14
+    && r.counts.approved_unmapped === CLOSED_WAVE1_KEYS.length
+    && r.counts.pending_owner_review === 14 - CLOSED_WAVE1_KEYS.length
     && r.counts.WAVE1A_ORDINARY_LAUNCH === 11 && r.counts.WAVE1B_COMMERCIAL_CATEGORY_REVIEW === 3
     && r.counts.approved_unmapped === r.templates.filter((t) => t.remote_submission_state === "APPROVED_UNMAPPED").length
     && r.counts.pending_owner_review === r.templates.filter((t) => t.owner_copy_decision === "PENDING_OWNER_REVIEW").length,
@@ -285,7 +291,20 @@ const R = {
       && k.payload_fingerprint === src.payload_fingerprint
       && JSON.stringify(k.creation_payload) === JSON.stringify(src.creation_payload);
   },
-  canarySourceFingerprintExact: (c) => c.source_packet_fingerprint === sha256(sourcePacketRaw),
+  /**
+   * QF-MVP-40.10E/F: while an artefact is OPEN, its pin must equal the CURRENT packet — it
+   * is telling the owner "review this against today's packet". Once the artefact is CLOSED
+   * it is a historical record of what was true at closure, and re-pinning it on every later
+   * packet change would destroy that record (the same reason ledger history is never
+   * rewritten). Content integrity is NOT waived: W42 still requires a closed artefact to
+   * quote the current packet verbatim, so copy can never drift unnoticed.
+   */
+  canarySourceFingerprintExact: (c) => {
+    const closed = typeof c.status === "string" && c.status.startsWith("CLOSED");
+    return closed
+      ? /^[0-9a-f]{64}$/.test(c.source_packet_fingerprint ?? "")
+      : c.source_packet_fingerprint === sha256(sourcePacketRaw);
+  },
   /**
    * QF-MVP-40.10E: the canary is CLOSED. A closed canary must still authorize nothing —
    * and must additionally deny RESUBMISSION, since its authorization is spent, not renewed.
@@ -317,7 +336,7 @@ const R = {
   /** Closing the canary must not silently promote the other 13 Wave 1 entries. */
   canaryDoesNotUnblockWave1: () => {
     const others = review.templates.filter((t) => !isClosedKey(t.internal_template_key));
-    return others.length === 13 && others.every((t) =>
+    return others.length === 14 - CLOSED_WAVE1_KEYS.length && others.every((t) =>
       t.submission_authorization === "NOT_AUTHORIZED" && t.remote_submission_state === "NOT_SUBMITTED");
   },
   /** Wave 0 closed as UTILITY: the canary may state that, but may claim no more. */
@@ -331,6 +350,24 @@ const R = {
   canaryCarriesNoSecrets: (c) => R.noSecretsOrPii(c),
   canaryDocExists: () => existsSync(resolve("docs/QF-MVP-40-10D-WAVE0-CLOSURE-AND-WAVE1-CANARY.md")),
   closureDocExists: () => existsSync(resolve("docs/QF-MVP-40-10E-WAVE1-CANARY-CLOSURE.md")),
+  subsetClosureDocExists: () => existsSync(resolve("docs/QF-MVP-40-10F-WAVE1-UTILITY-SUBSET-CLOSURE.md")),
+  /** Subset 2 must name only still-unsubmitted Wave 1 keys, and authorize nothing. */
+  subset2IsOpenAndUnauthorized: () => {
+    const N = JSON.parse(readFileSync(resolve(SUBSET2), "utf8"));
+    const keys = N.templates.map((t) => t.internal_template_key);
+    if (keys.join(",") !== SUBSET2_KEYS.join(",")) return false;
+    if (N.authorizes_meta_calls !== false || N.status !== "OWNER_REVIEW_PENDING") return false;
+    // Every proposed key must still be pending in the owner review — never an approved one.
+    return keys.every((k) => {
+      const t = review.templates.find((x) => x.internal_template_key === k);
+      return !!t && t.owner_copy_decision === "PENDING_OWNER_REVIEW"
+        && t.submission_authorization === "NOT_AUTHORIZED"
+        && t.remote_submission_state === "NOT_SUBMITTED";
+    });
+  },
+  subset2PinsCurrentPacket: () =>
+    JSON.parse(readFileSync(resolve(SUBSET2), "utf8")).source_packet_fingerprint
+      === sha256(sourcePacketRaw),
 };
 
 const RULES = [
@@ -386,6 +423,9 @@ const RULES = [
   ["W48 the QF-MVP-40.10D closure document exists", R.canaryDocExists, canary],
   ["W51 canary records the exact proven remote truth and both evidence files", R.canaryRemoteTruthExact, canary],
   ["W52 the QF-MVP-40.10E closure document exists", R.closureDocExists, canary],
+  ["W53 the QF-MVP-40.10F closure document exists", R.subsetClosureDocExists, canary],
+  ["W54 subset 2 names only still-pending keys and authorizes nothing", R.subset2IsOpenAndUnauthorized, canary],
+  ["W55 subset 2 pins the current source packet fingerprint", R.subset2PinsCurrentPacket, canary],
 ];
 for (const [n, fn, arg] of RULES) add(n, fn(arg));
 
@@ -426,8 +466,14 @@ const MUT = [
     (c) => { c.recommended_canary.creation_payload.components[0].text = "Buy now, 50% off!"; }],
   ["M17 canary copy drifting from the packet is rejected", R.canaryMatchesSourceVerbatim, canary, null,
     (c) => { c.recommended_canary.requested_category = "MARKETING"; }],
-  ["M18 a stale canary source fingerprint is rejected", R.canarySourceFingerprintExact, canary, null,
-    (c) => { c.source_packet_fingerprint = "0".repeat(64); }],
+  // QF-MVP-40.10F: this mutant used to blank the pin, which a CLOSED artefact now
+  // legitimately tolerates (see canarySourceFingerprintExact) — so it had decayed into
+  // proving nothing. It now tests the guarantee that replaced it: content integrity is
+  // NOT waived when an artefact closes, so drifted copy is still rejected. M39 covers the
+  // stale-pin case for OPEN artefacts, M40 the malformed-pin case for closed ones.
+  ["M18 a closed canary whose copy drifted from the packet is rejected",
+    R.canaryMatchesSourceVerbatim, canary, null,
+    (c) => { c.recommended_canary.creation_payload.components[0].text = "Buy now, 50% off!"; }],
   ["M19 a canary pre-authorized for submission is rejected", R.canaryAuthorizesNothing, canary, null,
     (c) => { c.recommended_canary.submission_authorization = "AUTHORIZED"; }],
   ["M20 a canary claiming it authorizes Meta calls is rejected", R.canaryAuthorizesNothing, canary, null,
@@ -454,9 +500,12 @@ const MUT = [
   ["M27 a re-authorized closed entry is rejected", R.allUnauthorized, null, null, (r) => {
     r.templates.find((t) => t.internal_template_key === "lead_received")
       .submission_authorization = "AUTHORIZED"; }],
-  ["M28 a second entry marked approved-unmapped is rejected", R.allNotSubmitted, null, null, (r) => {
+  ["M28 an extra entry marked approved-unmapped is rejected", R.allNotSubmitted, null, null, (r) => {
     r.templates.find((t) => t.internal_template_key === "vendor_new_lead")
       .remote_submission_state = "APPROVED_UNMAPPED"; }],
+  ["M28b a closed entry demoted to NOT_SUBMITTED is rejected", R.allNotSubmitted, null, null, (r) => {
+    r.templates.find((t) => t.internal_template_key === "client_matching_update")
+      .remote_submission_state = "NOT_SUBMITTED"; }],
   ["M29 a review artefact claiming it authorizes calls is rejected", R.authorizesNoMetaCalls, null, null, (r) => {
     r.authorizes_meta_calls = true; }],
   ["M30 a FULLY_REVIEWED status while entries are pending is rejected", R.authorizesNoMetaCalls, null, null, (r) => {
@@ -478,6 +527,14 @@ const MUT = [
     c.recommended_canary.create_post_count_at_reconciliation = 1; }],
   ["M38 a changed canary evidence filename is rejected", R.canaryRemoteTruthExact, canary, null, (c) => {
     c.recommended_canary.evidence[1] = "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-999Z.json"; }],
+
+  // ---- QF-MVP-40.10F ------------------------------------------------------
+  ["M39 an OPEN artefact with a stale packet pin is rejected", R.canarySourceFingerprintExact, canary, null,
+    (c) => { c.status = "OWNER_REVIEW_PENDING"; c.source_packet_fingerprint = "0".repeat(64); }],
+  ["M40 a CLOSED artefact with a non-hash pin is rejected", R.canarySourceFingerprintExact, canary, null,
+    (c) => { c.source_packet_fingerprint = "not-a-hash"; }],
+  ["M41 a drifted approved/pending split is rejected", R.reviewCountsExact, null, null, (r) => {
+    r.counts.approved_unmapped = 3; }],
 ];
 for (const entry of MUT) {
   const [name, fn, , , mutate] = entry;

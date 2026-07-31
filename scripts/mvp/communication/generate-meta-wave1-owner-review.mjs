@@ -94,7 +94,7 @@ const pendingEntries = templates.filter((t) => t.owner_copy_decision === "PENDIN
 const review = {
   artifact: "meta-wave1-owner-review",
   schema_version: "1.0",
-  phase: "QF-MVP-40.10E",
+  phase: "QF-MVP-40.10F",
   status: closedEntries.length === 0 ? "OWNER_REVIEW_PENDING"
     : (pendingEntries.length === 0 ? "FULLY_REVIEWED" : "PARTIALLY_REVIEWED"),
   authorizes_meta_calls: false,

@@ -1,7 +1,7 @@
 {
   "artifact": "meta-template-remote-state",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.10E",
+  "phase": "QF-MVP-40.10F",
   "contains_secrets": false,
   "authorizes_meta_calls": false,
   "authorizes_mapping": false,
@@ -90,6 +90,75 @@
         "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json"
       ],
       "notes": "The Wave 1 canary. Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled read-only to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. This extends the proven provider contract from the no-variable Wave 0 template to a VARIABLE-BEARING Utility template — the dimension the Wave 0 proof could not cover. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Wave 1 submission. Mapping, activation and sending require a later, separately authorized phase."
+    },
+    {
+      "internal_template_key": "client_lead_status_update",
+      "provider_template_name": "qf_client_lead_status_update_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T03-44-23-042Z.json",
+        "QF-MVP-40-WAVE1-client_lead_status_update-META-RECONCILIATION-2026-07-31T03-50-23-839Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase."
+    },
+    {
+      "internal_template_key": "client_matching_update",
+      "provider_template_name": "qf_client_matching_update_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json",
+        "QF-MVP-40-WAVE1-client_matching_update-META-RECONCILIATION-2026-07-31T04-22-20-119Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase."
+    },
+    {
+      "internal_template_key": "lead_assignment_alert",
+      "provider_template_name": "qf_lead_assignment_alert_v1",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "submission_outcome": "CREATED_PENDING",
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "evidence": [
+        "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-970Z.json",
+        "QF-MVP-40-WAVE1-lead_assignment_alert-META-RECONCILIATION-2026-07-31T06-13-53-155Z.json"
+      ],
+      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase."
     }
   ]
 }

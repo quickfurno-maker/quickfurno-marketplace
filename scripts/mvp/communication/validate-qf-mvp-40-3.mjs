@@ -252,12 +252,14 @@ const allTemplates = Object.values(templateManifest.groups).flat();
  * draft, and no entry may ever carry a provider template id.
  */
 /**
- * QF-MVP-40.10E: the closed set is now TWO templates — Wave 0 consent_help_response and
- * the Wave 1 canary lead_received, both APPROVED by Meta as UTILITY and both HELD from
- * creation. It is expressed as a SET so that admitting a third approval must be a
- * deliberate edit here, not something a per-key test silently tolerates.
+ * QF-MVP-40.10F: the closed set is now FIVE templates — Wave 0 consent_help_response plus
+ * the four approved Wave 1 templates (lead_received, client_lead_status_update,
+ * client_matching_update, lead_assignment_alert), all APPROVED by Meta as UTILITY and all
+ * HELD from creation. It is expressed as a SET so that admitting a further approval must
+ * be a deliberate edit here, not something a per-key test silently tolerates.
  */
-const CLOSED_KEYS_40_10E = ["consent_help_response", "lead_received"];
+const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
+  "client_lead_status_update", "client_matching_update", "lead_assignment_alert"]);
 const closedState = (t) => (CLOSED_KEYS_40_10E.includes(t.internal_template_key)
   ? t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
     && t.qf_mvp_40?.submit_now === false

@@ -1,0 +1,179 @@
+{
+  "artifact": "meta-wave1-next-utility-subset-2-review",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.10F",
+  "status": "OWNER_REVIEW_PENDING",
+  "authorizes_meta_calls": false,
+  "contains_secrets": false,
+  "note": "NON-SECRET. Proposes the SECOND exact three-template Utility subset for owner review, after the first subset (client_lead_status_update, client_matching_update, lead_assignment_alert) closed as APPROVED / UTILITY / APPROVED_UNMAPPED. It AUTHORIZES ZERO META CALLS and is not a blanket Wave 1 authorization. Copy, category, language, profile, payload and fingerprint are copied verbatim from the source submission packet and are never rewritten here. Submitting any of these three requires separate, explicit owner authorization. No provider template id appears here, and none may ever be committed.",
+  "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
+  "source_packet_fingerprint": "e75fae001456f1e9cf0862b4a1bc98582386af285faf8fc497a8987a78f7b872",
+  "prerequisite": {
+    "subset": [
+      "client_lead_status_update",
+      "client_matching_update",
+      "lead_assignment_alert"
+    ],
+    "last_proven_status": "APPROVED",
+    "last_proven_remote_category": "UTILITY",
+    "disposition": "APPROVED_UNMAPPED",
+    "note": "All three templates in the previous subset are machine proven: each was created with exactly one POST returning PENDING, then reconciled READ-ONLY to APPROVED with returned_category UTILITY and readback_semantic_match true. That is the precondition for proposing a further Utility subset. It grants no consent, mapping, activation or send authority."
+  },
+  "selection_rationale": [
+    "consent_stop_acknowledgement is the direct reply to a user STOP action.",
+    "consent_start_acknowledgement is the direct reply to a user START action and must state explicitly that promotional consent remains separate.",
+    "vendor_onboarding_reminder is tied to an existing vendor profile and an outstanding required item.",
+    "All three are Utility candidates: no discount, recharge or renewal language, no external URL, no marketing campaign copy.",
+    "Excluding any other template is SEQUENCING, not rejection."
+  ],
+  "explicitly_excluded_this_round": [
+    {
+      "internal_template_key": "clarification_request",
+      "reason": "Sequencing only — deferred to a later review subset, not rejected."
+    },
+    {
+      "internal_template_key": "clarification_reminder",
+      "reason": "Sequencing only — deferred to a later review subset, not rejected."
+    },
+    {
+      "internal_template_key": "vendor_new_lead",
+      "reason": "Sequencing only — deferred to a later review subset, not rejected. Carries quick-reply buttons, so it warrants its own review."
+    },
+    {
+      "internal_template_key": "vendor_response_reminder",
+      "reason": "Sequencing only — deferred to a later review subset, not rejected."
+    },
+    {
+      "internal_template_key": "low_credit_warning",
+      "reason": "Held separately for explicit CATEGORY review (commercial credit/recharge/renewal copy)."
+    },
+    {
+      "internal_template_key": "recharge_reminder",
+      "reason": "Held separately for explicit CATEGORY review (commercial credit/recharge/renewal copy)."
+    },
+    {
+      "internal_template_key": "vendor_package_expiry_warning",
+      "reason": "Held separately for explicit CATEGORY review (commercial credit/recharge/renewal copy)."
+    }
+  ],
+  "submission_protocol": [
+    "Submit ONE exact internal_template_key per operator run (--template). Never a wave, never a prefix.",
+    "Stop on the first non-success. No retry.",
+    "Reconcile each remote status READ-ONLY before proposing the next.",
+    "No provider mapping, no runtime activation, no staging canary, no send, no deployment.",
+    "Each of the three needs its own explicit owner authorization; this artefact grants none."
+  ],
+  "counts": {
+    "total": 3,
+    "pending_owner_review": 3,
+    "authorized": 0
+  },
+  "explicit_non_authorizations": [
+    "This artefact does not authorize submitting any of these three templates.",
+    "It does not authorize any other Wave 1 template.",
+    "It does not authorize Wave 2 or Wave 3.",
+    "It does not authorize a provider mapping, runtime activation, canary send or deployment.",
+    "It does not re-authorize any already-approved template; every one of those is CONSUMED and HELD.",
+    "The three commercial templates (low_credit_warning, recharge_reminder, vendor_package_expiry_warning) remain separately held for explicit category review."
+  ],
+  "templates": [
+    {
+      "internal_template_key": "consent_stop_acknowledgement",
+      "provider_template_name": "qf_consent_stop_acknowledgement_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "body_spec": "QuickFurno: you have been unsubscribed. We will not send you further updates or promotional messages. Reply START to resume, or HELP for help.",
+      "creation_payload": {
+        "name": "qf_consent_stop_acknowledgement_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: you have been unsubscribed. We will not send you further updates or promotional messages. Reply START to resume, or HELP for help."
+          }
+        ]
+      },
+      "payload_fingerprint": "850a4c01a48b78e237a85e186a448d8395abfb1e5049aaf6d8176b8628747268",
+      "rationale": [
+        "Directly tied to a user STOP action — the reply to something the user themselves just sent.",
+        "No promotion, discount, recharge, renewal or external URL.",
+        "Standard Text only — no button and no action payload."
+      ],
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "consent_start_acknowledgement",
+      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "body_spec": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help.",
+      "creation_payload": {
+        "name": "qf_consent_start_acknowledgement_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help."
+          }
+        ]
+      },
+      "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+      "rationale": [
+        "Directly tied to a user START action — the reply to something the user themselves just sent.",
+        "Must state explicitly that PROMOTIONAL consent remains separate: resuming messages is not opt-in to marketing.",
+        "No promotion, discount, recharge, renewal or external URL.",
+        "Standard Text only — no button and no action payload."
+      ],
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    },
+    {
+      "internal_template_key": "vendor_onboarding_reminder",
+      "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+      "provider_language": "en",
+      "requested_category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_group": "WAVE1A_ORDINARY_LAUNCH",
+      "body_spec": "QuickFurno: your vendor profile is not yet complete. Outstanding item: {{1}}. Complete it in your dashboard to start receiving leads.",
+      "creation_payload": {
+        "name": "qf_vendor_onboarding_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno: your vendor profile is not yet complete. Outstanding item: {{1}}. Complete it in your dashboard to start receiving leads.",
+            "example": {
+              "body_text": [
+                [
+                  "GST certificate"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+      "rationale": [
+        "Tied to an existing vendor profile and an outstanding required onboarding item.",
+        "No promotion, discount, recharge, renewal or external URL.",
+        "Standard Text only — no button and no action payload."
+      ],
+      "owner_copy_decision": "PENDING_OWNER_REVIEW",
+      "category_review_decision": "REVIEW_REQUIRED",
+      "submission_authorization": "NOT_AUTHORIZED",
+      "remote_submission_state": "NOT_SUBMITTED"
+    }
+  ]
+}

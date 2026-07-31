@@ -192,6 +192,10 @@ NEXT: INACTIVE PROVIDER MAPPING READINESS
 **Next phase: QF-MVP-40.11 — INACTIVE PROVIDER MAPPING READINESS**, followed by staging runtime
 verification. Nothing in this phase authorizes either.
 
+> **Followed by [QF-MVP-40.11](QF-MVP-40-11-INACTIVE-PROVIDER-MAPPING-READINESS.md).** That phase
+> prepares OFFLINE inactive-mapping readiness for the eight approved templates and performs no
+> mapping, database, provider or send action. Template submission remains PAUSED.
+
 ---
 
 ## 7. Explicitly NOT done

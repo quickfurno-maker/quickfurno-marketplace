@@ -30,7 +30,7 @@ const ROOT = path.resolve(
 
 const files = {
   migration:
-    "supabase/migrations/20260801113000_qf_mvp_automation_transport_replay_guard.sql",
+    "supabase/migrations/20260801152049_qf_mvp_automation_transport_replay_guard.sql",
   auth: "lib/automation/transportAuth.ts",
   types: "lib/automation/transportTypes.ts",
   service: "services/automationTransportService.ts",

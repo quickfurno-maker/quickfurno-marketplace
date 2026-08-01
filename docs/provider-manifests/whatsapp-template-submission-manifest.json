@@ -1,6 +1,6 @@
 {
-  "manifest_version": "2.0",
-  "phase": "QF-MVP-40.10G",
+  "manifest_version": "2.1",
+  "phase": "QF-MVP-40.12-R1",
   "channel": "whatsapp",
   "provider_key": "meta_whatsapp_cloud",
   "purpose": "Reviewable inventory of QuickFurno internal templates and their PLANNED Meta submission shape. Nothing here is submitted, approved, or wired to a provider mapping.",
@@ -18,10 +18,42 @@
   "binding_contract_notes": {
     "binding_version": 1,
     "proven_source_keys": [
-      "otp"
+      "otp",
+      "client_name",
+      "lead_status_label",
+      "matched_vendor_count",
+      "lead_reference",
+      "outstanding_item"
     ],
-    "proof": "The only CommunicationIntent variable built by live callers is { otp } (services/supabaseSendSmsHookService.ts, services/vendorVerificationService.ts, services/vendorPasswordResetService.ts). Business-template source keys are not wired to any live caller, so their bindings remain unresolved.",
-    "component_semantics": "component + 1-based position <- source_key (parameter_type). Positions are deterministic; order is NEVER inferred from object key order."
+    "proof_by_class": {
+      "live_caller_proven": {
+        "keys": [
+          "otp"
+        ],
+        "proof": "Built by live authentication callers: services/supabaseSendSmsHookService.ts, services/vendorVerificationService.ts, services/vendorPasswordResetService.ts."
+      },
+      "canonical_builder_proven": {
+        "keys": [
+          "client_name",
+          "lead_status_label",
+          "matched_vendor_count",
+          "lead_reference",
+          "outstanding_item"
+        ],
+        "proof": "Declared by the closed typed contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS) and emitted only by its named pure builders, which are the ONLY accepted construction path. QF-MVP-40.12-R1 verifies manifest / code / renderer parity, so a docs-only source_key is never sufficient.",
+        "honest_scope": "These keys were NOT found in a pre-existing live caller. The five business templates are CONTRACT-READY but NOT TRIGGER-WIRED: no automation was enabled, no mapping exists, and nothing here authorizes a send."
+      }
+    },
+    "zero_variable_templates": {
+      "keys": [
+        "consent_help_response",
+        "consent_stop_acknowledgement",
+        "consent_start_acknowledgement"
+      ],
+      "proof": "Evidence-bound acknowledgements with fixed reviewed copy and NO variables — an empty binding schema is authoritative. They remain deliberately absent from lib/communication/outboundConsentScope.ts."
+    },
+    "component_semantics": "component + 1-based position <- source_key (parameter_type). Positions are deterministic and declared explicitly; order is NEVER inferred from object key order, array index or alphabetical order.",
+    "mapping_state": "All provider mappings remain UNCREATED and INACTIVE. Binding resolution grants no mapping, activation or send authority."
   },
   "groups": {
     "authentication": [
@@ -785,16 +817,34 @@
         "variables_schema": {
           "1": {
             "type": "text",
-            "description": "client name"
+            "description": "client name",
+            "source_key": "client_name"
           },
           "2": {
             "type": "text",
-            "description": "human-readable lead status"
+            "description": "human-readable lead status",
+            "source_key": "lead_status_label"
           }
         },
         "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "authority": "lib/communication/businessTemplateVariables.ts::buildClientLeadStatusUpdateVariables",
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "client_name",
+              "parameter_type": "text"
+            },
+            {
+              "component": "body",
+              "position": 2,
+              "source_key": "lead_status_label",
+              "parameter_type": "text"
+            }
+          ],
+          "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
         "approval_status": "approved",
         "submission_state": "APPROVED_UNMAPPED",
@@ -832,16 +882,34 @@
         "variables_schema": {
           "1": {
             "type": "text",
-            "description": "client name"
+            "description": "client name",
+            "source_key": "client_name"
           },
           "2": {
             "type": "text",
-            "description": "count of matched vendors, pre-formatted"
+            "description": "count of matched vendors, pre-formatted",
+            "source_key": "matched_vendor_count"
           }
         },
         "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; registration and mapping are QF-MVP-40.6 work"
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "authority": "lib/communication/businessTemplateVariables.ts::buildClientMatchingUpdateVariables",
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "client_name",
+              "parameter_type": "text"
+            },
+            {
+              "component": "body",
+              "position": 2,
+              "source_key": "matched_vendor_count",
+              "parameter_type": "text"
+            }
+          ],
+          "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
         "approval_status": "approved",
         "submission_state": "APPROVED_UNMAPPED",
@@ -879,12 +947,23 @@
         "variables_schema": {
           "1": {
             "type": "text",
-            "description": "lead reference"
+            "description": "lead reference",
+            "source_key": "lead_reference"
           }
         },
         "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "authority": "lib/communication/businessTemplateVariables.ts::buildLeadAssignmentAlertVariables",
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "lead_reference",
+              "parameter_type": "text"
+            }
+          ],
+          "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
         "approval_status": "approved",
         "provider_template_id": null,
@@ -921,12 +1000,23 @@
         "variables_schema": {
           "1": {
             "type": "text",
-            "description": "client name"
+            "description": "client name",
+            "source_key": "client_name"
           }
         },
         "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "authority": "lib/communication/businessTemplateVariables.ts::buildLeadReceivedVariables",
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "client_name",
+              "parameter_type": "text"
+            }
+          ],
+          "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
         "approval_status": "approved",
         "provider_template_id": null,
@@ -1135,12 +1225,23 @@
         "variables_schema": {
           "1": {
             "type": "text",
-            "description": "outstanding onboarding or document item"
+            "description": "outstanding onboarding or document item",
+            "source_key": "outstanding_item"
           }
         },
         "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+          "binding_readiness": "resolved",
+          "binding_version": 1,
+          "authority": "lib/communication/businessTemplateVariables.ts::buildVendorOnboardingReminderVariables",
+          "bindings": [
+            {
+              "component": "body",
+              "position": 1,
+              "source_key": "outstanding_item",
+              "parameter_type": "text"
+            }
+          ],
+          "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
         "approval_status": "approved",
         "submission_state": "APPROVED_UNMAPPED",

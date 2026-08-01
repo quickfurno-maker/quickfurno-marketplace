@@ -1,0 +1,35 @@
+{
+  "artifact": "meta-staging-inactive-mapping-seed-blocker-resolution",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40.12-R1",
+  "status": "BINDING_GOVERNANCE_RESOLVED_OFFLINE",
+  "contains_secrets": false,
+  "staging_seed_executed": false,
+  "database_contacted": false,
+  "meta_contacted": false,
+  "mapping_count_written": 0,
+  "provider_account_written": false,
+  "remaining_blocker": "ENV_MISSING",
+  "authorizes_live_execution": false,
+  "note": "NON-SECRET offline record. It resolves ONE blocker — BINDING_SCHEMA_UNPROVEN — by establishing a canonical typed source-key contract for the five approved ordinary business templates. It executed no staging seed, contacted no database and made no Meta call. The prior owner authorization for QF-MVP-40.12 does NOT remove the operator's runtime credential and identity fences: a live run still requires the six phase-scoped variables in the process environment and still proves the exact staging project ref before constructing a client. No credential appears in this artefact.",
+  "resolved_blocker": {
+    "code": "BINDING_SCHEMA_UNPROVEN",
+    "was": "5 of 8 approved templates declared Meta positional variables with binding_readiness \"unresolved\" and no proven source_key anywhere in the repository, so a canonical mapping variables_schema could not be derived without fabricating names.",
+    "now": "A closed typed contract in lib/communication/businessTemplateVariables.ts declares each binding explicitly and its named pure builders are the only accepted construction path. The manifest records the same bindings, and the seed operator requires both authorities to agree exactly.",
+    "proof": "npm run test:mvp:40-12-r1 exercises the real builders and the real renderWhatsAppTemplateComponents — a manifest edit alone cannot satisfy it."
+  },
+  "honest_scope": {
+    "contract_ready": true,
+    "trigger_wired": false,
+    "note": "The five business templates are CONTRACT-READY, not TRIGGER-WIRED. No automation was enabled and no live caller was created; the builders exist so that the future caller and the mapping row cannot disagree about variable names."
+  },
+  "unchanged": [
+    "Meta-approved body copy and every payload fingerprint.",
+    "The approved set of eight templates, wave counts and total.",
+    "Remote-state evidence and history.",
+    "Mapping state: no mapping exists, none is active.",
+    "Template submission remains PAUSED; no subset 3 exists.",
+    "lib/communication/outboundConsentScope.ts — the three acknowledgements stay absent."
+  ],
+  "next_action": "Load the six phase-scoped variables into the current process environment WITHOUT writing them to a file, then re-run QF-MVP-40.12 Stage B from the pushed SHA: dry run, then --preflight-readonly, then exactly one --execute."
+}

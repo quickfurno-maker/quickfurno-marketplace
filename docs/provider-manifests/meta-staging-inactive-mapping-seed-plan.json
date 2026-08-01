@@ -31,23 +31,91 @@
     "Sanitized evidence is archived OUTSIDE the repository; no evidence file enters Git."
   ],
   "steps": [
-    { "step": 1, "name": "PROVE_STAGING_IDENTITY", "detail": "Resolve the effective environment through the project's own env loader and prove the target project is the staging project. Abort if the effective project is production or cannot be proven. A production service key present in a local env file is a known hazard, so identity must be proven, not assumed." },
-    { "step": 2, "name": "VERIFY_SCHEMA_READINESS", "detail": "Confirm public.communication_provider_template_mappings exists with template_key, channel, provider_key, language, version, provider_template_name, provider_template_id, approval_status and is_active, and that uq_comm_provider_template_mapping and uq_comm_provider_template_active are both present. Abort if any is missing; never create schema during a seed." },
-    { "step": 3, "name": "VERIFY_PROVIDER_ACCOUNT", "detail": "Confirm the intended row exists in public.communication_provider_accounts and is DISABLED. If it does not exist, it is created DISABLED in a separately authorized phase — never inside this seed." },
-    { "step": 4, "name": "READ_REMOTE_TEMPLATE_STATE", "detail": "Read-only reconciliation against Meta by exact template name and language for each of the eight templates. No create, edit, delete or send. Abort on any status other than APPROVED or any returned category other than UTILITY." },
-    { "step": 5, "name": "RESOLVE_REMOTE_IDS_IN_MEMORY", "detail": "If a remote identifier is returned, hold it in memory only for the duration of the run. It is never written to Git, never logged, and is not required for dispatch." },
-    { "step": 6, "name": "CHECK_COLLISIONS", "detail": "For each template, query the existing rows on the uq_comm_provider_template_mapping tuple. Abort if a conflicting row exists that is active, or that differs in provider_template_name, language or category." },
-    { "step": 7, "name": "BEGIN_TRANSACTION", "detail": "Open a single transaction covering all eight writes. A partial seed is never acceptable." },
-    { "step": 8, "name": "WRITE_INACTIVE_MAPPINGS", "detail": "Insert or upsert exactly eight rows on the uq_comm_provider_template_mapping conflict target, each with is_active false and approval_status approved. Provider template id may remain null." },
-    { "step": 9, "name": "REFUSE_ACTIVE_REPLACEMENT", "detail": "If any conflict target resolves to a row where is_active is true, the seed never proceeds with that row: it aborts the whole transaction. An active mapping is only ever changed by an explicit, separately authorized activation phase." },
-    { "step": 10, "name": "READ_BACK_ROWS", "detail": "Re-read the eight rows by their exact tuple and compare template_key, channel, provider_key, language, version, provider_template_name and approval_status against the readiness artefact." },
-    { "step": 11, "name": "PROVE_ALL_INACTIVE", "detail": "Assert every seeded row has is_active false, and that the count of active mappings for the affected tuples is zero." },
-    { "step": 12, "name": "PROVE_ACCOUNT_STILL_DISABLED", "detail": "Re-read the provider account and assert it is still disabled and unchanged by the seed." },
-    { "step": 13, "name": "PROVE_RUNTIME_POLICY_DISABLED", "detail": "Assert the communication runtime policy remains disabled so no send path can open as a side effect of seeding." },
-    { "step": 14, "name": "COMMIT_ONLY_IF_ALL_PASS", "detail": "Commit only when every preceding check passed. Any failed check leaves the transaction uncommitted." },
-    { "step": 15, "name": "ROLLBACK_ON_UNCERTAINTY", "detail": "On any error, ambiguous result, timeout or unknown outcome, roll back. An uncertain write is treated as a failed write and is never retried blindly." },
-    { "step": 16, "name": "ARCHIVE_SANITIZED_EVIDENCE", "detail": "Write a sanitized run record to the external operator evidence archive: counts, outcomes and template keys only. Never a remote id, account id, credential or raw provider response, and never inside the repository." },
-    { "step": 17, "name": "ZERO_SENDS", "detail": "Assert the run performed zero message sends and zero provider write calls, and record that assertion in the evidence." }
+    {
+      "step": 1,
+      "name": "PROVE_STAGING_IDENTITY",
+      "detail": "Resolve the effective environment through the project's own env loader and prove the target project is the staging project. Abort if the effective project is production or cannot be proven. A production service key present in a local env file is a known hazard, so identity must be proven, not assumed."
+    },
+    {
+      "step": 2,
+      "name": "VERIFY_SCHEMA_READINESS",
+      "detail": "Confirm public.communication_provider_template_mappings exists with template_key, channel, provider_key, language, version, provider_template_name, provider_template_id, approval_status and is_active, and that uq_comm_provider_template_mapping and uq_comm_provider_template_active are both present. Abort if any is missing; never create schema during a seed."
+    },
+    {
+      "step": 3,
+      "name": "VERIFY_PROVIDER_ACCOUNT",
+      "detail": "Confirm the intended row exists in public.communication_provider_accounts and is DISABLED. If it does not exist, it is created DISABLED in a separately authorized phase — never inside this seed."
+    },
+    {
+      "step": 4,
+      "name": "READ_REMOTE_TEMPLATE_STATE",
+      "detail": "Read-only reconciliation against Meta by exact template name and language for each of the eight templates. No create, edit, delete or send. Abort on any status other than APPROVED or any returned category other than UTILITY."
+    },
+    {
+      "step": 5,
+      "name": "RESOLVE_REMOTE_IDS_IN_MEMORY",
+      "detail": "If a remote identifier is returned, hold it in memory only for the duration of the run. It is never written to Git, never logged, and is not required for dispatch."
+    },
+    {
+      "step": 6,
+      "name": "CHECK_COLLISIONS",
+      "detail": "For each template, query the existing rows on the uq_comm_provider_template_mapping tuple. Abort if a conflicting row exists that is active, or that differs in provider_template_name, language or category."
+    },
+    {
+      "step": 7,
+      "name": "BEGIN_TRANSACTION",
+      "detail": "Open a single transaction covering all eight writes. A partial seed is never acceptable."
+    },
+    {
+      "step": 8,
+      "name": "WRITE_INACTIVE_MAPPINGS",
+      "detail": "Insert or upsert exactly eight rows on the uq_comm_provider_template_mapping conflict target, each with is_active false and approval_status approved. Provider template id may remain null."
+    },
+    {
+      "step": 9,
+      "name": "REFUSE_ACTIVE_REPLACEMENT",
+      "detail": "If any conflict target resolves to a row where is_active is true, the seed never proceeds with that row: it aborts the whole transaction. An active mapping is only ever changed by an explicit, separately authorized activation phase."
+    },
+    {
+      "step": 10,
+      "name": "READ_BACK_ROWS",
+      "detail": "Re-read the eight rows by their exact tuple and compare template_key, channel, provider_key, language, version, provider_template_name and approval_status against the readiness artefact."
+    },
+    {
+      "step": 11,
+      "name": "PROVE_ALL_INACTIVE",
+      "detail": "Assert every seeded row has is_active false, and that the count of active mappings for the affected tuples is zero."
+    },
+    {
+      "step": 12,
+      "name": "PROVE_ACCOUNT_STILL_DISABLED",
+      "detail": "Re-read the provider account and assert it is still disabled and unchanged by the seed."
+    },
+    {
+      "step": 13,
+      "name": "PROVE_RUNTIME_POLICY_DISABLED",
+      "detail": "Assert the communication runtime policy remains disabled so no send path can open as a side effect of seeding."
+    },
+    {
+      "step": 14,
+      "name": "COMMIT_ONLY_IF_ALL_PASS",
+      "detail": "Commit only when every preceding check passed. Any failed check leaves the transaction uncommitted."
+    },
+    {
+      "step": 15,
+      "name": "ROLLBACK_ON_UNCERTAINTY",
+      "detail": "On any error, ambiguous result, timeout or unknown outcome, roll back. An uncertain write is treated as a failed write and is never retried blindly."
+    },
+    {
+      "step": 16,
+      "name": "ARCHIVE_SANITIZED_EVIDENCE",
+      "detail": "Write a sanitized run record to the external operator evidence archive: counts, outcomes and template keys only. Never a remote id, account id, credential or raw provider response, and never inside the repository."
+    },
+    {
+      "step": 17,
+      "name": "ZERO_SENDS",
+      "detail": "Assert the run performed zero message sends and zero provider write calls, and record that assertion in the evidence."
+    }
   ],
   "abort_conditions": [
     "The effective environment cannot be proven to be staging.",
@@ -70,5 +138,12 @@
     "It does not authorize a migration, a staging canary or a deployment.",
     "Execution requires a separate, explicit owner authorization naming the exact branch and commit SHA."
   ],
-  "next_phase": "QF-MVP-40.12 — CONTROLLED STAGING PROVIDER ACCOUNT + INACTIVE MAPPING SEED"
+  "next_phase": "QF-MVP-40.12 — CONTROLLED STAGING PROVIDER ACCOUNT + INACTIVE MAPPING SEED",
+  "binding_governance": {
+    "status": "RESOLVED_OFFLINE",
+    "phase": "QF-MVP-40.12-R1",
+    "authority": "lib/communication/businessTemplateVariables.ts",
+    "note": "Step 8's variables_schema is no longer ambiguous. The five ordinary business templates now have a canonical typed source-key contract, and the seed operator requires BOTH the manifest and that code contract to agree before it will build a schema — a docs-only source_key is never accepted. The three consent acknowledgements remain zero-variable, for which an empty binding schema is authoritative. This resolves the BINDING_SCHEMA_UNPROVEN blocker only; it grants no mapping, activation or send authority, and the seed remains PLAN_ONLY_NOT_AUTHORIZED.",
+    "remaining_blocker": "ENV_MISSING — the six phase-scoped live staging/Meta variables."
+  }
 }

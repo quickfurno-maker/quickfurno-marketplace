@@ -733,8 +733,21 @@ const R = {
     return SUBSET2_EXCLUDED.every((k) => excluded.includes(k))
       && COMMERCIAL_KEYS.every((k) => JSON.stringify(N).includes(k));
   },
-  subset2PinsCurrentPacket: (inj) =>
-    readSubset2(inj).source_packet_fingerprint === sha256(readFileSync(resolve(PACKET))),
+  /**
+   * QF-MVP-40.12-R1: same open/closed distinction already applied to the canary review.
+   * While an artefact is OPEN its pin must equal the CURRENT packet — it tells the owner
+   * "review this against today's packet". Once CLOSED the pin is a historical record of
+   * what was true at closure; re-pinning it on every later packet change would destroy
+   * exactly what it documents. Content integrity is NOT waived — P99 still requires a
+   * closed subset to quote the current packet verbatim, so copy can never drift unseen.
+   */
+  subset2PinsCurrentPacket: (inj) => {
+    const N = readSubset2(inj);
+    const closed = typeof N.status === "string" && N.status.startsWith("CLOSED");
+    return closed
+      ? /^[0-9a-f]{64}$/.test(N.source_packet_fingerprint ?? "")
+      : N.source_packet_fingerprint === sha256(readFileSync(resolve(PACKET)));
+  },
   /** The START acknowledgement must say promotional consent stays separate. */
   subset2StartAckSeparatesPromotionalConsent: (inj) => {
     const t = readSubset2(inj).templates.find(
@@ -1110,8 +1123,14 @@ const MUT = [
   ["M52 a MARKETING category in subset 2 is rejected",
     R.subset2MatchesPacketVerbatim, null, null, () => {
     const N = readSubset2(); N.templates[0].requested_category = "MARKETING"; return N; }],
+  // The stale-pin defect only exists while an artefact is OPEN; once closed the pin is
+  // historical, so the mutant reopens it to exercise the live-pin branch. A malformed
+  // pin on a CLOSED artefact is covered separately by M53b.
   ["M53 a stale subset-2 source fingerprint is rejected", R.subset2PinsCurrentPacket, null, null, () => {
-    const N = readSubset2(); N.source_packet_fingerprint = "0".repeat(64); return N; }],
+    const N = readSubset2();
+    N.status = "OWNER_REVIEW_PENDING"; N.source_packet_fingerprint = "0".repeat(64); return N; }],
+  ["M53b a malformed pin on a closed subset is rejected", R.subset2PinsCurrentPacket, null, null, () => {
+    const N = readSubset2(); N.source_packet_fingerprint = "not-a-hash"; return N; }],
   ["M54 dropping the commercial-hold statement from subset 2 is rejected",
     R.subset2NamesCommercialHold, null, null, () => {
     const N = readSubset2(); N.explicitly_excluded_this_round = []; return N; }],

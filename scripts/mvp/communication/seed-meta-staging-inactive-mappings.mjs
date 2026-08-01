@@ -173,35 +173,60 @@ export function resolveStagingTarget(env = {}) {
  * customer message once the mapping is activated. An empty schema is legitimate ONLY when
  * the authoritative template genuinely has no variables.
  */
-export function buildCanonicalBindingSchema(manifestEntry) {
+export function buildCanonicalBindingSchema(manifestEntry, codeContract = null) {
+  const key = manifestEntry?.internal_template_key;
   const vars = manifestEntry?.variables_schema ?? {};
   const positions = Object.keys(vars);
   const readiness = manifestEntry?.binding_contract?.binding_readiness ?? null;
+  const fail = (detail) => ({ ok: false, reason: SeedFailure.BINDING_SCHEMA_UNPROVEN, detail });
 
   if (positions.length === 0) {
+    // A zero-variable template is authoritative on its own: there is no name to prove.
+    if (codeContract) return fail(`${key}: declares no variables but a code contract exists for it.`);
     return { ok: true, schema: { bindingVersion: 1, bindings: [] }, basis: "NO_VARIABLES" };
   }
   if (readiness !== "resolved") {
-    return {
-      ok: false,
-      reason: SeedFailure.BINDING_SCHEMA_UNPROVEN,
-      detail: `${manifestEntry.internal_template_key}: declares ${positions.length} variable(s) but `
-        + `binding_readiness is "${readiness}" — source keys are not proven from repository call `
-        + "sites, so a canonical variables_schema cannot be derived without fabricating it.",
-    };
+    return fail(`${key}: declares ${positions.length} variable(s) but binding_readiness is `
+      + `"${readiness}" — source keys are not proven from repository call sites, so a canonical `
+      + "variables_schema cannot be derived without fabricating it.");
   }
-  const bindings = positions
+
+  // QF-MVP-40.12-R1: a docs-only source_key is NOT sufficient. The manifest is one
+  // authority; the typed code contract is the other, and both must agree exactly. A
+  // manifest edit alone can therefore never unlock a seed.
+  if (!codeContract) {
+    return fail(`${key}: the manifest says resolved, but no canonical code contract was supplied `
+      + "for it — a docs-only source_key is never accepted.");
+  }
+  if (codeContract.templateKey !== key) return fail(`${key}: code contract is for a different template.`);
+  if (codeContract.bindingVersion !== 1) return fail(`${key}: code contract binding version is not 1.`);
+
+  const manifestBindings = positions
     .map((p) => Number(p))
     .sort((a, b) => a - b)
     .map((position) => {
       const sourceKey = vars[String(position)]?.source_key;
       return sourceKey ? { component: "body", position, sourceKey, parameterType: "text" } : null;
     });
-  if (bindings.some((b) => b === null)) {
-    return { ok: false, reason: SeedFailure.BINDING_SCHEMA_UNPROVEN,
-      detail: `${manifestEntry.internal_template_key}: a declared variable has no proven source_key.` };
+  if (manifestBindings.some((b) => b === null)) {
+    return fail(`${key}: a declared variable has no proven source_key.`);
   }
-  return { ok: true, schema: { bindingVersion: 1, bindings }, basis: "PROVEN_SOURCE_KEYS" };
+  const seen = new Set(manifestBindings.map((b) => b.sourceKey));
+  if (seen.size !== manifestBindings.length) return fail(`${key}: duplicate source_key in the manifest.`);
+
+  const codeBindings = codeContract.bindings.slice().sort((a, b) => a.position - b.position);
+  if (codeBindings.length !== manifestBindings.length) {
+    return fail(`${key}: manifest declares ${manifestBindings.length} binding(s) but the code `
+      + `contract declares ${codeBindings.length}.`);
+  }
+  for (let i = 0; i < codeBindings.length; i += 1) {
+    const m = manifestBindings[i], c = codeBindings[i];
+    if (m.position !== c.position) return fail(`${key}: binding position mismatch (manifest ${m.position} vs code ${c.position}).`);
+    if (m.sourceKey !== c.sourceKey) return fail(`${key}: source_key mismatch at position ${m.position} (manifest "${m.sourceKey}" vs code "${c.sourceKey}").`);
+    if (m.parameterType !== c.parameterType) return fail(`${key}: parameter_type mismatch at position ${m.position}.`);
+    if (m.component !== c.component) return fail(`${key}: component mismatch at position ${m.position}.`);
+  }
+  return { ok: true, schema: { bindingVersion: 1, bindings: manifestBindings }, basis: "PROVEN_SOURCE_KEYS" };
 }
 
 /** Parse and validate CLI flags. An unknown flag is refused rather than ignored. */
@@ -295,9 +320,15 @@ if (isDirect) {
   const byKey = new Map(Object.values(manifest.groups).flat()
     .map((t) => [t.internal_template_key, t]));
 
+  // The SECOND authority: the typed contract that owns these source keys. It is loaded
+  // through the repository's existing TS loader, never duplicated as a hand-maintained
+  // list here — a copy in the operator would be one more thing that can silently drift.
+  const contracts = (await import("../../../lib/communication/businessTemplateVariables.ts"))
+    .BUSINESS_TEMPLATE_CONTRACTS;
+
   const unproven = [];
   for (const t of SEED_SET) {
-    const built = buildCanonicalBindingSchema(byKey.get(t.key));
+    const built = buildCanonicalBindingSchema(byKey.get(t.key), contracts[t.key] ?? null);
     const label = built.ok ? `OK (${built.basis})` : `BLOCKED (${built.reason})`;
     console.log(`  ${t.key.padEnd(30)} ${t.classification.padEnd(19)} binding: ${label}`);
     if (!built.ok) unproven.push(built.detail);

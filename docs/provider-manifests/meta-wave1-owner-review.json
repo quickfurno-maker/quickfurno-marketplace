@@ -6,7 +6,7 @@
   "authorizes_meta_calls": false,
   "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. client_lead_status_update, client_matching_update, consent_start_acknowledgement, consent_stop_acknowledgement, lead_assignment_alert, lead_received, vendor_onboarding_reminder was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot authorization is CONSUMED, and being approved grants no consent, mapping, activation or send authority. The other 7 entries authorize ZERO Meta calls and remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: each further submission needs its own explicit owner authorization.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "189ecd895d7f08d64f544501ef22df79df6505a6d629091eaf3164f13f747c9d",
+  "source_packet_fingerprint": "5907883b634ab73526635c134df8c236da4bffe9facace4d436095f6f005711c",
   "counts": {
     "total": 14,
     "approved_unmapped": 7,

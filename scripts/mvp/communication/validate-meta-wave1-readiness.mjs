@@ -385,9 +385,19 @@ const R = {
       && sp.successor_subset_proposed === false && sp.successor_subset_authorized === false
       && !existsSync(resolve("docs/provider-manifests/meta-wave1-next-utility-subset-3-review.json"));
   },
-  subset2PinsCurrentPacket: () =>
-    JSON.parse(readFileSync(resolve(SUBSET2), "utf8")).source_packet_fingerprint
-      === sha256(sourcePacketRaw),
+  /**
+   * QF-MVP-40.12-R1: same open/closed distinction as canarySourceFingerprintExact. An
+   * OPEN artefact must pin the CURRENT packet; a CLOSED one keeps its historical closure
+   * hash, because re-pinning it on every later packet change destroys the record it
+   * exists to preserve. W54 still proves the closed set matches the owner review.
+   */
+  subset2PinsCurrentPacket: () => {
+    const N = JSON.parse(readFileSync(resolve(SUBSET2), "utf8"));
+    const closed = typeof N.status === "string" && N.status.startsWith("CLOSED");
+    return closed
+      ? /^[0-9a-f]{64}$/.test(N.source_packet_fingerprint ?? "")
+      : N.source_packet_fingerprint === sha256(sourcePacketRaw);
+  },
 };
 
 const RULES = [

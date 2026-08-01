@@ -51,6 +51,13 @@ const varTemplateUnproven = { internal_template_key: "lead_received",
 const varTemplateProven = { internal_template_key: "lead_received",
   variables_schema: { 1: { type: "text", description: "client name", source_key: "client_name" } },
   binding_contract: { binding_readiness: "resolved" } };
+/**
+ * QF-MVP-40.12-R1: the manifest is only ONE authority. The typed code contract is the
+ * other, and buildCanonicalBindingSchema now requires both to agree — so a docs-only
+ * source_key can never unlock a seed.
+ */
+const CODE_CONTRACT = { templateKey: "lead_received", bindingVersion: 1,
+  bindings: [{ component: "body", position: 1, sourceKey: "client_name", parameterType: "text" }] };
 
 const R = {
   // ---- Environment identity fence ----------------------------------------
@@ -130,15 +137,32 @@ const R = {
     return r.ok === false && r.reason === SeedFailure.BINDING_SCHEMA_UNPROVEN;
   },
   provenBindingAccepted: () => {
-    const r = buildCanonicalBindingSchema(varTemplateProven);
+    const r = buildCanonicalBindingSchema(varTemplateProven, CODE_CONTRACT);
     return r.ok === true && r.basis === "PROVEN_SOURCE_KEYS"
       && r.schema.bindings[0].sourceKey === "client_name";
   },
   resolvedButMissingSourceKeyRefused: () => {
     const r = buildCanonicalBindingSchema({ ...varTemplateProven,
-      variables_schema: { 1: { type: "text" } } });
+      variables_schema: { 1: { type: "text" } } }, CODE_CONTRACT);
     return r.ok === false && r.reason === SeedFailure.BINDING_SCHEMA_UNPROVEN;
   },
+  /** A manifest edit alone must never be sufficient. */
+  docsOnlySourceKeyRefused: () => {
+    const r = buildCanonicalBindingSchema(varTemplateProven, null);
+    return r.ok === false && r.reason === SeedFailure.BINDING_SCHEMA_UNPROVEN
+      && /docs-only source_key is never accepted/i.test(r.detail);
+  },
+  manifestCodeMismatchRefused: () => [
+    { ...CODE_CONTRACT, bindings: [{ ...CODE_CONTRACT.bindings[0], sourceKey: "customer_name" }] },
+    { ...CODE_CONTRACT, bindings: [{ ...CODE_CONTRACT.bindings[0], position: 2 }] },
+    { ...CODE_CONTRACT, bindings: [{ ...CODE_CONTRACT.bindings[0], parameterType: "payload" }] },
+    { ...CODE_CONTRACT, bindings: [...CODE_CONTRACT.bindings, { component: "body", position: 2, sourceKey: "extra", parameterType: "text" }] },
+    { ...CODE_CONTRACT, templateKey: "other_template" },
+    { ...CODE_CONTRACT, bindingVersion: 2 },
+  ].every((c) => buildCanonicalBindingSchema(varTemplateProven, c).ok === false),
+  /** A zero-variable template must not carry a code contract. */
+  ackWithCodeContractRefused: () =>
+    buildCanonicalBindingSchema(ack, CODE_CONTRACT).ok === false,
 
   // ---- Mapping / account classification -----------------------------------
   activeRowIsConflict: () => {
@@ -267,6 +291,9 @@ const RULES = [
   ["S17 an unproven binding schema is REFUSED, never fabricated", R.unprovenBindingRefused],
   ["S18 a proven binding schema is accepted", R.provenBindingAccepted],
   ["S19 resolved-but-missing source_key is refused", R.resolvedButMissingSourceKeyRefused],
+  ["S49 a docs-only source_key is refused without a code contract", R.docsOnlySourceKeyRefused],
+  ["S50 any manifest/code contract mismatch is refused", R.manifestCodeMismatchRefused],
+  ["S51 a zero-variable template carrying a code contract is refused", R.ackWithCodeContractRefused],
   ["S20 an existing ACTIVE mapping is a conflict", R.activeRowIsConflict],
   ["S21 a semantically different row is a conflict", R.semanticDifferenceIsConflict],
   ["S22 an exact inactive row is idempotent", R.exactInactiveIsIdempotent],
@@ -351,7 +378,12 @@ const MUT = [
   ["M19 a drifted language is rejected", () => classifyExistingMapping(
     existingRow({ language: "hi" }), intended).outcome !== "CONFLICT"],
   ["M20 a fabricated variables schema is rejected", () =>
-    buildCanonicalBindingSchema(varTemplateUnproven).ok],
+    buildCanonicalBindingSchema(varTemplateUnproven, CODE_CONTRACT).ok],
+  ["M20b a docs-only source_key without code proof is rejected", () =>
+    buildCanonicalBindingSchema(varTemplateProven, null).ok],
+  ["M20c a code contract disagreeing with the manifest is rejected", () =>
+    buildCanonicalBindingSchema(varTemplateProven,
+      { ...CODE_CONTRACT, bindings: [{ ...CODE_CONTRACT.bindings[0], sourceKey: "customer_name" }] }).ok],
   ["M21 overwriting an existing ACTIVE row is rejected", () => classifyExistingMapping(
     existingRow({ is_active: true }), intended).outcome !== "CONFLICT"],
   ["M22 a silent semantic upsert is rejected", () => classifyExistingMapping(

@@ -199,3 +199,10 @@ READY FOR SEPARATELY AUTHORIZED STAGING INACTIVE-MAPPING SEED
 
 **Next phase: QF-MVP-40.12 — CONTROLLED STAGING PROVIDER ACCOUNT + INACTIVE MAPPING SEED.** It must
 not run without separate owner authorization.
+
+> **Update — [QF-MVP-40.12-R1](QF-MVP-40-12-R1-BUSINESS-TEMPLATE-BINDING-GOVERNANCE.md).** The 40.12
+> seed refused safely on `BINDING_SCHEMA_UNPROVEN`: five of the eight templates declared Meta
+> positional variables with no proven source key. Binding governance is now **code-proven** for those
+> five via the canonical typed contract in `lib/communication/businessTemplateVariables.ts`, and the
+> operator requires both the manifest and that contract to agree. The **actual staging seed remains
+> NOT EXECUTED** — it is still blocked on the six phase-scoped live environment variables.

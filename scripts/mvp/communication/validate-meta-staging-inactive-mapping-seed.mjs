@@ -14,6 +14,8 @@ import {
   PROVIDER_CATEGORY, SEED_SET, REQUIRED_DISABLED_ACCOUNT_STATE, FORBIDDEN_ACCOUNT_STATE,
   SeedFailure, parseProjectRef, resolveStagingTarget, buildCanonicalBindingSchema,
   resolveMode, classifyExistingMapping, classifyExistingAccount, sanitizeForEvidence,
+  ATTESTATION_TTL_MS, attestationDigest, buildMappingRow, runtimePolicyIsNonSendable,
+  runReadOnlyPreflight, runControlledExecute, verifyAttestation,
 } from "./seed-meta-staging-inactive-mappings.mjs";
 
 const OPERATOR = "scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs";
@@ -237,21 +239,62 @@ const R = {
       && (exec.match(new RegExp(FORBIDDEN_PROJECT_REFS.production, "g")) ?? []).length === 1
       && (exec.match(new RegExp(FORBIDDEN_PROJECT_REFS.jarvis, "g")) ?? []).length === 1;
   },
-  noRetryAfterUncertainty: () => !/\bretry\b|\bfor\s*\(\s*let\s+attempt/i.test(exec)
-    && /WRITE_OUTCOME_UNCERTAIN/.test(exec),
+  /**
+   * The operator legitimately PRINTS "No retry is attempted", so scanning for the word
+   * flags the very message that documents the guarantee. Target the CONSTRUCT instead:
+   * no attempt loop, no retry helper, and a single bounded write funnel.
+   */
+  noRetryAfterUncertainty: () => {
+    if (/\bfor\s*\(\s*let\s+attempt|\bwhile\s*\([^)]*attempt|function\s+retry|\.retry\(/i.test(exec)) return false;
+    if (!/WRITE_OUTCOME_UNCERTAIN/.test(exec)) return false;
+    const calls = exec.match(/await attemptWrite\(/g) ?? [];
+    return calls.length >= 1 && calls.length <= 3;
+  },
   neverSetsIsActiveTrue: () => !/is_active:\s*true/.test(exec),
   neverWritesProviderTemplateId: () => !/provider_template_id:\s*["'`]/.test(exec),
   noRuntimePolicyWrite: () => !/communication_runtime_polic\w*[\s\S]{0,80}(insert|update|upsert)/i.test(exec),
   noCanaryWrite: () => !/canary[\s\S]{0,60}(insert|update|upsert)/i.test(exec),
+  /**
+   * A bearer token MUST be interpolated into the Authorization header — banning all
+   * interpolation would forbid the operator from working. What must never happen is a
+   * credential reaching a LOG. So: no secret in any console call, and an interpolated
+   * secret is tolerated only inside an Authorization/Bearer context.
+   */
+  /**
+   * A credential must never reach a LOG or an evidence file. Two interpolations are
+   * nevertheless required for the operator to work at all, and both send the value to
+   * Meta rather than to any output: the access token in an Authorization header, and the
+   * WABA id in the Graph URL path that addresses the account. The ACCESS TOKEN is held to
+   * the stricter rule — header only, never in a URL.
+   */
   noCredentialEcho: () => {
-    // No secret-bearing env var may be interpolated into a log/console call.
     const secrets = ["QF_STAGING_SUPABASE_SERVICE_ROLE_KEY", "QF_META_ACCESS_TOKEN",
       "QF_META_WABA_ID", "QF_META_PHONE_NUMBER_ID"];
-    return !secrets.some((s) => new RegExp(`console\\.[a-z]+\\([^)]*${s}`).test(exec))
-      && !secrets.some((s) => new RegExp(`\\$\\{[^}]*${s}[^}]*\\}`).test(exec));
+    if (secrets.some((x) => new RegExp(`console\\.[a-z]+\\([^;]*${x}`).test(exec))) return false;
+    for (const x of secrets) {
+      for (const m of exec.matchAll(new RegExp(`\\$\\{[^}]*${x}[^}]*\\}`, "g"))) {
+        const around = exec.slice(Math.max(0, m.index - 90), m.index + 40);
+        const inAuthHeader = /Authorization|Bearer/.test(around);
+        const inGraphUrl = /await fetch\(|graph\}/.test(around);
+        if (x === "QF_META_ACCESS_TOKEN") { if (!inAuthHeader) return false; continue; }
+        if (!inAuthHeader && !inGraphUrl) return false;
+      }
+    }
+    // The service-role key may only reach createClient, never a URL or a log.
+    return !/\$\{[^}]*QF_STAGING_SUPABASE_SERVICE_ROLE_KEY[^}]*\}/.test(exec);
   },
-  evidencePathOutsideRepository: () => !/QuickFurno-Operator-Evidence/.test(exec)
-    || /Desktop[\\/]+QuickFurno-Operator-Evidence/.test(src),
+  /**
+   * The evidence directory is now assembled from path SEGMENTS, so a literal separator
+   * no longer appears. Require the USERPROFILE/Desktop anchor and forbid any
+   * repo-relative form.
+   */
+  evidencePathOutsideRepository: () => {
+    if (!/QuickFurno-Operator-Evidence/.test(exec)) return true;   // never written at all
+    const anchored = /USERPROFILE[\s\S]{0,160}?"Desktop"[\s\S]{0,80}?"QuickFurno-Operator-Evidence"/.test(exec)
+      || /Desktop[\\/]+QuickFurno-Operator-Evidence/.test(exec);
+    const inRepo = /["'`](\.\/|docs[\\/]|scripts[\\/]|lib[\\/])[^"'`]*QuickFurno-Operator-Evidence/.test(exec);
+    return anchored && !inRepo;
+  },
   sanitizerRedactsEverything: () => {
     const s = sanitizeForEvidence(
       "EAAabcdefghij tok eyJabcdefghijklm 3f2504e0-4f89-11d3-9a0c-0305e82c3301 "
@@ -444,10 +487,373 @@ const MUT = [
 ];
 for (const [n, fn] of MUT) add(n, fn() === false);
 
+
+// ===========================================================================
+// QF-MVP-40.12-R2 — RUNTIME tests. Every external effect is an injected FAKE:
+// this suite opens no socket, no database connection and reads no credential.
+// ===========================================================================
+
+const VERSION = "1.0";
+const WABA = "123456789012345";
+const PHONE = "234567890123456";
+
+/** Records every port call so a test can prove reads happened and writes did not. */
+function makeFakes(over = {}) {
+  const calls = { reads: 0, writes: 0, metaGets: 0, metaWrites: 0, consumed: [] };
+  const mappings = over.mappings ? [...over.mappings] : [];
+  const accounts = over.accounts ? [...over.accounts] : [];
+  let policy = over.policy === undefined ? null : over.policy;
+  let stored = over.stored === undefined ? null : over.stored;
+  const consumedNonces = over.consumedNonces ? [...over.consumedNonces] : [];
+
+  const db = {
+    async proveSchema() { calls.reads += 1; return over.schema ?? { ok: true, proof: "fake" }; },
+    async proveIndexes() { calls.reads += 1; return over.indexes ?? { ok: true, proof: "fake" }; },
+    async selectInternalTemplates(keys) {
+      calls.reads += 1;
+      if (over.internalMissing) return [];
+      return keys.map((k) => ({ template_key: k, version: VERSION, language: "en" }));
+    },
+    async selectMappings() { calls.reads += 1; return mappings; },
+    async selectAccounts() { calls.reads += 1; return accounts; },
+    async selectRuntimePolicy() { calls.reads += 1; return policy; },
+    async insertAccount(row) {
+      calls.writes += 1;
+      if (over.accountWriteThrows) throw new Error("boom");
+      accounts.length = 0; accounts.push({ ...row, id: "fake-account" });
+      return accounts[0];
+    },
+    async normalizeAccountDisabled(row) {
+      calls.writes += 1;
+      accounts[0] = { ...accounts[0], ...REQUIRED_DISABLED_ACCOUNT_STATE,
+        business_account_reference: row.business_account_reference,
+        phone_number_reference: row.phone_number_reference };
+      return accounts[0];
+    },
+    async insertMappings(rows) {
+      calls.writes += 1;
+      if (over.mappingWriteThrows) throw new Error("boom");
+      for (const r of rows) mappings.push({ ...r });
+      return rows;
+    },
+  };
+  const meta = {
+    async verifyIdentity() {
+      calls.metaGets += 1;
+      return over.identityFails ? { ok: false, detail: "mismatch" } : { ok: true };
+    },
+    async getTemplateByName() {
+      calls.metaGets += 1;
+      return over.metaTemplate ?? { ok: true, matches: 1, status: "APPROVED",
+        category: "UTILITY", language: "en", semanticMatch: true };
+    },
+  };
+  const store = {
+    async read() { return stored; },
+    async write(p) { stored = p; },
+    async consumedNonces() { return consumedNonces; },
+    async consume(n) { consumedNonces.push(n); calls.consumed.push(n); },
+  };
+  return { calls, db, meta, store, mappings, accounts,
+    setPolicy: (p) => { policy = p; }, setStored: (v) => { stored = v; } };
+}
+
+const FIXED_NOW = 1_800_000_000_000;
+function makeDeps(f, over = {}) {
+  return {
+    db: f.db, meta: f.meta, store: f.store,
+    now: over.now ?? (() => FIXED_NOW),
+    head: "0f10e8e", branch: "mvp/qf-mvp-40-meta-readiness-v1",
+    projectRef: AUTHORIZED_STAGING_REF,
+    manifestHash: "m".repeat(64), readinessHash: "r".repeat(64),
+    bindingContractHash: "b".repeat(64), nonce: over.nonce ?? "nonce-1",
+    wabaRef: WABA, phoneRef: PHONE,
+    variablesSchemaFor: over.variablesSchemaFor
+      ?? (() => ({ bindingVersion: 1, bindings: [] })),
+  };
+}
+const inactiveRow = (seed) => ({
+  template_key: seed.key, channel: CHANNEL, provider_key: PROVIDER_KEY, language: LANGUAGE,
+  version: VERSION, provider_template_name: seed.name, provider_template_id: null,
+  provider_category: PROVIDER_CATEGORY, approval_status: "approved",
+  variables_schema: { bindingVersion: 1, bindings: [] }, is_active: false,
+});
+const disabledAccount = () => ({ id: "a", provider_key: PROVIDER_KEY, channel: CHANNEL,
+  readiness_status: "disabled", business_account_reference: WABA, phone_number_reference: PHONE });
+
+/** A preflight that succeeds, returning its payload for reuse as an attestation. */
+async function goodPreflight(over = {}) {
+  const f = makeFakes(over);
+  const r = await runReadOnlyPreflight(makeDeps(f, over));
+  return { f, r };
+}
+
+const RUNTIME = [
+  // ---- The defect this phase repairs -------------------------------------
+  ["R1  the unconditional PREFLIGHT_NOT_SATISFIED refusal is gone", () =>
+    !/PREFLIGHT_NOT_SATISFIED — live staging execution/.test(src)],
+  ["R2  a real preflight entry point exists and is reachable", () =>
+    /mode === "PREFLIGHT_READONLY"/.test(exec) && /runReadOnlyPreflight\(deps\)/.test(exec)],
+  ["R3  a real execute entry point exists and is reachable", () =>
+    /runControlledExecute\(deps\)/.test(exec)],
+
+  // ---- Preflight actually reads, and never writes -------------------------
+  ["R4  preflight performs real injected DB and Meta reads", async () => {
+    const { f, r } = await goodPreflight();
+    return r.ok === true && f.calls.reads >= 5 && f.calls.metaGets >= 9;
+  }],
+  ["R5  preflight performs ZERO writes", async () => {
+    const { f, r } = await goodPreflight();
+    return r.ok === true && f.calls.writes === 0;
+  }],
+  ["R6  preflight emits a sanitized attestation with the required pins", async () => {
+    const { r } = await goodPreflight();
+    const p = r.payload;
+    return ["head", "branch", "project_ref", "manifest_hash", "readiness_hash",
+      "binding_contract_hash", "nonce", "expires_at_ms", "attestation_sha256",
+      "schema_proof", "index_proof", "account_classification"].every((k) => p[k] !== undefined)
+      && p.template_keys.length === 8 && p.writes_performed === 0
+      && p.runtime_policy_non_sendable === true;
+  }],
+  ["R7  the attestation carries no secret or raw identifier", async () => {
+    const { r } = await goodPreflight();
+    const raw = JSON.stringify(r.payload);
+    return !raw.includes(WABA) && !raw.includes(PHONE)
+      && !/EAA[A-Za-z0-9]{6,}|eyJ[A-Za-z0-9._-]{10,}/.test(raw)
+      && !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(raw);
+  }],
+  ["R8  the attestation expires within 15 minutes", async () => {
+    const { r } = await goodPreflight();
+    return r.payload.expires_at_ms - r.payload.issued_at_ms === ATTESTATION_TTL_MS
+      && ATTESTATION_TTL_MS <= 15 * 60 * 1000;
+  }],
+
+  // ---- Preflight fail-closed cases ---------------------------------------
+  ["R9  missing schema blocks before any Meta call", async () => {
+    const f = makeFakes({ schema: { ok: false, reason: SeedFailure.SCHEMA_MISSING } });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.SCHEMA_MISSING
+      && f.calls.metaGets === 0 && f.calls.writes === 0;
+  }],
+  ["R10 unprovable index metadata returns INDEX_PROOF_UNAVAILABLE", async () => {
+    const f = makeFakes({ indexes: { ok: false, reason: SeedFailure.INDEX_PROOF_UNAVAILABLE } });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.INDEX_PROOF_UNAVAILABLE && f.calls.writes === 0;
+  }],
+  ["R11 a missing internal template blocks", async () => {
+    const f = makeFakes({ internalMissing: true });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.INTERNAL_TEMPLATE_MISSING;
+  }],
+  ["R12 a Meta identity mismatch blocks", async () => {
+    const f = makeFakes({ identityFails: true });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.META_IDENTITY_MISMATCH && f.calls.writes === 0;
+  }],
+  ["R13 ambiguous / not-approved / wrong-category Meta results block", async () => {
+    const cases = [
+      [{ ok: true, matches: 2 }, SeedFailure.META_TEMPLATE_AMBIGUOUS],
+      [{ ok: true, matches: 0 }, SeedFailure.META_TEMPLATE_AMBIGUOUS],
+      [{ ok: true, matches: 1, status: "PENDING", category: "UTILITY", language: "en", semanticMatch: true },
+        SeedFailure.META_STATUS_NOT_APPROVED],
+      [{ ok: true, matches: 1, status: "APPROVED", category: "MARKETING", language: "en", semanticMatch: true },
+        SeedFailure.META_CATEGORY_MISMATCH],
+      [{ ok: true, matches: 1, status: "APPROVED", category: "UTILITY", language: "hi", semanticMatch: true },
+        SeedFailure.META_CATEGORY_MISMATCH],
+      [{ ok: true, matches: 1, status: "APPROVED", category: "UTILITY", language: "en", semanticMatch: false },
+        SeedFailure.META_TEMPLATE_UNRESOLVED],
+    ];
+    for (const [metaTemplate, expected] of cases) {
+      const f = makeFakes({ metaTemplate });
+      const r = await runReadOnlyPreflight(makeDeps(f));
+      if (r.ok !== false || r.reason !== expected || f.calls.writes !== 0) return false;
+    }
+    return true;
+  }],
+  ["R14 an existing ACTIVE mapping blocks the whole plan", async () => {
+    const f = makeFakes({ mappings: [{ ...inactiveRow(SEED_SET[0]), is_active: true }] });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ACTIVE_MAPPING_PRESENT && f.calls.writes === 0;
+  }],
+  ["R15 a semantically different existing row blocks", async () => {
+    const f = makeFakes({ mappings: [{ ...inactiveRow(SEED_SET[0]),
+      provider_template_name: "qf_something_else_v1" }] });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.MAPPING_CONFLICT;
+  }],
+  ["R16 a send-capable existing account blocks", async () => {
+    const f = makeFakes({ accounts: [{ readiness_status: "provider_ready" }] });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ACCOUNT_SEND_CAPABLE && f.calls.writes === 0;
+  }],
+  ["R17 a sendable runtime policy blocks", async () => {
+    for (const policy of [{ outbound_enabled: true, activation_status: "disabled" },
+                          { outbound_enabled: false, activation_status: "active" },
+                          { outbound_enabled: false, activation_status: "canary" }]) {
+      const f = makeFakes({ policy });
+      const r = await runReadOnlyPreflight(makeDeps(f));
+      if (r.ok !== false || r.reason !== SeedFailure.RUNTIME_POLICY_SENDABLE) return false;
+    }
+    return true;
+  }],
+  ["R18 an unproven binding schema blocks the plan", async () => {
+    const f = makeFakes();
+    const r = await runReadOnlyPreflight(makeDeps(f, { variablesSchemaFor: () => null }));
+    return r.ok === false && r.reason === SeedFailure.BINDING_SCHEMA_UNPROVEN && f.calls.writes === 0;
+  }],
+
+  // ---- Execute: attestation contract --------------------------------------
+  ["R19 execute without an attestation is refused", async () => {
+    const f = makeFakes();
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_MISSING && f.calls.writes === 0;
+  }],
+  ["R20 execute reruns the FULL preflight before touching the attestation", async () => {
+    const f = makeFakes({ schema: { ok: false, reason: SeedFailure.SCHEMA_MISSING } });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.SCHEMA_MISSING && f.calls.writes === 0;
+  }],
+  ["R21 an EXPIRED attestation is refused", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    const r = await runControlledExecute(makeDeps(f,
+      { now: () => FIXED_NOW + ATTESTATION_TTL_MS + 1 }));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_EXPIRED && f.calls.writes === 0;
+  }],
+  ["R22 a REPLAYED (already consumed) attestation is refused", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload, consumedNonces: [pre.payload.nonce] });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_ALREADY_CONSUMED
+      && f.calls.writes === 0;
+  }],
+  ["R23 a TAMPERED attestation is refused", async () => {
+    const { r: pre } = await goodPreflight();
+    const tampered = { ...pre.payload, account_classification: "ALREADY_PRESENT_DISABLED" };
+    const f = makeFakes({ stored: tampered });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_TAMPERED && f.calls.writes === 0;
+  }],
+  ["R24 an attestation for a different HEAD / branch / project is refused", async () => {
+    for (const field of ["head", "branch", "project_ref", "manifest_hash", "binding_contract_hash"]) {
+      const { r: pre } = await goodPreflight();
+      const changed = { ...pre.payload, [field]: "different" };
+      changed.attestation_sha256 = attestationDigest(changed);
+      const f = makeFakes({ stored: changed });
+      const r = await runControlledExecute(makeDeps(f));
+      if (r.ok !== false || r.reason !== SeedFailure.ATTESTATION_MISMATCH || f.calls.writes !== 0) return false;
+    }
+    return true;
+  }],
+  ["R25 an attestation whose PLAN drifted is refused", async () => {
+    const { r: pre } = await goodPreflight();
+    const changed = { ...pre.payload,
+      mapping_plan: pre.payload.mapping_plan.map((m) => ({ ...m, outcome: "ALREADY_PRESENT_INACTIVE" })) };
+    changed.attestation_sha256 = attestationDigest(changed);
+    const f = makeFakes({ stored: changed });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_MISMATCH && f.calls.writes === 0;
+  }],
+
+  // ---- Execute: the happy path actually writes, safely --------------------
+  ["R26 execute writes the account and exactly eight INACTIVE mappings", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === true && r.mapping_count === 8 && r.active_mapping_count === 0
+      && r.message_send_count === 0 && r.meta_write_count === 0
+      && f.mappings.length === 8 && f.mappings.every((m) => m.is_active === false)
+      && f.mappings.every((m) => m.provider_template_id === null)
+      && f.accounts.length === 1 && f.accounts[0].readiness_status === "disabled";
+  }],
+  ["R27 the seeded account is never send-capable", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    await runControlledExecute(makeDeps(f));
+    const a = f.accounts[0];
+    return a.readiness_status !== "provider_ready" && a.configuration_status !== "complete"
+      && a.webhook_status !== "verified" && a.health_status !== "healthy";
+  }],
+  ["R28 an already-seeded staging DB is idempotent and writes nothing new", async () => {
+    const existing = SEED_SET.map(inactiveRow);
+    const { r: pre } = await goodPreflight({ mappings: existing, accounts: [disabledAccount()] });
+    const f = makeFakes({ mappings: existing, accounts: [disabledAccount()], stored: pre.payload });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === true && f.calls.writes === 0 && f.mappings.length === 8
+      && r.mapping_outcomes.every((m) => m.outcome === "ALREADY_PRESENT_INACTIVE");
+  }],
+  ["R29 the attestation nonce is consumed exactly once", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    await runControlledExecute(makeDeps(f));
+    const second = await runControlledExecute(makeDeps(f));
+    return f.calls.consumed.length === 1
+      && second.ok === false && second.reason === SeedFailure.ATTESTATION_ALREADY_CONSUMED;
+  }],
+  ["R30 an uncertain write stops with no retry", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload, mappingWriteThrows: true });
+    const r = await runControlledExecute(makeDeps(f));
+    // One account write plus ONE mapping attempt. A retry would make this 3.
+    return r.ok === false && r.reason === SeedFailure.WRITE_OUTCOME_UNCERTAIN
+      && f.calls.writes === 2;
+  }],
+  ["R31 a readback showing an active row fails closed", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    const original = f.db.insertMappings;
+    f.db.insertMappings = async (rows) => original(rows.map((x) => ({ ...x, is_active: true })));
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.READBACK_MISMATCH;
+  }],
+  ["R32 a readback showing a stored remote id fails closed", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    const original = f.db.insertMappings;
+    f.db.insertMappings = async (rows) => original(rows.map((x) => ({ ...x, provider_template_id: "999" })));
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.READBACK_MISMATCH;
+  }],
+  ["R33 a post-write sendable runtime policy fails closed", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    const original = f.db.insertMappings;
+    f.db.insertMappings = async (rows) => { f.setPolicy({ outbound_enabled: true }); return original(rows); };
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.RUNTIME_POLICY_SENDABLE;
+  }],
+  ["R34 no run ever produces a ninth mapping", async () => {
+    const { r: pre } = await goodPreflight();
+    const f = makeFakes({ stored: pre.payload });
+    await runControlledExecute(makeDeps(f));
+    return f.mappings.length === SEED_SET.length;
+  }],
+
+  // ---- Static: the runtime keeps every earlier fence ----------------------
+  ["R35 the runtime issues Meta GETs only", () =>
+    !/method:\s*["'](POST|PUT|PATCH|DELETE)["']/i.test(exec) && !/\/messages\b/.test(exec)],
+  ["R36 the runtime never activates a mapping or a policy", () =>
+    !/is_active:\s*true/.test(exec) && !/outbound_enabled:\s*true/.test(exec)
+    && !/activation_status:\s*["'](active|canary)["']/.test(exec)],
+  ["R37 evidence is written outside the repository only", () =>
+    /Desktop["'\s,]+.*QuickFurno-Operator-Evidence/.test(src)
+    && !/docs[\\/]+.*QuickFurno-Operator-Evidence/.test(src)],
+  ["R38 raw provider errors are never surfaced", () =>
+    !/console\.(log|error)\([^)]*\berror\b/.test(exec)
+    && /Deliberately no raw error/.test(src)],
+  ["R39 sanitizeForEvidence guards every reported detail", () =>
+    (exec.match(/sanitizeForEvidence\(String\(r\.detail\)\)/g) ?? []).length >= 2],
+];
+for (const [n, fn] of RUNTIME) {
+  const out = fn();
+  if (out && typeof out.then === "function") add(n, await out);
+  else add(n, out);
+}
+
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${!r.ok && r.detail ? `  [${r.detail}]` : ""}`);
 console.log(`\nSeed set: ${SEED_SET.length} · target: ${AUTHORIZED_STAGING_REF} (STAGING) `
   + `· forbidden refs rejected: production, jarvis`);
 console.log(`Summary: ${results.length - failed.length} passed, ${failed.length} failed `
-  + `(rules: ${RULES.length}, mutation self-tests: ${MUT.length}).`);
+  + `(rules: ${RULES.length}, mutation self-tests: ${MUT.length}, runtime tests: ${RUNTIME.length}).`);
 process.exit(failed.length === 0 ? 0 : 1);

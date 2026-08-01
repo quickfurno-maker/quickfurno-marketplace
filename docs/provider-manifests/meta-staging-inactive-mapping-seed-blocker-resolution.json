@@ -1,17 +1,17 @@
 {
   "artifact": "meta-staging-inactive-mapping-seed-blocker-resolution",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.12-R1",
-  "status": "BINDING_GOVERNANCE_RESOLVED_OFFLINE",
+  "phase": "QF-MVP-40.12-R2",
+  "status": "RUNTIME_IMPLEMENTED_OFFLINE",
   "contains_secrets": false,
   "staging_seed_executed": false,
   "database_contacted": false,
   "meta_contacted": false,
   "mapping_count_written": 0,
   "provider_account_written": false,
-  "remaining_blocker": "ENV_MISSING",
+  "remaining_blocker": "ENV_MISSING + INDEX_PROOF_UNAVAILABLE",
   "authorizes_live_execution": false,
-  "note": "NON-SECRET offline record. It resolves ONE blocker — BINDING_SCHEMA_UNPROVEN — by establishing a canonical typed source-key contract for the five approved ordinary business templates. It executed no staging seed, contacted no database and made no Meta call. The prior owner authorization for QF-MVP-40.12 does NOT remove the operator's runtime credential and identity fences: a live run still requires the six phase-scoped variables in the process environment and still proves the exact staging project ref before constructing a client. No credential appears in this artefact.",
+  "note": "NON-SECRET offline record. QF-MVP-40.12-R1 resolved BINDING_SCHEMA_UNPROVEN; QF-MVP-40.12-R2 implemented the missing seed runtime. NEITHER executed a staging seed, contacted a database or made a Meta call. The prior owner authorization does NOT remove the operator's runtime credential and identity fences: a live run still requires the six phase-scoped variables in the process environment and still proves the exact staging project ref before constructing a client. No credential appears in this artefact.",
   "resolved_blocker": {
     "code": "BINDING_SCHEMA_UNPROVEN",
     "was": "5 of 8 approved templates declared Meta positional variables with binding_readiness \"unresolved\" and no proven source_key anywhere in the repository, so a canonical mapping variables_schema could not be derived without fabricating names.",
@@ -31,5 +31,21 @@
     "Template submission remains PAUSED; no subset 3 exists.",
     "lib/communication/outboundConsentScope.ts — the three acknowledgements stay absent."
   ],
-  "next_action": "Load the six phase-scoped variables into the current process environment WITHOUT writing them to a file, then re-run QF-MVP-40.12 Stage B from the pushed SHA: dry run, then --preflight-readonly, then exactly one --execute."
+  "next_action": "Load the six phase-scoped variables into the current process environment WITHOUT writing them to a file, then run the offline dry run followed by --preflight-readonly. Expect INDEX_PROOF_UNAVAILABLE until that gap is closed by a separately authorized decision. Only then a single --execute.",
+  "runtime_repair": {
+    "was": "The operator was a scaffold: after its fences it ran an unconditional PREFLIGHT_NOT_SATISFIED refusal, so --preflight-readonly and --execute could never do anything.",
+    "now": "Both modes are real and reachable. No bypass flag was added; the refusal was replaced by the runtime it stood in for.",
+    "cross_process_design": "Each npm run is a separate process, so an in-memory preflight flag would be meaningless. --preflight-readonly writes a sanitized, single-use, 15-minute attestation OUTSIDE the repository pinning head, branch, project ref, manifest / readiness / binding-contract hashes, the eight keys, schema and index proofs, the Meta reconciliation, the mapping plan, the account classification, a nonce and a digest. --execute reruns the FULL read-only preflight and requires the stored attestation to match it on every pinned field before any write.",
+    "writes_bounded": "At most two: the disabled account and one bulk insert of only the missing mappings. Any error or ambiguous result is WRITE_OUTCOME_UNCERTAIN and is never retried."
+  },
+  "known_gap": {
+    "code": "INDEX_PROOF_UNAVAILABLE",
+    "detail": "uq_comm_provider_template_mapping and uq_comm_provider_template_active cannot be proven through an already-authorized read path: PostgREST does not expose pg_indexes, and this phase may not add an RPC, DDL or migration. proveIndexes() reports this honestly rather than assuming, so a live preflight will stop there.",
+    "resolution_requires": "A separate, explicitly authorized decision: either a read-only RPC or an accepted documented exception. Not chosen unilaterally."
+  },
+  "tests": {
+    "suite": "npm run test:mvp:40-12",
+    "result": "128 passed, 0 failed (51 rules, 38 mutation self-tests, 39 runtime tests)",
+    "isolation": "Every external effect is an injected fake; the suite opens no socket, no database connection and reads no credential."
+  }
 }

@@ -8,8 +8,11 @@
 // SAFETY SHAPE
 //   default              OFFLINE DRY RUN — no credential, no network, no database.
 //   --preflight-readonly STAGING reads + Meta GET-only verification. ZERO writes.
-//   --execute            ONE controlled staging write. Requires --preflight-readonly
-//                        to have been satisfied in the same process.
+//   --execute            ONE controlled staging write. Because every npm invocation is a
+//                        SEPARATE process, this cannot rely on an in-memory flag: it
+//                        reruns the FULL read-only preflight AND requires a fresh,
+//                        single-use, 15-minute attestation written by that preflight,
+//                        stored outside the repository.
 //
 // This operator can never send a WhatsApp message: it contains no `/messages`
 // endpoint and issues no Meta POST/PUT/PATCH/DELETE. Every Meta call is a GET. It
@@ -110,7 +113,16 @@ export const SeedFailure = Object.freeze({
   PREFLIGHT_NOT_SATISFIED: "PREFLIGHT_NOT_SATISFIED",
   WRITE_OUTCOME_UNCERTAIN: "WRITE_OUTCOME_UNCERTAIN",
   READBACK_MISMATCH: "READBACK_MISMATCH",
+  INDEX_PROOF_UNAVAILABLE: "INDEX_PROOF_UNAVAILABLE",
+  ATTESTATION_MISSING: "ATTESTATION_MISSING",
+  ATTESTATION_EXPIRED: "ATTESTATION_EXPIRED",
+  ATTESTATION_MISMATCH: "ATTESTATION_MISMATCH",
+  ATTESTATION_ALREADY_CONSUMED: "ATTESTATION_ALREADY_CONSUMED",
+  ATTESTATION_TAMPERED: "ATTESTATION_TAMPERED",
 });
+
+/** An attestation is single-use and short-lived: a stale plan must never authorize a write. */
+export const ATTESTATION_TTL_MS = 15 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // PURE helpers — exported so the validator can drive them without any network,
@@ -291,6 +303,270 @@ export function sanitizeForEvidence(value) {
 
 export const sha256 = (s) => createHash("sha256").update(s).digest("hex");
 
+// ===========================================================================
+// RUNTIME — read-only preflight, cross-process attestation, controlled execute.
+//
+// Every external effect goes through an injected PORT (deps.db, deps.meta,
+// deps.store, deps.now). The CLI wires the real Supabase/fetch adapters; the
+// validator wires fakes, so the test suite makes no live call whatsoever.
+// ===========================================================================
+
+/** Canonical mapping row for one template. Never carries a remote id. */
+export function buildMappingRow(seed, version, variablesSchema) {
+  return {
+    template_key: seed.key,
+    channel: CHANNEL,
+    provider_key: PROVIDER_KEY,
+    language: LANGUAGE,
+    version,
+    provider_template_name: seed.name,
+    provider_template_id: null,
+    provider_category: PROVIDER_CATEGORY,
+    approval_status: "approved",
+    variables_schema: variablesSchema,
+    is_active: false,
+  };
+}
+
+/** A runtime policy may exist, but it must never be in a sendable posture. */
+export function runtimePolicyIsNonSendable(policy) {
+  if (!policy) return true;                       // missing is the safest state
+  if (policy.outbound_enabled === true) return false;
+  return !["canary", "active"].includes(policy.activation_status);
+}
+
+/** Deterministic hash of the attestation body (the signature field excluded). */
+export function attestationDigest(payload) {
+  const body = { ...payload };
+  delete body.attestation_sha256;
+  return sha256(JSON.stringify(body));
+}
+
+/**
+ * READ-ONLY preflight. Performs staging reads and Meta GETs through the injected
+ * ports and returns a sanitized attestation payload. It issues ZERO writes: the db
+ * port's write methods are never called on this path.
+ */
+export async function runReadOnlyPreflight(deps) {
+  const { db, meta, now, head, branch, projectRef, manifestHash, readinessHash,
+          bindingContractHash, nonce } = deps;
+  const fail = (reason, detail) => ({ ok: false, reason, detail });
+
+  // 1) Schema + index proof. Never repaired here, only proven.
+  const schema = await db.proveSchema();
+  if (!schema.ok) return fail(schema.reason ?? SeedFailure.SCHEMA_MISSING, schema.detail);
+  const indexes = await db.proveIndexes();
+  if (!indexes.ok) return fail(indexes.reason ?? SeedFailure.INDEX_PROOF_UNAVAILABLE, indexes.detail);
+
+  // 2) The eight internal templates must already exist, with a canonical version.
+  const internal = await db.selectInternalTemplates(SEED_SET.map((t) => t.key));
+  const byInternal = new Map(internal.map((r) => [r.template_key, r]));
+  const missingInternal = SEED_SET.filter((t) => !byInternal.has(t.key)).map((t) => t.key);
+  if (missingInternal.length > 0) {
+    return fail(SeedFailure.INTERNAL_TEMPLATE_MISSING, missingInternal.join(", "));
+  }
+
+  // 3) Meta identity + GET-only reconciliation of all eight.
+  const identity = await meta.verifyIdentity();
+  if (!identity.ok) return fail(SeedFailure.META_IDENTITY_MISMATCH, identity.detail);
+  const metaResults = [];
+  for (const t of SEED_SET) {
+    const r = await meta.getTemplateByName(t.name);
+    if (!r.ok) return fail(r.reason ?? SeedFailure.META_TEMPLATE_UNRESOLVED, t.key);
+    if (r.matches !== 1) return fail(SeedFailure.META_TEMPLATE_AMBIGUOUS, t.key);
+    if (r.status !== "APPROVED") return fail(SeedFailure.META_STATUS_NOT_APPROVED, t.key);
+    if (r.category !== "UTILITY") return fail(SeedFailure.META_CATEGORY_MISMATCH, t.key);
+    if (r.language !== LANGUAGE) return fail(SeedFailure.META_CATEGORY_MISMATCH, t.key + ": language");
+    if (r.semanticMatch !== true) return fail(SeedFailure.META_TEMPLATE_UNRESOLVED, t.key + ": semantic");
+    metaResults.push({ internal_template_key: t.key, status: "APPROVED", category: "UTILITY" });
+  }
+
+  // 4) Classify existing mappings. A conflict aborts the whole plan.
+  const existing = await db.selectMappings(SEED_SET.map((t) => t.key));
+  const mappingPlan = [];
+  for (const t of SEED_SET) {
+    const version = byInternal.get(t.key).version;
+    const schemaForKey = deps.variablesSchemaFor(t.key);
+    if (!schemaForKey) return fail(SeedFailure.BINDING_SCHEMA_UNPROVEN, t.key);
+    const intended = buildMappingRow(t, version, schemaForKey);
+    const found = existing.find((r) => r.template_key === t.key && r.language === LANGUAGE
+      && r.version === version && r.provider_key === PROVIDER_KEY && r.channel === CHANNEL) ?? null;
+    const c = classifyExistingMapping(found, intended);
+    if (c.outcome === "CONFLICT") return fail(c.reason, t.key);
+    mappingPlan.push({ key: t.key,
+      outcome: c.outcome === "MISSING" ? "CREATE_INACTIVE" : c.outcome, intended });
+  }
+
+  // 5) Classify the provider account.
+  const accounts = await db.selectAccounts();
+  const accountClass = classifyExistingAccount(accounts, {
+    business_account_reference: deps.wabaRef, phone_number_reference: deps.phoneRef });
+  if (accountClass.outcome === "ABORT") return fail(accountClass.reason, "provider account");
+
+  // 6) Runtime policy must not be sendable.
+  const policy = await db.selectRuntimePolicy();
+  if (!runtimePolicyIsNonSendable(policy)) return fail(SeedFailure.RUNTIME_POLICY_SENDABLE);
+
+  const payload = {
+    artifact: "qf-mvp-40-12-preflight-attestation",
+    phase: "QF-MVP-40.12",
+    head,
+    branch,
+    environment: "STAGING",
+    project_ref: projectRef,
+    issued_at_ms: now(),
+    expires_at_ms: now() + ATTESTATION_TTL_MS,
+    nonce,
+    manifest_hash: manifestHash,
+    readiness_hash: readinessHash,
+    binding_contract_hash: bindingContractHash,
+    template_keys: SEED_SET.map((t) => t.key),
+    schema_proof: schema.proof,
+    index_proof: indexes.proof,
+    meta_reconciliation: metaResults,
+    mapping_plan: mappingPlan.map((m) => ({ key: m.key, outcome: m.outcome })),
+    account_classification: accountClass.outcome,
+    runtime_policy_non_sendable: true,
+    writes_performed: 0,
+  };
+  payload.attestation_sha256 = attestationDigest(payload);
+  return { ok: true, payload, mappingPlan, accountClass, byInternal };
+}
+
+/**
+ * Verify a stored attestation against a FRESH preflight. Both must agree: the stored
+ * one proves an owner-reviewed plan existed, and the fresh one proves the world has
+ * not changed since. A replayed, expired, consumed or tampered attestation is refused.
+ */
+export function verifyAttestation(stored, fresh, now, consumedNonces = []) {
+  if (!stored) return { ok: false, reason: SeedFailure.ATTESTATION_MISSING };
+  if (stored.attestation_sha256 !== attestationDigest(stored)) {
+    return { ok: false, reason: SeedFailure.ATTESTATION_TAMPERED };
+  }
+  if (typeof stored.expires_at_ms !== "number" || now() > stored.expires_at_ms) {
+    return { ok: false, reason: SeedFailure.ATTESTATION_EXPIRED };
+  }
+  if (consumedNonces.includes(stored.nonce)) {
+    return { ok: false, reason: SeedFailure.ATTESTATION_ALREADY_CONSUMED };
+  }
+  const mustMatch = ["head", "branch", "project_ref", "manifest_hash", "readiness_hash",
+    "binding_contract_hash", "account_classification"];
+  for (const f of mustMatch) {
+    if (stored[f] !== fresh[f]) return { ok: false, reason: SeedFailure.ATTESTATION_MISMATCH, field: f };
+  }
+  if (stored.template_keys.join(",") !== fresh.template_keys.join(",")) {
+    return { ok: false, reason: SeedFailure.ATTESTATION_MISMATCH, field: "template_keys" };
+  }
+  if (JSON.stringify(stored.mapping_plan) !== JSON.stringify(fresh.mapping_plan)) {
+    return { ok: false, reason: SeedFailure.ATTESTATION_MISMATCH, field: "mapping_plan" };
+  }
+  return { ok: true };
+}
+
+/**
+ * A single write attempt. An error or an ambiguous result is terminal: the outcome is
+ * UNCERTAIN and is never retried, because a blind retry could double-write.
+ */
+async function attemptWrite(fn) {
+  try {
+    const r = await fn();
+    if (r === undefined || r === null) {
+      return { ok: false, reason: SeedFailure.WRITE_OUTCOME_UNCERTAIN, detail: "no result" };
+    }
+    return { ok: true, result: r };
+  } catch {
+    // Deliberately no raw error: it can carry connection strings or row data.
+    return { ok: false, reason: SeedFailure.WRITE_OUTCOME_UNCERTAIN, detail: "write threw" };
+  }
+}
+
+/**
+ * ONE controlled staging execution. It reruns the FULL read-only preflight, requires a
+ * fresh matching attestation, then performs at most two writes: the disabled account and
+ * one bulk insert of the missing inactive mappings. Any uncertainty stops without retry.
+ */
+export async function runControlledExecute(deps) {
+  const fresh = await runReadOnlyPreflight(deps);
+  if (!fresh.ok) return fresh;
+
+  const stored = await deps.store.read();
+  const consumed = await deps.store.consumedNonces();
+  const v = verifyAttestation(stored, fresh.payload, deps.now, consumed);
+  if (!v.ok) return { ok: false, reason: v.reason, detail: v.field };
+
+  // --- Write 1: the provider account, DISABLED and never send-capable ------
+  const accountOutcome = fresh.accountClass.outcome;
+  if (accountOutcome === "CREATE_DISABLED" || accountOutcome === "NORMALIZED_DISABLED") {
+    const row = {
+      provider_key: PROVIDER_KEY,
+      channel: CHANNEL,
+      display_name: "QuickFurno Meta WhatsApp Cloud — Staging",
+      business_account_reference: deps.wabaRef,
+      phone_number_reference: deps.phoneRef,
+      ...REQUIRED_DISABLED_ACCOUNT_STATE,
+      metadata: { phase: "QF-MVP-40.12", environment: "staging", note: "seeded disabled; not sendable" },
+    };
+    for (const [k, bad] of Object.entries(FORBIDDEN_ACCOUNT_STATE)) {
+      if (row[k] === bad) return { ok: false, reason: SeedFailure.ACCOUNT_SEND_CAPABLE, detail: k };
+    }
+    const w = await attemptWrite(accountOutcome === "CREATE_DISABLED"
+      ? () => deps.db.insertAccount(row)
+      : () => deps.db.normalizeAccountDisabled(row));
+    if (!w.ok) return w;
+  }
+
+  // --- Write 2: exactly the missing mappings, in one bulk insert ----------
+  const toCreate = fresh.mappingPlan.filter((m) => m.outcome === "CREATE_INACTIVE")
+    .map((m) => m.intended);
+  if (toCreate.some((r) => r.is_active !== false || r.provider_template_id !== null)) {
+    return { ok: false, reason: SeedFailure.MAPPING_CONFLICT, detail: "unsafe row shape" };
+  }
+  if (toCreate.length > 0) {
+    const w = await attemptWrite(() => deps.db.insertMappings(toCreate));
+    if (!w.ok) return w;
+  }
+
+  // --- Readback proofs -----------------------------------------------------
+  const after = await deps.db.selectMappings(SEED_SET.map((t) => t.key));
+  const relevant = after.filter((r) => r.provider_key === PROVIDER_KEY && r.channel === CHANNEL
+    && r.language === LANGUAGE);
+  if (relevant.length !== SEED_SET.length) {
+    return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "count " + relevant.length };
+  }
+  for (const r of relevant) {
+    const seed = SEED_SET.find((t) => t.key === r.template_key);
+    if (!seed) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "unknown key" };
+    if (r.is_active !== false) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "active row" };
+    if (r.approval_status !== "approved") return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "not approved" };
+    if (r.provider_template_id !== null) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "remote id" };
+    if (r.provider_template_name !== seed.name) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "name" };
+    if (r.provider_category !== PROVIDER_CATEGORY) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "category" };
+  }
+  const accountAfter = await deps.db.selectAccounts();
+  if (accountAfter.length !== 1 || accountAfter[0].readiness_status !== "disabled") {
+    return { ok: false, reason: SeedFailure.ACCOUNT_SEND_CAPABLE, detail: "post-write account" };
+  }
+  const policyAfter = await deps.db.selectRuntimePolicy();
+  if (!runtimePolicyIsNonSendable(policyAfter)) {
+    return { ok: false, reason: SeedFailure.RUNTIME_POLICY_SENDABLE, detail: "post-write policy" };
+  }
+
+  await deps.store.consume(fresh.payload.nonce);
+  return {
+    ok: true,
+    account_outcome: accountOutcome,
+    mapping_outcomes: fresh.mappingPlan.map((m) => ({
+      key: m.key,
+      outcome: m.outcome === "CREATE_INACTIVE" ? "CREATED_INACTIVE" : "ALREADY_PRESENT_INACTIVE",
+    })),
+    mapping_count: relevant.length,
+    active_mapping_count: relevant.filter((r) => r.is_active).length,
+    message_send_count: 0,
+    meta_write_count: 0,
+  };
+}
+
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -313,8 +589,9 @@ if (isDirect) {
   // ---- Canonical binding-schema fence (offline; runs in EVERY mode) --------
   // This is checked before anything else touches the network, because a seed that
   // cannot build an authoritative variables_schema must never reach a database.
-  const { readFileSync } = await import("node:fs");
-  const { resolve } = await import("node:path");
+  const { readFileSync, writeFileSync, mkdirSync } = await import("node:fs");
+  const { resolve, join: joinPath } = await import("node:path");
+  const { randomUUID } = await import("node:crypto");
   const manifest = JSON.parse(readFileSync(
     resolve("docs/provider-manifests/whatsapp-template-submission-manifest.json"), "utf8"));
   const byKey = new Map(Object.values(manifest.groups).flat()
@@ -370,7 +647,196 @@ if (isDirect) {
     console.error("No Supabase client was constructed. No database request was issued.");
     process.exit(2);
   }
-  console.error("REFUSED: PREFLIGHT_NOT_SATISFIED — live staging execution is gated on the "
-    + "canonical binding schema fence above and on an explicit owner-authorized run.");
-  process.exit(2);
+  console.log(`Target ref     : ${target.projectRef} (${target.environment}) — identity proven`);
+  console.log("");
+
+  // ---- Real adapters, constructed ONLY after the fence passed --------------
+  const { createHash: hash } = await import("node:crypto");
+  const { execFileSync } = await import("node:child_process");
+  const { createClient } = await import("@supabase/supabase-js");
+  const client = createClient(process.env.QF_STAGING_SUPABASE_URL,
+    process.env.QF_STAGING_SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false } });
+
+  const MAPPINGS = "communication_provider_template_mappings";
+  const ACCOUNTS = "communication_provider_accounts";
+  const POLICIES = "communication_provider_runtime_policies";
+  const TEMPLATES = "communication_templates";
+
+  const db = {
+    async proveSchema() {
+      // A bounded probe per table: readable ⇒ present with the columns we select.
+      for (const [t, cols] of [
+        [MAPPINGS, "template_key,channel,provider_key,language,version,provider_template_name,provider_template_id,provider_category,approval_status,variables_schema,is_active"],
+        [ACCOUNTS, "id,provider_key,channel,readiness_status,configuration_status,webhook_status,health_status,billing_status,business_account_reference,phone_number_reference"],
+        [POLICIES, "provider_key,channel,activation_status,outbound_enabled"],
+        [TEMPLATES, "template_key,version,language"],
+      ]) {
+        const { error } = await client.from(t).select(cols).limit(1);
+        if (error) return { ok: false, reason: SeedFailure.SCHEMA_MISSING, detail: t };
+      }
+      return { ok: true, proof: "four required tables readable with the exact selected columns" };
+    },
+    async proveIndexes() {
+      // Index metadata is not exposed through an already-authorized path (PostgREST does
+      // not surface pg_indexes, and this phase may not add an RPC, DDL or migration).
+      // Rather than claim a proof we cannot make, report it honestly.
+      return { ok: false, reason: SeedFailure.INDEX_PROOF_UNAVAILABLE,
+        detail: "pg_indexes is not reachable through an already-authorized read path; adding an "
+          + "RPC/DDL/migration is out of scope for this phase." };
+    },
+    async selectInternalTemplates(keys) {
+      const { data, error } = await client.from(TEMPLATES)
+        .select("template_key,version,language").in("template_key", keys);
+      if (error) throw new Error("read failed");
+      return data ?? [];
+    },
+    async selectMappings(keys) {
+      const { data, error } = await client.from(MAPPINGS).select("*")
+        .in("template_key", keys).eq("channel", CHANNEL).eq("provider_key", PROVIDER_KEY);
+      if (error) throw new Error("read failed");
+      return data ?? [];
+    },
+    async selectAccounts() {
+      const { data, error } = await client.from(ACCOUNTS).select("*")
+        .eq("provider_key", PROVIDER_KEY).eq("channel", CHANNEL);
+      if (error) throw new Error("read failed");
+      return data ?? [];
+    },
+    async selectRuntimePolicy() {
+      const { data, error } = await client.from(POLICIES).select("*")
+        .eq("provider_key", PROVIDER_KEY).eq("channel", CHANNEL).maybeSingle();
+      if (error) throw new Error("read failed");
+      return data ?? null;
+    },
+    async insertAccount(row) {
+      const { data, error } = await client.from(ACCOUNTS).insert(row).select().single();
+      if (error) throw new Error("write failed");
+      return data;
+    },
+    async normalizeAccountDisabled(row) {
+      const { data, error } = await client.from(ACCOUNTS)
+        .update({ ...REQUIRED_DISABLED_ACCOUNT_STATE,
+                  business_account_reference: row.business_account_reference,
+                  phone_number_reference: row.phone_number_reference })
+        .eq("provider_key", PROVIDER_KEY).eq("channel", CHANNEL)
+        .neq("readiness_status", FORBIDDEN_ACCOUNT_STATE.readiness_status)
+        .select().single();
+      if (error) throw new Error("write failed");
+      return data;
+    },
+    async insertMappings(rows) {
+      const { data, error } = await client.from(MAPPINGS).insert(rows).select();
+      if (error) throw new Error("write failed");
+      return data;
+    },
+  };
+
+  const graph = `https://graph.facebook.com/${process.env.QF_META_GRAPH_API_VERSION}`;
+  const authHeaders = { Authorization: `Bearer ${process.env.QF_META_ACCESS_TOKEN}` };
+  const metaPort = {
+    async verifyIdentity() {
+      // GET only. Prove the phone number belongs to the exact WABA.
+      const res = await fetch(`${graph}/${process.env.QF_META_WABA_ID}/phone_numbers?fields=id`,
+        { headers: authHeaders });
+      if (!res.ok) return { ok: false, detail: `identity http ${res.status}` };
+      const body = await res.json();
+      const owned = (body.data ?? []).some((p) => p.id === process.env.QF_META_PHONE_NUMBER_ID);
+      return owned ? { ok: true } : { ok: false, detail: "phone number is not owned by this WABA" };
+    },
+    async getTemplateByName(name) {
+      const res = await fetch(
+        `${graph}/${process.env.QF_META_WABA_ID}/message_templates`
+        + `?name=${encodeURIComponent(name)}&fields=name,language,status,category`,
+        { headers: authHeaders });
+      if (!res.ok) return { ok: false, reason: SeedFailure.META_TEMPLATE_UNRESOLVED };
+      const body = await res.json();
+      const exact = (body.data ?? []).filter((t) => t.name === name && t.language === LANGUAGE);
+      if (exact.length !== 1) return { ok: true, matches: exact.length };
+      const t = exact[0];
+      return { ok: true, matches: 1, status: t.status, category: t.category,
+               language: t.language, semanticMatch: true };
+    },
+  };
+
+  // ---- Cross-process attestation store (external to the repository) --------
+  const evidenceDir = joinPath(process.env.USERPROFILE ?? process.env.HOME ?? ".",
+    "Desktop", "QuickFurno-Operator-Evidence", "QF-MVP-40", "Staging-Mapping-Seed-2026-08-01");
+  const attestationPath = joinPath(evidenceDir, "preflight-attestation.json");
+  const consumedPath = joinPath(evidenceDir, "consumed-nonces.json");
+  const store = {
+    async read() {
+      try { return JSON.parse(readFileSync(attestationPath, "utf8")); } catch { return null; }
+    },
+    async write(payload) {
+      mkdirSync(evidenceDir, { recursive: true });
+      writeFileSync(attestationPath, JSON.stringify(payload, null, 2) + "\n", "utf8");
+    },
+    async consumedNonces() {
+      try { return JSON.parse(readFileSync(consumedPath, "utf8")); } catch { return []; }
+    },
+    async consume(nonce) {
+      const all = await this.consumedNonces();
+      all.push(nonce);
+      mkdirSync(evidenceDir, { recursive: true });
+      writeFileSync(consumedPath, JSON.stringify(all, null, 2) + "\n", "utf8");
+    },
+  };
+
+  const readinessRaw = readFileSync(
+    resolve("docs/provider-manifests/meta-template-inactive-mapping-readiness.json"));
+  const manifestRaw = readFileSync(
+    resolve("docs/provider-manifests/whatsapp-template-submission-manifest.json"));
+  const deps = {
+    db, meta: metaPort, store,
+    now: () => Date.now(),
+    head: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+    branch: execFileSync("git", ["branch", "--show-current"], { encoding: "utf8" }).trim(),
+    projectRef: target.projectRef,
+    manifestHash: hash("sha256").update(manifestRaw).digest("hex"),
+    readinessHash: hash("sha256").update(readinessRaw).digest("hex"),
+    bindingContractHash: hash("sha256").update(JSON.stringify(contracts)).digest("hex"),
+    nonce: randomUUID(),
+    wabaRef: process.env.QF_META_WABA_ID,
+    phoneRef: process.env.QF_META_PHONE_NUMBER_ID,
+    variablesSchemaFor: (key) => {
+      const built = buildCanonicalBindingSchema(byKey.get(key), contracts[key] ?? null);
+      return built.ok ? built.schema : null;
+    },
+  };
+
+  if (mode === "PREFLIGHT_READONLY") {
+    const r = await runReadOnlyPreflight(deps);
+    if (!r.ok) {
+      console.error(`PREFLIGHT BLOCKED: ${r.reason}${r.detail ? ` — ${sanitizeForEvidence(String(r.detail))}` : ""}`);
+      console.error("ZERO writes were performed.");
+      process.exit(4);
+    }
+    await store.write(r.payload);
+    console.log("READ-ONLY PREFLIGHT PASSED — zero writes performed.");
+    console.log(`  account classification : ${r.payload.account_classification}`);
+    for (const m of r.payload.mapping_plan) console.log(`  ${m.key.padEnd(30)} ${m.outcome}`);
+    console.log(`  runtime policy         : non-sendable`);
+    console.log(`  attestation            : ${attestationPath}`);
+    console.log(`  expires in             : ${Math.round(ATTESTATION_TTL_MS / 60000)} minutes (single use)`);
+    console.log("");
+    console.log("Review the plan above, then run exactly one: npm run seed:mvp:40-12 -- --execute");
+    process.exit(0);
+  }
+
+  // ---- EXECUTE: reruns the full preflight, then at most two writes ---------
+  const r = await runControlledExecute(deps);
+  if (!r.ok) {
+    console.error(`EXECUTE BLOCKED: ${r.reason}${r.detail ? ` — ${sanitizeForEvidence(String(r.detail))}` : ""}`);
+    console.error("No retry is attempted. Inspect the sanitized reason before re-running.");
+    process.exit(5);
+  }
+  console.log("STAGING SEED COMPLETE — all mappings INACTIVE.");
+  console.log(`  provider account   : ${r.account_outcome} (disabled)`);
+  for (const m of r.mapping_outcomes) console.log(`  ${m.key.padEnd(30)} ${m.outcome}`);
+  console.log(`  mapping count      : ${r.mapping_count}`);
+  console.log(`  active mappings    : ${r.active_mapping_count}`);
+  console.log(`  messages sent      : ${r.message_send_count}`);
+  console.log(`  Meta write calls   : ${r.meta_write_count}`);
+  process.exit(0);
 }

@@ -1,0 +1,602 @@
+{
+  "name": "QF-MVP-50-01-Core-Job-Dispatcher-50.2B-SELFHOST-CANDIDATE",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "99cde81e-1857-42fc-8865-1b6928aac9b1",
+      "name": "Schedule Trigger — INACTIVE",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1440,
+        -160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5c4715c4-93f2-4e5e-8836-aa9a531a1cd8",
+      "name": "Manual Trigger — Handshake Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1440,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const enabled = $env.QF_N8N_TRANSPORT_ENABLED === 'true';\nconst baseUrl = ($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nconst inbound = $env.QF_N8N_TO_CORE_HMAC_SECRET || '';\nconst response = $env.QF_CORE_TO_N8N_HMAC_SECRET || '';\nconst configured = Boolean(\n  enabled &&\n  /^https:\\/\\//.test(baseUrl) &&\n  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId) &&\n  inbound.length >= 32 &&\n  response.length >= 32 &&\n  inbound !== response\n);\nreturn [{ json: {\n  phase: 'QF-MVP-50.2B',\n  transportVersion: 1,\n  configured,\n  transportEnabled: enabled,\n  secretSource: 'selfhost_env',\n  baseUrlConfigured: /^https:\\/\\//.test(baseUrl),\n  workerIdConfigured: /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId),\n  inboundSecretConfigured: inbound.length >= 32,\n  responseSecretConfigured: response.length >= 32,\n  secretsDistinct: inbound.length >= 32 && response.length >= 32 && inbound !== response,\n  workerId\n} }];"
+      },
+      "id": "804c05c2-7eec-4a39-8f69-f7c7f2950e27",
+      "name": "50.2B Runtime Preconditions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1180,
+        -70
+      ],
+      "notes": "Reads runtime env only. Returns booleans and worker ID; never emits either HMAC secret."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5bb21541-1f1d-40bd-9671-27b6ddfc2a43",
+              "leftValue": "={{ $json.configured }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "295127bd-23b3-492c-804d-ce8cc92c3746",
+      "name": "IF — Transport Configured",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -940,
+        -70
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "bd9bc74b-e4a4-4923-b770-b6166b86c845",
+      "name": "STOP — Secure Runtime Not Configured",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        120
+      ],
+      "notes": "Expected default path. No network call is possible while runtime preconditions are false."
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "requestId"
+      },
+      "id": "7b5a58a8-fbc0-4757-8c3b-d3e4a11e4b84",
+      "name": "Generate Request UUID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const requestId = $json.requestId;\nconst workerId = $json.workerId;\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {\n  throw new Error('QF_50_2B_REQUEST_ID_INVALID');\n}\nconst timestamp = Math.floor(Date.now() / 1000);\nconst rawBody = JSON.stringify({ transportVersion: 1, requestId, workerId });\nreturn [{ json: { ...$json, requestId, workerId, timestamp, rawBody } }];"
+      },
+      "id": "b7ae047c-d6b6-42ea-af72-18cbe88a28d3",
+      "name": "Build Exact Claim Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawBody }}",
+        "dataPropertyName": "bodySha256"
+      },
+      "id": "4ddfc10f-9809-4bae-95a2-b948bafd8f0b",
+      "name": "SHA256 — Claim Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'N8N_TO_CORE',\n  'POST',\n  '/api/internal/automation/n8n/claim',\n  $json.requestId,\n  String($json.timestamp),\n  $json.bodySha256\n].join('\\n');\nreturn [{ json: { ...$json, requestCanonical: canonical } }];"
+      },
+      "id": "d710e52a-1f36-40ee-8b1a-ebb297327b52",
+      "name": "Build Request Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.requestCanonical }}",
+        "dataPropertyName": "requestHmac",
+        "secret": "={{ $env.QF_N8N_TO_CORE_HMAC_SECRET }}"
+      },
+      "id": "07a43902-3018-488d-b5d9-98d6665a2062",
+      "name": "HMAC — n8n to Core",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        260,
+        -170
+      ],
+      "notes": "Secret value is runtime env only; workflow JSON contains only the environment-variable reference."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.QF_CORE_STAGING_BASE_URL.replace(/\\/$/, '') + '/api/internal/automation/n8n/claim' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-qf-transport-version",
+              "value": "1"
+            },
+            {
+              "name": "x-qf-request-id",
+              "value": "={{ $json.requestId }}"
+            },
+            {
+              "name": "x-qf-timestamp",
+              "value": "={{ String($json.timestamp) }}"
+            },
+            {
+              "name": "x-qf-body-sha256",
+              "value": "={{ $json.bodySha256 }}"
+            },
+            {
+              "name": "x-qf-signature",
+              "value": "={{ 'v1=' + $json.requestHmac }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.rawBody }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "3ef39dfe-80fb-4624-a502-0e0bc1f914f3",
+      "name": "POST Signed Claim to Core — STAGING ONLY",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        -170
+      ],
+      "notes": "Only reachable when runtime gate is explicitly enabled and all secure preconditions pass."
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst headers = response.headers || {};\nconst rawBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body ?? '');\nconst h = {};\nfor (const [k, v] of Object.entries(headers)) h[String(k).toLowerCase()] = Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '');\nreturn [{ json: {\n  requestId: $('Build Exact Claim Body').first().json.requestId,\n  statusCode: Number(response.statusCode),\n  rawResponseBody: rawBody,\n  responseHeaders: h,\n  responseVersion: h['x-qf-response-version'] || '',\n  responseRequestId: h['x-qf-response-request-id'] || '',\n  responseTimestamp: h['x-qf-response-timestamp'] || '',\n  responseBodySha256Header: h['x-qf-response-body-sha256'] || '',\n  responseSignature: h['x-qf-response-signature'] || ''\n} }];"
+      },
+      "id": "054171c4-64e3-4861-b122-9177bf53d003",
+      "name": "Normalize Core Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawResponseBody }}",
+        "dataPropertyName": "actualResponseBodySha256"
+      },
+      "id": "86d7f844-d2ac-4858-b213-db00bd1babdd",
+      "name": "SHA256 — Core Response Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        980,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ts = $json.responseTimestamp;\nconst canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'CORE_TO_N8N_RESPONSE',\n  '/api/internal/automation/n8n/claim',\n  $json.responseRequestId,\n  ts,\n  $json.actualResponseBodySha256\n].join('\\n');\nreturn [{ json: { ...$json, responseCanonical: canonical } }];"
+      },
+      "id": "6b6e40fb-f419-4c93-a069-570d23f0c42a",
+      "name": "Build Response Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.responseCanonical }}",
+        "dataPropertyName": "expectedResponseHmac",
+        "secret": "={{ $env.QF_CORE_TO_N8N_HMAC_SECRET }}"
+      },
+      "id": "2dee0b48-8c03-4a52-bc33-4f080a2ee4b1",
+      "name": "HMAC — Verify Core Response",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Math.floor(Date.now() / 1000);\nconst ts = Number($json.responseTimestamp);\nconst expectedSig = 'v1=' + $json.expectedResponseHmac;\nconst checks = {\n  version: $json.responseVersion === '1',\n  requestId: $json.responseRequestId === $json.requestId,\n  timestamp: /^\\d{10}$/.test($json.responseTimestamp) && Number.isSafeInteger(ts) && Math.abs(now - ts) <= 300,\n  bodyHash: /^[0-9a-f]{64}$/.test($json.responseBodySha256Header) && $json.responseBodySha256Header === $json.actualResponseBodySha256,\n  signature: /^v1=[0-9a-f]{64}$/.test($json.responseSignature) && $json.responseSignature === expectedSig,\n  status: Number.isInteger($json.statusCode) && $json.statusCode >= 200 && $json.statusCode < 600\n};\nconst verified = Object.values(checks).every(Boolean);\nreturn [{ json: { ...$json, verified, checks } }];"
+      },
+      "id": "d560ce6d-cbaf-45d7-b120-70e77d095c06",
+      "name": "Verify Signed Core Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        -170
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "35acdcce-de73-491d-af60-6ef4b5585cd0",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f2f0aad1-6c42-4406-8a4a-c509339fae60",
+      "name": "IF — Core Response Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1940,
+        -170
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ec2a7015-6e76-4485-8c8e-9d56ce785c6f",
+      "name": "STOP — Reject Unverified Response",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2180,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let payload;\ntry { payload = JSON.parse($json.rawResponseBody); } catch { throw new Error('QF_50_2B_RESPONSE_JSON_INVALID'); }\nif (!payload || typeof payload !== 'object' || payload.transportVersion !== 1 || payload.requestId !== $json.requestId) {\n  throw new Error('QF_50_2B_RESPONSE_ENVELOPE_INVALID');\n}\nconst allowedStates = new Set(['empty', 'claimed']);\nif (!allowedStates.has(payload.state) || typeof payload.replayed !== 'boolean' || typeof payload.executable !== 'boolean') {\n  throw new Error('QF_50_2B_RESPONSE_STATE_INVALID');\n}\nif ((payload.replayed || payload.state === 'empty') && payload.executable !== false) throw new Error('QF_50_2B_NONEXECUTABLE_INVARIANT');\nreturn [{ json: { verified: true, claim: payload, routingEnabled: false, safeCode: 'QF_50_2B_SIGNED_HANDSHAKE_VERIFIED_ROUTING_DISABLED' } }];"
+      },
+      "id": "0e71835e-6bc2-4538-8bed-45f139a881ad",
+      "name": "Parse Verified Claim — Routing Disabled",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        -270
+      ],
+      "notes": "50.2B ends here. Even a fresh executable claim is not routed to child workflows yet."
+    },
+    {
+      "parameters": {},
+      "id": "464d0bb9-2e7e-4fa1-bc4f-9704db7c795d",
+      "name": "STOP — 50.2B Handshake Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        -270
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## QF-MVP-50.2B — SELF-HOSTED STAGING CANDIDATE\\n\\n**KEEP INACTIVE / UNPUBLISHED.**\\n\\nDefault path is fail-closed because `QF_N8N_TRANSPORT_ENABLED` must equal `true`.\\n\\nSecrets are runtime env references only; never paste secret values into this workflow.\\n\\nRequired later on self-hosted n8n: `QF_CORE_STAGING_BASE_URL`, `QF_N8N_WORKER_ID`, `QF_N8N_TO_CORE_HMAC_SECRET`, `QF_CORE_TO_N8N_HMAC_SECRET`, `QF_N8N_TRANSPORT_ENABLED`.\\n\\n50.2B verifies the signed claim handshake only. Routing, Meta and WhatsApp remain disabled.",
+        "height": 420,
+        "width": 620
+      },
+      "id": "5a9e90ec-99af-445a-976d-f47388943a7b",
+      "name": "SECURITY — 50.2B READ FIRST",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1440,
+        -620
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger — INACTIVE": {
+      "main": [
+        [
+          {
+            "node": "50.2B Runtime Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger — Handshake Test": {
+      "main": [
+        [
+          {
+            "node": "50.2B Runtime Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "50.2B Runtime Preconditions": {
+      "main": [
+        [
+          {
+            "node": "IF — Transport Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Transport Configured": {
+      "main": [
+        [
+          {
+            "node": "Generate Request UUID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Secure Runtime Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Request UUID": {
+      "main": [
+        [
+          {
+            "node": "Build Exact Claim Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Exact Claim Body": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Claim Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Claim Body": {
+      "main": [
+        [
+          {
+            "node": "Build Request Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Request Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — n8n to Core",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — n8n to Core": {
+      "main": [
+        [
+          {
+            "node": "POST Signed Claim to Core — STAGING ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Signed Claim to Core — STAGING ONLY": {
+      "main": [
+        [
+          {
+            "node": "Normalize Core Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Core Response": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Core Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Core Response Body": {
+      "main": [
+        [
+          {
+            "node": "Build Response Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Verify Core Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Verify Core Response": {
+      "main": [
+        [
+          {
+            "node": "Verify Signed Core Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signed Core Response": {
+      "main": [
+        [
+          {
+            "node": "IF — Core Response Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Core Response Verified": {
+      "main": [
+        [
+          {
+            "node": "Parse Verified Claim — Routing Disabled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reject Unverified Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Verified Claim — Routing Disabled": {
+      "main": [
+        [
+          {
+            "node": "STOP — 50.2B Handshake Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true
+  },
+  "versionId": "d4cdfa53-b6db-40d8-b20d-4464fea4f2a1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

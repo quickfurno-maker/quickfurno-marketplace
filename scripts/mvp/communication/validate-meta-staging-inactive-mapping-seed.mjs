@@ -16,7 +16,11 @@ import {
   resolveMode, classifyExistingMapping, classifyExistingAccount, sanitizeForEvidence,
   ATTESTATION_TTL_MS, attestationDigest, buildMappingRow, runtimePolicyIsNonSendable,
   runReadOnlyPreflight, runControlledExecute, verifyAttestation,
+  verifyIndexProof, indexProofDigest, REQUIRED_INDEXES, INDEX_PROOF_TABLE,
+  scanMappingSet, verifyInternalTemplates, isInsideRepository,
 } from "./seed-meta-staging-inactive-mappings.mjs";
+// The REAL comparator, so the semantic tests exercise production behaviour.
+import { templatesAreIdentical } from "./submit-meta-templates.mjs";
 
 const OPERATOR = "scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs";
 const REGISTRY_SRC = "lib/communication/outboundConsentScope.ts";
@@ -570,6 +574,11 @@ function makeDeps(f, over = {}) {
     wabaRef: WABA, phoneRef: PHONE,
     variablesSchemaFor: over.variablesSchemaFor
       ?? (() => ({ bindingVersion: 1, bindings: [] })),
+    // The approved payload the real comparator comes back against. The fake Meta port
+    // decides the verdict, so this only has to be a stable non-null value here.
+    expectedPayloadFor: over.expectedPayloadFor
+      ?? ((key) => ({ name: key, language: "en", category: "UTILITY",
+        components: [{ type: "BODY", text: "fixture" }] })),
   };
 }
 const inactiveRow = (seed) => ({
@@ -850,10 +859,283 @@ for (const [n, fn] of RUNTIME) {
   else add(n, out);
 }
 
+
+// ===========================================================================
+// QF-MVP-40.12-R3 — index proof, real Meta semantics, whole-set scan.
+// Still entirely offline: every effect is an injected fake.
+// ===========================================================================
+
+const PROOF_NOW = 1_800_000_000_000;
+function makeProof(over = {}) {
+  const p = {
+    artifact: "qf-mvp-40-12-staging-index-proof",
+    schema_version: "1.0",
+    environment: "STAGING",
+    project_ref: AUTHORIZED_STAGING_REF,
+    table: INDEX_PROOF_TABLE,
+    indexes: [
+      { name: "uq_comm_provider_template_active", unique: true,
+        columns: ["template_key", "channel", "provider_key", "language"], predicate: "is_active" },
+      { name: "uq_comm_provider_template_mapping", unique: true,
+        columns: ["template_key", "channel", "provider_key", "language", "version"], predicate: null },
+    ],
+    source: "SUPABASE_DIRECT_READ_ONLY_SQL",
+    issued_at_ms: PROOF_NOW,
+    expires_at_ms: PROOF_NOW + 10 * 60 * 1000,
+    nonce: "proof-nonce-1",
+    ...over,
+  };
+  p.proof_sha256 = over.proof_sha256 ?? indexProofDigest(p);
+  return p;
+}
+const proofNow = () => PROOF_NOW;
+const verifyP = (p, now = proofNow) => verifyIndexProof(p, { now });
+
+/** Canonical rows keyed by template, used to drive the whole-set scan. */
+const canonicalMap = () => {
+  const m = new Map();
+  for (const t of SEED_SET) m.set(t.key, buildMappingRow(t, VERSION, { bindingVersion: 1, bindings: [] }));
+  return m;
+};
+const canonRow = (seed, over = {}) => ({ ...buildMappingRow(seed, VERSION,
+  { bindingVersion: 1, bindings: [] }), ...over });
+
+const R3 = [
+  // ---- DEFECT A: the index proof is real, fresh and external --------------
+  ["X1  a valid fresh proof is accepted", () => {
+    const r = verifyP(makeProof());
+    return r.ok === true && typeof r.proof_hash === "string" && r.proof_hash.length === 64;
+  }],
+  ["X2  the operator no longer hardcodes INDEX_PROOF_UNAVAILABLE", () =>
+    !/return \{ ok: false, reason: SeedFailure\.INDEX_PROOF_UNAVAILABLE,\s*\n\s*detail: "pg_indexes/.test(src)
+    && /QF_STAGING_INDEX_PROOF_PATH/.test(exec)],
+  ["X3  a missing proof is refused (no permanent bypass)", () =>
+    verifyP(null).ok === false && verifyP(undefined).ok === false
+    && verifyP({}).ok === false],
+  ["X4  an EXPIRED proof is refused", () =>
+    verifyP(makeProof(), () => PROOF_NOW + 11 * 60 * 1000).ok === false],
+  ["X5  a FUTURE-dated proof is refused", () =>
+    verifyP(makeProof({ issued_at_ms: PROOF_NOW + 5 * 60 * 1000 })).ok === false],
+  ["X6  a TTL longer than 15 minutes is refused", () =>
+    verifyP(makeProof({ expires_at_ms: PROOF_NOW + 16 * 60 * 1000 })).ok === false],
+  ["X7  a TAMPERED proof is refused", () => {
+    const p = makeProof();
+    p.indexes[0].predicate = null;             // altered after signing
+    return verifyP(p).ok === false;
+  }],
+  ["X8  a wrong project or table is refused", () =>
+    verifyP(makeProof({ project_ref: FORBIDDEN_PROJECT_REFS.production })).ok === false
+    && verifyP(makeProof({ project_ref: "zzzzzzzzzzzzzzzzzzzz" })).ok === false
+    && verifyP(makeProof({ table: "public.something_else" })).ok === false
+    && verifyP(makeProof({ environment: "PRODUCTION" })).ok === false],
+  ["X9  a missing or extra index entry is refused", () =>
+    verifyP(makeProof({ indexes: [makeProof().indexes[0]] })).ok === false
+    && verifyP(makeProof({ indexes: [...makeProof().indexes, { name: "extra", unique: true,
+        columns: ["x"], predicate: null }] })).ok === false],
+  ["X10 a renamed or non-unique index is refused", () => {
+    const renamed = makeProof(); renamed.indexes[1].name = "uq_other";
+    const notUnique = makeProof(); notUnique.indexes[0].unique = false;
+    return verifyP(makeProof({ indexes: renamed.indexes })).ok === false
+      && verifyP(makeProof({ indexes: notUnique.indexes })).ok === false;
+  }],
+  ["X11 a wrong COLUMN ORDER is refused", () => {
+    const p = makeProof();
+    p.indexes[1].columns = ["channel", "template_key", "provider_key", "language", "version"];
+    return verifyP(makeProof({ indexes: p.indexes })).ok === false;
+  }],
+  ["X12 a wrong PREDICATE is refused", () => {
+    const dropped = makeProof(); dropped.indexes[0].predicate = null;
+    const wrong = makeProof(); wrong.indexes[1].predicate = "is_active";
+    return verifyP(makeProof({ indexes: dropped.indexes })).ok === false
+      && verifyP(makeProof({ indexes: wrong.indexes })).ok === false;
+  }],
+  ["X13 a proof path INSIDE the repository is refused", () =>
+    isInsideRepository("docs/proof.json") === true
+    && isInsideRepository("./scripts/x/proof.json") === true
+    && isInsideRepository(process.cwd() + "/proof.json") === true
+    && isInsideRepository("C:/Users/x/Desktop/evidence/proof.json") === false
+    && /isInsideRepository\(path\)/.test(exec)],
+  ["X14 the proof hash is pinned into the attestation", async () => {
+    const proof = makeProof();
+    const f = makeFakes({ indexes: { ok: true, proof: "p", proof_hash: proof.proof_sha256 } });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === true && r.payload.index_proof_hash === proof.proof_sha256;
+  }],
+  ["X15 execute refuses when the index proof hash changed", async () => {
+    const a = makeProof();
+    const b = makeProof({ nonce: "proof-nonce-2" });
+    const pre = await runReadOnlyPreflight(makeDeps(
+      makeFakes({ indexes: { ok: true, proof: "p", proof_hash: a.proof_sha256 } })));
+    const f = makeFakes({ stored: pre.payload,
+      indexes: { ok: true, proof: "p", proof_hash: b.proof_sha256 } });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_MISMATCH
+      && r.detail === "index_proof_hash" && f.calls.writes === 0;
+  }],
+  ["X16 execute refuses when the proof has expired by then", async () => {
+    const f = makeFakes({ indexes: { ok: false, reason: SeedFailure.INDEX_PROOF_UNAVAILABLE } });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.INDEX_PROOF_UNAVAILABLE && f.calls.writes === 0;
+  }],
+
+  // ---- DEFECT B: the Meta semantic match is real --------------------------
+  ["X17 semanticMatch is never a hardcoded true", () =>
+    !/semanticMatch:\s*true\s*\}/.test(exec)
+    && /templatesAreIdentical\(/.test(exec)],
+  ["X18 the adapter REQUESTS components", () =>
+    /fields=name,language,status,category,components/.test(exec)],
+  ["X19 the real comparator is reused, not re-implemented", () =>
+    /from "\.\/submit-meta-templates\.mjs"/.test(exec)
+    && !/function canonicaliseTemplate/.test(exec)],
+  ["X20 a semantic mismatch blocks the plan", async () => {
+    const f = makeFakes({ metaTemplate: { ok: true, matches: 1, status: "APPROVED",
+      category: "UTILITY", language: "en", semanticMatch: false } });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.META_TEMPLATE_UNRESOLVED && f.calls.writes === 0;
+  }],
+  ["X21 the comparator itself rejects body / component drift", () => {
+    const approved = { name: "qf_lead_received_v1", language: "en", category: "UTILITY",
+      components: [{ type: "BODY", text: "Hi {{1}}, QuickFurno received your enquiry." }] };
+    const drifted = { ...approved,
+      components: [{ type: "BODY", text: "Hi {{1}}, buy now!" }] };
+    const missing = { ...approved, components: [] };
+    return templatesAreIdentical(approved, approved) === true
+      && templatesAreIdentical(approved, drifted) === false
+      && templatesAreIdentical(approved, missing) === false;
+  }],
+  ["X22 a duplicate remote template is refused", async () => {
+    const f = makeFakes({ metaTemplate: { ok: true, matches: 2 } });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.META_TEMPLATE_AMBIGUOUS;
+  }],
+  ["X23 a stored/fresh Meta reconciliation mismatch is refused", async () => {
+    const pre = await runReadOnlyPreflight(makeDeps(makeFakes()));
+    const changed = { ...pre.payload,
+      meta_reconciliation: pre.payload.meta_reconciliation.slice(0, 7) };
+    changed.attestation_sha256 = attestationDigest(changed);
+    const f = makeFakes({ stored: changed });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.ATTESTATION_MISMATCH
+      && f.calls.writes === 0;
+  }],
+
+  // ---- DEFECT C: the whole-set scan --------------------------------------
+  ["X24 an ACTIVE row on ANOTHER VERSION is caught", () => {
+    const rows = [canonRow(SEED_SET[0], { version: "9.9", is_active: true })];
+    const r = scanMappingSet(rows, canonicalMap());
+    return r.ok === false && r.reason === SeedFailure.ACTIVE_MAPPING_PRESENT;
+  }],
+  ["X25 an ACTIVE row on ANOTHER LANGUAGE is caught", () => {
+    const rows = [canonRow(SEED_SET[0], { language: "hi", is_active: true })];
+    const r = scanMappingSet(rows, canonicalMap());
+    return r.ok === false && r.reason === SeedFailure.ACTIVE_MAPPING_PRESENT;
+  }],
+  ["X26 a DUPLICATE canonical tuple is caught", () => {
+    const rows = [canonRow(SEED_SET[0]), canonRow(SEED_SET[0])];
+    const r = scanMappingSet(rows, canonicalMap());
+    return r.ok === false && r.reason === SeedFailure.MAPPING_CONFLICT;
+  }],
+  ["X27 an EXTRA non-canonical row is caught", () => {
+    for (const over of [{ version: "2.0" }, { language: "hi" }]) {
+      const r = scanMappingSet([canonRow(SEED_SET[0], over)], canonicalMap());
+      if (r.ok !== false || r.reason !== SeedFailure.MAPPING_CONFLICT) return false;
+    }
+    return true;
+  }],
+  ["X28 a POPULATED provider_template_id is caught", () => {
+    const r = scanMappingSet([canonRow(SEED_SET[0], { provider_template_id: "999" })], canonicalMap());
+    return r.ok === false && r.reason === SeedFailure.MAPPING_CONFLICT;
+  }],
+  ["X29 a NON-APPROVED row is caught", () => {
+    const r = scanMappingSet([canonRow(SEED_SET[0], { approval_status: "draft" })], canonicalMap());
+    return r.ok === false && r.reason === SeedFailure.MAPPING_CONFLICT;
+  }],
+  ["X30 a drifted name / category / schema is caught", () => {
+    for (const over of [{ provider_template_name: "qf_other_v1" },
+                        { provider_category: "marketing" },
+                        { variables_schema: { bindingVersion: 1, bindings: [{ component: "body",
+                          position: 1, sourceKey: "x", parameterType: "text" }] } }]) {
+      const r = scanMappingSet([canonRow(SEED_SET[0], over)], canonicalMap());
+      if (r.ok !== false || r.reason !== SeedFailure.MAPPING_CONFLICT) return false;
+    }
+    return true;
+  }],
+  ["X31 an exact inactive approved row passes the scan", () => {
+    const r = scanMappingSet(SEED_SET.map((t) => canonRow(t)), canonicalMap());
+    return r.ok === true && r.existing.length === 8;
+  }],
+  ["X32 the scan runs BEFORE any write in the preflight", async () => {
+    const f = makeFakes({ mappings: [canonRow(SEED_SET[0], { version: "9.9", is_active: true })] });
+    const r = await runReadOnlyPreflight(makeDeps(f));
+    return r.ok === false && f.calls.writes === 0;
+  }],
+
+  // ---- DEFECT D: internal template language / version ---------------------
+  ["X33 a non-'en' internal template is refused", () => {
+    const rows = SEED_SET.map((t) => ({ template_key: t.key, version: VERSION, language: "hi" }));
+    const r = verifyInternalTemplates(rows);
+    return r.ok === false && r.reason === SeedFailure.INTERNAL_TEMPLATE_MISSING;
+  }],
+  ["X34 a DUPLICATE internal template row is refused", () => {
+    const rows = [...SEED_SET.map((t) => ({ template_key: t.key, version: VERSION, language: "en" })),
+      { template_key: SEED_SET[0].key, version: VERSION, language: "en" }];
+    return verifyInternalTemplates(rows).ok === false;
+  }],
+  ["X35 an empty canonical version is refused", () => {
+    const rows = SEED_SET.map((t, i) => ({ template_key: t.key, language: "en",
+      version: i === 0 ? "  " : VERSION }));
+    return verifyInternalTemplates(rows).ok === false;
+  }],
+  ["X36 all eight present, en, versioned is accepted", () => {
+    const rows = SEED_SET.map((t) => ({ template_key: t.key, version: VERSION, language: "en" }));
+    const r = verifyInternalTemplates(rows);
+    return r.ok === true && r.byKey.size === 8;
+  }],
+
+  // ---- Post-write readback hardening --------------------------------------
+  ["X37 readback rejects a drifted version or schema", async () => {
+    for (const over of [{ version: "9.9" }, { variables_schema: { bindingVersion: 1,
+      bindings: [{ component: "body", position: 1, sourceKey: "x", parameterType: "text" }] } }]) {
+      const pre = await runReadOnlyPreflight(makeDeps(makeFakes()));
+      const f = makeFakes({ stored: pre.payload });
+      const original = f.db.insertMappings;
+      f.db.insertMappings = async (rows) => original(rows.map((x) => ({ ...x, ...over })));
+      const r = await runControlledExecute(makeDeps(f));
+      if (r.ok !== false || r.reason !== SeedFailure.READBACK_MISMATCH) return false;
+    }
+    return true;
+  }],
+  ["X38 readback rejects an EXTRA row for a key", async () => {
+    const pre = await runReadOnlyPreflight(makeDeps(makeFakes()));
+    const f = makeFakes({ stored: pre.payload });
+    const original = f.db.insertMappings;
+    f.db.insertMappings = async (rows) => {
+      const r = await original(rows);
+      f.mappings.push({ ...rows[0], version: "9.9" });   // a stray extra row appears
+      return r;
+    };
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === false && r.reason === SeedFailure.READBACK_MISMATCH;
+  }],
+  ["X39 the happy path still succeeds end to end", async () => {
+    const pre = await runReadOnlyPreflight(makeDeps(makeFakes()));
+    const f = makeFakes({ stored: pre.payload });
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === true && r.mapping_count === 8 && r.active_mapping_count === 0
+      && f.mappings.every((m) => m.is_active === false && m.provider_template_id === null);
+  }],
+];
+for (const [n, fn] of R3) {
+  const out = fn();
+  if (out && typeof out.then === "function") add(n, await out);
+  else add(n, out);
+}
+
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${!r.ok && r.detail ? `  [${r.detail}]` : ""}`);
 console.log(`\nSeed set: ${SEED_SET.length} · target: ${AUTHORIZED_STAGING_REF} (STAGING) `
   + `· forbidden refs rejected: production, jarvis`);
 console.log(`Summary: ${results.length - failed.length} passed, ${failed.length} failed `
-  + `(rules: ${RULES.length}, mutation self-tests: ${MUT.length}, runtime tests: ${RUNTIME.length}).`);
+  + `(rules: ${RULES.length}, mutation self-tests: ${MUT.length}, `
+  + `runtime tests: ${RUNTIME.length}, R3 tests: ${R3.length}).`);
 process.exit(failed.length === 0 ? 0 : 1);

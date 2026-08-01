@@ -1,17 +1,17 @@
 {
   "artifact": "meta-staging-inactive-mapping-seed-blocker-resolution",
   "schema_version": "1.0",
-  "phase": "QF-MVP-40.12-R2",
-  "status": "RUNTIME_IMPLEMENTED_OFFLINE",
+  "phase": "QF-MVP-40.12-R3",
+  "status": "RUNTIME_HARDENED_OFFLINE",
   "contains_secrets": false,
   "staging_seed_executed": false,
   "database_contacted": false,
   "meta_contacted": false,
   "mapping_count_written": 0,
   "provider_account_written": false,
-  "remaining_blocker": "ENV_MISSING + INDEX_PROOF_UNAVAILABLE",
+  "remaining_blocker": "FRESH_EXTERNAL_INDEX_PROOF + SIX_PROCESS_VARIABLES + LIVE_PREFLIGHT_NOT_RUN",
   "authorizes_live_execution": false,
-  "note": "NON-SECRET offline record. QF-MVP-40.12-R1 resolved BINDING_SCHEMA_UNPROVEN; QF-MVP-40.12-R2 implemented the missing seed runtime. NEITHER executed a staging seed, contacted a database or made a Meta call. The prior owner authorization does NOT remove the operator's runtime credential and identity fences: a live run still requires the six phase-scoped variables in the process environment and still proves the exact staging project ref before constructing a client. No credential appears in this artefact.",
+  "note": "NON-SECRET offline record. R1 resolved BINDING_SCHEMA_UNPROVEN, R2 implemented the seed runtime, R3 closed four defects in it. NONE executed a staging seed, contacted a database or made a Meta call. The prior owner authorization does not remove the operator's runtime fences: a live run still requires a FRESH external index proof, the six phase-scoped variables in the process environment, and proof of the exact staging project ref before a client is constructed.",
   "resolved_blocker": {
     "code": "BINDING_SCHEMA_UNPROVEN",
     "was": "5 of 8 approved templates declared Meta positional variables with binding_readiness \"unresolved\" and no proven source_key anywhere in the repository, so a canonical mapping variables_schema could not be derived without fabricating names.",
@@ -31,21 +31,34 @@
     "Template submission remains PAUSED; no subset 3 exists.",
     "lib/communication/outboundConsentScope.ts — the three acknowledgements stay absent."
   ],
-  "next_action": "Load the six phase-scoped variables into the current process environment WITHOUT writing them to a file, then run the offline dry run followed by --preflight-readonly. Expect INDEX_PROOF_UNAVAILABLE until that gap is closed by a separately authorized decision. Only then a single --execute.",
+  "next_action": "Produce a fresh index proof by direct read-only SQL and point QF_STAGING_INDEX_PROOF_PATH at it (outside the repository); it expires in 15 minutes, so generate it immediately before the run. Load the six phase-scoped variables into the process environment only. Then dry run, then --preflight-readonly, then exactly one --execute.",
   "runtime_repair": {
     "was": "The operator was a scaffold: after its fences it ran an unconditional PREFLIGHT_NOT_SATISFIED refusal, so --preflight-readonly and --execute could never do anything.",
     "now": "Both modes are real and reachable. No bypass flag was added; the refusal was replaced by the runtime it stood in for.",
     "cross_process_design": "Each npm run is a separate process, so an in-memory preflight flag would be meaningless. --preflight-readonly writes a sanitized, single-use, 15-minute attestation OUTSIDE the repository pinning head, branch, project ref, manifest / readiness / binding-contract hashes, the eight keys, schema and index proofs, the Meta reconciliation, the mapping plan, the account classification, a nonce and a digest. --execute reruns the FULL read-only preflight and requires the stored attestation to match it on every pinned field before any write.",
     "writes_bounded": "At most two: the disabled account and one bulk insert of only the missing mappings. Any error or ambiguous result is WRITE_OUTCOME_UNCERTAIN and is never retried."
   },
-  "known_gap": {
-    "code": "INDEX_PROOF_UNAVAILABLE",
-    "detail": "uq_comm_provider_template_mapping and uq_comm_provider_template_active cannot be proven through an already-authorized read path: PostgREST does not expose pg_indexes, and this phase may not add an RPC, DDL or migration. proveIndexes() reports this honestly rather than assuming, so a live preflight will stop there.",
-    "resolution_requires": "A separate, explicitly authorized decision: either a read-only RPC or an accepted documented exception. Not chosen unilaterally."
-  },
   "tests": {
     "suite": "npm run test:mvp:40-12",
-    "result": "128 passed, 0 failed (51 rules, 38 mutation self-tests, 39 runtime tests)",
-    "isolation": "Every external effect is an injected fake; the suite opens no socket, no database connection and reads no credential."
+    "result": "167 passed, 0 failed (51 rules, 38 mutation self-tests, 39 runtime tests, 39 R3 tests)",
+    "isolation": "No test contacts Supabase or Meta; every effect is an injected fake."
+  },
+  "r3_repairs": {
+    "index_proof": {
+      "was": "The adapter always returned INDEX_PROOF_UNAVAILABLE, so a live preflight could never get past it.",
+      "independent_finding": "Direct read-only SQL against the staging project proved both required indexes exist with the exact definitions the seed depends on.",
+      "now": "That finding is NOT hard-coded and is NOT a permanent exception. The operator consumes a FRESH external proof at QF_STAGING_INDEX_PROOF_PATH, produced out of band by direct read-only SQL, verified for artifact/environment/project/table/source, digest, expiry (max 15 minutes), no future-dating, exactly two entries with exact names, uniqueness, ORDERED columns and predicate, and a path outside the repository. The verified hash is pinned into the attestation and re-verified by --execute.",
+      "no_schema_change": "No RPC, DDL, migration or SQL function was added."
+    },
+    "meta_semantics": {
+      "was": "The adapter requested only name,language,status,category and then returned semanticMatch:true unconditionally — asserting something it had no basis for, and waving through exactly the body-drift case the check exists to catch.",
+      "now": "It requests components as well and compares the remote row against the approved creation_payload using the EXISTING templatesAreIdentical / canonicaliseTemplate from the submission operator. No weaker duplicate comparator was written. It fails closed when components are absent or more than one template matches. Still GET-only."
+    },
+    "whole_set_scan": {
+      "was": "Only the exact (key, language, version) tuple was classified, so an active row on another version or language, a duplicate tuple, an extra non-canonical row, a populated provider_template_id or a non-approved row were all invisible.",
+      "now": "scanMappingSet() scans every row for the eight keys before anything is classified, attested or written, and aborts on any of those. Post-write readback requires exactly one row per key, exactly eight rows in total, and exact canonical language, version, name, category and variables_schema."
+    },
+    "internal_templates": "verifyInternalTemplates() now requires all eight keys, no duplicate row per key, language en, and a non-empty canonical version.",
+    "attestation": "Stored/fresh comparison additionally pins schema_proof, index_proof_hash, runtime_policy_non_sendable and the full meta_reconciliation."
   }
 }

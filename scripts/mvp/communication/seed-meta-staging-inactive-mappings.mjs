@@ -1,12 +1,12 @@
 // ============================================================================
-// QF-MVP-40.12 — controlled STAGING inactive-mapping seed operator.
+// QF-MVP-40.12 â€” controlled STAGING inactive-mapping seed operator.
 //
 // Seeds exactly EIGHT approved-but-INACTIVE rows into the EXISTING
 // public.communication_provider_template_mappings table, and ensures exactly ONE
-// deliberately DISABLED public.communication_provider_accounts row — in STAGING ONLY.
+// deliberately DISABLED public.communication_provider_accounts row â€” in STAGING ONLY.
 //
 // SAFETY SHAPE
-//   default              OFFLINE DRY RUN — no credential, no network, no database.
+//   default              OFFLINE DRY RUN â€” no credential, no network, no database.
 //   --preflight-readonly STAGING reads + Meta GET-only verification. ZERO writes.
 //   --execute            ONE controlled staging write. Because every npm invocation is a
 //                        SEPARATE process, this cannot rely on an in-memory flag: it
@@ -26,7 +26,7 @@ import { isAbsolute, relative, resolve as resolvePath } from "node:path";
 // is exactly how a "semantic match" stops meaning anything.
 import { templatesAreIdentical } from "./submit-meta-templates.mjs";
 
-/** True when a path resolves inside this repository — evidence/proofs must not. */
+/** True when a path resolves inside this repository â€” evidence/proofs must not. */
 export function isInsideRepository(p, root = process.cwd()) {
   if (typeof p !== "string" || p.trim() === "") return false;
   const abs = isAbsolute(p) ? p : resolvePath(root, p);
@@ -78,7 +78,7 @@ export const SEED_SET = Object.freeze([
     classification: "ORDINARY_BUSINESS" },
 ]);
 
-/** The provider account must land in — and stay in — a non-sendable state. */
+/** The provider account must land in â€” and stay in â€” a non-sendable state. */
 export const REQUIRED_DISABLED_ACCOUNT_STATE = Object.freeze({
   readiness_status: "disabled",
   configuration_status: "partial",
@@ -137,7 +137,7 @@ export const SeedFailure = Object.freeze({
 export const ATTESTATION_TTL_MS = 15 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
-// PURE helpers — exported so the validator can drive them without any network,
+// PURE helpers â€” exported so the validator can drive them without any network,
 // database or credential.
 // ---------------------------------------------------------------------------
 
@@ -153,7 +153,7 @@ export function parseProjectRef(url) {
 
 /**
  * The environment identity fence. It runs BEFORE any client is constructed and before
- * the first database request. It never returns, prints or logs a secret value — only
+ * the first database request. It never returns, prints or logs a secret value â€” only
  * presence booleans and the (non-secret) project ref.
  */
 export function resolveStagingTarget(env = {}) {
@@ -211,7 +211,7 @@ export function buildCanonicalBindingSchema(manifestEntry, codeContract = null) 
   }
   if (readiness !== "resolved") {
     return fail(`${key}: declares ${positions.length} variable(s) but binding_readiness is `
-      + `"${readiness}" — source keys are not proven from repository call sites, so a canonical `
+      + `"${readiness}" â€” source keys are not proven from repository call sites, so a canonical `
       + "variables_schema cannot be derived without fabricating it.");
   }
 
@@ -220,7 +220,7 @@ export function buildCanonicalBindingSchema(manifestEntry, codeContract = null) 
   // manifest edit alone can therefore never unlock a seed.
   if (!codeContract) {
     return fail(`${key}: the manifest says resolved, but no canonical code contract was supplied `
-      + "for it — a docs-only source_key is never accepted.");
+      + "for it â€” a docs-only source_key is never accepted.");
   }
   if (codeContract.templateKey !== key) return fail(`${key}: code contract is for a different template.`);
   if (codeContract.bindingVersion !== 1) return fail(`${key}: code contract binding version is not 1.`);
@@ -266,6 +266,27 @@ export function resolveMode(argv = []) {
   return { ok: true, mode: "DRY_RUN", network: false, writes: false };
 }
 
+/**
+ * Canonical semantic JSON equality for values round-tripped through PostgreSQL jsonb.
+ *
+ * jsonb preserves JSON meaning but does NOT preserve object-key insertion order.
+ * Arrays remain ordered because array order is semantically significant.
+ */
+export function canonicalJsonValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, canonicalJsonValue(value[key])])
+    );
+  }
+  return value;
+}
+
+export function jsonSemanticEqual(left, right) {
+  return JSON.stringify(canonicalJsonValue(left ?? null))
+    === JSON.stringify(canonicalJsonValue(right ?? null));
+}
+
 /** Classify an existing mapping row against the intended seed row. */
 export function classifyExistingMapping(existing, intended) {
   if (!existing) return { outcome: "MISSING" };
@@ -278,7 +299,7 @@ export function classifyExistingMapping(existing, intended) {
     && existing.channel === intended.channel
     && existing.version === intended.version
     && (existing.provider_category ?? null) === intended.provider_category
-    && JSON.stringify(existing.variables_schema ?? null) === JSON.stringify(intended.variables_schema);
+    && jsonSemanticEqual(existing.variables_schema, intended.variables_schema);
   if (!same) return { outcome: "CONFLICT", reason: SeedFailure.MAPPING_CONFLICT };
   return { outcome: "ALREADY_PRESENT_INACTIVE" };
 }
@@ -316,7 +337,7 @@ export function sanitizeForEvidence(value) {
 export const sha256 = (s) => createHash("sha256").update(s).digest("hex");
 
 // ===========================================================================
-// RUNTIME — read-only preflight, cross-process attestation, controlled execute.
+// RUNTIME â€” read-only preflight, cross-process attestation, controlled execute.
 //
 // Every external effect goes through an injected PORT (deps.db, deps.meta,
 // deps.store, deps.now). The CLI wires the real Supabase/fetch adapters; the
@@ -342,13 +363,13 @@ export function buildMappingRow(seed, version, variablesSchema) {
 
 
 // ===========================================================================
-// QF-MVP-40.12-R3 — external index proof, whole-set mapping scan.
+// QF-MVP-40.12-R3 â€” external index proof, whole-set mapping scan.
 // ===========================================================================
 
 /**
  * The exact index definitions the seed depends on. The row-level unique index is the
  * deterministic conflict target; the PARTIAL one makes two competing active mappings
- * structurally impossible. Both must be proven — never assumed, never permanently
+ * structurally impossible. Both must be proven â€” never assumed, never permanently
  * excepted.
  */
 export const REQUIRED_INDEXES = Object.freeze([
@@ -379,7 +400,7 @@ export function indexProofDigest(proof) {
 /**
  * Verify a FRESH external index proof.
  *
- * PostgREST cannot read pg_indexes, and this phase may add no RPC, DDL or migration —
+ * PostgREST cannot read pg_indexes, and this phase may add no RPC, DDL or migration â€”
  * so the proof is produced out of band by direct read-only SQL and handed in by path.
  * It is deliberately NOT a standing exception: it expires, it is pinned into the
  * attestation, and --execute re-verifies it. A missing, expired, future-dated,
@@ -399,7 +420,7 @@ export function verifyIndexProof(proof, opts = {}) {
   if (typeof proof.nonce !== "string" || proof.nonce.length === 0) return bad("missing nonce");
 
   if (typeof proof.proof_sha256 !== "string" || proof.proof_sha256 !== indexProofDigest(proof)) {
-    return bad("digest mismatch — the proof was altered after it was issued");
+    return bad("digest mismatch â€” the proof was altered after it was issued");
   }
   const t = now();
   if (typeof proof.issued_at_ms !== "number" || typeof proof.expires_at_ms !== "number") {
@@ -427,7 +448,7 @@ export function verifyIndexProof(proof, opts = {}) {
 }
 
 /**
- * WHOLE-SET scan across every row for the eight keys — not just the canonical tuple.
+ * WHOLE-SET scan across every row for the eight keys â€” not just the canonical tuple.
  * An active row on ANOTHER version or language, a duplicate tuple, an extra
  * non-canonical row, a populated remote id or a non-approved row would all be invisible
  * to a per-tuple check, yet any of them makes the seed unsafe.
@@ -462,7 +483,7 @@ export function scanMappingSet(rows, canonicalByKey) {
     if ((r.provider_category ?? null) !== canonical.provider_category) {
       return bad(SeedFailure.MAPPING_CONFLICT, `${r.template_key}: category differs`);
     }
-    if (JSON.stringify(r.variables_schema ?? null) !== JSON.stringify(canonical.variables_schema)) {
+    if (!jsonSemanticEqual(r.variables_schema, canonical.variables_schema)) {
       return bad(SeedFailure.MAPPING_CONFLICT, `${r.template_key}: variables_schema differs`);
     }
   }
@@ -683,7 +704,7 @@ export async function runControlledExecute(deps) {
     const row = {
       provider_key: PROVIDER_KEY,
       channel: CHANNEL,
-      display_name: "QuickFurno Meta WhatsApp Cloud — Staging",
+      display_name: "QuickFurno Meta WhatsApp Cloud â€” Staging",
       business_account_reference: deps.wabaRef,
       phone_number_reference: deps.phoneRef,
       ...REQUIRED_DISABLED_ACCOUNT_STATE,
@@ -713,7 +734,7 @@ export async function runControlledExecute(deps) {
   const after = await deps.db.selectMappings(SEED_SET.map((t) => t.key));
   const mineAfter = after.filter((r) => r.provider_key === PROVIDER_KEY && r.channel === CHANNEL
     && SEED_SET.some((t) => t.key === r.template_key));
-  // Exactly eight rows in total — an extra version or language row is a failure, not noise.
+  // Exactly eight rows in total â€” an extra version or language row is a failure, not noise.
   if (mineAfter.length !== SEED_SET.length) {
     return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "total " + mineAfter.length };
   }
@@ -732,7 +753,7 @@ export async function runControlledExecute(deps) {
     if (r.provider_category !== PROVIDER_CATEGORY) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "category" };
     if (r.language !== canonical.language) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "language" };
     if (r.version !== canonical.version) return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "version" };
-    if (JSON.stringify(r.variables_schema ?? null) !== JSON.stringify(canonical.variables_schema)) {
+    if (!jsonSemanticEqual(r.variables_schema, canonical.variables_schema)) {
       return { ok: false, reason: SeedFailure.READBACK_MISMATCH, detail: "variables_schema" };
     }
   }
@@ -776,7 +797,7 @@ if (isDirect) {
   console.log(`Phase          : QF-MVP-40.12`);
   console.log(`Mode           : ${mode}`);
   console.log(`Authorized ref : ${AUTHORIZED_STAGING_REF} (STAGING)`);
-  console.log(`Forbidden refs : production, jarvis — both rejected by exact ref`);
+  console.log(`Forbidden refs : production, jarvis â€” both rejected by exact ref`);
   console.log(`Templates      : ${SEED_SET.length}`);
   console.log("");
 
@@ -793,7 +814,7 @@ if (isDirect) {
 
   // The SECOND authority: the typed contract that owns these source keys. It is loaded
   // through the repository's existing TS loader, never duplicated as a hand-maintained
-  // list here — a copy in the operator would be one more thing that can silently drift.
+  // list here â€” a copy in the operator would be one more thing that can silently drift.
   const contracts = (await import("../../../lib/communication/businessTemplateVariables.ts"))
     .BUSINESS_TEMPLATE_CONTRACTS;
 
@@ -807,7 +828,7 @@ if (isDirect) {
   console.log("");
 
   if (unproven.length > 0) {
-    console.error("BLOCKED — CANONICAL BINDING SCHEMA UNPROVEN");
+    console.error("BLOCKED â€” CANONICAL BINDING SCHEMA UNPROVEN");
     console.error("");
     for (const d of unproven) console.error(`  - ${d}`);
     console.error("");
@@ -841,7 +862,7 @@ if (isDirect) {
     console.error("No Supabase client was constructed. No database request was issued.");
     process.exit(2);
   }
-  console.log(`Target ref     : ${target.projectRef} (${target.environment}) — identity proven`);
+  console.log(`Target ref     : ${target.projectRef} (${target.environment}) â€” identity proven`);
   console.log("");
 
   // ---- Real adapters, constructed ONLY after the fence passed --------------
@@ -859,7 +880,7 @@ if (isDirect) {
 
   const db = {
     async proveSchema() {
-      // A bounded probe per table: readable ⇒ present with the columns we select.
+      // A bounded probe per table: readable â‡’ present with the columns we select.
       for (const [t, cols] of [
         [MAPPINGS, "template_key,channel,provider_key,language,version,provider_template_name,provider_template_id,provider_category,approval_status,variables_schema,is_active"],
         [ACCOUNTS, "id,provider_key,channel,readiness_status,configuration_status,webhook_status,health_status,billing_status,business_account_reference,phone_number_reference"],
@@ -956,7 +977,7 @@ if (isDirect) {
     },
     async getTemplateByName(name, expectedPayload) {
       // `components` is REQUESTED: without it there is nothing to compare, and the
-      // previous adapter returned semanticMatch:true unconditionally — a claim it had no
+      // previous adapter returned semanticMatch:true unconditionally â€” a claim it had no
       // basis for. Fields mirror the submission operator's reconcile read.
       const res = await fetch(
         `${graph}/${process.env.QF_META_WABA_ID}/message_templates`
@@ -971,7 +992,7 @@ if (isDirect) {
       if (!Array.isArray(t.components) || t.components.length === 0) {
         return { ok: false, reason: SeedFailure.META_TEMPLATE_UNRESOLVED };
       }
-      // The REAL comparator already used by the submission/reconciliation operator —
+      // The REAL comparator already used by the submission/reconciliation operator â€”
       // exact body text, component order and buttons. No weaker local duplicate.
       const semanticMatch = templatesAreIdentical(
         { name: t.name, language: t.language, category: t.category, components: t.components },
@@ -1035,12 +1056,12 @@ if (isDirect) {
   if (mode === "PREFLIGHT_READONLY") {
     const r = await runReadOnlyPreflight(deps);
     if (!r.ok) {
-      console.error(`PREFLIGHT BLOCKED: ${r.reason}${r.detail ? ` — ${sanitizeForEvidence(String(r.detail))}` : ""}`);
+      console.error(`PREFLIGHT BLOCKED: ${r.reason}${r.detail ? ` â€” ${sanitizeForEvidence(String(r.detail))}` : ""}`);
       console.error("ZERO writes were performed.");
       process.exit(4);
     }
     await store.write(r.payload);
-    console.log("READ-ONLY PREFLIGHT PASSED — zero writes performed.");
+    console.log("READ-ONLY PREFLIGHT PASSED â€” zero writes performed.");
     console.log(`  account classification : ${r.payload.account_classification}`);
     for (const m of r.payload.mapping_plan) console.log(`  ${m.key.padEnd(30)} ${m.outcome}`);
     console.log(`  runtime policy         : non-sendable`);
@@ -1054,11 +1075,11 @@ if (isDirect) {
   // ---- EXECUTE: reruns the full preflight, then at most two writes ---------
   const r = await runControlledExecute(deps);
   if (!r.ok) {
-    console.error(`EXECUTE BLOCKED: ${r.reason}${r.detail ? ` — ${sanitizeForEvidence(String(r.detail))}` : ""}`);
+    console.error(`EXECUTE BLOCKED: ${r.reason}${r.detail ? ` â€” ${sanitizeForEvidence(String(r.detail))}` : ""}`);
     console.error("No retry is attempted. Inspect the sanitized reason before re-running.");
     process.exit(5);
   }
-  console.log("STAGING SEED COMPLETE — all mappings INACTIVE.");
+  console.log("STAGING SEED COMPLETE â€” all mappings INACTIVE.");
   console.log(`  provider account   : ${r.account_outcome} (disabled)`);
   for (const m of r.mapping_outcomes) console.log(`  ${m.key.padEnd(30)} ${m.outcome}`);
   console.log(`  mapping count      : ${r.mapping_count}`);

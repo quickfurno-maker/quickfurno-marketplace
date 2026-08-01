@@ -1,5 +1,5 @@
 // ============================================================================
-// QF-MVP-40.12 — staging inactive-mapping seed operator validator.  OFFLINE.
+// QF-MVP-40.12 â€” staging inactive-mapping seed operator validator.  OFFLINE.
 //
 // Drives the operator's exported PURE helpers and statically audits its source. It
 // opens no database connection, calls no Meta endpoint, sends nothing and reads no
@@ -18,6 +18,7 @@ import {
   runReadOnlyPreflight, runControlledExecute, verifyAttestation,
   verifyIndexProof, indexProofDigest, REQUIRED_INDEXES, INDEX_PROOF_TABLE,
   scanMappingSet, verifyInternalTemplates, isInsideRepository,
+  canonicalJsonValue, jsonSemanticEqual,
 } from "./seed-meta-staging-inactive-mappings.mjs";
 // The REAL comparator, so the semantic tests exercise production behaviour.
 import { templatesAreIdentical } from "./submit-meta-templates.mjs";
@@ -59,7 +60,7 @@ const varTemplateProven = { internal_template_key: "lead_received",
   binding_contract: { binding_readiness: "resolved" } };
 /**
  * QF-MVP-40.12-R1: the manifest is only ONE authority. The typed code contract is the
- * other, and buildCanonicalBindingSchema now requires both to agree — so a docs-only
+ * other, and buildCanonicalBindingSchema now requires both to agree â€” so a docs-only
  * source_key can never unlock a seed.
  */
 const CODE_CONTRACT = { templateKey: "lead_received", bindingVersion: 1,
@@ -102,7 +103,7 @@ const R = {
     && resolveStagingTarget({ ...GOOD_ENV, QF_META_PHONE_NUMBER_ID: "12" }).ok === false,
   /**
    * The generic public URL must never be a fallback. The bare-name check is anchored so
-   * it cannot be satisfied — or tripped — by the phase-scoped QF_STAGING_ variables,
+   * it cannot be satisfied â€” or tripped â€” by the phase-scoped QF_STAGING_ variables,
    * whose names legitimately CONTAIN "SUPABASE_SERVICE_ROLE_KEY" as a substring.
    */
   noPublicUrlFallback: () => {
@@ -201,7 +202,7 @@ const R = {
   /**
    * No send-capable value may be WRITTEN. The operator legitimately NAMES those values
    * once, inside FORBIDDEN_ACCOUNT_STATE, so the check asserts each appears exactly once
-   * and only after that declaration — the same shape as the forbidden-project-ref fence.
+   * and only after that declaration â€” the same shape as the forbidden-project-ref fence.
    * Scanning for the bare literal would flag the very constant that forbids it.
    */
   forbiddenStateNeverWritten: () => {
@@ -259,7 +260,7 @@ const R = {
   noRuntimePolicyWrite: () => !/communication_runtime_polic\w*[\s\S]{0,80}(insert|update|upsert)/i.test(exec),
   noCanaryWrite: () => !/canary[\s\S]{0,60}(insert|update|upsert)/i.test(exec),
   /**
-   * A bearer token MUST be interpolated into the Authorization header — banning all
+   * A bearer token MUST be interpolated into the Authorization header â€” banning all
    * interpolation would forbid the operator from working. What must never happen is a
    * credential reaching a LOG. So: no secret in any console call, and an interpolated
    * secret is tolerated only inside an Authorization/Bearer context.
@@ -269,7 +270,7 @@ const R = {
    * nevertheless required for the operator to work at all, and both send the value to
    * Meta rather than to any output: the access token in an Authorization header, and the
    * WABA id in the Graph URL path that addresses the account. The ACCESS TOKEN is held to
-   * the stricter rule — header only, never in a URL.
+   * the stricter rule â€” header only, never in a URL.
    */
   noCredentialEcho: () => {
     const secrets = ["QF_STAGING_SUPABASE_SERVICE_ROLE_KEY", "QF_META_ACCESS_TOKEN",
@@ -493,7 +494,7 @@ for (const [n, fn] of MUT) add(n, fn() === false);
 
 
 // ===========================================================================
-// QF-MVP-40.12-R2 — RUNTIME tests. Every external effect is an injected FAKE:
+// QF-MVP-40.12-R2 â€” RUNTIME tests. Every external effect is an injected FAKE:
 // this suite opens no socket, no database connection and reads no credential.
 // ===========================================================================
 
@@ -600,7 +601,7 @@ async function goodPreflight(over = {}) {
 const RUNTIME = [
   // ---- The defect this phase repairs -------------------------------------
   ["R1  the unconditional PREFLIGHT_NOT_SATISFIED refusal is gone", () =>
-    !/PREFLIGHT_NOT_SATISFIED — live staging execution/.test(src)],
+    !/PREFLIGHT_NOT_SATISFIED â€” live staging execution/.test(src)],
   ["R2  a real preflight entry point exists and is reachable", () =>
     /mode === "PREFLIGHT_READONLY"/.test(exec) && /runReadOnlyPreflight\(deps\)/.test(exec)],
   ["R3  a real execute entry point exists and is reachable", () =>
@@ -861,7 +862,7 @@ for (const [n, fn] of RUNTIME) {
 
 
 // ===========================================================================
-// QF-MVP-40.12-R3 — index proof, real Meta semantics, whole-set scan.
+// QF-MVP-40.12-R3 â€” index proof, real Meta semantics, whole-set scan.
 // Still entirely offline: every effect is an injected fake.
 // ===========================================================================
 
@@ -1131,11 +1132,87 @@ for (const [n, fn] of R3) {
   else add(n, out);
 }
 
+
+// ===========================================================================
+// QF-MVP-40.12-R4 — PostgreSQL jsonb semantic readback.
+// Object-key order is not semantic; array order and values remain semantic.
+// ===========================================================================
+const reorderJsonbObjectKeys = (value) => {
+  if (Array.isArray(value)) return value.map(reorderJsonbObjectKeys);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value).reverse().map((key) => [key, reorderJsonbObjectKeys(value[key])])
+    );
+  }
+  return value;
+};
+
+const R4 = [
+  ["Y1 jsonb object-key reorder is semantically equal", () => {
+    const a = { bindingVersion: 1, bindings: [] };
+    const b = { bindings: [], bindingVersion: 1 };
+    return jsonSemanticEqual(a, b)
+      && JSON.stringify(canonicalJsonValue(a)) === JSON.stringify(canonicalJsonValue(b));
+  }],
+  ["Y2 nested object-key reorder passes classification and whole-set scan", () => {
+    const intendedR4 = {
+      ...intended,
+      variables_schema: {
+        bindingVersion: 1,
+        bindings: [{ component: "body", position: 1, sourceKey: "client_name", parameterType: "text" }],
+      },
+    };
+    const reordered = reorderJsonbObjectKeys(intendedR4.variables_schema);
+    const classified = classifyExistingMapping(
+      existingRow({ variables_schema: reordered }),
+      intendedR4
+    );
+    const seed = SEED_SET.find((t) => t.key === "lead_received");
+    const canonical = new Map([[
+      "lead_received",
+      buildMappingRow(seed, VERSION, intendedR4.variables_schema),
+    ]]);
+    const scanned = scanMappingSet([{
+      ...buildMappingRow(seed, VERSION, reordered),
+      variables_schema: reordered,
+    }], canonical);
+    return classified.outcome === "ALREADY_PRESENT_INACTIVE"
+      && scanned.ok === true;
+  }],
+  ["Y3 execute readback accepts PostgreSQL-style object-key reorder", async () => {
+    const pre = await runReadOnlyPreflight(makeDeps(makeFakes()));
+    const f = makeFakes({ stored: pre.payload });
+    const original = f.db.insertMappings;
+    f.db.insertMappings = async (rows) =>
+      original(rows.map((row) => ({
+        ...row,
+        variables_schema: reorderJsonbObjectKeys(row.variables_schema),
+      })));
+    const r = await runControlledExecute(makeDeps(f));
+    return r.ok === true && r.mapping_count === 8 && r.active_mapping_count === 0;
+  }],
+  ["Y4 array order and actual value drift still fail closed", () =>
+    jsonSemanticEqual({ bindings: [1, 2] }, { bindings: [2, 1] }) === false
+    && jsonSemanticEqual(
+      { bindingVersion: 1, bindings: [] },
+      { bindingVersion: 2, bindings: [] }
+    ) === false],
+  ["Y5 raw variables_schema JSON.stringify comparison is gone", () =>
+    !/JSON\.stringify\([^)]*variables_schema/.test(exec)
+    && /jsonSemanticEqual\(r\.variables_schema,\s*canonical\.variables_schema\)/.test(exec)],
+];
+
+for (const [n, fn] of R4) {
+  const out = fn();
+  if (out && typeof out.then === "function") add(n, await out);
+  else add(n, out);
+}
+
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${!r.ok && r.detail ? `  [${r.detail}]` : ""}`);
-console.log(`\nSeed set: ${SEED_SET.length} · target: ${AUTHORIZED_STAGING_REF} (STAGING) `
-  + `· forbidden refs rejected: production, jarvis`);
+console.log(`\nSeed set: ${SEED_SET.length} Â· target: ${AUTHORIZED_STAGING_REF} (STAGING) `
+  + `Â· forbidden refs rejected: production, jarvis`);
 console.log(`Summary: ${results.length - failed.length} passed, ${failed.length} failed `
   + `(rules: ${RULES.length}, mutation self-tests: ${MUT.length}, `
-  + `runtime tests: ${RUNTIME.length}, R3 tests: ${R3.length}).`);
+  + `runtime tests: ${RUNTIME.length}, R3 tests: ${R3.length}, R4 tests: ${R4.length}).`);
 process.exit(failed.length === 0 ? 0 : 1);

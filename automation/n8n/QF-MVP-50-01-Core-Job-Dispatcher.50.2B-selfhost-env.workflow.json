@@ -168,56 +168,12 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.QF_CORE_STAGING_BASE_URL.replace(/\\/$/, '') + '/api/internal/automation/n8n/claim' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "content-type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-qf-transport-version",
-              "value": "1"
-            },
-            {
-              "name": "x-qf-request-id",
-              "value": "={{ $json.requestId }}"
-            },
-            {
-              "name": "x-qf-timestamp",
-              "value": "={{ String($json.timestamp) }}"
-            },
-            {
-              "name": "x-qf-body-sha256",
-              "value": "={{ $json.bodySha256 }}"
-            },
-            {
-              "name": "x-qf-signature",
-              "value": "={{ 'v1=' + $json.requestHmac }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ $json.rawBody }}",
-        "options": {
-          "timeout": 10000,
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true,
-              "responseFormat": "text"
-            }
-          }
-        }
+        "jsCode": "// QF-MVP-50.2B-R1 signed transport. Replaces the HTTP Request node, whose raw-body +\n// text + full-response combination serialises a live stream on n8n 2.32.7.\n// Request signing stays upstream and response verification stays downstream: this node\n// only performs the exchange and emits plain, fully-serialisable data.\nconst items = $input.all();\nif (items.length !== 1) throw new Error('QF_50_2B_TRANSPORT_ITEM_COUNT_INVALID');\nconst input = items[0].json;\nif (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('QF_50_2B_TRANSPORT_INPUT_INVALID');\n\n// Reads that may hit a throwing accessor never escape un-sanitized.\nconst pick = (o, k) => { try { return o === null || o === undefined ? undefined : o[k]; } catch (_) { return undefined; } };\n// Primitives only. A non-scalar is dropped, never stringified into '[object Object]'.\nconst scalar = (v) => (typeof v === 'string' ? v : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null);\n\nconst requestId = scalar(input.requestId);\nconst timestamp = scalar(input.timestamp);\nconst bodySha256 = scalar(input.bodySha256);\nconst requestHmac = scalar(input.requestHmac);\nif (!requestId || !timestamp || !bodySha256 || !requestHmac) throw new Error('QF_50_2B_TRANSPORT_IDENTITY_INVALID');\nif (/[\\r\\n\\u0000]/.test(requestId + timestamp + bodySha256 + requestHmac)) throw new Error('QF_50_2B_TRANSPORT_IDENTITY_UNSAFE');\n\n// rawBody is transmitted byte-for-byte: bodySha256 and the upstream signature are bound to\n// these exact bytes. The two guards below only refuse inputs the HTTP layer would silently\n// reshape (edge whitespace is trimmed, non-JSON is re-encoded) under a JSON content type.\nconst rawBody = input.rawBody;\nif (typeof rawBody !== 'string' || rawBody.length === 0) throw new Error('QF_50_2B_TRANSPORT_RAW_BODY_INVALID');\nif (rawBody !== rawBody.trim()) throw new Error('QF_50_2B_TRANSPORT_RAW_BODY_UNSTABLE');\ntry { JSON.parse(rawBody); } catch (_) { throw new Error('QF_50_2B_TRANSPORT_RAW_BODY_NOT_JSON'); }\n\nconst baseUrl = String($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nif (!/^https:\\/\\//.test(baseUrl)) throw new Error('QF_50_2B_TRANSPORT_BASE_URL_INVALID');\nconst url = baseUrl + '/api/internal/automation/n8n/claim';\n\nlet httpResponse;\ntry {\n  httpResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: url,\n    headers: {\n      'content-type': 'application/json',\n      'x-qf-transport-version': '1',\n      'x-qf-request-id': requestId,\n      'x-qf-timestamp': timestamp,\n      'x-qf-body-sha256': bodySha256,\n      'x-qf-signature': 'v1=' + requestHmac\n    },\n    body: rawBody,\n    timeout: 10000,\n    returnFullResponse: true,\n    encoding: 'text',\n    json: false,\n    ignoreHttpStatusErrors: true,\n    disableFollowRedirect: true\n  });\n} catch (error) {\n  // Only a token-shaped code is surfaced. The original error object is discarded here:\n  // it carries the request/agent graph that produced the circular-structure failure.\n  const raw = pick(error, 'code');\n  const code = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'UNKNOWN';\n  throw new Error('QF_50_2B_TRANSPORT_CALL_FAILED_' + code);\n}\n\nif (!httpResponse || typeof httpResponse !== 'object' || Array.isArray(httpResponse)) throw new Error('QF_50_2B_TRANSPORT_RESULT_INVALID');\nconst statusCode = pick(httpResponse, 'statusCode');\nconst body = pick(httpResponse, 'body');\nconst headersIn = pick(httpResponse, 'headers');\nif (!Number.isInteger(statusCode)) throw new Error('QF_50_2B_TRANSPORT_STATUS_INVALID');\nif (statusCode >= 300 && statusCode < 400) throw new Error('QF_50_2B_TRANSPORT_REDIRECT_REFUSED');\nif (typeof body !== 'string') throw new Error('QF_50_2B_TRANSPORT_BODY_NOT_STRING');\nif (!headersIn || typeof headersIn !== 'object' || Array.isArray(headersIn)) throw new Error('QF_50_2B_TRANSPORT_HEADERS_INVALID');\n\n// Header values are copied out by value into a fresh object. A container that exposes no own\n// enumerable entries is read through its iterator instead of degrading to an empty map.\nlet entries = Object.entries(headersIn);\nif (entries.length === 0 && typeof pick(headersIn, 'entries') === 'function') {\n  try { entries = Array.from(headersIn.entries()); } catch (_) { entries = []; }\n}\nconst headers = {};\nfor (const pair of entries) {\n  const name = String(pair[0]).toLowerCase();\n  // A '__proto__' header name would assign through the prototype instead of landing on the\n  // map, so it is refused outright. Core never signs one. First value wins for repeats.\n  if (name === '__proto__') continue;\n  if (Object.prototype.hasOwnProperty.call(headers, name)) continue;\n  const value = pair[1];\n  const normalized = Array.isArray(value) ? value.map(scalar).filter((x) => x !== null) : scalar(value);\n  if (normalized === null) continue;\n  headers[name] = normalized;\n}\nif (Object.keys(headers).length === 0) throw new Error('QF_50_2B_TRANSPORT_HEADERS_EMPTY');\n\nconst statusMessage = scalar(pick(httpResponse, 'statusMessage')) || '';\n\n// Only these four plain fields leave this node. No request, socket, agent, config or client\n// reference is carried forward, so nothing downstream can hold an unserialisable object.\nreturn [{ json: { statusCode: statusCode, body: body, headers: headers, statusMessage: statusMessage } }];\n"
       },
       "id": "3ef39dfe-80fb-4624-a502-0e0bc1f914f3",
       "name": "POST Signed Claim to Core — STAGING ONLY",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         500,
         -170

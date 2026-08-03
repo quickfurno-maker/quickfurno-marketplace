@@ -37,10 +37,18 @@ export const ACTIVE_DISPATCH_CHANNEL: CommunicationChannel = "whatsapp";
 
 export type CommunicationLane = "authentication" | "business";
 
+/**
+ * `lead` (QF-MVP-50.2C) is a standalone communication recipient REFERENCE: a durable
+ * pointer at `public.leads.id` from which Core can resolve the authoritative contact
+ * destination at dispatch. It is deliberately NOT equated with `client`: a lead is not
+ * an authenticated principal, its phone does not prove account ownership, and it never
+ * becomes a consent principal.
+ */
 export type CommunicationRecipientType =
   | "client"
   | "vendor"
   | "admin"
+  | "lead"
   | "integration"
   | "system";
 

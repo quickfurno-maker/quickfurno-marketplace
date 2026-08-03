@@ -9,7 +9,9 @@ on:
       - main
   push:
     branches:
-      - mvp/qf-mvp-50-secure-n8n-handshake-v1
+      # Durable QF-MVP-50 feature-branch glob. The previous single-branch filter
+      # went stale the moment that branch merged, silently disabling push runs.
+      - 'mvp/qf-mvp-50-*'
 
 permissions:
   contents: read
@@ -88,6 +90,9 @@ jobs:
 
       - name: QF-MVP-50.2B validator
         run: npm run test:mvp:50-2b
+
+      - name: QF-MVP-50.2C validator
+        run: npm run test:mvp:50-2c
 
       - name: Typecheck
         run: npm run typecheck

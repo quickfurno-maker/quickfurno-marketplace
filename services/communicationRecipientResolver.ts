@@ -46,6 +46,8 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
           return await this.resolveVendor(id);
         case "admin":
           return await this.resolveAdmin(id);
+        case "lead":
+          return await this.resolveLead(id);
         default:
           // Unreachable: validateRecipientReference already rejected these.
           return failRecipientResolution(RecipientResolutionError.RECIPIENT_TYPE_UNSUPPORTED);
@@ -53,6 +55,27 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
     } catch {
       return failRecipientResolution(RecipientResolutionError.RECIPIENT_LOOKUP_FAILED);
     }
+  }
+
+  /**
+   * QF-MVP-50.2C. `public.leads.phone` is raw contact text captured at enquiry time —
+   * it is NOT stored normalized — so it is canonicalised at read and never written back.
+   *
+   * Deliberately absent: any phone→`client_accounts` lookup, ownership inference, fuzzy
+   * matching, vendor fallback, or durable plaintext copy. A lead is a contact reference,
+   * not a proof of account ownership, so a match by number would be a wrong-subject
+   * decision. Anything unresolvable fails closed.
+   */
+  private async resolveLead(leadId: string): Promise<Result<string>> {
+    const { data, error } = await adminClient()
+      .from("leads")
+      .select("phone")
+      .eq("id", leadId)
+      .maybeSingle();
+
+    if (error) return failRecipientResolution(RecipientResolutionError.RECIPIENT_LOOKUP_FAILED);
+    if (!data) return failRecipientResolution(RecipientResolutionError.RECIPIENT_NOT_FOUND);
+    return normalizeResolvedDestination((data as { phone: string | null }).phone);
   }
 
   /** Phase 5A `client_accounts.phone_e164` is already the normalized identity. */

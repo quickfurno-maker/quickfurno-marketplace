@@ -7,6 +7,12 @@
 // Pure module: no database, network, environment, provider or clock I/O.
 // ============================================================================
 
+import {
+  getWorkflowFamilyForAction,
+  isAutomationActionType,
+  type AutomationWorkflowFamily,
+} from "./actionRegistry";
+
 export const AUTOMATION_CONTRACT_VERSION = 1 as const;
 
 export const AUTOMATION_REQUEST_SOURCES = [
@@ -85,6 +91,12 @@ export interface AutomationJobEnvelope {
   authorizedAt: string;
   authorizedBy: AutomationAuditActor;
   safeContext: Readonly<Record<string, unknown>>;
+  /**
+   * Derived by Core from the action registry — the single source of truth. There is
+   * deliberately no caller argument and no safeContext override: n8n receives the
+   * family, it never asserts one, and it never parses the actionType prefix itself.
+   */
+  workflowFamily: AutomationWorkflowFamily;
 }
 
 export interface AutomationExecutionResult {
@@ -263,6 +275,11 @@ export function buildAutomationJobEnvelope(
   if (!isValidAuditActor(authorized.authorization.authorizedBy)) {
     throw new Error("INVALID_AUTHORIZATION_ACTOR");
   }
+  // The family is only derivable for a REGISTERED action, so an unregistered one
+  // cannot produce an envelope at all rather than defaulting to some family.
+  if (!isAutomationActionType(authorized.request.actionType)) {
+    throw new Error("AUTOMATION_ACTION_TYPE_NOT_REGISTERED");
+  }
 
   return Object.freeze({
     contractVersion: AUTOMATION_CONTRACT_VERSION,
@@ -277,6 +294,7 @@ export function buildAutomationJobEnvelope(
     authorizedAt: authorized.authorization.authorizedAt,
     authorizedBy: Object.freeze({ ...authorized.authorization.authorizedBy }),
     safeContext: deepFreezeCopy(authorized.request.safeContext),
+    workflowFamily: getWorkflowFamilyForAction(authorized.request.actionType),
   });
 }
 

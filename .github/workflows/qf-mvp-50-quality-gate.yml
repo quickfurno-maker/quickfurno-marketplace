@@ -30,6 +30,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          # The QF-MVP-40.10 containment guards prove a claim over a pinned historical commit
+          # range. A depth-1 checkout would not contain those ancestor objects and the guards
+          # would fail closed, so the full history is required.
+          fetch-depth: 0
 
       - name: Verify exact checked-out SHA
         run: |
@@ -52,6 +56,23 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # QF-MVP-40 provider/template authority is what the 50.x orchestration consumes, so the
+      # exact-head gate proves it too. All offline: no secrets, no Meta, no Supabase.
+      - name: QF-MVP-40.4 template catalogue
+        run: npm run test:mvp:40-4
+
+      - name: QF-MVP-40.10A Meta template contract
+        run: npm run test:mvp:40-10a
+
+      - name: QF-MVP-40.10B Wave 1 readiness
+        run: node scripts/mvp/communication/validate-meta-wave1-readiness.mjs
+
+      - name: QF-MVP-40.11 inactive mapping readiness
+        run: npm run test:mvp:40-11
+
+      - name: QF-MVP-40.12-R1 business template bindings
+        run: npm run test:mvp:40-12-r1
 
       - name: QF-MVP-50.1A validator
         run: npm run test:mvp:50-1a

@@ -444,6 +444,139 @@ record("I08 forward-only: no historical migration was edited",
 record("I09 migration is transactional", /^begin;/m.test(migrationCode) && /^commit;/m.test(migrationCode));
 
 // ---------------------------------------------------------------------------
+// I-R1. FAIL-CLOSED CONSTRAINT DISCOVERY (QF-MVP-50.2C-R1)
+//
+// Each rule is expressed as a predicate over migration SQL text so the same rule can be
+// re-run against a deliberately mutated copy below. A rule that still passes on the
+// mutant is not load-bearing and is reported as such.
+// ---------------------------------------------------------------------------
+const MIG_RULES = {
+  resolvesRelationStructurally: (sql) =>
+    /to_regclass\('public\.communication_messages'\)/.test(sql) &&
+    /v_relid\s+is\s+null/.test(sql),
+  resolvesColumnStructurally: (sql) =>
+    /pg_attribute/.test(sql) &&
+    /attname\s*=\s*'recipient_type'/.test(sql) &&
+    /not\s+att\.attisdropped/.test(sql) &&
+    /attnum\s*>\s*0/.test(sql),
+  matchesConstraintByConkey: (sql) =>
+    /con\.conrelid\s*=\s*v_relid/.test(sql) &&
+    /con\.contype\s*=\s*'c'/.test(sql) &&
+    /con\.conkey\s*=\s*array\[\s*v_recipient_attnum\s*\]::smallint\[\]/.test(sql),
+  notTextMatchAuthority: (sql) => !/pg_get_constraintdef/.test(sql),
+  noLimitOne: (sql) => !/\blimit\s+1\b/i.test(sql),
+  requiresExactlyOne: (sql) =>
+    /v_constraint_count\s*=\s*0/.test(sql) && /v_constraint_count\s*>\s*1/.test(sql),
+  raisesOnMissing: (sql) => /QF_MVP_50_2C_RECIPIENT_TYPE_CONSTRAINT_MISSING/.test(sql),
+  raisesOnAmbiguous: (sql) => /QF_MVP_50_2C_RECIPIENT_TYPE_CONSTRAINT_AMBIGUOUS/.test(sql),
+  raisesOnMissingColumn: (sql) => /QF_MVP_50_2C_RECIPIENT_TYPE_COLUMN_MISSING/.test(sql),
+  noPermissiveSkip: (sql) => !/if\s+v_constraint\s+is\s+not\s+null\s+then/i.test(sql),
+  noSwallowingHandler: (sql) => !/\bexception\s+when\b/i.test(sql),
+  dropOnlyAfterProof: (sql) => {
+    const proof = sql.search(/v_constraint_count\s*>\s*1/);
+    const drop = sql.search(/drop\s+constraint/i);
+    return proof !== -1 && drop !== -1 && proof < drop;
+  },
+  identifierSafeDrop: (sql) => /format\(\s*\n?\s*'alter table public\.communication_messages drop constraint %I'/.test(sql),
+  exactSixValues: (sql) =>
+    /check\s*\(recipient_type in \('client', 'vendor', 'admin', 'lead', 'integration', 'system'\)\)/.test(sql),
+  namedReplacement: (sql) => /add constraint communication_messages_recipient_type_check/.test(sql),
+  noDml: (sql) => !/\b(insert\s+into|update\s+public\.|delete\s+from|truncate|copy\s+public\.)\b/i.test(sql),
+  strictNameFetch: (sql) => /into\s+strict\s+v_constraint/.test(sql),
+  locksBeforeProof: (sql) => {
+    const lock = sql.search(/lock\s+table\s+%s\s+in\s+access\s+exclusive\s+mode/i);
+    // Anchor on the ASSIGNMENT, not the DECLARE section where the name first appears.
+    const proof = sql.search(/into\s+v_constraint_count/);
+    return lock !== -1 && proof !== -1 && lock < proof;
+  },
+  schemaQualifiedCatalogues: (sql) =>
+    /pg_catalog\.pg_attribute/.test(sql) && /pg_catalog\.pg_constraint/.test(sql) &&
+    !/\bfrom\s+pg_attribute\b/.test(sql) && !/\bfrom\s+pg_constraint\b/.test(sql),
+  residualCheckPostCondition: (sql) =>
+    /con\.conkey\s*&&\s*array\[\s*v_recipient_attnum\s*\]::smallint\[\]/.test(sql) &&
+    /v_residual_count\s*<>\s*1/.test(sql) &&
+    /QF_MVP_50_2C_RECIPIENT_TYPE_RESIDUAL_CONSTRAINT/.test(sql),
+  postConditionAfterAdd: (sql) => {
+    const add = sql.search(/add constraint communication_messages_recipient_type_check/);
+    // Anchor on the ASSIGNMENT, not the DECLARE section where the name first appears.
+    const post = sql.search(/into\s+v_residual_count/);
+    return add !== -1 && post !== -1 && add < post;
+  },
+};
+const MIG_RULE_LABELS = {
+  resolvesRelationStructurally: "R01 resolves communication_messages via to_regclass and guards null",
+  resolvesColumnStructurally: "R02 resolves recipient_type attnum structurally from pg_attribute",
+  matchesConstraintByConkey: "R03 matches the CHECK by exact single-column conkey",
+  notTextMatchAuthority: "R04 pg_get_constraintdef text matching is no longer the authority",
+  noLimitOne: "R05 no LIMIT 1 anywhere in the migration",
+  requiresExactlyOne: "R06 requires exactly one matching constraint (0 and >1 both handled)",
+  raisesOnMissing: "R07 zero-match raises QF_MVP_50_2C_RECIPIENT_TYPE_CONSTRAINT_MISSING",
+  raisesOnAmbiguous: "R08 multi-match raises QF_MVP_50_2C_RECIPIENT_TYPE_CONSTRAINT_AMBIGUOUS",
+  raisesOnMissingColumn: "R09 missing recipient_type column raises fail-closed",
+  noPermissiveSkip: "R10 no permissive 'if v_constraint is not null then' skip remains",
+  noSwallowingHandler: "R11 no exception handler can swallow the failure and continue",
+  dropOnlyAfterProof: "R12 the drop happens only after the exact-one proof",
+  identifierSafeDrop: "R13 drop uses format('%I', ...) for the identifier",
+  exactSixValues: "R14 replacement CHECK holds exactly the six expected values",
+  namedReplacement: "R15 replacement constraint is explicitly named",
+  noDml: "R16 no INSERT/UPDATE/DELETE/TRUNCATE/COPY",
+  strictNameFetch: "R17 constraint name is fetched with INTO STRICT, never a silent first row",
+  locksBeforeProof: "R18 the relation is locked before the exact-one proof, not after",
+  schemaQualifiedCatalogues: "R19 catalogue reads are schema-qualified against search_path",
+  residualCheckPostCondition: "R20 post-condition proves no residual CHECK still gates recipient_type",
+  postConditionAfterAdd: "R21 the residual post-condition runs after the replacement is added",
+};
+for (const [key, fn] of Object.entries(MIG_RULES)) {
+  record(MIG_RULE_LABELS[key], fn(migrationCode));
+}
+
+// --- mutation self-tests: each mutant must be caught by at least one rule ----
+const MIG_MUTANTS = [
+  ["M01 permissive skip instead of exact-one",
+    (s) => s.replace(/if v_constraint_count = 0 then[\s\S]*?end if;\s*\n\s*if v_constraint_count > 1 then[\s\S]*?end if;/,
+      "if v_constraint is not null then\n    null;\n  end if;")],
+  ["M02 LIMIT 1 reintroduced",
+    (s) => s.replace("and con.conkey = array[v_recipient_attnum]::smallint[];",
+      "and con.conkey = array[v_recipient_attnum]::smallint[]\n   limit 1;")],
+  ["M03 missing-constraint raise removed",
+    (s) => s.replace(/if v_constraint_count = 0 then[\s\S]*?end if;/, "")],
+  ["M04 ambiguous-constraint raise removed",
+    (s) => s.replace(/if v_constraint_count > 1 then[\s\S]*?end if;/, "")],
+  ["M05 back to pg_get_constraintdef text matching",
+    (s) => s.replace("con.conkey = array[v_recipient_attnum]::smallint[]",
+      "pg_get_constraintdef(con.oid) ilike '%recipient_type%'")],
+  ["M06 lead removed from the replacement CHECK",
+    (s) => s.replace("'client', 'vendor', 'admin', 'lead', 'integration', 'system'",
+      "'client', 'vendor', 'admin', 'integration', 'system'")],
+  ["M07 an existing recipient type dropped",
+    (s) => s.replace("'client', 'vendor', 'admin', 'lead', 'integration', 'system'",
+      "'client', 'vendor', 'lead', 'integration', 'system'")],
+  ["M08 identifier interpolated unsafely",
+    (s) => s.replace("format(\n    'alter table public.communication_messages drop constraint %I',\n    v_constraint\n  )",
+      "'alter table public.communication_messages drop constraint ' || v_constraint")],
+  ["M09 swallowing exception handler added",
+    (s) => s.replace("end\n$$;", "exception when others then\n    null;\nend\n$$;")],
+  ["M10 a data write introduced",
+    (s) => s.replace("commit;", "update public.communication_messages set recipient_type = 'lead';\n\ncommit;")],
+  ["M11 strict name fetch downgraded to a silent first-row pick",
+    (s) => s.replace("into strict v_constraint", "into v_constraint")],
+  ["M12 residual-CHECK post-condition removed",
+    (s) => s.replace(/select count\(\*\)\s*\n\s*into v_residual_count[\s\S]*?end if;/, "")],
+  ["M13 post-condition weakened to allow a residual CHECK",
+    (s) => s.replace("v_residual_count <> 1", "v_residual_count < 1")],
+  ["M14 lock moved after the exact-one proof",
+    (s) => s.replace(/  execute format\('lock table %s in access exclusive mode', v_relid::regclass\);\n/, "")],
+  ["M15 catalogue reads de-qualified (search_path exposure)",
+    (s) => s.replace(/pg_catalog\.pg_constraint/g, "pg_constraint")],
+];
+for (const [label, mutate] of MIG_MUTANTS) {
+  const mutant = mutate(migrationCode);
+  const changed = mutant !== migrationCode;
+  const caught = Object.values(MIG_RULES).some((fn) => !fn(mutant));
+  record(`R-MUT ${label}`, changed && caught);
+}
+
+// ---------------------------------------------------------------------------
 // J. NEGATIVE AUTHORITY SCAN
 // ---------------------------------------------------------------------------
 const BANNED = {

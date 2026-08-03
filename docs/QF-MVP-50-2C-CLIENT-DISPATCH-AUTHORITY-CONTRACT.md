@@ -149,12 +149,35 @@ recipient, template or provider information, so it is safe to surface as an opaq
 
 `supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql` widens
 `communication_messages.recipient_type` to accept `lead`, preserving `client`, `vendor`,
-`admin`, `integration` and `system`. It resolves the server-generated inline constraint name
-from the catalogue rather than assuming it. Forward-only: no historical migration is edited, no
-data is written, no backfill, no phone normalisation, no seed, no ownership column, and
-automation persistence, the 50.1C replay ledger and every provider mapping are untouched.
-`public.whatsapp_logs.recipient_type` is a legacy table the unified core does not write and is
-deliberately unchanged.
+`admin`, `integration` and `system`.
+
+The prior contract comes from `20260708000170_unified_communication_core.sql`, which declared
+the CHECK inline — so its name is server-generated and cannot be assumed. The migration
+therefore **resolves the `recipient_type` column structurally from the PostgreSQL catalogues
+(relation OID plus the exact single-column `conkey`) and requires exactly one matching CHECK
+constraint. Missing or ambiguous schema aborts fail-closed before any replacement**, with the
+deterministic codes `QF_MVP_50_2C_RECIPIENT_TYPE_CONSTRAINT_MISSING` and
+`QF_MVP_50_2C_RECIPIENT_TYPE_CONSTRAINT_AMBIGUOUS`. Identifying by catalogue relationship rather
+than by text inside `pg_get_constraintdef`, and never with `LIMIT 1`, removes two silent-wrong
+states: a reworded expression the text search would miss (leaving an incompatible CHECK that
+still rejects `lead`), and an arbitrary pick among several that could drop the wrong one. No
+exception handler swallows a failure, so the transaction aborts with nothing partially applied.
+
+Four further hardenings close the remaining silent-wrong paths. The relation is locked
+`ACCESS EXCLUSIVE` **before** the proof, so the exact-one result is serialized against the swap
+that depends on it rather than being merely advisory. The constraint name is fetched
+`INTO STRICT`, so the fetch itself raises instead of silently taking a first row. Catalogue reads
+are schema-qualified (`pg_catalog.*`) so the proof cannot be swayed by the caller's `search_path`.
+And because step 4 matches only *single-column* CHECKs, a **multi-column** CHECK that also gates
+`recipient_type` would have survived untouched and could still reject `lead` while the migration
+reported success — so a post-condition proves, via `conkey` overlap, that the constraint just
+added is the only CHECK constraining that column, raising
+`QF_MVP_50_2C_RECIPIENT_TYPE_RESIDUAL_CONSTRAINT` otherwise.
+
+Forward-only: no historical migration is edited, no data is written, no backfill, no phone
+normalisation, no seed, no ownership column, and automation persistence, the 50.1C replay ledger
+and every provider mapping are untouched. `public.whatsapp_logs.recipient_type` is a legacy table
+the unified core does not write and is deliberately unchanged.
 
 **The migration is a source candidate only — it has not been applied to any database.**
 

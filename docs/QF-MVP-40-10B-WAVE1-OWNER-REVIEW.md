@@ -62,7 +62,7 @@ Ordinary transactional launch copy. `category_review_decision: REVIEW_REQUIRED`.
 
 | Internal key | Provider name | Category | Buttons | Fingerprint (first 12) | Owner decision |
 |---|---|---|---|---|---|
-| `clarification_reminder` | `qf_clarification_reminder_v1` | UTILITY | — | `1e7dddd0df8e` | ☐ approve ☐ change |
+| `clarification_reminder` | `qf_clarification_reminder_v1` | UTILITY | — | `87c5420a8d97` | ☐ approve ☐ change (candidate corrected — see §3.1) |
 | `clarification_request` | `qf_clarification_request_v1` | UTILITY | — | `9c484b4d7e54` | ☐ approve ☐ change |
 | `client_lead_status_update` | `qf_client_lead_status_update_v1` | UTILITY | — | `ce8982c65251` | ☐ approve ☐ change |
 | `client_matching_update` | `qf_client_matching_update_v1` | UTILITY | — | `c0930db5a9be` | ☐ approve ☐ change |
@@ -74,11 +74,26 @@ Ordinary transactional launch copy. `category_review_decision: REVIEW_REQUIRED`.
 | `vendor_onboarding_reminder` | `qf_vendor_onboarding_reminder_v1` | UTILITY | — | `c6e95a38dde8` | ☐ approve ☐ change |
 | `vendor_response_reminder` | `qf_vendor_response_reminder_v1` | UTILITY | — | `a3833a69b369` | ☐ approve ☐ change |
 
+### 3.1 Supersession — `clarification_reminder` local candidate
+
+The `clarification_reminder` candidate reviewed at fingerprint `1e7dddd0df8e` carried **one** body
+parameter while its example value was a client name, so the sentence ("please share `{{1}}`") and the
+example ("Asha") contradicted each other. That draft fingerprint is **superseded**.
+
+The local candidate was corrected to two explicit parameters under QF-MVP-50.2C-P0, matching the
+`clarification_request` shape: position 1 is the client name, position 2 is the outstanding item.
+The current fingerprint is `87c5420a8d97`.
+
+This is a local draft correction only. The template was never submitted, so **no Meta call occurred**
+and no remote contract was rewritten. `clarification_reminder` remains `DRAFT_NOT_SUBMITTED`,
+`PENDING_OWNER_REVIEW`, `NOT_AUTHORIZED`, and Wave 1 remains blocked pending owner decision. The
+historical review of `1e7dddd0df8e` above is preserved as fact; it is simply no longer current.
+
 ### Exact copy
 
-**`clarification_reminder`** → `qf_clarification_reminder_v1` · UTILITY · `1e7dddd0df8e`
+**`clarification_reminder`** → `qf_clarification_reminder_v1` · UTILITY · `87c5420a8d97`
 
-> Reminder from QuickFurno: please share {{1}} so we can complete your match.
+> Hi {{1}}, just a reminder from QuickFurno: please share {{2}} so we can complete your match.
 
 **`clarification_request`** → `qf_clarification_request_v1` · UTILITY · `9c484b4d7e54`
 

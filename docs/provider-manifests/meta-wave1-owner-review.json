@@ -6,7 +6,7 @@
   "authorizes_meta_calls": false,
   "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. client_lead_status_update, client_matching_update, consent_start_acknowledgement, consent_stop_acknowledgement, lead_assignment_alert, lead_received, vendor_onboarding_reminder was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot authorization is CONSUMED, and being approved grants no consent, mapping, activation or send authority. The other 7 entries authorize ZERO Meta calls and remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: each further submission needs its own explicit owner authorization.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "5907883b634ab73526635c134df8c236da4bffe9facace4d436095f6f005711c",
+  "source_packet_fingerprint": "fa19476b198eafa98b0d136c56cf474587dcfbd227a8bb8877f0e2f1879563de",
   "counts": {
     "total": 14,
     "approved_unmapped": 7,
@@ -38,18 +38,19 @@
         "components": [
           {
             "type": "body",
-            "text": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
+            "text": "Hi {{1}}, just a reminder from QuickFurno: please share {{2}} so we can complete your match.",
             "example": {
               "body_text": [
                 [
-                  "Asha"
+                  "Asha",
+                  "preferred budget range"
                 ]
               ]
             }
           }
         ]
       },
-      "payload_fingerprint": "1e7dddd0df8ea054c19e048bf0892eca2078473a46449a4b0b516a91dc145789",
+      "payload_fingerprint": "87c5420a8d97ab4de45e6c34eb0312cf957a9c53b28435cfeb3ffe3ce92f1474",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
       "owner_copy_decision": "PENDING_OWNER_REVIEW",
       "category_review_decision": "REVIEW_REQUIRED",

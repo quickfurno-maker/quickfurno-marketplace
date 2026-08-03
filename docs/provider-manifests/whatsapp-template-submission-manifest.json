@@ -728,9 +728,13 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Reminder from QuickFurno: please share {{1}} so we can complete your match.",
+        "body_spec": "Hi {{1}}, just a reminder from QuickFurno: please share {{2}} so we can complete your match.",
         "variables_schema": {
           "1": {
+            "type": "text",
+            "description": "client name"
+          },
+          "2": {
             "type": "text",
             "description": "clarification prompt"
           }
@@ -752,7 +756,8 @@
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-40.6",
           "example_fixture": {
-            "1": "Asha"
+            "1": "Asha",
+            "2": "preferred budget range"
           },
           "registry_expectation": "ORDINARY_REGISTRY",
           "ordinary_registry_entry": true,

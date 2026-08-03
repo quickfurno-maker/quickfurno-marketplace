@@ -1,0 +1,57 @@
+name: QF MVP 50 Quality Gate
+
+# Repository-only gate: offline validators, typecheck and build on a GitHub-hosted
+# runner. It takes no secrets and makes no staging, provider or deployment calls.
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - mvp/qf-mvp-50-secure-n8n-handshake-v1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: QF-MVP-50.1A validator
+        run: npm run test:mvp:50-1a
+
+      - name: QF-MVP-50.1B validator
+        run: npm run test:mvp:50-1b
+
+      - name: QF-MVP-50.1C validator
+        run: npm run test:mvp:50-1c
+
+      - name: QF-MVP-50.2A validator
+        run: npm run test:mvp:50-2a
+
+      - name: QF-MVP-50.2B validator
+        run: npm run test:mvp:50-2b
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

@@ -1,0 +1,11 @@
+# Supabase
+# Local CLI state only. `.temp/project-ref` records which remote project this
+# working copy is linked to — linking is a local, owner-performed step and the
+# ref is never committed. `config.toml` and `migrations/` ARE source-controlled.
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

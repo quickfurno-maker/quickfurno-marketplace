@@ -23,14 +23,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      # On a pull_request event actions/checkout defaults to refs/pull/<n>/merge,
+      # a synthetic merge commit that is not the reviewed head. Pin the event head
+      # SHA explicitly so the gate proves the exact code under review.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual SHA:   $ACTUAL_SHA"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      # The MVP validators import .ts modules through a resolve-only hook and rely
+      # on Node's native type stripping, which Node 20 does not provide.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
+
+      - name: Report Node version
+        run: node --version
 
       - name: Install dependencies
         run: npm ci

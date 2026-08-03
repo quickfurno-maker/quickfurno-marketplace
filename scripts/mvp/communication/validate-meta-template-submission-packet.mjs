@@ -17,6 +17,51 @@ import {
 } from "./submit-meta-templates.mjs";
 
 /**
+ * Immutable QF-MVP-40.10 history pins. BASE is the QF-MVP-30 closeout; CLOSURE is the
+ * QF-MVP-40.10G commit "fix(communication): close Wave 1 consent subset", after which
+ * template submission was paused. Neither may be repointed at a moving ref.
+ */
+const QF_MVP_40_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
+const QF_MVP_40_10_CLOSURE_HEAD = "d5931a3409ed26cbe87ea2a7a2835dbc9a7f99ac";
+
+/** A git failure is never a pass: an unreadable pin fails closed. */
+function commitExists(sha) {
+  try {
+    execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: ROOT, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function commitIsAncestorOfHead(sha) {
+  if (!commitExists(sha)) return false;
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", sha, "HEAD"], { cwd: ROOT, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True only when the EXACT pinned range carries no migration. Both ends must exist and the
+ * closure must be reachable from HEAD, so a bogus, deleted or unrelated pin fails closed
+ * rather than vacuously passing.
+ */
+function historicalRangeHasNoMigration(baseSha, closureSha) {
+  if (!commitExists(baseSha) || !commitIsAncestorOfHead(closureSha)) return false;
+  let changed;
+  try {
+    changed = execFileSync("git", ["diff", "--name-only", `${baseSha}..${closureSha}`],
+      { encoding: "utf8", cwd: ROOT });
+  } catch {
+    return false;
+  }
+  return !changed.split("\n").some((f) => f.trim().startsWith("supabase/migrations/"));
+}
+
+/**
  * The exact Wave 0 contract. QF-MVP-40.10C: v2 was APPROVED BY META AS MARKETING
  * rather than the requested UTILITY, so it is quarantined and v3 is the strict
  * Utility candidate. Both earlier names are retired and must never reappear as a
@@ -811,11 +856,14 @@ const R = {
     && p.templates.filter((t) => t.local_state.approval_status === "approved")
         .every((t) => p.note.includes(t.internal_template_key)),
   // ---- boundary ----------------------------------------------------------
-  noMigrationOnBranch: () => {
-    const changed = execFileSync("git", ["diff", "--name-only",
-      "1713838401da8b160cbeb9d3b6090bd017bdb958..HEAD"], { encoding: "utf8", cwd: ROOT });
-    return !changed.split("\n").some((f) => f.trim().startsWith("supabase/migrations/"));
-  },
+  // "QF-MVP-40.10 added no migration" is a fact about a FIXED span of history, so it must be
+  // proven over BASE..CLOSURE. The original form compared BASE..HEAD, which decayed the moment
+  // later QF-MVP-50 migrations landed: a permanently true historical claim started reporting
+  // false. Widening the range is not evidence — pinning it is.
+  noMigrationInQfMvp40HistoricalRange: () =>
+    historicalRangeHasNoMigration(QF_MVP_40_BASE, QF_MVP_40_10_CLOSURE_HEAD),
+  // The pin is only evidence if it is real history reachable from where we stand.
+  qfMvp40ClosureIsAncestorOfHead: () => commitIsAncestorOfHead(QF_MVP_40_10_CLOSURE_HEAD),
   docExists: () => existsSync(resolve(DOC)),
 };
 
@@ -850,7 +898,8 @@ const RULES = [
   ["P26 submission script has no message-send endpoint", R.submitScriptHasNoSendEndpoint, packet],
   ["P27 submission script has no delete or edit endpoint", R.submitScriptHasNoDeleteOrEdit, packet],
   ["P28 submission script never echoes a secret", R.submitScriptNeverEchoesSecret, packet],
-  ["P29 no migration added on this branch", R.noMigrationOnBranch, packet],
+  ["P29 no migration in the pinned QF-MVP-40.10 historical range", R.noMigrationInQfMvp40HistoricalRange, packet],
+  ["P29b QF-MVP-40.10 closure pin is real history reachable from HEAD", R.qfMvp40ClosureIsAncestorOfHead, packet],
   ["P30 readiness document exists", R.docExists, packet],
   ["P31 no hardcoded Graph API version remains", R.noHardcodedApiVersion, packet],
   ["P32 API version is REQUIRED with no default", R.apiVersionRequiredNoDefault, packet],

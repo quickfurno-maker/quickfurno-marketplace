@@ -42,7 +42,52 @@ const isClosedKey = (k) => CLOSED_WAVE1_KEYS.includes(k);
 const V1C_SUBMISSION_EVIDENCE = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-30T18-46-18-281Z.json";
 const V1C_RECONCILIATION_EVIDENCE =
   "QF-MVP-40-WAVE1-lead_received-META-RECONCILIATION-2026-07-31T02-01-53-804Z.json";
-const BRANCH_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
+/**
+ * Immutable QF-MVP-40.10 history pins. BASE is the QF-MVP-30 closeout; CLOSURE is the
+ * QF-MVP-40.10G commit "fix(communication): close Wave 1 consent subset", after which
+ * template submission was paused. Neither may be repointed at a moving ref: the claim
+ * "QF-MVP-40.10 added no migration" is a fact about a FIXED span of history, and comparing
+ * against HEAD made it decay the moment later QF-MVP-50 migrations landed.
+ */
+const QF_MVP_40_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
+const QF_MVP_40_10_CLOSURE_HEAD = "d5931a3409ed26cbe87ea2a7a2835dbc9a7f99ac";
+
+/** A git failure is never a pass: an unreadable pin fails closed. */
+function commitExists(sha) {
+  try {
+    execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function commitIsAncestorOfHead(sha) {
+  if (!commitExists(sha)) return false;
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", sha, "HEAD"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True only when the EXACT pinned range carries no migration. Both ends must exist and the
+ * closure must be reachable from HEAD, so a bogus, deleted or unrelated pin fails closed
+ * rather than vacuously passing.
+ */
+function historicalRangeHasNoMigration(baseSha, closureSha) {
+  if (!commitExists(baseSha) || !commitIsAncestorOfHead(closureSha)) return false;
+  let changed;
+  try {
+    changed = execFileSync("git", ["diff", "--name-only", `${baseSha}..${closureSha}`],
+      { encoding: "utf8" });
+  } catch {
+    return false;
+  }
+  return !changed.split("\n").some((f) => f.trim().startsWith("supabase/migrations/"));
+}
 
 const ROOT = process.cwd();
 const results = [];
@@ -264,10 +309,9 @@ const R = {
     return recordsReconciledResult && !miscreditsV2 && wave1StillBlocked
       && (!claimsUtilityApproval || qualified);
   },
-  noMigrationInBranch: () => {
-    const changed = execFileSync("git", ["diff", "--name-only", `${BRANCH_BASE}..HEAD`], { encoding: "utf8" });
-    return !changed.split("\n").some((f) => f.trim().startsWith("supabase/migrations/"));
-  },
+  noMigrationInQfMvp40HistoricalRange: () =>
+    historicalRangeHasNoMigration(QF_MVP_40_BASE, QF_MVP_40_10_CLOSURE_HEAD),
+  qfMvp40ClosureIsAncestorOfHead: () => commitIsAncestorOfHead(QF_MVP_40_10_CLOSURE_HEAD),
   noEvidenceTracked: () => {
     const tracked = execFileSync("git", ["ls-files"], { encoding: "utf8" });
     return !/META-(SUBMISSION|RECONCILIATION)-/.test(tracked);
@@ -438,7 +482,8 @@ const RULES = [
   ["W35 Group B asserts nothing about category validity", R.groupBAssertsNothingAboutValidity, review],
   ["W36 owner-review document exists", R.docExists, review],
   ["W37 owner-reported approval is not shown as machine-proven", R.ownerApprovalNotMachineProven, review],
-  ["W38 no migration in the branch delta", R.noMigrationInBranch, review],
+  ["W38 no migration in the pinned QF-MVP-40.10 historical range", R.noMigrationInQfMvp40HistoricalRange, review],
+  ["W38b QF-MVP-40.10 closure pin is real history reachable from HEAD", R.qfMvp40ClosureIsAncestorOfHead, review],
   ["W39 no evidence JSON is tracked", R.noEvidenceTracked, review],
   ["W49 review counts are exact and self-consistent", R.reviewCountsExact, review],
   ["W50 review note denies any blanket Wave 1 authorization", R.reviewNoteDeniesBlanketAuthorization, review],

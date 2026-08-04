@@ -63,6 +63,14 @@ const L3_RESOLVED = {
 };
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+function canonicalMigrationSourceBytes(buffer) {
+  const canonicalText = buffer
+    .toString("utf8")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  return Buffer.from(canonicalText, "utf8");
+}
+const canonicalMigrationSourceSha256 = (buffer) => sha256(canonicalMigrationSourceBytes(buffer));
 const read = (relativePath) => readFileSync(path.join(ROOT, relativePath), "utf8");
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -92,7 +100,7 @@ function loadState() {
       filename,
       version: match?.[1] ?? null,
       name: match?.[2] ?? null,
-      sha256: sha256(bytes),
+      sha256: canonicalMigrationSourceSha256(bytes),
       malformed: !match,
     };
   });
@@ -104,6 +112,7 @@ function loadState() {
     baselineSha: sha256(readFileSync(path.join(ROOT, BASELINE_PATH))),
     targetExists: existsSync(path.join(ROOT, TARGET_PATH)),
     targetSha: sha256(readFileSync(path.join(ROOT, TARGET_PATH))),
+    targetCanonicalSha: canonicalMigrationSourceSha256(readFileSync(path.join(ROOT, TARGET_PATH))),
     s1Exists: existsSync(path.join(ROOT, S1_PATH)),
     s1: read(S1_PATH),
     governance: read(GOVERNANCE_PATH),
@@ -132,6 +141,21 @@ function validateState(state) {
 
   check("manifest parses with manifestVersion=1", manifest.manifestVersion === 1);
   check("manifest scope is source-only G1", manifest.scope?.phase === "QF-MVP-50.2C-S2-G1" && manifest.scope?.databaseMutationAuthorized === false);
+  check("migration source hash policy exists", typeof manifest.migrationSourceHashPolicy === "object" && manifest.migrationSourceHashPolicy !== null);
+  check("migration source hash algorithm is sha256", manifest.migrationSourceHashPolicy?.algorithm === "sha256");
+  check("migration source canonicalization is UTF8_LINE_ENDINGS_TO_LF", manifest.migrationSourceHashPolicy?.canonicalization === "UTF8_LINE_ENDINGS_TO_LF");
+  check("migration source hash scope is exact", manifest.migrationSourceHashPolicy?.scope === "supabase/migrations/*.sql");
+  check("migration source hash policy preserves BOM", manifest.migrationSourceHashPolicy?.preserveBom === true);
+  check("migration source hash policy preserves final-newline state", manifest.migrationSourceHashPolicy?.preserveFinalNewlineState === true);
+  check("migration source hash policy preserves all non-line-ending bytes", manifest.migrationSourceHashPolicy?.preserveAllNonLineEndingBytes === true);
+  const lfFixture = Buffer.from("SELECT 1;\n-- x\n", "utf8");
+  const crlfFixture = Buffer.from("SELECT 1;\r\n-- x\r\n", "utf8");
+  const loneCrFixture = Buffer.from("SELECT 1;\r-- x\r", "utf8");
+  check("canonical migration hash equates LF and CRLF", canonicalMigrationSourceSha256(lfFixture) === canonicalMigrationSourceSha256(crlfFixture));
+  check("canonical migration hash equates LF and lone CR", canonicalMigrationSourceSha256(lfFixture) === canonicalMigrationSourceSha256(loneCrFixture));
+  check("canonical migration hash preserves non-line-ending changes", canonicalMigrationSourceSha256(Buffer.from("SELECT 1", "utf8")) !== canonicalMigrationSourceSha256(Buffer.from("SELECT 2", "utf8")));
+  check("canonical migration hash preserves final-newline presence", canonicalMigrationSourceSha256(Buffer.from("SELECT 1\n", "utf8")) !== canonicalMigrationSourceSha256(Buffer.from("SELECT 1", "utf8")));
+  check("canonical migration hash preserves UTF-8 BOM", canonicalMigrationSourceSha256(Buffer.from("\ufeffSELECT 1\n", "utf8")) !== canonicalMigrationSourceSha256(Buffer.from("SELECT 1\n", "utf8")));
   check("staging environment identity is exact", manifest.environment?.name === "QuickFurno Staging" && manifest.environment?.projectRef === "uckafzuochmbvtiodmcl");
   check("forbidden project refs are exact", same(manifest.environment?.forbiddenProjectRefs, {
     production: "yqpgcsduqbxulrlzwzap", jarvis: "coilipywdvxklewquqvv", onedecore: "lpurlfmpvriyvpkujvyl",
@@ -171,7 +195,7 @@ function validateState(state) {
     .filter((record) => !L3_RESOLVED[record.version])
     .every((record) => !("remoteStatementCount" in record) && !("remoteOrderedStatementDigestSha256" in record) && !("byteProvenance" in record)));
   check("target manifest identity is exact", manifest.pendingTarget?.version === TARGET_VERSION && manifest.pendingTarget?.name === "qf_mvp_50_2c_lead_communication_recipient" && manifest.pendingTarget?.path === TARGET_PATH);
-  check("target source exists and SHA is exact", state.targetExists && state.targetSha === TARGET_SHA && manifest.pendingTarget?.sha256 === TARGET_SHA);
+  check("target source exists and raw/canonical SHA are exact", state.targetExists && state.targetSha === TARGET_SHA && state.targetCanonicalSha === TARGET_SHA && manifest.pendingTarget?.sha256 === TARGET_SHA);
   check("target is newest local migration", newestVersion === TARGET_VERSION);
   check("target has no newer local migration", validMigrations.filter((record) => record.version > TARGET_VERSION).length === 0 && manifest.pendingTarget?.newerLocalMigrationCount === 0);
   check("target operational status is PENDING", manifest.pendingTarget?.operationalStatus === "PENDING" && manifest.pendingTarget?.remoteVersionStatusAtL3 === "ABSENT");
@@ -237,6 +261,10 @@ function runMutants(pristineState) {
     ["S1 old vocabulary includes lead", (state) => { state.s1 = state.s1.replace("\n`lead` was absent.", "\n- `lead`\n\n`lead` was absent."); }],
     ["governance permits include-all", (state) => { state.governance = state.governance.replace("`--include-all` is forbidden for this lineage", "`--include-all` is permitted for this lineage"); }],
     ["CI G1 step removed", (state) => { state.workflow = state.workflow.replace(/\n\s+- name: QF-MVP-50\.2C-S2-G1 staging history governance\s+run: npm run test:mvp:50-2c-s2-g1\s*/m, "\n"); }],
+    ["migration hash policy canonicalization changed to raw bytes", (state) => { state.manifest.migrationSourceHashPolicy.canonicalization = "RAW_BYTES"; }],
+    ["one canonical pre-baseline SHA changed to raw CRLF hash", (state) => {
+      state.manifest.preBaselineChain.records.find((record) => record.version === "20260620000003").sha256 = "e8c7f0f7eec2fd2108189fc462deeb70025c88f2ef2ae760dcc83b77451d5fb9";
+    }],
   ];
 
   return cases.map(([name, mutate]) => {

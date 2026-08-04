@@ -1,5 +1,13 @@
 {
   "manifestVersion": 1,
+  "migrationSourceHashPolicy": {
+    "algorithm": "sha256",
+    "canonicalization": "UTF8_LINE_ENDINGS_TO_LF",
+    "scope": "supabase/migrations/*.sql",
+    "preserveBom": true,
+    "preserveFinalNewlineState": true,
+    "preserveAllNonLineEndingBytes": true
+  },
   "scope": {
     "phase": "QF-MVP-50.2C-S2-G1",
     "purpose": "Source-controlled QuickFurno Staging migration-history governance",
@@ -53,12 +61,12 @@
       {
         "version": "20260620000003",
         "filename": "20260620000003_functions.sql",
-        "sha256": "e8c7f0f7eec2fd2108189fc462deeb70025c88f2ef2ae760dcc83b77451d5fb9"
+        "sha256": "617aeddae50aae7dcdce1f9521690d754c3092ce17ac6bec22d4e6d442e240f7"
       },
       {
         "version": "20260620000004",
         "filename": "20260620000004_seed_data.sql",
-        "sha256": "b9a03ae87e259e6248fec4f91b03f7999cb382d45ed8dceb997b160f62da9b3d"
+        "sha256": "bac3a1f4c896a9e11aae01a2734b4d2ac59292564be0c177f3c53c329ec29682"
       },
       {
         "version": "20260620000005",
@@ -73,47 +81,47 @@
       {
         "version": "20260622000007",
         "filename": "20260622000007_vendor_location.sql",
-        "sha256": "e988d96252feee3d18f1d6314d4d8a0d5c751716cee8414fd21c5d77dceb149e"
+        "sha256": "595a0e714ba1fac10c423dcde456f8a8316dd321a662f3824921559ef1e3b805"
       },
       {
         "version": "20260624000008",
         "filename": "20260624000008_lead_capture_consent.sql",
-        "sha256": "deaada84e27505011f25916db4a1a1e2c08acb5ca1b6d9fb2a6904f3699b958e"
+        "sha256": "260dcddc22e69a5673aedac3c6a6c97a980df33758c2de3a0e4ef8ed44bc2180"
       },
       {
         "version": "20260624000009",
         "filename": "20260624000009_vendor_onboarding.sql",
-        "sha256": "37823cd6a41b6a9be20cc3fb6955a31ff5d9ec49445ea5a782af2a5ccc8c8dbe"
+        "sha256": "d3fff71ade912c37e6ed7a6ca2140c03e9ff0cdfb16160b9374090debbff62d5"
       },
       {
         "version": "20260624000010",
         "filename": "20260624000010_vendor_exact_columns.sql",
-        "sha256": "0e6685cd30ee78852eb172a15b042f3aef30f66f4703dae4b215bd299d222ad9"
+        "sha256": "64a1c6fc165c885b045c91f03e990c9d0835a22a26b26600ab1cd04c704017d7"
       },
       {
         "version": "20260624000011",
         "filename": "20260624000011_vendor_office_address.sql",
-        "sha256": "52b8962ef606bdf550744182e74e533087f4e40ef3877424db9161d9278d1297"
+        "sha256": "61686e0f72c9c5a2b06346473efc7950c75f08e3f0add9715ee2555944eea1e0"
       },
       {
         "version": "20260627000012",
         "filename": "20260627000012_aos_management_foundation.sql",
-        "sha256": "746fda12d01587451ba0cc726ec375704ef2bc81590761a96fa861daad75d882"
+        "sha256": "04a00aaf0c3effe4ecdcb83d4cc4f9b50ef474276475e757d13a67fe18f027ff"
       },
       {
         "version": "20260627000013",
         "filename": "20260627000013_crm_analytics_foundation.sql",
-        "sha256": "3d892f4c358f062d763adcc61443d78e5b3f0b79898d20ca216a56cc8c4648e5"
+        "sha256": "3086704cc1f9970f9aa8e05fb8bc627f1609a48d01417980eb626442426ee1b6"
       },
       {
         "version": "20260628000014",
         "filename": "20260628000014_aos_control_center_foundation.sql",
-        "sha256": "b1502869427f0862bc6721a0c99f0d21fd4f041d7393e929d29191fc0d2137d7"
+        "sha256": "4a26cbc9d61d978a19fbb727568c6c7d1bcc5b42be5ab01c9a84ad630d765589"
       },
       {
         "version": "20260628000015",
         "filename": "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
-        "sha256": "f13f0f0f1d05ce15c95bfb6eec19fbf3b2a04894486184cca84b55af156e77a8"
+        "sha256": "2804f03ce0c8845e0d350b1ff9ba7dbd0c301d2b3ecfc3e8b0b75d23204a0d16"
       },
       {
         "version": "20260630000016",
@@ -148,7 +156,7 @@
       {
         "version": "20260701000022",
         "filename": "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
-        "sha256": "c1c1f551e978828850dc872fefbdce25286662e709852cd48290b3e93b7bc447"
+        "sha256": "6bce0e939f091102a55d4a4a83f89f4539106781fcdc4abb7f5c8b58de34bf92"
       },
       {
         "version": "20260701000023",

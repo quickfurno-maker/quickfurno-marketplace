@@ -1,0 +1,612 @@
+{
+  "manifestVersion": 1,
+  "migrationSourceHashPolicy": {
+    "algorithm": "sha256",
+    "canonicalization": "UTF8_LINE_ENDINGS_TO_LF",
+    "scope": "supabase/migrations/*.sql",
+    "preserveBom": true,
+    "preserveFinalNewlineState": true,
+    "preserveAllNonLineEndingBytes": true
+  },
+  "scope": {
+    "phase": "QF-MVP-50.2C-S2-G1",
+    "purpose": "Source-controlled QuickFurno Staging migration-history governance",
+    "environmentSpecific": true,
+    "databaseMutationAuthorized": false,
+    "productionImplication": false
+  },
+  "environment": {
+    "name": "QuickFurno Staging",
+    "projectRef": "uckafzuochmbvtiodmcl",
+    "forbiddenProjectRefs": {
+      "production": "yqpgcsduqbxulrlzwzap",
+      "jarvis": "coilipywdvxklewquqvv",
+      "onedecore": "lpurlfmpvriyvpkujvyl"
+    }
+  },
+  "baseline": {
+    "version": "20260722000100",
+    "name": "qf_mvp_staging_baseline_269c9265",
+    "sourcePath": "supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql",
+    "sourceSchemaSha256": "269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f",
+    "trackedSourceSha256": "101ac82c7840eec8802155fec4d4a18cba445447b7d773aaf168417f737aa33c",
+    "gitBlobSha": "65e56c0419a986cc14a5abcfb184dd4a82625630",
+    "historicalDocumentedSha256": "920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81",
+    "historicalDocumentedShaStatus": "DOCUMENTATION_ERROR_UNREPRODUCIBLE",
+    "remoteStatementCount": 821,
+    "remoteOrderedStatementDigestSha256": "231e163068b0608aa53f09d97ded9c85f6b69d37d07ccd15de07d2c8c2aab581",
+    "contentRevisionCount": 1,
+    "migrationChainDiscoverable": false,
+    "normalDbPushMustNeverDiscoverBaseline": true,
+    "externalApplyWorkspaceBytesRetained": false
+  },
+  "preBaselineChain": {
+    "classification": "PRE_BASELINE_CHAIN_INTENTIONALLY_SUPERSEDED_FOR_STAGING",
+    "semanticRole": "HISTORICAL_SOURCE_CHAIN_NOT_REMOTE_LEDGER_ENTRIES",
+    "count": 68,
+    "mustReplayOnStaging": false,
+    "mustRepairAsApplied": false,
+    "mustInsertIntoRemoteHistory": false,
+    "records": [
+      {
+        "version": "20260620000001",
+        "filename": "20260620000001_create_tables.sql",
+        "sha256": "ab03c500be5e873677cc558d23c0641fcd5072ad4ad52bed8fcfe92d6165edbc"
+      },
+      {
+        "version": "20260620000002",
+        "filename": "20260620000002_rls_policies.sql",
+        "sha256": "f266be5b9d9a9165e7bea12f84ce773aa51aea1e2d22fec9b43a1a031319df60"
+      },
+      {
+        "version": "20260620000003",
+        "filename": "20260620000003_functions.sql",
+        "sha256": "617aeddae50aae7dcdce1f9521690d754c3092ce17ac6bec22d4e6d442e240f7"
+      },
+      {
+        "version": "20260620000004",
+        "filename": "20260620000004_seed_data.sql",
+        "sha256": "bac3a1f4c896a9e11aae01a2734b4d2ac59292564be0c177f3c53c329ec29682"
+      },
+      {
+        "version": "20260620000005",
+        "filename": "20260620000005_homepage_alignment.sql",
+        "sha256": "09fafcb2406f7139020cbdd6a95fb7b974876f81e333b2348e03318f54829871"
+      },
+      {
+        "version": "20260621000006",
+        "filename": "20260621000006_superadmin_foundation.sql",
+        "sha256": "d5e1adfddaa3d30ebad148dcaf8291d75da5b9594d359b13fd84345a08c488ae"
+      },
+      {
+        "version": "20260622000007",
+        "filename": "20260622000007_vendor_location.sql",
+        "sha256": "595a0e714ba1fac10c423dcde456f8a8316dd321a662f3824921559ef1e3b805"
+      },
+      {
+        "version": "20260624000008",
+        "filename": "20260624000008_lead_capture_consent.sql",
+        "sha256": "260dcddc22e69a5673aedac3c6a6c97a980df33758c2de3a0e4ef8ed44bc2180"
+      },
+      {
+        "version": "20260624000009",
+        "filename": "20260624000009_vendor_onboarding.sql",
+        "sha256": "d3fff71ade912c37e6ed7a6ca2140c03e9ff0cdfb16160b9374090debbff62d5"
+      },
+      {
+        "version": "20260624000010",
+        "filename": "20260624000010_vendor_exact_columns.sql",
+        "sha256": "64a1c6fc165c885b045c91f03e990c9d0835a22a26b26600ab1cd04c704017d7"
+      },
+      {
+        "version": "20260624000011",
+        "filename": "20260624000011_vendor_office_address.sql",
+        "sha256": "61686e0f72c9c5a2b06346473efc7950c75f08e3f0add9715ee2555944eea1e0"
+      },
+      {
+        "version": "20260627000012",
+        "filename": "20260627000012_aos_management_foundation.sql",
+        "sha256": "04a00aaf0c3effe4ecdcb83d4cc4f9b50ef474276475e757d13a67fe18f027ff"
+      },
+      {
+        "version": "20260627000013",
+        "filename": "20260627000013_crm_analytics_foundation.sql",
+        "sha256": "3086704cc1f9970f9aa8e05fb8bc627f1609a48d01417980eb626442426ee1b6"
+      },
+      {
+        "version": "20260628000014",
+        "filename": "20260628000014_aos_control_center_foundation.sql",
+        "sha256": "4a26cbc9d61d978a19fbb727568c6c7d1bcc5b42be5ab01c9a84ad630d765589"
+      },
+      {
+        "version": "20260628000015",
+        "filename": "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
+        "sha256": "2804f03ce0c8845e0d350b1ff9ba7dbd0c301d2b3ecfc3e8b0b75d23204a0d16"
+      },
+      {
+        "version": "20260630000016",
+        "filename": "20260630000016_aos_runtime_settings.sql",
+        "sha256": "347f990cc650dfe83ad08c0c266e66ce4c0e47bbb12bc85a2ffa86647e41ba20"
+      },
+      {
+        "version": "20260630000017",
+        "filename": "20260630000017_lead_assignment_approvals.sql",
+        "sha256": "e003d15483e06a1878b4fcf1f599255ce58747c6a4a3ea954c3d86d9124fc89a"
+      },
+      {
+        "version": "20260630000018",
+        "filename": "20260630000018_vendor_actions_credits_package_sync.sql",
+        "sha256": "088f4edc669b168bae49d917e1be9248ede8cab1ec43bc7b6c0b6ac3cc85cfaf"
+      },
+      {
+        "version": "20260630000019",
+        "filename": "20260630000019_assignment_ledger_snapshots.sql",
+        "sha256": "f33b71156779959e77423c85b11b378cbb48437d6e8684c029b9657440de48eb"
+      },
+      {
+        "version": "20260630000020",
+        "filename": "20260630000020_align_active_cities.sql",
+        "sha256": "71bb73864becb7db69735a8d6c03deecd69308eb22b1da0d1f245e852aa57c56"
+      },
+      {
+        "version": "20260630000021",
+        "filename": "20260630000021_category_governance.sql",
+        "sha256": "53008f55163b3b8bbbdf230ca0c86a2aeb487a85f8cf66bbc9c69acd701671e1"
+      },
+      {
+        "version": "20260701000022",
+        "filename": "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
+        "sha256": "6bce0e939f091102a55d4a4a83f89f4539106781fcdc4abb7f5c8b58de34bf92"
+      },
+      {
+        "version": "20260701000023",
+        "filename": "20260701000023_vendor_package_orders.sql",
+        "sha256": "519f702a3875ddf7c6d1ceb1b09a21bca904e0c2e7242f270b83a67bf08a1ed8"
+      },
+      {
+        "version": "20260701000024",
+        "filename": "20260701000024_vendor_profile_change_requests.sql",
+        "sha256": "8ca496b72c746b3188b8ba778f79fe64904e310488b281a858afd1f3c75b77cc"
+      },
+      {
+        "version": "20260701000025",
+        "filename": "20260701000025_vendor_notifications_support.sql",
+        "sha256": "2b169eaca453e1c50b7c669466e0cf8f41a55c468dab82dc9bba0f61a460a640"
+      },
+      {
+        "version": "20260701000026",
+        "filename": "20260701000026_bad_lead_report_safety_fields.sql",
+        "sha256": "a5b1d0fda6f100ee4537a54a74e9e4b85e3abaea017222dec62113360bad713f"
+      },
+      {
+        "version": "20260701000027",
+        "filename": "20260701000027_phase26a_auto_lead_matching_foundation.sql",
+        "sha256": "f08f41690541492a04071fb0d485f37fc38959c2e6ddc0f560654e8fef5ec9f3"
+      },
+      {
+        "version": "20260701000028",
+        "filename": "20260701000028_phase26a_live_schema_repair.sql",
+        "sha256": "09c97006357c72ce31cff682c07942b56c197577a9ecc29482e0657f5b22eaf5"
+      },
+      {
+        "version": "20260701000029",
+        "filename": "20260701000029_phase26a2_admin_audit_hardening.sql",
+        "sha256": "08ff461b0c07da3c54384fc297075f074b2fe76520d6996759ae09992d4c2a2f"
+      },
+      {
+        "version": "20260701000030",
+        "filename": "20260701000030_phase26a2c_smart_override_assignment.sql",
+        "sha256": "e3ff8003d8cd9a4e5880a3f8a7b765e0ee8e18e291a53ca69c68102325c67056"
+      },
+      {
+        "version": "20260701000031",
+        "filename": "20260701000031_phase26a2c_recovery_fallback_reporting.sql",
+        "sha256": "94930bc363b5ba3a0ce79f4751080c59be7e9f28f4b2982ac0d11bc19d2ac483"
+      },
+      {
+        "version": "20260701000032",
+        "filename": "20260701000032_phase26a2d_client_requirement_groups.sql",
+        "sha256": "2e8f07bae58babf707463849e512c3f673f27385bb9f32a99bdca03feae811b8"
+      },
+      {
+        "version": "20260701000033",
+        "filename": "20260701000033_phase26a2e_preferred_vendor_recharge_window.sql",
+        "sha256": "b70441fd206afb379eac746a5eb75c1b457025dd1050d4beb365daf7df414176"
+      },
+      {
+        "version": "20260702000034",
+        "filename": "20260702000034_fix_auto_match_category_mapping.sql",
+        "sha256": "069fdc52c9b584a4e08c6cdb6340f673726db0a104335d5367909f7a960cc7ad"
+      },
+      {
+        "version": "20260702000035",
+        "filename": "20260702000035_preferred_vendor_lead_intent.sql",
+        "sha256": "5be51723f8c955e636e2971a5efd80264f0b9842e4c650e5b459406007eec9b0"
+      },
+      {
+        "version": "20260702000037",
+        "filename": "20260702000037_fix_preferred_vendor_credit_direct_assignment.sql",
+        "sha256": "493e8173403ba262bc7614b49f8841b0f2ef9d3acd14efe8f4cd3d04dd650c64"
+      },
+      {
+        "version": "20260702000038",
+        "filename": "20260702000038_lead_quality_engine_phase1.sql",
+        "sha256": "ae380fc31af9dab192134128fac9217fa5a423c5b502ad9174cd49a6d30c1de8"
+      },
+      {
+        "version": "20260702000039",
+        "filename": "20260702000039_b_lead_clarification_flow.sql",
+        "sha256": "ed0e04cf7fefcafa07a7fe5f90b7213d8e18c433fc9646836ec3b7b83392fb1d"
+      },
+      {
+        "version": "20260704000040",
+        "filename": "20260704000040_google_area_location_foundation.sql",
+        "sha256": "5ae5b6abb40da2fcb1266bf6db2787cb1745f34bc37dba82137d29b7773e8052"
+      },
+      {
+        "version": "20260704000100",
+        "filename": "20260704000100_align_lead_quality_status_constraints.sql",
+        "sha256": "b89b13ba976048228a957f8b1c151a0179d8fa5b3a36d2e52fbe3c14cf618e0e"
+      },
+      {
+        "version": "20260704000110",
+        "filename": "20260704000110_lead_scores_security_hardening.sql",
+        "sha256": "384f2bbc32f8a84ab5b0e7fba190da68a4df19f2d758dd67cb5e58420340e185"
+      },
+      {
+        "version": "20260705000130",
+        "filename": "20260705000130_distance_category_matching_rpc.sql",
+        "sha256": "75f4cfff08402297d577724be8fc48d067203ad37dd2361723daf5ab6fde7393"
+      },
+      {
+        "version": "20260706000140",
+        "filename": "20260706000140_vendor_accepting_leads.sql",
+        "sha256": "f772738cef96f2cef708dc06267a45c40946049bb03b651f70b0815a710a139d"
+      },
+      {
+        "version": "20260706000141",
+        "filename": "20260706000141_vendor_credit_wallet_rpc.sql",
+        "sha256": "088dcfd3e7e53c4bf2ec01a095c2454813b6e42720d400c2701971df4017d7ef"
+      },
+      {
+        "version": "20260706000142",
+        "filename": "20260706000142_credit_wallet_assignment_rpc.sql",
+        "sha256": "db929e81304b5fe3203925bca02cbf884b474666a0af769f0eab644102df712a"
+      },
+      {
+        "version": "20260706000143",
+        "filename": "20260706000143_preferred_assignment_accepting_leads.sql",
+        "sha256": "437105dfa4bdfba9d8e494d92db235cedf7efab9e8a235a00a169f8472f4b507"
+      },
+      {
+        "version": "20260706000144",
+        "filename": "20260706000144_manual_assignment_accepting_leads.sql",
+        "sha256": "77aa9aea2f6d5255bd0d90dc89475be1b27cc50869a0d3474bf0edd37d86cd84"
+      },
+      {
+        "version": "20260706000145",
+        "filename": "20260706000145_package_purchase_idempotent_grant.sql",
+        "sha256": "77494a9d3e5f6da9bcb1bf430a39451515b49c6a870b3dd3db5c8c47ae83374f"
+      },
+      {
+        "version": "20260706000146",
+        "filename": "20260706000146_create_qf_workflow_kernel_foundation.sql",
+        "sha256": "fc13723ea9a215385b3e894938708d6119e790dcaf379d4209238da213b7d781"
+      },
+      {
+        "version": "20260706000147",
+        "filename": "20260706000147_workflow_kernel_atomic_step.sql",
+        "sha256": "c75bbe51ca230672c6ce9bd9e07f37ad37e9a39b767a74d7eb7d7a9ee7c609dd"
+      },
+      {
+        "version": "20260706000148",
+        "filename": "20260706000148_workflow_kernel_safety_hardening.sql",
+        "sha256": "8ffe6876559aebd2acd46afb6b32c2ccd280f4908c4bcff66fe8f365c0b3c30b"
+      },
+      {
+        "version": "20260706000149",
+        "filename": "20260706000149_workflow_kernel_retry_consistency.sql",
+        "sha256": "92a1efbaf2713474636180682be0dd3cc40582807bd0f135ac70b95cde93947d"
+      },
+      {
+        "version": "20260706000150",
+        "filename": "20260706000150_automation_policy_config_foundation.sql",
+        "sha256": "4477e72494e399ed714d7d596506a326aeb6d1b2a74b28376fe54f7142150b9d"
+      },
+      {
+        "version": "20260708000160",
+        "filename": "20260708000160_identity_security_foundation.sql",
+        "sha256": "61bde9591e4eb09ff327a99f4306c0c9492c2ce45534ea6e7369c72df3bae509"
+      },
+      {
+        "version": "20260708000170",
+        "filename": "20260708000170_unified_communication_core.sql",
+        "sha256": "a50f54c88dd3a2e64d9dceb8b0a4372eb370a60287f71e88f31afd0addf7e493"
+      },
+      {
+        "version": "20260708000180",
+        "filename": "20260708000180_vendor_authentication_foundation.sql",
+        "sha256": "360b994f9e217d4ad13836a3fba8794539f9d724ddaea6c3a9f2bd6704d17f61"
+      },
+      {
+        "version": "20260708000190",
+        "filename": "20260708000190_client_whatsapp_otp_login_readiness.sql",
+        "sha256": "a286b19f52a136afd554f0d072e83d8bba3e39fc75d2086c47780340402cd84e"
+      },
+      {
+        "version": "20260708000200",
+        "filename": "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+        "sha256": "e232b17f087940308a0487218fbcb9a20343c2aa489646a612f42d56aaea2572"
+      },
+      {
+        "version": "20260709000100",
+        "filename": "20260709000100_messaging_channel_provider_foundation.sql",
+        "sha256": "32f3bd3c5cec1ce2188eb3e631f358d188d3dc084b1f21853140a0f635ea17f0"
+      },
+      {
+        "version": "20260709000200",
+        "filename": "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+        "sha256": "161f8f51009bf1c1bca127e01ed6ce6d068dcbe34eadaa2d866402aa4033e0f5"
+      },
+      {
+        "version": "20260710000100",
+        "filename": "20260710000100_auth_transport_resilience_decision_foundation.sql",
+        "sha256": "6a76183799f25d501fad0f084bcd4c6159b96779343fd3700729e98f4483068b"
+      },
+      {
+        "version": "20260711000100",
+        "filename": "20260711000100_whatsapp_inbound_message_foundation.sql",
+        "sha256": "5c95c6a270988e26ed1c70d778f0420b84663a30037949f5898503079a858d3a"
+      },
+      {
+        "version": "20260711000200",
+        "filename": "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+        "sha256": "80cb049231d347ebd52fd628bd9b99be1f6c5a79f24b380be844fba951fcba90"
+      },
+      {
+        "version": "20260712000300",
+        "filename": "20260712000300_communication_consent_command_writer_rpc.sql",
+        "sha256": "0fbc02fa87a64ca41a9f2018116ee954a6f433d86b0c99385edee1146d7d71fb"
+      },
+      {
+        "version": "20260713000100",
+        "filename": "20260713000100_communication_consent_ack_intents.sql",
+        "sha256": "28e17928287964b03ca1ccdb50e8c0dfb69a87422cc2f262d6ecfe3c0e53affe"
+      },
+      {
+        "version": "20260716000100",
+        "filename": "20260716000100_communication_provider_account_binding.sql",
+        "sha256": "db73a23ca8e1bac86d023a72f920828b103aa8cafe4278be5664a11b40c0518a"
+      },
+      {
+        "version": "20260720000100",
+        "filename": "20260720000100_communication_delivery_event_provider_account_required.sql",
+        "sha256": "df951f3788f02545fe31e517753f419b1f9e9f14b8142dd0bd58d8db22be33d7"
+      },
+      {
+        "version": "20260721000100",
+        "filename": "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+        "sha256": "056696790cfdf2c55ab187dc58e211eab0aa232b47d131abd9009cebf5e831a0"
+      }
+    ]
+  },
+  "postBaselineApplied": [
+    {
+      "version": "20260723000100",
+      "filename": "20260723000100_qf_mvp_marketplace_authority_foundation.sql",
+      "name": "qf_mvp_marketplace_authority_foundation",
+      "localSha256": "b6307094715a102fa0cfccc1533cb8089e5b26fbe1e80a294c127b81e29f2b83",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000200",
+      "filename": "20260723000200_qf_mvp_assignment_lineage_backfill.sql",
+      "name": "qf_mvp_assignment_lineage_backfill",
+      "localSha256": "9d77f4460701caa1caf172b50886b681f4b7e86849172ca2a7af1ece70eb3d60",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000300",
+      "filename": "20260723000300_qf_mvp_canonical_assignment_authority.sql",
+      "name": "qf_mvp_canonical_assignment_authority",
+      "localSha256": "46ce7377a217a13620305572f1be9038a56c911ce76a556b4d52f91fe107177e",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000400",
+      "filename": "20260723000400_qf_mvp_lineage_append_only_grants.sql",
+      "name": "qf_mvp_lineage_append_only_grants",
+      "localSha256": "91544524c27ca26020b648f13f462d2613ca407366c8de0f258ea4f04d8c553b",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000500",
+      "filename": "20260723000500_qf_mvp_assignment_universal_enforcement.sql",
+      "name": "qf_mvp_assignment_universal_enforcement",
+      "localSha256": "d13703553663271172cfdcedc5e9be8374e7e9c1d225d2c67816fce837450cf3",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000600",
+      "filename": "20260723000600_qf_mvp_public_projection_privilege_hardening.sql",
+      "name": "qf_mvp_public_projection_privilege_hardening",
+      "localSha256": "0d3d871b0c6ab9de8d82eeb8499437f1f40a8a6c81561cf41cb8ade60b464da2",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000700",
+      "filename": "20260723000700_qf_mvp_auth_user_onboarding_trigger.sql",
+      "name": "qf_mvp_auth_user_onboarding_trigger",
+      "localSha256": "8fb3c28c2c0e776d88d3c8163a895c5e108cb84b89ac95f41b86a521f50daecd",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000800",
+      "filename": "20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql",
+      "name": "qf_mvp_legacy_assignment_rpc_execute_revocation",
+      "localSha256": "94c696cdd5c1e91ad75222aa8cad544daf8c5271b1453fb78729bd62d7db520a",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723000900",
+      "filename": "20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql",
+      "name": "qf_mvp_credit_ledger_reconciliation_exception_register",
+      "localSha256": "75b6faf2f7ed52007b79b9036dd5998f00eb67d88e62ffa34b3d9d1343c5039d",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723001000",
+      "filename": "20260723001000_qf_mvp_profiles_privilege_admin_role_cleanup.sql",
+      "name": "qf_mvp_profiles_privilege_admin_role_cleanup",
+      "localSha256": "5cf12b726b40aea6cac1d7f97eb2b289d6a46db39f9adc197249a37939a16592",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723001100",
+      "filename": "20260723001100_qf_mvp_vendor_crm_foundation.sql",
+      "name": "qf_mvp_vendor_crm_foundation",
+      "localSha256": "9212f746f0eb90a0be281b9b31c34e3c4ea19466d5d09c9e29f11bafb969ed34",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260723001200",
+      "filename": "20260723001200_qf_mvp_vendor_segment_foundation.sql",
+      "name": "qf_mvp_vendor_segment_foundation",
+      "localSha256": "e5f05be8d1ae856056158772f9cc492643d550af85751ac987451e4ca6729f77",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false,
+      "byteProvenance": "UNAVAILABLE",
+      "remoteStatementCount": 1,
+      "remoteOrderedStatementDigestSha256": "21a8f22417ca9e895590ce2411544f3667660cdc74eefa3f46032c7eb9f07b00"
+    },
+    {
+      "version": "20260723001300",
+      "filename": "20260723001300_qf_mvp_vendor_campaign_foundation.sql",
+      "name": "qf_mvp_vendor_campaign_foundation",
+      "localSha256": "3a92fd063bf222230578532ae2df1bb602ceb9fe625363650d33a7bcd54fc268",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false,
+      "byteProvenance": "UNAVAILABLE",
+      "remoteStatementCount": 1,
+      "remoteOrderedStatementDigestSha256": "0ac1ee093c4fbeb9bbb1e8b19551f614c3dba2970c168f3e58edc5753f18d405"
+    },
+    {
+      "version": "20260723001400",
+      "filename": "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql",
+      "name": "qf_mvp_vendor_campaign_evidence_hardening",
+      "localSha256": "c554704378e4d673273344c797a3b68eb875ace766553c3f5ab5bb81cf30e31a",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false
+    },
+    {
+      "version": "20260728001500",
+      "filename": "20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql",
+      "name": "qf_mvp_vendor_campaign_execution_handoff_foundation",
+      "localSha256": "51ccaada4fa934e855aa7da37535cd753b692ef8855800adadbe1819ebf81687",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false,
+      "byteProvenance": "REPRESENTATION_EQUIVALENT",
+      "remoteStatementCount": 1,
+      "remoteOrderedStatementDigestSha256": "459a9698a31318759bf6ff605050224136e5dddf4c216646a46823b01177be52"
+    },
+    {
+      "version": "20260728001600",
+      "filename": "20260728001600_qf_mvp_frequency_policy_history_hardening.sql",
+      "name": "qf_mvp_frequency_policy_history_hardening",
+      "localSha256": "e1ab794e82964b875c87d9126db0ce801eb06f5e7e099aa1bc13d37d46178c95",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false,
+      "byteProvenance": "EXACT",
+      "remoteStatementCount": 1,
+      "remoteOrderedStatementDigestSha256": "4823948c3389f094a88ddbf177db5dae3e90b0812447266ee42885ed4b25688f"
+    },
+    {
+      "version": "20260801110000",
+      "filename": "20260801110000_qf_mvp_automation_action_persistence.sql",
+      "name": "qf_mvp_automation_action_persistence",
+      "localSha256": "ffdd69e5b04f6cf3e747d4d4959b9c4fcae848aeac36697fdffc83d5403f70fc",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false,
+      "byteProvenance": "UNAVAILABLE",
+      "remoteStatementCount": 79,
+      "remoteOrderedStatementDigestSha256": "c37232cbc2a041fd58bd7d8cefc4ff3a0e27ce3c415d0d03c33e0b2fe60856e4"
+    },
+    {
+      "version": "20260801152049",
+      "filename": "20260801152049_qf_mvp_automation_transport_replay_guard.sql",
+      "name": "qf_mvp_automation_transport_replay_guard",
+      "localSha256": "28405567e2dd1370db4ccf58526701ca2713adbe19188838f16a510eb8128257",
+      "ledgerApplication": "PROVEN",
+      "semanticApplication": "PROVEN",
+      "deploymentBlocker": false,
+      "byteProvenance": "UNAVAILABLE",
+      "remoteStatementCount": 1,
+      "remoteOrderedStatementDigestSha256": "d5a6a68f267af3ca55822a347211292224ad73a21551720bc128786a56349b72"
+    }
+  ],
+  "pendingTarget": {
+    "version": "20260803000000",
+    "name": "qf_mvp_50_2c_lead_communication_recipient",
+    "path": "supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql",
+    "sha256": "77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca",
+    "operationalStatus": "PENDING",
+    "documentationStatus": "SOURCE_CONTROLLED_PREFLIGHT_IMPORTED_BY_G1",
+    "newerLocalMigrationCount": 0,
+    "remoteVersionStatusAtL3": "ABSENT",
+    "preflightEvidencePath": "docs/QF-MVP-50-2C-S1-STAGING-PREFLIGHT-EVIDENCE.md"
+  },
+  "safety": {
+    "baselineMustRemainOutsideMigrations": true,
+    "preBaselineReplayForbidden": true,
+    "preBaselineMassRepairAsAppliedForbidden": true,
+    "baselineRemoteRowRevertForbidden": true,
+    "includeAllForbiddenForThisLineage": true,
+    "ordinaryFullRepositoryDbPushAuthorizedForTarget": false,
+    "targetRequiresFreshPreflight": true,
+    "targetRequiresExactOneTargetDryRun": true,
+    "targetRequiresIsolatedVersionPreservingDesign": true,
+    "targetRequiresIndependentPostApplyVerification": true,
+    "forbiddenTargets": [
+      "production",
+      "jarvis",
+      "onedecore"
+    ]
+  },
+  "evidence": {
+    "acceptedL3Decision": "L3_DESIGN_A",
+    "l3FinalMarker": "QF_MVP_50_2C_S2_L3_FORENSIC_AUDIT_READY_FOR_OWNER_DECISION",
+    "importedS1EvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
+    "importedS1EvidencePath": "docs/QF-MVP-50-2C-S1-STAGING-PREFLIGHT-EVIDENCE.md",
+    "importedS1HistoricalMain": "e511166119703c6044a73d4629a031a6685a3415",
+    "importedS1FinalStatus": "QF_MVP_50_2C_S1_STAGING_PREFLIGHT_READY",
+    "g1PerformsDatabaseAccess": false
+  }
+}

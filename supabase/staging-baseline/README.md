@@ -22,6 +22,12 @@
 - Verification SQL SHA256: `7ba9792f300119b7c1aa84a4c02394186116a507c9097bd6f95f23f55e504193` (**current**, QF-MVP-20.2C2R — exact `to_regprocedure` OID function resolution + `conindid` index classification). Superseded: `e82b757f…` (20.2C1R identity-scoped) and `89362a35…` (original).
 - **Status: baseline APPLIED to staging and FULLY VERIFIED** — all 40 corrected verification rows PASS. Migration history holds exactly one row (`20260722000100` / `qf_mvp_staging_baseline_269c9265`).
 
+### G1 checksum provenance correction (QF-MVP-50.2C-S2-G1)
+
+The generated checksum above is retained as a historical documented value. L3 proved that the tracked baseline SQL has exactly one Git content revision and currently hashes to `101ac82c7840eec8802155fec4d4a18cba445447b7d773aaf168417f737aa33c` (Git blob `65e56c0419a986cc14a5abcfb184dd4a82625630`). The historical `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` checksum is unreproducible from the immutable Git source and the tested LF, CRLF, BOM, and final-newline representations. Its status is `DOCUMENTATION_ERROR_UNREPRODUCIBLE`, and it must not be used as a repository source-integrity gate.
+
+The historical external apply workspace is not retained, so its exact file bytes cannot now be re-proven. Remote ledger identity—version `20260722000100`, name `qf_mvp_staging_baseline_269c9265`, and 821 stored statements—plus successful staging verification remain the application evidence. The source-schema SHA-256 `269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f` is unchanged. The baseline remains staging-only and outside `supabase/migrations/`.
+
 ## Regenerate (deterministic, offline — no DB/network)
 
 Portable form (adjust the external dump path for your machine):

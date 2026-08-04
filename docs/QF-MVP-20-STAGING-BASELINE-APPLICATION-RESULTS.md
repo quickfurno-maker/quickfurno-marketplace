@@ -12,6 +12,12 @@
 
 Baseline SQL remained byte-identical (`920a4aa0…`) throughout.
 
+## Checksum provenance correction — QF-MVP-50.2C-S2-G1
+
+The original report recorded `920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81` as the repository and external copied-migration checksum. The later L3 forensic audit proved that the immutable repository baseline has one Git content revision and hashes to `101ac82c7840eec8802155fec4d4a18cba445447b7d773aaf168417f737aa33c`. The `920a4aa0…` value was not reproduced by the Git source or tested LF, CRLF, BOM, and final-newline representations. The old repository-source checksum claim is therefore a documentation error and is withdrawn as a source-integrity assertion.
+
+The external apply workspace is no longer retained, so the exact historical external-file byte identity cannot now be re-proven. This correction does not invalidate the exact remote ledger version/name/statement identity or the successful corrected **40/40** staging verification. G1 made no database mutation and did not rerun or rewrite the historical command output below.
+
 ## 1. Branch & commit baseline
 
 Branch `mvp/qf-mvp-20-marketplace-engine-v1` @ `b72308ae20cc0dbbccb1f1523ae3a6ed1fb1bfe5`; tracked tree clean; secrets/skills excluded; `supabase/migrations/**` unchanged.

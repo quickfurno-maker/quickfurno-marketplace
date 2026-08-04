@@ -1,7 +1,7 @@
 # QF-MVP-50.2C-S2 — Staging Migration-History Governance
 
-**Status:** G1 source-governance candidate only  
-**Environment:** QuickFurno Staging (`uckafzuochmbvtiodmcl`)  
+**Status:** G1 source-governance candidate only
+**Environment:** QuickFurno Staging (`uckafzuochmbvtiodmcl`)
 **Database or migration application authorized by G1:** **NO**
 
 ## 1. Intentional staging-history model

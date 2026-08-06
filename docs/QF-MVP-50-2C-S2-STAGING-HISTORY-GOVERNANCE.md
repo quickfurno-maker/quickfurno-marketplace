@@ -67,6 +67,19 @@ The single permitted post-anchor migration is:
 
 No generic future-migration allowance is granted. G1 still fails closed on a second post-anchor migration, a renamed candidate, a candidate whose on-disk or manifest hash drifts, a missing candidate, a second manifest `PENDING` entry, a candidate silently marked `APPLIED`, and a fabricated remote-absence claim. Direct migration count is pinned at exactly `88`.
 
+### 4b. This pin is a checkpoint, not a roadmap prohibition
+
+G1 freezes the **current** candidate state. It is **not** a statement that no further migration may ever exist, and it does not block QF-MVP-50.2E, 50.3 or any later phase.
+
+The pin is designed to be **re-pinned, never loosened**. A later phase that legitimately adds a migration must, in the same commit:
+
+1. bump the exact migration count;
+2. add that migration's exact version, name, path and canonical SHA-256 to `pendingPostAnchorMigrations`;
+3. move any migration that has since been applied to staging out of the pending list and record it with its own imported owner-reviewed evidence marker, as §4 did for `20260803000000`;
+4. keep every mutant honest — a second unpinned, renamed, hash-drifted or missing candidate must still fail.
+
+What is permanently forbidden is the *shape* of the relaxation, not the act of adding migrations: never `version > anchor`, never `count >= N`, never a wildcard, and never a remote status asserted by an offline validator. Each new migration is pinned individually and deployed through its own authorized staging gate.
+
 ## 5. Fail-closed deployment boundaries
 
 - **No replay:** never replay the 68 pre-baseline versions on staging.

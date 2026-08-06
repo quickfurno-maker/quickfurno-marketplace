@@ -148,9 +148,27 @@ export type CompletionEvidenceRuling =
  *   delivered Verified forward webhook from accepted/sent/outcome_unknown.
  *   read      Verified forward webhook.
  *
- *   retry_scheduled  recordDispatchFailure with result.retryable, a lane that
- *                    allows retry, and attempts remaining. This is Core's own
- *                    normalized retry-safe failure.
+ *   retry_scheduled  NOT completable. This is the one status that looks
+ *                    completable and is not. recordDispatchFailure writes it
+ *                    together with `next_retry_at`, and it means THE
+ *                    COMMUNICATION LANE OWNS A PENDING PROVIDER RETRY FOR THIS
+ *                    EXACT MESSAGE ROW: dispatchPersistedMessage accepts
+ *                    precisely `queued` and `retry_scheduled` and re-dispatches
+ *                    the SAME row under the SAME idempotency key.
+ *
+ *                    An automation `retryable_failure` is a DIFFERENT lifecycle:
+ *                    it opens a NEW attempt, which yields a NEW
+ *                    qf_auto_v1:{jobId}:{attemptId} key and therefore a SECOND
+ *                    communication row and a SECOND provider send. Mapping this
+ *                    status to retryable_failure would stand up two independent
+ *                    retry mechanisms over one logical send and deliver the
+ *                    client duplicate messages.
+ *
+ *                    So the attempt is simply NOT YET RESOLVED — the same
+ *                    ruling as queued/dispatching — and the callback is refused
+ *                    until the communication lane reaches a terminal state.
+ *                    Nothing here cancels, consumes or mutates the pending
+ *                    communication retry; that is not this phase's authority.
  *
  *   failed      A non-retryable provider failure, or markMessageFailed for a
  *               terminal failure that never reached the provider.
@@ -165,6 +183,17 @@ export type CompletionEvidenceRuling =
  *                    "unknown_outcome": the provider may have accepted and Core
  *                    can neither prove nor disprove it. This is exactly the
  *                    automation `uncertain` meaning — terminal, never resent.
+ *
+ *   NOTE ON RETRY: because retry_scheduled is the communication lane's own
+ *   pending retry, NO communication status currently maps to
+ *   `retryable_failure`. The automation retry schedule in ./retryPolicy.ts is
+ *   still Core-owned, exercised and correct — it is simply unreachable from
+ *   this table today. QF-MVP-50.2E may introduce a genuine automation-level
+ *   retryable failure (a pre-execution refusal that creates NO communication
+ *   row, so there is nothing for the communication lane to retry); that is when
+ *   it becomes reachable. Adding a retryable mapping here without proving no
+ *   communication-lane retry is pending would reintroduce the duplicate-send
+ *   defect described above.
  *
  *   queued / dispatching  NOT completable. `queued` means no dispatch has begun;
  *                         `dispatching` means a provider call is still in flight
@@ -206,9 +235,8 @@ export const COMPLETION_EVIDENCE_RULINGS: Readonly<
     safeCode: "QF_COMM_READ",
   },
   retry_scheduled: {
-    completable: true,
-    classification: "retryable_failure",
-    safeCode: "QF_COMM_RETRY_SCHEDULED",
+    completable: false,
+    code: "AUTOMATION_COMPLETION_COMMUNICATION_RETRY_PENDING",
   },
   failed: {
     completable: true,

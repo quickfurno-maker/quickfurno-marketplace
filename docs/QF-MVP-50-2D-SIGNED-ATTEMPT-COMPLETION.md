@@ -55,7 +55,7 @@ Every ruling is justified by the exact Core writer that can produce the state. R
 | `sent` | `success` | `recordDispatchSuccess` with a synchronous provider "sent", or a verified forward webhook. |
 | `delivered` | `success` | Verified forward webhook. |
 | `read` | `success` | Verified forward webhook. |
-| `retry_scheduled` | `retryable_failure` | `recordDispatchFailure` with a retryable error, a retry-allowing lane and attempts remaining. |
+| `retry_scheduled` | **not completable** | The communication lane owns a pending provider retry for that exact row — see §3a. |
 | `failed` | `definitive_failure` | Non-retryable provider failure, or `markMessageFailed` for a terminal pre-provider failure. |
 | `dead_letter` | `definitive_failure` | Retryable errors exhausted. A fresh automation attempt would mint a new idempotency key and therefore a new message — amplifying a send the communication lane already gave up on. |
 | `cancelled` | `definitive_failure` | Administratively terminal. |
@@ -64,6 +64,18 @@ Every ruling is justified by the exact Core writer that can produce the state. R
 | `dispatching` | **not completable** | A provider call is still in flight; the outcome is genuinely unresolved. |
 
 The table is total over the closed 11-value vocabulary. An unrecognised status returns `AUTOMATION_COMPLETION_EVIDENCE_UNKNOWN_STATE` rather than inheriting a neighbour's meaning.
+
+### 3a. Why `retry_scheduled` is refused (the two-retry-mechanism fence)
+
+`recordDispatchFailure` writes `retry_scheduled` together with `next_retry_at`, and `dispatchPersistedMessage` accepts precisely `queued` and `retry_scheduled` and re-dispatches **the same row under the same idempotency key**. That status therefore means *the communication lane owns a pending provider retry for this exact message*.
+
+An automation `retryable_failure` is a **different lifecycle**: it opens a new attempt, which yields a new `qf_auto_v1:{jobId}:{attemptId}` key and therefore a **second** communication row and a **second** provider send. Mapping `retry_scheduled` to `retryable_failure` would stand up two independent retry mechanisms over one logical send and deliver the client duplicate WhatsApp messages — immediately in the form of an abandoned row still marked "retry pending", and visibly the moment the communication due-sweep is wired to its existing entry point.
+
+So the attempt is treated as **not yet resolved** — the same ruling as `queued`/`dispatching` — and the callback is refused with `AUTOMATION_COMPLETION_COMMUNICATION_RETRY_PENDING` until the communication lane reaches a terminal state. Nothing here cancels, consumes or mutates the pending communication retry; that is not this phase's authority.
+
+**Consequence:** no communication status currently maps to `retryable_failure`. The automation retry schedule below is still Core-owned, exercised and correct — it is simply unreachable from the mapping today. It becomes reachable when 50.2E introduces a genuine automation-level retryable failure (a pre-execution refusal that creates no communication row, so there is nothing for the communication lane to retry). Adding a retryable mapping without first proving no communication-lane retry is pending would reintroduce the duplicate-send defect.
+
+The three terminal failure states are safe by the same test: `dead_letter` and `cancelled` are absorbing states with `next_retry_at = null`, and `outcome_unknown` is explicitly parked with no retry and no dead-letter — none of them carries a pending communication retry.
 
 **No evidence, no completion.** If no communication row exists for the derived key, the callback fails closed with `AUTOMATION_COMPLETION_EVIDENCE_NOT_FOUND` and the attempt stays owned and open. This is the expected state until 50.2E exists; no evidence is invented to make the route look useful sooner.
 

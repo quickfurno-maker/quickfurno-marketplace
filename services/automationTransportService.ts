@@ -282,6 +282,13 @@ export async function completeAutomationAttemptForN8nTransport(
   // Only a retryable failure may carry a retry timestamp, and Core alone
   // computes it. When the budget is spent this stays null so the RPC applies
   // its own dead-letter rule.
+  //
+  // No communication status maps to `retryable_failure` today — `retry_scheduled`
+  // is the communication lane's OWN pending retry and is refused as unresolved,
+  // so completing it here would create a second, duplicate send. This branch is
+  // therefore currently unreachable and is retained deliberately: retry timing
+  // must already be Core-owned when QF-MVP-50.2E introduces a genuine
+  // automation-level retryable failure. See lib/automation/completionContract.ts.
   const nextRetryAt =
     ruling.classification === "retryable_failure"
       ? buildAutomationNextRetryAt({

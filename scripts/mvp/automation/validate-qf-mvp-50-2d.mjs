@@ -382,9 +382,31 @@ record("E05 accepted is proven provider acceptance, not internal queueing",
     return /effectiveOutcomeCertainty\(result\) === "accepted"\s*\n?\s*\? await this\.recordDispatchSuccess/.test(svc) &&
       /const target: CommunicationMessageStatus = result\.normalizedStatus === "sent" \? "sent" : "accepted"/.test(svc);
   })());
-record("E06 retry_scheduled is the only retryable_failure state",
-  RULING("retry_scheduled").classification === "retryable_failure" &&
-  COMMUNICATION_MESSAGE_STATUSES.filter((s) => RULING(s).completable && RULING(s).classification === "retryable_failure").length === 1);
+// --- the duplicate-retry fence (QF-MVP-50.2D-R1 review finding) -------------
+// `retry_scheduled` means the COMMUNICATION lane owns a pending provider retry
+// for that exact row. An automation retryable_failure opens a NEW attempt, a new
+// idempotency key and therefore a SECOND message. Mapping it would run two retry
+// mechanisms over one logical send.
+record("E06 retry_scheduled is NOT completable — the communication lane owns that retry",
+  RULING("retry_scheduled").completable === false &&
+  RULING("retry_scheduled").code === "AUTOMATION_COMPLETION_COMMUNICATION_RETRY_PENDING");
+record("E06a no communication status maps to retryable_failure",
+  COMMUNICATION_MESSAGE_STATUSES.filter((s) => RULING(s).completable && RULING(s).classification === "retryable_failure").length === 0);
+record("E06b the communication lane's re-dispatch entry point still owns exactly queued+retry_scheduled",
+  (() => {
+    const svc = stripJs(read("services/communicationService.ts"));
+    return /message\.status !== "queued" && message\.status !== "retry_scheduled"/.test(svc) &&
+      /finalStatus = "retry_scheduled"/.test(svc) &&
+      /updates\.next_retry_at = new Date\(/.test(svc);
+  })());
+record("E06c a terminal communication state carries no pending communication retry",
+  (() => {
+    const svc = stripJs(read("services/communicationService.ts"));
+    // dead_letter and cancelled are absorbing states in ALLOWED_TRANSITIONS, and
+    // outcome_unknown is explicitly parked with next_retry_at = null.
+    return /dead_letter: \[\],/.test(svc) && /cancelled: \[\],/.test(svc) &&
+      /outcome_unknown: \["sent", "delivered", "read", "failed"\],/.test(svc);
+  })());
 record("E07 failed/dead_letter/cancelled are definitive failures",
   ["failed", "dead_letter", "cancelled"].every((s) => RULING(s).classification === "definitive_failure"));
 record("E08 dead_letter never becomes a fresh automation retry",
@@ -399,6 +421,9 @@ record("E10 queued and dispatching are NOT completable",
   RULING("queued").completable === false && RULING("dispatching").completable === false &&
   RULING("queued").code === "AUTOMATION_COMPLETION_EVIDENCE_UNRESOLVED" &&
   RULING("dispatching").code === "AUTOMATION_COMPLETION_EVIDENCE_UNRESOLVED");
+record("E10a exactly three statuses are refused as unresolved",
+  COMMUNICATION_MESSAGE_STATUSES.filter((s) => !RULING(s).completable).sort().join(",") ===
+  "dispatching,queued,retry_scheduled");
 record("E11 routing/claim/HTTP-200 is never a success input",
   !/statusCode|httpStatus|routing|workflowFinished|n8nCompleted/i.test(contractCode) &&
   Object.keys(COMPLETION_EVIDENCE_RULINGS).every((s) => COMMUNICATION_MESSAGE_STATUSES.includes(s)));
@@ -691,6 +716,8 @@ const TS_MUTANTS = [
     resolveCompletionEvidenceRuling("totally_new").completable === false],
   ["dispatching treated as completable", () => COMPLETION_EVIDENCE_RULINGS.dispatching.completable === false],
   ["queued treated as completable", () => COMPLETION_EVIDENCE_RULINGS.queued.completable === false],
+  ["retry_scheduled completed into a second, duplicate send", () =>
+    COMPLETION_EVIDENCE_RULINGS.retry_scheduled.completable === false],
   ["the retry cap exceeded", () => automationRetryDelaySeconds(99) === 3600],
   ["a retry scheduled past the budget", () => buildAutomationNextRetryAt({ attemptCount: 5, maxAttempts: 5, now: NOW }) === null],
   ["a claim-path signature accepted at the completion route", () =>

@@ -40,9 +40,32 @@ Exactly 18 post-baseline versions are approved as common local/remote staging hi
 
 The machine-readable manifest is authoritative for the exact 18-version set and the six captured remote statement digests. It deliberately does not invent remote digests for the other 12 versions.
 
-## 4. Pending target
+## 4. Applied anchor (superseding the original "pending target" section)
 
-`20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql` is operationally `PENDING` and was absent remotely at L3. Its locked SHA-256 is `77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca`. G1 imports the accepted S1 preflight record into source control; it does not apply the migration and does not make the historical S1 observation permanent current-state proof.
+`20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql` was operationally `PENDING` and absent remotely **at L3**. Its locked SHA-256 remains `77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca`. G1 imports the accepted S1 preflight record into source control; it does not apply the migration and does not make the historical S1 observation permanent current-state proof.
+
+**QF-MVP-50.2C-S2-D2-R1 subsequently applied and verified it on QuickFurno Staging** under the owner-reviewed marker `QF_MVP_50_2C_S2_D2_R1_STAGING_MIGRATION_APPLIED_AND_VERIFIED`: applied exactly once, remote history count `20`, target present exactly once, local/remote SHA exact, `recipient_type` vocabulary now including `lead`, with no repair and no replay.
+
+It is therefore recorded in the manifest as the frozen **applied anchor** (`appliedAnchor`, `operationalStatus: APPLIED`). The `remoteVersionStatusAtL3: ABSENT` field is retained deliberately: it is a historical L3 observation, not a current-state claim. G1 performs no database access and re-proves none of this itself — the applied status is imported owner-reviewed evidence, exactly like S1.
+
+## 4a. Post-anchor migration pin — QF-MVP-50.2D-R1
+
+The original G1 rule was *"`20260803000000` must be the newest local migration and there must be zero newer ones."* That rule was correct only while the target was pending. Now that the anchor is applied, it is **re-pinned, not loosened**:
+
+> The anchor is frozen and applied. **Exactly one** explicitly declared, hash-pinned post-anchor migration may exist, and it remains `PENDING` until its own separately authorized staging deployment gate.
+
+The single permitted post-anchor migration is:
+
+| Field | Value |
+|---|---|
+| Version | `20260804000000` |
+| Name | `qf_mvp_50_2d_automation_transport_completion_route` |
+| Phase | QF-MVP-50.2D |
+| SHA-256 | `043f1e3bbe261aef516ca35b54eb3e1c339d21d6b0c55c77f1d138eb502fa2c2` |
+| Operational status | `PENDING` — not applied by QF-MVP-50.2D |
+| Remote status | `NOT_PROVEN_OFFLINE` — G1 makes no network claim about it |
+
+No generic future-migration allowance is granted. G1 still fails closed on a second post-anchor migration, a renamed candidate, a candidate whose on-disk or manifest hash drifts, a missing candidate, a second manifest `PENDING` entry, a candidate silently marked `APPLIED`, and a fabricated remote-absence claim. Direct migration count is pinned at exactly `88`.
 
 ## 5. Fail-closed deployment boundaries
 
@@ -53,6 +76,6 @@ The machine-readable manifest is authoritative for the exact 18-version set and 
 - **No normal full-repo push:** an ordinary full-repository `db push` is not an authorized target-deployment mechanism.
 - **No authority from G1:** this document, manifest, validator, and imported evidence authorize no migration or database mutation.
 
-A future target-deployment phase must use an isolated, version-preserving workspace; re-prove the staging identity and live preconditions at the last moment; perform an owner-authorized dry-run that proposes exactly `20260803000000`; apply only after separate authorization; and independently verify the postconditions.
+A target-deployment phase must use an isolated, version-preserving workspace; re-prove the staging identity and live preconditions at the last moment; perform an owner-authorized dry-run that proposes exactly the one intended version; apply only after separate authorization; and independently verify the postconditions. QF-MVP-50.2C-S2-D2-R1 discharged this for the `20260803000000` anchor. The pinned `20260804000000` post-anchor migration has NOT been through it and must repeat it in full.
 
 This is an environment-specific staging model. It provides no production deployment authorization or migration-history conclusion for production. Production, Jarvis, and OneDecore remain forbidden targets for this lineage.

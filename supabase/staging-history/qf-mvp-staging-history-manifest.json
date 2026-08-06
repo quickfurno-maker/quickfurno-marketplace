@@ -572,17 +572,35 @@
       "remoteOrderedStatementDigestSha256": "d5a6a68f267af3ca55822a347211292224ad73a21551720bc128786a56349b72"
     }
   ],
-  "pendingTarget": {
+  "appliedAnchor": {
     "version": "20260803000000",
     "name": "qf_mvp_50_2c_lead_communication_recipient",
     "path": "supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql",
     "sha256": "77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca",
-    "operationalStatus": "PENDING",
+    "operationalStatus": "APPLIED",
     "documentationStatus": "SOURCE_CONTROLLED_PREFLIGHT_IMPORTED_BY_G1",
-    "newerLocalMigrationCount": 0,
     "remoteVersionStatusAtL3": "ABSENT",
-    "preflightEvidencePath": "docs/QF-MVP-50-2C-S1-STAGING-PREFLIGHT-EVIDENCE.md"
+    "preflightEvidencePath": "docs/QF-MVP-50-2C-S1-STAGING-PREFLIGHT-EVIDENCE.md",
+    "appliedEvidenceMarker": "QF_MVP_50_2C_S2_D2_R1_STAGING_MIGRATION_APPLIED_AND_VERIFIED",
+    "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
+    "remoteHistoryCountAfterApply": 20,
+    "appliedExactlyOnce": true,
+    "postAnchorMigrationCount": 1,
+    "supersedesNewestLocalMigrationRule": "QF-MVP-50.2D-R1"
   },
+  "pendingPostAnchorMigrations": [
+    {
+      "version": "20260804000000",
+      "name": "qf_mvp_50_2d_automation_transport_completion_route",
+      "path": "supabase/migrations/20260804000000_qf_mvp_50_2d_automation_transport_completion_route.sql",
+      "sha256": "043f1e3bbe261aef516ca35b54eb3e1c339d21d6b0c55c77f1d138eb502fa2c2",
+      "phase": "QF-MVP-50.2D",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    }
+  ],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,
@@ -594,6 +612,9 @@
     "targetRequiresExactOneTargetDryRun": true,
     "targetRequiresIsolatedVersionPreservingDesign": true,
     "targetRequiresIndependentPostApplyVerification": true,
+    "postAnchorMigrationsRequireOwnStagingGate": true,
+    "postAnchorMigrationsMustBeExplicitlyPinned": true,
+    "genericFutureMigrationAllowanceForbidden": true,
     "forbiddenTargets": [
       "production",
       "jarvis",

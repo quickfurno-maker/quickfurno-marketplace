@@ -97,6 +97,9 @@ jobs:
       - name: QF-MVP-50.2C-S2-G1 staging history governance
         run: npm run test:mvp:50-2c-s2-g1
 
+      - name: QF-MVP-50.2D validator
+        run: npm run test:mvp:50-2d
+
       - name: Typecheck
         run: npm run typecheck
 

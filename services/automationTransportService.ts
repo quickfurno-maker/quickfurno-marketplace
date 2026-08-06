@@ -7,13 +7,19 @@
 
 import { adminClient } from "@/lib/supabase";
 import {
+  getAutomationJob,
   getClaimedAutomationJobEnvelope,
 } from "@/services/automationPersistenceService";
+import { buildAutomationCommunicationIdempotencyKey } from "@/lib/automation/clientDispatchRegistry";
+import { resolveCompletionEvidenceRuling } from "@/lib/automation/completionContract";
+import { buildAutomationNextRetryAt } from "@/lib/automation/retryPolicy";
 import type {
   AutomationTransportClaimRow,
+  AutomationTransportCompletionRow,
   AutomationTransportRuntimeConfig,
   FreshClaimEvidence,
   N8nClaimResponseBody,
+  N8nCompleteResponseBody,
 } from "@/lib/automation/transportTypes";
 
 const SAFE_WORKER_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
@@ -170,6 +176,170 @@ export async function claimAutomationJobForN8nTransport(input: {
     executable: true,
     claim,
     job,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// QF-MVP-50.2D — signed attempt completion
+// ---------------------------------------------------------------------------
+
+export type N8nCompletionTransportResult =
+  | { ok: true; body: N8nCompleteResponseBody }
+  | { ok: false; status: 409; code: string };
+
+export interface CompleteAutomationAttemptForN8nTransportInput {
+  readonly requestId: string;
+  readonly workerId: string;
+  readonly bodySha256: string;
+  readonly jobId: string;
+  readonly attemptId: string;
+  readonly executorReference: string;
+  /** Canonical clock, injected so retry timing is deterministic under test. */
+  readonly now?: Date;
+}
+
+/**
+ * Finalize the exact current automation attempt from Core-owned evidence.
+ *
+ * NOTHING here trusts n8n. The classification, the safe code and the retry
+ * timestamp are all derived from the communication row that Core reaches
+ * through its OWN key, qf_auto_v1:{jobId}:{attemptId}. n8n's only contribution
+ * is an executorReference, and that is checked for equality against the row
+ * Core already found — never used to select a row.
+ *
+ * No provider call, no communication send, no Meta/WhatsApp, no n8n execution.
+ */
+export async function completeAutomationAttemptForN8nTransport(
+  input: CompleteAutomationAttemptForN8nTransportInput,
+): Promise<N8nCompletionTransportResult> {
+  if (!UUID_RE.test(input.requestId)) {
+    throw new Error("AUTOMATION_TRANSPORT_REQUEST_ID_INVALID");
+  }
+  if (!SAFE_WORKER_RE.test(input.workerId)) {
+    throw new Error("AUTOMATION_TRANSPORT_WORKER_ID_INVALID");
+  }
+  if (!SHA256_RE.test(input.bodySha256)) {
+    throw new Error("AUTOMATION_TRANSPORT_BODY_HASH_INVALID");
+  }
+  if (
+    !UUID_RE.test(input.jobId) ||
+    !UUID_RE.test(input.attemptId) ||
+    !UUID_RE.test(input.executorReference)
+  ) {
+    throw new Error("AUTOMATION_TRANSPORT_COMPLETION_IDENTITY_INVALID");
+  }
+
+  // Read ONLY to obtain the durable retry budget (attempt_count / max_attempts)
+  // needed to compute a legal next_retry_at. Ownership remains the RPC's
+  // authority and is deliberately not re-decided here.
+  const job = await getAutomationJob(input.jobId);
+  if (!job) {
+    return { ok: false, status: 409, code: "AUTOMATION_COMPLETION_JOB_NOT_FOUND" };
+  }
+
+  const idempotencyKey = buildAutomationCommunicationIdempotencyKey(
+    input.jobId,
+    input.attemptId,
+  );
+  if (!idempotencyKey) {
+    throw new Error("AUTOMATION_TRANSPORT_COMPLETION_IDENTITY_INVALID");
+  }
+
+  // `provider_message_id` is not in this projection. The provider's own message
+  // identifier is never read here and therefore can never be surfaced to n8n.
+  const { data: evidence, error: evidenceError } = await adminClient()
+    .from("communication_messages")
+    .select("id, status")
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+
+  if (evidenceError) throw evidenceError;
+
+  const message = evidence as { id: string; status: string } | null;
+  if (!message) {
+    // Expected until QF-MVP-50.2E creates execution evidence. No evidence is
+    // invented to make this route look useful before then.
+    return {
+      ok: false,
+      status: 409,
+      code: "AUTOMATION_COMPLETION_EVIDENCE_NOT_FOUND",
+    };
+  }
+
+  if (message.id !== input.executorReference) {
+    return {
+      ok: false,
+      status: 409,
+      code: "AUTOMATION_COMPLETION_EXECUTOR_REFERENCE_MISMATCH",
+    };
+  }
+
+  const ruling = resolveCompletionEvidenceRuling(message.status);
+  if (!ruling.completable) {
+    return { ok: false, status: 409, code: ruling.code };
+  }
+
+  // Only a retryable failure may carry a retry timestamp, and Core alone
+  // computes it. When the budget is spent this stays null so the RPC applies
+  // its own dead-letter rule.
+  const nextRetryAt =
+    ruling.classification === "retryable_failure"
+      ? buildAutomationNextRetryAt({
+          attemptCount: job.attempt_count,
+          maxAttempts: job.max_attempts,
+          now: input.now ?? new Date(),
+        })
+      : null;
+
+  const { data, error } = await adminClient()
+    .rpc("qf_complete_automation_attempt_transport_v1", {
+      p_request_id: input.requestId,
+      p_worker_id: input.workerId,
+      p_body_sha256: input.bodySha256,
+      p_job_id: input.jobId,
+      p_attempt_id: input.attemptId,
+      p_classification: ruling.classification,
+      p_safe_code: ruling.safeCode,
+      p_executor_reference: input.executorReference,
+      p_next_retry_at: nextRetryAt,
+    })
+    .maybeSingle();
+
+  if (error || !data) {
+    throw error ?? new Error("AUTOMATION_TRANSPORT_COMPLETION_FAILED");
+  }
+
+  const row = data as AutomationTransportCompletionRow;
+
+  if (
+    row.request_id !== input.requestId ||
+    row.route_key !== "complete_v1" ||
+    row.state !== "completed" ||
+    row.job_id !== input.jobId ||
+    row.attempt_id !== input.attemptId
+  ) {
+    throw new Error("AUTOMATION_TRANSPORT_COMPLETION_EVIDENCE_MISMATCH");
+  }
+
+  if (!row.classification || !row.safe_code || !row.executor_reference) {
+    throw new Error("AUTOMATION_TRANSPORT_COMPLETION_EVIDENCE_INCOMPLETE");
+  }
+
+  return {
+    ok: true,
+    body: {
+      ok: true,
+      transportVersion: 1,
+      requestId: input.requestId,
+      route: "complete_v1",
+      state: "completed",
+      replayed: row.is_replay,
+      jobStatus: row.job_status,
+      attemptStatus: row.attempt_status,
+      classification: row.classification,
+      safeCode: row.safe_code,
+      executorReference: row.executor_reference,
+    },
   };
 }
 

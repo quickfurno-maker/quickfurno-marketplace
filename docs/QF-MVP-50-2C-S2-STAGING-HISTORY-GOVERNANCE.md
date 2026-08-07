@@ -48,17 +48,18 @@ The machine-readable manifest is authoritative for the exact 18-version set and 
 
 It is therefore recorded in the manifest as the frozen **applied anchor** (`appliedAnchor`, `operationalStatus: APPLIED`). The `remoteVersionStatusAtL3: ABSENT` field is retained deliberately: it is a historical L3 observation, not a current-state claim. G1 performs no database access and re-proves none of this itself — the applied status is imported owner-reviewed evidence, exactly like S1.
 
-## 4a. Post-anchor migration pin — QF-MVP-50.2E-R1
+## 4a. Post-anchor migration pin — QF-MVP-50.2E-S2-G1
 
-This rule has now been re-pinned twice, and never loosened:
+This rule has now been re-pinned three times, and never loosened:
 
 | Revision | Rule |
 |---|---|
 | original | `20260803000000` must be the newest local migration; zero newer ones |
 | QF-MVP-50.2D-R1 | exactly **one** hash-pinned post-anchor migration, `PENDING` |
-| **QF-MVP-50.2E-R1** | exactly **two** hash-pinned post-anchor migrations, in exact order: one `APPLIED`, one `PENDING` |
+| QF-MVP-50.2E-R1 | exactly **two** hash-pinned post-anchor migrations, in exact order: one `APPLIED`, one `PENDING` |
+| **QF-MVP-50.2E-S2-G1** | exactly **two** hash-pinned post-anchor migrations, in exact order, **both `APPLIED`**; **zero** pending remain |
 
-> The anchor is frozen and applied. **Exactly two** explicitly declared, hash-pinned post-anchor migrations may exist, in exactly this order. The first is `APPLIED` on QuickFurno Staging under imported owner-reviewed evidence; the second remains `PENDING` until its own separately authorized staging deployment gate.
+> The anchor is frozen and applied. **Exactly two** explicitly declared, hash-pinned post-anchor migrations may exist, in exactly this order, and **both are now `APPLIED`** on QuickFurno Staging under their own imported owner-reviewed evidence markers and their own exact remote-history counts. **No pending post-anchor migration remains.**
 
 **Applied post-anchor migration:**
 
@@ -76,18 +77,27 @@ This rule has now been re-pinned twice, and never loosened:
 
 QF-MVP-50.2D-S2 applied and verified it on QuickFurno Staging: applied exactly once, remote migration history count `21`, target present exactly once, local/remote SHA exact. As with the `20260803000000` anchor in §4, G1 performs no database access and re-proves none of this itself — the applied status is **imported owner-reviewed evidence**, not an offline claim. Until this re-pin, source still recorded it as `PENDING` while it was operationally `APPLIED`; that gap existed because the staging deployment gate deliberately made no source edit, and closing it is a truthfulness obligation of the next phase that touches G1.
 
-**Pending post-anchor migration:**
+**Second applied post-anchor migration:**
 
 | Field | Value |
 |---|---|
 | Version | `20260805000000` |
 | Name | `qf_mvp_50_2e_automation_transport_client_execution_route` |
 | Phase | QF-MVP-50.2E |
-| SHA-256 | `9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b` |
-| Operational status | `PENDING` — not applied by QF-MVP-50.2E |
-| Remote status | `NOT_PROVEN_OFFLINE` — G1 makes no network claim about it |
+| SHA-256 | `9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b` (unchanged) |
+| Operational status | `APPLIED` |
+| Applied-evidence marker | `QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED` |
+| Evidence type | `IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD` |
+| Remote history count after apply | `22` |
+| Applied by the source phase that recorded it | **No** — QF-MVP-50.2E-S2-G1 applies nothing |
 
-No generic future-migration allowance is granted. G1 still fails closed on a third post-anchor migration, an out-of-order pair, a renamed candidate, a candidate whose on-disk or manifest hash drifts, a missing candidate, a second manifest `PENDING` entry, a candidate silently marked `APPLIED`, a pending candidate forging applied evidence, an applied candidate demoted back to `PENDING`, a forged applied marker, an altered remote history count, an applied candidate also listed as pending, and an understated post-anchor count. Direct migration count is pinned at exactly `89`.
+QF-MVP-50.2E-S2-R1 applied and verified it on QuickFurno Staging: applied exactly once, remote migration history count `22`, newest applied version `20260805000000`, ledger fully aligned, local/remote SHA exact. As with §4 and the first post-anchor migration, G1 performs no database access and re-proves none of this itself — the applied status is **imported owner-reviewed evidence**.
+
+**`pendingPostAnchorMigrations` is now empty.** A future phase that adds a migration re-pins it as a new `PENDING` entry and must deploy it through its own authorized staging gate; it never inherits an allowance from this state.
+
+**The successful 50.2E apply mechanism, for the record:** a fresh isolated TEMP directory outside Git, linked to the staging project, populated by `migration fetch --linked` (which reproduces the exact remote set including the controlled baseline), then the single target migration copied in, proven to be the only local-only version, dry-run once, pushed once. The TEMP was deleted afterwards. An **ordinary full-repository `db push` remains forbidden and is in fact structurally impossible** for this lineage: the repository legitimately holds 68 pre-baseline versions the remote does not, and the remote holds the controlled baseline the repository does not, so the CLI reports `LegacyDbPushMissingLocalError`. Its suggested remedies — `migration repair --status reverted` and `db pull` — remain **permanently forbidden**; that divergence is intentional and must never be "fixed".
+
+No generic future-migration allowance is granted. G1 still fails closed on a third post-anchor migration, an out-of-order pair, a renamed candidate, a candidate whose on-disk or manifest hash drifts, a missing candidate, **any** new `PENDING` entry, an applied candidate demoted back to `PENDING`, a missing or forged applied marker, a marker copied between migrations, an altered remote history count, a false `appliedExactlyOnce`, a changed evidence type, a source phase falsely claiming it performed the apply, a fabricated offline remote status, an applied candidate also listed as pending, and an understated post-anchor count. Direct migration count is pinned at exactly `89`.
 
 ### 4b. This pin is a checkpoint, not a roadmap prohibition
 
@@ -111,6 +121,6 @@ What is permanently forbidden is the *shape* of the relaxation, not the act of a
 - **No normal full-repo push:** an ordinary full-repository `db push` is not an authorized target-deployment mechanism.
 - **No authority from G1:** this document, manifest, validator, and imported evidence authorize no migration or database mutation.
 
-A target-deployment phase must use an isolated, version-preserving workspace; re-prove the staging identity and live preconditions at the last moment; perform an owner-authorized dry-run that proposes exactly the one intended version; apply only after separate authorization; and independently verify the postconditions. QF-MVP-50.2C-S2-D2-R1 discharged this for the `20260803000000` anchor, and QF-MVP-50.2D-S2 discharged it for `20260804000000`. The pinned `20260805000000` post-anchor migration has NOT been through it and must repeat it in full.
+A target-deployment phase must use an isolated, version-preserving workspace; re-prove the staging identity and live preconditions at the last moment; perform an owner-authorized dry-run that proposes exactly the one intended version; apply only after separate authorization; and independently verify the postconditions. QF-MVP-50.2C-S2-D2-R1 discharged this for the `20260803000000` anchor, QF-MVP-50.2D-S2 for `20260804000000`, and QF-MVP-50.2E-S2-R1 for `20260805000000`. Every future migration must repeat it in full.
 
 This is an environment-specific staging model. It provides no production deployment authorization or migration-history conclusion for production. Production, Jarvis, and OneDecore remain forbidden targets for this lineage.

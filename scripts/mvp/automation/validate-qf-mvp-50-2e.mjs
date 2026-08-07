@@ -700,33 +700,43 @@ record("G01 the anchor is untouched",
   manifest.appliedAnchor?.version === "20260803000000" &&
   manifest.appliedAnchor?.operationalStatus === "APPLIED" &&
   manifest.appliedAnchor?.remoteHistoryCountAfterApply === 20);
-record("G02 the post-anchor count is exactly two",
+// QF-MVP-50.2E-S2-G1. The 50.2E migration has now been applied to QuickFurno
+// Staging (imported owner-reviewed evidence, remote history 22), so BOTH
+// post-anchor migrations are APPLIED and ZERO remain pending.
+record("G02 exactly two APPLIED and zero PENDING post-anchor migrations",
   manifest.appliedAnchor?.postAnchorMigrationCount === 2 &&
-  manifest.appliedPostAnchorMigrations?.length === 1 &&
-  manifest.pendingPostAnchorMigrations?.length === 1);
+  manifest.appliedPostAnchorMigrations?.length === 2 &&
+  manifest.pendingPostAnchorMigrations?.length === 0 &&
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.version), ["20260804000000", "20260805000000"]));
 record("G03 20260804000000 is recorded APPLIED with remote history 21",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].operationalStatus === "APPLIED" &&
   manifest.appliedPostAnchorMigrations[0].appliedEvidenceMarker === "QF_MVP_50_2D_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
   manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply === 21 &&
   manifest.appliedPostAnchorMigrations[0].sha256 === "043f1e3bbe261aef516ca35b54eb3e1c339d21d6b0c55c77f1d138eb502fa2c2");
-record("G04 20260805000000 is the sole PENDING pin, hash-exact",
-  manifest.pendingPostAnchorMigrations[0].version === "20260805000000" &&
-  manifest.pendingPostAnchorMigrations[0].path === MIGRATION_PATH &&
-  manifest.pendingPostAnchorMigrations[0].sha256 === MIGRATION_SHA &&
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate === true);
-record("G05 remote state is never fabricated offline",
-  manifest.pendingPostAnchorMigrations[0].remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+record("G04 20260805000000 is recorded APPLIED with remote history 22, hash-exact",
+  manifest.appliedPostAnchorMigrations[1].version === "20260805000000" &&
+  manifest.appliedPostAnchorMigrations[1].path === MIGRATION_PATH &&
+  manifest.appliedPostAnchorMigrations[1].sha256 === MIGRATION_SHA &&
+  manifest.appliedPostAnchorMigrations[1].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker === "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+  manifest.appliedPostAnchorMigrations[1].appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply === 22 &&
+  manifest.appliedPostAnchorMigrations[1].appliedExactlyOnce === true);
+record("G05 no applied record fabricates an offline remote status or self-claims the apply",
+  manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r) && r.appliedByThisPhase === false) &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
 record("G06 G1 pins the exact count 89, not a lower bound",
   /const MIGRATION_COUNT = 89;/.test(g1Source) &&
   !/>=\s*89|length\s*>=/.test(g1Source));
-record("G07 G1 pins both post-anchor identities literally",
-  g1Source.includes('const APPLIED_POST_ANCHOR_VERSION = "20260804000000"') &&
-  g1Source.includes('const PENDING_POST_ANCHOR_VERSION = "20260805000000"') &&
-  g1Source.includes(`const PENDING_POST_ANCHOR_SHA = "${MIGRATION_SHA}"`));
+record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
+  g1Source.includes('version: "20260804000000"') &&
+  g1Source.includes('version: "20260805000000"') &&
+  g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
+  g1Source.includes('marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"') &&
+  g1Source.includes("remoteHistory: 21") &&
+  g1Source.includes("remoteHistory: 22"));
 record("G08 the local migration set is exactly 89 with 20260805000000 newest",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();

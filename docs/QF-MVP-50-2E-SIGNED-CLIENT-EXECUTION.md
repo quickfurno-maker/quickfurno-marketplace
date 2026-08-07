@@ -1,13 +1,14 @@
 # QF-MVP-50.2E — Signed Core Client Execution + Inactive n8n Wiring
 
-**Status:** SOURCE CANDIDATE
+**Source status:** MERGED / MAIN-SYNCED / POST-MERGE-PROVEN
 **Base:** `4bb2ce1d4e0581aa76802ac7408062f4b43987be`
-**Target:** source + offline tests only
-**Staging apply:** NONE — the new migration is LOCAL PENDING
+**Staging migration:** **APPLIED / VERIFIED** — `20260805000000`, staging history now **22**
 **Workflow activation:** NONE — the new n8n candidate is inactive and unpublished
-**Provider / Meta / WhatsApp:** NONE
+**Provider / Meta / WhatsApp:** NONE — no real send has ever been made
 **Supabase credential in n8n:** NONE
 **Jarvis:** NOT TOUCHED — no Jarvis repository, path, project or file was read or written
+
+> **Top-level QF-MVP-50.2 is NOT COMPLETE.** The schema is in place on staging and the source is merged, but no client action is live-provider-ready, no job producer exists, and n8n has never been activated. See §14.
 
 ## 1. What this phase is
 
@@ -294,11 +295,12 @@ template, creates no mapping, changes no Meta state, flips no `binding_readiness
 
 The new migration required moving the QF-MVP-50.2C-S2-G1 freeze. It was **re-pinned, not loosened** —
 see `QF-MVP-50-2C-S2-STAGING-HISTORY-GOVERNANCE.md` §4a. `20260803000000` remains the frozen applied
-anchor. `20260804000000` is now recorded `APPLIED` with its imported owner-reviewed 50.2D-S2 marker
-and remote history count `21` — closing a source/operational truth gap that existed because the
-staging gate deliberately made no source edit. `20260805000000` is the single hash-pinned `PENDING`
-post-anchor migration and stays `PENDING` until its own separately authorized staging deployment
-gate. Migration count is pinned at exactly `89`, post-anchor count at exactly `2`.
+anchor. `20260804000000` is recorded `APPLIED` with its imported owner-reviewed 50.2D-S2 marker and
+remote history count `21`. **`20260805000000` is now also recorded `APPLIED`**, with its own imported
+owner-reviewed marker `QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED` and remote history
+count `22`, applied exactly once and **not** by the source phase that recorded it.
+`pendingPostAnchorMigrations` is now empty. Migration count is pinned at exactly `89`, post-anchor
+count at exactly `2`.
 
 The QF-MVP-50.2D validator was also **re-pinned, not loosened**: it hard-pinned migration count 88,
 exactly-one-post-anchor, the two-route vocabulary, the G1 constants, and "no workflow may reference
@@ -320,8 +322,8 @@ reclaim recovery · start QF-MVP-50.3.
 
 Remaining, each separately governed:
 
-1. **Technical review**, push, exact-head CI, PR, merge.
-2. **A separate exact-one staging migration gate** for `20260805000000`, then importing its marker into G1.
+1. ~~Technical review, push, exact-head CI, PR, merge.~~ **DONE** — merged as `2249cb60`.
+2. ~~A separate exact-one staging migration gate for `20260805000000`.~~ **DONE** — applied and verified under QF-MVP-50.2E-S2-R1, staging history `22`; marker imported into G1 by QF-MVP-50.2E-S2-G1.
 3. **A client automation action/job producer.** Nothing in the application creates or authorizes client automation action requests today — `createAutomationActionRequest` / `createAutomationJob` have no callers outside their own module. Without it there is no job for n8n to claim.
 4. **Six-action provider readiness**: an active non-draft template row, an approved candidate with `send_authority` granted, an ACTIVE approved mapping with a resolved `variables_schema`, and a ready bound provider account — for each of the six.
 5. **A ruling on pending communication recovery**: either wire a communication due sweep or explicitly accept that a `retry_scheduled` row parks until QF-MVP-50.5.

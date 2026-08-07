@@ -648,10 +648,15 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-50.2E-R1 RE-PIN. 20260804000000 is now APPLIED on QuickFurno Staging under
 // imported owner-reviewed evidence (remote history 21), and 20260805000000 is the single
 // PENDING candidate. Every assertion below is an exact identity check.
-record("G03 exactly one APPLIED and one PENDING post-anchor migration are declared",
-  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 1 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 2);
+// QF-MVP-50.2E-S2-G1 RE-PIN. 20260805000000 has now been applied to QuickFurno
+// Staging (imported owner-reviewed evidence, remote history 22), so BOTH
+// post-anchor migrations are APPLIED and ZERO remain pending. Still exact counts,
+// exact order and exact per-migration identity — never a floor or a wildcard.
+record("G03 exactly two APPLIED and zero PENDING post-anchor migrations are declared",
+  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 2 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 2 &&
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.version), ["20260804000000", "20260805000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&
@@ -664,17 +669,20 @@ record("G04b the applied entry carries imported owner-reviewed 50.2D-S2 staging 
   manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply === 21 &&
   manifest.appliedPostAnchorMigrations[0].appliedExactlyOnce === true &&
   manifest.appliedPostAnchorMigrations[0].appliedByThisPhase === false);
-record("G04c the pinned pending entry is the exact 50.2E migration by version, name, path and hash",
-  manifest.pendingPostAnchorMigrations[0].version === "20260805000000" &&
-  manifest.pendingPostAnchorMigrations[0].name === "qf_mvp_50_2e_automation_transport_client_execution_route" &&
-  manifest.pendingPostAnchorMigrations[0].path === `supabase/migrations/${EXECUTION_MIGRATION_NAME}` &&
-  manifest.pendingPostAnchorMigrations[0].sha256 === EXECUTION_MIGRATION_SHA);
-record("G05 the pinned migration is PENDING and not applied by this phase",
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[0].appliedByThisPhase === false &&
-  manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate === true);
-record("G06 G1 claims no offline knowledge of the remote state",
-  manifest.pendingPostAnchorMigrations[0].remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+record("G04c the applied 50.2E entry is exact by version, name, path and hash",
+  manifest.appliedPostAnchorMigrations[1].version === "20260805000000" &&
+  manifest.appliedPostAnchorMigrations[1].name === "qf_mvp_50_2e_automation_transport_client_execution_route" &&
+  manifest.appliedPostAnchorMigrations[1].path === `supabase/migrations/${EXECUTION_MIGRATION_NAME}` &&
+  manifest.appliedPostAnchorMigrations[1].sha256 === EXECUTION_MIGRATION_SHA);
+record("G05 the 50.2E entry carries imported owner-reviewed 50.2E-S2 staging evidence",
+  manifest.appliedPostAnchorMigrations[1].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker === "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+  manifest.appliedPostAnchorMigrations[1].appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply === 22 &&
+  manifest.appliedPostAnchorMigrations[1].appliedExactlyOnce === true &&
+  manifest.appliedPostAnchorMigrations[1].appliedByThisPhase === false);
+record("G06 no applied record fabricates an offline remote status",
+  manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r)) &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
 record("G07 no generic future-migration allowance was granted",
@@ -684,28 +692,40 @@ record("G07 no generic future-migration allowance was granted",
 record("G08 G1 asserts the exact migration count, not a lower bound",
   /const MIGRATION_COUNT = 89;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source));
-record("G09 G1 pins both post-anchor hashes literally",
-  g1Source.includes(`const APPLIED_POST_ANCHOR_SHA = "${POST_ANCHOR_SHA}"`) &&
-  g1Source.includes(`const APPLIED_POST_ANCHOR_VERSION = "20260804000000"`) &&
-  g1Source.includes(`const PENDING_POST_ANCHOR_SHA = "${EXECUTION_MIGRATION_SHA}"`) &&
-  g1Source.includes(`const PENDING_POST_ANCHOR_VERSION = "20260805000000"`));
-record("G09a G1 rejects a demoted or forged applied post-anchor record",
-  /applied post-anchor demoted back to PENDING/.test(g1Source) &&
-  /applied post-anchor marker forged/.test(g1Source) &&
-  /applied post-anchor remote history count changed/.test(g1Source) &&
-  /applied post-anchor also listed as pending/.test(g1Source) &&
-  /pending post-anchor forges applied evidence/.test(g1Source) &&
+record("G09 G1 pins both post-anchor identities and hashes literally",
+  g1Source.includes(`version: "20260804000000"`) &&
+  g1Source.includes(`sha: "${POST_ANCHOR_SHA}"`) &&
+  g1Source.includes(`version: "20260805000000"`) &&
+  g1Source.includes(`sha: "${EXECUTION_MIGRATION_SHA}"`) &&
+  g1Source.includes(`marker: "QF_MVP_50_2D_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"`) &&
+  g1Source.includes(`marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"`) &&
+  g1Source.includes("remoteHistory: 21") &&
+  g1Source.includes("remoteHistory: 22"));
+record("G09a G1 rejects a demoted, forged or mis-counted applied post-anchor record",
+  /50\.2D demoted back to PENDING/.test(g1Source) &&
+  /50\.2D marker forged/.test(g1Source) &&
+  /50\.2D remote history changed from 21/.test(g1Source) &&
+  /50\.2E marker forged/.test(g1Source) &&
+  /50\.2E remote history 21 instead of 22/.test(g1Source) &&
+  /50\.2E remote history 23/.test(g1Source) &&
+  /an applied post-anchor also listed as pending/.test(g1Source) &&
+  /post-anchor order swapped/.test(g1Source) &&
   /post-anchor count understated/.test(g1Source));
-record("G10 G1 still rejects an arbitrary newer migration",
-  /second post-anchor migration added/.test(g1Source) &&
-  /post-anchor migration renamed/.test(g1Source) &&
-  /post-anchor migration SHA drifted on disk/.test(g1Source) &&
-  /post-anchor manifest SHA changed/.test(g1Source) &&
-  /post-anchor migration missing from disk/.test(g1Source) &&
-  /second manifest pending post-anchor entry/.test(g1Source));
-record("G11 G1 rejects a silently applied or fabricated post-anchor status",
-  /post-anchor silently marked applied/.test(g1Source) &&
-  /post-anchor remote absence fabricated offline/.test(g1Source));
+record("G10 G1 still rejects an arbitrary newer or drifted migration",
+  /a third post-anchor migration on disk/.test(g1Source) &&
+  /a third applied post-anchor migration/.test(g1Source) &&
+  /50\.2E migration renamed/.test(g1Source) &&
+  /50\.2E on-disk SHA drift/.test(g1Source) &&
+  /50\.2E manifest SHA drift/.test(g1Source) &&
+  /50\.2E migration missing from disk/.test(g1Source) &&
+  /a new pending entry silently added/.test(g1Source));
+record("G11 G1 rejects a regressed or fabricated post-anchor status",
+  /50\.2E left PENDING/.test(g1Source) &&
+  /50\.2E applied but marker missing/.test(g1Source) &&
+  /50\.2E appliedExactlyOnce false/.test(g1Source) &&
+  /50\.2E evidence type changed/.test(g1Source) &&
+  /50\.2E claimed applied by this source phase/.test(g1Source) &&
+  /50\.2E fabricated offline remote status field/.test(g1Source));
 record("G12 the historical baseline and pre-baseline protections are untouched",
   manifest.preBaselineChain?.count === 68 &&
   manifest.preBaselineChain?.mustReplayOnStaging === false &&

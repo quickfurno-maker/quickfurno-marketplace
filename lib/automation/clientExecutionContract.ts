@@ -481,6 +481,18 @@ export const PRE_COMMUNICATION_FAILURE_RULINGS: Readonly<
     classification: "retryable_failure",
     safeCode: "QF_EXEC_INFRASTRUCTURE_TRANSIENT",
   },
+
+  // --- QF-MVP-50.2 execution-time business eligibility -----------------------
+  // A business-scheduled action (the +24h reminder, the +48h follow-up) whose
+  // justifying business truth has since moved on. This is a DELIBERATE terminal
+  // non-send, not a failure of anything: no communication row exists, no
+  // provider was contacted, and retrying could only chase a lead who no longer
+  // needs chasing. Modelled exactly as an outbound consent refusal already is —
+  // definitive, with its own safe code — so no unrelated state is overloaded.
+  QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE: {
+    classification: "definitive_failure",
+    safeCode: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE",
+  },
 });
 
 /**

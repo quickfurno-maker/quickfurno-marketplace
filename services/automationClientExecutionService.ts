@@ -474,6 +474,15 @@ async function buildClientCommunicationIntent(args: {
   const facts = await readLeadFacts(args.leadId);
   if (!facts.ok) return { ok: false, code: facts.code };
 
+  // QF-MVP-50.2 FINAL CLOSURE — EXECUTION-TIME BUSINESS ELIGIBILITY REPROOF.
+  //
+  // A business-scheduled action was enqueued from truth that was current at
+  // PRODUCER time (+24h reminder, +48h follow-up). By the time it runs, that
+  // truth may have moved on. Core re-proves it from the live row before any
+  // communication is attempted; n8n is never consulted and never sees lead state.
+  const eligibility = await proveExecutionTimeEligibility(args.definition, args.leadId, facts.lead);
+  if (!eligibility.ok) return { ok: false, code: eligibility.code };
+
   const variableInput = resolveVariableInput(args.definition, facts.lead);
   if (!variableInput.ok) return { ok: false, code: variableInput.code };
 
@@ -512,6 +521,71 @@ async function buildClientCommunicationIntent(args: {
       metadata: {},
     },
   };
+}
+
+/**
+ * QF-MVP-50.2 owner policy B1/B2 — the exact business states a delayed client
+ * action requires AT EXECUTION TIME.
+ *
+ * Immediate actions have no separate reproof: their producer transaction and
+ * their execution observe effectively the same truth, and every one of them
+ * still passes the full Core revalidation chain plus the consent, template,
+ * mapping and provider-account gates inside `send()`.
+ *
+ * A refusal here is a PRE-COMMUNICATION no-send: no communication row is
+ * created, no provider is contacted, and the attempt is finalized through the
+ * existing bounded ruling table as a deliberate terminal non-send — exactly how
+ * an outbound consent refusal is already modelled. It is never reported as a
+ * provider failure and never fabricates communication evidence.
+ */
+type EligibilityResult = { ok: true } | { ok: false; code: string };
+
+async function proveExecutionTimeEligibility(
+  definition: ClientAutomationDispatchDefinition,
+  leadId: string,
+  lead: LeadFacts,
+): Promise<EligibilityResult> {
+  switch (definition.actionType) {
+    case "client.missing_information_reminder": {
+      // Owner policy B1: only remind while the clarification is genuinely still
+      // outstanding. A lead that answered, or whose clarification was resolved
+      // or withdrawn, must never be chased.
+      const { data, error } = await adminClient()
+        .from("leads")
+        .select("clarification_required, clarification_status")
+        .eq("id", leadId)
+        .maybeSingle();
+
+      if (error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+      const row = data as
+        | { clarification_required: boolean | null; clarification_status: string | null }
+        | null;
+      if (!row) return { ok: false, code: "QF_EXEC_LEAD_NOT_FOUND" };
+
+      if (row.clarification_required !== true) {
+        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+      }
+      // `preview_prepared` is the outstanding state the producer fired on. Any
+      // later state means the clarification has moved on and the reminder is moot.
+      if (row.clarification_status !== "preview_prepared") {
+        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+      }
+      return { ok: true };
+    }
+
+    case "client.transactional_followup": {
+      // Owner policy B2: only follow up while the lead is STILL exactly in the
+      // status that justified the follow-up. If it moved on — won, lost,
+      // re-quoted, anything — the follow-up is silently dropped.
+      if (lead.status !== "Quotation Sent") {
+        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+      }
+      return { ok: true };
+    }
+
+    default:
+      return { ok: true };
+  }
 }
 
 interface LeadFacts {

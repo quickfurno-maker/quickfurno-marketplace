@@ -703,10 +703,10 @@ record("G01 the anchor is untouched",
 // QF-MVP-50.2E-S2-G1. The 50.2E migration has now been applied to QuickFurno
 // Staging (imported owner-reviewed evidence, remote history 22), so BOTH
 // post-anchor migrations are APPLIED and ZERO remain pending.
-record("G02 exactly two APPLIED and zero PENDING post-anchor migrations",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 2 &&
+record("G02 exactly two APPLIED and one PENDING post-anchor migration",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 3 &&
   manifest.appliedPostAnchorMigrations?.length === 2 &&
-  manifest.pendingPostAnchorMigrations?.length === 0 &&
+  manifest.pendingPostAnchorMigrations?.length === 1 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), ["20260804000000", "20260805000000"]));
 record("G03 20260804000000 is recorded APPLIED with remote history 21",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
@@ -727,9 +727,9 @@ record("G05 no applied record fabricates an offline remote status or self-claims
   manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r) && r.appliedByThisPhase === false) &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
-record("G06 G1 pins the exact count 89, not a lower bound",
-  /const MIGRATION_COUNT = 89;/.test(g1Source) &&
-  !/>=\s*89|length\s*>=/.test(g1Source));
+record("G06 G1 pins the exact count 90, not a lower bound",
+  /const MIGRATION_COUNT = 90;/.test(g1Source) &&
+  !/>=\s*90|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
   g1Source.includes('version: "20260805000000"') &&
@@ -737,14 +737,14 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
   g1Source.includes('marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"') &&
   g1Source.includes("remoteHistory: 21") &&
   g1Source.includes("remoteHistory: 22"));
-record("G08 the local migration set is exactly 89 with 20260805000000 newest",
+record("G08 the local migration set is exactly 90 with the 50.2 producer newest",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 89 && files.at(-1) === MIGRATION_NAME;
+    return files.length === 90 && files.at(-1) === "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 89/.test(d2Source) &&
-  /exactly two migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 90/.test(d2Source) &&
+  /exactly three migrations are newer than the anchor/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
 record("G10 the completion-path allowlist names exactly one workflow",

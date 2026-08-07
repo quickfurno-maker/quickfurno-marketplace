@@ -15,8 +15,20 @@ export const N8N_CLAIM_ROUTE_PATH =
 export const N8N_COMPLETE_ROUTE_PATH =
   "/api/internal/automation/n8n/complete" as const;
 
+/**
+ * QF-MVP-50.2E. The third and final signed n8n -> Core route. Like the other two,
+ * the exact path is a canonical HMAC field, so a claim or completion signature can
+ * never authenticate an execution request and vice versa.
+ */
+export const N8N_EXECUTE_CLIENT_ROUTE_PATH =
+  "/api/internal/automation/n8n/execute-client" as const;
+
 /** Closed transport route vocabulary. Mirrors the ledger's route_key CHECK. */
-export const AUTOMATION_TRANSPORT_ROUTE_KEYS = ["claim_v1", "complete_v1"] as const;
+export const AUTOMATION_TRANSPORT_ROUTE_KEYS = [
+  "claim_v1",
+  "complete_v1",
+  "execute_v1",
+] as const;
 export type AutomationTransportRouteKey =
   (typeof AUTOMATION_TRANSPORT_ROUTE_KEYS)[number];
 
@@ -118,6 +130,78 @@ export interface N8nCompleteResponseBody {
   safeCode: string;
   executorReference: string;
 }
+
+// ---------------------------------------------------------------------------
+// QF-MVP-50.2E — client execution route
+// ---------------------------------------------------------------------------
+
+/**
+ * Exactly what the execution transport RPC returns.
+ *
+ * IDENTITY ONLY. There is deliberately no classification, no safe code, no
+ * communication status, no executor reference and no business payload here: the
+ * execute ledger records ONLY that a signed execution request identity was
+ * durably reserved for this exact attempt. Every replay re-reads Core truth from
+ * the communication and attempt ledgers instead of trusting a stored outcome, so
+ * a replay can never disagree with what actually happened.
+ */
+export interface AutomationTransportExecutionRow {
+  request_id: string;
+  route_key: AutomationTransportRouteKey;
+  state: "recorded";
+  is_replay: boolean;
+  job_id: string;
+  action_request_id: string;
+  attempt_id: string;
+  attempt_number: number;
+  max_attempts: number;
+}
+
+/**
+ * The public orchestration branch key. n8n branches on THIS and on nothing else —
+ * never on the HTTP status code, and never on the presence of a field.
+ */
+export type N8nExecuteClientOrchestrationState =
+  | "execution_recorded"
+  | "communication_pending"
+  | "attempt_finalized"
+  | "rejected";
+
+/**
+ * Sanitized execution result. Deliberately absent: recipient, destination,
+ * phone/email, destination hash/mask, template key, variables, provider key,
+ * provider account, provider message id, raw provider status/body/error, consent
+ * state, lead data, SQL, stack, secret, environment value.
+ *
+ * `executorReference` appears ONLY on `execution_recorded`, and is ONLY ever a
+ * real `communication_messages.id`.
+ */
+export interface N8nExecuteClientSuccessBody {
+  ok: true;
+  transportVersion: 1;
+  requestId: string;
+  route: "execute_v1";
+  orchestrationState: Exclude<N8nExecuteClientOrchestrationState, "rejected">;
+  replayed: boolean;
+  executorReference?: string;
+}
+
+/**
+ * An authenticated refusal. It carries the same closed branch key so a single
+ * n8n switch covers every outcome, and it never finalizes or consumes the attempt.
+ */
+export interface N8nExecuteClientRejectionBody {
+  ok: false;
+  transportVersion: 1;
+  requestId: string;
+  route: "execute_v1";
+  orchestrationState: "rejected";
+  code: string;
+}
+
+export type N8nExecuteClientResponseBody =
+  | N8nExecuteClientSuccessBody
+  | N8nExecuteClientRejectionBody;
 
 export interface AutomationTransportRuntimeConfig {
   mode: "off" | "staging" | "production";

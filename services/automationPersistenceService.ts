@@ -21,6 +21,7 @@ import {
 } from "@/lib/automation/actionRegistry";
 import type {
   AutomationActionRequestRow,
+  AutomationExecutionAttemptRow,
   AutomationJobRow,
   ClaimedAutomationJob,
   CompleteAutomationAttemptInput,
@@ -237,6 +238,99 @@ export async function getAutomationJob(
 
   if (error) throw error;
   return (data as AutomationJobRow | null) ?? null;
+}
+
+export async function getAutomationExecutionAttempt(
+  attemptId: string,
+): Promise<AutomationExecutionAttemptRow | null> {
+  requireUuid(attemptId, "AUTOMATION_ATTEMPT_ID_INVALID");
+
+  const { data, error } = await adminClient()
+    .from("automation_execution_attempts")
+    .select("*")
+    .eq("id", attemptId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as AutomationExecutionAttemptRow | null) ?? null;
+}
+
+/**
+ * QF-MVP-50.2E — the READ-SIDE current-attempt proof.
+ *
+ * The identical rule already exists as the authoritative WRITE-side guard inside
+ * `qf_complete_automation_attempt_v1` (job `processing`, `locked_by` equal to the
+ * worker, attempt linked to the job, `attempt_number = job.attempt_count`,
+ * attempt worker equal, attempt `started`). That guard is reached only when Core
+ * is ALREADY finalizing, so an execution boundary that must decide BEFORE doing
+ * anything had no way to ask the same question. This is that question, and
+ * nothing more: it decides no outcome, writes nothing and locks nothing.
+ *
+ * `owned_completed` is a deliberately separate verdict from `not_owned`. An
+ * attempt that is fully linked and current but already `completed` is the exact
+ * shape of a REPLAY after a lost response, and the caller must be able to answer
+ * it truthfully from durable evidence rather than refuse it as unauthorized.
+ */
+export type AutomationAttemptOwnership =
+  | {
+      readonly verdict: "owned_started" | "owned_completed";
+      readonly job: AutomationJobRow;
+      readonly attempt: AutomationExecutionAttemptRow;
+    }
+  | { readonly verdict: "not_owned"; readonly code: string };
+
+export async function proveCurrentAutomationAttemptOwnership(input: {
+  jobId: string;
+  attemptId: string;
+  workerId: string;
+}): Promise<AutomationAttemptOwnership> {
+  requireUuid(input.jobId, "AUTOMATION_JOB_ID_INVALID");
+  requireUuid(input.attemptId, "AUTOMATION_ATTEMPT_ID_INVALID");
+  requireSafeId(input.workerId, "AUTOMATION_WORKER_ID_INVALID", 200);
+
+  const job = await getAutomationJob(input.jobId);
+  if (!job) {
+    return { verdict: "not_owned", code: "AUTOMATION_EXECUTION_JOB_NOT_FOUND" };
+  }
+
+  const attempt = await getAutomationExecutionAttempt(input.attemptId);
+  if (!attempt) {
+    return {
+      verdict: "not_owned",
+      code: "AUTOMATION_EXECUTION_ATTEMPT_NOT_FOUND",
+    };
+  }
+
+  // Linkage and currency are checked BEFORE status, so an attempt belonging to a
+  // different job, or a superseded attempt of this job, is never mistaken for a
+  // replay of the current one.
+  if (
+    attempt.job_id !== job.id ||
+    attempt.worker_id !== input.workerId ||
+    attempt.attempt_number !== job.attempt_count
+  ) {
+    return {
+      verdict: "not_owned",
+      code: "AUTOMATION_EXECUTION_ATTEMPT_NOT_CURRENT",
+    };
+  }
+
+  if (attempt.status === "completed") {
+    return { verdict: "owned_completed", job, attempt };
+  }
+
+  if (
+    attempt.status !== "started" ||
+    job.status !== "processing" ||
+    job.locked_by !== input.workerId
+  ) {
+    return {
+      verdict: "not_owned",
+      code: "AUTOMATION_EXECUTION_JOB_NOT_OWNED",
+    };
+  }
+
+  return { verdict: "owned_started", job, attempt };
 }
 
 /**

@@ -43,6 +43,7 @@ import { COMMUNICATION_MESSAGE_STATUSES } from "../../../lib/communication/types
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
 const sha256 = (v) => createHash("sha256").update(v).digest("hex");
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const canonicalSha256 = (buf) =>
   sha256(Buffer.from(buf.toString("utf8").replace(/\r\n/g, "\n").replace(/\r/g, "\n"), "utf8"));
 
@@ -57,6 +58,12 @@ const MIGRATION_PATH = `supabase/migrations/${MIGRATION_NAME}`;
 const ANCHOR_NAME = "20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql";
 const ANCHOR_SHA = "77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca";
 const POST_ANCHOR_SHA = "043f1e3bbe261aef516ca35b54eb3e1c339d21d6b0c55c77f1d138eb502fa2c2";
+// QF-MVP-50.2E-R1 — the single pinned post-anchor successor. Named here so every
+// "exactly N" assertion below stays an exact identity check rather than a count.
+const EXECUTION_MIGRATION_NAME =
+  "20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql";
+const EXECUTION_MIGRATION_SHA =
+  "9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b";
 const CLAIM_MIGRATION_NAME = "20260801152049_qf_mvp_automation_transport_replay_guard.sql";
 const PERSISTENCE_MIGRATION_NAME = "20260801110000_qf_mvp_automation_action_persistence.sql";
 
@@ -81,11 +88,20 @@ const migrationCode = stripSql(migrationSource);
 
 /** The exact completion service body, so a neighbouring claim function cannot satisfy its rules. */
 const serviceCode = stripJs(serviceSource);
+// QF-MVP-50.2E-R1 RE-PIN. The slice must end at whichever boundary comes FIRST, so a
+// later phase appending its own functions to this service can never be absorbed into the
+// 50.2D body and silently satisfy — or silently break — a 50.2D containment assertion.
 const completionBody = (() => {
   const i = serviceCode.indexOf("export async function completeAutomationAttemptForN8nTransport");
   if (i === -1) return "";
-  const j = serviceCode.indexOf("function requireFreshClaimEvidence", i);
-  return serviceCode.slice(i, j === -1 ? serviceCode.length : j);
+  // Boundaries must be CODE, not comments: `serviceCode` is comment-stripped, so a
+  // banner would not survive. The next top-level `export` is where the 50.2D function
+  // provably ends.
+  const ends = [
+    serviceCode.indexOf("\nexport ", i + 1),
+    serviceCode.indexOf("function requireFreshClaimEvidence", i),
+  ].filter((n) => n !== -1);
+  return serviceCode.slice(i, ends.length ? Math.min(...ends) : serviceCode.length);
 })();
 /** The wholly-new 50.2D modules, used by every containment scan. */
 const newModuleCode = contractCode + retryCode + routeCode + completionBody;
@@ -229,10 +245,16 @@ record("T20 every pre-verification refusal is unsigned",
 record("T21 no second crypto system was introduced",
   !/createHmac|createHash|node:crypto|scrypt|randomBytes/.test(routeCode + completionBody + contractCode + retryCode) &&
   routeCode.includes('from "@/lib/automation/transportAuth"'));
-record("T22 the transport route vocabulary is closed to exactly two routes",
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 2 &&
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") === "claim_v1,complete_v1" &&
-  /check \(route_key in \('claim_v1', 'complete_v1'\)\)/.test(migrationCode));
+// QF-MVP-50.2E-R1 RE-PIN. The vocabulary was closed to exactly two routes; it is now
+// closed to exactly three, still by exact ordered equality — never a length lower bound
+// and never a membership test. THIS MIGRATION's own text is unchanged and must still
+// declare exactly the two routes it introduced: `execute_v1` is added by 20260805000000,
+// so a `50.2D` migration that mentions it would mean the historical file had been edited.
+record("T22 the transport route vocabulary is closed to exactly three routes",
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 3 &&
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") === "claim_v1,complete_v1,execute_v1" &&
+  /check \(route_key in \('claim_v1', 'complete_v1'\)\)/.test(migrationCode) &&
+  !/execute_v1/.test(migrationCode));
 
 // ---------------------------------------------------------------------------
 // L. LEDGER / REPLAY MODEL
@@ -526,6 +548,17 @@ record("C03 the migration touches no communication table",
   !/alter table public\.communication_/i.test(migrationCode));
 record("C04 no 50.2D module reaches into the n8n workflow tree",
   !/automation\/n8n|workflow\.json|n8n-nodes-base/.test(newModuleCode));
+// QF-MVP-50.2E-R1 RE-PIN, NEVER LOOSEN.
+//
+// The rule was "NO workflow may reference the completion path", which was exactly right
+// while no executor existed. QF-MVP-50.2E adds the client executor, which legitimately
+// calls the completion route. The class is therefore NOT opened: it is narrowed to an
+// exact allowlist of ONE named file, and the two pre-existing candidates are additionally
+// required to stay completion-path-free. Every workflow, without exception, must still be
+// inactive and unpublished.
+const COMPLETION_PATH_ALLOWED_WORKFLOWS = [
+  "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
+];
 record("C05 the n8n workflow candidates remain inactive and unpublished",
   (() => {
     const dir = path.join(ROOT, "automation/n8n");
@@ -534,11 +567,27 @@ record("C05 the n8n workflow candidates remain inactive and unpublished",
     if (flows.length === 0) return false;
     return flows.every((f) => {
       const wf = JSON.parse(readFileSync(path.join(dir, f), "utf8"));
-      // 50.2D added no completion node anywhere: the completion path must not
-      // appear in any workflow, and nothing may have been activated.
-      return wf.active === false &&
-        !Object.prototype.hasOwnProperty.call(wf, "published") &&
-        !JSON.stringify(wf).includes(N8N_COMPLETE_ROUTE_PATH);
+      if (wf.active !== false) return false;
+      if (Object.prototype.hasOwnProperty.call(wf, "published")) return false;
+      // Only the exact named executor may reference the completion path.
+      if (COMPLETION_PATH_ALLOWED_WORKFLOWS.includes(f)) return true;
+      return !JSON.stringify(wf).includes(N8N_COMPLETE_ROUTE_PATH);
+    });
+  })());
+record("C05a the 50.2A and 50.2B candidates are byte-frozen and completion-path-free",
+  (() => {
+    const frozen = {
+      "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json":
+        "9bc49e424a55fd93e24141172a185d58f60e6b5e7f4110f99ef4184174a4be47",
+      "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json":
+        "93f75377da159f6f64c5c816178df4e982e240cecee108d626e266dedcc4705c",
+    };
+    return Object.entries(frozen).every(([file, expected]) => {
+      const full = path.join(ROOT, "automation/n8n", file);
+      if (!existsSync(full)) return false;
+      const bytes = readFileSync(full);
+      if (JSON.stringify(JSON.parse(bytes.toString("utf8"))).includes(N8N_COMPLETE_ROUTE_PATH)) return false;
+      return canonicalSha256(bytes) === expected;
     });
   })());
 record("C06 the completion route path is declared once, in transportTypes",
@@ -560,11 +609,19 @@ record("I01 the 50.2C anchor is byte-identical to its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", ANCHOR_NAME))) === ANCHOR_SHA);
 record("I02 the 50.2D migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === POST_ANCHOR_SHA);
-record("I03 exactly one migration is newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 1);
-record("I04 that migration is exactly the 50.2D transport completion route",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000")[0] === MIGRATION_NAME);
-record("I05 the local migration count is exactly 88", migrationFiles.length === 88);
+// QF-MVP-50.2E-R1 RE-PIN. "Exactly one newer migration" was correct while 50.2D was the
+// only post-anchor candidate. It is re-pinned to exactly TWO, named in exact order — not
+// relaxed to a count floor and not relaxed to "anything newer".
+record("I03 exactly two migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 2);
+record("I04 they are exactly the 50.2D completion route then the 50.2E execution route",
+  same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
+       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME]));
+record("I05 the local migration count is exactly 89", migrationFiles.length === 89);
+record("I05a the 50.2E execution migration matches its pinned hash",
+  canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
+record("I05b the 50.2D migration text is untouched by 50.2E",
+  canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === POST_ANCHOR_SHA);
 record("I06 the 50.1C claim migration is unmodified in its claim semantics",
   claimMigrationSource.includes("check (route_key = 'claim_v1')") &&
   claimMigrationSource.includes("check (state in ('processing', 'claimed', 'empty'))") &&
@@ -588,13 +645,30 @@ record("G01 the anchor is recorded APPLIED with imported D2-R1 evidence",
   manifest.appliedAnchor?.remoteHistoryCountAfterApply === 20 &&
   manifest.appliedAnchor?.sha256 === ANCHOR_SHA);
 record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget === undefined);
-record("G03 exactly one pending post-anchor migration is declared",
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1);
-record("G04 the pinned entry is the exact 50.2D migration by version, name, path and hash",
-  manifest.pendingPostAnchorMigrations[0].version === "20260804000000" &&
-  manifest.pendingPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&
-  manifest.pendingPostAnchorMigrations[0].path === MIGRATION_PATH &&
-  manifest.pendingPostAnchorMigrations[0].sha256 === POST_ANCHOR_SHA);
+// QF-MVP-50.2E-R1 RE-PIN. 20260804000000 is now APPLIED on QuickFurno Staging under
+// imported owner-reviewed evidence (remote history 21), and 20260805000000 is the single
+// PENDING candidate. Every assertion below is an exact identity check.
+record("G03 exactly one APPLIED and one PENDING post-anchor migration are declared",
+  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 1 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 2);
+record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
+  manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
+  manifest.appliedPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&
+  manifest.appliedPostAnchorMigrations[0].path === MIGRATION_PATH &&
+  manifest.appliedPostAnchorMigrations[0].sha256 === POST_ANCHOR_SHA);
+record("G04b the applied entry carries imported owner-reviewed 50.2D-S2 staging evidence",
+  manifest.appliedPostAnchorMigrations[0].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[0].appliedEvidenceMarker === "QF_MVP_50_2D_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+  manifest.appliedPostAnchorMigrations[0].appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply === 21 &&
+  manifest.appliedPostAnchorMigrations[0].appliedExactlyOnce === true &&
+  manifest.appliedPostAnchorMigrations[0].appliedByThisPhase === false);
+record("G04c the pinned pending entry is the exact 50.2E migration by version, name, path and hash",
+  manifest.pendingPostAnchorMigrations[0].version === "20260805000000" &&
+  manifest.pendingPostAnchorMigrations[0].name === "qf_mvp_50_2e_automation_transport_client_execution_route" &&
+  manifest.pendingPostAnchorMigrations[0].path === `supabase/migrations/${EXECUTION_MIGRATION_NAME}` &&
+  manifest.pendingPostAnchorMigrations[0].sha256 === EXECUTION_MIGRATION_SHA);
 record("G05 the pinned migration is PENDING and not applied by this phase",
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[0].appliedByThisPhase === false &&
@@ -606,13 +680,22 @@ record("G06 G1 claims no offline knowledge of the remote state",
 record("G07 no generic future-migration allowance was granted",
   manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&
-  !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*88/.test(g1Source));
+  !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*89/.test(g1Source));
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 88;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 89;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source));
-record("G09 G1 pins the post-anchor hash literally",
-  g1Source.includes(`const POST_ANCHOR_SHA = "${POST_ANCHOR_SHA}"`) &&
-  g1Source.includes(`const POST_ANCHOR_VERSION = "20260804000000"`));
+record("G09 G1 pins both post-anchor hashes literally",
+  g1Source.includes(`const APPLIED_POST_ANCHOR_SHA = "${POST_ANCHOR_SHA}"`) &&
+  g1Source.includes(`const APPLIED_POST_ANCHOR_VERSION = "20260804000000"`) &&
+  g1Source.includes(`const PENDING_POST_ANCHOR_SHA = "${EXECUTION_MIGRATION_SHA}"`) &&
+  g1Source.includes(`const PENDING_POST_ANCHOR_VERSION = "20260805000000"`));
+record("G09a G1 rejects a demoted or forged applied post-anchor record",
+  /applied post-anchor demoted back to PENDING/.test(g1Source) &&
+  /applied post-anchor marker forged/.test(g1Source) &&
+  /applied post-anchor remote history count changed/.test(g1Source) &&
+  /applied post-anchor also listed as pending/.test(g1Source) &&
+  /pending post-anchor forges applied evidence/.test(g1Source) &&
+  /post-anchor count understated/.test(g1Source));
 record("G10 G1 still rejects an arbitrary newer migration",
   /second post-anchor migration added/.test(g1Source) &&
   /post-anchor migration renamed/.test(g1Source) &&

@@ -585,16 +585,31 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 1,
-    "supersedesNewestLocalMigrationRule": "QF-MVP-50.2D-R1"
+    "postAnchorMigrationCount": 2,
+    "supersedesNewestLocalMigrationRule": "QF-MVP-50.2E-R1"
   },
-  "pendingPostAnchorMigrations": [
+  "appliedPostAnchorMigrations": [
     {
       "version": "20260804000000",
       "name": "qf_mvp_50_2d_automation_transport_completion_route",
       "path": "supabase/migrations/20260804000000_qf_mvp_50_2d_automation_transport_completion_route.sql",
       "sha256": "043f1e3bbe261aef516ca35b54eb3e1c339d21d6b0c55c77f1d138eb502fa2c2",
       "phase": "QF-MVP-50.2D",
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_50_2D_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED",
+      "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
+      "remoteHistoryCountAfterApply": 21,
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": false
+    }
+  ],
+  "pendingPostAnchorMigrations": [
+    {
+      "version": "20260805000000",
+      "name": "qf_mvp_50_2e_automation_transport_client_execution_route",
+      "path": "supabase/migrations/20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql",
+      "sha256": "9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b",
+      "phase": "QF-MVP-50.2E",
       "operationalStatus": "PENDING",
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "requiresSeparateStagingDeploymentGate": true,

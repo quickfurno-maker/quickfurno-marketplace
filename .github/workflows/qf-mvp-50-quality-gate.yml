@@ -100,6 +100,9 @@ jobs:
       - name: QF-MVP-50.2D validator
         run: npm run test:mvp:50-2d
 
+      - name: QF-MVP-50.2E validator
+        run: npm run test:mvp:50-2e
+
       - name: Typecheck
         run: npm run typecheck
 

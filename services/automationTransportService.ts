@@ -16,6 +16,7 @@ import { buildAutomationNextRetryAt } from "@/lib/automation/retryPolicy";
 import type {
   AutomationTransportClaimRow,
   AutomationTransportCompletionRow,
+  AutomationTransportExecutionRow,
   AutomationTransportRuntimeConfig,
   FreshClaimEvidence,
   N8nClaimResponseBody,
@@ -348,6 +349,108 @@ export async function completeAutomationAttemptForN8nTransport(
       executorReference: row.executor_reference,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// QF-MVP-50.2E — signed client-execution identity reservation
+// ---------------------------------------------------------------------------
+
+export interface RecordedClientExecutionIdentity {
+  readonly requestId: string;
+  readonly jobId: string;
+  readonly attemptId: string;
+  readonly isReplay: boolean;
+}
+
+/**
+ * Reserve the durable, attempt-scoped `execute_v1` transport identity.
+ *
+ * IDENTITY ONLY. Nothing about the outcome of the execution is stored, because
+ * the execution has not happened yet and will happen in the application layer
+ * AFTER this call commits. No cross-system atomicity exists or is claimed; the
+ * crash-safety property comes from every replay re-reading Core truth.
+ */
+export async function recordClientExecutionTransportIdentity(input: {
+  requestId: string;
+  workerId: string;
+  bodySha256: string;
+  jobId: string;
+  attemptId: string;
+}): Promise<RecordedClientExecutionIdentity> {
+  if (!UUID_RE.test(input.requestId)) {
+    throw new Error("AUTOMATION_TRANSPORT_REQUEST_ID_INVALID");
+  }
+  if (!SAFE_WORKER_RE.test(input.workerId)) {
+    throw new Error("AUTOMATION_TRANSPORT_WORKER_ID_INVALID");
+  }
+  if (!SHA256_RE.test(input.bodySha256)) {
+    throw new Error("AUTOMATION_TRANSPORT_BODY_HASH_INVALID");
+  }
+  if (!UUID_RE.test(input.jobId) || !UUID_RE.test(input.attemptId)) {
+    throw new Error("AUTOMATION_TRANSPORT_EXECUTION_IDENTITY_INVALID");
+  }
+
+  const { data, error } = await adminClient()
+    .rpc("qf_record_automation_execution_transport_v1", {
+      p_request_id: input.requestId,
+      p_worker_id: input.workerId,
+      p_body_sha256: input.bodySha256,
+      p_job_id: input.jobId,
+      p_attempt_id: input.attemptId,
+    })
+    .maybeSingle();
+
+  if (error || !data) {
+    throw error ?? new Error("AUTOMATION_TRANSPORT_EXECUTION_FAILED");
+  }
+
+  const row = data as AutomationTransportExecutionRow;
+
+  if (
+    row.route_key !== "execute_v1" ||
+    row.state !== "recorded" ||
+    row.job_id !== input.jobId ||
+    row.attempt_id !== input.attemptId
+  ) {
+    throw new Error("AUTOMATION_TRANSPORT_EXECUTION_EVIDENCE_MISMATCH");
+  }
+
+  return {
+    requestId: row.request_id,
+    jobId: row.job_id,
+    attemptId: row.attempt_id,
+    isReplay: row.is_replay,
+  };
+}
+
+/**
+ * Read the existing `execute_v1` reservation for an attempt, if any.
+ *
+ * This is the ONLY thing that lets a replay distinguish "Core executed this
+ * attempt and finalized it, then the response was lost" from "somebody else
+ * finalized this attempt". Without it, a lost response after a pre-communication
+ * finalization would be indistinguishable from an unauthorized request.
+ */
+export async function getRecordedClientExecutionIdentity(input: {
+  jobId: string;
+  attemptId: string;
+}): Promise<{ requestId: string } | null> {
+  if (!UUID_RE.test(input.jobId) || !UUID_RE.test(input.attemptId)) {
+    throw new Error("AUTOMATION_TRANSPORT_EXECUTION_IDENTITY_INVALID");
+  }
+
+  const { data, error } = await adminClient()
+    .from("automation_transport_requests")
+    .select("id")
+    .eq("route_key", "execute_v1")
+    .eq("job_id", input.jobId)
+    .eq("attempt_id", input.attemptId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const row = data as { id: string } | null;
+  return row ? { requestId: row.id } : null;
 }
 
 function requireFreshClaimEvidence(

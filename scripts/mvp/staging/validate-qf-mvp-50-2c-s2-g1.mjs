@@ -66,9 +66,22 @@ const POST_ANCHOR_APPLIED = [
   path: `supabase/migrations/${m.version}_${m.name}.sql`,
 }));
 
-const POST_ANCHOR_ORDER = POST_ANCHOR_APPLIED.map((m) => m.version);
+// QF-MVP-50.2-FINAL-CLOSURE-R2 adds exactly one NEW pending post-anchor
+// migration (the atomic client automation producer). The two applied records
+// above are untouched; this one stays PENDING until its own staging gate.
+const POST_ANCHOR_PENDING = [
+  {
+    version: "20260806000000",
+    name: "qf_mvp_50_2_atomic_client_automation_producer",
+    sha: "ce947a6f8d7dd42d2851f6c99eba4bf2ef39308b8d85ff876260d575185a3cfb",
+    phase: "QF-MVP-50.2-FINAL-CLOSURE-R2",
+  },
+].map((m) => ({ ...m, filename: `${m.version}_${m.name}.sql`, path: `supabase/migrations/${m.version}_${m.name}.sql` }));
+
+const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING].map((m) => m.version);
+const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING];
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
-const MIGRATION_COUNT = 89;
+const MIGRATION_COUNT = 90;
 
 const APPROVED_COMMON = [
   "20260723000100", "20260723000200", "20260723000300", "20260723000400",
@@ -164,7 +177,7 @@ function loadState() {
     targetCanonicalSha: canonicalMigrationSourceSha256(readFileSync(path.join(ROOT, TARGET_PATH))),
     // One on-disk record per pinned post-anchor migration, keyed by version, so
     // every SHA assertion below stays an exact per-migration identity check.
-    postAnchorOnDisk: Object.fromEntries(POST_ANCHOR_APPLIED.map((m) => {
+    postAnchorOnDisk: Object.fromEntries(POST_ANCHOR_ALL.map((m) => {
       const full = path.join(ROOT, m.path);
       const present = existsSync(full);
       return [m.version, {
@@ -267,12 +280,34 @@ function validateState(state) {
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
 
-  check("exactly two local migrations are newer than the anchor", postAnchorLocal.length === 2, `actual=${postAnchorLocal.length}`);
+  check("exactly three local migrations are newer than the anchor", postAnchorLocal.length === 3, `actual=${postAnchorLocal.length}`);
   check("the two post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 2);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 3);
   check("manifest declares exactly two APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 2, `actual=${appliedPins?.length}`);
-  check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("ZERO pending post-anchor migrations remain", pendingPins !== null && pendingPins.length === 0, `actual=${pendingPins?.length}`);
+  check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
+  check("exactly one PENDING post-anchor migration is declared", pendingPins !== null && pendingPins.length === 1, `actual=${pendingPins?.length}`);
+  check("the pending record is in exact pinned order after the applied ones", same(pendingPins?.map((r) => r.version), POST_ANCHOR_PENDING.map((m) => m.version)));
+
+  for (const expected of POST_ANCHOR_PENDING) {
+    const label = `${expected.phase} ${expected.version}`;
+    const local = postAnchorLocal.find((record) => record.version === expected.version);
+    const pin = pendingPins?.find((record) => record.version === expected.version);
+    const disk = state.postAnchorOnDisk?.[expected.version];
+    check(`${label}: local migration is exactly the pinned version/name/file`,
+      local?.version === expected.version && local?.name === expected.name && local?.filename === expected.filename);
+    check(`${label}: manifest entry matches the pinned identity`,
+      pin?.version === expected.version && pin?.name === expected.name && pin?.path === expected.path && pin?.phase === expected.phase);
+    check(`${label}: source exists and raw/canonical SHA are exact`,
+      disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha);
+    check(`${label}: manifest SHA equals the on-disk SHA`,
+      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256);
+    check(`${label}: is PENDING, needs its own gate, not applied by this phase`,
+      pin?.operationalStatus === "PENDING" && pin?.requiresSeparateStagingDeploymentGate === true && pin?.appliedByThisPhase === false);
+    check(`${label}: remote status is not fabricated offline`,
+      pin?.remoteVersionStatus === "NOT_PROVEN_OFFLINE");
+    check(`${label}: claims no applied evidence`,
+      !("appliedEvidenceMarker" in (pin ?? {})) && !("remoteHistoryCountAfterApply" in (pin ?? {})));
+  }
 
   // Per-migration exact identity, hash, evidence and remote-history assertions.
   for (const expected of POST_ANCHOR_APPLIED) {

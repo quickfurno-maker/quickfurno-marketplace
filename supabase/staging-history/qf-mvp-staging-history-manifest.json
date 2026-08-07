@@ -585,8 +585,8 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 2,
-    "supersedesNewestLocalMigrationRule": "QF-MVP-50.2E-S2-G1"
+    "postAnchorMigrationCount": 3,
+    "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
     {
@@ -616,7 +616,19 @@
       "appliedByThisPhase": false
     }
   ],
-  "pendingPostAnchorMigrations": [],
+  "pendingPostAnchorMigrations": [
+    {
+      "version": "20260806000000",
+      "name": "qf_mvp_50_2_atomic_client_automation_producer",
+      "path": "supabase/migrations/20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql",
+      "sha256": "ce947a6f8d7dd42d2851f6c99eba4bf2ef39308b8d85ff876260d575185a3cfb",
+      "phase": "QF-MVP-50.2-FINAL-CLOSURE-R2",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    }
+  ],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,

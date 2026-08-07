@@ -64,6 +64,8 @@ const EXECUTION_MIGRATION_NAME =
   "20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql";
 const EXECUTION_MIGRATION_SHA =
   "9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b";
+const PRODUCER_MIGRATION_NAME =
+  "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql";
 const CLAIM_MIGRATION_NAME = "20260801152049_qf_mvp_automation_transport_replay_guard.sql";
 const PERSISTENCE_MIGRATION_NAME = "20260801110000_qf_mvp_automation_action_persistence.sql";
 
@@ -612,12 +614,12 @@ record("I02 the 50.2D migration matches its pinned hash",
 // QF-MVP-50.2E-R1 RE-PIN. "Exactly one newer migration" was correct while 50.2D was the
 // only post-anchor candidate. It is re-pinned to exactly TWO, named in exact order — not
 // relaxed to a count floor and not relaxed to "anything newer".
-record("I03 exactly two migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 2);
-record("I04 they are exactly the 50.2D completion route then the 50.2E execution route",
+record("I03 exactly three migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 3);
+record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, then the 50.2 producer",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
-       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME]));
-record("I05 the local migration count is exactly 89", migrationFiles.length === 89);
+       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME]));
+record("I05 the local migration count is exactly 90", migrationFiles.length === 90);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -652,10 +654,10 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // Staging (imported owner-reviewed evidence, remote history 22), so BOTH
 // post-anchor migrations are APPLIED and ZERO remain pending. Still exact counts,
 // exact order and exact per-migration identity — never a floor or a wildcard.
-record("G03 exactly two APPLIED and zero PENDING post-anchor migrations are declared",
+record("G03 exactly two APPLIED and one PENDING post-anchor migration are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 2 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 2 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 3 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), ["20260804000000", "20260805000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
@@ -688,9 +690,9 @@ record("G06 no applied record fabricates an offline remote status",
 record("G07 no generic future-migration allowance was granted",
   manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&
-  !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*89/.test(g1Source));
+  !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*90/.test(g1Source));
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 89;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 90;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",
   g1Source.includes(`version: "20260804000000"`) &&

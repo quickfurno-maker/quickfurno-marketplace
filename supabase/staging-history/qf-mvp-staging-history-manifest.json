@@ -585,7 +585,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 5,
+    "postAnchorMigrationCount": 7,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -655,7 +655,30 @@
       "appliedByThisPhase": false
     }
   ],
-  "pendingPostAnchorMigrations": [],
+  "pendingPostAnchorMigrations": [
+    {
+      "version": "20260809000000",
+      "name": "qf_mvp_50_3_vendor_automation_producer",
+      "path": "supabase/migrations/20260809000000_qf_mvp_50_3_vendor_automation_producer.sql",
+      "sha256": "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11",
+      "phase": "QF-MVP-50.3",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    },
+    {
+      "version": "20260810000000",
+      "name": "qf_mvp_50_4_campaign_recipient_automation",
+      "path": "supabase/migrations/20260810000000_qf_mvp_50_4_campaign_recipient_automation.sql",
+      "sha256": "8440e5e818676232969c5046941daa7e8fc905728ea73d295ca0e997c5ac7906",
+      "phase": "QF-MVP-50.4",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    }
+  ],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,

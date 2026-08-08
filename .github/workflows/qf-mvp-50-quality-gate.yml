@@ -106,6 +106,12 @@ jobs:
       - name: QF-MVP-50.2 final closure validator
         run: npm run test:mvp:50-2-final
 
+      - name: QF-MVP-50.3 validator
+        run: npm run test:mvp:50-3
+
+      - name: QF-MVP-50.4 validator
+        run: npm run test:mvp:50-4
+
       - name: Typecheck
         run: npm run typecheck
 

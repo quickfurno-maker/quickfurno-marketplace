@@ -15,9 +15,10 @@ The producer migration has been applied to QuickFurno staging (`uckafzuochmbvtio
 | `20260805000000` (50.2E) | APPLIED | 22 |
 | `20260806000000` (producer) | APPLIED | 23 |
 
-| `20260807000000` (execute_v1 repair) | **PENDING** | — |
+| `20260807000000` (execute_v1 repair) | APPLIED | 24 |
+| `20260808000000` (fresh-claim wedge repair) | **PENDING** | — |
 
-Pending post-anchor migrations: **1**. Post-anchor migration count: **4**. Local migration count: **91**.
+Pending post-anchor migrations: **1**. Post-anchor migration count: **5**. Local migration count: **92**.
 
 ### 0.1 The execute_v1 reservation defect
 
@@ -27,7 +28,21 @@ Every name in its `returns table (…)` is a PL/pgSQL OUT parameter that stays i
 
 The consequence was total: no client automation action could ever be executed, so execution-time eligibility reproof, intent building, the communication partition and `communication_pending` were all unreachable.
 
-The fix is the successor migration `20260807000000`, which `CREATE OR REPLACE`s the function with an identical signature, return shape, security posture, grants and replay/ownership semantics, changing **only** column references to be explicitly alias-qualified. The historical `20260805000000` is byte-frozen and is never rewritten, and no `#variable_conflict` pragma is used — a pragma would hide the next collision instead of failing on it.
+The fix is the successor migration `20260807000000`, which `CREATE OR REPLACE`s the function with an identical signature, return shape, security posture, grants and replay/ownership semantics, changing **only** column references to be explicitly alias-qualified. The historical `20260805000000` is byte-frozen and is never rewritten, and no `#variable_conflict` pragma is used — a pragma would hide the next collision instead of failing on it. It is **APPLIED** to staging at remote history 24 under `QF_MVP_50_2_EXECUTE_V1_REPAIR_STAGING_APPLIED_AND_VERIFIED`.
+
+### 0.2 The fresh-claim retry queue wedge
+
+With execution unblocked, the first real n8n run exposed a second, independent defect. Three individually-correct designs combined into permanent starvation:
+
+1. a client execution whose WhatsApp provider is not configured is finalized `retryable_failure` / `QF_EXEC_INFRASTRUCTURE_TRANSIENT`, parking the job in `retry_scheduled`;
+2. `uq_automation_transport_requests_claim_job` permits exactly **one** `claim_v1` reservation per job, ever, so that job can never be re-claimed through the signed route;
+3. the ordinary claim selector also accepted `retry_scheduled`, ordered by `next_retry_at` ascending — and a stranded job's `next_retry_at` is in the **past**, so it out-ranked every later fresh job forever.
+
+Every subsequent claim therefore re-selected the stranded job, violated the unique index (`23505`) and returned Core **500**. Fresh work was permanently starved.
+
+The fix is the successor migration `20260808000000`, which excludes `retry_scheduled` from the **ordinary fresh-work selector** only. `retry_scheduled` remains a legal, durable, **inert** state: nothing is reset, replaced, deleted or swept, no append-only guard is touched, and claim uniqueness is deliberately left unchanged. Governed retry recovery — due sweep, `retry_scheduled` reclaim, stale leases, dead-letter handling — remains owned by **QF-MVP-50.5** and is not implemented here.
+
+> **The transient is not a consent gap.** Both `communication_suppressions` and `communication_preferences` exist on staging. `QF_EXEC_INFRASTRUCTURE_TRANSIENT` here is `WHATSAPP_PROVIDER_NOT_CONFIGURED`, raised by runtime provider selection *before* consent is ever consulted — exactly the intended zero-live-readiness posture. Live channel/provider readiness remains owned by QF-MVP-40 / QF-MVP-80 per §8.
 
 **Earned evidence markers**
 

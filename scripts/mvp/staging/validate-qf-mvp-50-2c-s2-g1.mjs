@@ -53,7 +53,7 @@ const APPLIED_EVIDENCE_MARKER = "QF_MVP_50_2C_S2_D2_R1_STAGING_MIGRATION_APPLIED
 // evidence. G1 performs no database access and re-proves none of it itself.
 //
 // This is NOT a relaxation to "anything newer is fine". There is no `>=`, no
-// wildcard and no version-greater-than allowance: a fifth post-anchor migration,
+// wildcard and no version-greater-than allowance: a sixth post-anchor migration,
 // a renamed candidate, a hash-drifted candidate, a missing candidate, an
 // out-of-order set, any new PENDING entry, a demoted applied record, a forged
 // marker and a wrong remote-history count all still fail closed.
@@ -82,29 +82,37 @@ const POST_ANCHOR_APPLIED = [
     remoteHistory: 23,
     phase: "QF-MVP-50.2-FINAL-CLOSURE-R2",
   },
+  {
+    version: "20260807000000",
+    name: "qf_mvp_50_2_execute_v1_reservation_ambiguity_repair",
+    sha: "c36171fe851968c5e42477c048d535c563676f3d44e020d41fd5abcff1dacee5",
+    marker: "QF_MVP_50_2_EXECUTE_V1_REPAIR_STAGING_APPLIED_AND_VERIFIED",
+    remoteHistory: 24,
+    phase: "QF-MVP-50.2-EXECUTE-V1-REPAIR",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
   path: `supabase/migrations/${m.version}_${m.name}.sql`,
 }));
 
-// QF-MVP-50.2-EXECUTE-V1-REPAIR adds exactly ONE new pending post-anchor
-// migration: the successor that repairs the execute_v1 RETURNS TABLE
-// output-variable / column ambiguity (42702). The three applied records above
-// are untouched; this one stays PENDING until its own staging gate.
+// QF-MVP-50.2-FRESH-CLAIM-WEDGE-REPAIR adds exactly ONE new pending post-anchor
+// migration: the successor that excludes retry_scheduled from the ordinary
+// fresh-work claim selector. The four applied records above are untouched;
+// this one stays PENDING until its own staging gate.
 const POST_ANCHOR_PENDING = [
   {
-    version: "20260807000000",
-    name: "qf_mvp_50_2_execute_v1_reservation_ambiguity_repair",
-    sha: "c36171fe851968c5e42477c048d535c563676f3d44e020d41fd5abcff1dacee5",
-    phase: "QF-MVP-50.2-EXECUTE-V1-REPAIR",
+    version: "20260808000000",
+    name: "qf_mvp_50_2_fresh_claim_retry_wedge_repair",
+    sha: "8b798bb3c5db5d91f988d92cec3705237db08c753ae5018d09dccc09ff0240aa",
+    phase: "QF-MVP-50.2-FRESH-CLAIM-WEDGE-REPAIR",
   },
 ].map((m) => ({ ...m, filename: `${m.version}_${m.name}.sql`, path: `supabase/migrations/${m.version}_${m.name}.sql` }));
 
 const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING].map((m) => m.version);
 const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING];
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
-const MIGRATION_COUNT = 91;
+const MIGRATION_COUNT = 92;
 
 const APPROVED_COMMON = [
   "20260723000100", "20260723000200", "20260723000300", "20260723000400",
@@ -303,10 +311,10 @@ function validateState(state) {
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
 
-  check("exactly four local migrations are newer than the anchor", postAnchorLocal.length === 4, `actual=${postAnchorLocal.length}`);
-  check("the four post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 4);
-  check("manifest declares exactly three APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 3, `actual=${appliedPins?.length}`);
+  check("exactly five local migrations are newer than the anchor", postAnchorLocal.length === 5, `actual=${postAnchorLocal.length}`);
+  check("the five post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 5);
+  check("manifest declares exactly four APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 4, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   // Exactly ONE pending record: the execute_v1 repair, hash-pinned like every
   // other post-anchor migration. A missing key, a second pending entry and a
@@ -362,11 +370,11 @@ function validateState(state) {
       !("remoteVersionStatus" in (pin ?? {})));
   }
 
-  check("the three applied markers are all distinct",
-    new Set(POST_ANCHOR_APPLIED.map((m) => m.marker)).size === 3 &&
-    new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker)).size === 3);
-  check("the three remote-history counts are exactly 21, 22, 23 in ascending order",
-    same((appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply), [21, 22, 23]));
+  check("the four applied markers are all distinct",
+    new Set(POST_ANCHOR_APPLIED.map((m) => m.marker)).size === 4 &&
+    new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker)).size === 4);
+  check("the four remote-history counts are exactly 21, 22, 23, 24 in ascending order",
+    same((appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply), [21, 22, 23, 24]));
   check("G1 still claims no database access of its own", manifest.evidence?.g1PerformsDatabaseAccess === false);
   check("newest local migration is the newest pinned post-anchor migration", newestVersion === POST_ANCHOR_ORDER[POST_ANCHOR_ORDER.length - 1]);
   check("no generic future-migration allowance is granted", manifest.safety?.genericFutureMigrationAllowanceForbidden === true && manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true && manifest.safety?.postAnchorMigrationsRequireOwnStagingGate === true);
@@ -451,10 +459,10 @@ function runMutants(pristineState) {
       state.migrations = state.migrations.filter((m) => m.version !== "20260805000000");
       state.postAnchorOnDisk["20260805000000"].exists = false;
     }],
-    ["a new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260808000000", name: "fifth", path: "supabase/migrations/20260808000000_fifth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.2F", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
+    ["a new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260809000000", name: "sixth", path: "supabase/migrations/20260809000000_sixth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.2F", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
     ["the pending list key deleted entirely instead of emptied", (state) => { delete state.manifest.pendingPostAnchorMigrations; }],
-    ["a fifth applied post-anchor migration", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
-    ["a fifth post-anchor migration on disk", (state) => { state.migrations.push({ filename: "20260808000000_fifth.sql", version: "20260808000000", name: "fifth", sha256: "c".repeat(64), malformed: false }); }],
+    ["a sixth applied post-anchor migration", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
+    ["a sixth post-anchor migration on disk", (state) => { state.migrations.push({ filename: "20260809000000_sixth.sql", version: "20260809000000", name: "sixth", sha256: "c".repeat(64), malformed: false }); }],
 
     // --- QF-MVP-50.2-R2-APPLIED-TRUTH: the newly imported APPLIED record ------
     ["R2 producer left PENDING", (state) => {
@@ -488,6 +496,27 @@ function runMutants(pristineState) {
       state.postAnchorOnDisk["20260806000000"].exists = false;
     }],
     ["R2 also listed as pending", (state) => { state.manifest.pendingPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
+
+    // --- QF-MVP-50.2-EXECUTE-V1-REPAIR: the 070 applied record ---------------
+    ["070 execute repair left PENDING", (state) => {
+      const [e] = state.manifest.appliedPostAnchorMigrations.splice(3, 1);
+      state.manifest.pendingPostAnchorMigrations.push({ ...e, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE" });
+    }],
+    ["070 demoted to PENDING in place", (state) => { state.manifest.appliedPostAnchorMigrations[3].operationalStatus = "PENDING"; }],
+    ["070 remote history 23 instead of 24", (state) => { state.manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply = 23; }],
+    ["070 remote history 25 instead of 24", (state) => { state.manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply = 25; }],
+    ["070 marker missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceMarker; }],
+    ["070 marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceMarker = "QF_MVP_FAKE_070_MARKER"; }],
+    ["070 evidence type self-asserted", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceType = "SELF_ASSERTED"; }],
+    ["070 claimed applied by this source phase", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedByThisPhase = true; }],
+    ["070 appliedExactlyOnce false", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedExactlyOnce = false; }],
+    ["070 manifest SHA drift", (state) => { state.manifest.appliedPostAnchorMigrations[3].sha256 = "7".repeat(64); }],
+    ["070 on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260807000000"].sha = "7".repeat(64); state.postAnchorOnDisk["20260807000000"].canonicalSha = "7".repeat(64); }],
+    ["070 fabricated offline remote status field", (state) => { state.manifest.appliedPostAnchorMigrations[3].remoteVersionStatus = "PRESENT"; }],
+    ["070 migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260807000000");
+      state.postAnchorOnDisk["20260807000000"].exists = false;
+    }],
     ["50.2D demoted back to PENDING", (state) => { state.manifest.appliedPostAnchorMigrations[0].operationalStatus = "PENDING"; }],
     ["50.2D marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[0].appliedEvidenceMarker = "QF_MVP_FAKE_APPLIED_MARKER"; }],
     ["50.2D remote history changed from 21", (state) => { state.manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply = 20; }],

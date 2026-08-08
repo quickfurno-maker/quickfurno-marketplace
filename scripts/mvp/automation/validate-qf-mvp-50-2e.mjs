@@ -705,14 +705,23 @@ record("G01 the anchor is untouched",
 // post-anchor migrations are APPLIED and ZERO remain pending.
 // QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
 // (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
-record("G02 exactly three APPLIED and one PENDING post-anchor migration",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 4 &&
-  manifest.appliedPostAnchorMigrations?.length === 3 &&
+record("G02 exactly four APPLIED and one PENDING post-anchor migration",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 5 &&
+  manifest.appliedPostAnchorMigrations?.length === 4 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
   manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260807000000" &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260808000000" &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000"]));
+record("G02b 20260807000000 is recorded APPLIED with remote history 24, hash-exact",
+  manifest.appliedPostAnchorMigrations[3].version === "20260807000000" &&
+  manifest.appliedPostAnchorMigrations[3].sha256 ===
+    "c36171fe851968c5e42477c048d535c563676f3d44e020d41fd5abcff1dacee5" &&
+  manifest.appliedPostAnchorMigrations[3].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[3].appliedEvidenceMarker ===
+    "QF_MVP_50_2_EXECUTE_V1_REPAIR_STAGING_APPLIED_AND_VERIFIED" &&
+  manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply === 24 &&
+  manifest.appliedPostAnchorMigrations[3].appliedExactlyOnce === true);
 record("G02a 20260806000000 is recorded APPLIED with remote history 23, hash-exact",
   manifest.appliedPostAnchorMigrations[2].version === "20260806000000" &&
   manifest.appliedPostAnchorMigrations[2].sha256 ===
@@ -743,9 +752,9 @@ record("G05 no applied record fabricates an offline remote status or self-claims
   manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r) && r.appliedByThisPhase === false) &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
-record("G06 G1 pins the exact count 91, not a lower bound",
-  /const MIGRATION_COUNT = 91;/.test(g1Source) &&
-  !/>=\s*91|length\s*>=/.test(g1Source));
+record("G06 G1 pins the exact count 92, not a lower bound",
+  /const MIGRATION_COUNT = 92;/.test(g1Source) &&
+  !/>=\s*92|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
   g1Source.includes('version: "20260805000000"') &&
@@ -753,14 +762,14 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
   g1Source.includes('marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"') &&
   g1Source.includes("remoteHistory: 21") &&
   g1Source.includes("remoteHistory: 22"));
-record("G08 the local migration set is exactly 91 with the execute_v1 repair newest",
+record("G08 the local migration set is exactly 92 with the fresh-claim wedge repair newest",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 91 && files.at(-1) === "20260807000000_qf_mvp_50_2_execute_v1_reservation_ambiguity_repair.sql";
+    return files.length === 92 && files.at(-1) === "20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 91/.test(d2Source) &&
-  /exactly four migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 92/.test(d2Source) &&
+  /exactly five migrations are newer than the anchor/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
 record("G10 the completion-path allowlist names exactly one workflow",

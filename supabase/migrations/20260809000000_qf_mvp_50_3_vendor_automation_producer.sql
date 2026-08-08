@@ -508,6 +508,18 @@ begin
   end if;
 
   -- 9.6 no vendor accept/reject state was introduced anywhere
+  --
+  -- EXACTLY ONE EXEMPTION: public.vendors.accepting_leads. That column is a
+  -- VENDOR AVAILABILITY toggle -- "this vendor is currently open to new leads" --
+  -- created by the pre-baseline migration 20260706000140_vendor_accepting_leads.sql
+  -- and load-bearing in preferred/manual assignment, the credit wallet RPC, the
+  -- canonical assignment authority and the public projection. It is NOT per-lead
+  -- acceptance, rejection, decline, vendor decision state or an acceptance
+  -- workflow, and this migration introduces none of those. The header of this
+  -- file already states that distinction; the exemption below makes the guard
+  -- agree with it. The exemption is deliberately keyed to that one exact
+  -- table+column pair, so every other accept/reject-style lead column -- on
+  -- vendors or anywhere else in public -- still aborts this migration.
   if exists (
     select 1 from information_schema.columns
      where table_schema = 'public'
@@ -516,6 +528,10 @@ begin
          or column_name ilike '%reject%lead%'
          or column_name ilike '%lead%reject%'
          or column_name in ('acceptance_rate', 'rejection_rate'))
+       and not (
+         table_name = 'vendors'
+         and column_name = 'accepting_leads'
+       )
   ) then
     raise exception 'QF-MVP-50.3 aborted: a vendor accept/reject column exists.'
       using errcode = 'P0001';

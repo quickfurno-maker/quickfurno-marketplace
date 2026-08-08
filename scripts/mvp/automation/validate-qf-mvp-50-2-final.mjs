@@ -38,6 +38,13 @@ const stripJs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/
 const MIGRATION_NAME = "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql";
 const MIGRATION_PATH = `supabase/migrations/${MIGRATION_NAME}`;
 const MIGRATION_SHA = "ce947a6f8d7dd42d2851f6c99eba4bf2ef39308b8d85ff876260d575185a3cfb";
+const R2_APPLIED_MARKER = "QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED";
+const ATOMIC_PRODUCER_MARKER = "QF_MVP_50_2_ATOMIC_PRODUCER_STAGING_CERTIFIED";
+// Not earned yet. Orchestration certification is a separate, later gate; these
+// two markers must NOT appear in source until a real n8n runtime has executed
+// the merged workflow against QuickFurno staging.
+const N8N_CERTIFIED_MARKER = "QF_MVP_50_2_CLIENT_N8N_STAGING_CERTIFIED";
+const STAGING_COMPLETE_MARKER = "QF_MVP_50_2_STAGING_CERTIFICATION_COMPLETE";
 
 const migrationSource = read(MIGRATION_PATH);
 const sql = stripSql(migrationSource);
@@ -48,10 +55,14 @@ const leadServiceCode = stripJs(read("services/leadService.ts"));
 const adminServiceCode = stripJs(read("services/adminService.ts"));
 const clarificationCode = stripJs(read("services/leadClarificationService.ts"));
 const matchingCode = stripJs(read("services/leadMatchingEngine.ts"));
-const manifest = JSON.parse(read("supabase/staging-history/qf-mvp-staging-history-manifest.json"));
+const manifestText = read("supabase/staging-history/qf-mvp-staging-history-manifest.json");
+const manifest = JSON.parse(manifestText);
 const ciWorkflow = read(".github/workflows/qf-mvp-50-quality-gate.yml");
 const pkg = JSON.parse(read("package.json"));
 const doc = read("docs/QF-MVP-50-2-FINAL-CLOSURE.md");
+const g1Source = read("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
+const producerPin = manifest.appliedPostAnchorMigrations
+  .find((r) => r.version === "20260806000000");
 
 /** Only the `perform ... qf_enqueue_client_automation_v1(<action>` call sites — the
  *  action allowlist inside the primitive mentions every action and must not be counted. */
@@ -251,20 +262,63 @@ for (const [action, spec] of Object.entries(TRIGGER_MATRIX)) {
 // ---------------------------------------------------------------------------
 // G. GOVERNANCE / SCOPE CONTAINMENT
 // ---------------------------------------------------------------------------
-record("G01 exactly one new PENDING post-anchor migration is pinned",
-  manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260806000000" &&
-  manifest.pendingPostAnchorMigrations[0].sha256 === MIGRATION_SHA &&
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[0].remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-  manifest.pendingPostAnchorMigrations[0].appliedByThisPhase === false);
-record("G02 the two applied records are untouched",
-  manifest.appliedPostAnchorMigrations.length === 2 &&
-  manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply === 21 &&
-  manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply === 22);
+// QF-MVP-50.2-R2-APPLIED-TRUTH — the producer migration was applied exactly once
+// to QuickFurno staging (remote history 23) by an external owner-reviewed
+// execution. This source phase imports that record and applies nothing itself.
+// Zero post-anchor migrations remain pending.
+record("G01 the producer migration is pinned APPLIED at remote history 23",
+  manifest.appliedPostAnchorMigrations.length === 3 &&
+  producerPin?.version === "20260806000000" &&
+  producerPin?.sha256 === MIGRATION_SHA &&
+  producerPin?.operationalStatus === "APPLIED" &&
+  producerPin?.appliedEvidenceMarker === R2_APPLIED_MARKER &&
+  producerPin?.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  producerPin?.remoteHistoryCountAfterApply === 23 &&
+  producerPin?.appliedExactlyOnce === true &&
+  producerPin?.appliedByThisPhase === false &&
+  // an applied record must never also carry an un-proven offline remote status
+  !("remoteVersionStatus" in (producerPin ?? {})));
+record("G01a the pending post-anchor list exists and is exactly empty",
+  Array.isArray(manifest.pendingPostAnchorMigrations) &&
+  manifest.pendingPostAnchorMigrations.length === 0);
+record("G02 the three applied records are 21 / 22 / 23 in exact ascending order",
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23]) &&
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
+    ["20260804000000", "20260805000000", "20260806000000"]) &&
+  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 3);
 record("G03 post-anchor count and local migration count agree at 3 / 90",
   manifest.appliedAnchor.postAnchorMigrationCount === 3 &&
   readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 90);
+record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
+  g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
+  g1Source.includes("remoteHistory: 23") &&
+  g1Source.includes("manifest declares exactly three APPLIED post-anchor migrations") &&
+  g1Source.includes("the PENDING post-anchor list exists and is exactly empty") &&
+  // no `>=`, no wildcard: the count assertions stay exact
+  g1Source.includes("appliedPins.length === 3") &&
+  g1Source.includes("pendingPins.length === 0"));
+record("G03b the atomic producer staging certification is recorded",
+  doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
+// An unearned marker may be NAMED in prose only to disclaim it. It must never
+// appear as machine-readable evidence (manifest / G1 pin), and every prose
+// sentence carrying it must negate it.
+const unearnedIsDisclaimedInProse = (marker) =>
+  doc.split(/(?<=\.)\s|\n/)
+    .filter((line) => line.includes(marker))
+    .every((line) => /\bnot\b|\bno\b|\bnever\b|\buntil\b|\bunearned\b|\bremains? (?:unproven|uncertified)\b/i.test(line));
+record("G03c orchestration certification is NOT yet claimed anywhere in source",
+  unearnedIsDisclaimedInProse(N8N_CERTIFIED_MARKER) &&
+  unearnedIsDisclaimedInProse(STAGING_COMPLETE_MARKER) &&
+  // never machine-readable evidence
+  !manifestText.includes(N8N_CERTIFIED_MARKER) &&
+  !manifestText.includes(STAGING_COMPLETE_MARKER) &&
+  !g1Source.includes(N8N_CERTIFIED_MARKER) &&
+  !g1Source.includes(STAGING_COMPLETE_MARKER) &&
+  // and the doc must positively say they are not earned
+  /\*\*Not earned\.\*\*/.test(doc));
+record("G03d the closure doc still states orchestration is uncertified",
+  /ORCHESTRATION UNCERTIFIED/i.test(doc) &&
+  /NOT COMPLETE/i.test(doc));
 record("G04 no vendor accept/reject concept is implemented anywhere in this package",
   // Plain string matching on purpose: the phrase contains a slash, and an
   // escaping slip in a regex here would silently weaken the guard.
@@ -285,7 +339,15 @@ record("G05 no Jarvis reference appears anywhere in this package",
 record("G06 no QF-MVP-50.3 vendor workflow surface is added",
   !/vendor\.(lead_offer|response_reminder|onboarding_reminder|document_reminder|package_expiry|low_credit)/.test(sql + executionCode));
 record("G07 the closure doc does not claim QF-MVP-50.2 complete",
-  /NOT COMPLETE/i.test(doc) && !/QF-MVP-50\.2 is COMPLETE/i.test(doc));
+  /NOT COMPLETE/i.test(doc) &&
+  !/QF-MVP-50\.2 is COMPLETE/i.test(doc) &&
+  !/COMPLETE \/ TESTED \/ FROZEN/i.test(doc));
+record("G07a no real Meta/WhatsApp send is claimed and readiness stays zero-of-six",
+  // "live-provider-ready" may appear ONLY inside a sentence that negates it.
+  doc.split(/[.\n]/)
+    .filter((line) => /live[- ]provider[- ]ready/i.test(line))
+    .every((line) => /\b(?:zero|no|not|never|remains? disabled|until)\b/i.test(line)) &&
+  /no real send/i.test(doc));
 record("G08 the validator is registered and wired after 50.2E in CI",
   pkg.scripts["test:mvp:50-2-final"] ===
     "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2-final.mjs" &&
@@ -334,6 +396,40 @@ const mutants = [
   ["a TypeScript fire-and-forget producer is impossible",
     () => !/createAutomationActionRequest\(|createAutomationJob\(/.test(
       leadServiceCode + adminServiceCode + clarificationCode + matchingCode + executionCode)],
+
+  // --- QF-MVP-50.2-R2-APPLIED-TRUTH staging-truth mutants -------------------
+  // Each lambda states the invariant that makes the named defect impossible.
+  ["understating the applied producer as still PENDING is impossible",
+    () => producerPin?.operationalStatus === "APPLIED" &&
+          manifest.pendingPostAnchorMigrations.length === 0 &&
+          !manifest.pendingPostAnchorMigrations.some((r) => r.version === "20260806000000")],
+  ["recording remote history 22 for the producer is impossible",
+    () => producerPin?.remoteHistoryCountAfterApply === 23],
+  ["recording remote history 24 for the producer is impossible",
+    () => producerPin?.remoteHistoryCountAfterApply === 23 &&
+          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 23)],
+  ["claiming the producer was applied more than once is impossible",
+    () => producerPin?.appliedExactlyOnce === true],
+  ["claiming this source phase applied the migration is impossible",
+    () => producerPin?.appliedByThisPhase === false &&
+          producerPin?.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD"],
+  ["forging the applied-evidence marker is impossible",
+    () => producerPin?.appliedEvidenceMarker === R2_APPLIED_MARKER &&
+          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 3],
+  ["claiming n8n orchestration certification before it is earned is impossible",
+    () => unearnedIsDisclaimedInProse(N8N_CERTIFIED_MARKER) &&
+          !manifestText.includes(N8N_CERTIFIED_MARKER) && !g1Source.includes(N8N_CERTIFIED_MARKER)],
+  ["claiming overall staging certification before it is earned is impossible",
+    () => unearnedIsDisclaimedInProse(STAGING_COMPLETE_MARKER) &&
+          !manifestText.includes(STAGING_COMPLETE_MARKER) && !g1Source.includes(STAGING_COMPLETE_MARKER)],
+  ["declaring QF-MVP-50.2 COMPLETE while orchestration is uncertified is impossible",
+    () => /NOT COMPLETE/i.test(doc) && /ORCHESTRATION UNCERTIFIED/i.test(doc) &&
+          !/COMPLETE \/ TESTED \/ FROZEN/i.test(doc)],
+  ["silently loosening the G1 post-anchor pin is impossible",
+    () => g1Source.includes("appliedPins.length === 3") &&
+          g1Source.includes("pendingPins.length === 0") &&
+          !/appliedPins\.length\s*>=/.test(g1Source) &&
+          !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];
 for (const [name, fn] of mutants) {
   let held = false;

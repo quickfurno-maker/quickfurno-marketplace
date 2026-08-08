@@ -3,6 +3,7 @@
 // ============================================================================
 
 import type { AutomationJobEnvelope } from "./actionContract";
+import type { AutomationWorkflowFamily } from "./actionRegistry";
 
 export const N8N_CLAIM_ROUTE_PATH =
   "/api/internal/automation/n8n/claim" as const;
@@ -23,6 +24,19 @@ export const N8N_COMPLETE_ROUTE_PATH =
 export const N8N_EXECUTE_CLIENT_ROUTE_PATH =
   "/api/internal/automation/n8n/execute-client" as const;
 
+/**
+ * QF-MVP-50.3 / 50.4. Two more signed n8n -> Core execute routes, one per
+ * workflow family. Each exact path is a canonical HMAC field, so a signature
+ * minted for one family's execute route can never authenticate another's.
+ * Both reuse the frozen `execute_v1` transport route identity — there is no
+ * execute_v2.
+ */
+export const N8N_EXECUTE_VENDOR_ROUTE_PATH =
+  "/api/internal/automation/n8n/execute-vendor" as const;
+
+export const N8N_EXECUTE_CAMPAIGN_ROUTE_PATH =
+  "/api/internal/automation/n8n/execute-campaign" as const;
+
 /** Closed transport route vocabulary. Mirrors the ledger's route_key CHECK. */
 export const AUTOMATION_TRANSPORT_ROUTE_KEYS = [
   "claim_v1",
@@ -36,6 +50,46 @@ export interface N8nClaimRequestBody {
   transportVersion: 1;
   requestId: string;
   workerId: string;
+}
+
+/**
+ * QF-MVP-50.3/50.4 family-aware claim body.
+ *
+ * The legacy three-key body is kept verbatim above and remains valid; it now
+ * resolves to a CLIENT-ONLY claim in SQL, so the existing client workflow needs
+ * no change and can no longer consume vendor or campaign work.
+ *
+ * This body adds EXACTLY ONE field. `workflowFamily` is a single canonical
+ * family — never an array, a comma list, a wildcard or "all" — and there is no
+ * caller-supplied action allowlist: Core matches the declared family against
+ * durable action truth.
+ *
+ * Because the field is part of the request body, it is covered by the canonical
+ * body hash that already binds the signed transport identity. A replay of the
+ * same requestId under a DIFFERENT family therefore conflicts rather than
+ * inheriting the original claim.
+ */
+export interface N8nFamilyClaimRequestBody {
+  transportVersion: 1;
+  requestId: string;
+  workerId: string;
+  workflowFamily: AutomationWorkflowFamily;
+}
+
+/** The closed family vocabulary a claim request may declare. */
+export const N8N_CLAIMABLE_WORKFLOW_FAMILIES = [
+  "client_whatsapp",
+  "vendor_whatsapp",
+  "campaign_execution",
+] as const satisfies readonly AutomationWorkflowFamily[];
+
+export function isClaimableWorkflowFamily(
+  value: unknown,
+): value is AutomationWorkflowFamily {
+  return (
+    typeof value === "string" &&
+    (N8N_CLAIMABLE_WORKFLOW_FAMILIES as readonly string[]).includes(value)
+  );
 }
 
 export type AutomationTransportClaimState =

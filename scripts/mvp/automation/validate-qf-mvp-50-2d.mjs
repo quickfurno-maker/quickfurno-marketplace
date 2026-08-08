@@ -72,6 +72,9 @@ const REPAIR_MIGRATION_NAME =
 // QF-MVP-50.2-FRESH-CLAIM-WEDGE-REPAIR successor. Re-pinned, never loosened.
 const WEDGE_MIGRATION_NAME =
   "20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql";
+// QF-MVP-50.3 / 50.4 successors. Re-pinned, never loosened.
+const VENDOR_MIGRATION_NAME = "20260809000000_qf_mvp_50_3_vendor_automation_producer.sql";
+const CAMPAIGN_MIGRATION_NAME = "20260810000000_qf_mvp_50_4_campaign_recipient_automation.sql";
 const CLAIM_MIGRATION_NAME = "20260801152049_qf_mvp_automation_transport_replay_guard.sql";
 const PERSISTENCE_MIGRATION_NAME = "20260801110000_qf_mvp_automation_action_persistence.sql";
 
@@ -564,8 +567,15 @@ record("C04 no 50.2D module reaches into the n8n workflow tree",
 // exact allowlist of ONE named file, and the two pre-existing candidates are additionally
 // required to stay completion-path-free. Every workflow, without exception, must still be
 // inactive and unpublished.
+// QF-MVP-50.3 / 50.4 add the vendor and campaign executors, which legitimately
+// call the completion route on the same frozen terms. The class is still NOT
+// opened: this remains an exact allowlist of THREE named files, every other
+// workflow must stay completion-path-free, and every workflow without exception
+// must still be inactive and unpublished.
 const COMPLETION_PATH_ALLOWED_WORKFLOWS = [
   "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
+  "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
+  "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
 ];
 record("C05 the n8n workflow candidates remain inactive and unpublished",
   (() => {
@@ -620,12 +630,14 @@ record("I02 the 50.2D migration matches its pinned hash",
 // QF-MVP-50.2E-R1 RE-PIN. "Exactly one newer migration" was correct while 50.2D was the
 // only post-anchor candidate. It is re-pinned to exactly TWO, named in exact order — not
 // relaxed to a count floor and not relaxed to "anything newer".
-record("I03 exactly five migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 5);
+record("I03 exactly eight migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 8);
 record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, the execute_v1 repair, then the fresh-claim wedge repair",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
-       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME, WEDGE_MIGRATION_NAME]));
-record("I05 the local migration count is exactly 92", migrationFiles.length === 92);
+       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME,
+        WEDGE_MIGRATION_NAME, VENDOR_MIGRATION_NAME, CAMPAIGN_MIGRATION_NAME,
+        "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql"]));
+record("I05 the local migration count is exactly 95", migrationFiles.length === 95);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -663,10 +675,11 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-50.2-R2-APPLIED-TRUTH: the third post-anchor migration is now APPLIED
 // too (remote history 23), so zero remain pending. Re-pinned, never loosened —
 // the counts stay exact and the pending list must still exist and be empty.
-record("G03 exactly five APPLIED and zero PENDING post-anchor migrations are declared",
+record("G03 exactly five APPLIED and three PENDING post-anchor migrations are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 5 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 5 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 3 &&
+  same(manifest.pendingPostAnchorMigrations.map((r) => r.version), ["20260809000000", "20260810000000", "20260811000000"]) &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 8 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
@@ -702,7 +715,7 @@ record("G07 no generic future-migration allowance was granted",
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&
   !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*90/.test(g1Source));
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 92;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 95;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",
   g1Source.includes(`version: "20260804000000"`) &&
@@ -724,8 +737,8 @@ record("G09a G1 rejects a demoted, forged or mis-counted applied post-anchor rec
   /post-anchor order swapped/.test(g1Source) &&
   /post-anchor count understated/.test(g1Source));
 record("G10 G1 still rejects an arbitrary newer or drifted migration",
-  /a sixth post-anchor migration on disk/.test(g1Source) &&
-  /a sixth applied post-anchor migration/.test(g1Source) &&
+  /a ninth post-anchor migration on disk/.test(g1Source) &&
+  /a ninth applied post-anchor migration/.test(g1Source) &&
   /50\.2E migration renamed/.test(g1Source) &&
   /50\.2E on-disk SHA drift/.test(g1Source) &&
   /50\.2E manifest SHA drift/.test(g1Source) &&

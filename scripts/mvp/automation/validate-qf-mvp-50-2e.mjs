@@ -690,8 +690,18 @@ record("N19 every workflow in the tree is inactive and unpublished",
       const wf = JSON.parse(readFileSync(path.join(ROOT, "automation/n8n", f), "utf8"));
       return wf.active === false && !Object.prototype.hasOwnProperty.call(wf, "published");
     }));
-record("N20 exactly three workflow candidates exist",
-  readdirSync(path.join(ROOT, "automation/n8n")).filter((f) => f.endsWith(".workflow.json")).length === 3);
+record("N20 exactly five workflow candidates exist, by exact name",
+  (() => {
+    const flows = readdirSync(path.join(ROOT, "automation/n8n"))
+      .filter((f) => f.endsWith(".workflow.json")).sort();
+    return flows.length === 5 && same(flows, [
+      "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json",
+      "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json",
+      "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
+      "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
+      "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
+    ]);
+  })());
 
 // ---------------------------------------------------------------------------
 // G. G1 RE-PIN
@@ -705,11 +715,11 @@ record("G01 the anchor is untouched",
 // post-anchor migrations are APPLIED and ZERO remain pending.
 // QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
 // (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
-record("G02 exactly five APPLIED and zero PENDING post-anchor migrations",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 5 &&
+record("G02 exactly five APPLIED and three PENDING post-anchor migrations",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 8 &&
   manifest.appliedPostAnchorMigrations?.length === 5 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.pendingPostAnchorMigrations.length === 3 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]));
 record("G02c 20260808000000 is recorded APPLIED with remote history 25, hash-exact",
@@ -760,9 +770,9 @@ record("G05 no applied record fabricates an offline remote status or self-claims
   manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r) && r.appliedByThisPhase === false) &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
-record("G06 G1 pins the exact count 92, not a lower bound",
-  /const MIGRATION_COUNT = 92;/.test(g1Source) &&
-  !/>=\s*92|length\s*>=/.test(g1Source));
+record("G06 G1 pins the exact count 95, not a lower bound",
+  /const MIGRATION_COUNT = 95;/.test(g1Source) &&
+  !/>=\s*95|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
   g1Source.includes('version: "20260805000000"') &&
@@ -770,18 +780,22 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
   g1Source.includes('marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"') &&
   g1Source.includes("remoteHistory: 21") &&
   g1Source.includes("remoteHistory: 22"));
-record("G08 the local migration set is exactly 92 with the fresh-claim wedge repair newest",
+record("G08 the local migration set is exactly 95 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 92 && files.at(-1) === "20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql";
+    return files.length === 95 &&
+      files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
+      files.at(-1) === "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 92/.test(d2Source) &&
-  /exactly five migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 95/.test(d2Source) &&
+  /exactly eight migrations are newer than the anchor/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
-record("G10 the completion-path allowlist names exactly one workflow",
-  /COMPLETION_PATH_ALLOWED_WORKFLOWS = \[\s*\n\s*"QF-MVP-50-02-Client-Whatsapp-Executor\.50\.2E-selfhost-env\.workflow\.json",\s*\n\s*\]/.test(d2Source));
+record("G10 the completion-path allowlist names exactly the three executors",
+  // Still an EXACT named allowlist, never a class: the client executor plus the
+  // QF-MVP-50.3 vendor and QF-MVP-50.4 campaign executors, and nothing else.
+  /COMPLETION_PATH_ALLOWED_WORKFLOWS = \[\s*\n\s*"QF-MVP-50-02-Client-Whatsapp-Executor\.50\.2E-selfhost-env\.workflow\.json",\s*\n\s*"QF-MVP-50-03-Vendor-Whatsapp-Executor\.workflow\.json",\s*\n\s*"QF-MVP-50-04-Campaign-Execution-Executor\.workflow\.json",\s*\n\s*\]/.test(d2Source));
 record("G11 no generic future-migration allowance appeared",
   manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&

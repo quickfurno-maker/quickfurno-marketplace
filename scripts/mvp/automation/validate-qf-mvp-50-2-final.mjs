@@ -397,13 +397,12 @@ record("R16 the repair self-verifies its own posture and fails closed",
   /repair aborted: a guard clause was lost/.test(repairSource));
 record("R17 no #variable_conflict pragma is used to mask the collision",
   !/#variable_conflict/i.test(repairSql));
-record("R18 the execute_v1 repair is present, ordered before the wedge repair",
+record("R18 the execute_v1 repair is present, ordered immediately before the wedge repair",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 92 &&
-      files.indexOf(REPAIR_NAME) === files.length - 2 &&
-      files.at(-1) === WEDGE_NAME;
+    return files.length === 95 &&
+      files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
 // ---------------------------------------------------------------------------
@@ -488,11 +487,11 @@ record("W17 the repair self-verifies and fails closed",
   /wedge repair aborted: claim uniqueness must not be weakened/.test(wedgeSource));
 record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surface",
   !/provider_template_mappings|send_authority|binding_readiness|n8n|meta|whatsapp|vendor_|campaign|qf-jarvis/i.test(wedgeSql));
-record("W19 the wedge repair is the newest local migration and the set is exactly 92",
+record("W19 the wedge repair is present and the set is exactly 94",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 92 && files.at(-1) === WEDGE_NAME;
+    return files.length === 95 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -514,9 +513,11 @@ record("G01 the producer migration is pinned APPLIED at remote history 23",
   producerPin?.appliedByThisPhase === false &&
   // an applied record must never also carry an un-proven offline remote status
   !("remoteVersionStatus" in (producerPin ?? {})));
-record("G01a the pending post-anchor list exists and is exactly empty",
+record("G01a every QF-MVP-50.2 migration is APPLIED — nothing 50.2 remains pending",
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 0);
+  !manifest.pendingPostAnchorMigrations.some((r) =>
+    ["20260804000000", "20260805000000", "20260806000000",
+     "20260807000000", "20260808000000"].includes(r.version)));
 record("G01b the execute_v1 repair is APPLIED at remote history 24",
   execRepairPin?.sha256 === REPAIR_SHA &&
   execRepairPin?.operationalStatus === "APPLIED" &&
@@ -540,18 +541,18 @@ record("G02 the five applied records are 21 / 22 / 23 / 24 / 25 in exact ascendi
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]) &&
   new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 5);
-record("G03 post-anchor count and local migration count agree at 5 / 92",
-  manifest.appliedAnchor.postAnchorMigrationCount === 5 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 92);
+record("G03 post-anchor count and local migration count agree at 8 / 95",
+  manifest.appliedAnchor.postAnchorMigrationCount === 8 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 95);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
   g1Source.includes("manifest declares exactly five APPLIED post-anchor migrations") &&
-  g1Source.includes("the PENDING post-anchor list exists and is exactly empty") &&
+  g1Source.includes("exactly three PENDING post-anchor migrations are declared") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 5") &&
-  g1Source.includes("pendingPins.length === 0") &&
-  g1Source.includes("const MIGRATION_COUNT = 92;"));
+  g1Source.includes("pendingPins.length === 3") &&
+  g1Source.includes("const MIGRATION_COUNT = 95;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -747,7 +748,7 @@ const mutants = [
   ["understating the applied wedge repair as still PENDING is impossible",
     () => wedgePin?.operationalStatus === "APPLIED" &&
           wedgePin?.remoteHistoryCountAfterApply === 25 &&
-          manifest.pendingPostAnchorMigrations.length === 0],
+          !manifest.pendingPostAnchorMigrations.some((r) => r.version === "20260808000000")],
   ["understating the applied execute_v1 repair as still PENDING is impossible",
     () => execRepairPin?.operationalStatus === "APPLIED" &&
           execRepairPin?.remoteHistoryCountAfterApply === 24 &&
@@ -787,7 +788,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 5") &&
-          g1Source.includes("pendingPins.length === 0") &&
+          g1Source.includes("pendingPins.length === 3") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];

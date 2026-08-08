@@ -96,7 +96,9 @@
     "test:phase2a": "node scripts/phase2a-lead-lifecycle-harness.mjs",
     "test:phase2b": "node scripts/phase2b-lead-orchestration-adapter-harness.mjs",
     "grant:superadmin": "node scripts/grant-superadmin.mjs",
-    "test:phase5f:d4c": "node scripts/phase5f-d4c-consent-ack-async-harness.mjs"
+    "test:phase5f:d4c": "node scripts/phase5f-d4c-consent-ack-async-harness.mjs",
+    "test:mvp:50-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-3.mjs",
+    "test:mvp:50-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

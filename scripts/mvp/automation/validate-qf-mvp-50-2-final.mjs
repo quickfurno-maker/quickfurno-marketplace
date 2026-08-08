@@ -51,6 +51,16 @@ const REPAIR_SHA =
   "c36171fe851968c5e42477c048d535c563676f3d44e020d41fd5abcff1dacee5";
 const REPAIR_MARKER = "QF_MVP_50_2_EXECUTE_V1_REPAIR_STAGING_APPLIED_AND_VERIFIED";
 
+// QF-MVP-50.2 fresh-claim retry wedge repair — successor migration. The
+// historical claim migrations (20260801110000 / 20260801152049) are byte-frozen
+// and must never be edited to carry the fix.
+const CLAIM_PERSIST_NAME = "20260801110000_qf_mvp_automation_action_persistence.sql";
+const CLAIM_GUARD_NAME = "20260801152049_qf_mvp_automation_transport_replay_guard.sql";
+const WEDGE_NAME = "20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql";
+const WEDGE_PATH = `supabase/migrations/${WEDGE_NAME}`;
+const WEDGE_SHA = "8b798bb3c5db5d91f988d92cec3705237db08c753ae5018d09dccc09ff0240aa";
+const WEDGE_MARKER = "QF_MVP_50_2_RETRY_WEDGE_STAGING_APPLIED_AND_VERIFIED";
+
 const R2_APPLIED_MARKER = "QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED";
 const ATOMIC_PRODUCER_MARKER = "QF_MVP_50_2_ATOMIC_PRODUCER_STAGING_CERTIFIED";
 // Not earned yet. Orchestration certification is a separate, later gate; these
@@ -85,6 +95,23 @@ const repairedFn = (() => {
 })();
 const producerPin = manifest.appliedPostAnchorMigrations
   .find((r) => r.version === "20260806000000");
+const execRepairPin = manifest.appliedPostAnchorMigrations
+  .find((r) => r.version === "20260807000000");
+const wedgeSource = read(WEDGE_PATH);
+const wedgeSql = stripSql(wedgeSource);
+/** DDL only — everything before the trailing self-verification block, whose
+ *  guard predicates legitimately name the very shapes they forbid. */
+const wedgeDdl = (() => {
+  const i = wedgeSql.lastIndexOf("do $$");
+  return i === -1 ? wedgeSql : wedgeSql.slice(0, i);
+})();
+/** The repaired claim function body as it appears in the wedge migration. */
+const wedgeFn = (() => {
+  const i = wedgeSql.indexOf("create or replace function public.qf_claim_automation_job_v1");
+  if (i === -1) return "";
+  const j = wedgeSql.indexOf("comment on function", i);
+  return wedgeSql.slice(i, j === -1 ? wedgeSql.length : j);
+})();
 
 /** Only the `perform ... qf_enqueue_client_automation_v1(<action>` call sites — the
  *  action allowlist inside the primitive mentions every action and must not be counted. */
@@ -369,11 +396,102 @@ record("R16 the repair self-verifies its own posture and fails closed",
   /repair aborted: a guard clause was lost/.test(repairSource));
 record("R17 no #variable_conflict pragma is used to mask the collision",
   !/#variable_conflict/i.test(repairSql));
-record("R18 the repair is the newest local migration and the set is exactly 91",
+record("R18 the execute_v1 repair is present, ordered before the wedge repair",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 91 && files.at(-1) === REPAIR_NAME;
+    return files.length === 92 &&
+      files.indexOf(REPAIR_NAME) === files.length - 2 &&
+      files.at(-1) === WEDGE_NAME;
+  })());
+
+// ---------------------------------------------------------------------------
+// W. FRESH-CLAIM RETRY WEDGE REPAIR
+//
+// Three correct designs combined into a starvation: a retryable outcome parks a
+// job in retry_scheduled; uq_automation_transport_requests_claim_job allows
+// exactly ONE claim_v1 per job; and the ordinary selector took retry_scheduled
+// ordered by a now-past next_retry_at. So the stranded job out-ranked every
+// fresh job forever, re-claim hit 23505 and Core returned 500.
+//
+// The repair excludes retry_scheduled from the ORDINARY fresh-work selector.
+// retry_scheduled stays legal, durable and inert; governed retry recovery is
+// QF-MVP-50.5 and is NOT implemented here.
+// ---------------------------------------------------------------------------
+record("W01 the wedge repair migration exists at its pinned hash",
+  existsSync(path.join(ROOT, WEDGE_PATH)) &&
+  canonicalSha256(readFileSync(path.join(ROOT, WEDGE_PATH))) === WEDGE_SHA);
+record("W02 the historical claim migrations are byte-frozen, never edited to carry the fix",
+  existsSync(path.join(ROOT, `supabase/migrations/${CLAIM_PERSIST_NAME}`)) &&
+  existsSync(path.join(ROOT, `supabase/migrations/${CLAIM_GUARD_NAME}`)) &&
+  !/create or replace function public\.qf_claim_automation_job_v1/.test(
+    stripSql(read(`supabase/migrations/${CLAIM_GUARD_NAME}`))));
+record("W03 the repair is a CREATE OR REPLACE of the same claim function and signature",
+  /create or replace function public\.qf_claim_automation_job_v1\(p_worker_id text\)/.test(wedgeSql));
+record("W04 the return contract is unchanged",
+  (() => {
+    const m = wedgeFn.match(/returns table \(([\s\S]*?)\)\s*language plpgsql/);
+    if (!m) return false;
+    const cols = m[1].split(",").map((c) => c.trim().split(/\s+/)[0]);
+    return same(cols, ["job_id", "action_request_id", "attempt_id", "attempt_number", "max_attempts"]);
+  })());
+record("W05 SECURITY DEFINER and the pinned search_path are preserved",
+  /security definer/.test(wedgeFn) &&
+  /set search_path = pg_catalog, public, pg_temp/.test(wedgeFn));
+record("W06 execute stays service_role only",
+  /revoke all on function public\.qf_claim_automation_job_v1\(text\)[\s\S]{0,120}?from public, anon, authenticated, service_role/.test(wedgeSql) &&
+  /grant execute on function public\.qf_claim_automation_job_v1\(text\)[\s\S]{0,120}?to service_role/.test(wedgeSql) &&
+  !/grant [^\n]*to (public|anon|authenticated)\b/i.test(wedgeSql));
+record("W07 the fresh-work selector accepts ONLY due pending work",
+  /j\.status = 'pending'/.test(wedgeFn) &&
+  /j\.available_at <= now\(\)/.test(wedgeFn));
+record("W08 no executable retry_scheduled predicate survives in the selector",
+  !/j\.status = 'retry_scheduled'/.test(wedgeFn) &&
+  !/j\.next_retry_at <= now\(\)/.test(wedgeFn) &&
+  !/j\.next_retry_at is not null/.test(wedgeFn));
+record("W09 no wildcard or inequality selector replaces the exact status match",
+  !/j\.status\s*(?:<>|!=)/.test(wedgeFn) &&
+  !/j\.status\s+in\s*\(/.test(wedgeFn) &&
+  !/j\.status\s*=\s*any/i.test(wedgeFn));
+record("W10 the lease, attempt-budget and worker-id contracts are preserved",
+  /for update skip locked/.test(wedgeFn) &&
+  /j\.attempt_count < j\.max_attempts/.test(wedgeFn) &&
+  /AUTOMATION_WORKER_ID_INVALID/.test(wedgeFn) &&
+  /p_worker_id !~ '\^\[A-Za-z0-9\]\[A-Za-z0-9\._:-\]\{0,199\}\$'/.test(wedgeFn));
+record("W11 attempt creation is unchanged",
+  /insert into public\.automation_execution_attempts/.test(wedgeFn) &&
+  /v_job\.attempt_count,/.test(wedgeFn));
+record("W12 retry_scheduled rows are never reset, replaced or deleted",
+  !/set[^;]*status\s*=\s*'pending'[^;]*where[^;]*retry_scheduled/is.test(wedgeDdl) &&
+  !/update public\.automation_jobs[^;]*retry_scheduled/is.test(wedgeDdl) &&
+  !/\bdelete from\b|\btruncate\b/i.test(wedgeDdl));
+record("W13 no due sweep, retry worker or second queue is introduced",
+  !/due_sweep|dueSweep|reclaimStale|recovery_worker|retry_worker/i.test(wedgeDdl) &&
+  !/create table/i.test(wedgeSql));
+record("W14 claim uniqueness is NOT weakened",
+  !/drop index[^;]*uq_automation_transport_requests_claim_job/i.test(wedgeSql) &&
+  !/alter table[^;]*drop constraint[^;]*claim_job/i.test(wedgeSql) &&
+  /uq_automation_transport_requests_claim_job/.test(wedgeSource) &&
+  /claim uniqueness must not be weakened/.test(wedgeSource));
+record("W15 the repair grows no schema and changes no trigger",
+  !/create table|add column|drop column|create (unique )?index|alter table|create type|create trigger|drop trigger/i.test(wedgeSql));
+record("W16 QF-MVP-50.5 remains the owner of governed retry recovery",
+  /QF-MVP-50\.5/.test(wedgeSource) &&
+  /retry recovery must remain QF-MVP-50\.5 scope/.test(wedgeSource));
+record("W17 the repair self-verifies and fails closed",
+  /wedge repair aborted: SECURITY DEFINER lost/.test(wedgeSource) &&
+  /wedge repair aborted: an executable retry_scheduled selector predicate remains/.test(wedgeSource) &&
+  /wedge repair aborted: the fresh pending selector is absent/.test(wedgeSource) &&
+  /wedge repair aborted: a frozen claim invariant was lost/.test(wedgeSource) &&
+  /wedge repair aborted: execute granted beyond service_role/.test(wedgeSource) &&
+  /wedge repair aborted: claim uniqueness must not be weakened/.test(wedgeSource));
+record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surface",
+  !/provider_template_mappings|send_authority|binding_readiness|n8n|meta|whatsapp|vendor_|campaign|qf-jarvis/i.test(wedgeSql));
+record("W19 the wedge repair is the newest local migration and the set is exactly 92",
+  (() => {
+    const files = readdirSync(path.join(ROOT, "supabase/migrations"))
+      .filter((f) => f.endsWith(".sql")).sort();
+    return files.length === 92 && files.at(-1) === WEDGE_NAME;
   })());
 
 // ---------------------------------------------------------------------------
@@ -384,7 +502,7 @@ record("R18 the repair is the newest local migration and the set is exactly 91",
 // execution. This source phase imports that record and applies nothing itself.
 // Zero post-anchor migrations remain pending.
 record("G01 the producer migration is pinned APPLIED at remote history 23",
-  manifest.appliedPostAnchorMigrations.length === 3 &&
+  manifest.appliedPostAnchorMigrations.length === 4 &&
   producerPin?.version === "20260806000000" &&
   producerPin?.sha256 === MIGRATION_SHA &&
   producerPin?.operationalStatus === "APPLIED" &&
@@ -395,12 +513,12 @@ record("G01 the producer migration is pinned APPLIED at remote history 23",
   producerPin?.appliedByThisPhase === false &&
   // an applied record must never also carry an un-proven offline remote status
   !("remoteVersionStatus" in (producerPin ?? {})));
-record("G01a exactly one PENDING post-anchor migration is pinned — the execute_v1 repair",
+record("G01a exactly one PENDING post-anchor migration is pinned — the wedge repair",
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
   manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260807000000" &&
-  manifest.pendingPostAnchorMigrations[0].path === REPAIR_PATH &&
-  manifest.pendingPostAnchorMigrations[0].sha256 === REPAIR_SHA &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260808000000" &&
+  manifest.pendingPostAnchorMigrations[0].path === WEDGE_PATH &&
+  manifest.pendingPostAnchorMigrations[0].sha256 === WEDGE_SHA &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[0].remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
   manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate === true &&
@@ -408,25 +526,34 @@ record("G01a exactly one PENDING post-anchor migration is pinned — the execute
   // a pending record must never carry applied evidence
   !("appliedEvidenceMarker" in manifest.pendingPostAnchorMigrations[0]) &&
   !("remoteHistoryCountAfterApply" in manifest.pendingPostAnchorMigrations[0]));
-record("G01b the repair marker is NOT claimed while the migration is pending",
-  !manifestText.includes(REPAIR_MARKER));
-record("G02 the three applied records are 21 / 22 / 23 in exact ascending order",
-  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23]) &&
+record("G01b the execute_v1 repair is APPLIED at remote history 24",
+  execRepairPin?.sha256 === REPAIR_SHA &&
+  execRepairPin?.operationalStatus === "APPLIED" &&
+  execRepairPin?.appliedEvidenceMarker === REPAIR_MARKER &&
+  execRepairPin?.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  execRepairPin?.remoteHistoryCountAfterApply === 24 &&
+  execRepairPin?.appliedExactlyOnce === true &&
+  execRepairPin?.appliedByThisPhase === false &&
+  !("remoteVersionStatus" in (execRepairPin ?? {})));
+record("G01c the wedge marker is NOT claimed while its migration is pending",
+  !manifestText.includes(WEDGE_MARKER));
+record("G02 the four applied records are 21 / 22 / 23 / 24 in exact ascending order",
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23, 24]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000"]) &&
-  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 3);
-record("G03 post-anchor count and local migration count agree at 4 / 91",
-  manifest.appliedAnchor.postAnchorMigrationCount === 4 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 91);
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000"]) &&
+  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 4);
+record("G03 post-anchor count and local migration count agree at 5 / 92",
+  manifest.appliedAnchor.postAnchorMigrationCount === 5 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 92);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
-  g1Source.includes("manifest declares exactly three APPLIED post-anchor migrations") &&
+  g1Source.includes("manifest declares exactly four APPLIED post-anchor migrations") &&
   g1Source.includes("exactly one PENDING post-anchor migration is declared") &&
   // no `>=`, no wildcard: the count assertions stay exact
-  g1Source.includes("appliedPins.length === 3") &&
+  g1Source.includes("appliedPins.length === 4") &&
   g1Source.includes("pendingPins.length === 1") &&
-  g1Source.includes("const MIGRATION_COUNT = 91;"));
+  g1Source.includes("const MIGRATION_COUNT = 92;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -538,7 +665,7 @@ const mutants = [
     () => producerPin?.remoteHistoryCountAfterApply === 23],
   ["recording remote history 24 for the producer is impossible",
     () => producerPin?.remoteHistoryCountAfterApply === 23 &&
-          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 23)],
+          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 24)],
   ["claiming the producer was applied more than once is impossible",
     () => producerPin?.appliedExactlyOnce === true],
   ["claiming this source phase applied the migration is impossible",
@@ -546,7 +673,8 @@ const mutants = [
           producerPin?.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD"],
   ["forging the applied-evidence marker is impossible",
     () => producerPin?.appliedEvidenceMarker === R2_APPLIED_MARKER &&
-          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 3],
+          execRepairPin?.appliedEvidenceMarker === REPAIR_MARKER &&
+          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 4],
   ["claiming n8n orchestration certification before it is earned is impossible",
     () => unearnedIsDisclaimedInProse(N8N_CERTIFIED_MARKER) &&
           !manifestText.includes(N8N_CERTIFIED_MARKER) && !g1Source.includes(N8N_CERTIFIED_MARKER)],
@@ -591,12 +719,49 @@ const mutants = [
           existsSync(path.join(ROOT, REPAIR_PATH))],
   ["masking the collision with a #variable_conflict pragma is impossible",
     () => !/#variable_conflict/i.test(repairSql)],
-  ["claiming the repair marker before the migration is applied is impossible",
-    () => !manifestText.includes(REPAIR_MARKER) &&
+  ["claiming the wedge marker before the migration is applied is impossible",
+    () => !manifestText.includes(WEDGE_MARKER) &&
           manifest.pendingPostAnchorMigrations.length === 1 &&
-          manifest.pendingPostAnchorMigrations[0].version === "20260807000000"],
+          manifest.pendingPostAnchorMigrations[0].version === "20260808000000"],
+  ["understating the applied execute_v1 repair as still PENDING is impossible",
+    () => execRepairPin?.operationalStatus === "APPLIED" &&
+          execRepairPin?.remoteHistoryCountAfterApply === 24 &&
+          !manifest.pendingPostAnchorMigrations.some((r) => r.version === "20260807000000")],
+  // --- fresh-claim wedge repair regression mutants -------------------------
+  ["reintroducing retry_scheduled into the fresh selector is impossible",
+    () => !/j\.status = 'retry_scheduled'/.test(wedgeFn) &&
+          !/j\.next_retry_at <= now\(\)/.test(wedgeFn)],
+  ["replacing the exact status match with a wildcard is impossible",
+    () => /j\.status = 'pending'/.test(wedgeFn) &&
+          !/j\.status\s*(?:<>|!=)/.test(wedgeFn) &&
+          !/j\.status\s+in\s*\(/.test(wedgeFn)],
+  ["removing due pending work from the selector is impossible",
+    () => /j\.status = 'pending'/.test(wedgeFn) && /j\.available_at <= now\(\)/.test(wedgeFn)],
+  ["auto-resetting retry_scheduled back to pending is impossible",
+    () => !/update public\.automation_jobs[^;]*retry_scheduled/is.test(wedgeDdl)],
+  ["creating a retry attempt or replacement job is impossible",
+    () => (wedgeDdl.match(/insert into public\.automation_execution_attempts/g) ?? []).length === 1 &&
+          !/insert into public\.automation_jobs/i.test(wedgeDdl)],
+  ["adding a due sweep or retry worker is impossible",
+    () => !/due_sweep|dueSweep|reclaimStale|recovery_worker|retry_worker/i.test(wedgeDdl)],
+  ["deleting retry evidence is impossible",
+    () => !/\bdelete from\b|\btruncate\b/i.test(wedgeDdl)],
+  ["disabling an append-only guard is impossible",
+    () => !/disable trigger|drop trigger/i.test(wedgeSql)],
+  ["weakening claim uniqueness is impossible",
+    () => !/drop index[^;]*uq_automation_transport_requests_claim_job/i.test(wedgeSql) &&
+          !/alter table[^;]*drop constraint[^;]*claim_job/i.test(wedgeSql)],
+  ["introducing a second queue is impossible",
+    () => !/create table/i.test(wedgeSql)],
+  ["removing the QF-MVP-50.5 retry-recovery boundary is impossible",
+    () => /QF-MVP-50\.5/.test(wedgeSource) &&
+          /retry recovery must remain QF-MVP-50\.5 scope/.test(wedgeSource)],
+  ["editing the historical claim migration instead of shipping a successor is impossible",
+    () => !/create or replace function public\.qf_claim_automation_job_v1/.test(
+            stripSql(read(`supabase/migrations/${CLAIM_GUARD_NAME}`))) &&
+          existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
-    () => g1Source.includes("appliedPins.length === 3") &&
+    () => g1Source.includes("appliedPins.length === 4") &&
           g1Source.includes("pendingPins.length === 1") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],

@@ -705,14 +705,22 @@ record("G01 the anchor is untouched",
 // post-anchor migrations are APPLIED and ZERO remain pending.
 // QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
 // (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
-record("G02 exactly four APPLIED and one PENDING post-anchor migration",
+record("G02 exactly five APPLIED and zero PENDING post-anchor migrations",
   manifest.appliedAnchor?.postAnchorMigrationCount === 5 &&
-  manifest.appliedPostAnchorMigrations?.length === 4 &&
+  manifest.appliedPostAnchorMigrations?.length === 5 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260808000000" &&
+  manifest.pendingPostAnchorMigrations.length === 0 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]));
+record("G02c 20260808000000 is recorded APPLIED with remote history 25, hash-exact",
+  manifest.appliedPostAnchorMigrations[4].version === "20260808000000" &&
+  manifest.appliedPostAnchorMigrations[4].sha256 ===
+    "8b798bb3c5db5d91f988d92cec3705237db08c753ae5018d09dccc09ff0240aa" &&
+  manifest.appliedPostAnchorMigrations[4].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[4].appliedEvidenceMarker ===
+    "QF_MVP_50_2_RETRY_WEDGE_STAGING_APPLIED_AND_VERIFIED" &&
+  manifest.appliedPostAnchorMigrations[4].remoteHistoryCountAfterApply === 25 &&
+  manifest.appliedPostAnchorMigrations[4].appliedExactlyOnce === true);
 record("G02b 20260807000000 is recorded APPLIED with remote history 24, hash-exact",
   manifest.appliedPostAnchorMigrations[3].version === "20260807000000" &&
   manifest.appliedPostAnchorMigrations[3].sha256 ===

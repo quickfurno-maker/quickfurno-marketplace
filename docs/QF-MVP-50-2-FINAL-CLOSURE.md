@@ -1,9 +1,10 @@
 # QF-MVP-50.2 — Final Closure Contract
 
-**Status:** SOURCE SHIPPED + DATABASE/ATOMIC PRODUCER CERTIFIED — **ORCHESTRATION UNCERTIFIED**
+**Status:** **COMPLETE / TESTED / FROZEN**
 **Base:** `d0bead498845b52d1aff6e3babaae4d31e829fe9`
-**Migration:** `20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql` — **APPLIED to QuickFurno staging**
-**Top-level QF-MVP-50.2:** **NOT COMPLETE** — orchestration certification still remains
+**Top-level QF-MVP-50.2 — CLIENT WORKFLOWS:** **COMPLETE / TESTED / FROZEN**
+
+QF-MVP-50 overall remains **NOT COMPLETE**. QF-MVP-50.3 is **NOT STARTED**. Vendor accept/reject must not be introduced or implied.
 
 ## 0. Staging truth (imported)
 
@@ -16,9 +17,9 @@ The producer migration has been applied to QuickFurno staging (`uckafzuochmbvtio
 | `20260806000000` (producer) | APPLIED | 23 |
 
 | `20260807000000` (execute_v1 repair) | APPLIED | 24 |
-| `20260808000000` (fresh-claim wedge repair) | **PENDING** | — |
+| `20260808000000` (fresh-claim wedge repair) | APPLIED | 25 |
 
-Pending post-anchor migrations: **1**. Post-anchor migration count: **5**. Local migration count: **92**.
+Pending post-anchor migrations: **0**. Post-anchor migration count: **5**. Local migration count: **92**.
 
 ### 0.1 The execute_v1 reservation defect
 
@@ -40,7 +41,7 @@ With execution unblocked, the first real n8n run exposed a second, independent d
 
 Every subsequent claim therefore re-selected the stranded job, violated the unique index (`23505`) and returned Core **500**. Fresh work was permanently starved.
 
-The fix is the successor migration `20260808000000`, which excludes `retry_scheduled` from the **ordinary fresh-work selector** only. `retry_scheduled` remains a legal, durable, **inert** state: nothing is reset, replaced, deleted or swept, no append-only guard is touched, and claim uniqueness is deliberately left unchanged. Governed retry recovery — due sweep, `retry_scheduled` reclaim, stale leases, dead-letter handling — remains owned by **QF-MVP-50.5** and is not implemented here.
+The fix is the successor migration `20260808000000` — **APPLIED** to staging at remote history 25 under `QF_MVP_50_2_RETRY_WEDGE_STAGING_APPLIED_AND_VERIFIED` — which excludes `retry_scheduled` from the **ordinary fresh-work selector** only. `retry_scheduled` remains a legal, durable, **inert** state: nothing is reset, replaced, deleted or swept, no append-only guard is touched, and claim uniqueness is deliberately left unchanged. Governed retry recovery — due sweep, `retry_scheduled` reclaim, stale leases, dead-letter handling — remains owned by **QF-MVP-50.5** and is not implemented here.
 
 > **The transient is not a consent gap.** Both `communication_suppressions` and `communication_preferences` exist on staging. `QF_EXEC_INFRASTRUCTURE_TRANSIENT` here is `WHATSAPP_PROVIDER_NOT_CONFIGURED`, raised by runtime provider selection *before* consent is ever consulted — exactly the intended zero-live-readiness posture. Live channel/provider readiness remains owned by QF-MVP-40 / QF-MVP-80 per §8.
 
@@ -119,16 +120,33 @@ All six actions are structurally supported and exercisable against Core-owned mo
 
 > Production send for an action remains disabled until QF-MVP-40 / QF-MVP-80 provider readiness is satisfied.
 
-## 9. What remains before QF-MVP-50.2 can be called COMPLETE
+## 9. Completion — what COMPLETE / TESTED / FROZEN means
 
-Source is shipped, the migration is applied at remote history 23, and the atomic producer is certified against staging. What is **still outstanding** is orchestration certification:
+### Earned markers
 
-- the exact merged n8n executor workflow executed by a real n8n runtime;
-- the signed Core claim and execute boundaries exercised across all six client actions;
-- delayed-action eligibility suppression (stale reminder, stale follow-up) exercised end to end;
-- replay, changed-body conflict and stale-attempt behaviour exercised;
-- `communication_pending` proven to stop the workflow with no completion and no redispatch.
+- `QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED`
+- `QF_MVP_50_2_ATOMIC_PRODUCER_STAGING_CERTIFIED`
+- `QF_MVP_50_2_EXECUTE_V1_REPAIR_STAGING_APPLIED_AND_VERIFIED`
+- `QF_MVP_50_2_RETRY_WEDGE_STAGING_APPLIED_AND_VERIFIED`
+- `QF_MVP_50_2_CLIENT_N8N_STAGING_CERTIFIED`
+- `QF_MVP_50_2_STAGING_CERTIFICATION_COMPLETE`
 
-`QF_MVP_50_2_CLIENT_N8N_STAGING_CERTIFIED` and `QF_MVP_50_2_STAGING_CERTIFICATION_COMPLETE` are **not** earned until every item above is proven, and 50.2 is **not** COMPLETE before then. The only configured n8n is production-bound and must not be used for this; certification requires an isolated runtime.
+### Proven
+
+- **All six client actions traversed a real, isolated n8n runtime** (n8n 2.32.6, self-hosted, loopback-only) driving the exact merged executor workflow — imported with hash-proven graph equivalence (52 nodes, 44 connections, `active:false`) — against QuickFurno staging through a locally-built production Core.
+- Every run: signed `claim_v1` → HTTPS to Core → **verified signed response** → routing on the Core-derived `workflowFamily` (`client_whatsapp`) → an execute body carrying **exactly five keys** (`transportVersion`, `requestId`, `workerId`, `jobId`, `attemptId`) → a **successful `execute_v1` reservation** → a Core-authored orchestration state.
+- n8n never chose an action, entity, recipient, phone, template, provider, consent decision, retry or business-eligibility outcome. `completionReady` is true only for `execution_recorded`, so no `complete_v1` was ever called from a terminal state.
+- The DB-native atomic producer is staging-certified, and real producer triggers were observed firing on a live lead INSERT, a clarification INSERT (immediate action plus the +24 h reminder) and real `leads.status` transitions.
+- **Delayed-action eligibility reproof discriminates correctly.** A stale reminder and a stale follow-up each returned `QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE` as a pre-communication terminal non-send; the eligible variants passed the reproof and progressed past it.
+- **Replay / conflict / stale attempt**: the same `requestId` with the same canonical body replayed (`replayed: true`); the same `requestId` with a changed body was rejected; a foreign/stale attempt was rejected; re-running with no fresh work created no second attempt.
+- **The fresh queue stays usable with `retry_scheduled` residue present.** Fresh jobs continued to be claimed while eight stranded retry rows accumulated — the condition that previously returned Core 500.
+- **Zero communication rows, zero provider effect, zero real Meta/WhatsApp sends** across every run.
+
+### Deferred by design, to their canonical owners
+
+- **`retry_scheduled` recovery → QF-MVP-50.5.** Due sweep, retry reclaim, stale leases and dead-letter handling are not implemented. Stranded rows remain durable, inert audit evidence and are never reset, replaced or deleted.
+- **Live channel / provider readiness → QF-MVP-40 / QF-MVP-80** (§8). During certification the terminal outcome for provider-dependent actions was `QF_EXEC_INFRASTRUCTURE_TRANSIENT`, raised by runtime provider selection as `WHATSAPP_PROVIDER_NOT_CONFIGURED` — the intended zero-live-readiness posture. **This is not a consent gap:** both `communication_suppressions` and `communication_preferences` exist on staging and the provider gate fires before consent is consulted.
+- **Variable contracts for `client.requirement_collection` and `client.missing_information_reminder`.** `resolveVariableInput` has no mapping for these two actions yet, so they terminate as a Core-owned `QF_EXEC_VARIABLES_UNRESOLVED` definitive non-send. Their orchestration path is fully certified; their message-variable contract is not yet implemented and is owned by the phase that introduces those templates.
+- **`communication_pending`** is covered by **split evidence** — no safe synthetic control exists to manufacture `queued`/`dispatching`/`retry_scheduled` communication statuses without a real provider effect, and none was fabricated. The evidence is: the executable 50.2D/50.2E partition tests; the frozen workflow graph, in which `completionReady` is true only for `execution_recorded` so a pending state stops without calling `complete_v1`; and the real n8n claim+execute runs across all six actions.
 
 **Vendor accept/reject is permanently removed** and must not appear in any future package.

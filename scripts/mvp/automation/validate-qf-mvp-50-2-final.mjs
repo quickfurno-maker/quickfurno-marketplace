@@ -63,9 +63,8 @@ const WEDGE_MARKER = "QF_MVP_50_2_RETRY_WEDGE_STAGING_APPLIED_AND_VERIFIED";
 
 const R2_APPLIED_MARKER = "QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED";
 const ATOMIC_PRODUCER_MARKER = "QF_MVP_50_2_ATOMIC_PRODUCER_STAGING_CERTIFIED";
-// Not earned yet. Orchestration certification is a separate, later gate; these
-// two markers must NOT appear in source until a real n8n runtime has executed
-// the merged workflow against QuickFurno staging.
+// EARNED. A real isolated n8n runtime executed the exact merged workflow against
+// QuickFurno staging across all six client actions.
 const N8N_CERTIFIED_MARKER = "QF_MVP_50_2_CLIENT_N8N_STAGING_CERTIFIED";
 const STAGING_COMPLETE_MARKER = "QF_MVP_50_2_STAGING_CERTIFICATION_COMPLETE";
 
@@ -97,6 +96,8 @@ const producerPin = manifest.appliedPostAnchorMigrations
   .find((r) => r.version === "20260806000000");
 const execRepairPin = manifest.appliedPostAnchorMigrations
   .find((r) => r.version === "20260807000000");
+const wedgePin = manifest.appliedPostAnchorMigrations
+  .find((r) => r.version === "20260808000000");
 const wedgeSource = read(WEDGE_PATH);
 const wedgeSql = stripSql(wedgeSource);
 /** DDL only — everything before the trailing self-verification block, whose
@@ -502,7 +503,7 @@ record("W19 the wedge repair is the newest local migration and the set is exactl
 // execution. This source phase imports that record and applies nothing itself.
 // Zero post-anchor migrations remain pending.
 record("G01 the producer migration is pinned APPLIED at remote history 23",
-  manifest.appliedPostAnchorMigrations.length === 4 &&
+  manifest.appliedPostAnchorMigrations.length === 5 &&
   producerPin?.version === "20260806000000" &&
   producerPin?.sha256 === MIGRATION_SHA &&
   producerPin?.operationalStatus === "APPLIED" &&
@@ -513,19 +514,9 @@ record("G01 the producer migration is pinned APPLIED at remote history 23",
   producerPin?.appliedByThisPhase === false &&
   // an applied record must never also carry an un-proven offline remote status
   !("remoteVersionStatus" in (producerPin ?? {})));
-record("G01a exactly one PENDING post-anchor migration is pinned — the wedge repair",
+record("G01a the pending post-anchor list exists and is exactly empty",
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260808000000" &&
-  manifest.pendingPostAnchorMigrations[0].path === WEDGE_PATH &&
-  manifest.pendingPostAnchorMigrations[0].sha256 === WEDGE_SHA &&
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[0].remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-  manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate === true &&
-  manifest.pendingPostAnchorMigrations[0].appliedByThisPhase === false &&
-  // a pending record must never carry applied evidence
-  !("appliedEvidenceMarker" in manifest.pendingPostAnchorMigrations[0]) &&
-  !("remoteHistoryCountAfterApply" in manifest.pendingPostAnchorMigrations[0]));
+  manifest.pendingPostAnchorMigrations.length === 0);
 record("G01b the execute_v1 repair is APPLIED at remote history 24",
   execRepairPin?.sha256 === REPAIR_SHA &&
   execRepairPin?.operationalStatus === "APPLIED" &&
@@ -535,24 +526,31 @@ record("G01b the execute_v1 repair is APPLIED at remote history 24",
   execRepairPin?.appliedExactlyOnce === true &&
   execRepairPin?.appliedByThisPhase === false &&
   !("remoteVersionStatus" in (execRepairPin ?? {})));
-record("G01c the wedge marker is NOT claimed while its migration is pending",
-  !manifestText.includes(WEDGE_MARKER));
-record("G02 the four applied records are 21 / 22 / 23 / 24 in exact ascending order",
-  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23, 24]) &&
+record("G01c the wedge repair is APPLIED at remote history 25",
+  wedgePin?.sha256 === WEDGE_SHA &&
+  wedgePin?.operationalStatus === "APPLIED" &&
+  wedgePin?.appliedEvidenceMarker === WEDGE_MARKER &&
+  wedgePin?.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  wedgePin?.remoteHistoryCountAfterApply === 25 &&
+  wedgePin?.appliedExactlyOnce === true &&
+  wedgePin?.appliedByThisPhase === false &&
+  !("remoteVersionStatus" in (wedgePin ?? {})));
+record("G02 the five applied records are 21 / 22 / 23 / 24 / 25 in exact ascending order",
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000"]) &&
-  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 4);
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]) &&
+  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 5);
 record("G03 post-anchor count and local migration count agree at 5 / 92",
   manifest.appliedAnchor.postAnchorMigrationCount === 5 &&
   readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 92);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
-  g1Source.includes("manifest declares exactly four APPLIED post-anchor migrations") &&
-  g1Source.includes("exactly one PENDING post-anchor migration is declared") &&
+  g1Source.includes("manifest declares exactly five APPLIED post-anchor migrations") &&
+  g1Source.includes("the PENDING post-anchor list exists and is exactly empty") &&
   // no `>=`, no wildcard: the count assertions stay exact
-  g1Source.includes("appliedPins.length === 4") &&
-  g1Source.includes("pendingPins.length === 1") &&
+  g1Source.includes("appliedPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 0") &&
   g1Source.includes("const MIGRATION_COUNT = 92;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
@@ -563,19 +561,28 @@ const unearnedIsDisclaimedInProse = (marker) =>
   doc.split(/(?<=\.)\s|\n/)
     .filter((line) => line.includes(marker))
     .every((line) => /\bnot\b|\bno\b|\bnever\b|\buntil\b|\bunearned\b|\bremains? (?:unproven|uncertified)\b/i.test(line));
-record("G03c orchestration certification is NOT yet claimed anywhere in source",
-  unearnedIsDisclaimedInProse(N8N_CERTIFIED_MARKER) &&
-  unearnedIsDisclaimedInProse(STAGING_COMPLETE_MARKER) &&
-  // never machine-readable evidence
-  !manifestText.includes(N8N_CERTIFIED_MARKER) &&
-  !manifestText.includes(STAGING_COMPLETE_MARKER) &&
-  !g1Source.includes(N8N_CERTIFIED_MARKER) &&
-  !g1Source.includes(STAGING_COMPLETE_MARKER) &&
-  // and the doc must positively say they are not earned
-  /\*\*Not earned\.\*\*/.test(doc));
-record("G03d the closure doc still states orchestration is uncertified",
-  /ORCHESTRATION UNCERTIFIED/i.test(doc) &&
-  /NOT COMPLETE/i.test(doc));
+record("G03c all six operational markers are recorded as earned",
+  [R2_APPLIED_MARKER, ATOMIC_PRODUCER_MARKER, REPAIR_MARKER, WEDGE_MARKER,
+   N8N_CERTIFIED_MARKER, STAGING_COMPLETE_MARKER].every((m) => doc.includes(m)));
+record("G03d QF-MVP-50.2 is COMPLETE / TESTED / FROZEN while QF-MVP-50 is not",
+  /COMPLETE \/ TESTED \/ FROZEN/.test(doc) &&
+  /QF-MVP-50 overall remains \*\*NOT COMPLETE\*\*/.test(doc) &&
+  /QF-MVP-50\.3 is \*\*NOT STARTED\*\*/.test(doc));
+record("G03e completion rests on a real six-action n8n proof, not an assertion",
+  /All six client actions traversed a real, isolated n8n runtime/.test(doc) &&
+  /exactly five keys/.test(doc) &&
+  /successful `execute_v1` reservation/.test(doc) &&
+  /QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(doc) &&
+  /replayed: true/.test(doc));
+record("G03f the deferred owners are named exactly, not guessed",
+  /`retry_scheduled` recovery → QF-MVP-50\.5/.test(doc) &&
+  /Live channel \/ provider readiness → QF-MVP-40 \/ QF-MVP-80/.test(doc) &&
+  /This is not a consent gap/.test(doc) &&
+  /WHATSAPP_PROVIDER_NOT_CONFIGURED/.test(doc));
+record("G03g communication_pending is documented as split evidence, not fabricated",
+  /communication_pending/.test(doc) &&
+  /split evidence/.test(doc) &&
+  /none was fabricated/.test(doc));
 record("G04 no vendor accept/reject concept is implemented anywhere in this package",
   // Plain string matching on purpose: the phrase contains a slash, and an
   // escaping slip in a regex here would silently weaken the guard.
@@ -595,10 +602,9 @@ record("G05 no Jarvis reference appears anywhere in this package",
   !/qf-jarvis|coilipywdvxklewquqvv/i.test(sql + executionCode + contractSource + doc));
 record("G06 no QF-MVP-50.3 vendor workflow surface is added",
   !/vendor\.(lead_offer|response_reminder|onboarding_reminder|document_reminder|package_expiry|low_credit)/.test(sql + executionCode));
-record("G07 the closure doc does not claim QF-MVP-50.2 complete",
-  /NOT COMPLETE/i.test(doc) &&
-  !/QF-MVP-50\.2 is COMPLETE/i.test(doc) &&
-  !/COMPLETE \/ TESTED \/ FROZEN/i.test(doc));
+record("G07 QF-MVP-50 overall is still NOT COMPLETE and 50.3 is NOT STARTED",
+  /QF-MVP-50 overall remains \*\*NOT COMPLETE\*\*/.test(doc) &&
+  /QF-MVP-50\.3 is \*\*NOT STARTED\*\*/.test(doc));
 record("G07a no real Meta/WhatsApp send is claimed and readiness stays zero-of-six",
   // "live-provider-ready" may appear ONLY inside a sentence that negates it.
   doc.split(/[.\n]/)
@@ -665,7 +671,7 @@ const mutants = [
     () => producerPin?.remoteHistoryCountAfterApply === 23],
   ["recording remote history 24 for the producer is impossible",
     () => producerPin?.remoteHistoryCountAfterApply === 23 &&
-          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 24)],
+          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 25)],
   ["claiming the producer was applied more than once is impossible",
     () => producerPin?.appliedExactlyOnce === true],
   ["claiming this source phase applied the migration is impossible",
@@ -674,16 +680,35 @@ const mutants = [
   ["forging the applied-evidence marker is impossible",
     () => producerPin?.appliedEvidenceMarker === R2_APPLIED_MARKER &&
           execRepairPin?.appliedEvidenceMarker === REPAIR_MARKER &&
-          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 4],
-  ["claiming n8n orchestration certification before it is earned is impossible",
-    () => unearnedIsDisclaimedInProse(N8N_CERTIFIED_MARKER) &&
-          !manifestText.includes(N8N_CERTIFIED_MARKER) && !g1Source.includes(N8N_CERTIFIED_MARKER)],
-  ["claiming overall staging certification before it is earned is impossible",
-    () => unearnedIsDisclaimedInProse(STAGING_COMPLETE_MARKER) &&
-          !manifestText.includes(STAGING_COMPLETE_MARKER) && !g1Source.includes(STAGING_COMPLETE_MARKER)],
-  ["declaring QF-MVP-50.2 COMPLETE while orchestration is uncertified is impossible",
-    () => /NOT COMPLETE/i.test(doc) && /ORCHESTRATION UNCERTIFIED/i.test(doc) &&
-          !/COMPLETE \/ TESTED \/ FROZEN/i.test(doc)],
+          wedgePin?.appliedEvidenceMarker === WEDGE_MARKER &&
+          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 5],
+  ["dropping the n8n certification marker is impossible",
+    () => doc.includes(N8N_CERTIFIED_MARKER)],
+  ["dropping the overall staging-certification marker is impossible",
+    () => doc.includes(STAGING_COMPLETE_MARKER)],
+  ["dropping the wedge or execute-repair marker is impossible",
+    () => doc.includes(WEDGE_MARKER) && doc.includes(REPAIR_MARKER) &&
+          manifestText.includes(WEDGE_MARKER) && manifestText.includes(REPAIR_MARKER)],
+  ["declaring COMPLETE without the six-action n8n proof is impossible",
+    () => /COMPLETE \/ TESTED \/ FROZEN/.test(doc) &&
+          /All six client actions traversed a real, isolated n8n runtime/.test(doc) &&
+          /successful `execute_v1` reservation/.test(doc)],
+  ["marking QF-MVP-50 overall complete is impossible",
+    () => /QF-MVP-50 overall remains \*\*NOT COMPLETE\*\*/.test(doc)],
+  ["starting QF-MVP-50.3 in this package is impossible",
+    () => /QF-MVP-50\.3 is \*\*NOT STARTED\*\*/.test(doc) &&
+          !/vendor\.(lead_offer|response_reminder|onboarding_reminder|document_reminder|package_expiry|low_credit)/.test(sql + executionCode)],
+  ["claiming consent availability that staging does not have is impossible",
+    () => /This is not a consent gap/.test(doc) &&
+          /WHATSAPP_PROVIDER_NOT_CONFIGURED/.test(doc)],
+  ["claiming live provider readiness is impossible",
+    () => doc.split(/[.\n]/)
+      .filter((line) => /live[- ]provider[- ]ready/i.test(line))
+      .every((line) => /\b(?:zero|no|not|never|remains? disabled|until)\b/i.test(line))],
+  ["claiming a real Meta/WhatsApp send is impossible",
+    () => /zero real Meta\/WhatsApp sends/i.test(doc) && /no real send/i.test(doc)],
+  ["removing the QF-MVP-50.5 retry-recovery boundary from the closure doc is impossible",
+    () => /`retry_scheduled` recovery → QF-MVP-50\.5/.test(doc)],
   // --- execute_v1 repair regression mutants -------------------------------
   // Each lambda states the invariant that makes the named regression impossible.
   ["reintroducing an unqualified route_key in the replay lookup is impossible",
@@ -719,10 +744,10 @@ const mutants = [
           existsSync(path.join(ROOT, REPAIR_PATH))],
   ["masking the collision with a #variable_conflict pragma is impossible",
     () => !/#variable_conflict/i.test(repairSql)],
-  ["claiming the wedge marker before the migration is applied is impossible",
-    () => !manifestText.includes(WEDGE_MARKER) &&
-          manifest.pendingPostAnchorMigrations.length === 1 &&
-          manifest.pendingPostAnchorMigrations[0].version === "20260808000000"],
+  ["understating the applied wedge repair as still PENDING is impossible",
+    () => wedgePin?.operationalStatus === "APPLIED" &&
+          wedgePin?.remoteHistoryCountAfterApply === 25 &&
+          manifest.pendingPostAnchorMigrations.length === 0],
   ["understating the applied execute_v1 repair as still PENDING is impossible",
     () => execRepairPin?.operationalStatus === "APPLIED" &&
           execRepairPin?.remoteHistoryCountAfterApply === 24 &&
@@ -761,8 +786,8 @@ const mutants = [
             stripSql(read(`supabase/migrations/${CLAIM_GUARD_NAME}`))) &&
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
-    () => g1Source.includes("appliedPins.length === 4") &&
-          g1Source.includes("pendingPins.length === 1") &&
+    () => g1Source.includes("appliedPins.length === 5") &&
+          g1Source.includes("pendingPins.length === 0") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];

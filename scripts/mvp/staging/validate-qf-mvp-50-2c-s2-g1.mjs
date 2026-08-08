@@ -114,6 +114,12 @@ const POST_ANCHOR_APPLIED = [
 // their own staging gate.
 const POST_ANCHOR_PENDING = [
   {
+    version: "20260808500000",
+    name: "qf_mvp_50_3_automation_policy_config_foundation_bridge",
+    sha: "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
+    phase: "QF-MVP-50.3-50.4-POLICY-CONFIG-BRIDGE",
+  },
+  {
     version: "20260809000000",
     name: "qf_mvp_50_3_vendor_automation_producer",
     sha: "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11",
@@ -136,7 +142,7 @@ const POST_ANCHOR_PENDING = [
 const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING].map((m) => m.version);
 const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING];
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
-const MIGRATION_COUNT = 95;
+const MIGRATION_COUNT = 96;
 
 const APPROVED_COMMON = [
   "20260723000100", "20260723000200", "20260723000300", "20260723000400",
@@ -335,15 +341,15 @@ function validateState(state) {
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
 
-  check("exactly eight local migrations are newer than the anchor", postAnchorLocal.length === 8, `actual=${postAnchorLocal.length}`);
-  check("the eight post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 8);
+  check("exactly nine local migrations are newer than the anchor", postAnchorLocal.length === 9, `actual=${postAnchorLocal.length}`);
+  check("the nine post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 9);
   check("manifest declares exactly five APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 5, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   // Exactly ONE pending record: the execute_v1 repair, hash-pinned like every
   // other post-anchor migration. A missing key, a second pending entry and a
   // silently emptied list all fail closed.
-  check("exactly three PENDING post-anchor migrations are declared", pendingPins !== null && pendingPins.length === 3, `actual=${pendingPins?.length}`);
+  check("exactly four PENDING post-anchor migrations are declared", pendingPins !== null && pendingPins.length === 4, `actual=${pendingPins?.length}`);
   check("the pending records are in exact pinned order after the applied ones", same(pendingPins?.map((r) => r.version), POST_ANCHOR_PENDING.map((m) => m.version)));
 
   for (const expected of POST_ANCHOR_PENDING) {

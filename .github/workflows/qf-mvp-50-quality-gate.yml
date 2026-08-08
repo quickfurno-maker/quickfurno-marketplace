@@ -112,6 +112,9 @@ jobs:
       - name: QF-MVP-50.4 validator
         run: npm run test:mvp:50-4
 
+      - name: QF-MVP-50.3/50.4 policy-config bridge validator
+        run: npm run test:mvp:50-3-50-4-bridge
+
       - name: Typecheck
         run: npm run typecheck
 

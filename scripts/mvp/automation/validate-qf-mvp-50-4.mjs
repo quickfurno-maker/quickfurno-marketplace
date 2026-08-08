@@ -303,10 +303,10 @@ record("G01 the migration is pinned PENDING with exact identity",
       !("appliedEvidenceMarker" in pin) &&
       !("remoteHistoryCountAfterApply" in pin);
   })());
-record("G02 exactly three pending post-anchor migrations are declared",
-  manifest.pendingPostAnchorMigrations.length === 3 &&
+record("G02 exactly four pending post-anchor migrations are declared",
+  manifest.pendingPostAnchorMigrations.length === 4 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version),
-    ["20260809000000", "20260810000000", "20260811000000"]));
+    ["20260808500000", "20260809000000", "20260810000000", "20260811000000"]));
 record("G03 the five applied records remain 21/22/23/24/25",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25]));
@@ -316,8 +316,8 @@ record("G05 the validator is registered and wired into CI after 50.3",
   pkg.scripts["test:mvp:50-4"] ===
     "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs" &&
   /- name: QF-MVP-50\.3 validator\s+run: npm run test:mvp:50-3\s+- name: QF-MVP-50\.4 validator\s+run: npm run test:mvp:50-4/.test(ciWorkflow));
-record("G06 the local migration set is exactly 95",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 95);
+record("G06 the local migration set is exactly 96",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

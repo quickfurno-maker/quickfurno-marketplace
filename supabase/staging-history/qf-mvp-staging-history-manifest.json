@@ -388,6 +388,34 @@
         "filename": "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
         "sha256": "056696790cfdf2c55ab187dc58e211eab0aa232b47d131abd9009cebf5e831a0"
       }
+    ],
+    "postBaselineParityBridges": [
+      {
+        "bridgeVersion": "20260808500000",
+        "bridgePath": "supabase/migrations/20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql",
+        "bridgeSha256": "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
+        "omittedPreBaselineVersion": "20260706000150",
+        "omittedPreBaselineFilename": "20260706000150_automation_policy_config_foundation.sql",
+        "omittedCanonicalObjects": [
+          "public.automation_policy_configs",
+          "public.automation_policy_active_configs",
+          "public.qf_prevent_automation_policy_config_mutation()",
+          "trg_automation_policy_configs_immutable"
+        ],
+        "discoveredBy": "QF-MVP-50.3 (20260809000000) preflight abort on QuickFurno staging",
+        "rationale": "The staging baseline squash 269c9265 was intended to supersede the whole pre-baseline chain but does not contain this canonical foundation, so the post-baseline QF-MVP-50.3 producer could not apply.",
+        "preBaselineMigrationReplayed": false,
+        "preBaselineMigrationEdited": false,
+        "presenceIdempotentByCatalogProbe": true,
+        "noOpWhenCanonicalFoundationAlreadyPresent": true,
+        "failsClosedOnPartialOrIncompatibleState": true,
+        "createsOnlyOnProvenAbsence": true,
+        "overwritesExistingRows": false,
+        "carriesBusinessPolicy": false,
+        "lowCreditThresholdRemainsOwnedBy": "20260809000000",
+        "doesNotAuthorizeArbitraryPreBaselineReplay": true,
+        "scopeNote": "POST_BASELINE_PARITY_REPAIR for exactly one omitted canonical foundation. PRE_BASELINE_CHAIN_INTENTIONALLY_SUPERSEDED_FOR_STAGING remains in force with mustReplayOnStaging=false and safety.preBaselineReplayForbidden=true. Any further omission must be handled by its own owner-authorised bridge, never by replaying the pre-baseline chain."
+      }
     ]
   },
   "postBaselineApplied": [
@@ -585,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 8,
+    "postAnchorMigrationCount": 9,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -656,6 +684,19 @@
     }
   ],
   "pendingPostAnchorMigrations": [
+    {
+      "version": "20260808500000",
+      "name": "qf_mvp_50_3_automation_policy_config_foundation_bridge",
+      "path": "supabase/migrations/20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql",
+      "sha256": "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
+      "phase": "QF-MVP-50.3-50.4-POLICY-CONFIG-BRIDGE",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false,
+      "mustApplyBeforeVersion": "20260809000000",
+      "bridgeClassification": "POST_BASELINE_PARITY_REPAIR_NOT_PRE_BASELINE_REPLAY"
+    },
     {
       "version": "20260809000000",
       "name": "qf_mvp_50_3_vendor_automation_producer",

@@ -401,7 +401,7 @@ record("R18 the execute_v1 repair is present, ordered immediately before the wed
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 95 &&
+    return files.length === 96 &&
       files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
@@ -487,11 +487,11 @@ record("W17 the repair self-verifies and fails closed",
   /wedge repair aborted: claim uniqueness must not be weakened/.test(wedgeSource));
 record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surface",
   !/provider_template_mappings|send_authority|binding_readiness|n8n|meta|whatsapp|vendor_|campaign|qf-jarvis/i.test(wedgeSql));
-record("W19 the wedge repair is present and the set is exactly 94",
+record("W19 the wedge repair is present and the set is exactly 96",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 95 && files.includes(WEDGE_NAME);
+    return files.length === 96 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -541,18 +541,18 @@ record("G02 the five applied records are 21 / 22 / 23 / 24 / 25 in exact ascendi
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]) &&
   new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 5);
-record("G03 post-anchor count and local migration count agree at 8 / 95",
-  manifest.appliedAnchor.postAnchorMigrationCount === 8 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 95);
+record("G03 post-anchor count and local migration count agree at 9 / 96",
+  manifest.appliedAnchor.postAnchorMigrationCount === 9 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
   g1Source.includes("manifest declares exactly five APPLIED post-anchor migrations") &&
-  g1Source.includes("exactly three PENDING post-anchor migrations are declared") &&
+  g1Source.includes("exactly four PENDING post-anchor migrations are declared") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 5") &&
-  g1Source.includes("pendingPins.length === 3") &&
-  g1Source.includes("const MIGRATION_COUNT = 95;"));
+  g1Source.includes("pendingPins.length === 4") &&
+  g1Source.includes("const MIGRATION_COUNT = 96;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -788,7 +788,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 5") &&
-          g1Source.includes("pendingPins.length === 3") &&
+          g1Source.includes("pendingPins.length === 4") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];

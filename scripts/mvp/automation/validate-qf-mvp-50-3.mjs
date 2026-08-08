@@ -389,8 +389,8 @@ record("G08 CI still takes no secret, database, provider or deployment action",
   !ciWorkflow.includes("${{ secrets.") &&
   !/^\s*(?:run:\s*)?(?:npx\s+)?supabase\s+/mi.test(ciWorkflow) &&
   !/\bdb push\b/i.test(ciWorkflow));
-record("G09 the local migration set is exactly 95",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 95);
+record("G09 the local migration set is exactly 96",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS — each defect must be impossible by construction

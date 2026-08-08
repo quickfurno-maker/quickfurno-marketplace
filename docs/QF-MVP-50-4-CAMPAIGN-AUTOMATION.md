@@ -72,6 +72,21 @@ Aggregation is recomputed from durable truth by `getCampaignResultProjection`; n
 
 **QF-MVP-50.5** owns retry recovery, due sweeps, stale leases and dead-letter handling. None is implemented here.
 
-## 9. What remains before QF-MVP-50.4 can be called COMPLETE
+## 9. Family-aware claim routing (shared substrate repair)
 
-The campaign **execution route** (`campaign_execution` family) and the inactive campaign n8n executor workflow are not part of this source slice, and neither is staging certification. Until those exist and are certified against staging, 50.4 is SOURCE READY only.
+The signed claim was **family-blind**: the workflow family was derived only *after* an irreversible claim. Because a claim commits `processing`, burns the job's single permitted `claim_v1` row, and `processing -> pending` is not a legal transition, a workflow that took another family's job would **permanently strand it**. Latent while only the client executor existed; unacceptable once vendor and campaign executors share the queue.
+
+Migration `20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql` fixes it by **prevention, never reversal**:
+
+- a canonical SQL `action -> workflow family` map over the frozen 14-action registry, validator-pinned against the TypeScript registry; an unknown action maps to `NULL` and every caller fails closed;
+- the **legacy** `qf_claim_automation_job_v1(text)` keeps its exact signature, return shape, fresh-pending semantics, `retry_scheduled` exclusion, ordering, lease and attempt behaviour — but its selector is now fenced to `client_whatsapp`, so the shipped client route and workflow are unchanged and can no longer consume vendor or campaign work;
+- `qf_claim_automation_job_for_family_v1(worker, family)` takes **exactly one** family — no array, wildcard, comma list or "all", and `NULL` is not "any";
+- `qf_claim_automation_job_transport_for_family_v1` keeps route identity `claim_v1`. The family travels in the request body, so it is already inside the canonical body hash: a same-`requestId` call under a different family **conflicts** rather than inheriting the claim.
+
+The claim route accepts exactly two shapes — the byte-compatible legacy three-key body, and a four-key body adding only `workflowFamily`. No caller-supplied action allowlist is accepted anywhere.
+
+**Deliberately absent:** no release, no unclaim, no `processing -> pending`, no claim-row deletion, no extra attempt, no due sweep, no stale-lease recovery. Those remain QF-MVP-50.5. The one-claim-per-job uniqueness and the `retry_scheduled` exclusion are unchanged.
+
+## 10. What remains before QF-MVP-50.4 can be called COMPLETE
+
+The campaign **execution route** (`campaign_execution` family) and the inactive campaign n8n executor workflow are not part of this source slice — the family-aware claim they require is now in place, and neither is staging certification. Until those exist and are certified against staging, 50.4 is SOURCE READY only.

@@ -25,7 +25,7 @@ import {
   getNonProducedCampaignReason,
   isAllowedCampaignDispatchEntityType,
 } from "../../../lib/automation/campaignDispatchRegistry.ts";
-import { AUTOMATION_ACTION_TYPES } from "../../../lib/automation/actionRegistry.ts";
+import { AUTOMATION_ACTION_TYPES, getWorkflowFamilyForAction } from "../../../lib/automation/actionRegistry.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
@@ -58,6 +58,16 @@ const resultService = read("services/campaignCommunicationResultService.ts");
 const handoffService = read("services/campaignHandoffService.ts");
 const ciWorkflow = read(".github/workflows/qf-mvp-50-quality-gate.yml");
 const pkg = JSON.parse(read("package.json"));
+
+const CLAIM_MIGRATION_NAME =
+  "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql";
+const CLAIM_MIGRATION_PATH = `supabase/migrations/${CLAIM_MIGRATION_NAME}`;
+const CLAIM_MIGRATION_SHA = "fc7efae9c2349854b9856d3b3b3956933bcfe79ed15c1eeb7caf65bc61f8f89d";
+const claimMigrationSource = read(CLAIM_MIGRATION_PATH);
+const claimSql = stripSql(claimMigrationSource);
+const claimRouteSource = read("app/api/internal/automation/n8n/claim/route.ts");
+const transportServiceSource = read("services/automationTransportService.ts");
+const transportTypesSource = read("lib/automation/transportTypes.ts");
 
 const results = [];
 const record = (name, passed, detail = "") =>
@@ -293,10 +303,10 @@ record("G01 the migration is pinned PENDING with exact identity",
       !("appliedEvidenceMarker" in pin) &&
       !("remoteHistoryCountAfterApply" in pin);
   })());
-record("G02 exactly two pending post-anchor migrations are declared",
-  manifest.pendingPostAnchorMigrations.length === 2 &&
+record("G02 exactly three pending post-anchor migrations are declared",
+  manifest.pendingPostAnchorMigrations.length === 3 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version),
-    ["20260809000000", "20260810000000"]));
+    ["20260809000000", "20260810000000", "20260811000000"]));
 record("G03 the five applied records remain 21/22/23/24/25",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25]));
@@ -306,8 +316,8 @@ record("G05 the validator is registered and wired into CI after 50.3",
   pkg.scripts["test:mvp:50-4"] ===
     "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs" &&
   /- name: QF-MVP-50\.3 validator\s+run: npm run test:mvp:50-3\s+- name: QF-MVP-50\.4 validator\s+run: npm run test:mvp:50-4/.test(ciWorkflow));
-record("G06 the local migration set is exactly 94",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 94);
+record("G06 the local migration set is exactly 95",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 95);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS
@@ -359,6 +369,166 @@ for (const [name, fn] of mutants) {
   let held = false;
   try { held = fn() === true; } catch { held = false; }
   record(`M-${name}`, held);
+}
+
+
+// ---------------------------------------------------------------------------
+// K. SHARED FAMILY-AWARE CLAIM ROUTING (QF-MVP-50.3/50.4)
+//
+// The claim was FAMILY-BLIND: family was derived only AFTER an irreversible
+// claim, so one executor could permanently strand another family's job. These
+// assertions freeze the prevention.
+// ---------------------------------------------------------------------------
+record("K01 the family-aware claim migration exists at its pinned hash",
+  existsSync(path.join(ROOT, CLAIM_MIGRATION_PATH)) &&
+  canonicalSha256(readFileSync(path.join(ROOT, CLAIM_MIGRATION_PATH))) === CLAIM_MIGRATION_SHA);
+record("K02 the historical claim migrations are byte-frozen",
+  canonicalSha256(readFileSync(path.join(ROOT,
+    "supabase/migrations/20260801152049_qf_mvp_automation_transport_replay_guard.sql")))
+    === "28405567e2dd1370db4ccf58526701ca2713adbe19188838f16a510eb8128257" &&
+  canonicalSha256(readFileSync(path.join(ROOT,
+    "supabase/migrations/20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql")))
+    === "8b798bb3c5db5d91f988d92cec3705237db08c753ae5018d09dccc09ff0240aa");
+record("K03 the LEGACY claim keeps its exact signature and is now client-fenced",
+  /create or replace function public\.qf_claim_automation_job_v1\(p_worker_id text\)/.test(claimSql) &&
+  /qf_automation_action_workflow_family_v1\(r\.action_type\)\s*\n?\s*= 'client_whatsapp'/.test(claimSql));
+record("K04 the legacy claim still has the frozen fresh-pending semantics",
+  /j\.status = 'pending'/.test(claimSql) &&
+  /j\.available_at <= now\(\)/.test(claimSql) &&
+  /j\.attempt_count < j\.max_attempts/.test(claimSql) &&
+  /for update skip locked/.test(claimSql));
+record("K05 retry_scheduled remains excluded from every claim selector",
+  !/j\.status = 'retry_scheduled'/.test(claimSql) &&
+  !/j\.next_retry_at <= now\(\)/.test(claimSql));
+/** The family-aware claim function body only — not the trailing self-verification
+ *  block, which legitimately probes wildcard / multi-family / null inputs in
+ *  order to prove they are refused. */
+const familyClaimFn = (() => {
+  const i = claimSql.indexOf("create or replace function public.qf_claim_automation_job_for_family_v1");
+  const j = claimSql.indexOf("comment on function", i);
+  return i === -1 ? "" : claimSql.slice(i, j === -1 ? claimSql.length : j);
+})();
+record("K06 the family-aware claim takes EXACTLY ONE family",
+  /p_worker_id text,\s*\n?\s*p_workflow_family text/.test(familyClaimFn) &&
+  // one scalar family: no array type, no plural parameter
+  !/text\[\]/.test(familyClaimFn) &&
+  !/p_workflow_families/.test(claimSql));
+record("K07 the family vocabulary is closed and fails closed",
+  /p_workflow_family not in\s*\n?\s*\('client_whatsapp', 'vendor_whatsapp', 'campaign_execution'\)/.test(familyClaimFn) &&
+  /AUTOMATION_CLAIM_WORKFLOW_FAMILY_INVALID/.test(familyClaimFn) &&
+  // no wildcard / any escape hatch inside the executable selector
+  !/'all'|'\*'|'any'/i.test(familyClaimFn));
+record("K08 no caller-supplied action allowlist is accepted anywhere",
+  !/p_action_types|p_action_allowlist|actionTypes\s*:/i.test(claimSql + claimRouteSource + transportServiceSource));
+record("K09 the family comes from durable action truth, not the caller",
+  /from public\.automation_action_requests r\s*\n?\s*where r\.id = j\.action_request_id/.test(claimSql) &&
+  /qf_automation_action_workflow_family_v1\(r\.action_type\)/.test(claimSql));
+record("K10 the SQL action->family map matches the frozen registry exactly",
+  (() => {
+    const pairs = [...claimSql.matchAll(/when '([a-z_]+\.[a-z_]+)'\s*then '([a-z_]+)'/g)]
+      .map((m) => [m[1], m[2]]);
+    if (pairs.length !== 14) return false;
+    if (new Set(pairs.map((p) => p[0])).size !== 14) return false;
+    return pairs.every(([action, family]) =>
+      AUTOMATION_ACTION_TYPES.includes(action) &&
+      getWorkflowFamilyForAction(action) === family);
+  })());
+record("K11 an unknown action maps to NULL and never defaults to a family",
+  /else null/.test(claimSql) &&
+  /an unknown action must map to NULL/.test(claimMigrationSource));
+record("K12 the transport wrapper keeps route identity claim_v1 — no claim_v2",
+  /route_key <> 'claim_v1'/.test(claimSql) &&
+  !/claim_v2/.test(claimSql + claimRouteSource + transportServiceSource));
+record("K13 family is bound into the signed identity via the canonical body hash",
+  /body_sha256 is distinct from p_body_sha256/.test(claimSql) &&
+  /workflowFamily/.test(transportTypesSource) &&
+  /body_sha256 carries the declared family/.test(claimMigrationSource));
+record("K14 a same-requestId changed-family call conflicts",
+  /AUTOMATION_TRANSPORT_REQUEST_REPLAY_CONFLICT/.test(claimSql) &&
+  /cannot inherit this identity/.test(claimMigrationSource));
+record("K15 the one-claim-per-job uniqueness is UNCHANGED",
+  !/drop index[^;]*uq_automation_transport_requests_claim_job/i.test(claimSql) &&
+  /claim uniqueness must not be weakened/.test(claimMigrationSource));
+record("K16 NO release / unclaim / recovery semantics were added",
+  !/processing'\s*->\s*'pending|set status = 'pending'/.test(claimSql) &&
+  !/\bdelete from\b|due_sweep|reclaimStale|retry_worker|unclaim|release_claim/i.test(
+    claimSql.replace(/a claim release path was introduced/g, " ")
+            .replace(/recovery semantics must remain QF-MVP-50\.5/g, " ")
+            .replace(/v_def ~ 'delete from'/g, " ")
+            .replace(/v_def ~ 'due_sweep'/g, " ")));
+record("K17 the claim route accepts EXACTLY the legacy and family shapes",
+  /keys\.length === 3/.test(claimRouteSource) &&
+  /keys\.length === 4/.test(claimRouteSource) &&
+  /keys\[3\] === "workflowFamily"/.test(claimRouteSource) &&
+  /AUTOMATION_TRANSPORT_BODY_FIELDS_INVALID/.test(claimRouteSource));
+record("K18 the route dispatches legacy -> client-only, family -> family-aware",
+  /"workflowFamily" in parsed\.body/.test(claimRouteSource) &&
+  /claimAutomationJobForFamilyN8nTransport/.test(claimRouteSource) &&
+  /claimAutomationJobForN8nTransport/.test(claimRouteSource));
+record("K19 the route validates the family against the closed vocabulary",
+  /isClaimableWorkflowFamily\(value\.workflowFamily\)/.test(claimRouteSource) &&
+  /AUTOMATION_CLAIM_WORKFLOW_FAMILY_INVALID/.test(claimRouteSource));
+record("K20 both claim paths share one row-interpretation, so they cannot drift",
+  /function interpretClaimRow/.test(transportServiceSource) &&
+  (transportServiceSource.match(/interpretClaimRow\(/g) ?? []).length >= 3);
+record("K21 the client workflow JSON is byte-unchanged",
+  canonicalSha256(readFileSync(path.join(ROOT,
+    "automation/n8n/QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json")))
+    === "79716cd979aedaaa06aced84d843cad3ca15b47580bbbed8f85175b8c916dad4");
+record("K22 the claim migration is pinned PENDING with exact identity",
+  (() => {
+    const pin = manifest.pendingPostAnchorMigrations
+      .find((r) => r.version === "20260811000000");
+    return Boolean(pin) &&
+      pin.path === CLAIM_MIGRATION_PATH &&
+      pin.sha256 === CLAIM_MIGRATION_SHA &&
+      pin.operationalStatus === "PENDING" &&
+      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+      pin.requiresSeparateStagingDeploymentGate === true &&
+      pin.appliedByThisPhase === false;
+  })());
+
+const claimMutants = [
+  ["removing the family predicate is impossible",
+    () => /qf_automation_action_workflow_family_v1\(r\.action_type\)/.test(claimSql) &&
+          (claimSql.match(/qf_automation_action_workflow_family_v1\(r\.action_type\)/g) ?? []).length >= 2],
+  ["making the legacy claim all-family again is impossible",
+    () => /= 'client_whatsapp'/.test(claimSql) &&
+          /the legacy claim is not client-fenced/.test(claimMigrationSource)],
+  ["accepting a family array is impossible",
+    () => !/text\[\]/.test(familyClaimFn) && !/p_workflow_families/.test(claimSql)],
+  ["accepting a wildcard family is impossible",
+    () => /p_workflow_family not in/.test(claimSql) &&
+          /a wildcard family was accepted/.test(claimMigrationSource)],
+  ["accepting a caller action allowlist is impossible",
+    () => !/p_action_types|p_action_allowlist/i.test(claimSql + claimRouteSource)],
+  ["omitting family from the body hash is impossible",
+    () => /keys\[3\] === "workflowFamily"/.test(claimRouteSource) &&
+          /body_sha256 is distinct from p_body_sha256/.test(claimSql)],
+  ["mapping an action to the wrong family is impossible",
+    () => {
+      const pairs = [...claimSql.matchAll(/when '([a-z_]+\.[a-z_]+)'\s*then '([a-z_]+)'/g)];
+      return pairs.length === 14 &&
+        pairs.every((m) => getWorkflowFamilyForAction(m[1]) === m[2]);
+    }],
+  ["an unknown action falling back to a family is impossible",
+    () => /else null/.test(claimSql)],
+  ["reintroducing retry_scheduled to a claim selector is impossible",
+    () => !/j\.status = 'retry_scheduled'/.test(claimSql)],
+  ["weakening one-claim-per-job uniqueness is impossible",
+    () => !/drop index[^;]*claim_job/i.test(claimSql)],
+  ["adding a release or recovery path is impossible",
+    () => !/set status = 'pending'/.test(claimSql) &&
+          !/unclaim|release_claim/i.test(claimSql)],
+  ["changing the client workflow JSON is impossible",
+    () => canonicalSha256(readFileSync(path.join(ROOT,
+            "automation/n8n/QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json")))
+            === "79716cd979aedaaa06aced84d843cad3ca15b47580bbbed8f85175b8c916dad4"],
+];
+for (const [name, fn] of claimMutants) {
+  let held = false;
+  try { held = fn() === true; } catch { held = false; }
+  record(`MK-${name}`, held);
 }
 
 // ---------------------------------------------------------------------------

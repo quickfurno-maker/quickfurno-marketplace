@@ -13,6 +13,7 @@ import {
 import { buildAutomationCommunicationIdempotencyKey } from "@/lib/automation/clientDispatchRegistry";
 import { resolveCompletionEvidenceRuling } from "@/lib/automation/completionContract";
 import { buildAutomationNextRetryAt } from "@/lib/automation/retryPolicy";
+import { isClaimableWorkflowFamily } from "@/lib/automation/transportTypes";
 import type {
   AutomationTransportClaimRow,
   AutomationTransportCompletionRow,
@@ -84,6 +85,55 @@ export function getAutomationTransportRuntimeConfig():
   };
 }
 
+/**
+ * QF-MVP-50.3/50.4 family-aware claim.
+ *
+ * Identical transport semantics to the legacy claim, with one difference: the
+ * caller declares EXACTLY ONE workflow family and Core will only ever hand back
+ * a job of that family. A job of another family is invisible to this claim, so
+ * it can never be irreversibly consumed and stranded by the wrong executor.
+ *
+ * The family is part of the signed body, so it is already bound into
+ * `bodySha256` and a same-requestId, changed-family replay conflicts.
+ */
+export async function claimAutomationJobForFamilyN8nTransport(input: {
+  requestId: string;
+  workerId: string;
+  workflowFamily: string;
+  bodySha256: string;
+}): Promise<N8nClaimResponseBody> {
+  if (!UUID_RE.test(input.requestId)) {
+    throw new Error("AUTOMATION_TRANSPORT_REQUEST_ID_INVALID");
+  }
+  if (!SAFE_WORKER_RE.test(input.workerId)) {
+    throw new Error("AUTOMATION_TRANSPORT_WORKER_ID_INVALID");
+  }
+  if (!isClaimableWorkflowFamily(input.workflowFamily)) {
+    throw new Error("AUTOMATION_CLAIM_WORKFLOW_FAMILY_INVALID");
+  }
+  if (!SHA256_RE.test(input.bodySha256)) {
+    throw new Error("AUTOMATION_TRANSPORT_BODY_HASH_INVALID");
+  }
+
+  const { data, error } = await adminClient()
+    .rpc("qf_claim_automation_job_transport_for_family_v1", {
+      p_request_id: input.requestId,
+      p_worker_id: input.workerId,
+      p_workflow_family: input.workflowFamily,
+      p_body_sha256: input.bodySha256,
+    })
+    .maybeSingle();
+
+  if (error || !data) {
+    throw error ?? new Error("AUTOMATION_TRANSPORT_CLAIM_FAILED");
+  }
+
+  return interpretClaimRow(data as AutomationTransportClaimRow, {
+    requestId: input.requestId,
+    workerId: input.workerId,
+  });
+}
+
 export async function claimAutomationJobForN8nTransport(input: {
   requestId: string;
   workerId: string;
@@ -111,8 +161,21 @@ export async function claimAutomationJobForN8nTransport(input: {
     throw error ?? new Error("AUTOMATION_TRANSPORT_CLAIM_FAILED");
   }
 
-  const row = data as AutomationTransportClaimRow;
+  return interpretClaimRow(data as AutomationTransportClaimRow, {
+    requestId: input.requestId,
+    workerId: input.workerId,
+  });
+}
 
+/**
+ * Shared claim-row interpretation. Both the legacy client-only claim and the
+ * family-aware claim return the SAME transport envelope semantics, including
+ * the no-blind-resend replay rule, so they cannot drift apart.
+ */
+async function interpretClaimRow(
+  row: AutomationTransportClaimRow,
+  input: { requestId: string; workerId: string },
+): Promise<N8nClaimResponseBody> {
   if (row.request_id !== input.requestId) {
     throw new Error("AUTOMATION_TRANSPORT_REQUEST_EVIDENCE_MISMATCH");
   }

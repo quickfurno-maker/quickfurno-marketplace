@@ -641,11 +641,23 @@ record(
   route.includes("parsed.body.workerId !== config.workerId"),
 );
 record(
-  "76 route allows exactly three body fields",
-  route.includes("keys.length !== 3") &&
-    route.includes('keys[0] !== "requestId"') &&
-    route.includes('keys[1] !== "transportVersion"') &&
-    route.includes('keys[2] !== "workerId"'),
+  // QF-MVP-50.3/50.4 re-pin, NOT a relaxation. The claim body now has EXACTLY
+  // TWO accepted shapes: the byte-compatible legacy three-field body (which SQL
+  // now fences to client_whatsapp) and a four-field family-aware body that adds
+  // ONLY `workflowFamily`. Both key sets are pinned exactly, any other key set
+  // is refused, and the family value is validated against the closed
+  // vocabulary — so this is strictly stronger than the previous single-shape
+  // assertion.
+  "76 route allows exactly the legacy three-field body or the four-field family body",
+  route.includes("keys.length === 3") &&
+    route.includes("keys.length === 4") &&
+    route.includes('keys[0] === "requestId"') &&
+    route.includes('keys[1] === "transportVersion"') &&
+    route.includes('keys[2] === "workerId"') &&
+    route.includes('keys[3] === "workflowFamily"') &&
+    route.includes("!isLegacyShape && !isFamilyShape") &&
+    route.includes("AUTOMATION_TRANSPORT_BODY_FIELDS_INVALID") &&
+    route.includes("isClaimableWorkflowFamily(value.workflowFamily)"),
 );
 record(
   "77 route sends verified body hash to durable replay RPC service",

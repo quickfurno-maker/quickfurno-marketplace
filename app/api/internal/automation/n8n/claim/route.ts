@@ -4,9 +4,12 @@ import {
 } from "@/lib/automation/transportAuth";
 import {
   N8N_CLAIM_ROUTE_PATH,
+  isClaimableWorkflowFamily,
   type N8nClaimRequestBody,
+  type N8nFamilyClaimRequestBody,
 } from "@/lib/automation/transportTypes";
 import {
+  claimAutomationJobForFamilyN8nTransport,
   claimAutomationJobForN8nTransport,
   getAutomationTransportRuntimeConfig,
 } from "@/services/automationTransportService";
@@ -120,11 +123,31 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await claimAutomationJobForN8nTransport({
-      requestId: verified.requestId,
-      workerId: parsed.body.workerId,
-      bodySha256: verified.bodySha256,
-    });
+    // QF-MVP-50.3/50.4 CLAIM TOPOLOGY.
+    //
+    // Exactly two accepted shapes, and both are family-safe:
+    //
+    //   legacy 3-key body  -> qf_claim_automation_job_v1, which SQL now fences
+    //                         to client_whatsapp. The existing client workflow
+    //                         is unchanged and can no longer consume vendor or
+    //                         campaign work.
+    //   4-key body with
+    //   workflowFamily     -> the family-aware claim, exactly one family.
+    //
+    // There is no third business-authority implementation, no action allowlist
+    // input, and no shape that can claim across families.
+    const result = "workflowFamily" in parsed.body
+      ? await claimAutomationJobForFamilyN8nTransport({
+          requestId: verified.requestId,
+          workerId: parsed.body.workerId,
+          workflowFamily: parsed.body.workflowFamily,
+          bodySha256: verified.bodySha256,
+        })
+      : await claimAutomationJobForN8nTransport({
+          requestId: verified.requestId,
+          workerId: parsed.body.workerId,
+          bodySha256: verified.bodySha256,
+        });
 
     return signedJson(
       result,
@@ -151,7 +174,7 @@ export async function POST(request: Request) {
 function parseClaimBody(
   rawBody: string,
 ):
-  | { ok: true; body: N8nClaimRequestBody }
+  | { ok: true; body: N8nClaimRequestBody | N8nFamilyClaimRequestBody }
   | { ok: false; status: 400; code: string } {
   let value: unknown;
   try {
@@ -172,13 +195,23 @@ function parseClaimBody(
     };
   }
 
+  // EXACTLY two shapes. The legacy 3-key body is byte-compatible with the
+  // shipped client workflow; the 4-key body adds one field and nothing else.
+  // Any other key set — including an action allowlist — is refused.
   const keys = Object.keys(value).sort();
-  if (
-    keys.length !== 3 ||
-    keys[0] !== "requestId" ||
-    keys[1] !== "transportVersion" ||
-    keys[2] !== "workerId"
-  ) {
+  const isLegacyShape =
+    keys.length === 3 &&
+    keys[0] === "requestId" &&
+    keys[1] === "transportVersion" &&
+    keys[2] === "workerId";
+  const isFamilyShape =
+    keys.length === 4 &&
+    keys[0] === "requestId" &&
+    keys[1] === "transportVersion" &&
+    keys[2] === "workerId" &&
+    keys[3] === "workflowFamily";
+
+  if (!isLegacyShape && !isFamilyShape) {
     return {
       ok: false,
       status: 400,
@@ -195,6 +228,27 @@ function parseClaimBody(
       ok: false,
       status: 400,
       code: "AUTOMATION_TRANSPORT_BODY_INVALID",
+    };
+  }
+
+  if (isFamilyShape) {
+    // Exactly one canonical family. A wildcard, an array, a comma list, an
+    // empty string and an unknown value all fail closed here.
+    if (!isClaimableWorkflowFamily(value.workflowFamily)) {
+      return {
+        ok: false,
+        status: 400,
+        code: "AUTOMATION_CLAIM_WORKFLOW_FAMILY_INVALID",
+      };
+    }
+    return {
+      ok: true,
+      body: {
+        transportVersion: 1,
+        requestId: value.requestId,
+        workerId: value.workerId,
+        workflowFamily: value.workflowFamily,
+      },
     };
   }
 

@@ -531,6 +531,128 @@ for (const [name, fn] of claimMutants) {
   record(`MK-${name}`, held);
 }
 
+
+// ---------------------------------------------------------------------------
+// E. CAMPAIGN EXECUTOR — route, service, 40.8 seam, workflow
+// ---------------------------------------------------------------------------
+const campaignRoute = read("app/api/internal/automation/n8n/execute-campaign/route.ts");
+const campaignService = read("services/automationCampaignExecutionService.ts");
+const familyContract = read("lib/automation/familyExecutionContract.ts");
+const campaignWorkflowSource = read("automation/n8n/QF-MVP-50-04-Campaign-Execution-Executor.workflow.json");
+const campaignWorkflow = JSON.parse(campaignWorkflowSource);
+const campaignWorkflowText = JSON.stringify(campaignWorkflow);
+/** Executable code only — the header and inline comments legitimately NAME the
+ *  authorities this service refuses to touch. */
+const campaignServiceCode = campaignService
+  .replace(/\/\*[\s\S]*?\*\//g, " ")
+  .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+record("E01 the campaign execute route exists at its exact path",
+  /N8N_EXECUTE_CAMPAIGN_ROUTE_PATH/.test(campaignRoute) &&
+  /"\/api\/internal\/automation\/n8n\/execute-campaign"/.test(read("lib/automation/transportTypes.ts")));
+record("E02 it reuses the frozen signed transport verification",
+  /verifyN8nToCoreRequest/.test(campaignRoute) &&
+  /path: N8N_EXECUTE_CAMPAIGN_ROUTE_PATH/.test(campaignRoute));
+record("E03 it reuses execute_v1",
+  /route: "execute_v1"/.test(campaignRoute) &&
+  !/execute_v2/.test(campaignRoute + campaignService));
+record("E04 the request body is EXACTLY the five identity keys",
+  /parseFamilyExecuteRequestBody/.test(campaignRoute) &&
+  /keys\.length !== N8N_FAMILY_EXECUTE_REQUEST_KEYS\.length/.test(familyContract));
+record("E05 the service fences the family to campaign_execution",
+  /CAMPAIGN_EXECUTION_WORKFLOW_FAMILY = "campaign_execution"/.test(campaignService) &&
+  /envelope\.workflowFamily !== CAMPAIGN_EXECUTION_WORKFLOW_FAMILY/.test(campaignService));
+record("E06 the intent id comes from DURABLE job truth, never the request",
+  /THE INTENT ID COMES FROM DURABLE JOB TRUTH/.test(campaignService) &&
+  /const intentId = envelope\.entityId/.test(campaignService) &&
+  !/intentId:\s*input\./.test(campaignService));
+record("E07 the 40.8 seam is called in the exact contracted order",
+  campaignService.indexOf("buildCampaignExecutionPlan({ intentId })") > -1 &&
+  campaignService.indexOf("buildCampaignExecutionPlan({ intentId })") <
+    campaignService.indexOf("createRuntimeCommunicationService") &&
+  campaignService.indexOf("createRuntimeCommunicationService") <
+    campaignService.indexOf("reconcileCampaignIntent({ intentId: plan.intentId })"));
+record("E08 dispatch goes through the EXISTING CommunicationService",
+  /createRuntimeCommunicationService\(\)/.test(campaignService) &&
+  /service\.data\.send\(/.test(campaignService));
+record("E09 every campaign fact comes from the Core plan",
+  /plan\.templateKey/.test(campaignService) &&
+  /plan\.correlationId/.test(campaignService) &&
+  /plan\.idempotencyKey/.test(campaignService) &&
+  /plan\.entityId/.test(campaignService));
+record("E10 no audience is recalculated and no snapshot is read",
+  !/vendor_campaign_audience_members|qf_prepare_vendor_campaign|snapshot/i.test(campaignServiceCode));
+record("E11 no second communication_intent is created",
+  !/insert[\s\S]{0,40}communication_intents/i.test(campaignServiceCode) &&
+  !/from\("communication_intents"\)/.test(campaignServiceCode));
+record("E12 no second batching or handoff authority",
+  !/qf_handoff_vendor_campaign_intents|batch/i.test(campaignServiceCode));
+record("E13 campaign.execute_batch can never be executed here",
+  /getNonProducedCampaignReason\(envelope\.actionType\)/.test(campaignService) &&
+  /AUTOMATION_EXECUTION_CAMPAIGN_ACTION_NOT_PRODUCED/.test(campaignService));
+record("E14 an ineligible intent is a bounded terminal non-send",
+  /!planned\.ok[\s\S]{0,240}?QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(campaignService));
+record("E15 consent, suppression and frequency stay at the network boundary",
+  !/communication_preferences|communication_suppressions|communication_frequency_policies/.test(campaignServiceCode) &&
+  /re-checked there, at the network boundary/.test(campaignService));
+record("E16 no aggregate is computed or submitted here",
+  !/count\(|total|delivered|aggregate/i.test(
+    campaignService.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ")));
+record("E17 the frozen four-state result partition is preserved",
+  /orchestrationState: "execution_recorded"/.test(campaignService) &&
+  /orchestrationState: "communication_pending"/.test(campaignService) &&
+  /orchestrationState: "attempt_finalized"/.test(campaignService) &&
+  /orchestrationState: "rejected"/.test(campaignRoute));
+record("E18 the campaign workflow ships INACTIVE",
+  campaignWorkflow.active === false);
+record("E19 it claims exactly one family: campaign_execution",
+  /workflowFamily = 'campaign_execution'/.test(campaignWorkflowText) &&
+  /workflowFamily === 'campaign_execution'/.test(campaignWorkflowText) &&
+  !/'vendor_whatsapp'|'client_whatsapp'/.test(campaignWorkflowText));
+record("E20 its execute body carries exactly the five keys",
+  /transportVersion: 1, requestId, workerId, jobId, attemptId/.test(campaignWorkflowText));
+record("E21 it posts to the campaign execute route",
+  campaignWorkflowText.includes("/api/internal/automation/n8n/execute-campaign") &&
+  !campaignWorkflowText.includes("/api/internal/automation/n8n/execute-client"));
+record("E22 it completes only when Core says completionReady",
+  /completionReady: state === 'execution_recorded'/.test(campaignWorkflowText));
+record("E23 it holds no audience, recipient, provider or DB authority",
+  !/audience|recipient_ref|qf_prepare|qf_handoff|supabase|graph\.facebook/i.test(campaignWorkflowText));
+record("E24 the graph is structurally the proven client executor",
+  campaignWorkflow.nodes.length === 52 &&
+  Object.keys(campaignWorkflow.connections).length === 44);
+
+const execMutants = [
+  ["removing the campaign family check is impossible",
+    () => /envelope\.workflowFamily !== CAMPAIGN_EXECUTION_WORKFLOW_FAMILY/.test(campaignService)],
+  ["n8n supplying its own intent id is impossible",
+    () => /const intentId = envelope\.entityId/.test(campaignService) &&
+          !/intentId:\s*input\./.test(campaignService)],
+  ["recalculating the audience is impossible",
+    () => !/vendor_campaign_audience_members|qf_prepare_vendor_campaign/i.test(campaignServiceCode)],
+  ["creating a second intent is impossible",
+    () => !/insert[\s\S]{0,40}communication_intents/i.test(campaignService)],
+  ["skipping the execution plan is impossible",
+    () => /buildCampaignExecutionPlan\(\{ intentId \}\)/.test(campaignService)],
+  ["skipping reconcile is impossible",
+    () => /reconcileCampaignIntent\(\{ intentId: plan\.intentId \}\)/.test(campaignService)],
+  ["a direct provider node in the workflow is impossible",
+    () => !/graph\.facebook|whatsAppApi|metaApi/i.test(campaignWorkflowText)],
+  ["a direct campaign DB write is impossible",
+    () => !/supabase|postgres/i.test(campaignWorkflowText)],
+  ["activating execute_batch here is impossible",
+    () => /AUTOMATION_EXECUTION_CAMPAIGN_ACTION_NOT_PRODUCED/.test(campaignService)],
+  ["completing on communication_pending is impossible",
+    () => /completionReady: state === 'execution_recorded'/.test(campaignWorkflowText)],
+  ["shipping the campaign workflow active is impossible",
+    () => campaignWorkflow.active === false],
+];
+for (const [name, fn] of execMutants) {
+  let held = false;
+  try { held = fn() === true; } catch { held = false; }
+  record(`ME-${name}`, held);
+}
+
 // ---------------------------------------------------------------------------
 for (const r of results) {
   console.log(`${r.passed ? "PASS" : "FAIL"} ${r.name}${r.detail ? ` (${r.detail})` : ""}`);

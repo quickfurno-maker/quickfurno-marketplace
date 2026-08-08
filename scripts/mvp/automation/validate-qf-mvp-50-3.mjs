@@ -611,6 +611,160 @@ for (const [name, fn] of claimMutants) {
   record(`MK-${name}`, held);
 }
 
+
+// ---------------------------------------------------------------------------
+// V. VENDOR EXECUTOR — route, service, reproofs, workflow
+// ---------------------------------------------------------------------------
+const vendorRoute = read("app/api/internal/automation/n8n/execute-vendor/route.ts");
+const vendorService = read("services/automationVendorExecutionService.ts");
+const familyContract = read("lib/automation/familyExecutionContract.ts");
+const vendorWorkflowSource = read("automation/n8n/QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json");
+const vendorWorkflow = JSON.parse(vendorWorkflowSource);
+const vendorWorkflowText = JSON.stringify(vendorWorkflow);
+
+record("V01 the vendor execute route exists at its exact path",
+  /N8N_EXECUTE_VENDOR_ROUTE_PATH/.test(vendorRoute) &&
+  /"\/api\/internal\/automation\/n8n\/execute-vendor"/.test(read("lib/automation/transportTypes.ts")));
+record("V02 it reuses the frozen signed transport verification",
+  /verifyN8nToCoreRequest/.test(vendorRoute) &&
+  /buildSignedCoreResponseHeaders/.test(vendorRoute) &&
+  /path: N8N_EXECUTE_VENDOR_ROUTE_PATH/.test(vendorRoute));
+record("V03 it reuses execute_v1 — there is no execute_v2",
+  /route: "execute_v1"/.test(vendorRoute) &&
+  !/execute_v2/.test(vendorRoute + vendorService + familyContract));
+record("V04 the request body is EXACTLY the five identity keys",
+  (() => {
+    const m = familyContract.match(/N8N_FAMILY_EXECUTE_REQUEST_KEYS = Object\.freeze\(\[([\s\S]*?)\]/);
+    if (!m) return false;
+    const keys = [...m[1].matchAll(/"([a-zA-Z]+)"/g)].map((x) => x[1]);
+    return same(keys, ["attemptId", "jobId", "requestId", "transportVersion", "workerId"]);
+  })() &&
+  /keys\.length !== N8N_FAMILY_EXECUTE_REQUEST_KEYS\.length/.test(familyContract));
+record("V05 no business field is accepted in the execute request",
+  !/recipient|phone|template|provider|consent|workflowFamily/i.test(
+    familyContract.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ")));
+record("V06 the route rejects a requestId or worker mismatch",
+  /AUTOMATION_TRANSPORT_REQUEST_ID_MISMATCH/.test(vendorRoute) &&
+  /AUTOMATION_TRANSPORT_WORKER_NOT_AUTHORIZED/.test(vendorRoute));
+record("V07 the service fences the family to vendor_whatsapp",
+  /VENDOR_EXECUTION_WORKFLOW_FAMILY = "vendor_whatsapp"/.test(vendorService) &&
+  /envelope\.workflowFamily !== VENDOR_EXECUTION_WORKFLOW_FAMILY/.test(vendorService) &&
+  /AUTOMATION_EXECUTION_WORKFLOW_FAMILY_MISMATCH/.test(vendorService));
+record("V08 a foreign-family job is refused WITHOUT being finalized",
+  /leaves the attempt owned and open for its real executor/.test(vendorService));
+record("V09 ownership and current-attempt proof come first",
+  vendorService.indexOf("proveCurrentAutomationAttemptOwnership") <
+    vendorService.indexOf("recordClientExecutionTransportIdentity"));
+record("V10 durable communication evidence is read BEFORE reserving",
+  // compare CALL sites; the import line naturally appears first
+  vendorService.indexOf("readCommunicationEvidence(idempotencyKey)") <
+    vendorService.indexOf("await recordClientExecutionTransportIdentity("));
+record("V11 the execute_v1 reservation is the frozen shared one",
+  /recordClientExecutionTransportIdentity/.test(vendorService) &&
+  /AUTOMATION_EXECUTION_RESERVATION_REFUSED/.test(vendorService));
+record("V12 lead_offer reproof re-reads the assignment and its vendor",
+  /case "vendor\.lead_offer":[\s\S]{0,700}?from\("lead_assignments"\)[\s\S]{0,400}?row\.vendor_id !== facts\.vendorId/.test(vendorService));
+record("V13 response_reminder requires vendor_status still exactly 'New'",
+  /case "vendor\.response_reminder":[\s\S]{0,1200}?row\.vendor_status !== "New"/.test(vendorService) &&
+  /resp2h/.test(vendorService) && /resp24h/.test(vendorService));
+record("V14 onboarding reproof requires onboarding_stage still 'new'",
+  /case "vendor\.onboarding_reminder":[\s\S]{0,700}?row\.onboarding_stage !== "new"/.test(vendorService));
+record("V15 package reproof requires the exact source expiry identity",
+  /case "vendor\.package_expiry_warning":[\s\S]{0,1600}?formatExpiryStamp\(row\.package_expires_at\) !== stamp/.test(vendorService) &&
+  /row\.package_status !== "active"/.test(vendorService));
+record("V16 low-credit reproof reads the policy config, never a literal",
+  /VENDOR_LOW_CREDIT_THRESHOLD_POLICY_KEY/.test(vendorService) &&
+  /readLowCreditThreshold/.test(vendorService) &&
+  /row\.remaining_credits > threshold/.test(vendorService) &&
+  // no hard-coded numeric threshold anywhere in the executor
+  !/remaining_credits\s*(<=|<|>=|>)\s*\d/.test(vendorService) &&
+  !/thresholdCredits\s*[:=]\s*\d/.test(vendorService));
+record("V17 an unconfigured threshold is a terminal non-send, not an assumed 3",
+  /threshold === null[\s\S]{0,160}?QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(vendorService) &&
+  /never an assumed 3/.test(vendorService));
+record("V18 every stale reproof is a pre-communication no-send",
+  (vendorService.match(/QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/g) ?? []).length >= 8 &&
+  /PRE-COMMUNICATION no-send/.test(vendorService));
+record("V19 vendor.document_reminder can never be executed",
+  /getNonProducibleVendorReason\(envelope\.actionType\)/.test(vendorService) &&
+  /AUTOMATION_EXECUTION_VENDOR_ACTION_NOT_PRODUCIBLE/.test(vendorService));
+record("V20 Core owns recipient, consent, template and provider",
+  /resolveVendorFacts/.test(vendorService) &&
+  /RECIPIENT_REFERENCE_DESTINATION/.test(vendorService) &&
+  /createRuntimeCommunicationService/.test(vendorService) &&
+  /recipient_type: "vendor"/.test(vendorService));
+record("V21 an assignment-scoped action resolves its vendor THROUGH the assignment",
+  /entityType === "lead_assignment"[\s\S]{0,500}?vendorId = row\.vendor_id/.test(vendorService));
+record("V22 the frozen four-state result partition is preserved",
+  /orchestrationState: "execution_recorded"/.test(vendorService) &&
+  /orchestrationState: "communication_pending"/.test(vendorService) &&
+  /orchestrationState: "attempt_finalized"/.test(vendorService) &&
+  /orchestrationState: "rejected"/.test(vendorRoute));
+record("V23 executorReference is emitted only for execution_recorded",
+  /orchestrationState: "execution_recorded",\s*\n\s*replayed,\s*\n\s*executorReference: evidence\.id/.test(vendorService) &&
+  !/communication_pending",[\s\S]{0,120}?executorReference/.test(vendorService));
+record("V24 the vendor workflow ships INACTIVE",
+  vendorWorkflow.active === false);
+record("V25 the vendor workflow claims exactly one family: vendor_whatsapp",
+  /workflowFamily = 'vendor_whatsapp'/.test(vendorWorkflowText) &&
+  /workflowFamily === 'vendor_whatsapp'/.test(vendorWorkflowText) &&
+  !/'campaign_execution'|'client_whatsapp'/.test(vendorWorkflowText));
+record("V26 its execute body carries exactly the five keys",
+  /transportVersion: 1, requestId, workerId, jobId, attemptId/.test(vendorWorkflowText));
+record("V27 it posts to the vendor execute route",
+  vendorWorkflowText.includes("/api/internal/automation/n8n/execute-vendor") &&
+  !vendorWorkflowText.includes("/api/internal/automation/n8n/execute-client"));
+record("V28 it completes only when Core says completionReady",
+  /completionReady: state === 'execution_recorded'/.test(vendorWorkflowText) &&
+  /IF — Completion Ready/.test(vendorWorkflowText));
+record("V29 it has no provider node and writes no business row",
+  !/whatsAppApi|metaApi|httpRequest.*graph\.facebook|supabase/i.test(vendorWorkflowText));
+record("V30 the vendor workflow contains no accept/reject semantics",
+  // `rejected` is the FROZEN orchestration state and `Reject Unverified ...` is
+  // the frozen signature-refusal node family. Neither is a vendor decision, so
+  // this checks the identifier-level phrases that WOULD be one.
+  (() => {
+    const text = vendorWorkflowText.toLowerCase();
+    return !ACCEPT_REJECT_PHRASES.some((p) => text.includes(p)) &&
+      !/accept[ _-]?(this )?lead|decline[ _-]?(this )?lead|respond yes/i.test(vendorWorkflowText);
+  })());
+record("V31 the graph is structurally the proven client executor",
+  vendorWorkflow.nodes.length === 52 &&
+  Object.keys(vendorWorkflow.connections).length === 44);
+
+const vendorExecMutants = [
+  ["removing the vendor family check is impossible",
+    () => /envelope\.workflowFamily !== VENDOR_EXECUTION_WORKFLOW_FAMILY/.test(vendorService)],
+  ["executing a client or campaign job on the vendor route is impossible",
+    () => /AUTOMATION_EXECUTION_WORKFLOW_FAMILY_MISMATCH/.test(vendorService)],
+  ["hard-coding the low-credit threshold in the executor is impossible",
+    () => !/remaining_credits\s*(<=|<|>=|>)\s*\d/.test(vendorService) &&
+          /readLowCreditThreshold/.test(vendorService)],
+  ["sending after a package renewal is impossible",
+    () => /formatExpiryStamp\(row\.package_expires_at\) !== stamp/.test(vendorService)],
+  ["reminding when vendor_status is not New is impossible",
+    () => /row\.vendor_status !== "New"/.test(vendorService)],
+  ["reminding after onboarding progressed is impossible",
+    () => /row\.onboarding_stage !== "new"/.test(vendorService)],
+  ["executing vendor.document_reminder is impossible",
+    () => /AUTOMATION_EXECUTION_VENDOR_ACTION_NOT_PRODUCIBLE/.test(vendorService)],
+  ["a vendor accept/reject concept in the executor is impossible",
+    () => !/acceptlead|rejectlead|vendor_accept|vendor_reject|acceptance_rate|rejection_rate/i
+            .test(vendorService.toLowerCase())],
+  ["n8n supplying phone, template or provider is impossible",
+    () => !/recipient|phone|template|provider/i.test(
+      familyContract.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " "))],
+  ["completing on communication_pending is impossible",
+    () => /completionReady: state === 'execution_recorded'/.test(vendorWorkflowText)],
+  ["shipping the vendor workflow active is impossible",
+    () => vendorWorkflow.active === false],
+];
+for (const [name, fn] of vendorExecMutants) {
+  let held = false;
+  try { held = fn() === true; } catch { held = false; }
+  record(`MV-${name}`, held);
+}
+
 // ---------------------------------------------------------------------------
 for (const r of results) {
   console.log(`${r.passed ? "PASS" : "FAIL"} ${r.name}${r.detail ? ` (${r.detail})` : ""}`);

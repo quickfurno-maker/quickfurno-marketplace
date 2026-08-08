@@ -89,4 +89,6 @@ The claim route accepts exactly two shapes — the byte-compatible legacy three-
 
 ## 10. What remains before QF-MVP-50.4 can be called COMPLETE
 
-The campaign **execution route** (`campaign_execution` family) and the inactive campaign n8n executor workflow are not part of this source slice — the family-aware claim they require is now in place, and neither is staging certification. Until those exist and are certified against staging, 50.4 is SOURCE READY only.
+The executor slice is now source-complete: the signed `execute-campaign` route, the campaign execution service wired to the binding 40.8 seam, and the **inactive** campaign n8n executor (`automation/n8n/QF-MVP-50-04-Campaign-Execution-Executor.workflow.json`, `active:false`) which claims exactly `workflowFamily = campaign_execution`.
+
+What remains is **operational**, not source: the three pending migrations must be applied to staging exactly once, and the campaign executor must be certified against staging through a real isolated n8n runtime. Until then 50.4 is SOURCE READY only.

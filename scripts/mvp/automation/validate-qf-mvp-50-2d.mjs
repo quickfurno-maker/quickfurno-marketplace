@@ -567,8 +567,15 @@ record("C04 no 50.2D module reaches into the n8n workflow tree",
 // exact allowlist of ONE named file, and the two pre-existing candidates are additionally
 // required to stay completion-path-free. Every workflow, without exception, must still be
 // inactive and unpublished.
+// QF-MVP-50.3 / 50.4 add the vendor and campaign executors, which legitimately
+// call the completion route on the same frozen terms. The class is still NOT
+// opened: this remains an exact allowlist of THREE named files, every other
+// workflow must stay completion-path-free, and every workflow without exception
+// must still be inactive and unpublished.
 const COMPLETION_PATH_ALLOWED_WORKFLOWS = [
   "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
+  "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
+  "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
 ];
 record("C05 the n8n workflow candidates remain inactive and unpublished",
   (() => {

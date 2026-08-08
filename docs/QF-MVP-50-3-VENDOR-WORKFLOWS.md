@@ -88,4 +88,8 @@ The claim route accepts exactly two shapes — the byte-compatible legacy three-
 
 ## 9. What remains before QF-MVP-50.3 can be called COMPLETE
 
-The vendor **execution route** (`vendor_whatsapp` family) and the inactive vendor n8n executor workflow are not part of this source slice — the family-aware claim they require is now in place, and neither is staging certification. Until those exist and are certified against staging, 50.3 is SOURCE READY only.
+The executor slice is now source-complete: the signed `execute-vendor` route, the vendor execution service with all five execution-time reproofs, and the **inactive** vendor n8n executor (`automation/n8n/QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json`, `active:false`) which claims exactly `workflowFamily = vendor_whatsapp`.
+
+What remains is **operational**, not source: the three pending migrations must be applied to staging exactly once, and the vendor executor must be certified against staging through a real isolated n8n runtime. Until then 50.3 is SOURCE READY only.
+
+**Known truthful limitation.** Only `vendor_onboarding_reminder` currently has a bound business variable contract. The other four vendor templates do not, so those actions terminate as a Core-owned `QF_EXEC_VARIABLES_UNRESOLVED` definitive non-send — the same shape two client actions already have. Binding those template variables is QF-MVP-40.12 territory, not this phase.

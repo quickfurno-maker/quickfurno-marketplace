@@ -690,8 +690,18 @@ record("N19 every workflow in the tree is inactive and unpublished",
       const wf = JSON.parse(readFileSync(path.join(ROOT, "automation/n8n", f), "utf8"));
       return wf.active === false && !Object.prototype.hasOwnProperty.call(wf, "published");
     }));
-record("N20 exactly three workflow candidates exist",
-  readdirSync(path.join(ROOT, "automation/n8n")).filter((f) => f.endsWith(".workflow.json")).length === 3);
+record("N20 exactly five workflow candidates exist, by exact name",
+  (() => {
+    const flows = readdirSync(path.join(ROOT, "automation/n8n"))
+      .filter((f) => f.endsWith(".workflow.json")).sort();
+    return flows.length === 5 && same(flows, [
+      "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json",
+      "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json",
+      "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
+      "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
+      "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
+    ]);
+  })());
 
 // ---------------------------------------------------------------------------
 // G. G1 RE-PIN
@@ -782,8 +792,10 @@ record("G09 the 50.2D validator was re-pinned, not loosened",
   /exactly eight migrations are newer than the anchor/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
-record("G10 the completion-path allowlist names exactly one workflow",
-  /COMPLETION_PATH_ALLOWED_WORKFLOWS = \[\s*\n\s*"QF-MVP-50-02-Client-Whatsapp-Executor\.50\.2E-selfhost-env\.workflow\.json",\s*\n\s*\]/.test(d2Source));
+record("G10 the completion-path allowlist names exactly the three executors",
+  // Still an EXACT named allowlist, never a class: the client executor plus the
+  // QF-MVP-50.3 vendor and QF-MVP-50.4 campaign executors, and nothing else.
+  /COMPLETION_PATH_ALLOWED_WORKFLOWS = \[\s*\n\s*"QF-MVP-50-02-Client-Whatsapp-Executor\.50\.2E-selfhost-env\.workflow\.json",\s*\n\s*"QF-MVP-50-03-Vendor-Whatsapp-Executor\.workflow\.json",\s*\n\s*"QF-MVP-50-04-Campaign-Execution-Executor\.workflow\.json",\s*\n\s*\]/.test(d2Source));
 record("G11 no generic future-migration allowance appeared",
   manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&

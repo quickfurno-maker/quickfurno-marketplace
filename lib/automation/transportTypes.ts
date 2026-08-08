@@ -24,6 +24,19 @@ export const N8N_COMPLETE_ROUTE_PATH =
 export const N8N_EXECUTE_CLIENT_ROUTE_PATH =
   "/api/internal/automation/n8n/execute-client" as const;
 
+/**
+ * QF-MVP-50.3 / 50.4. Two more signed n8n -> Core execute routes, one per
+ * workflow family. Each exact path is a canonical HMAC field, so a signature
+ * minted for one family's execute route can never authenticate another's.
+ * Both reuse the frozen `execute_v1` transport route identity — there is no
+ * execute_v2.
+ */
+export const N8N_EXECUTE_VENDOR_ROUTE_PATH =
+  "/api/internal/automation/n8n/execute-vendor" as const;
+
+export const N8N_EXECUTE_CAMPAIGN_ROUTE_PATH =
+  "/api/internal/automation/n8n/execute-campaign" as const;
+
 /** Closed transport route vocabulary. Mirrors the ledger's route_key CHECK. */
 export const AUTOMATION_TRANSPORT_ROUTE_KEYS = [
   "claim_v1",

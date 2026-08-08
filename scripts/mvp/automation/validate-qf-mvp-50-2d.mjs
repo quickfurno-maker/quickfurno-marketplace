@@ -66,6 +66,9 @@ const EXECUTION_MIGRATION_SHA =
   "9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b";
 const PRODUCER_MIGRATION_NAME =
   "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql";
+// QF-MVP-50.2-EXECUTE-V1-REPAIR successor. Re-pinned, never loosened.
+const REPAIR_MIGRATION_NAME =
+  "20260807000000_qf_mvp_50_2_execute_v1_reservation_ambiguity_repair.sql";
 const CLAIM_MIGRATION_NAME = "20260801152049_qf_mvp_automation_transport_replay_guard.sql";
 const PERSISTENCE_MIGRATION_NAME = "20260801110000_qf_mvp_automation_action_persistence.sql";
 
@@ -614,12 +617,12 @@ record("I02 the 50.2D migration matches its pinned hash",
 // QF-MVP-50.2E-R1 RE-PIN. "Exactly one newer migration" was correct while 50.2D was the
 // only post-anchor candidate. It is re-pinned to exactly TWO, named in exact order — not
 // relaxed to a count floor and not relaxed to "anything newer".
-record("I03 exactly three migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 3);
-record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, then the 50.2 producer",
+record("I03 exactly four migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 4);
+record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, then the execute_v1 repair",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
-       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME]));
-record("I05 the local migration count is exactly 90", migrationFiles.length === 90);
+       [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME]));
+record("I05 the local migration count is exactly 91", migrationFiles.length === 91);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -657,10 +660,11 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-50.2-R2-APPLIED-TRUTH: the third post-anchor migration is now APPLIED
 // too (remote history 23), so zero remain pending. Re-pinned, never loosened —
 // the counts stay exact and the pending list must still exist and be empty.
-record("G03 exactly three APPLIED and zero PENDING post-anchor migrations are declared",
+record("G03 exactly three APPLIED and one PENDING post-anchor migration are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 3 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 3 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260807000000" &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 4 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
@@ -696,7 +700,7 @@ record("G07 no generic future-migration allowance was granted",
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&
   !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*90/.test(g1Source));
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 90;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 91;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",
   g1Source.includes(`version: "20260804000000"`) &&
@@ -718,8 +722,8 @@ record("G09a G1 rejects a demoted, forged or mis-counted applied post-anchor rec
   /post-anchor order swapped/.test(g1Source) &&
   /post-anchor count understated/.test(g1Source));
 record("G10 G1 still rejects an arbitrary newer or drifted migration",
-  /a fourth post-anchor migration on disk/.test(g1Source) &&
-  /a fourth applied post-anchor migration/.test(g1Source) &&
+  /a fifth post-anchor migration on disk/.test(g1Source) &&
+  /a fifth applied post-anchor migration/.test(g1Source) &&
   /50\.2E migration renamed/.test(g1Source) &&
   /50\.2E on-disk SHA drift/.test(g1Source) &&
   /50\.2E manifest SHA drift/.test(g1Source) &&

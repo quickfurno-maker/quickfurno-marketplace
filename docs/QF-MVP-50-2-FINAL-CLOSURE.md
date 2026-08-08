@@ -15,7 +15,19 @@ The producer migration has been applied to QuickFurno staging (`uckafzuochmbvtio
 | `20260805000000` (50.2E) | APPLIED | 22 |
 | `20260806000000` (producer) | APPLIED | 23 |
 
-Pending post-anchor migrations: **0**. Post-anchor migration count: **3**. Local migration count: **90**.
+| `20260807000000` (execute_v1 repair) | **PENDING** | — |
+
+Pending post-anchor migrations: **1**. Post-anchor migration count: **4**. Local migration count: **91**.
+
+### 0.1 The execute_v1 reservation defect
+
+Driving the exact merged n8n executor workflow through a real n8n runtime against staging revealed that `public.qf_record_automation_execution_transport_v1` — shipped by the applied migration `20260805000000` — raises `42702 column reference "route_key" is ambiguous` on **every** call.
+
+Every name in its `returns table (…)` is a PL/pgSQL OUT parameter that stays in scope for the whole body, so the attempt-scoped replay lookup's bare `route_key` and `attempt_id` resolved to the output variables rather than to the columns of `automation_transport_requests`. Staging corroborated this: `select count(*) … where route_key = 'execute_v1'` was **0** — the reservation had never once succeeded. `claim_v1` and `complete_v1` are unaffected.
+
+The consequence was total: no client automation action could ever be executed, so execution-time eligibility reproof, intent building, the communication partition and `communication_pending` were all unreachable.
+
+The fix is the successor migration `20260807000000`, which `CREATE OR REPLACE`s the function with an identical signature, return shape, security posture, grants and replay/ownership semantics, changing **only** column references to be explicitly alias-qualified. The historical `20260805000000` is byte-frozen and is never rewritten, and no `#variable_conflict` pragma is used — a pragma would hide the next collision instead of failing on it.
 
 **Earned evidence markers**
 

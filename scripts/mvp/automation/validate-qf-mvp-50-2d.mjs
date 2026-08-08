@@ -654,11 +654,15 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // Staging (imported owner-reviewed evidence, remote history 22), so BOTH
 // post-anchor migrations are APPLIED and ZERO remain pending. Still exact counts,
 // exact order and exact per-migration identity — never a floor or a wildcard.
-record("G03 exactly two APPLIED and one PENDING post-anchor migration are declared",
-  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 2 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
+// QF-MVP-50.2-R2-APPLIED-TRUTH: the third post-anchor migration is now APPLIED
+// too (remote history 23), so zero remain pending. Re-pinned, never loosened —
+// the counts stay exact and the pending list must still exist and be empty.
+record("G03 exactly three APPLIED and zero PENDING post-anchor migrations are declared",
+  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 3 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
   manifest.appliedAnchor?.postAnchorMigrationCount === 3 &&
-  same(manifest.appliedPostAnchorMigrations.map((r) => r.version), ["20260804000000", "20260805000000"]));
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
+    ["20260804000000", "20260805000000", "20260806000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&
@@ -714,20 +718,36 @@ record("G09a G1 rejects a demoted, forged or mis-counted applied post-anchor rec
   /post-anchor order swapped/.test(g1Source) &&
   /post-anchor count understated/.test(g1Source));
 record("G10 G1 still rejects an arbitrary newer or drifted migration",
-  /a third post-anchor migration on disk/.test(g1Source) &&
-  /a third applied post-anchor migration/.test(g1Source) &&
+  /a fourth post-anchor migration on disk/.test(g1Source) &&
+  /a fourth applied post-anchor migration/.test(g1Source) &&
   /50\.2E migration renamed/.test(g1Source) &&
   /50\.2E on-disk SHA drift/.test(g1Source) &&
   /50\.2E manifest SHA drift/.test(g1Source) &&
   /50\.2E migration missing from disk/.test(g1Source) &&
-  /a new pending entry silently added/.test(g1Source));
+  /R2 migration renamed/.test(g1Source) &&
+  /R2 on-disk SHA drift/.test(g1Source) &&
+  /R2 manifest SHA drift/.test(g1Source) &&
+  /R2 migration missing from disk/.test(g1Source) &&
+  /a new pending entry silently added/.test(g1Source) &&
+  /the pending list key deleted entirely instead of emptied/.test(g1Source));
 record("G11 G1 rejects a regressed or fabricated post-anchor status",
   /50\.2E left PENDING/.test(g1Source) &&
   /50\.2E applied but marker missing/.test(g1Source) &&
   /50\.2E appliedExactlyOnce false/.test(g1Source) &&
   /50\.2E evidence type changed/.test(g1Source) &&
   /50\.2E claimed applied by this source phase/.test(g1Source) &&
-  /50\.2E fabricated offline remote status field/.test(g1Source));
+  /50\.2E fabricated offline remote status field/.test(g1Source) &&
+  // the newly imported R2 applied record is guarded to the same strength
+  /R2 producer left PENDING/.test(g1Source) &&
+  /R2 producer demoted to PENDING in place/.test(g1Source) &&
+  /R2 remote history 22 instead of 23/.test(g1Source) &&
+  /R2 remote history 24 instead of 23/.test(g1Source) &&
+  /R2 marker missing/.test(g1Source) &&
+  /R2 marker forged/.test(g1Source) &&
+  /R2 appliedExactlyOnce false/.test(g1Source) &&
+  /R2 evidence type self-asserted/.test(g1Source) &&
+  /R2 claimed applied by this source phase/.test(g1Source) &&
+  /R2 fabricated offline remote status field/.test(g1Source));
 record("G12 the historical baseline and pre-baseline protections are untouched",
   manifest.preBaselineChain?.count === 68 &&
   manifest.preBaselineChain?.mustReplayOnStaging === false &&

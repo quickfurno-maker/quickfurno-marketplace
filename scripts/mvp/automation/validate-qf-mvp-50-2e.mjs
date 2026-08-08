@@ -703,11 +703,26 @@ record("G01 the anchor is untouched",
 // QF-MVP-50.2E-S2-G1. The 50.2E migration has now been applied to QuickFurno
 // Staging (imported owner-reviewed evidence, remote history 22), so BOTH
 // post-anchor migrations are APPLIED and ZERO remain pending.
-record("G02 exactly two APPLIED and one PENDING post-anchor migration",
+// QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
+// (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
+record("G02 exactly three APPLIED and zero PENDING post-anchor migrations",
   manifest.appliedAnchor?.postAnchorMigrationCount === 3 &&
-  manifest.appliedPostAnchorMigrations?.length === 2 &&
-  manifest.pendingPostAnchorMigrations?.length === 1 &&
-  same(manifest.appliedPostAnchorMigrations.map((r) => r.version), ["20260804000000", "20260805000000"]));
+  manifest.appliedPostAnchorMigrations?.length === 3 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) &&
+  manifest.pendingPostAnchorMigrations.length === 0 &&
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
+    ["20260804000000", "20260805000000", "20260806000000"]));
+record("G02a 20260806000000 is recorded APPLIED with remote history 23, hash-exact",
+  manifest.appliedPostAnchorMigrations[2].version === "20260806000000" &&
+  manifest.appliedPostAnchorMigrations[2].sha256 ===
+    "ce947a6f8d7dd42d2851f6c99eba4bf2ef39308b8d85ff876260d575185a3cfb" &&
+  manifest.appliedPostAnchorMigrations[2].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[2].appliedEvidenceMarker ===
+    "QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+  manifest.appliedPostAnchorMigrations[2].appliedEvidenceType ===
+    "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+  manifest.appliedPostAnchorMigrations[2].remoteHistoryCountAfterApply === 23 &&
+  manifest.appliedPostAnchorMigrations[2].appliedExactlyOnce === true);
 record("G03 20260804000000 is recorded APPLIED with remote history 21",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].operationalStatus === "APPLIED" &&

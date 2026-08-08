@@ -1,9 +1,28 @@
 # QF-MVP-50.2 — Final Closure Contract
 
-**Status:** SOURCE CLOSURE CANDIDATE
+**Status:** SOURCE SHIPPED + DATABASE/ATOMIC PRODUCER CERTIFIED — **ORCHESTRATION UNCERTIFIED**
 **Base:** `d0bead498845b52d1aff6e3babaae4d31e829fe9`
-**Migration:** `20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql` — **SOURCE-PENDING, not applied**
-**Top-level QF-MVP-50.2:** **NOT COMPLETE** — operational staging certification still remains
+**Migration:** `20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql` — **APPLIED to QuickFurno staging**
+**Top-level QF-MVP-50.2:** **NOT COMPLETE** — orchestration certification still remains
+
+## 0. Staging truth (imported)
+
+The producer migration has been applied to QuickFurno staging (`uckafzuochmbvtiodmcl`) exactly once by an external owner-reviewed execution. This document imports that record; no phase documented here performs a database mutation.
+
+| Migration | Status | Remote history after apply |
+|---|---|---|
+| `20260804000000` (50.2D) | APPLIED | 21 |
+| `20260805000000` (50.2E) | APPLIED | 22 |
+| `20260806000000` (producer) | APPLIED | 23 |
+
+Pending post-anchor migrations: **0**. Post-anchor migration count: **3**. Local migration count: **90**.
+
+**Earned evidence markers**
+
+- `QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED` — the producer migration is applied exactly once at remote history 23, hash `ce947a6f8d7dd42d2851f6c99eba4bf2ef39308b8d85ff876260d575185a3cfb`.
+- `QF_MVP_50_2_ATOMIC_PRODUCER_STAGING_CERTIFIED` — the DB-native producer was observed against QuickFurno staging: lead INSERT plus automation request and job in one transaction; rollback removing all three; helper replay yielding one request and one job; clarification producing an immediate action and a +24 h reminder; the matching transition and its same-match suppression; the status transition and its same-status suppression; the +48 h Quotation Sent follow-up including leave-and-re-enter behaviour; invalid-authority rejection; and zero residual certification fixtures.
+
+**Not earned.** `QF_MVP_50_2_CLIENT_N8N_STAGING_CERTIFIED` and `QF_MVP_50_2_STAGING_CERTIFICATION_COMPLETE` are **not** claimed. No n8n runtime has yet executed the merged workflow against QuickFurno staging, so the signed claim/execute orchestration boundary remains unproven. Until that is earned, QF-MVP-50.2 is **NOT COMPLETE**.
 
 ## 1. Already done before this package
 
@@ -75,6 +94,14 @@ All six actions are structurally supported and exercisable against Core-owned mo
 
 ## 9. What remains before QF-MVP-50.2 can be called COMPLETE
 
-One combined package: technical review → push → exact-head CI → PR → merge → exact-one staging apply of `20260806000000` → source-truth import → controlled staging n8n activation → synthetic six-action end-to-end proof → replay/idempotency/pending-state checks → then, and only then, mark 50.2 COMPLETE.
+Source is shipped, the migration is applied at remote history 23, and the atomic producer is certified against staging. What is **still outstanding** is orchestration certification:
+
+- the exact merged n8n executor workflow executed by a real n8n runtime;
+- the signed Core claim and execute boundaries exercised across all six client actions;
+- delayed-action eligibility suppression (stale reminder, stale follow-up) exercised end to end;
+- replay, changed-body conflict and stale-attempt behaviour exercised;
+- `communication_pending` proven to stop the workflow with no completion and no redispatch.
+
+`QF_MVP_50_2_CLIENT_N8N_STAGING_CERTIFIED` and `QF_MVP_50_2_STAGING_CERTIFICATION_COMPLETE` are **not** earned until every item above is proven, and 50.2 is **not** COMPLETE before then. The only configured n8n is production-bound and must not be used for this; certification requires an isolated runtime.
 
 **Vendor accept/reject is permanently removed** and must not appear in any future package.

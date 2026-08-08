@@ -38,6 +38,19 @@ const stripJs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/
 const MIGRATION_NAME = "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql";
 const MIGRATION_PATH = `supabase/migrations/${MIGRATION_NAME}`;
 const MIGRATION_SHA = "ce947a6f8d7dd42d2851f6c99eba4bf2ef39308b8d85ff876260d575185a3cfb";
+// QF-MVP-50.2 execute_v1 ambiguity repair — successor migration. The historical
+// 50.2E migration is byte-frozen and must never be edited to carry the fix.
+const HISTORICAL_EXEC_NAME =
+  "20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql";
+const HISTORICAL_EXEC_SHA =
+  "9a8a29975e18135b96e7be7d4510104033c5de00cf080df5dab4326e3891250b";
+const REPAIR_NAME =
+  "20260807000000_qf_mvp_50_2_execute_v1_reservation_ambiguity_repair.sql";
+const REPAIR_PATH = `supabase/migrations/${REPAIR_NAME}`;
+const REPAIR_SHA =
+  "c36171fe851968c5e42477c048d535c563676f3d44e020d41fd5abcff1dacee5";
+const REPAIR_MARKER = "QF_MVP_50_2_EXECUTE_V1_REPAIR_STAGING_APPLIED_AND_VERIFIED";
+
 const R2_APPLIED_MARKER = "QF_MVP_50_2_FINAL_R2_STAGING_MIGRATION_APPLIED_AND_VERIFIED";
 const ATOMIC_PRODUCER_MARKER = "QF_MVP_50_2_ATOMIC_PRODUCER_STAGING_CERTIFIED";
 // Not earned yet. Orchestration certification is a separate, later gate; these
@@ -61,6 +74,15 @@ const ciWorkflow = read(".github/workflows/qf-mvp-50-quality-gate.yml");
 const pkg = JSON.parse(read("package.json"));
 const doc = read("docs/QF-MVP-50-2-FINAL-CLOSURE.md");
 const g1Source = read("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
+const repairSource = read(REPAIR_PATH);
+const repairSql = stripSql(repairSource);
+/** The repaired function body as it appears in the successor migration. */
+const repairedFn = (() => {
+  const i = repairSql.indexOf("create or replace function public.qf_record_automation_execution_transport_v1");
+  if (i === -1) return "";
+  const j = repairSql.indexOf("comment on function", i);
+  return repairSql.slice(i, j === -1 ? repairSql.length : j);
+})();
 const producerPin = manifest.appliedPostAnchorMigrations
   .find((r) => r.version === "20260806000000");
 
@@ -260,6 +282,101 @@ for (const [action, spec] of Object.entries(TRIGGER_MATRIX)) {
 }
 
 // ---------------------------------------------------------------------------
+// R. execute_v1 RESERVATION AMBIGUITY REPAIR
+//
+// The defect: every name in `returns table (...)` is a PL/pgSQL OUT parameter
+// that stays in scope, so a bare `route_key` / `attempt_id` in the replay
+// lookup resolved to the OUT variable and raised 42702 on EVERY call. It is
+// fixed by explicit alias qualification in a SUCCESSOR migration; the applied
+// 50.2E migration is never rewritten.
+// ---------------------------------------------------------------------------
+record("R01 the successor repair migration exists at its pinned hash",
+  existsSync(path.join(ROOT, REPAIR_PATH)) &&
+  canonicalSha256(readFileSync(path.join(ROOT, REPAIR_PATH))) === REPAIR_SHA);
+record("R02 the historical 50.2E migration is byte-frozen, never edited to carry the fix",
+  canonicalSha256(readFileSync(path.join(ROOT, `supabase/migrations/${HISTORICAL_EXEC_NAME}`)))
+    === HISTORICAL_EXEC_SHA);
+record("R03 the repair is a CREATE OR REPLACE of the exact same function and signature",
+  /create or replace function public\.qf_record_automation_execution_transport_v1\(/.test(repairSql) &&
+  /p_request_id uuid,\s*p_worker_id text,\s*p_body_sha256 text,\s*p_job_id uuid,\s*p_attempt_id uuid/.test(repairSql));
+record("R04 the return shape is unchanged — all nine output columns in order",
+  (() => {
+    const m = repairedFn.match(/returns table \(([\s\S]*?)\)\s*language plpgsql/);
+    if (!m) return false;
+    const cols = m[1].split(",").map((c) => c.trim().split(/\s+/)[0]);
+    return same(cols, ["request_id", "route_key", "state", "is_replay", "job_id",
+      "action_request_id", "attempt_id", "attempt_number", "max_attempts"]);
+  })());
+record("R05 SECURITY DEFINER and the pinned search_path are preserved",
+  /security definer/.test(repairedFn) &&
+  /set search_path = pg_catalog, public, pg_temp/.test(repairedFn));
+record("R06 execute stays service_role only",
+  /revoke all on function public\.qf_record_automation_execution_transport_v1[\s\S]{0,200}?from public, anon, authenticated, service_role/.test(repairSql) &&
+  /grant execute on function public\.qf_record_automation_execution_transport_v1[\s\S]{0,200}?to service_role/.test(repairSql) &&
+  !/grant [^\n]*to (public|anon|authenticated)\b/i.test(repairSql));
+record("R07 NO unqualified reference to any RETURNS TABLE output name survives",
+  (() => {
+    // Every OUT name that is also a column of a table this body queries.
+    const shadowed = ["route_key", "attempt_id", "state", "job_id",
+      "action_request_id", "attempt_number", "max_attempts", "request_id"];
+    // Strip the SET clause: SET targets are target columns, never substituted,
+    // and PostgreSQL forbids qualifying them.
+    const body = repairedFn.replace(/set state = 'recorded',[\s\S]*?finalized_at = now\(\)/, " ");
+    return shadowed.every((n) => {
+      // a bare occurrence in a WHERE/AND predicate position is the defect shape
+      const bare = new RegExp(`(?:where|and|or)\\s+${n}\\s*(?:=|<>|is\\b)`, "i");
+      return !bare.test(body);
+    });
+  })());
+record("R08 the replay lookup is explicitly alias-qualified",
+  /from public\.automation_transport_requests as atr\s*\n\s*where atr\.route_key = 'execute_v1'\s*\n\s*and atr\.attempt_id = p_attempt_id/.test(repairedFn));
+record("R09 every automation_transport_requests read in the body is aliased",
+  (() => {
+    const reads = [...repairedFn.matchAll(/from public\.automation_transport_requests(\s+as\s+\w+)?/g)];
+    return reads.length >= 2 && reads.every((m) => Boolean(m[1]));
+  })());
+record("R10 the route vocabulary is still exactly execute_v1",
+  /'execute_v1'/.test(repairedFn) &&
+  !/'claim_v1'|'complete_v1'/.test(repairedFn));
+record("R11 all replay / ownership / currency guards are preserved",
+  ["AUTOMATION_TRANSPORT_EXECUTION_IDENTITY_REQUIRED",
+    "AUTOMATION_TRANSPORT_WORKER_ID_INVALID",
+    "AUTOMATION_TRANSPORT_BODY_HASH_INVALID",
+    "AUTOMATION_EXECUTION_JOB_NOT_FOUND",
+    "AUTOMATION_EXECUTION_ATTEMPT_NOT_CURRENT",
+    "AUTOMATION_EXECUTION_JOB_NOT_OWNED",
+    "AUTOMATION_TRANSPORT_REQUEST_REPLAY_CONFLICT",
+    "AUTOMATION_TRANSPORT_REPLAY_STATE_MISSING",
+    "AUTOMATION_TRANSPORT_REQUEST_INCOMPLETE_INVARIANT",
+  ].every((code) => repairedFn.includes(code)));
+record("R12 the body-hash and worker-id contracts are unchanged",
+  /p_body_sha256 !~ '\^\[0-9a-f\]\{64\}\$'/.test(repairedFn) &&
+  /p_worker_id !~ '\^\[A-Za-z0-9\]\[A-Za-z0-9\._:-\]\{0,199\}\$'/.test(repairedFn));
+record("R13 the repair grows no schema and changes no trigger or producer",
+  !/create table|add column|drop column|create (unique )?index|alter table|create type|create trigger|drop trigger/i.test(repairSql) &&
+  !/qf_enqueue_client_automation_v1|trg_qf_produce_/.test(repairSql));
+record("R14 the repair touches no provider, n8n, vendor, campaign or 50.5 surface",
+  !/provider_template_mappings|send_authority|binding_readiness|n8n|meta|whatsapp|vendor_|campaign|due_sweep|dispatchPersistedMessage/i.test(repairSql));
+record("R15 the repair seeds nothing and deletes no append-only evidence",
+  !/^\s*insert into/mi.test(repairSql.replace(/insert into public\.automation_transport_requests \(/g, " ")) &&
+  !/\bdelete from\b|\btruncate\b|\bdrop trigger\b|alter table[^;]*disable trigger/i.test(repairSql));
+record("R16 the repair self-verifies its own posture and fails closed",
+  /repair aborted: SECURITY DEFINER lost/.test(repairSource) &&
+  /repair aborted: search_path not preserved/.test(repairSource) &&
+  /repair aborted: an unqualified ambiguous reference remains/.test(repairSource) &&
+  /repair aborted: qualified replay lookup is absent/.test(repairSource) &&
+  /repair aborted: execute granted beyond service_role/.test(repairSource) &&
+  /repair aborted: a guard clause was lost/.test(repairSource));
+record("R17 no #variable_conflict pragma is used to mask the collision",
+  !/#variable_conflict/i.test(repairSql));
+record("R18 the repair is the newest local migration and the set is exactly 91",
+  (() => {
+    const files = readdirSync(path.join(ROOT, "supabase/migrations"))
+      .filter((f) => f.endsWith(".sql")).sort();
+    return files.length === 91 && files.at(-1) === REPAIR_NAME;
+  })());
+
+// ---------------------------------------------------------------------------
 // G. GOVERNANCE / SCOPE CONTAINMENT
 // ---------------------------------------------------------------------------
 // QF-MVP-50.2-R2-APPLIED-TRUTH — the producer migration was applied exactly once
@@ -278,25 +395,38 @@ record("G01 the producer migration is pinned APPLIED at remote history 23",
   producerPin?.appliedByThisPhase === false &&
   // an applied record must never also carry an un-proven offline remote status
   !("remoteVersionStatus" in (producerPin ?? {})));
-record("G01a the pending post-anchor list exists and is exactly empty",
+record("G01a exactly one PENDING post-anchor migration is pinned — the execute_v1 repair",
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 0);
+  manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260807000000" &&
+  manifest.pendingPostAnchorMigrations[0].path === REPAIR_PATH &&
+  manifest.pendingPostAnchorMigrations[0].sha256 === REPAIR_SHA &&
+  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
+  manifest.pendingPostAnchorMigrations[0].remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+  manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate === true &&
+  manifest.pendingPostAnchorMigrations[0].appliedByThisPhase === false &&
+  // a pending record must never carry applied evidence
+  !("appliedEvidenceMarker" in manifest.pendingPostAnchorMigrations[0]) &&
+  !("remoteHistoryCountAfterApply" in manifest.pendingPostAnchorMigrations[0]));
+record("G01b the repair marker is NOT claimed while the migration is pending",
+  !manifestText.includes(REPAIR_MARKER));
 record("G02 the three applied records are 21 / 22 / 23 in exact ascending order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000"]) &&
   new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 3);
-record("G03 post-anchor count and local migration count agree at 3 / 90",
-  manifest.appliedAnchor.postAnchorMigrationCount === 3 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 90);
+record("G03 post-anchor count and local migration count agree at 4 / 91",
+  manifest.appliedAnchor.postAnchorMigrationCount === 4 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 91);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
   g1Source.includes("manifest declares exactly three APPLIED post-anchor migrations") &&
-  g1Source.includes("the PENDING post-anchor list exists and is exactly empty") &&
+  g1Source.includes("exactly one PENDING post-anchor migration is declared") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 3") &&
-  g1Source.includes("pendingPins.length === 0"));
+  g1Source.includes("pendingPins.length === 1") &&
+  g1Source.includes("const MIGRATION_COUNT = 91;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -401,7 +531,8 @@ const mutants = [
   // Each lambda states the invariant that makes the named defect impossible.
   ["understating the applied producer as still PENDING is impossible",
     () => producerPin?.operationalStatus === "APPLIED" &&
-          manifest.pendingPostAnchorMigrations.length === 0 &&
+          // the producer specifically must never reappear as pending; the
+          // pending list itself may legitimately hold a NEWER migration
           !manifest.pendingPostAnchorMigrations.some((r) => r.version === "20260806000000")],
   ["recording remote history 22 for the producer is impossible",
     () => producerPin?.remoteHistoryCountAfterApply === 23],
@@ -425,9 +556,48 @@ const mutants = [
   ["declaring QF-MVP-50.2 COMPLETE while orchestration is uncertified is impossible",
     () => /NOT COMPLETE/i.test(doc) && /ORCHESTRATION UNCERTIFIED/i.test(doc) &&
           !/COMPLETE \/ TESTED \/ FROZEN/i.test(doc)],
+  // --- execute_v1 repair regression mutants -------------------------------
+  // Each lambda states the invariant that makes the named regression impossible.
+  ["reintroducing an unqualified route_key in the replay lookup is impossible",
+    () => !/where\s+route_key\s*=/.test(repairedFn) &&
+          /atr\.route_key = 'execute_v1'/.test(repairedFn)],
+  ["reintroducing an unqualified attempt_id in the replay lookup is impossible",
+    () => !/and\s+attempt_id\s*=\s*p_attempt_id/.test(repairedFn) &&
+          /atr\.attempt_id = p_attempt_id/.test(repairedFn)],
+  ["leaving any other RETURNS TABLE output name unqualified in a predicate is impossible",
+    () => ["state", "job_id", "action_request_id", "attempt_number", "max_attempts", "request_id"]
+      .every((n) => !new RegExp(`(?:where|and|or)\\s+${n}\\s*(?:=|<>|is\\b)`, "i")
+        .test(repairedFn.replace(/set state = 'recorded',[\s\S]*?finalized_at = now\(\)/, " ")))],
+  ["an unaliased read of automation_transport_requests is impossible",
+    () => [...repairedFn.matchAll(/from public\.automation_transport_requests(\s+as\s+\w+)?/g)]
+      .every((m) => Boolean(m[1]))],
+  ["changing the route key away from execute_v1 is impossible",
+    () => /'execute_v1'/.test(repairedFn) && !/'claim_v1'|'complete_v1'/.test(repairedFn)],
+  ["weakening the attempt-scoped replay lookup is impossible",
+    () => /select atr\.\* into v_existing/.test(repairedFn) &&
+          /for update/.test(repairedFn) &&
+          /if v_existing\.id is not null then/.test(repairedFn)],
+  ["removing the replay-conflict branch is impossible",
+    () => (repairedFn.match(/AUTOMATION_TRANSPORT_REQUEST_REPLAY_CONFLICT/g) ?? []).length >= 3],
+  ["broadening the execute grant beyond service_role is impossible",
+    () => /to service_role/.test(repairSql) &&
+          !/grant [^\n]*to (public|anon|authenticated)\b/i.test(repairSql)],
+  ["changing SECURITY DEFINER or the pinned search_path is impossible",
+    () => /security definer/.test(repairedFn) &&
+          /set search_path = pg_catalog, public, pg_temp/.test(repairedFn)],
+  ["editing the historical 50.2E migration instead of shipping a successor is impossible",
+    () => canonicalSha256(readFileSync(path.join(ROOT, `supabase/migrations/${HISTORICAL_EXEC_NAME}`)))
+            === HISTORICAL_EXEC_SHA &&
+          existsSync(path.join(ROOT, REPAIR_PATH))],
+  ["masking the collision with a #variable_conflict pragma is impossible",
+    () => !/#variable_conflict/i.test(repairSql)],
+  ["claiming the repair marker before the migration is applied is impossible",
+    () => !manifestText.includes(REPAIR_MARKER) &&
+          manifest.pendingPostAnchorMigrations.length === 1 &&
+          manifest.pendingPostAnchorMigrations[0].version === "20260807000000"],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 3") &&
-          g1Source.includes("pendingPins.length === 0") &&
+          g1Source.includes("pendingPins.length === 1") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];

@@ -39,7 +39,7 @@ const HISTORICAL_SHA = "4477e72494e399ed714d7d596506a326aeb6d1b2a74b28376fe54f71
 
 const FROZEN = [
   ["20260809000000_qf_mvp_50_3_vendor_automation_producer.sql",
-   "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11"],
+   "3588f6d06256af7d6ae95263bb474fb33a15428d0a402bd81c6dd1eb0e6076cb"],
   ["20260810000000_qf_mvp_50_4_campaign_recipient_automation.sql",
    "8440e5e818676232969c5046941daa7e8fc905728ea73d295ca0e997c5ac7906"],
   ["20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql",
@@ -48,7 +48,11 @@ const FROZEN = [
 
 const MIGRATION_COUNT = 96;
 const POST_ANCHOR_COUNT = 9;
-const PENDING_ORDER = [BRIDGE_VERSION, "20260809000000", "20260810000000", "20260811000000"];
+const PENDING_ORDER = ["20260809000000", "20260810000000", "20260811000000"];
+const APPLIED_ORDER = ["20260804000000", "20260805000000", "20260806000000",
+  "20260807000000", "20260808000000", BRIDGE_VERSION];
+const BRIDGE_APPLIED_MARKER = "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED";
+const BRIDGE_REMOTE_HISTORY = 26;
 
 const bridgeSource = read(BRIDGE_PATH);
 const bridge = stripSql(bridgeSource);
@@ -248,34 +252,37 @@ record("G04 the recorded bridge semantics match the SQL",
   bridgeGov?.overwritesExistingRows === false &&
   bridgeGov?.carriesBusinessPolicy === false &&
   bridgeGov?.lowCreditThresholdRemainsOwnedBy === "20260809000000");
-record("G05 the bridge is PENDING with its own staging gate, not applied by this source phase",
+record("G05 the bridge is recorded APPLIED exactly once at remote history 26",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations?.[0];
+    const pin = manifest.appliedPostAnchorMigrations?.at(-1);
     return pin?.version === BRIDGE_VERSION &&
       pin.sha256 === BRIDGE_SHA &&
       pin.path === BRIDGE_PATH &&
-      pin.operationalStatus === "PENDING" &&
-      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      pin.requiresSeparateStagingDeploymentGate === true &&
+      pin.operationalStatus === "APPLIED" &&
+      pin.appliedEvidenceMarker === BRIDGE_APPLIED_MARKER &&
+      pin.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
+      pin.remoteHistoryCountAfterApply === BRIDGE_REMOTE_HISTORY &&
+      pin.appliedExactlyOnce === true &&
       pin.appliedByThisPhase === false &&
-      pin.mustApplyBeforeVersion === "20260809000000" &&
-      !("appliedEvidenceMarker" in pin) &&
-      !("remoteHistoryCountAfterApply" in pin);
+      pin.catalogParityVerified === true;
   })());
-record("G06 exactly four pending post-anchor migrations, bridge first",
-  manifest.pendingPostAnchorMigrations?.length === 4 &&
+record("G05a the bridge no longer appears as pending",
+  !manifest.pendingPostAnchorMigrations.some((r) => r.version === BRIDGE_VERSION));
+record("G06 exactly three pending post-anchor migrations remain, in order",
+  manifest.pendingPostAnchorMigrations?.length === 3 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version), PENDING_ORDER));
-record("G07 the five applied records still read 21/22/23/24/25",
+record("G07 the six applied records read 21/22/23/24/25/26 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25]));
+    [21, 22, 23, 24, 25, 26]) &&
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
 record("G08 the anchor post-anchor count agrees at 9",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
 record("G09 G1 was re-pinned to 96 / 9, not loosened",
   /const MIGRATION_COUNT = 96;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 4") &&
-  g1Source.includes("appliedPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 3") &&
+  g1Source.includes("appliedPins.length === 6") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G10 no generic future-migration allowance was granted",
@@ -306,8 +313,11 @@ const mutants = [
           migrationFiles.indexOf(BRIDGE_NAME) < migrationFiles.indexOf(FROZEN[0][0])],
   ["editing the historical pre-baseline migration is impossible",
     () => canonicalSha256(readFileSync(path.join(ROOT, HISTORICAL_PATH))) === HISTORICAL_SHA],
-  ["editing the merged 50.3 producer is impossible",
+  ["drifting the 50.3 producer from its re-pinned hash is impossible",
     () => canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", FROZEN[0][0]))) === FROZEN[0][1]],
+  ["editing the APPLIED bridge is impossible",
+    () => canonicalSha256(readFileSync(path.join(ROOT, BRIDGE_PATH))) === BRIDGE_SHA &&
+          manifest.appliedPostAnchorMigrations.at(-1).sha256 === BRIDGE_SHA],
   ["editing the merged 50.4 or family-claim migrations is impossible",
     () => FROZEN.slice(1).every(([f, s]) =>
       canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", f))) === s)],
@@ -344,10 +354,16 @@ const mutants = [
           manifest.preBaselineChain.count === 68 &&
           // exactly the two canonical tables, nothing else from the pre-baseline chain
           (bridge.match(/create table public\./g) ?? []).length === 2],
-  ["shipping the bridge as already applied is impossible",
-    () => manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
-          manifest.pendingPostAnchorMigrations[0].appliedByThisPhase === false &&
-          manifest.appliedPostAnchorMigrations.length === 5],
+  ["claiming the bridge was applied more than once is impossible",
+    () => manifest.appliedPostAnchorMigrations.at(-1).appliedExactlyOnce === true &&
+          manifest.appliedPostAnchorMigrations.filter((r) => r.version === BRIDGE_VERSION).length === 1 &&
+          manifest.appliedPostAnchorMigrations.length === 6],
+  ["marking 090/100/110 applied before their own gate is impossible",
+    () => manifest.pendingPostAnchorMigrations.length === 3 &&
+          manifest.pendingPostAnchorMigrations.every((r) =>
+            r.operationalStatus === "PENDING" &&
+            r.appliedByThisPhase === false &&
+            !("remoteHistoryCountAfterApply" in r))],
 ];
 for (const [name, fn] of mutants) {
   let held = false;

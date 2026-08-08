@@ -681,32 +681,37 @@
       "remoteHistoryCountAfterApply": 25,
       "appliedExactlyOnce": true,
       "appliedByThisPhase": false
-    }
-  ],
-  "pendingPostAnchorMigrations": [
+    },
     {
       "version": "20260808500000",
       "name": "qf_mvp_50_3_automation_policy_config_foundation_bridge",
       "path": "supabase/migrations/20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql",
       "sha256": "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
       "phase": "QF-MVP-50.3-50.4-POLICY-CONFIG-BRIDGE",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED",
+      "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
+      "remoteHistoryCountAfterApply": 26,
+      "appliedExactlyOnce": true,
       "appliedByThisPhase": false,
-      "mustApplyBeforeVersion": "20260809000000",
-      "bridgeClassification": "POST_BASELINE_PARITY_REPAIR_NOT_PRE_BASELINE_REPLAY"
-    },
+      "catalogParityVerified": true
+    }
+  ],
+  "pendingPostAnchorMigrations": [
     {
       "version": "20260809000000",
       "name": "qf_mvp_50_3_vendor_automation_producer",
       "path": "supabase/migrations/20260809000000_qf_mvp_50_3_vendor_automation_producer.sql",
-      "sha256": "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11",
+      "sha256": "3588f6d06256af7d6ae95263bb474fb33a15428d0a402bd81c6dd1eb0e6076cb",
       "phase": "QF-MVP-50.3",
       "operationalStatus": "PENDING",
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "appliedByThisPhase": false,
+      "supersededSourceSha256": "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11",
+      "sourceCorrection": "SELF_VERIFICATION_9_6_VENDOR_AVAILABILITY_TOGGLE_EXEMPTION",
+      "sourceCorrectionNote": "Check 9.6 falsely matched the pre-baseline vendor availability toggle public.vendors.accepting_leads and aborted the migration. Exactly that one table+column pair is now exempted; all other accept/reject-style lead columns still abort. No business DDL, producer logic, action set, owner policy, scheduling, grants or other self-verification changed. 090 had never been applied to staging (occurrence 0) and its failed attempt rolled back cleanly, so no applied history diverges.",
+      "mustApplyAfterVersion": "20260808500000"
     },
     {
       "version": "20260810000000",
@@ -749,7 +754,32 @@
       "production",
       "jarvis",
       "onedecore"
-    ]
+    ],
+    "vendorAcceptRejectPermanentlyAbsent": true,
+    "vendorAvailabilityToggleIsNotAcceptReject": {
+      "column": "public.vendors.accepting_leads",
+      "origin": "supabase/migrations/20260706000140_vendor_accepting_leads.sql",
+      "originClass": "PRE_BASELINE_EMBEDDED_IN_STAGING_BASELINE",
+      "semantics": "VENDOR_AVAILABILITY_ONLY",
+      "meaning": "this vendor is currently open to new leads",
+      "isNot": [
+        "per-lead acceptance",
+        "rejection",
+        "decline",
+        "vendor decision state",
+        "acceptance workflow"
+      ],
+      "loadBearingIn": [
+        "supabase/migrations/20260706000143_preferred_assignment_accepting_leads.sql",
+        "supabase/migrations/20260706000144_manual_assignment_accepting_leads.sql",
+        "supabase/migrations/20260706000142_credit_wallet_assignment_rpc.sql",
+        "supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql",
+        "supabase/migrations/20260723000600_qf_mvp_public_projection_privilege_hardening.sql"
+      ],
+      "exemptedInGuard": "20260809000000 check 9.6, keyed to this exact table+column pair only",
+      "guardStillAbortsOnEveryOtherMatch": true,
+      "knownGrammarGap": "The 9.6 grammar requires lead-adjacency or the exact names acceptance_rate/rejection_rate, so bare acceptance_status / rejection_reason columns are not detected. That gap pre-dates this correction and was NOT introduced by it; broadening the grammar is out of scope for this phase."
+    }
   },
   "evidence": {
     "acceptedL3Decision": "L3_DESIGN_A",

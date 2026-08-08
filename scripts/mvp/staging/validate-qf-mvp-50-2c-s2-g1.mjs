@@ -98,6 +98,14 @@ const POST_ANCHOR_APPLIED = [
     remoteHistory: 25,
     phase: "QF-MVP-50.2-FRESH-CLAIM-WEDGE-REPAIR",
   },
+  {
+    version: "20260808500000",
+    name: "qf_mvp_50_3_automation_policy_config_foundation_bridge",
+    sha: "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
+    marker: "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED",
+    remoteHistory: 26,
+    phase: "QF-MVP-50.3-50.4-POLICY-CONFIG-BRIDGE",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -114,15 +122,9 @@ const POST_ANCHOR_APPLIED = [
 // their own staging gate.
 const POST_ANCHOR_PENDING = [
   {
-    version: "20260808500000",
-    name: "qf_mvp_50_3_automation_policy_config_foundation_bridge",
-    sha: "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
-    phase: "QF-MVP-50.3-50.4-POLICY-CONFIG-BRIDGE",
-  },
-  {
     version: "20260809000000",
     name: "qf_mvp_50_3_vendor_automation_producer",
-    sha: "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11",
+    sha: "3588f6d06256af7d6ae95263bb474fb33a15428d0a402bd81c6dd1eb0e6076cb",
     phase: "QF-MVP-50.3",
   },
   {
@@ -344,12 +346,12 @@ function validateState(state) {
   check("exactly nine local migrations are newer than the anchor", postAnchorLocal.length === 9, `actual=${postAnchorLocal.length}`);
   check("the nine post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
   check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 9);
-  check("manifest declares exactly five APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 5, `actual=${appliedPins?.length}`);
+  check("manifest declares exactly six APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 6, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   // Exactly ONE pending record: the execute_v1 repair, hash-pinned like every
   // other post-anchor migration. A missing key, a second pending entry and a
   // silently emptied list all fail closed.
-  check("exactly four PENDING post-anchor migrations are declared", pendingPins !== null && pendingPins.length === 4, `actual=${pendingPins?.length}`);
+  check("exactly three PENDING post-anchor migrations are declared", pendingPins !== null && pendingPins.length === 3, `actual=${pendingPins?.length}`);
   check("the pending records are in exact pinned order after the applied ones", same(pendingPins?.map((r) => r.version), POST_ANCHOR_PENDING.map((m) => m.version)));
 
   for (const expected of POST_ANCHOR_PENDING) {
@@ -400,11 +402,11 @@ function validateState(state) {
       !("remoteVersionStatus" in (pin ?? {})));
   }
 
-  check("the five applied markers are all distinct",
-    new Set(POST_ANCHOR_APPLIED.map((m) => m.marker)).size === 5 &&
-    new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker)).size === 5);
-  check("the five remote-history counts are exactly 21, 22, 23, 24, 25 in ascending order",
-    same((appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25]));
+  check("the six applied markers are all distinct",
+    new Set(POST_ANCHOR_APPLIED.map((m) => m.marker)).size === 6 &&
+    new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker)).size === 6);
+  check("the six remote-history counts are exactly 21, 22, 23, 24, 25, 26 in ascending order",
+    same((appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25, 26]));
   check("G1 still claims no database access of its own", manifest.evidence?.g1PerformsDatabaseAccess === false);
   check("newest local migration is the newest pinned post-anchor migration", newestVersion === POST_ANCHOR_ORDER[POST_ANCHOR_ORDER.length - 1]);
   check("no generic future-migration allowance is granted", manifest.safety?.genericFutureMigrationAllowanceForbidden === true && manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true && manifest.safety?.postAnchorMigrationsRequireOwnStagingGate === true);

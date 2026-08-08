@@ -41,6 +41,22 @@ QuickFurno has **no** accept, reject or decline concept for an assigned lead, an
 - `vendor.response_reminder` means **only** "an assigned lead has not progressed past `vendor_status = 'New'`". It is a contact/progress nudge. Its copy must use transactional language such as *a newly assigned lead is still pending review or contact* — never "accept", "reject" or "respond yes/no".
 - `vendors.accepting_leads` is an **availability toggle** (does this vendor currently want new enquiries) and is unrelated.
 
+### 3.1 The one guard exemption for `vendors.accepting_leads`
+
+The migration's self-verification check **9.6** scans `public` for accept/reject-style lead columns and aborts if it finds one. Its original pattern `%accept%lead%` matched `vendors.accepting_leads` and aborted the migration on staging — a false positive that contradicted this very section.
+
+Check 9.6 now exempts **exactly one** table+column pair, `public.vendors.accepting_leads`, and nothing else. That column:
+
+- is created by the pre-baseline migration `20260706000140_vendor_accepting_leads.sql` and is embedded in the staging baseline, long predating QF-MVP-50.3;
+- is load-bearing in preferred assignment, manual assignment, the credit wallet RPC, the canonical assignment authority and the public projection;
+- means **only** "this vendor is currently open to new leads" — it is not per-lead acceptance, rejection, decline, vendor decision state, or an acceptance workflow.
+
+The exemption is keyed to that exact pair, so the guard still aborts on every other match — including `accepting_leads` on any *other* table, and any decision-style column on `vendors` itself. Verified live against staging in a rolled-back transaction, and frozen by the V01–V14 assertions in `scripts/mvp/automation/validate-qf-mvp-50-3.mjs`.
+
+**Known grammar gap, pre-existing:** 9.6 requires lead-adjacency or the exact names `acceptance_rate` / `rejection_rate`, so a bare `acceptance_status` or `rejection_reason` column would not be detected. That gap pre-dates this correction and was not introduced by it; broadening the grammar is out of scope here.
+
+Vendor accept/reject remains **permanently absent**.
+
 The validator carries dedicated assertions and mutants for every one of these phrases, and prose may only ever *prohibit* the concept.
 
 ## 4. The low-credit threshold is config-driven

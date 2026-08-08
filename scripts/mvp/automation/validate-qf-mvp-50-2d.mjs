@@ -677,13 +677,13 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-50.2-R2-APPLIED-TRUTH: the third post-anchor migration is now APPLIED
 // too (remote history 23), so zero remain pending. Re-pinned, never loosened —
 // the counts stay exact and the pending list must still exist and be empty.
-record("G03 exactly five APPLIED and four PENDING post-anchor migrations are declared",
-  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 5 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 4 &&
-  same(manifest.pendingPostAnchorMigrations.map((r) => r.version), ["20260808500000", "20260809000000", "20260810000000", "20260811000000"]) &&
+record("G03 exactly six APPLIED and three PENDING post-anchor migrations are declared",
+  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 6 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 3 &&
+  same(manifest.pendingPostAnchorMigrations.map((r) => r.version), ["20260809000000", "20260810000000", "20260811000000"]) &&
   manifest.appliedAnchor?.postAnchorMigrationCount === 9 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&

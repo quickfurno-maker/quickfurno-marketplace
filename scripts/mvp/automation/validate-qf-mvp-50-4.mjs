@@ -303,13 +303,13 @@ record("G01 the migration is pinned PENDING with exact identity",
       !("appliedEvidenceMarker" in pin) &&
       !("remoteHistoryCountAfterApply" in pin);
   })());
-record("G02 exactly four pending post-anchor migrations are declared",
-  manifest.pendingPostAnchorMigrations.length === 4 &&
+record("G02 exactly three pending post-anchor migrations are declared",
+  manifest.pendingPostAnchorMigrations.length === 3 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version),
-    ["20260808500000", "20260809000000", "20260810000000", "20260811000000"]));
-record("G03 the five applied records remain 21/22/23/24/25",
+    ["20260809000000", "20260810000000", "20260811000000"]));
+record("G03 the six applied records read 21/22/23/24/25/26",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25]));
+    [21, 22, 23, 24, 25, 26]));
 record("G04 the doc states SOURCE READY, not complete",
   /SOURCE READY/.test(doc) && !/COMPLETE \/ TESTED \/ FROZEN/.test(doc));
 record("G05 the validator is registered and wired into CI after 50.3",

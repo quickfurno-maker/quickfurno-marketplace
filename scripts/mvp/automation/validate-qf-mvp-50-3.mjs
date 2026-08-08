@@ -35,7 +35,7 @@ const stripSql = (s) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g,
 
 const MIGRATION_NAME = "20260809000000_qf_mvp_50_3_vendor_automation_producer.sql";
 const MIGRATION_PATH = `supabase/migrations/${MIGRATION_NAME}`;
-const MIGRATION_SHA = "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11";
+const MIGRATION_SHA = "3588f6d06256af7d6ae95263bb474fb33a15428d0a402bd81c6dd1eb0e6076cb";
 
 // The owner-locked policy values. Every one of these is a decision, not a guess.
 const LOW_CREDIT_THRESHOLD = 3;
@@ -367,11 +367,17 @@ record("G01 the migration is pinned PENDING with exact identity",
       !("appliedEvidenceMarker" in pin) &&
       !("remoteHistoryCountAfterApply" in pin);
   })());
-record("G02 the five applied post-anchor records are untouched at 21/22/23/24/25",
+record("G02 the six applied post-anchor records read 21/22/23/24/25/26",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25]));
-record("G03 no fabricated remote history for the new migration",
-  !manifestText.includes("QF_MVP_50_3_") || !/remoteHistoryCountAfterApply": 26/.test(manifestText));
+    [21, 22, 23, 24, 25, 26]));
+record("G03 no fabricated remote history for this migration",
+  (() => {
+    const pin = manifest.pendingPostAnchorMigrations.find((r) => r.version === "20260809000000");
+    return Boolean(pin) &&
+      pin.operationalStatus === "PENDING" &&
+      !("remoteHistoryCountAfterApply" in pin) &&
+      !("appliedEvidenceMarker" in pin);
+  })());
 record("G04 the doc states SOURCE READY, not complete",
   /SOURCE READY/.test(doc) &&
   !/COMPLETE \/ TESTED \/ FROZEN/.test(doc) &&
@@ -391,6 +397,123 @@ record("G08 CI still takes no secret, database, provider or deployment action",
   !/\bdb push\b/i.test(ciWorkflow));
 record("G09 the local migration set is exactly 96",
   readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
+
+// ---------------------------------------------------------------------------
+// V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject
+//
+// public.vendors.accepting_leads means "this vendor is currently open to new
+// leads". It was created by the pre-baseline migration
+// 20260706000140_vendor_accepting_leads.sql, is embedded in the staging
+// baseline, and is load-bearing in preferred/manual assignment, the credit
+// wallet RPC, the canonical assignment authority and the public projection.
+// It is NOT per-lead acceptance, rejection, decline, vendor decision state or
+// an acceptance workflow.
+//
+// The guard grammar below is PARSED OUT OF THE MIGRATION rather than restated,
+// so these cases can never silently drift from the SQL that actually runs.
+// ---------------------------------------------------------------------------
+const guardBlock = (() => {
+  // Anchored in the RAW source: the 9.6 label lives in a comment, and `sql` is
+  // comment-stripped. Bounded to the 9.6 if-block so nothing else leaks in.
+  const start = migrationSource.indexOf("9.6 no vendor accept/reject state");
+  if (start === -1) return "";
+  const end = migrationSource.indexOf("end if;", start);
+  return end === -1 ? migrationSource.slice(start) : migrationSource.slice(start, end + "end if;".length);
+})();
+const guardPatterns = [...guardBlock.matchAll(/column_name ilike '([^']+)'/g)].map((m) => m[1]);
+const guardExactNames = (() => {
+  const m = guardBlock.match(/column_name in \(([^)]*)\)/);
+  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
+})();
+const guardExemption = (() => {
+  const m = guardBlock.match(/and not \(\s*table_name = '([^']+)'\s*and column_name = '([^']+)'\s*\)/);
+  return m ? { table: m[1], column: m[2] } : null;
+})();
+const BACKSLASH = String.fromCharCode(92);
+const escapeLiteral = (x) => x.replace(/[^A-Za-z0-9_]/g, (ch) => BACKSLASH + ch);
+const likeToRe = (p) => new RegExp("^" + p.split("%").map(escapeLiteral).join(".*") + "$", "i");
+// Faithful mirror of the SQL predicate: pattern/name match AND NOT the exemption.
+const guardAborts = (table, column) => {
+  const matched = guardPatterns.some((p) => likeToRe(p).test(column)) ||
+    guardExactNames.includes(column);
+  if (!matched) return false;
+  if (guardExemption && table === guardExemption.table && column === guardExemption.column) return false;
+  return true;
+};
+
+record("V01 the guard grammar was parsed from the migration",
+  guardPatterns.length === 4 && guardExactNames.length === 2 && guardExemption !== null);
+record("V02 the exemption is exactly public.vendors.accepting_leads",
+  guardExemption?.table === "vendors" && guardExemption?.column === "accepting_leads");
+record("V03 exactly one exemption exists - no allowlist",
+  (guardBlock.match(/and not \(/g) ?? []).length === 1 &&
+  !/table_name in \(/.test(guardBlock) &&
+  !/column_name not in \(/.test(guardBlock));
+
+// A. the availability toggle must NOT abort
+record("V04 (A) vendors.accepting_leads does not abort the migration",
+  guardAborts("vendors", "accepting_leads") === false);
+
+// B. every other accept/reject-style lead column must still abort
+for (const [tbl, col] of [
+  ["vendors", "lead_accepted"],
+  ["vendors", "lead_rejected"],
+  ["vendors", "lead_accepted_at"],
+  ["vendors", "acceptance_rate"],
+  ["vendors", "rejection_rate"],
+  ["lead_assignments", "accept_lead"],
+  ["lead_assignments", "reject_lead"],
+  ["lead_assignments", "lead_rejection_reason"],
+  ["lead_assignments", "lead_acceptance_status"],
+]) {
+  record(`V05 (B) ${tbl}.${col} still aborts`, guardAborts(tbl, col) === true);
+}
+
+// C. the exemption must be EXACT in both dimensions
+record("V06 (C) accepting_leads on any other table still aborts",
+  guardAborts("lead_assignments", "accepting_leads") === true &&
+  guardAborts("vendor_crm_profiles", "accepting_leads") === true);
+record("V07 (C) a decision column on vendors still aborts",
+  guardAborts("vendors", "lead_accepted") === true &&
+  guardAborts("vendors", "accept_lead_decision") === true);
+record("V08 (C) the guard was not removed and still raises",
+  /9\.6 no vendor accept\/reject state/.test(migrationSource) &&
+  /a vendor accept\/reject column exists/.test(migrationSource) &&
+  /errcode = 'P0001'/.test(guardBlock));
+record("V09 (C) no broad vendors-wide accept/lead exemption exists",
+  !/table_name = 'vendors'\s*\)/.test(guardBlock) &&
+  !/column_name ilike '%accept%lead%'\s*\)\s*$/.test(guardBlock) &&
+  guardAborts("vendors", "lead_accepted") === true);
+
+// D. availability semantics preserved, no accept/reject surface introduced
+record("V10 (D) the migration documents the availability-toggle distinction",
+  /VENDOR AVAILABILITY/i.test(migrationSource) &&
+  /20260706000140_vendor_accepting_leads\.sql/.test(migrationSource) &&
+  /NOT per-lead\s*\n?--?\s*acceptance/i.test(migrationSource.replace(/\r/g, "")));
+record("V11 (D) the migration never writes or alters accepting_leads",
+  !/alter table[^;]*accepting_leads/i.test(sql) &&
+  !/update\s+public\.vendors/i.test(sql) &&
+  !/drop column[^;]*accepting_leads/i.test(sql));
+record("V12 (D) no accept/reject action, state or endpoint is introduced",
+  !/vendor\.(accept|reject)/i.test(sql + registrySource) &&
+  !/accept_lead|reject_lead|lead_accepted|lead_rejected/i.test(registrySource) &&
+  !/acceptance_workflow|decline/i.test(sql));
+record("V13 (D) governance records the availability-toggle distinction",
+  manifest.safety?.vendorAcceptRejectPermanentlyAbsent === true &&
+  manifest.safety?.vendorAvailabilityToggleIsNotAcceptReject?.column ===
+    "public.vendors.accepting_leads" &&
+  manifest.safety.vendorAvailabilityToggleIsNotAcceptReject.semantics ===
+    "VENDOR_AVAILABILITY_ONLY" &&
+  manifest.safety.vendorAvailabilityToggleIsNotAcceptReject
+    .guardStillAbortsOnEveryOtherMatch === true);
+record("V14 the 090 pin records the correction and the superseded hash",
+  (() => {
+    const pin = manifest.pendingPostAnchorMigrations.find((r) => r.version === "20260809000000");
+    return pin?.sha256 === MIGRATION_SHA &&
+      pin.supersededSourceSha256 ===
+        "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11" &&
+      pin.sourceCorrection === "SELF_VERIFICATION_9_6_VENDOR_AVAILABILITY_TOGGLE_EXEMPTION";
+  })());
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS — each defect must be impossible by construction

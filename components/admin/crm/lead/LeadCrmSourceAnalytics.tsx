@@ -20,12 +20,18 @@ export function SourceAnalytics({ rows }: { rows: CrmRow[] }) {
   ];
 
   return (
+    <div className="space-y-3">
+    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+      Distribution of the leads currently loaded in this view. Counts only — no spend, attribution, cost-per-lead or
+      revenue is modelled anywhere in QuickFurno.
+    </p>
     <div className="grid gap-4 lg:grid-cols-2">
       <ChartCard title="Leads by source" rows={bySource} />
       <ChartCard title="Leads by UTM source" rows={byUtm} />
       <ChartCard title="Leads by city" rows={byCity} />
       <ChartCard title="Leads by service / category" rows={byService} />
       <ChartCard title="Preferred vendor vs general" rows={intentRows} />
+    </div>
     </div>
   );
 }

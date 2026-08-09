@@ -31,7 +31,6 @@ export function LeadInbox({
   onSelect,
   onUpdateStatus,
   onAssign,
-  onScheduleFollowUp,
   isPending,
 }: {
   rows: CrmRow[];
@@ -40,7 +39,6 @@ export function LeadInbox({
   onSelect: (row: CrmRow) => void;
   onUpdateStatus: (leadId: string, status: string) => void;
   onAssign: (row: CrmRow) => void;
-  onScheduleFollowUp: (row: CrmRow) => void;
   isPending: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -98,53 +96,120 @@ export function LeadInbox({
         emptyTitle="No leads match this view"
         emptyMessage="Adjust the filters, clear the quick filter, or wait for new lead submissions."
         columns={[
-          { header: "Priority", cell: (row) => <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} /> },
-          { header: "Quality", cell: (row) => row.qualityBadge
-            ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} />
-            : <StatusBadge value="Not scored" tone="slate" /> },
-          { header: "Clarification", cell: (row) => { const b = clarificationBadge(row); return <StatusBadge value={b.label} tone={b.tone} />; } },
-          { header: "Client", cell: (row) => (
-            <div className="min-w-40">
-              <p className="font-semibold text-slate-900">{row.name}</p>
-              {row.preferredBadge ? <div className="mt-1"><StatusBadge value={row.preferredBadge.label} tone={row.preferredBadge.tone} /></div> : null}
-            </div>
-          ) },
-          { header: "Phone", cell: (row) => row.phoneDigits
-            ? <a href={`tel:${row.phoneDigits}`} className="font-mono text-sm text-emerald-700 hover:underline">{row.phone}</a>
-            : <span className="text-slate-400">Not set</span> },
-          { header: "City / Area", cell: (row) => <span className="whitespace-nowrap">{[row.area, row.city].filter((v) => v && v !== "Not set").join(", ") || row.city}</span> },
-          { header: "Service", cell: (row) => <span className="whitespace-nowrap">{row.service}</span> },
-          { header: "Budget", cell: (row) => row.budget },
-          { header: "Timeline", cell: (row) => row.timeline },
-          { header: "Source", cell: (row) => <StatusBadge value={row.source} /> },
-          { header: "Intent", cell: (row) => <StatusBadge value={row.isPreferred ? "Preferred" : "Auto-match"} tone={row.isPreferred ? "violet" : "slate"} /> },
-          { header: "Vendors", cell: (row) => <StatusBadge value={`${row.assignedCount}/3`} tone={row.assignedCount > 0 ? "emerald" : "amber"} /> },
-          { header: "Status", cell: (row) => <StatusBadge value={row.statusLabel} /> },
-          { header: "Created", cell: (row) => <span className="whitespace-nowrap">{formatDate(row.createdAt)}</span> },
-          { header: "Next follow-up", cell: (row) => row.followUp
-            ? <StatusBadge value={formatDate(row.followUp)} tone={followUpDue(row.followUp) ? "rose" : "slate"} />
-            : <span className="text-slate-400">—</span> },
-          { header: "Actions", cell: (row) => (
-            <div className="flex items-center gap-1.5">
-              {row.phoneDigits ? (
-                <>
-                  <a href={`tel:${row.phoneDigits}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="Call client">Call</a>
-                  <a href={`https://wa.me/${waNumber(row.phoneDigits)}`} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Open WhatsApp">WA</a>
-                </>
-              ) : null}
-              <ActionMenu
-                actions={[
-                  { label: "View details", onClick: () => onSelect(row) },
-                  { label: "Mark contacted", onClick: () => onUpdateStatus(row.id, "Contacted") },
-                  { label: "Mark converted", onClick: () => onUpdateStatus(row.id, "Converted") },
-                  { label: "Mark lost", onClick: () => onUpdateStatus(row.id, "Lost") },
-                  { label: "Mark spam", onClick: () => onUpdateStatus(row.id, "Spam") },
-                  { label: "Assign vendor", onClick: () => onAssign(row) },
-                  { label: "Schedule follow-up", onClick: () => onScheduleFollowUp(row) },
-                ]}
+          {
+            header: "Lead",
+            cell: (row) => (
+              <div className="min-w-[13rem]">
+                <button
+                  type="button"
+                  onClick={() => onSelect(row)}
+                  className="rounded text-left font-semibold text-slate-900 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  {row.name}
+                </button>
+                <p className="mt-0.5 font-mono text-xs text-slate-500">{row.phone}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  <StatusBadge value={row.source} tone="slate" />
+                  {row.preferredBadge ? <StatusBadge value={row.preferredBadge.label} tone={row.preferredBadge.tone} /> : null}
+                </div>
+              </div>
+            ),
+          },
+          {
+            header: "Requirement",
+            cell: (row) => (
+              <div className="min-w-[10rem]">
+                <p className="font-medium text-slate-800">{row.service}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {[row.budget, row.timeline].filter((v) => v && v !== "Not set").join(" · ") || "No budget / timeline"}
+                </p>
+              </div>
+            ),
+          },
+          {
+            header: "Location",
+            cell: (row) => (
+              <span className="whitespace-nowrap text-slate-700">
+                {[row.area, row.city].filter((v) => v && v !== "Not set").join(", ") || row.city}
+              </span>
+            ),
+          },
+          {
+            header: "Quality",
+            cell: (row) => (
+              <div className="flex flex-col gap-1">
+                <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} />
+                {row.qualityBadge ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} /> : null}
+              </div>
+            ),
+          },
+          { header: "Stage", cell: (row) => <StatusBadge value={row.statusLabel} /> },
+          {
+            header: "Clarification",
+            cell: (row) => {
+              const b = clarificationBadge(row);
+              return <StatusBadge value={b.label} tone={b.tone} />;
+            },
+          },
+          {
+            header: "Assignment",
+            cell: (row) => (
+              <StatusBadge
+                value={row.assignedCount === 0 ? "Unassigned" : `${row.assignedCount} vendor${row.assignedCount === 1 ? "" : "s"}`}
+                tone={row.assignedCount === 0 ? "amber" : "emerald"}
               />
-            </div>
-          ) },
+            ),
+          },
+          {
+            header: "Follow-up",
+            cell: (row) =>
+              row.followUp ? (
+                <StatusBadge
+                  value={followUpDue(row.followUp) ? `Due ${formatDate(row.followUp)}` : formatDate(row.followUp)}
+                  tone={followUpDue(row.followUp) ? "rose" : "slate"}
+                />
+              ) : (
+                <span className="text-slate-400">None</span>
+              ),
+          },
+          { header: "Created", cell: (row) => <span className="whitespace-nowrap text-slate-600">{formatDate(row.createdAt)}</span> },
+          {
+            header: "Actions",
+            cell: (row) => (
+              <div className="flex items-center gap-1.5">
+                {row.phoneDigits ? (
+                  <>
+                    <a
+                      href={`tel:${row.phoneDigits}`}
+                      aria-label={`Call ${row.name}`}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                      Call
+                    </a>
+                    <a
+                      href={`https://wa.me/${waNumber(row.phoneDigits)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Open WhatsApp chat with ${row.name}`}
+                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 outline-none transition hover:bg-emerald-100 focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    >
+                      WA
+                    </a>
+                  </>
+                ) : null}
+                <ActionMenu
+                  actions={[
+                    { label: "View details", onClick: () => onSelect(row) },
+                    { label: "Mark contacted", onClick: () => onUpdateStatus(row.id, "Contacted") },
+                    { label: "Mark converted", onClick: () => onUpdateStatus(row.id, "Converted") },
+                    { label: "Mark lost", onClick: () => onUpdateStatus(row.id, "Lost") },
+                    { label: "Mark spam", onClick: () => onUpdateStatus(row.id, "Spam") },
+                    { label: "Assign vendor", onClick: () => onAssign(row) },
+                  ]}
+                />
+              </div>
+            ),
+          },
         ]}
       />
     </div>

@@ -151,7 +151,6 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
             notify("Opening Lead Distribution for manual vendor assignment…", "info");
             router.push("/admin/lead-distribution");
           }}
-          onScheduleFollowUp={() => notify("Follow-up scheduling is read-only in this phase (shows existing follow-up dates).", "info")}
           isPending={isPending}
         />
       ) : null}
@@ -159,7 +158,7 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
       {active === "Pipeline Board" ? <PipelineBoard rows={rows} onSelect={setSelected} /> : null}
       {active === "Follow-ups" ? <FollowUps rows={rows} onSelect={setSelected} /> : null}
       {active === "Assignment Queue" ? <AssignmentQueue queue={data.leadAssignmentQueue ?? []} /> : null}
-      {active === "Vendor Response" ? <VendorResponse rows={rows} vendorsById={vendorsById} deliveryLogs={data.leadDeliveryLogs ?? []} /> : null}
+      {active === "Vendor Activity" ? <VendorResponse rows={rows} vendorsById={vendorsById} deliveryLogs={data.leadDeliveryLogs ?? []} /> : null}
       {active === "Source Analytics" ? <SourceAnalytics rows={rows} /> : null}
       {active === "Nurture" ? <Nurture rows={rows} onSelect={setSelected} /> : null}
 

@@ -74,7 +74,7 @@ export const TABS = [
   "Pipeline Board",
   "Follow-ups",
   "Assignment Queue",
-  "Vendor Response",
+  "Vendor Activity",
   "Source Analytics",
   "Nurture",
 ];

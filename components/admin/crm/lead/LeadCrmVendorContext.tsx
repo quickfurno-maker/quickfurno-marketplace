@@ -18,8 +18,19 @@ import {
 import { type CrmRow } from "./leadCrmTypes";
 import { MiniStat } from "./leadCrmShared";
 
+/**
+ * Vendor activity on assigned leads.
+ *
+ * WORDING MATTERS HERE. This surface was previously titled "Vendor Response",
+ * which implied a per-lead accept/reject contract. No such contract exists.
+ * `assignment.vendor_status` is the vendor's PROGRESS on a lead already assigned
+ * to them (New -> Contacted -> …) — the same field
+ * lib/automation/vendorDispatchRegistry.ts describes as "progressed past
+ * vendor_status = 'New' … a contact/progress nudge". A vendor never accepts,
+ * rejects, declines or awaits acceptance of a lead in QuickFurno.
+ */
 export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmRow[]; vendorsById: Map<string, Vendor>; deliveryLogs: LeadDeliveryLog[] }) {
-  const responseCounts = useMemo(() => {
+  const progressCounts = useMemo(() => {
     const map = new Map<string, number>();
     rows.forEach((row) => row.assignments.forEach((a) => {
       const status = a.vendor_status || "New";
@@ -32,8 +43,13 @@ export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmR
 
   return (
     <div className="space-y-4">
+      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        How vendors are <strong className="font-semibold text-slate-800">progressing</strong> leads already assigned to
+        them, plus delivery records. Vendors do not accept or reject assigned leads in QuickFurno.
+      </p>
+
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Vendor response status" rows={responseCounts} />
+        <ChartCard title="Vendor progress on assigned leads" rows={progressCounts} />
         <SectionCard title="Delivery snapshot" description="Dashboard + WhatsApp-preview delivery logs (preview only — no live sends).">
           <div className="grid gap-3 sm:grid-cols-3">
             <MiniStat label="Delivery logs" value={deliveryLogs.length} tone="blue" />
@@ -42,6 +58,11 @@ export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmR
           </div>
         </SectionCard>
       </div>
+      {deliveryLogs.length > recentDeliveries.length ? (
+        <p className="text-xs text-slate-500">
+          Showing the {recentDeliveries.length} most recent of {deliveryLogs.length} delivery records.
+        </p>
+      ) : null}
 
       <DataTable
         rows={recentDeliveries}

@@ -139,4 +139,3 @@ export interface VendorCrmProfileSummary {
   primary_contact: VendorContact | null;
   latest_note: VendorNote | null;
 }
-

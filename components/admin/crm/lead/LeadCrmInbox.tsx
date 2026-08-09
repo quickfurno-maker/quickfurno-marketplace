@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   ActionMenu,
   DataTable,
+  FilterChip,
   SelectFilter,
   StatusBadge,
   Toolbar,
@@ -58,8 +59,16 @@ export function LeadInbox({
       && (intent === "All" || (intent === "Preferred vendor" ? row.isPreferred : !row.isPreferred));
   }), [rows, quickFilter, query, city, service, priority, source, intent]);
 
+  const activeSelects: Array<{ key: string; label: string; value: string; clear: () => void }> = [
+    { key: "city", label: "City", value: city, clear: () => setCity("All") },
+    { key: "service", label: "Service", value: service, clear: () => setService("All") },
+    { key: "priority", label: "Priority", value: priority, clear: () => setPriority("All") },
+    { key: "source", label: "Source", value: source, clear: () => setSource("All") },
+    { key: "intent", label: "Intent", value: intent, clear: () => setIntent("All") },
+  ].filter((f) => f.value !== "All");
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <div className="sticky top-2 z-20">
         <Toolbar
           query={query}
@@ -77,37 +86,42 @@ export function LeadInbox({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-semibold text-slate-500">Showing {formatNumber(filtered.length)} of {formatNumber(rows.length)}</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-semibold text-slate-500">
+          Showing {formatNumber(filtered.length)} of {formatNumber(rows.length)}
+        </span>
         {quickFilter !== "all" ? (
-          <button
-            type="button"
-            onClick={() => setQuickFilter("all")}
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700"
-          >
-            {QUICK_FILTER_LABEL[quickFilter]} <span aria-hidden>✕</span>
-          </button>
+          <FilterChip
+            label="Quick filter"
+            value={QUICK_FILTER_LABEL[quickFilter]}
+            onRemove={() => setQuickFilter("all")}
+          />
         ) : null}
-        {isPending ? <span className="text-slate-400">Saving…</span> : null}
+        {activeSelects.map((filter) => (
+          <FilterChip key={filter.key} label={filter.label} value={filter.value} onRemove={filter.clear} />
+        ))}
+        {isPending ? <span className="text-[11px] text-slate-400">Saving…</span> : null}
       </div>
 
       <DataTable
         rows={filtered}
+        density="compact"
+        getRowKey={(row) => row.id}
         emptyTitle="No leads match this view"
         emptyMessage="Adjust the filters, clear the quick filter, or wait for new lead submissions."
         columns={[
           {
             header: "Lead",
             cell: (row) => (
-              <div className="min-w-[13rem]">
+              <div className="min-w-[12rem]">
                 <button
                   type="button"
                   onClick={() => onSelect(row)}
-                  className="rounded text-left font-semibold text-slate-900 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-slate-300"
+                  className="qfa-focus block max-w-full truncate rounded text-left text-[13px] font-semibold text-slate-950 underline-offset-2 hover:underline"
                 >
                   {row.name}
                 </button>
-                <p className="mt-0.5 font-mono text-xs text-slate-500">{row.phone}</p>
+                <p className="mt-0.5 truncate font-mono text-[11px] text-slate-500">{row.phone}</p>
                 <div className="mt-1 flex flex-wrap gap-1">
                   <StatusBadge value={row.source} tone="slate" />
                   {row.preferredBadge ? <StatusBadge value={row.preferredBadge.label} tone={row.preferredBadge.tone} /> : null}
@@ -118,9 +132,9 @@ export function LeadInbox({
           {
             header: "Requirement",
             cell: (row) => (
-              <div className="min-w-[10rem]">
-                <p className="font-medium text-slate-800">{row.service}</p>
-                <p className="mt-0.5 text-xs text-slate-500">
+              <div className="min-w-[9rem]">
+                <p className="truncate text-[13px] font-medium text-slate-800">{row.service}</p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-500">
                   {[row.budget, row.timeline].filter((v) => v && v !== "Not set").join(" · ") || "No budget / timeline"}
                 </p>
               </div>
@@ -129,7 +143,7 @@ export function LeadInbox({
           {
             header: "Location",
             cell: (row) => (
-              <span className="whitespace-nowrap text-slate-700">
+              <span className="whitespace-nowrap text-[13px] text-slate-700">
                 {[row.area, row.city].filter((v) => v && v !== "Not set").join(", ") || row.city}
               </span>
             ),
@@ -137,7 +151,7 @@ export function LeadInbox({
           {
             header: "Quality",
             cell: (row) => (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col items-start gap-1">
                 <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} />
                 {row.qualityBadge ? <StatusBadge value={row.qualityBadge.label} tone={row.qualityBadge.tone} /> : null}
               </div>
@@ -172,17 +186,18 @@ export function LeadInbox({
                 <span className="text-slate-400">None</span>
               ),
           },
-          { header: "Created", cell: (row) => <span className="whitespace-nowrap text-slate-600">{formatDate(row.createdAt)}</span> },
+          { header: "Created", cell: (row) => <span className="whitespace-nowrap text-[11px] text-slate-500">{formatDate(row.createdAt)}</span> },
           {
             header: "Actions",
+            className: "text-right",
             cell: (row) => (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-end gap-1">
                 {row.phoneDigits ? (
                   <>
                     <a
                       href={`tel:${row.phoneDigits}`}
                       aria-label={`Call ${row.name}`}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300"
+                      className="qfa-focus inline-flex h-8 items-center rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                     >
                       Call
                     </a>
@@ -191,7 +206,7 @@ export function LeadInbox({
                       target="_blank"
                       rel="noreferrer"
                       aria-label={`Open WhatsApp chat with ${row.name}`}
-                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 outline-none transition hover:bg-emerald-100 focus-visible:ring-2 focus-visible:ring-emerald-300"
+                      className="qfa-focus inline-flex h-8 items-center rounded-[var(--qfa-radius-sm)] border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
                     >
                       WA
                     </a>

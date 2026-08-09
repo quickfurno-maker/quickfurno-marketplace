@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import {
   ChartCard,
   DataTable,
+  NoteBar,
   SectionCard,
   StatusBadge,
 } from "../../AdminPrimitives";
@@ -42,16 +43,16 @@ export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmR
   const recentDeliveries = deliveryLogs.slice(0, 40);
 
   return (
-    <div className="space-y-4">
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+    <div className="space-y-3">
+      <NoteBar>
         How vendors are <strong className="font-semibold text-slate-800">progressing</strong> leads already assigned to
         them, plus delivery records. Vendors do not accept or reject assigned leads in QuickFurno.
-      </p>
+      </NoteBar>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <ChartCard title="Vendor progress on assigned leads" rows={progressCounts} />
         <SectionCard title="Delivery snapshot" description="Dashboard + WhatsApp-preview delivery logs (preview only — no live sends).">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3">
             <MiniStat label="Delivery logs" value={deliveryLogs.length} tone="blue" />
             <MiniStat label="Contact shared" value={deliveryLogs.filter((l) => l.contact_shared).length} tone="emerald" />
             <MiniStat label="Credit deducted" value={deliveryLogs.filter((l) => l.credit_deducted).length} tone="amber" />
@@ -66,6 +67,8 @@ export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmR
 
       <DataTable
         rows={recentDeliveries}
+        density="compact"
+        getRowKey={(row, index) => String(row.id ?? index)}
         emptyTitle="No delivery logs yet"
         emptyMessage="Vendor lead deliveries (dashboard + WhatsApp preview) will appear here."
         columns={[

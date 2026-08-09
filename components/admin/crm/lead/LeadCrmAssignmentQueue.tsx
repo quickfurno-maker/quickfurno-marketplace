@@ -2,6 +2,7 @@
 
 import {
   DataTable,
+  NoteBar,
   StatCard,
   StatusBadge,
 } from "../../AdminPrimitives";
@@ -43,19 +44,21 @@ export function AssignmentQueue({ queue }: { queue: LeadAssignmentQueueRow[] }) 
   const active = queue.filter((row) => (row.queue_status ?? "queued") !== "resolved");
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Queue rows" value={formatNumber(queue.length)} helper="All queue entries" icon="distribution" tone="indigo" />
         <StatCard label="Active" value={formatNumber(active.length)} helper="Not yet resolved" icon="distribution" tone="amber" />
         <StatCard label="Resolved" value={formatNumber(queue.length - active.length)} helper="Completed" icon="distribution" tone="emerald" />
         <StatCard label="Due now" value={formatNumber(active.filter((r) => followUpDue(r.next_retry_at)).length)} helper="Retry time reached" icon="notifications" tone="rose" />
       </section>
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+      <NoteBar>
         Visibility only. Matching, assignment, credit deduction and vendor notification are performed by Core — nothing
         on this screen triggers them.
-      </p>
+      </NoteBar>
 
       <DataTable
         rows={queue}
+        density="compact"
+        getRowKey={(row, index) => String(row.id ?? index)}
         emptyTitle="Assignment queue is empty"
         emptyMessage="Queued leads awaiting delayed fill or vendor availability will appear here."
         columns={[

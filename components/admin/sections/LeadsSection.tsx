@@ -78,7 +78,6 @@ export function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify:
             <SelectFilter label="Source" value={source} onChange={setSource} options={uniqueOptions(data.leads.map((lead) => lead.source || "Website"))} />
           </>
         }
-        action={<SecondaryButton onClick={() => notify("CSV export placeholder ready.")}>Export CSV</SecondaryButton>}
       />
 
       <BadLeadReportsReviewPanel data={data} notify={notify} runAction={runAction} />
@@ -103,8 +102,6 @@ export function LeadsPage({ data, notify, runAction }: { data: Snapshot; notify:
                 actions={[
                   { label: "View lead", onClick: () => setSelected(lead) },
                   { label: "Mark contacted", onClick: () => runAction("Lead status update", () => adminUpdateLeadStatus(lead.id, "Contacted")) },
-                  { label: "Assign vendor", onClick: () => notify("Manual assign drawer placeholder ready.") },
-                  { label: "Export lead", onClick: () => notify("Single lead export placeholder ready.") },
                 ]}
               />
             ),
@@ -167,11 +164,11 @@ export function LeadDetailDrawer({ lead, vendors, onClose }: { lead: Lead; vendo
           ["Timeline", lead.timeline || "Not provided"],
           ["Status", <StatusBadge key="status" value={lead.status || "New"} />],
         ]} />
-        <article className="rounded-2xl border border-slate-200 bg-white p-4">
+        <article className="qfa-panel p-4">
           <h3 className="text-sm font-semibold text-slate-950">Requirement</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">{lead.message || "No requirement message provided."}</p>
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-4">
+        <article className="qfa-panel p-4">
           <h3 className="text-sm font-semibold text-slate-950">Assignment Timeline</h3>
           <div className="mt-3 space-y-2">
             {(lead.lead_assignments ?? []).length ? lead.lead_assignments?.map((assignment) => (

@@ -58,19 +58,19 @@ export function Overview({
   const openWork = attention.reduce((sum, k) => sum + k.value, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <section aria-labelledby="crm-attention-heading">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="crm-attention-heading" className="text-base font-semibold tracking-tight text-slate-950">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="crm-attention-heading" className="text-[13px] font-bold uppercase tracking-wide text-slate-500">
             Needs attention
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-[11px] text-slate-500">
             {openWork === 0
               ? "Nothing is waiting on a decision right now."
-              : `${formatNumber(openWork)} lead${openWork === 1 ? "" : "s"} across ${attention.length} queues.`}
+              : `${formatNumber(openWork)} lead${openWork === 1 ? "" : "s"} across ${attention.length} queues`}
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           {attention.map((kpi) => (
             <KpiCard key={kpi.key} kpi={kpi} emphasis onClick={handlerFor(kpi)} />
           ))}
@@ -78,18 +78,18 @@ export function Overview({
       </section>
 
       <section aria-labelledby="crm-volume-heading">
-        <h2 id="crm-volume-heading" className="mb-3 text-base font-semibold tracking-tight text-slate-950">
+        <h2 id="crm-volume-heading" className="mb-2 text-[13px] font-bold uppercase tracking-wide text-slate-500">
           Pipeline volume
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {volume.map((kpi) => (
             <KpiCard key={kpi.key} kpi={kpi} onClick={handlerFor(kpi)} />
           ))}
         </div>
       </section>
 
-      <p className="text-xs text-slate-500">
-        Counts are computed from the leads currently loaded in this view. Selecting a card filters the Lead Inbox.
+      <p className="text-[11px] text-slate-500">
+        Counts are computed from the leads currently loaded in this view. Selecting a tile filters the Lead Inbox.
       </p>
     </div>
   );
@@ -97,35 +97,43 @@ export function Overview({
 
 function KpiCard({ kpi, emphasis = false, onClick }: { kpi: Kpi; emphasis?: boolean; onClick: () => void }) {
   const idle = kpi.value === 0;
-  // Emphasis is carried by the border + the "Open" affordance text, not colour
+  const active = emphasis && !idle;
+  // Emphasis is carried by the rail + the "Needs action" word, not colour
   // alone, so severity survives greyscale and colour-blind viewing.
-  const frame = emphasis && !idle ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-white";
-  const chip = emphasis && !idle ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600";
+  const frame = active
+    ? "border-amber-200 bg-amber-50/50 hover:border-amber-300"
+    : "border-[color:var(--qfa-line)] bg-white hover:border-[color:var(--qfa-line-strong)]";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group flex w-full flex-col rounded-xl border p-4 text-left outline-none transition duration-150 hover:shadow-sm focus-visible:ring-4 focus-visible:ring-slate-200 ${frame}`}
+      className={`qfa-focus group relative flex w-full items-center gap-3 overflow-hidden rounded-[var(--qfa-radius-lg)] border px-3.5 py-3 text-left shadow-[var(--qfa-shadow-1)] transition-colors ${frame}`}
     >
-      <span className="flex items-start justify-between gap-3">
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${chip}`}>
-          <AdminIcon name={ICONS[kpi.key] ?? "crm"} className="h-4 w-4" />
-        </span>
-        {emphasis && !idle ? (
-          <span className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-            Needs action
-          </span>
-        ) : null}
-      </span>
-      <span className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-slate-950">
+      {active ? <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-amber-500" /> : null}
+      <AdminIcon
+        name={ICONS[kpi.key] ?? "crm"}
+        className={`h-4 w-4 shrink-0 ${active ? "text-amber-600" : "text-slate-400"}`}
+      />
+      <span className="shrink-0 text-[26px] font-semibold leading-none tabular-nums tracking-tight text-slate-950">
         {formatNumber(kpi.value)}
       </span>
-      <span className="mt-0.5 truncate text-sm font-semibold text-slate-800">{kpi.label}</span>
-      <span className="mt-0.5 text-xs text-slate-500">{kpi.helper}</span>
-      <span className="mt-2 text-xs font-semibold text-slate-600 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
-        Filter inbox →
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold text-slate-900">{kpi.label}</span>
+        <span className="block truncate text-[11px] text-slate-500">{kpi.helper}</span>
       </span>
+      {active ? (
+        <span className="shrink-0 rounded-[var(--qfa-radius-xs)] border border-amber-200 bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+          Needs action
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-xs font-semibold text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        >
+          →
+        </span>
+      )}
     </button>
   );
 }

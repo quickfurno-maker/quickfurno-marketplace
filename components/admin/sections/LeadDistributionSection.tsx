@@ -17,6 +17,7 @@ import {
   StatCard,
   StatusBadge,
   Tabs,
+  NoteBar,
   ToggleSwitch,
 } from "../AdminPrimitives";
 import { type Category, type City, type Lead, type Snapshot, type Vendor } from "../adminTypes";
@@ -66,17 +67,27 @@ export function LeadDistributionPage({
       ) : tab === "Assignment Approval Preview" ? (
         <LeadAssignmentApprovalControl leads={data.leads} notify={notify} />
       ) : tab === "Rules & Settings" ? (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {["Auto assignment", "Match by city", "Match by locality", "Verified vendors only", "Paid vendors only", "Remaining leads required", "Duplicate protection", "Fair rotation"].map((rule, index) => (
-            <article key={rule} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <h2 className="text-sm font-semibold text-slate-950">{rule}</h2>
-                <ToggleSwitch checked={index < 6} />
-              </div>
-              <p className="mt-3 text-sm leading-6 text-slate-500">Future-ready distribution rule. Persist in settings when backend rule storage is finalized.</p>
-            </article>
-          ))}
-        </section>
+        /* These eight rules used to render an enable switch whose state came
+           from `index < 6` — a fabricated value on a control that persisted
+           nothing. Distribution policy is enforced in Core and configured
+           through the marketplace runtime settings, so this is now a plain
+           reference list of the rules the matcher applies. */
+        <div className="space-y-3">
+          <NoteBar tone="warning">
+            Reference list only. These rules are enforced by Core matching; they are not switched on or off from this
+            screen, and no rule state is stored here.
+          </NoteBar>
+          <SectionCard title="Distribution rules applied by Core">
+            <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+              {["Auto assignment", "Match by city", "Match by locality", "Verified vendors only", "Paid vendors only", "Remaining leads required", "Duplicate protection", "Fair rotation"].map((rule) => (
+                <li key={rule} className="flex items-center gap-2 text-[13px] text-slate-700">
+                  <span aria-hidden="true" className="h-1 w-1 shrink-0 rounded-full bg-slate-400" />
+                  {rule}
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        </div>
       ) : tab === "Recent Assignments" ? (
         <RecentAssignmentsPanel notify={notify} />
       ) : tab === "Failed Assignments" ? (
@@ -278,7 +289,7 @@ export function EligibilityChecker({ data, notify }: { data: Snapshot; notify: (
 
   return (
     <section className="grid gap-5 xl:grid-cols-[360px_1fr]">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="qfa-panel p-4">
         <h2 className="text-lg font-semibold text-slate-950">Eligibility Checker</h2>
         <p className="mt-2 text-sm text-slate-500">Uses the shared vendorEligibility helper — the same logic as the Lead Assignment Approval Preview.</p>
         <div className="mt-5 space-y-3">

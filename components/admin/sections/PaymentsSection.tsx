@@ -42,19 +42,19 @@ export function PaymentsPage({ data, notify }: { data: Snapshot; notify: (messag
           </div>
         </SectionCard>
 
-        <SectionCard title="Collection Notes" description="Operational placeholders only; no payment logic changed.">
-          <div className="grid gap-3 sm:grid-cols-3">
+        {/* These three were buttons that only fired a "<x> placeholder ready."
+            toast. Manual collection, invoice download and renewal follow-up
+            have no implementation, so they are listed as scope rather than
+            offered as controls. */}
+        <SectionCard title="Not built yet" description="No collection, invoicing or renewal action is available from this page.">
+          <ul className="grid gap-1.5 sm:grid-cols-3">
             {["Manual collection", "Invoice download", "Renewal follow-up"].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => notify(`${item} placeholder ready.`)}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50/40"
-              >
-                {item}
-              </button>
+              <li key={item} className="flex items-center justify-between gap-2 text-[13px] text-slate-700">
+                <span className="min-w-0 truncate">{item}</span>
+                <StatusBadge value="Not built" tone="slate" />
+              </li>
             ))}
-          </div>
+          </ul>
         </SectionCard>
       </section>
 
@@ -70,7 +70,6 @@ export function PaymentsPage({ data, notify }: { data: Snapshot; notify: (messag
           { header: "Mode", cell: (row) => <StatusBadge value={row.payment_method || "Manual"} tone="slate" /> },
           { header: "Status", cell: (row) => <StatusBadge value={row.payment_status || "Pending"} /> },
           { header: "Transaction", cell: (row) => row.transaction_id || "Not linked" },
-          { header: "Actions", cell: () => <SecondaryButton onClick={() => notify("Invoice placeholder ready.")}>Invoice</SecondaryButton> },
         ]}
       />
     </div>

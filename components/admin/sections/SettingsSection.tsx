@@ -6,6 +6,7 @@ import {
 } from "@/app/actions";
 import {
   SectionCard,
+  StatusBadge,
   ToggleSwitch,
 } from "../AdminPrimitives";
 import { type Lead, type MarketplaceRuntimeSetting, type Snapshot, type Vendor } from "../adminTypes";
@@ -101,7 +102,7 @@ export function MarketplaceRuntimeSettingsPanel({
           />
         </div>
 
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-3 qfa-quiet p-3">
           <label className="grid gap-1">
             <span className="text-xs font-semibold uppercase text-slate-500">Minimum paid vendors required</span>
             <input
@@ -109,7 +110,7 @@ export function MarketplaceRuntimeSettingsPanel({
               min={1}
               value={settings.minimum_paid_vendors_required_for_auto_assignment}
               onChange={(event) => save("minimum_paid_vendors_required_for_auto_assignment", Math.max(1, Number(event.target.value) || 1))}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="qfa-control px-2.5 font-semibold outline-none"
             />
           </label>
           <label className="grid gap-1">
@@ -120,7 +121,7 @@ export function MarketplaceRuntimeSettingsPanel({
               max={3}
               value={settings.max_vendors_per_lead}
               onChange={(event) => save("max_vendors_per_lead", Math.max(1, Math.min(3, Number(event.target.value) || 1)))}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="qfa-control px-2.5 font-semibold outline-none"
             />
           </label>
           <label className="grid gap-1">
@@ -128,7 +129,7 @@ export function MarketplaceRuntimeSettingsPanel({
             <select
               value={settings.auto_assignment_mode}
               onChange={(event) => save("auto_assignment_mode", event.target.value as MarketplaceSettingsView["auto_assignment_mode"])}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="qfa-control px-2.5 font-semibold outline-none"
             >
               <option value="off">off</option>
               <option value="preview">preview</option>
@@ -146,7 +147,7 @@ export function MarketplaceToggle({ label, checked, onChange }: { label: string;
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/30"
+      className="flex items-center justify-between gap-4 qfa-panel p-3 text-left transition-colors hover:border-[color:var(--qfa-line-strong)]"
       aria-pressed={checked}
     >
       <span className="text-sm font-semibold text-slate-800">{label}</span>
@@ -168,26 +169,28 @@ export function SettingsPage({
 }) {
   const groups = ["Business Settings", "Lead Settings", "Vendor Settings", "Distribution Settings", "AI Settings", "Automation Settings", "Security Settings"];
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <MarketplaceRuntimeSettingsPanel settingsRows={data.marketplaceSettings ?? []} runAction={runAction} />
-      <section className="grid gap-4 xl:grid-cols-2">
-        {groups.map((group, index) => (
-          <article key={group} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">{group}</h2>
-                <p className="mt-2 text-sm text-slate-500">Global marketplace controls prepared for Supabase persistence.</p>
-              </div>
-              <ToggleSwitch checked={index < 4} />
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <input className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder="Setting key" />
-              <input className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder="Setting value" />
-            </div>
-            <button type="button" onClick={() => notify(`${group} save placeholder ready.`)} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Save</button>
-          </article>
-        ))}
-      </section>
+
+      {/* This grid used to render seven "settings groups", each with an enable
+          switch driven by `index < 4`, two inert key/value inputs bound to
+          nothing, and a Save button that only fired a toast reading
+          "<group> save placeholder ready." Nothing was ever written. The real,
+          persisted controls are in the runtime settings panel above; this is
+          now a scope list stating plainly that these groups are not built. */}
+      <SectionCard
+        title="Planned settings groups"
+        description="Not implemented. Only the marketplace runtime settings above are stored and applied."
+      >
+        <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+          {groups.map((group) => (
+            <li key={group} className="flex items-center justify-between gap-2 text-[13px] text-slate-700">
+              <span className="min-w-0 truncate">{group}</span>
+              <StatusBadge value="Not built" tone="slate" />
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
     </div>
   );
 }

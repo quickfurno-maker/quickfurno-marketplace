@@ -7,8 +7,11 @@ import { type BadgeTone } from "./leadCrmTypes";
 
 export function DrawerSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold text-slate-950">{title}</h3>
+    /* Drawer sections are grouped by a heading, not by another nested white
+       card. Stacking ten bordered cards inside an already-panelled drawer was
+       the main reason the detail view read as a wall. */
+    <section>
+      <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">{title}</h3>
       {children}
     </section>
   );
@@ -25,9 +28,9 @@ export function MiniStat({ label, value, tone }: { label: string; value: number;
     cyan: "border-cyan-200 bg-cyan-50 text-cyan-700",
   };
   return (
-    <div className={`rounded-xl border px-4 py-3 ${toneClass[tone]}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{formatNumber(value)}</p>
+    <div className={`rounded-[var(--qfa-radius)] border px-3 py-2 ${toneClass[tone]}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-0.5 text-xl font-semibold tabular-nums">{formatNumber(value)}</p>
     </div>
   );
 }

@@ -225,7 +225,6 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
             <SelectFilter label="Eligibility" value={eligibility} onChange={setEligibility} options={["All", "Eligible", "Not eligible"]} />
           </>
         }
-        action={<SecondaryButton onClick={() => notify("Vendor export placeholder ready.")}>Export Vendors</SecondaryButton>}
       />
 
       <SectionCard
@@ -454,11 +453,11 @@ export function ManageCreditsModal({ vendor, busy, onClose, onSave }: { vendor: 
         </div>
         <label className="block">
           <span className="text-xs font-semibold uppercase text-slate-500">{mode === "add" ? "Credits to add (negative removes)" : "Set credits to"}</span>
-          <input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+          <input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" placeholder="0" className="mt-1 qfa-control w-full px-2.5 outline-none" />
         </label>
         <label className="block">
           <span className="text-xs font-semibold uppercase text-slate-500">Reason</span>
-          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Manual top-up after payment" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Manual top-up after payment" className="mt-1 qfa-control w-full px-2.5 outline-none" />
         </label>
         <p className="text-xs text-slate-500">No credits are ever deducted automatically. This change is logged.</p>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
@@ -483,21 +482,21 @@ export function AssignPackageModal({ vendor, busy, onClose, onSave }: { vendor: 
       <div className="space-y-4">
         <label className="block">
           <span className="text-xs font-semibold uppercase text-slate-500">Package name</span>
-          <input value={packageName} onChange={(event) => setPackageName(event.target.value)} placeholder="e.g. Growth Package" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+          <input value={packageName} onChange={(event) => setPackageName(event.target.value)} placeholder="e.g. Growth Package" className="mt-1 qfa-control w-full px-2.5 outline-none" />
         </label>
         <label className="block">
           <span className="text-xs font-semibold uppercase text-slate-500">Package status</span>
-          <select value={packageStatus} onChange={(event) => setPackageStatus(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100">
+          <select value={packageStatus} onChange={(event) => setPackageStatus(event.target.value)} className="mt-1 qfa-control w-full px-2.5 font-medium outline-none">
             {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </label>
         <label className="block">
           <span className="text-xs font-semibold uppercase text-slate-500">Credits to add (optional)</span>
-          <input value={creditsToAdd} onChange={(event) => setCreditsToAdd(event.target.value)} type="number" placeholder="0" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+          <input value={creditsToAdd} onChange={(event) => setCreditsToAdd(event.target.value)} type="number" placeholder="0" className="mt-1 qfa-control w-full px-2.5 outline-none" />
         </label>
         <label className="block">
           <span className="text-xs font-semibold uppercase text-slate-500">Expiry date (optional)</span>
-          <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} type="date" className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+          <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} type="date" className="mt-1 qfa-control w-full px-2.5 outline-none" />
         </label>
         <p className="text-xs text-slate-500">Updating the package never notifies the vendor and never triggers n8n.</p>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
@@ -599,7 +598,7 @@ export function VendorDetailDrawer({
             )}
           </article>
         ) : null}
-        <article className="rounded-2xl border border-slate-200 bg-white p-4">
+        <article className="qfa-panel p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-slate-950">Phase 25A internal status</h3>

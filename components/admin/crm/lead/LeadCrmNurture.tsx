@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  Blank,
   DataTable,
+  NoteBar,
   StatusBadge,
 } from "../../AdminPrimitives";
 import {
@@ -26,21 +28,23 @@ export function Nurture({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: Cr
   const nurtureRows = rows.filter((row) => String(row.lead.status ?? "").toLowerCase().includes("nurture"));
   return (
     <div className="space-y-3">
-    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+    <NoteBar>
       Read-only view of leads whose status is marked for nurture. No automated sequence, campaign or message is
       scheduled or sent from this screen.
-    </p>
+    </NoteBar>
     <DataTable
       rows={nurtureRows}
+      density="compact"
+      getRowKey={(row) => row.id}
       emptyTitle="No nurture leads"
       emptyMessage="Leads marked for nurture will appear here. Automated nurture sequences are not enabled in this phase."
       columns={[
-        { header: "Client", cell: (row) => <button type="button" onClick={() => onSelect(row)} className="font-semibold text-emerald-700 hover:underline">{row.name}</button> },
+        { header: "Client", cell: (row) => <button type="button" onClick={() => onSelect(row)} className="qfa-focus rounded font-semibold text-slate-900 underline-offset-2 hover:underline">{row.name}</button> },
         { header: "Service", cell: (row) => row.service },
         { header: "City", cell: (row) => row.city },
         { header: "Priority", cell: (row) => <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} /> },
         { header: "Status", cell: (row) => <StatusBadge value={row.statusLabel} /> },
-        { header: "Follow-up", cell: (row) => row.followUp ? formatDate(row.followUp) : "—" },
+        { header: "Follow-up", cell: (row) => row.followUp ? <span className="whitespace-nowrap">{formatDate(row.followUp)}</span> : <Blank /> },
       ]}
     />
     </div>

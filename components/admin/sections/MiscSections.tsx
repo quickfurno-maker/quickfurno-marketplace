@@ -4,6 +4,7 @@ import {
   ActionMenu,
   DataTable,
   EmptyState,
+  NoteBar,
   PrimaryButton,
   SecondaryButton,
   SectionCard,
@@ -41,43 +42,40 @@ export const aiAgents = [
   ["Fraud/Duplicate Lead Agent", "Find repeated phones, spam entries and invalid leads."],
 ];
 
+/**
+ * Planned agent catalogue — a roadmap list, not a control surface.
+ *
+ * What used to render here was fabricated end to end: a per-agent enable
+ * switch driven by `index < 2` that persisted nothing, a "N suggestions" count
+ * derived from the array index, a "Confidence 72%" chip that incremented by
+ * position, and a suggestions table of three invented rows with invented
+ * confidence scores and Accept/Reject actions wired to `() => {}`.
+ *
+ * No agent exists, no suggestion exists and no confidence is computed anywhere
+ * in QuickFurno, so none of it is rendered. The catalogue below is the only
+ * true statement this page can make about itself.
+ */
 export function AIAgentsPage() {
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {aiAgents.map(([name, purpose], index) => (
-          <article key={name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">{name}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{purpose}</p>
+    <div className="space-y-4">
+      <NoteBar tone="warning">
+        No AI agent is built, connected or running. There is no agent runtime, no suggestion store and no scoring model
+        in QuickFurno today. This page lists the agents that are planned — it does not control anything.
+      </NoteBar>
+
+      <SectionCard title="Planned agents" description="Scope only. Each entry becomes real work in a later phase.">
+        <ul className="divide-y divide-[color:var(--qfa-line-soft)]">
+          {aiAgents.map(([name, purpose]) => (
+            <li key={name} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-slate-900">{name}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{purpose}</p>
               </div>
-              <ToggleSwitch checked={index < 2} />
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <StatusBadge value={index < 2 ? "Draft" : "Disabled"} />
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">{index + 2} suggestions</span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">Confidence {72 + index}%</span>
-            </div>
-          </article>
-        ))}
-      </section>
-      <DataTable
-        rows={[
-          ["Lead quality", "Lead", "Budget and urgency look strong", "86%", "New"],
-          ["Vendor match", "Vendor", "Prioritize vendors with remaining credits", "78%", "New"],
-          ["Renewal", "Vendor", "Low balance vendor needs reminder", "74%", "Draft"],
-        ]}
-        emptyTitle="No AI suggestions"
-        emptyMessage="Suggestions will appear here when AI agents are connected."
-        columns={[
-          { header: "Suggestion", cell: (row) => row[2] },
-          { header: "Module", cell: (row) => row[1] },
-          { header: "Confidence", cell: (row) => row[3] },
-          { header: "Status", cell: (row) => <StatusBadge value={row[4]} /> },
-          { header: "Action", cell: () => <ActionMenu actions={[{ label: "Accept", onClick: () => {} }, { label: "Reject", onClick: () => {} }]} /> },
-        ]}
-      />
+              <StatusBadge value="Not built" tone="slate" />
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
     </div>
   );
 }
@@ -99,7 +97,9 @@ export function AutomationsPage({ notify }: { notify: (message: string, tone?: "
             { header: "Last Run", cell: () => "Not run" },
             { header: "Success", cell: () => "0" },
             { header: "Failed", cell: () => "0" },
-            { header: "Actions", cell: () => <ActionMenu actions={[{ label: "Test webhook", onClick: () => notify("Webhook test placeholder ready.") }, { label: "Enable/disable", onClick: () => notify("Automation toggle placeholder ready.") }]} /> },
+            /* The Actions column offered "Test webhook" and "Enable/disable",
+               both of which only fired a "…placeholder ready" toast. This is a
+               read-only catalogue, so it no longer pretends to have controls. */
           ]}
         />
       </SectionCard>
@@ -107,21 +107,34 @@ export function AutomationsPage({ notify }: { notify: (message: string, tone?: "
   );
 }
 
-export function WebsiteContentPage({ notify }: { notify: (message: string) => void }) {
+/**
+ * CMS scope list.
+ *
+ * Each of these eight blocks used to render a title input, a content textarea
+ * and a Save button. None of the fields was bound to state or to any record,
+ * and Save only fired a "<section> save placeholder ready." toast — so an
+ * operator could type a full homepage rewrite, press Save, see a success
+ * message, and lose everything. That is worse than having no editor at all.
+ */
+export function WebsiteContentPage() {
   const sections = ["Hero Content", "CTA Buttons", "Featured Categories", "Featured Cities", "Testimonials", "FAQs", "Contact Info", "SEO Settings"];
   return (
-    <section className="grid gap-4 xl:grid-cols-2">
-      {sections.map((section) => (
-        <article key={section} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-950">{section}</h2>
-          <div className="mt-4 space-y-3">
-            <input className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder={`${section} title`} />
-            <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100" placeholder={`${section} content`} />
-            <PrimaryButton onClick={() => notify(`${section} save placeholder ready.`)}>Save</PrimaryButton>
-          </div>
-        </article>
-      ))}
-    </section>
+    <div className="space-y-4">
+      <NoteBar tone="warning">
+        No content editor is connected. There is no CMS table behind this page, so nothing typed here could be saved.
+        Website copy is currently changed in code and deployed.
+      </NoteBar>
+      <SectionCard title="Planned content blocks" description="Scope only — editing is not available.">
+        <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+          {sections.map((section) => (
+            <li key={section} className="flex items-center justify-between gap-2 text-[13px] text-slate-700">
+              <span className="min-w-0 truncate">{section}</span>
+              <StatusBadge value="Not built" tone="slate" />
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    </div>
   );
 }
 
@@ -136,13 +149,14 @@ export function ReviewsPage() {
         { header: "Client", cell: (row) => row[1] },
         { header: "Rating", cell: (row) => row[2] },
         { header: "Status", cell: (row) => <StatusBadge value={row[3]} /> },
-        { header: "Actions", cell: () => <ActionMenu actions={[{ label: "Approve", onClick: () => {} }, { label: "Reject", onClick: () => {} }]} /> },
+        /* Approve/Reject were wired to `() => {}`. There is no moderation
+           action behind this page yet, so no action column is rendered. */
       ]}
     />
   );
 }
 
-export function NotificationsPage({ data, notify }: { data: Snapshot; notify: (message: string) => void }) {
+export function NotificationsPage({ data }: { data: Snapshot }) {
   const notifications = [
     ...data.leads.slice(0, 4).map((lead) => ({ title: "New lead", message: `${lead.name || "Client"} submitted a requirement`, type: "New lead", priority: "High", date: lead.created_at })),
     ...data.vendors.filter((vendor) => Number(vendor.remaining_credits ?? 0) <= 3).slice(0, 4).map((vendor) => ({ title: "Low balance vendor", message: `${vendor.business_name || "Vendor"} has low lead balance`, type: "Low balance vendor", priority: "Medium", date: vendor.created_at })),
@@ -158,7 +172,9 @@ export function NotificationsPage({ data, notify }: { data: Snapshot; notify: (m
         { header: "Priority", cell: (row) => <StatusBadge value={row.priority} /> },
         { header: "Read", cell: () => <StatusBadge value="Unread" /> },
         { header: "Date", cell: (row) => formatDate(row.date) },
-        { header: "Actions", cell: () => <SecondaryButton onClick={() => notify("Notification marked read placeholder.")}>Mark read</SecondaryButton> },
+        /* "Mark read" only produced a "…placeholder" toast — there is no
+           notification-read state to write. The Read column above is likewise
+           a constant, so it is labelled honestly rather than being actionable. */
       ]}
     />
   );

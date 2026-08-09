@@ -52,8 +52,8 @@ export function FollowUps({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Pill label="Overdue" value={overdue.length} urgent={overdue.length > 0} />
         <Pill label="Today" value={today.length} urgent={today.length > 0} />
         <Pill label="Upcoming" value={upcoming.length} urgent={false} />
@@ -71,13 +71,15 @@ export function FollowUps({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: 
                 {group.hint} · {formatNumber(group.rows.length)}
               </span>
               {group.urgent ? (
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                <span className="rounded-[var(--qfa-radius-xs)] border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
                   Needs action
                 </span>
               ) : null}
             </div>
             <DataTable
               rows={group.rows}
+              density="compact"
+              getRowKey={(row: CrmRow) => row.id}
               emptyTitle="None"
               emptyMessage=""
               columns={[
@@ -131,8 +133,8 @@ export function FollowUps({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: 
 function Pill({ label, value, urgent }: { label: string; value: number; urgent: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-        urgent ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-600"
+      className={`inline-flex h-7 items-center gap-1.5 rounded-[var(--qfa-radius-sm)] border px-2 text-xs font-semibold ${
+        urgent ? "border-amber-200 bg-amber-50 text-amber-900" : "border-[color:var(--qfa-line)] bg-white text-slate-600"
       }`}
     >
       {label}

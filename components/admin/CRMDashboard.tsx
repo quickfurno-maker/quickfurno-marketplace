@@ -124,17 +124,23 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
   const isLimited = Boolean(meta && meta.rowsLoaded?.leads < totalLeads);
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-900">
-        Operations CRM — live from your lead pipeline. Priority labels are
-        computed for display only and are never written to the database.
-        {isLimited
-          ? ` Showing the latest ${formatNumber(rows.length)} of ${formatNumber(totalLeads)} leads — KPI totals below are accurate.`
-          : ` Showing ${formatNumber(rows.length)} leads.`}
-        {error ? ` Some data was limited: ${error}` : ""}
+    <div className="space-y-4">
+      {/* Context strip, not a banner card. AdminShell already titles this page
+          "CRM", so the workspace opens straight onto its own navigation. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-600">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {isLimited
+            ? `Latest ${formatNumber(rows.length)} of ${formatNumber(totalLeads)} leads`
+            : `${formatNumber(rows.length)} leads`}
+        </span>
+        <span aria-hidden="true" className="text-slate-300">·</span>
+        <span>Priority labels are computed for display only and are never written to the database.</span>
+        {isLimited ? <span>KPI totals are counted live and stay accurate.</span> : null}
+        {error ? <span className="font-medium text-amber-700">Some data was limited: {error}</span> : null}
       </div>
 
-      <Tabs tabs={TABS} active={active} onChange={setActive} />
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Lead CRM sections" />
 
       {active === "Overview" ? (
         <Overview kpis={kpis} onCard={openInbox} onGoFollowUps={() => setActive("Follow-ups")} />

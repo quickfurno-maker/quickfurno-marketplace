@@ -67,9 +67,7 @@ export function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (m
             header: "Actions",
             cell: (item) => (
               <ActionMenu actions={[
-                { label: "Edit", onClick: () => notify("Package edit placeholder ready.") },
                 { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility.", () => adminSetPackageActive(item.id, !item.is_active)) },
-                { label: "Duplicate", onClick: () => notify("Duplicate package placeholder ready.") },
               ]} />
             ),
           },
@@ -104,7 +102,6 @@ export function PackageRowCard({ item, notify, ask }: { item: PackageRow; notify
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <ToggleSwitch checked={Boolean(item.is_active)} label="Visible" />
         <ActionMenu actions={[
-          { label: "Edit", onClick: () => notify("Package edit placeholder ready.") },
           { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility.", () => adminSetPackageActive(item.id, !item.is_active)) },
         ]} />
       </div>
@@ -131,9 +128,9 @@ export function PackageTemplateCard({ item, notify }: { item: (typeof packageTem
           </li>
         ))}
       </ul>
-      <button type="button" onClick={() => notify("Package editor placeholder ready.")} className="mt-5 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-        Configure package
-      </button>
+      {/* "Configure package" only fired a "Package editor placeholder ready."
+          toast — there is no package editor. Activation, the one real control
+          on this page, stays in the row action menu above. */}
     </article>
   );
 }

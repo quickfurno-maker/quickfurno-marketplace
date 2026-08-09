@@ -42,7 +42,6 @@ export function SubscriptionsPage({ data, notify }: { data: Snapshot; notify: (m
           { header: "Remaining", cell: (row: any) => formatNumber(row.remaining_leads ?? row.leads_remaining ?? row.remaining_credits ?? 0) },
           { header: "Expiry", cell: (row: any) => formatDate(row.expiry_date) },
           { header: "Status", cell: (row: any) => <StatusBadge value={row.status || "Active"} /> },
-          { header: "Actions", cell: () => <SecondaryButton onClick={() => notify("Renewal drawer placeholder ready.")}>Renew</SecondaryButton> },
         ]}
       />
 

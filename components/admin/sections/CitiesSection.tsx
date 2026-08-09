@@ -49,7 +49,7 @@ export function CitiesPage({ data, notify, ask }: { data: Snapshot; notify: (mes
           { header: "Launch Status", cell: (item) => <StatusBadge value={item.launch_status || (item.is_active ? "Active" : "Hidden")} /> },
           { header: "Homepage", cell: (item) => <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} /> },
           { header: "Localities", cell: () => <StatusBadge value="Manager prepared" tone="slate" /> },
-          { header: "Actions", cell: (item) => <ActionMenu actions={[{ label: "Edit city", onClick: () => notify("City editor placeholder ready.") }, { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update city", "This changes public form city visibility.", () => adminSetCityActive(item.id, !item.is_active)) }, { label: "Manage localities", onClick: () => notify("Locality manager placeholder ready.") }]} /> },
+          { header: "Actions", cell: (item) => <ActionMenu actions={[{ label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update city", "This changes public form city visibility.", () => adminSetCityActive(item.id, !item.is_active)) }, { label: "Manage localities", onClick: () => notify("Locality manager placeholder ready.") }]} /> },
         ]}
       />
     </div>

@@ -25,34 +25,43 @@ export type AttentionItem = {
   approximate?: boolean;
 };
 
-/** Severity is conveyed by label + icon + border, never by colour alone. */
-const TONE: Record<AttentionSeverity, { wrap: string; chip: string; pill: string; word: string }> = {
+/** Severity is conveyed by label + icon + rail, never by colour alone. */
+const TONE: Record<AttentionSeverity, { rail: string; chip: string; icon: string; word: string }> = {
   critical: {
-    wrap: "border-rose-200 bg-rose-50/60 hover:border-rose-300",
-    chip: "bg-rose-100 text-rose-700",
-    pill: "border-rose-200 bg-white text-rose-700",
+    rail: "bg-rose-500",
+    chip: "border-rose-200 bg-rose-50 text-rose-800",
+    icon: "text-rose-600",
     word: "Critical",
   },
   warning: {
-    wrap: "border-amber-200 bg-amber-50/60 hover:border-amber-300",
-    chip: "bg-amber-100 text-amber-800",
-    pill: "border-amber-200 bg-white text-amber-800",
+    rail: "bg-amber-500",
+    chip: "border-amber-200 bg-amber-50 text-amber-900",
+    icon: "text-amber-600",
     word: "Needs action",
   },
   info: {
-    wrap: "border-slate-200 bg-white hover:border-slate-300",
-    chip: "bg-slate-100 text-slate-700",
-    pill: "border-slate-200 bg-white text-slate-600",
+    rail: "bg-slate-300",
+    chip: "border-slate-200 bg-slate-50 text-slate-700",
+    icon: "text-slate-500",
     word: "Monitor",
   },
   clear: {
-    wrap: "border-emerald-200 bg-emerald-50/50",
-    chip: "bg-emerald-100 text-emerald-700",
-    pill: "border-emerald-200 bg-white text-emerald-700",
+    rail: "bg-emerald-400",
+    chip: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    icon: "text-emerald-600",
     word: "Clear",
   },
 };
 
+/**
+ * The operational queue for the dashboard.
+ *
+ * Previously six equally-sized coloured cards in a grid — which made a critical
+ * queue look exactly as important as a cleared one and consumed most of the
+ * fold. It is now a ranked list: severity rail, the count, what it means, and
+ * the route that actions it. Scanning top-to-bottom answers "what do I do
+ * next?" in one pass.
+ */
 export function AttentionCenter({ items }: { items: AttentionItem[] }) {
   const ranked = [...items].sort((a, b) => {
     const order: AttentionSeverity[] = ["critical", "warning", "info", "clear"];
@@ -63,49 +72,58 @@ export function AttentionCenter({ items }: { items: AttentionItem[] }) {
   const needing = ranked.filter((item) => item.severity === "critical" || item.severity === "warning").length;
 
   return (
-    <section aria-labelledby="qf-attention-heading" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 id="qf-attention-heading" className="text-base font-semibold tracking-tight text-slate-950">
+    <section aria-labelledby="qf-attention-heading" className="qfa-panel overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--qfa-line-soft)] px-4 py-2.5">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h2 id="qf-attention-heading" className="text-[15px] font-semibold tracking-tight text-slate-950">
             Attention center
           </h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="min-w-0 truncate text-xs text-slate-500">
             {needing === 0
               ? "Nothing is waiting on a human decision right now."
-              : `${needing} ${needing === 1 ? "queue needs" : "queues need"} a human decision.`}
+              : `${needing} ${needing === 1 ? "queue needs" : "queues need"} a decision`}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
           Live snapshot
         </span>
       </div>
 
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="divide-y divide-[color:var(--qfa-line-soft)]">
         {ranked.map((item) => {
           const tone = TONE[item.severity];
           const body = (
             <>
-              <div className="flex items-start justify-between gap-3">
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tone.chip}`}>
-                  <AdminIcon name={item.icon} className="h-4 w-4" />
-                </span>
+              <span aria-hidden="true" className={`h-9 w-0.5 shrink-0 rounded-full ${tone.rail}`} />
+              <AdminIcon name={item.icon} className={`h-4 w-4 shrink-0 ${tone.icon}`} />
+
+              <span className="w-24 shrink-0 sm:w-28">
                 <span
-                  className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tone.pill}`}
+                  className={`inline-flex items-center rounded-[var(--qfa-radius-xs)] border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tone.chip}`}
                 >
                   {tone.word}
                 </span>
-              </div>
-              <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-slate-950">{item.value}</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{item.label}</p>
-              <p className="mt-1 text-xs leading-4 text-slate-500">
-                {item.detail}
-                {item.approximate ? (
-                  <span className="mt-1 block font-medium text-slate-400">
-                    From the latest loaded rows — not a marketplace-wide total.
-                  </span>
-                ) : null}
-              </p>
+              </span>
+
+              <span className="w-14 shrink-0 text-right text-lg font-semibold tabular-nums leading-none text-slate-950 sm:w-16">
+                {item.value}
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold text-slate-900">{item.label}</span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {item.detail}
+                  {item.approximate ? " Counted over the latest loaded rows, not marketplace-wide." : ""}
+                </span>
+              </span>
+
+              {item.href ? (
+                <span className="hidden shrink-0 items-center gap-1 text-xs font-semibold text-slate-500 transition-colors group-hover:text-emerald-700 sm:inline-flex">
+                  Open queue
+                  <span aria-hidden="true">→</span>
+                </span>
+              ) : null}
             </>
           );
 
@@ -114,16 +132,12 @@ export function AttentionCenter({ items }: { items: AttentionItem[] }) {
               {item.href ? (
                 <Link
                   href={item.href}
-                  className={`block h-full rounded-xl border p-4 outline-none transition duration-150 hover:shadow-sm focus-visible:ring-4 focus-visible:ring-slate-200 ${tone.wrap}`}
+                  className="qfa-focus group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[color:var(--qfa-inset)]"
                 >
                   {body}
-                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-700">
-                    Open queue
-                    <span aria-hidden="true">→</span>
-                  </span>
                 </Link>
               ) : (
-                <div className={`h-full rounded-xl border p-4 ${tone.wrap}`}>{body}</div>
+                <div className="flex items-center gap-3 px-4 py-2.5">{body}</div>
               )}
             </li>
           );

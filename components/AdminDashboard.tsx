@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  ActionMenu,
+  Blank,
   ChartCard,
   Drawer,
   InfoGrid,
-  PageHeader,
+  NoteBar,
+  Panel,
   ProgressBar,
+  Quiet,
   SectionCard,
   SecondaryButton,
   StatCard,
@@ -141,35 +143,31 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
   const vendorHealthRows = (lowBalanceVendors.length ? lowBalanceVendors : data.vendors).slice(0, 5);
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Marketplace Command Center"
-        description="Monitor leads, vendor capacity, collections, and urgent marketplace operations from one calm superadmin workspace."
-        meta={
-          <>
-            <StatusBadge value="Superadmin" tone="slate" />
-            <StatusBadge value={`${formatNumber(totalLeads)} leads`} tone="emerald" />
-            <StatusBadge value={`Updated ${formatDate(data.generatedAt)}`} tone="blue" />
-          </>
-        }
-        actions={
-          <>
-            <LinkButton href="/admin/leads">Review Leads</LinkButton>
-            <LinkButton href="/admin/vendors">Vendor Queue</LinkButton>
-            <LinkButton href="/admin/payments">Revenue</LinkButton>
-          </>
-        }
-      />
+    <div className="space-y-4">
+      {/* Compact command strip.
+          This used to be a full-height white hero card that repeated the page
+          title AdminShell already prints. It is now a single ~64px row: live
+          context on the left, the three real destinations on the right. */}
+      <div className="flex flex-col gap-2.5 border-b border-[color:var(--qfa-line)] pb-3.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <StatusBadge value="Superadmin" tone="slate" />
+          <StatusBadge value={`${formatNumber(totalLeads)} leads`} tone="emerald" />
+          <StatusBadge value={`Updated ${formatDate(data.generatedAt)}`} tone="blue" />
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <LinkButton href="/admin/leads" icon="leads">Review leads</LinkButton>
+          <LinkButton href="/admin/vendors" icon="vendors">Vendor queue</LinkButton>
+          <LinkButton href="/admin/payments" icon="payments">Revenue</LinkButton>
+        </div>
+      </div>
 
       {error ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-          Admin data loaded with fallback UI because Supabase returned: {error}
-        </div>
+        <NoteBar tone="warning">Admin data loaded with fallback UI because Supabase returned: {error}</NoteBar>
       ) : null}
 
       {data.warnings?.length ? (
-        <SectionCard title="Supabase Fallback Notices">
-          <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
+        <SectionCard title="Supabase fallback notices">
+          <ul className="list-disc space-y-1 pl-5 text-[13px] text-slate-600">
             {data.warnings.slice(0, 4).map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
@@ -177,14 +175,14 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </SectionCard>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Marketplace key figures">
         {kpis.map(([label, value, helper, icon, tone]) => (
           <StatCard key={label} label={label} value={value} helper={helper} icon={icon} tone={tone} />
         ))}
       </section>
 
       {meta ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-[11px] text-slate-500">
           Showing the latest {formatNumber(meta.rowsLoaded?.leads ?? data.leads.length)} of {formatNumber(totalLeads)} leads
           and latest {formatNumber(meta.rowsLoaded?.vendors ?? data.vendors.length)} of {formatNumber(meta.totals?.total_vendors ?? data.vendors.length)} vendors.
           KPI totals are counted live and stay accurate.
@@ -193,50 +191,52 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
 
       <AttentionCenter items={attentionItems} />
 
-      <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <SectionCard
-          title="Today's Priority"
+          title="Today's priority"
           description="The shortest path to keeping the marketplace moving today."
-          action={<Link href="/admin/leads" className="text-sm font-semibold text-emerald-700">Open leads</Link>}
+          action={
+            <Link href="/admin/leads" className="qfa-focus rounded text-[13px] font-semibold text-emerald-700 hover:underline">
+              Open leads
+            </Link>
+          }
         >
-          <div className="grid gap-3">
+          <div className="grid gap-2">
             {priorityLeads.length ? (
               priorityLeads.map((lead) => (
-                <div key={lead.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 sm:grid-cols-[1fr_auto] sm:items-center">
+                <Quiet key={lead.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-slate-950">{lead.name || "Unnamed lead"}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-[13px] font-semibold text-slate-950">{lead.name || "Unnamed lead"}</p>
                       <StatusBadge value={lead.lead_priority || (isHotLead(lead) ? "Hot" : "Unassigned")} />
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {lead.service_required || lead.category || "Requirement not set"} in {lead.city || "city not set"} - {maskPhone(lead.phone)}
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {lead.service_required || lead.category || "Requirement not set"} · {lead.city || "City not set"} · {maskPhone(lead.phone)}
                     </p>
                   </div>
-                  <SecondaryButton onClick={() => setSelectedLead(lead)}>View</SecondaryButton>
-                </div>
+                  <SecondaryButton size="sm" onClick={() => setSelectedLead(lead)}>View</SecondaryButton>
+                </Quiet>
               ))
             ) : (
-              <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+              <Quiet className="p-3 text-[13px] text-slate-500">
                 No urgent leads in this snapshot. New public enquiries will appear here automatically.
-              </p>
+              </Quiet>
             )}
           </div>
         </SectionCard>
 
         <SectionCard title="Quick operations" description="Jump straight into an existing admin workspace.">
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-1.5 sm:grid-cols-2">
             {quickOperations.map((op) => (
               <Link
                 key={op.href}
                 href={op.href}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 outline-none transition duration-150 hover:border-slate-300 hover:shadow-sm focus-visible:ring-4 focus-visible:ring-slate-200"
+                className="qfa-focus group flex items-center gap-2.5 rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line-soft)] bg-white px-3 py-2 transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-slate-900 group-hover:text-white">
-                  <AdminIcon name={op.icon} className="h-4 w-4" />
-                </span>
+                <AdminIcon name={op.icon} className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-emerald-600" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-slate-900">{op.label}</span>
-                  <span className="block truncate text-xs text-slate-500">{op.detail}</span>
+                  <span className="block truncate text-[13px] font-semibold text-slate-900">{op.label}</span>
+                  <span className="block truncate text-[11px] text-slate-500">{op.detail}</span>
                 </span>
               </Link>
             ))}
@@ -244,44 +244,67 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </SectionCard>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        <SectionCard title="Lead Funnel" description="Placeholder-ready funnel view backed by live lead statuses." className="xl:col-span-1">
+      <section className="grid gap-4 xl:grid-cols-3">
+        <SectionCard title="Lead funnel" description="Live lead statuses across the leads loaded in this snapshot.">
           <FunnelRows rows={leadFunnelRows} total={data.leads.length} />
         </SectionCard>
 
-        <SectionCard title="Vendor Health" description="Capacity and response risk at a glance." className="xl:col-span-1">
-          <div className="space-y-4">
+        <SectionCard title="Vendor credit balance" description="Lead credits remaining against the credits purchased.">
+          {/* This panel used to show a "health score" percentage synthesised
+              from credits, rating, status and visibility with invented weights.
+              No such score exists in the product, so it has been replaced with
+              the underlying facts: real credit balance, real status, real
+              rating. Nothing here is computed from a made-up formula. */}
+          <div className="space-y-2">
             {vendorHealthRows.length ? (
               vendorHealthRows.map((vendor) => {
-                const score = vendorHealthScore(vendor);
+                const remaining = Number(vendor.remaining_credits ?? 0);
+                const total = Number(vendor.total_credits ?? 0);
+                const pct = total > 0 ? Math.round((remaining / total) * 100) : 0;
+                const low = remaining <= 3;
                 return (
                   <button
                     key={vendor.id}
                     type="button"
                     onClick={() => setSelectedVendor(vendor)}
-                    className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50/30"
+                    className="qfa-focus w-full rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line-soft)] bg-white p-3 text-left transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-950">{vendor.business_name || "Unnamed vendor"}</p>
-                        <p className="mt-1 text-xs text-slate-500">{vendor.city || "City not set"} - {formatNumber(vendor.remaining_credits)} credits</p>
+                        <p className="truncate text-[13px] font-semibold text-slate-950">{vendor.business_name || "Unnamed vendor"}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          {vendor.city || "City not set"} · {vendor.status || "Status not set"}
+                        </p>
                       </div>
-                      <StatusBadge value={`${score}%`} tone={score >= 75 ? "emerald" : score >= 45 ? "amber" : "rose"} />
+                      <span className="shrink-0 text-right">
+                        <span className="block text-[13px] font-semibold tabular-nums text-slate-900">
+                          {formatNumber(remaining)}
+                          {total > 0 ? <span className="text-slate-400">/{formatNumber(total)}</span> : null}
+                        </span>
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">credits</span>
+                      </span>
                     </div>
-                    <div className="mt-3">
-                      <ProgressBar value={score} tone={score >= 75 ? "emerald" : score >= 45 ? "amber" : "rose"} />
-                    </div>
+                    {total > 0 ? (
+                      <div className="mt-2">
+                        <ProgressBar value={pct} tone={low ? "rose" : pct >= 40 ? "emerald" : "amber"} />
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-slate-400">No package credits recorded.</p>
+                    )}
+                    {low ? (
+                      <p className="mt-1.5 text-[11px] font-semibold text-rose-700">Low balance — at or under 3 credits.</p>
+                    ) : null}
                   </button>
                 );
               })
             ) : (
-              <p className="text-sm text-slate-500">Vendor health will appear after vendor onboarding starts.</p>
+              <p className="text-[13px] text-slate-500">Vendor credit balances will appear after vendor onboarding starts.</p>
             )}
           </div>
         </SectionCard>
 
-        <SectionCard title="Revenue Snapshot" description="Paid collections by package, using current payment data.">
-          <div className="mb-5 grid grid-cols-2 gap-3">
+        <SectionCard title="Revenue snapshot" description="Paid collections by package, using current payment data.">
+          <div className="mb-3 grid grid-cols-2 gap-2">
             <MetricPill label="Month" value={formatINR(stats.revenue_this_month)} />
             <MetricPill label="Lifetime" value={formatINR(stats.total_revenue)} />
           </div>
@@ -289,28 +312,26 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </SectionCard>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <ChartCard title="Lead Sources" rows={groupBy(data.leads, (lead) => lead.source || "Website")} />
+      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <ChartCard title="Lead sources" rows={groupBy(data.leads, (lead) => lead.source || "Website")} />
 
-        <SectionCard title="Recent Activity" description="Latest lead, vendor, and payment events.">
-          <div className="space-y-3">
+        <SectionCard title="Recent activity" description="Latest lead, vendor, and payment events.">
+          <div className="divide-y divide-[color:var(--qfa-line-soft)]">
             {recentActivity.length ? (
               recentActivity.map((item) => (
-                <div key={`${item.type}-${item.id}`} className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
+                <div key={`${item.type}-${item.id}`} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge value={item.type} tone={item.tone} />
-                      <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
+                      <p className="truncate text-[13px] font-semibold text-slate-950">{item.title}</p>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">{item.detail}</p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">{item.detail}</p>
                   </div>
-                  <span className="shrink-0 text-xs font-medium text-slate-400">{formatDate(item.date)}</span>
+                  <span className="shrink-0 whitespace-nowrap text-[11px] text-slate-400">{formatDate(item.date)}</span>
                 </div>
               ))
             ) : (
-              <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                Recent marketplace activity will appear here.
-              </p>
+              <Quiet className="p-3 text-[13px] text-slate-500">Recent marketplace activity will appear here.</Quiet>
             )}
           </div>
         </SectionCard>
@@ -322,9 +343,13 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
   );
 }
 
-function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+function LinkButton({ href, children, icon }: { href: string; children: React.ReactNode; icon: AdminIconName }) {
   return (
-    <Link href={href} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-700">
+    <Link
+      href={href}
+      className="qfa-focus inline-flex h-[var(--qfa-control-h)] items-center justify-center gap-1.5 rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white px-3 text-[13px] font-semibold text-slate-700 transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
+    >
+      <AdminIcon name={icon} className="h-3.5 w-3.5 text-slate-400" />
       {children}
     </Link>
   );
@@ -332,68 +357,97 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 
 function MetricPill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 truncate text-base font-semibold text-slate-950">{value}</p>
-    </div>
+    <Quiet className="px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate text-[15px] font-semibold text-slate-950">{value}</p>
+    </Quiet>
   );
 }
 
 function FunnelRows({ rows, total, money = false }: { rows: Array<{ label: string; value: number }>; total: number; money?: boolean }) {
   const normalizedTotal = Math.max(1, total);
-  const visibleRows = rows.length ? rows.slice(0, 6) : [{ label: "Prepared", value: 0 }];
+  const visibleRows = rows.length ? rows.slice(0, 6) : [];
+
+  if (!visibleRows.length) {
+    return <p className="text-[13px] text-slate-500">No data in this snapshot yet.</p>;
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       {visibleRows.map((row) => {
         const percent = total ? Math.round((row.value / normalizedTotal) * 100) : 0;
         return (
-          <div key={row.label} className="space-y-1.5">
-            <div className="flex items-center justify-between gap-4 text-xs font-medium">
-              <span className="truncate text-slate-600">{row.label}</span>
-              <span className="text-slate-900">{money ? formatINR(row.value) : `${formatNumber(row.value)} (${percent}%)`}</span>
+          <div key={row.label} className="space-y-1">
+            <div className="flex items-center justify-between gap-4 text-xs">
+              <span className="min-w-0 truncate text-slate-600">{row.label}</span>
+              <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                {money ? formatINR(row.value) : `${formatNumber(row.value)} (${percent}%)`}
+              </span>
             </div>
-            <ProgressBar value={Math.max(row.value ? 8 : 4, percent)} />
+            <ProgressBar value={Math.max(row.value ? 6 : 3, percent)} />
           </div>
         );
       })}
+      {rows.length > 6 ? (
+        <p className="pt-0.5 text-[11px] text-slate-500">+{rows.length - 6} more not shown.</p>
+      ) : null}
     </div>
   );
 }
 
 function LeadDrawer({ lead, vendors, onClose }: { lead: Lead; vendors: Vendor[]; onClose: () => void }) {
   return (
-    <Drawer title={lead.name || "Lead details"} subtitle={`Lead ID ${shortId(lead.id)}`} onClose={onClose}>
-      <div className="space-y-5">
-        <InfoGrid
-          rows={[
-            ["Phone", lead.phone || "Not provided"],
-            ["Email", lead.email || "Not provided"],
-            ["City", lead.city || "Not provided"],
-            ["Locality", lead.locality || lead.area || "Not provided"],
-            ["Category", lead.service_required || lead.category || "Not provided"],
-            ["Budget", lead.budget || "Not provided"],
-            ["Timeline", lead.timeline || "Not provided"],
-            ["Source", lead.source || "Website"],
-          ]}
-        />
-        <SectionCard title="Requirement">
-          <p className="text-sm leading-6 text-slate-600">{lead.message || "No detailed requirement message was provided."}</p>
-        </SectionCard>
-        <SectionCard title="Assigned Vendors">
-          <div className="space-y-2">
+    <Drawer
+      title={lead.name || "Lead details"}
+      subtitle={`Lead ID ${shortId(lead.id)}`}
+      onClose={onClose}
+      header={
+        <div className="flex flex-wrap gap-1.5">
+          <StatusBadge value={lead.status || "New"} />
+          {lead.lead_priority ? <StatusBadge value={lead.lead_priority} /> : null}
+          <StatusBadge value={lead.source || "Website"} tone="slate" />
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <DrawerBlock title="Client">
+          <InfoGrid
+            rows={[
+              ["Phone", lead.phone || <Blank />],
+              ["Email", lead.email || <Blank />],
+              ["City", lead.city || <Blank />],
+              ["Locality", lead.locality || lead.area || <Blank />],
+            ]}
+          />
+        </DrawerBlock>
+
+        <DrawerBlock title="Requirement">
+          <InfoGrid
+            rows={[
+              ["Category", lead.service_required || lead.category || <Blank />],
+              ["Budget", lead.budget || <Blank />],
+              ["Timeline", lead.timeline || <Blank />],
+            ]}
+          />
+          <p className="mt-2 text-[13px] leading-5 text-slate-600">
+            {lead.message || "No detailed requirement message was provided."}
+          </p>
+        </DrawerBlock>
+
+        <DrawerBlock title="Assigned vendors">
+          <div className="space-y-1.5">
             {lead.lead_assignments?.length ? (
               lead.lead_assignments.map((assignment) => (
-                <div key={assignment.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                  <span className="font-medium text-slate-700">{vendorName(vendors, assignment.vendor_id)}</span>
+                <div key={assignment.id} className="flex items-center justify-between gap-3 rounded-[var(--qfa-radius-sm)] bg-[color:var(--qfa-inset)] px-2.5 py-1.5 text-[13px]">
+                  <span className="min-w-0 truncate font-medium text-slate-700">{vendorName(vendors, assignment.vendor_id)}</span>
                   <StatusBadge value={assignmentStatus(assignment)} />
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-500">No vendor assignment recorded yet.</p>
+              <p className="text-[13px] text-slate-500">No vendor assignment recorded yet.</p>
             )}
           </div>
-        </SectionCard>
+        </DrawerBlock>
       </div>
     </Drawer>
   );
@@ -401,28 +455,95 @@ function LeadDrawer({ lead, vendors, onClose }: { lead: Lead; vendors: Vendor[];
 
 function VendorDrawer({ vendor, onClose }: { vendor: Vendor; onClose: () => void }) {
   return (
-    <Drawer title={vendor.business_name || "Vendor details"} subtitle={`Vendor ID ${shortId(vendor.id)}`} onClose={onClose}>
-      <div className="space-y-5">
-        <InfoGrid
-          rows={[
-            ["Owner", vendor.owner_name || "Not provided"],
-            ["Phone", vendor.phone || "Not provided"],
-            ["Email", vendor.email || "Not provided"],
-            ["City", vendor.city || "Not provided"],
-            ["Categories", vendor.service_categories?.join(", ") || "Not provided"],
-            ["Areas", vendor.areas_covered?.join(", ") || "Not provided"],
-            ["Remaining Leads", formatNumber(vendor.remaining_credits)],
-            ["Rating", vendor.rating ? `${vendor.rating}/5` : "Not rated"],
-          ]}
-        />
-        <SectionCard title="Vendor Status" description="Operational status and public visibility.">
-          <div className="flex items-center justify-between gap-3">
-            <StatusBadge value={vendor.status || "Pending"} />
-            <ActionMenu actions={[{ label: "Assign package", onClick: () => {} }, { label: "Pause vendor", onClick: () => {} }, { label: "Add internal note", onClick: () => {} }]} />
+    <Drawer
+      title={vendor.business_name || "Vendor details"}
+      subtitle={`Vendor ID ${shortId(vendor.id)}`}
+      onClose={onClose}
+      header={
+        <div className="flex flex-wrap gap-1.5">
+          <StatusBadge value={vendor.status || "Pending"} />
+          <StatusBadge value={vendor.is_active === false ? "Disabled" : "Enabled"} />
+          <StatusBadge value={`${formatNumber(vendor.remaining_credits)} credits left`} tone="slate" />
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <DrawerBlock title="Contact">
+          <InfoGrid
+            rows={[
+              ["Owner", vendor.owner_name || <Blank />],
+              ["Phone", vendor.phone || <Blank />],
+              ["Email", vendor.email || <Blank />],
+              ["City", vendor.city || <Blank />],
+            ]}
+          />
+        </DrawerBlock>
+
+        <DrawerBlock title="Coverage">
+          <InfoGrid
+            rows={[
+              ["Categories", vendor.service_categories?.join(", ") || <Blank />],
+              ["Areas", vendor.areas_covered?.join(", ") || <Blank />],
+            ]}
+          />
+        </DrawerBlock>
+
+        <DrawerBlock title="Capacity">
+          <InfoGrid
+            rows={[
+              ["Credits remaining", formatNumber(vendor.remaining_credits)],
+              ["Credits purchased", vendor.total_credits != null ? formatNumber(vendor.total_credits) : <Blank />],
+              ["Package", vendor.package_name || <Blank />],
+              ["Package status", vendor.package_status || <Blank />],
+              ["Rating", vendor.rating ? `${vendor.rating}/5` : "Not rated"],
+              ["Public visibility", vendor.public_visibility === false ? "Hidden" : "Visible"],
+            ]}
+          />
+        </DrawerBlock>
+
+        {/* The action menu that used to sit here offered "Assign package",
+            "Pause vendor" and "Add internal note", all wired to `() => {}`.
+            Those are real operations that belong to the guarded Vendors and
+            Vendor Subscriptions workspaces, so this panel links to them
+            instead of presenting menu items that do nothing. */}
+        <Panel className="p-3">
+          <p className="text-[13px] font-semibold text-slate-900">Manage this vendor</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Verification, package and credit changes are performed in their own guarded workspaces.
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <Link
+              href="/admin/vendors"
+              className="qfa-focus inline-flex h-8 items-center rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Vendors workspace
+            </Link>
+            <Link
+              href="/admin/vendor-subscriptions"
+              className="qfa-focus inline-flex h-8 items-center rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Subscriptions & credits
+            </Link>
+            <Link
+              href={`/admin/vendor-crm/${vendor.id}`}
+              className="qfa-focus inline-flex h-8 items-center rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Vendor CRM profile
+            </Link>
           </div>
-        </SectionCard>
+        </Panel>
       </div>
     </Drawer>
+  );
+}
+
+/** Section wrapper inside a drawer: heading + quiet grouping, not a card stack. */
+function DrawerBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">{title}</h3>
+      {children}
+    </section>
   );
 }
 
@@ -436,14 +557,6 @@ function isHotLead(lead: Lead) {
 function isUnassignedLead(lead: Lead) {
   const status = String(lead.status ?? "New").toLowerCase();
   return !closedLeadStatuses.has(status) && (lead.lead_assignments?.length ?? 0) === 0;
-}
-
-function vendorHealthScore(vendor: Vendor) {
-  const credits = Math.min(40, Number(vendor.remaining_credits ?? 0) * 8);
-  const rating = Math.min(25, Number(vendor.rating ?? 0) * 5);
-  const active = vendor.is_active !== false && ["approved", "active"].includes(String(vendor.status ?? "").toLowerCase()) ? 25 : 8;
-  const visibility = vendor.public_visibility === false ? 0 : 10;
-  return Math.max(8, Math.min(98, Math.round(credits + rating + active + visibility)));
 }
 
 function buildRecentActivity(data: Snapshot) {

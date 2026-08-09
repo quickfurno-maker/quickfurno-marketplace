@@ -19,7 +19,7 @@ export function ReportsPage({ data }: { data: Snapshot }) {
       </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {reports.map((report) => (
-          <article key={report} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <article key={report} className="qfa-panel p-4">
             <h2 className="text-base font-semibold text-slate-950">{report}</h2>
             <p className="mt-2 text-sm text-slate-500">CSV, Excel-compatible export, and printable layout placeholder.</p>
             <button type="button" className="mt-4 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Export</button>

@@ -525,7 +525,7 @@ function TestLab({
             <button
               type="button"
               onClick={() => placeholder("Run test on sample old leads")}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="inline-flex min-h-[var(--qfa-control-h)] w-full items-center justify-center rounded-[var(--qfa-radius)] bg-slate-900 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-slate-800"
             >
               Run sample test
             </button>
@@ -755,7 +755,7 @@ function SelectBox({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+        className="mt-2 qfa-control w-full px-2.5 font-semibold outline-none"
       >
         {options.map((option) => (
           <option key={option} value={option}>

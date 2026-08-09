@@ -172,13 +172,13 @@ export function VendorCampaignEditor({
               <span className="mb-1 block font-medium text-slate-600">Name</span>
               <input value={name} onChange={(e) => setName(e.target.value)} disabled={!isDraft}
                 maxLength={CAMPAIGN_MAX_NAME_LENGTH}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-300" />
+                className="qfa-control w-full px-2.5 outline-none" />
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Description</span>
               <input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!isDraft}
                 maxLength={CAMPAIGN_MAX_DESCRIPTION_LENGTH}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-300" />
+                className="qfa-control w-full px-2.5 outline-none" />
             </label>
           </div>
 
@@ -186,21 +186,21 @@ export function VendorCampaignEditor({
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Purpose</span>
               <select value={purpose} onChange={(e) => setPurpose(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 {CAMPAIGN_PURPOSES.map((p) => <option key={p} value={p}>{p.replace(/_/g, " ")}</option>)}
               </select>
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Channel</span>
               <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 {CAMPAIGN_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Consent scope</span>
               <select value={consentScope} onChange={(e) => setConsentScope(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 {CAMPAIGN_CONSENT_SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
@@ -210,7 +210,7 @@ export function VendorCampaignEditor({
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Source segment</span>
               <select value={segmentId} onChange={(e) => setSegmentId(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 <option value="">— select a segment —</option>
                 {segments.map((s) => (
                   <option key={s.id} value={s.id}>{s.name} (v{s.definition_version}, {s.status})</option>
@@ -220,7 +220,7 @@ export function VendorCampaignEditor({
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Template</span>
               <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 <option value="">— select a template —</option>
                 {templates.map((t) => (
                   <option key={t.template_key} value={t.template_key}>

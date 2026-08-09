@@ -339,7 +339,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
             <>
               <SafetyLegend />
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Lead</h3>
                 <dl className="mt-3 grid gap-2 text-sm">
                   <Row label="Name" value={detail.leadName || "Not provided"} />
@@ -349,7 +349,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                 </dl>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-semibold text-slate-950">Approval</h3>
                   <div className="flex flex-wrap gap-2">
@@ -367,7 +367,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                 </dl>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Selected vendors ({detail.selectedVendorCount})</h3>
                 <div className="mt-3 space-y-2">
                   {detail.vendors.length ? detail.vendors.map((vendor) => (
@@ -389,7 +389,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                 </div>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Side effects</h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Row label="WhatsApp" value="Disabled" />

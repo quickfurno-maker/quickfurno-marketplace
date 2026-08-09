@@ -10,6 +10,12 @@ import { adminNavGroups, getAdminSectionByKey, getAdminSectionByPath } from "./a
 
 const COLLAPSE_STORAGE_KEY = "qf.admin.sidebarCollapsed";
 
+/**
+ * The shell owns page identity for the whole admin: breadcrumb, the single h1,
+ * and the section description. Pages must NOT print their own title again —
+ * that duplication is what made every screen open with two stacked headers and
+ * ~140px of chrome before any data.
+ */
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -75,11 +81,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="admin-surface min-h-screen bg-[#f4f6fa] font-sans text-slate-950">
+    <div className="admin-surface min-h-screen bg-[color:var(--qfa-page)] font-sans text-slate-950">
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
+        className="qfa-focus fixed left-3 top-3 z-40 inline-flex h-10 w-10 items-center justify-center rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white text-slate-700 shadow-[var(--qfa-shadow-1)] lg:hidden"
         aria-label="Open admin menu"
       >
         <span className="h-0.5 w-5 rounded bg-current shadow-[0_6px_0_currentColor,0_-6px_0_currentColor]" />
@@ -95,79 +101,63 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
       <AdminCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
-      <div className={collapsed ? "lg:pl-[88px]" : "lg:pl-[296px]"}>
-        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-[#f4f6fa]/85 px-4 py-3.5 backdrop-blur-xl sm:px-6 lg:px-8">
-          <div className="flex min-h-14 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0 pl-14 lg:pl-0">
+      <div className={collapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"}>
+        <header className="sticky top-0 z-30 border-b border-[color:var(--qfa-line)] bg-[color:var(--qfa-page)]/90 px-4 py-2.5 backdrop-blur-xl sm:px-5 lg:px-7">
+          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0 pl-12 lg:pl-0">
               <nav aria-label="Breadcrumb">
-                <ol className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                <ol className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-slate-500">
                   <li>
-                    <Link href="/admin/dashboard" className="rounded text-slate-600 transition hover:text-slate-900">
+                    <Link href="/admin/dashboard" className="qfa-focus rounded transition-colors hover:text-slate-900">
                       Admin
                     </Link>
                   </li>
                   <li aria-hidden="true" className="text-slate-300">/</li>
-                  <li className="truncate text-slate-500">{group}</li>
+                  <li className="truncate">{group}</li>
                   <li aria-hidden="true" className="text-slate-300">/</li>
-                  <li className="truncate text-slate-900" aria-current="page">{current.label}</li>
-                  <li>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Live snapshot
-                    </span>
-                  </li>
+                  <li className="truncate font-semibold text-slate-700" aria-current="page">{current.label}</li>
                 </ol>
               </nav>
-              <h1 className="mt-1.5 truncate text-2xl font-semibold tracking-tight text-slate-950">
-                {current.label}
-              </h1>
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <h1 className="truncate text-xl font-semibold tracking-tight text-slate-950">{current.label}</h1>
+                <p className="min-w-0 truncate text-[13px] text-slate-500">{current.description}</p>
+              </div>
             </div>
 
-            <div className="grid min-w-0 gap-2 sm:flex sm:items-center sm:justify-end">
-              <div className="relative min-w-0 sm:w-80">
-                <button
-                  type="button"
-                  onClick={() => setPaletteOpen(true)}
-                  aria-haspopup="dialog"
-                  className="group flex h-10 w-full items-center gap-2 rounded-lg border border-slate-200 bg-white pl-3 pr-2 text-left text-sm text-slate-500 shadow-sm outline-none transition hover:border-slate-300 focus-visible:border-emerald-300 focus-visible:ring-4 focus-visible:ring-emerald-100"
-                >
-                  <AdminIcon name="reports" className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="min-w-0 flex-1 truncate">Jump to section…</span>
-                  <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 sm:block">
-                    Ctrl K
-                  </kbd>
-                </button>
-              </div>
-              <div className="flex min-w-0 items-center gap-2">
-                <Link
-                  href="/admin/notifications"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm outline-none transition hover:border-emerald-200 hover:text-emerald-700 focus-visible:ring-4 focus-visible:ring-emerald-100"
-                  aria-label="Notifications"
-                >
-                  <AdminIcon name="notifications" className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/admin/leads"
-                  className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition hover:bg-emerald-700"
-                >
-                  <AdminIcon name="leads" className="h-4 w-4" />
-                  Add Lead
-                </Link>
-                <div className="hidden h-10 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 shadow-sm md:flex">
-                  <span className="grid h-7 w-7 place-items-center rounded-md bg-slate-950 text-xs font-bold text-white">SA</span>
-                  <div className="leading-tight">
-                    <p className="text-sm font-semibold text-slate-950">Superadmin</p>
-                    <p className="text-xs text-slate-500">QuickFurno</p>
-                  </div>
+            <div className="flex min-w-0 items-center gap-1.5 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                aria-haspopup="dialog"
+                className="qfa-control qfa-focus flex min-w-0 flex-1 items-center gap-2 bg-white pl-2.5 pr-1.5 text-left text-slate-500 sm:w-64 sm:flex-none"
+              >
+                <AdminIcon name="reports" className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span className="min-w-0 flex-1 truncate text-[13px]">Jump to section…</span>
+                <kbd className="hidden shrink-0 rounded border border-[color:var(--qfa-line)] bg-[color:var(--qfa-inset)] px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 sm:block">
+                  Ctrl K
+                </kbd>
+              </button>
+              <Link
+                href="/admin/notifications"
+                className="qfa-control qfa-focus grid w-[var(--qfa-control-h)] shrink-0 place-items-center text-slate-600 hover:text-emerald-700"
+                aria-label="Notifications"
+              >
+                <AdminIcon name="notifications" className="h-4 w-4" />
+              </Link>
+              <div className="hidden shrink-0 items-center gap-2 md:flex">
+                <span className="grid h-[var(--qfa-control-h)] w-[var(--qfa-control-h)] place-items-center rounded-[var(--qfa-radius)] bg-slate-900 text-[11px] font-bold text-white">
+                  SA
+                </span>
+                <div className="leading-tight">
+                  <p className="text-[13px] font-semibold text-slate-950">Superadmin</p>
+                  <p className="text-[11px] text-slate-500">QuickFurno</p>
                 </div>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-[1680px] px-4 py-5 sm:px-5 lg:px-7 lg:py-6">{children}</main>
       </div>
     </div>
   );
@@ -192,7 +182,7 @@ function Sidebar({
     <>
       <aside
         className={`qf-sidebar fixed inset-y-0 left-0 z-50 hidden border-r border-white/5 text-white lg:block ${
-          collapsed ? "w-[88px]" : "w-[296px]"
+          collapsed ? "w-[76px]" : "w-[264px]"
         }`}
         aria-label="Admin navigation"
       >
@@ -213,7 +203,7 @@ function Sidebar({
             className="absolute inset-0 cursor-default bg-slate-950/55 backdrop-blur-sm"
             onClick={onClose}
           />
-          <aside className="qf-sidebar absolute inset-y-0 left-0 w-[min(21rem,88vw)] border-r border-white/5 text-white shadow-2xl">
+          <aside className="qf-sidebar absolute inset-y-0 left-0 w-[min(19rem,86vw)] border-r border-white/5 text-white shadow-2xl">
             <SidebarContent pathname={pathname} collapsed={false} onNavigate={onClose} onSignOut={onSignOut} />
           </aside>
         </div>
@@ -237,20 +227,20 @@ function SidebarContent({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className={`border-b border-white/10 py-5 ${collapsed ? "px-3" : "px-5"}`}>
+      <div className={`border-b border-white/10 py-3.5 ${collapsed ? "px-2.5" : "px-4"}`}>
         <div className="flex items-center gap-2">
           <Link
             href="/admin/dashboard"
             onClick={onNavigate}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+            className="qfa-focus flex min-w-0 flex-1 items-center gap-2.5 rounded-[var(--qfa-radius)]"
           >
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-400 text-sm font-black text-[#0a0f1c] shadow-lg shadow-emerald-950/30">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--qfa-radius)] bg-emerald-400 text-[13px] font-black text-[#0a0f1c]">
               QF
             </span>
             {collapsed ? null : (
               <div className="min-w-0">
-                <p className="truncate text-lg font-semibold tracking-tight">QuickFurno</p>
-                <p className="truncate text-xs font-medium text-slate-400">Superadmin Command Center</p>
+                <p className="truncate text-[15px] font-semibold tracking-tight">QuickFurno</p>
+                <p className="truncate text-[11px] text-slate-400">Superadmin</p>
               </div>
             )}
           </Link>
@@ -261,41 +251,27 @@ function SidebarContent({
               aria-pressed={collapsed}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="hidden h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-300 outline-none transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400/70 lg:grid"
+              className="qfa-focus hidden h-7 w-7 shrink-0 place-items-center rounded-[var(--qfa-radius-sm)] border border-white/10 bg-white/[0.04] text-slate-300 transition-colors hover:bg-white/10 hover:text-white lg:grid"
             >
-              <span aria-hidden="true" className="text-xs font-bold">{collapsed ? "»" : "«"}</span>
+              <span aria-hidden="true" className="text-[11px] font-bold">{collapsed ? "»" : "«"}</span>
             </button>
           ) : null}
         </div>
-        {collapsed ? null : (
-          <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-slate-300">Preview-safe mode</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Safe
-              </span>
-            </div>
-            <p className="mt-2 text-[11px] leading-4 text-slate-400">
-              No WhatsApp · No vendor notification · No credit deduction · No auto-assignment.
-            </p>
-          </div>
-        )}
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5" aria-label="Admin sections">
-        <div className="space-y-6">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3" aria-label="Admin sections">
+        <div className="space-y-4">
           {adminNavGroups.map((group) => (
             <div key={group.title}>
               <p
-                className={`text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 ${
-                  collapsed ? "px-0 text-center" : "px-3"
+                className={`text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 ${
+                  collapsed ? "text-center" : "px-2.5"
                 }`}
               >
                 {collapsed ? <span aria-hidden="true">•</span> : group.title}
                 {collapsed ? <span className="sr-only">{group.title}</span> : null}
               </p>
-              <div className="mt-2 space-y-1">
+              <div className="mt-1.5 space-y-0.5">
                 {group.sections.map((key) => {
                   const section = getAdminSectionByKey(key);
                   const active =
@@ -309,36 +285,30 @@ function SidebarContent({
                       href={section.href}
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
-                      title={collapsed ? section.label : undefined}
-                      className={`group relative flex min-w-0 items-center gap-3 rounded-xl py-2.5 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${
-                        collapsed ? "justify-center px-2" : "px-3"
+                      title={collapsed ? section.label : section.description}
+                      className={`qfa-focus group relative flex min-w-0 items-center gap-2.5 rounded-[var(--qfa-radius)] py-1.5 text-[13px] font-medium transition-colors ${
+                        collapsed ? "justify-center px-1.5" : "px-2.5"
                       } ${
                         active
-                          ? "bg-white text-slate-950 shadow-sm shadow-emerald-950/10"
-                          : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                          ? "bg-white/95 text-slate-950"
+                          : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
                       }`}
                     >
-                      {active ? (
-                        <span className="absolute inset-y-2 left-0 w-1 rounded-full bg-emerald-400" />
+                      {active && !collapsed ? (
+                        <span aria-hidden="true" className="absolute inset-y-1.5 -left-2.5 w-0.5 rounded-full bg-emerald-400" />
                       ) : null}
-                      <span
-                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
-                          active
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-white/[0.06] text-slate-400 group-hover:bg-white/10 group-hover:text-emerald-200"
-                        }`}
-                      >
-                        <AdminIcon name={section.icon} className="h-4 w-4" />
-                      </span>
+                      <AdminIcon
+                        name={section.icon}
+                        className={`h-4 w-4 shrink-0 ${active ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-300"}`}
+                      />
                       {collapsed ? (
                         <span className="sr-only">{section.label}</span>
                       ) : (
-                        <span className="min-w-0">
-                          <span className="block truncate">{section.label}</span>
-                          <span className={`block truncate text-xs ${active ? "text-slate-500" : "text-slate-400/80"}`}>
-                            {section.description}
-                          </span>
-                        </span>
+                        /* Single-line labels. The old two-line rows truncated
+                           the description on almost every item, which read as
+                           clutter rather than context — the description now
+                           lives in the title attribute and the page header. */
+                        <span className="min-w-0 truncate">{section.label}</span>
                       )}
                     </Link>
                   );
@@ -349,31 +319,30 @@ function SidebarContent({
         </div>
       </nav>
 
-      <div className={`border-t border-white/10 ${collapsed ? "p-3" : "p-4"}`}>
-        <div className={`rounded-xl border border-white/10 bg-white/[0.04] ${collapsed ? "p-2" : "p-4"}`}>
-          {collapsed ? null : (
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-xs font-bold text-white ring-1 ring-white/10">
-                SA
+      <div className={`border-t border-white/10 ${collapsed ? "p-2.5" : "p-3"}`}>
+        {collapsed ? null : (
+          <div className="mb-2.5 rounded-[var(--qfa-radius)] border border-white/10 bg-white/[0.04] px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold text-slate-300">Preview-safe mode</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                <span aria-hidden="true" className="h-1 w-1 rounded-full bg-emerald-400" />
+                Safe
               </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">Superadmin</p>
-                <p className="truncate text-[11px] text-slate-400">Full access · Auth via Supabase</p>
-              </div>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={onSignOut}
-            title={collapsed ? "Sign out" : undefined}
-            className={`inline-flex h-9 w-full items-center justify-center rounded-lg border border-white/10 bg-white/5 text-sm font-semibold text-slate-300 outline-none transition hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${
-              collapsed ? "" : "mt-4"
-            }`}
-          >
-            {collapsed ? <span aria-hidden="true">⏻</span> : "Sign out"}
-            {collapsed ? <span className="sr-only">Sign out</span> : null}
-          </button>
-        </div>
+            <p className="mt-1 text-[10px] leading-4 text-slate-400">
+              No WhatsApp · No vendor notification · No credit deduction · No auto-assignment.
+            </p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onSignOut}
+          title={collapsed ? "Sign out" : undefined}
+          className="qfa-focus inline-flex h-8 w-full items-center justify-center rounded-[var(--qfa-radius-sm)] border border-white/10 bg-white/5 text-[13px] font-semibold text-slate-300 transition-colors hover:bg-white hover:text-slate-950"
+        >
+          {collapsed ? <span aria-hidden="true">⏻</span> : "Sign out"}
+          {collapsed ? <span className="sr-only">Sign out</span> : null}
+        </button>
       </div>
     </div>
   );

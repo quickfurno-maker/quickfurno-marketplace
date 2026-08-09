@@ -248,7 +248,7 @@ function ManualAssignmentModal({ lead, notify, onClose }: { lead: Lead; notify: 
   return (
     <ModalShell title="Assign Vendors Manually" subtitle={lead.name || "Lead"} onClose={onClose}>
       <div className="space-y-4">
-        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+        <article className="qfa-quiet p-3 text-[13px]">
           <div className="grid gap-1.5 sm:grid-cols-2">
             <Detail label="Lead ID" value={shortId(lead.id)} />
             <Detail label="Phone" value={maskPhone(lead.phone)} />

@@ -218,7 +218,7 @@ export function RequirementGroupsPanel({
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 qfa-panel p-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-950">Requirement groups</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -269,7 +269,7 @@ export function RequirementGroupsPanel({
         </p>
       ) : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto qfa-panel">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>

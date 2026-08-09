@@ -164,13 +164,13 @@ export function VendorSegmentEditor({
               <span className="mb-1 block font-medium text-slate-600">Name</span>
               <input value={name} onChange={(e) => setName(e.target.value)} disabled={isArchived}
                 maxLength={120}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-300" />
+                className="qfa-control w-full px-2.5 outline-none" />
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Description</span>
               <input value={description} onChange={(e) => setDescription(e.target.value)} disabled={isArchived}
                 maxLength={2000}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-300" />
+                className="qfa-control w-full px-2.5 outline-none" />
             </label>
           </div>
 

@@ -3556,15 +3556,166 @@ h1, h2, h3 {
 
 /* Reusable premium card shadow so every admin card clearly floats. */
 .admin-surface .qf-card-shadow {
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 16px 38px -18px rgba(15, 23, 42, 0.28);
+  box-shadow: var(--qfa-shadow-1);
 }
 .admin-surface .qf-card-hover:hover {
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08), 0 28px 56px -20px rgba(15, 23, 42, 0.38);
+  box-shadow: var(--qfa-shadow-2);
 }
 
 /* Deep navy premium sidebar (clearly blue, not the old near-black green). */
 .admin-surface .qf-sidebar {
   background: linear-gradient(180deg, #14264a 0%, #0d1a35 52%, #081124 100%);
+}
+
+/* ============================================================
+   Admin Dashboard V2 — premium visual system tokens.
+
+   One place to tune radius, elevation, control height, surface
+   and text colour for the WHOLE admin. Primitives in
+   components/admin/AdminPrimitives.tsx consume these, so a change
+   here moves every admin screen together instead of leaving the
+   product in two competing visual systems.
+
+   The `--qfa-*` variables sit on :root and the `.qfa-*` classes are
+   unprefixed by `.admin-surface` ON PURPOSE: AdminPrimitives is also
+   imported by components/VendorDashboard.tsx, which renders OUTSIDE
+   `.admin-surface`. Scoping these would leave that page unstyled.
+   Both namespaces are new and unique, so nothing on the public site
+   can match them and no existing rule is overridden.
+   ============================================================ */
+:root {
+  /* Radius scale — restrained. Big pill radii read as "template". */
+  --qfa-radius-xs: 6px;
+  --qfa-radius-sm: 8px;
+  --qfa-radius: 10px;
+  --qfa-radius-lg: 14px;
+
+  /* Control heights. Page-level actions 38px, in-row actions 32px. */
+  --qfa-control-h: 38px;
+  --qfa-control-h-sm: 32px;
+
+  /* Surfaces: page ground, raised panel, quiet inset. */
+  --qfa-page: #f4f6fa;
+  --qfa-surface: #ffffff;
+  --qfa-inset: #f8fafc;
+  --qfa-inset-strong: #f1f5f9;
+
+  /* Lines: hairline default, softer separator inside a panel. */
+  --qfa-line: #e2e8f0;
+  --qfa-line-soft: #eef2f6;
+  --qfa-line-strong: #cbd5e1;
+
+  /* Text roles. */
+  --qfa-ink: #0f172a;
+  --qfa-ink-soft: #334155;
+  --qfa-muted: #64748b;
+  --qfa-faint: #94a3b8;
+
+  /* Elevation — deliberately shallow. Depth comes from the line and
+     the inset, not from every block hovering off the page. */
+  --qfa-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
+  --qfa-shadow-2: 0 2px 4px rgba(16, 24, 40, 0.05), 0 8px 20px -12px rgba(15, 23, 42, 0.2);
+  --qfa-shadow-pop: 0 12px 32px -8px rgba(15, 23, 42, 0.22);
+
+  /* Accent + state. */
+  --qfa-accent: #059669;
+  --qfa-accent-soft: #ecfdf5;
+  --qfa-focus: rgba(16, 185, 129, 0.28);
+
+  /* One transition duration for the whole admin (§26: 120–180ms). */
+  --qfa-motion: 150ms;
+}
+
+/* --- Panels ------------------------------------------------- */
+/* Raised surface. Used where a block genuinely is its own object. */
+.qfa-panel {
+  background: var(--qfa-surface);
+  border: 1px solid var(--qfa-line);
+  border-radius: var(--qfa-radius-lg);
+  box-shadow: var(--qfa-shadow-1);
+}
+
+/* Border-only grouping. Used where a block is context, not an object —
+   this is what stops the screen becoming a stack of white rectangles. */
+.qfa-quiet {
+  background: var(--qfa-inset);
+  border: 1px solid var(--qfa-line-soft);
+  border-radius: var(--qfa-radius);
+}
+
+.qfa-divider {
+  border-color: var(--qfa-line-soft);
+}
+
+/* --- Controls ----------------------------------------------- */
+.qfa-control {
+  height: var(--qfa-control-h);
+  border-radius: var(--qfa-radius);
+  border: 1px solid var(--qfa-line);
+  background: var(--qfa-surface);
+  color: var(--qfa-ink);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.qfa-control:hover:not(:disabled) {
+  border-color: var(--qfa-line-strong);
+}
+
+.qfa-control:focus-visible,
+.qfa-control:focus-within {
+  outline: none;
+  border-color: var(--qfa-accent);
+  box-shadow: 0 0 0 3px var(--qfa-focus);
+}
+
+/* Native select chrome differs per-OS and is the single biggest
+   "browser default" tell. Strip it and draw our own indicator. */
+.qfa-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+  padding-right: 1.5rem;
+  cursor: pointer;
+}
+
+/* --- Focus -------------------------------------------------- */
+.qfa-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--qfa-focus);
+  border-radius: var(--qfa-radius-sm);
+}
+
+/* --- Table -------------------------------------------------- */
+.qfa-th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--qfa-muted);
+  background: var(--qfa-inset);
+  border-bottom: 1px solid var(--qfa-line);
+}
+
+.qfa-td {
+  border-bottom: 1px solid var(--qfa-line-soft);
+  color: var(--qfa-ink-soft);
+  font-size: 13px;
+}
+
+.qfa-row:hover .qfa-td {
+  background: var(--qfa-inset);
+}
+
+.qfa-row:last-child .qfa-td {
+  border-bottom: 0;
+}
+
+/* Honour the reduced-motion preference across the whole admin. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-surface * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 /* ============================================================

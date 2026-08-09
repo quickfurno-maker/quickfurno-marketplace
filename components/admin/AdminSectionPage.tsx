@@ -38,7 +38,7 @@ import {
   ToggleSwitch,
   Toolbar,
 } from "./AdminPrimitives";
-import { getAdminSectionByKey, type AdminSectionKey } from "./adminConfig";
+import { type AdminSectionKey } from "./adminConfig";
 import {
   AIAgentsPage,
   AdminUsersPage,
@@ -91,7 +91,6 @@ import { RequirementGroupsPanel } from "./RequirementGroupsPanel";
 
 export function AdminSectionPage({ section, snapshot, error }: { section: AdminSectionKey; snapshot: Snapshot | null; error?: string | null }) {
   const data = snapshot ?? emptySnapshot();
-  const config = getAdminSectionByKey(section);
   const router = useRouter();
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => Promise<{ ok: boolean; error?: string }> } | null>(null);
@@ -119,20 +118,17 @@ export function AdminSectionPage({ section, snapshot, error }: { section: AdminS
   }
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={config.label}
-        description={config.description}
-        actions={
-          <>
-            <SecondaryButton onClick={() => notify("Filter drawer placeholder is ready.")}>Filter</SecondaryButton>
-            <PrimaryButton onClick={() => notify(`${config.addLabel} flow is ready for backend wiring.`)}>{config.addLabel}</PrimaryButton>
-          </>
-        }
-      />
-
+    <div className="space-y-4">
+      {/* No page header here on purpose.
+          AdminShell already renders the breadcrumb, the h1 and this section's
+          description, so a second title block only duplicated the page name.
+          The two buttons that used to live here ("Filter" -> "Filter drawer
+          placeholder is ready", and the Add action -> "flow is ready for
+          backend wiring") were placeholder controls: they were styled as the
+          page's primary actions but performed nothing. A control that cannot
+          act must not be rendered. */}
       {error ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+        <div className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
           This page is showing safe fallback UI because Supabase returned: {error}
         </div>
       ) : null}
@@ -198,11 +194,11 @@ function renderSection(
     case "automations":
       return <AutomationsPage notify={helpers.notify} />;
     case "website-content":
-      return <WebsiteContentPage notify={helpers.notify} />;
+      return <WebsiteContentPage />;
     case "reviews":
       return <ReviewsPage />;
     case "notifications":
-      return <NotificationsPage data={data} notify={helpers.notify} />;
+      return <NotificationsPage data={data} />;
     case "users":
       return <AdminUsersPage data={data} />;
     case "settings":

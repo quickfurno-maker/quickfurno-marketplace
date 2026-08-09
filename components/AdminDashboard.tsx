@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   Blank,
   ChartCard,
+  DataTable,
   Drawer,
   InfoGrid,
   NoteBar,
@@ -13,13 +14,13 @@ import {
   Quiet,
   SectionCard,
   SecondaryButton,
-  StatCard,
   StatusBadge,
 } from "@/components/admin/AdminPrimitives";
 import { AdminIcon } from "@/components/admin/AdminIcon";
-import { AttentionCenter, type AttentionItem } from "@/components/admin/AttentionCenter";
 import type { AdminIconName } from "@/components/admin/adminConfig";
 import { emptySnapshot, type Lead, type Snapshot, type Vendor } from "@/components/admin/adminTypes";
+import { PIPELINE_COLUMNS } from "@/components/admin/crm/lead/leadCrmTypes";
+import { statusBucket } from "@/components/admin/crm/lead/leadCrmUtils";
 import {
   assignmentStatus,
   formatDate,
@@ -48,6 +49,19 @@ const quickOperations: Array<{ href: string; label: string; detail: string; icon
   { href: "/admin/settings", label: "Settings", detail: "Global marketplace controls", icon: "settings" },
 ];
 
+/** Semantic accent palette for the CSS donut + legends (dark theme tokens). */
+const CHART_COLORS = ["#2d7cff", "#00d8ff", "#13d89a", "#7c4dff", "#ff9f1c", "#71839d"];
+
+type QueueItem = {
+  id: string;
+  label: string;
+  value: number;
+  severity: "critical" | "warning" | "clear";
+  icon: AdminIconName;
+  href: string;
+  approximate?: boolean;
+};
+
 export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null; error?: string | null }) {
   const data = snapshot ?? emptySnapshot();
   const stats = data.stats ?? {};
@@ -67,92 +81,76 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
   // table, never for the headline number.
   const lowBalanceTotal = Number(stats.low_balance_vendors ?? lowBalanceVendors.length);
 
-  const attentionItems: AttentionItem[] = [
-    {
-      id: "unassigned-leads",
-      label: "Unassigned leads",
-      value: unassignedLeads.length,
-      detail: "Leads with no vendor matched yet.",
-      severity: unassignedLeads.length > 0 ? "warning" : "clear",
-      icon: "distribution",
-      href: "/admin/leads",
-      approximate: true,
-    },
-    {
-      id: "pending-vendors",
-      label: "Pending vendor approvals",
-      value: Number(stats.pending_vendors ?? 0),
-      detail: "Vendor accounts awaiting verification.",
-      severity: Number(stats.pending_vendors ?? 0) > 0 ? "warning" : "clear",
-      icon: "vendors",
-      href: "/admin/vendors",
-    },
-    {
-      id: "pending-payments",
-      label: "Pending payments",
-      value: Number(stats.pending_payments ?? 0),
-      detail: "Collections not yet reconciled.",
-      severity: Number(stats.pending_payments ?? 0) > 0 ? "warning" : "clear",
-      icon: "payments",
-      href: "/admin/payments",
-    },
-    {
-      id: "low-balance",
-      label: "Low balance vendors",
-      value: lowBalanceTotal,
-      detail: "Vendors close to running out of lead credits.",
-      severity: lowBalanceTotal > 0 ? "critical" : "clear",
-      icon: "subscriptions",
-      href: "/admin/vendor-subscriptions",
-    },
-    {
-      id: "expired-vendors",
-      label: "Expired packages",
-      value: Number(stats.expired_vendors ?? 0),
-      detail: "Vendors whose package validity has lapsed.",
-      severity: Number(stats.expired_vendors ?? 0) > 0 ? "warning" : "clear",
-      icon: "subscriptions",
-      href: "/admin/vendor-subscriptions",
-    },
-    {
-      id: "bad-lead-reports",
-      label: "Bad lead reports",
-      value: Number(stats.bad_lead_reports_pending ?? 0),
-      detail: "Vendor-reported lead quality disputes awaiting review.",
-      severity: Number(stats.bad_lead_reports_pending ?? 0) > 0 ? "warning" : "clear",
-      icon: "reviews",
-      href: "/admin/lead-distribution",
-    },
+  const queueItems: QueueItem[] = [
+    { id: "unassigned-leads", label: "Unassigned leads", value: unassignedLeads.length, severity: unassignedLeads.length > 0 ? "warning" : "clear", icon: "distribution", href: "/admin/leads", approximate: true },
+    { id: "pending-vendors", label: "Vendors pending approval", value: Number(stats.pending_vendors ?? 0), severity: Number(stats.pending_vendors ?? 0) > 0 ? "warning" : "clear", icon: "vendors", href: "/admin/vendors" },
+    { id: "pending-payments", label: "Pending payments", value: Number(stats.pending_payments ?? 0), severity: Number(stats.pending_payments ?? 0) > 0 ? "warning" : "clear", icon: "payments", href: "/admin/payments" },
+    { id: "low-balance", label: "Low credit vendors", value: lowBalanceTotal, severity: lowBalanceTotal > 0 ? "critical" : "clear", icon: "subscriptions", href: "/admin/vendor-subscriptions" },
+    { id: "expired-vendors", label: "Package renewals due", value: Number(stats.expired_vendors ?? 0), severity: Number(stats.expired_vendors ?? 0) > 0 ? "warning" : "clear", icon: "subscriptions", href: "/admin/vendor-subscriptions" },
+    { id: "bad-lead-reports", label: "Bad lead reports", value: Number(stats.bad_lead_reports_pending ?? 0), severity: Number(stats.bad_lead_reports_pending ?? 0) > 0 ? "warning" : "clear", icon: "reviews", href: "/admin/lead-distribution" },
   ];
 
-  const kpis = [
-    ["Total Leads", formatNumber(stats.total_leads), `${formatNumber(stats.leads_this_week)} this week`, "leads", "emerald"],
-    ["Leads Today", formatNumber(stats.leads_today), `${formatNumber(stats.leads_this_month)} this month`, "leads", "indigo"],
-    ["Hot Leads", formatNumber(hotLeads.length), "In latest loaded leads", "notifications", "amber"],
-    ["Unassigned Leads", formatNumber(unassignedLeads.length), "In latest loaded leads", "distribution", "rose"],
-    ["Active Vendors", formatNumber(stats.active_vendors), `${formatNumber(stats.pending_vendors)} pending`, "vendors", "emerald"],
-    ["Paid Vendors", formatNumber(stats.paid_vendors), `${formatNumber(stats.expired_vendors)} expired`, "subscriptions", "indigo"],
-    ["Revenue This Month", formatINR(stats.revenue_this_month), `${formatINR(stats.total_revenue)} lifetime`, "payments", "emerald"],
-    ["Follow-ups Due", formatNumber(followUpsDue), "Sales queue", "crm", "amber"],
-  ] as const;
+  /**
+   * Primary KPI rail — six real metrics, mirroring the approved command
+   * center. Trend arrows are shown NOWHERE because no metric history table
+   * exists; each tile carries a truthful contextual line instead.
+   */
+  const kpis: Array<{
+    label: string;
+    value: React.ReactNode;
+    helper: string;
+    icon: AdminIconName;
+    glow: string;
+    bloom: string;
+    href: string;
+  }> = [
+    { label: "Total Leads", value: formatNumber(stats.total_leads), helper: `${formatNumber(stats.leads_this_week)} this week`, icon: "leads", glow: "qfa-glow-violet", bloom: "rgba(124, 77, 255, 0.22)", href: "/admin/leads" },
+    { label: "New Leads Today", value: formatNumber(stats.leads_today), helper: `${formatNumber(stats.leads_this_month)} this month`, icon: "leads", glow: "qfa-glow-cyan", bloom: "rgba(0, 216, 255, 0.18)", href: "/admin/leads" },
+    { label: "Hot Leads", value: formatNumber(hotLeads.length), helper: "In latest loaded leads", icon: "notifications", glow: "qfa-glow-red", bloom: "rgba(255, 77, 103, 0.2)", href: "/admin/crm" },
+    { label: "Unassigned Leads", value: formatNumber(unassignedLeads.length), helper: "Needs your attention", icon: "distribution", glow: "qfa-glow-amber", bloom: "rgba(255, 159, 28, 0.2)", href: "/admin/leads" },
+    { label: "Follow-ups Due", value: formatNumber(followUpsDue), helper: "Sales queue", icon: "crm", glow: "qfa-glow-blue", bloom: "rgba(45, 124, 255, 0.22)", href: "/admin/crm" },
+    { label: "Revenue This Month", value: formatINR(stats.revenue_this_month), helper: `${formatINR(stats.total_revenue)} lifetime`, icon: "payments", glow: "qfa-glow-green", bloom: "rgba(19, 216, 154, 0.2)", href: "/admin/payments" },
+  ];
 
-  const leadFunnelRows = useMemo(() => groupBy(data.leads, (lead) => lead.status || "New"), [data.leads]);
+  /**
+   * Pipeline stages use the SAME deterministic bucketing as the CRM
+   * pipeline view (statusBucket), so the dashboard and CRM never disagree.
+   * Counts cover the leads loaded in this snapshot — labelled as such.
+   */
+  const pipeline = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const lead of data.leads) {
+      const bucket = statusBucket(lead, lead.lead_assignments?.length ?? 0);
+      // "duplicate" shares the Spam / Duplicate column, same as the CRM board.
+      const key = bucket === "duplicate" ? "spam" : bucket;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return PIPELINE_COLUMNS.map((column) => ({
+      bucket: column.bucket,
+      label: column.label,
+      count: counts.get(column.bucket) ?? 0,
+    })).filter((stage) => stage.bucket !== "spam" || stage.count > 0);
+  }, [data.leads]);
+
+  const cityRows = useMemo(() => groupBy(data.leads, (lead) => lead.city || "City not set"), [data.leads]);
+  const categoryRows = useMemo(
+    () => groupBy(data.leads, (lead) => lead.service_required || lead.category || "Not specified"),
+    [data.leads],
+  );
   const revenueRows = useMemo(() => revenueByPackage(data.payments, data.packages), [data.payments, data.packages]);
   const recentActivity = useMemo(() => buildRecentActivity(data), [data]);
-  const priorityLeads = [...hotLeads, ...unassignedLeads.filter((lead) => !hotLeads.includes(lead))].slice(0, 5);
+  const recentLeads = data.leads.slice(0, 10);
   const vendorHealthRows = (lowBalanceVendors.length ? lowBalanceVendors : data.vendors).slice(0, 5);
 
   return (
     <div className="space-y-4">
-      {/* Compact command strip.
-          This used to be a full-height white hero card that repeated the page
-          title AdminShell already prints. It is now a single ~64px row: live
-          context on the left, the three real destinations on the right. */}
+      {/* Command strip: live context left, real destinations right. */}
       <div className="flex flex-col gap-2.5 border-b border-[color:var(--qfa-line)] pb-3.5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <StatusBadge value="Superadmin" tone="slate" />
           <StatusBadge value={`${formatNumber(totalLeads)} leads`} tone="emerald" />
-          <StatusBadge value={`Updated ${formatDate(data.generatedAt)}`} tone="blue" />
+          <StatusBadge value={`${formatNumber(stats.active_vendors)} active vendors`} tone="blue" />
+          <StatusBadge value={`Updated ${formatDate(data.generatedAt)}`} tone="slate" />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <LinkButton href="/admin/leads" icon="leads">Review leads</LinkButton>
@@ -175,9 +173,26 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </SectionCard>
       ) : null}
 
-      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Marketplace key figures">
-        {kpis.map(([label, value, helper, icon, tone]) => (
-          <StatCard key={label} label={label} value={value} helper={helper} icon={icon} tone={tone} />
+      {/* KPI rail — six primary metrics across desktop, each a real route. */}
+      <section className="grid grid-cols-2 gap-2.5 md:grid-cols-3 2xl:grid-cols-6" aria-label="Marketplace key figures">
+        {kpis.map((kpi, index) => (
+          <Link
+            key={kpi.label}
+            href={kpi.href}
+            className={`qfa-kpi qfa-focus qfa-rise ${index >= 2 ? `qfa-rise-${Math.min(4, index)}` : ""} px-3.5 py-3`}
+            style={{ "--kpi-bloom": kpi.bloom } as React.CSSProperties}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className={`qfa-glow-chip ${kpi.glow} shrink-0`} aria-hidden="true">
+                <AdminIcon name={kpi.icon} className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 truncate text-xs font-semibold text-slate-600">{kpi.label}</span>
+            </div>
+            <div className="mt-2.5 truncate text-[26px] font-semibold leading-none tracking-tight text-slate-950 tabular-nums">
+              {kpi.value}
+            </div>
+            <p className="mt-2 truncate text-[11px] text-slate-500">{kpi.helper}</p>
+          </Link>
         ))}
       </section>
 
@@ -189,72 +204,132 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </p>
       ) : null}
 
-      <AttentionCenter items={attentionItems} />
+      {/* Pipeline overview — same buckets as the CRM board, chevron rail. */}
+      <SectionCard
+        title="Lead Pipeline Overview"
+        description={`Across the latest ${formatNumber(data.leads.length)} leads loaded in this snapshot.`}
+        action={
+          <Link href="/admin/crm" className="qfa-focus rounded text-[13px] font-semibold text-emerald-700 hover:underline">
+            View full pipeline
+          </Link>
+        }
+      >
+        <div className="qfa-pipe" role="list" aria-label="Lead pipeline stages">
+          {pipeline.map((stage) => {
+            const percent = data.leads.length ? Math.round((stage.count / data.leads.length) * 100) : 0;
+            return (
+              <div key={stage.bucket} role="listitem" className={`qfa-pipe-seg qfa-pipe--${stage.bucket}`}>
+                <p className="qfa-pipe-label truncate text-[11px] font-bold uppercase tracking-wide">{stage.label}</p>
+                <p className="mt-1 text-xl font-semibold leading-none tracking-tight text-slate-950 tabular-nums">
+                  {formatNumber(stage.count)}
+                </p>
+                <p className="mt-1 text-[10px] font-semibold text-slate-500 tabular-nums">{percent}%</p>
+              </div>
+            );
+          })}
+        </div>
+      </SectionCard>
 
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      {/* Center band: dense recent-leads table + founder action queue. */}
+      <section className="grid gap-4 xl:grid-cols-[1.55fr_0.85fr]">
         <SectionCard
-          title="Today's priority"
-          description="The shortest path to keeping the marketplace moving today."
+          title="Recent Leads"
+          description="Latest enquiries in this snapshot. Open any row for full detail."
           action={
             <Link href="/admin/leads" className="qfa-focus rounded text-[13px] font-semibold text-emerald-700 hover:underline">
-              Open leads
+              View all
             </Link>
           }
+          className="min-w-0"
         >
-          <div className="grid gap-2">
-            {priorityLeads.length ? (
-              priorityLeads.map((lead) => (
-                <Quiet key={lead.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <DataTable
+            columns={[
+              {
+                header: "Client",
+                cell: (lead: Lead) => (
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-[13px] font-semibold text-slate-950">{lead.name || "Unnamed lead"}</p>
-                      <StatusBadge value={lead.lead_priority || (isHotLead(lead) ? "Hot" : "Unassigned")} />
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {lead.service_required || lead.category || "Requirement not set"} · {lead.city || "City not set"} · {maskPhone(lead.phone)}
-                    </p>
+                    <p className="truncate text-[13px] font-semibold text-slate-950">{lead.name || "Unnamed lead"}</p>
+                    <p className="truncate text-[11px] text-slate-500">{maskPhone(lead.phone)}</p>
                   </div>
-                  <SecondaryButton size="sm" onClick={() => setSelectedLead(lead)}>View</SecondaryButton>
-                </Quiet>
-              ))
-            ) : (
-              <Quiet className="p-3 text-[13px] text-slate-500">
-                No urgent leads in this snapshot. New public enquiries will appear here automatically.
-              </Quiet>
-            )}
-          </div>
+                ),
+              },
+              {
+                header: "Requirement",
+                cell: (lead: Lead) => (
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] text-slate-700">{lead.service_required || lead.category || <Blank />}</p>
+                    <p className="truncate text-[11px] text-slate-500">{lead.budget || "Budget not set"}</p>
+                  </div>
+                ),
+              },
+              { header: "City", cell: (lead: Lead) => <span className="text-[13px] text-slate-700">{lead.city || <Blank />}</span> },
+              {
+                header: "Quality",
+                cell: (lead: Lead) => <QualityCell lead={lead} />,
+              },
+              { header: "Status", cell: (lead: Lead) => <StatusBadge value={lead.status || "New"} /> },
+              {
+                header: "Created",
+                cell: (lead: Lead) => <span className="whitespace-nowrap text-[11px] text-slate-500">{formatDate(lead.created_at)}</span>,
+              },
+              {
+                header: "",
+                cell: (lead: Lead) => (
+                  <SecondaryButton size="sm" onClick={() => setSelectedLead(lead)} aria-label={`View ${lead.name || "lead"}`}>
+                    View
+                  </SecondaryButton>
+                ),
+                className: "text-right",
+              },
+            ]}
+            rows={recentLeads}
+            density="compact"
+            getRowKey={(lead) => lead.id}
+            emptyTitle="No leads yet"
+            emptyMessage="New public enquiries will appear here automatically."
+          />
         </SectionCard>
 
-        <SectionCard title="Quick operations" description="Jump straight into an existing admin workspace.">
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            {quickOperations.map((op) => (
-              <Link
-                key={op.href}
-                href={op.href}
-                className="qfa-focus group flex items-center gap-2.5 rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line-soft)] bg-white px-3 py-2 transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
-              >
-                <AdminIcon name={op.icon} className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-emerald-600" />
-                <span className="min-w-0">
-                  <span className="block truncate text-[13px] font-semibold text-slate-900">{op.label}</span>
-                  <span className="block truncate text-[11px] text-slate-500">{op.detail}</span>
+        {/* Founder Action Queue — real actionable counts, real destinations. */}
+        <SectionCard
+          title="Founder Action Queue"
+          description="Everything that needs a decision, ranked by severity."
+          className="h-fit"
+        >
+          <div className="space-y-0.5">
+            {queueItems.map((item) => (
+              <Link key={item.id} href={item.href} className="qfa-queue-row qfa-focus group">
+                <span
+                  className={`qfa-glow-chip shrink-0 ${
+                    item.severity === "critical" ? "qfa-glow-red" : item.severity === "warning" ? "qfa-glow-amber" : "qfa-glow-green"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <AdminIcon name={item.icon} className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700 group-hover:text-slate-950">
+                  {item.label}
+                  {item.approximate ? <span className="sr-only"> (in loaded leads)</span> : null}
+                </span>
+                <span className={`qfa-count qfa-count--${item.severity}`}>
+                  {formatNumber(item.value)}
                 </span>
               </Link>
             ))}
           </div>
+          <p className="mt-3 border-t border-[color:var(--qfa-line-soft)] pt-2.5 text-[11px] leading-4 text-slate-500">
+            Unassigned leads are counted over the loaded snapshot; the other counts are live server-side totals.
+          </p>
         </SectionCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Lead funnel" description="Live lead statuses across the leads loaded in this snapshot.">
-          <FunnelRows rows={leadFunnelRows} total={data.leads.length} />
-        </SectionCard>
+      {/* Analytics band — four compact panels over real snapshot data. */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DonutPanel title="Leads by City" rows={cityRows} total={data.leads.length} />
+        <ChartCard title="Leads by Category" rows={categoryRows} />
+        <ChartCard title="Lead Sources" rows={groupBy(data.leads, (lead) => lead.source || "Website")} />
 
-        <SectionCard title="Vendor credit balance" description="Lead credits remaining against the credits purchased.">
-          {/* This panel used to show a "health score" percentage synthesised
-              from credits, rating, status and visibility with invented weights.
-              No such score exists in the product, so it has been replaced with
-              the underlying facts: real credit balance, real status, real
-              rating. Nothing here is computed from a made-up formula. */}
+        <SectionCard title="Vendor Credit Balance" description="Lead credits remaining against purchased.">
           <div className="space-y-2">
             {vendorHealthRows.length ? (
               vendorHealthRows.map((vendor) => {
@@ -267,32 +342,24 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
                     key={vendor.id}
                     type="button"
                     onClick={() => setSelectedVendor(vendor)}
-                    className="qfa-focus w-full rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line-soft)] bg-white p-3 text-left transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
+                    className="qfa-focus w-full rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line-soft)] bg-white p-2.5 text-left transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-semibold text-slate-950">{vendor.business_name || "Unnamed vendor"}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                          {vendor.city || "City not set"} · {vendor.status || "Status not set"}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-right">
-                        <span className="block text-[13px] font-semibold tabular-nums text-slate-900">
-                          {formatNumber(remaining)}
-                          {total > 0 ? <span className="text-slate-400">/{formatNumber(total)}</span> : null}
-                        </span>
-                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">credits</span>
+                      <p className="min-w-0 truncate text-[13px] font-semibold text-slate-950">{vendor.business_name || "Unnamed vendor"}</p>
+                      <span className="shrink-0 text-[12px] font-semibold tabular-nums text-slate-900">
+                        {formatNumber(remaining)}
+                        {total > 0 ? <span className="text-slate-400">/{formatNumber(total)}</span> : null}
                       </span>
                     </div>
                     {total > 0 ? (
-                      <div className="mt-2">
+                      <div className="mt-1.5">
                         <ProgressBar value={pct} tone={low ? "rose" : pct >= 40 ? "emerald" : "amber"} />
                       </div>
                     ) : (
-                      <p className="mt-2 text-[11px] text-slate-400">No package credits recorded.</p>
+                      <p className="mt-1.5 text-[11px] text-slate-400">No package credits recorded.</p>
                     )}
                     {low ? (
-                      <p className="mt-1.5 text-[11px] font-semibold text-rose-700">Low balance — at or under 3 credits.</p>
+                      <p className="mt-1 text-[11px] font-semibold text-rose-700">Low balance — at or under 3 credits.</p>
                     ) : null}
                   </button>
                 );
@@ -302,20 +369,19 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
             )}
           </div>
         </SectionCard>
+      </section>
 
-        <SectionCard title="Revenue snapshot" description="Paid collections by package, using current payment data.">
+      {/* Secondary band: revenue, activity, quick operations. */}
+      <section className="grid gap-4 xl:grid-cols-3">
+        <SectionCard title="Revenue Snapshot" description="Paid collections by package, using current payment data.">
           <div className="mb-3 grid grid-cols-2 gap-2">
             <MetricPill label="Month" value={formatINR(stats.revenue_this_month)} />
             <MetricPill label="Lifetime" value={formatINR(stats.total_revenue)} />
           </div>
           <FunnelRows rows={revenueRows} total={Number(stats.total_revenue ?? 0)} money />
         </SectionCard>
-      </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <ChartCard title="Lead sources" rows={groupBy(data.leads, (lead) => lead.source || "Website")} />
-
-        <SectionCard title="Recent activity" description="Latest lead, vendor, and payment events.">
+        <SectionCard title="Recent Activity" description="Latest lead, vendor, and payment events.">
           <div className="divide-y divide-[color:var(--qfa-line-soft)]">
             {recentActivity.length ? (
               recentActivity.map((item) => (
@@ -335,11 +401,109 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
             )}
           </div>
         </SectionCard>
+
+        <SectionCard title="Quick Operations" description="Jump straight into an existing admin workspace.">
+          <div className="grid gap-1.5">
+            {quickOperations.map((op) => (
+              <Link
+                key={op.href}
+                href={op.href}
+                className="qfa-focus group flex items-center gap-2.5 rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line-soft)] bg-white px-3 py-2 transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-[color:var(--qfa-inset)]"
+              >
+                <AdminIcon name={op.icon} className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-emerald-600" />
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-semibold text-slate-900">{op.label}</span>
+                  <span className="block truncate text-[11px] text-slate-500">{op.detail}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </SectionCard>
       </section>
 
       {selectedLead ? <LeadDrawer lead={selectedLead} vendors={data.vendors} onClose={() => setSelectedLead(null)} /> : null}
       {selectedVendor ? <VendorDrawer vendor={selectedVendor} onClose={() => setSelectedVendor(null)} /> : null}
     </div>
+  );
+}
+
+/**
+ * Lead quality cell. `lead_quality_score` is a real stored column; when it is
+ * absent we fall back to the stored priority label, and to a quiet dash when
+ * neither exists. Nothing synthesises a score.
+ */
+function QualityCell({ lead }: { lead: Lead }) {
+  const score = lead.lead_quality_score;
+  if (score != null && Number.isFinite(Number(score))) {
+    const value = Number(score);
+    const tone = value >= 70 ? "qfa-count--clear" : value >= 40 ? "qfa-count--warning" : "qfa-count--critical";
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className={`qfa-count ${tone}`}>{value}</span>
+        {lead.lead_priority ? <StatusBadge value={lead.lead_priority} /> : null}
+      </span>
+    );
+  }
+  if (lead.lead_priority) return <StatusBadge value={lead.lead_priority} />;
+  return <Blank />;
+}
+
+/**
+ * CSS-only donut over real grouped counts (top 5 + Others). No chart
+ * dependency; the ring is a conic-gradient and the hole is a mask.
+ */
+function DonutPanel({ title, rows, total }: { title: string; rows: Array<{ label: string; value: number }>; total: number }) {
+  const top = rows.slice(0, 5);
+  const otherValue = rows.slice(5).reduce((sum, row) => sum + row.value, 0);
+  const segments = otherValue > 0 ? [...top, { label: "Others", value: otherValue }] : top;
+  const sum = Math.max(1, segments.reduce((acc, seg) => acc + seg.value, 0));
+
+  let cursor = 0;
+  const stops = segments.map((segment, index) => {
+    const start = (cursor / sum) * 360;
+    cursor += segment.value;
+    const end = (cursor / sum) * 360;
+    return `${CHART_COLORS[index % CHART_COLORS.length]} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
+  });
+
+  return (
+    <SectionCard title={title}>
+      {segments.length ? (
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0" aria-hidden="true">
+            <div className="qfa-donut" style={{ background: `conic-gradient(${stops.join(", ")})` }} />
+            <div className="absolute inset-0 grid place-items-center">
+              <span className="text-center">
+                <span className="block text-lg font-semibold leading-none tracking-tight text-slate-950 tabular-nums">
+                  {formatNumber(total)}
+                </span>
+                <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wide text-slate-500">Loaded</span>
+              </span>
+            </div>
+          </div>
+          <ul className="min-w-0 flex-1 space-y-1.5">
+            {segments.map((segment, index) => {
+              const percent = Math.round((segment.value / sum) * 100);
+              return (
+                <li key={segment.label} className="flex items-center gap-2 text-xs">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-slate-600">{segment.label}</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                    {formatNumber(segment.value)} <span className="font-normal text-slate-500">({percent}%)</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-[13px] text-slate-500">No data in this snapshot yet.</p>
+      )}
+    </SectionCard>
   );
 }
 

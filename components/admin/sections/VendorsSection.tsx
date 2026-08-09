@@ -404,6 +404,14 @@ export function assignmentReasonLabel(reason: string): string {
     vendor_inactive: "Inactive",
     vendor_pending_approval: "Pending approval",
     vendor_suspended: "Suspended",
+    // `not_accepting_leads` is the vendor AVAILABILITY switch
+    // (vendors.accepting_leads): the vendor is not open to receiving NEW lead
+    // assignments. It is NOT a per-lead decision — QuickFurno has no vendor
+    // accept/reject of an assigned lead. The label is worded so it can never be
+    // read as one. Previously this code had no mapping at all and the raw
+    // identifier "not_accepting_leads" leaked into the admin UI.
+    not_accepting_leads: "Unavailable for new assignments",
+    vendor_not_approved: "Not approved",
   };
   return labels[reason] ?? reason;
 }

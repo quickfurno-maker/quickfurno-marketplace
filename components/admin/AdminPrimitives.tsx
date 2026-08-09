@@ -23,9 +23,11 @@
 // so the admin is dark while anything outside that scope stays light.
 // ============================================================================
 
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AdminIcon } from "./AdminIcon";
 import type { AdminIconName } from "./adminConfig";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 type BadgeTone = "emerald" | "blue" | "amber" | "rose" | "slate" | "violet" | "cyan";
 
@@ -122,7 +124,7 @@ const BUTTON_BASE =
 
 function sizeClasses(size: ButtonSize) {
   return size === "sm"
-    ? "h-8 rounded-[var(--qfa-radius-sm)] px-2.5 text-xs"
+    ? "h-10 rounded-[var(--qfa-radius-sm)] px-2.5 text-xs sm:h-8"
     : "h-[var(--qfa-control-h)] rounded-[var(--qfa-radius)] px-3.5 text-[13px]";
 }
 
@@ -329,7 +331,7 @@ export function ProgressBar({ value, tone = "emerald" }: { value: number; tone?:
   const width = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
   return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+    <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-slate-100">
       <div className={`h-full rounded-full ${color}`} style={{ width: `${width}%` }} />
     </div>
   );
@@ -420,10 +422,9 @@ export function SelectFilter({
 }) {
   return (
     <label className="qfa-control group relative inline-flex min-w-0 cursor-pointer items-center gap-1.5 pl-2.5">
-      <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400 sm:inline">
+      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:text-[11px]">
         {label}
       </span>
-      <span className="sr-only sm:hidden">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -487,10 +488,23 @@ export function DataTable<T>({
   onRowClick?: (row: T) => void;
 }) {
   const cellPad = density === "compact" ? "px-3 py-2" : "px-3.5 py-2.5";
+  const overflowHintId = useId();
+  const needsHorizontalHint = columns.length >= 4;
 
   return (
     <div className="qfa-panel overflow-hidden">
-      <div className="overflow-x-auto">
+      {needsHorizontalHint ? (
+        <p id={overflowHintId} className="border-b border-[color:var(--qfa-line-soft)] px-3 py-1.5 text-[10px] font-medium text-slate-500 md:hidden">
+          Scroll horizontally for more columns.
+        </p>
+      ) : null}
+      <div
+        className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"
+        role={needsHorizontalHint ? "region" : undefined}
+        aria-label={needsHorizontalHint ? "Scrollable data table" : undefined}
+        aria-describedby={needsHorizontalHint ? overflowHintId : undefined}
+        tabIndex={needsHorizontalHint ? 0 : undefined}
+      >
         <table className="min-w-full border-separate border-spacing-0 text-left">
           <thead className={stickyHeader ? "sticky top-0 z-10" : undefined}>
             <tr>
@@ -513,18 +527,26 @@ export function DataTable<T>({
                   <tr
                     key={getRowKey ? getRowKey(row, index) : index}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    onKeyDown={onRowClick ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onRowClick(row);
+                      }
+                    } : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
                     aria-selected={isRowActive ? active : undefined}
-                    className={`qfa-row transition-colors ${onRowClick ? "cursor-pointer" : ""} ${
+                    className={`qfa-row qfa-focus transition-colors ${onRowClick ? "cursor-pointer" : ""} ${
                       active ? "bg-emerald-50/60" : ""
                     }`}
                   >
-                    {columns.map((column) => (
+                    {columns.map((column, columnIndex) => (
                       <td
                         key={column.header}
                         className={`qfa-td align-middle ${cellPad} ${
                           active ? "border-l-emerald-300" : ""
                         } ${column.className ?? ""}`}
                       >
+                        {active && columnIndex === 0 ? <span className="sr-only">Selected row. </span> : null}
                         {column.cell(row)}
                       </td>
                     ))}
@@ -577,9 +599,10 @@ export function EmptyState({ title, message, compact = false }: { title: string;
 
 export function LoadingState() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div role="status" aria-label="Loading admin data" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <span className="sr-only">Loading admin data…</span>
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="qfa-panel h-24 animate-pulse px-4 py-3.5">
+        <div key={index} aria-hidden="true" className="qfa-panel h-24 animate-pulse px-4 py-3.5">
           <div className="h-3 w-24 rounded bg-slate-100" />
           <div className="mt-3 h-6 w-20 rounded bg-slate-100" />
           <div className="mt-3 h-2 w-full rounded bg-slate-100" />
@@ -619,26 +642,7 @@ export function Drawer({
   width?: "xl" | "2xl";
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = overflow;
-      previous?.focus?.();
-    };
-  }, [onClose]);
+  useAdminModalFocus({ open: true, containerRef: panelRef, onClose });
 
   return (
     <div
@@ -660,8 +664,8 @@ export function Drawer({
         <div className="shrink-0 border-b border-[color:var(--qfa-line)] bg-white px-5 py-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
-              {subtitle ? <div className="mt-0.5 truncate text-[13px] text-slate-500">{subtitle}</div> : null}
+              <h2 className="break-words text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
+              {subtitle ? <div className="mt-0.5 break-words text-[13px] text-slate-500">{subtitle}</div> : null}
             </div>
             <SecondaryButton onClick={onClose} size="sm" aria-label="Close panel">
               Close
@@ -689,25 +693,25 @@ export function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onCancel();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onCancel]);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  useAdminModalFocus({ open: true, containerRef: dialogRef, onClose: onCancel });
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 backdrop-blur-[2px]">
       <div
-        role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="alertdialog"
         aria-modal="true"
-        aria-label={title}
-        className="w-full max-w-md rounded-[var(--qfa-radius-lg)] border border-[color:var(--qfa-line)] bg-white p-5 shadow-[var(--qfa-shadow-pop)]"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="w-full max-w-md rounded-[var(--qfa-radius-lg)] border border-[color:var(--qfa-line)] bg-white p-5 shadow-[var(--qfa-shadow-pop)] outline-none"
       >
-        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1.5 text-[13px] leading-5 text-slate-500">{message}</p>
-        <div className="mt-5 flex justify-end gap-2">
+        <h2 id={titleId} className="text-base font-semibold text-slate-950">{title}</h2>
+        <p id={descriptionId} className="mt-1.5 text-[13px] leading-5 text-slate-500">{message}</p>
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
           <PrimaryButton onClick={onConfirm}>Confirm</PrimaryButton>
         </div>
@@ -792,13 +796,20 @@ export function Tabs({
   active,
   onChange,
   label = "Workspace sections",
+  id,
 }: {
   tabs: string[];
   active: string;
   onChange: (tab: string) => void;
   label?: string;
+  id?: string;
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const activeIndex = tabs.indexOf(active);
+
+  useEffect(() => {
+    refs.current[activeIndex]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeIndex]);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent, index: number) => {
@@ -828,6 +839,8 @@ export function Tabs({
             }}
             type="button"
             role="tab"
+            id={id ? `${id}-${tabToken(tab)}-tab` : undefined}
+            aria-controls={id ? `${id}-panel` : undefined}
             aria-selected={selected}
             tabIndex={selected ? 0 : -1}
             onKeyDown={(event) => onKeyDown(event, index)}
@@ -846,53 +859,163 @@ export function Tabs({
   );
 }
 
+function tabToken(tab: string): string {
+  return tab.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+export function TabPanel({
+  id,
+  active,
+  children,
+  className = "",
+}: {
+  id: string;
+  active: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      id={`${id}-panel`}
+      role="tabpanel"
+      aria-labelledby={`${id}-${tabToken(active)}-tab`}
+      tabIndex={0}
+      className={`qfa-focus rounded-[var(--qfa-radius-sm)] outline-none ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Menus
 // ---------------------------------------------------------------------------
 
 export function ActionMenu({ actions }: { actions: Array<{ label: string; onClick: () => void; danger?: boolean }> }) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const menuId = useId();
+
+  const placeMenu = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = 208;
+    const estimatedHeight = Math.min(320, actions.length * 40 + 8);
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width));
+    const top = rect.bottom + estimatedHeight + 8 <= window.innerHeight
+      ? rect.bottom + 4
+      : Math.max(8, rect.top - estimatedHeight - 4);
+    setPosition({ top, left });
+  }, [actions.length]);
+
+  function openAndFocus(index: number) {
+    if (!actions.length) return;
+    placeMenu();
+    setOpen(true);
+    window.setTimeout(() => itemRefs.current[index]?.focus(), 0);
+  }
 
   // Click-away and Escape. The previous menu stayed open until it was clicked
   // again, so two open menus could overlap each other in a table.
   useEffect(() => {
     if (!open) return;
     function onDocDown(event: MouseEvent) {
-      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!wrapRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     }
+    function onViewportChange() { placeMenu(); }
     document.addEventListener("mousedown", onDocDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
     return () => {
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
     };
-  }, [open]);
+  }, [open, placeMenu]);
 
   return (
     <div ref={wrapRef} className="relative inline-flex">
-      <SecondaryButton size="sm" onClick={() => setOpen((value) => !value)}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        disabled={!actions.length}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (open) setOpen(false);
+          else {
+            placeMenu();
+            setOpen(true);
+          }
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            openAndFocus(0);
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            openAndFocus(Math.max(0, actions.length - 1));
+          }
+        }}
+        className={`${BUTTON_BASE} h-10 rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2.5 text-xs text-slate-700 qfa-focus hover:border-[color:var(--qfa-line-strong)] hover:bg-slate-50 sm:h-8`}
+      >
         Actions
         <span aria-hidden="true" className="text-[9px] text-slate-400">▼</span>
-      </SecondaryButton>
-      {open ? (
+      </button>
+      {open && position ? createPortal(
         <div
+          ref={menuRef}
+          id={menuId}
           role="menu"
-          className="absolute right-0 top-9 z-30 w-52 overflow-hidden rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white py-1 shadow-[var(--qfa-shadow-pop)]"
+          style={{ top: position.top, left: position.left }}
+          className="fixed z-[80] w-52 overflow-hidden rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-[color:var(--qfa-surface)] py-1 shadow-[var(--qfa-shadow-pop)]"
+          onKeyDown={(event) => {
+            const index = itemRefs.current.indexOf(document.activeElement as HTMLButtonElement);
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              itemRefs.current[(index + 1) % actions.length]?.focus();
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              itemRefs.current[(index - 1 + actions.length) % actions.length]?.focus();
+            } else if (event.key === "Home") {
+              event.preventDefault();
+              itemRefs.current[0]?.focus();
+            } else if (event.key === "End") {
+              event.preventDefault();
+              itemRefs.current[actions.length - 1]?.focus();
+            } else if (event.key === "Tab") {
+              setOpen(false);
+            }
+          }}
         >
-          {actions.map((action) => (
+          {actions.map((action, index) => (
             <button
               key={action.label}
+              ref={(node) => { itemRefs.current[index] = node; }}
               type="button"
               role="menuitem"
               onClick={() => {
                 setOpen(false);
                 action.onClick();
+                triggerRef.current?.focus();
               }}
-              className={`block w-full px-3 py-1.5 text-left text-[13px] font-medium transition-colors ${
+              className={`qfa-focus block min-h-10 w-full px-3 py-2 text-left text-[13px] font-medium transition-colors ${
                 action.danger ? "text-rose-700 hover:bg-rose-50" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
               }`}
             >
@@ -900,7 +1023,7 @@ export function ActionMenu({ actions }: { actions: Array<{ label: string; onClic
             </button>
           ))}
         </div>
-      ) : null}
+      , document.body) : null}
     </div>
   );
 }
@@ -945,8 +1068,8 @@ export function Toast({ message, tone = "info" }: { message: string; tone?: "suc
         : "border-[color:var(--qfa-line)] bg-white text-slate-900";
   return (
     <div
-      role="status"
-      aria-live="polite"
+      role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
       className={`fixed bottom-5 right-5 z-50 max-w-sm rounded-[var(--qfa-radius)] border px-3.5 py-2.5 text-[13px] font-semibold shadow-[var(--qfa-shadow-pop)] ${color}`}
     >
       {message}

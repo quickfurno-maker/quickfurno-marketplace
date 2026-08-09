@@ -29,7 +29,7 @@ import type {
   VendorTask,
 } from "@/lib/crm/vendorCrmProfileTypes";
 import type { VendorTaskStatus } from "@/lib/crm/vendorCrmContracts";
-import { EmptyState, ProgressBar, StatusBadge, Tabs, Toast } from "../AdminPrimitives";
+import { EmptyState, ProgressBar, StatusBadge, TabPanel, Tabs, Toast } from "../AdminPrimitives";
 import {
   ContactsTab,
   CoreContextTab,
@@ -133,13 +133,14 @@ export function VendorCrmProfile(props: VendorCrmProfileProps) {
       <RecordHeader core={core} profile={profile} />
 
       <Tabs
+        id="vendor-crm-profile-tabs"
         tabs={Object.values(TAB_LABELS)}
         active={activeLabel}
         label="Vendor CRM profile sections"
         onChange={(label) => navigate(TAB_BY_LABEL[label] ?? "overview", 1)}
       />
 
-      <div className={`qfa-profile-enter ${routePending ? "opacity-60" : "opacity-100"}`}>
+      <TabPanel id="vendor-crm-profile-tabs" active={activeLabel} className={`qfa-profile-enter ${routePending ? "opacity-60" : "opacity-100"}`}>
         {props.activeTab === "overview" ? (
           <OverviewTab
             core={core}
@@ -223,7 +224,7 @@ export function VendorCrmProfile(props: VendorCrmProfileProps) {
         ) : null}
 
         {props.activeTab === "core-context" ? <CoreContextTab core={core} /> : null}
-      </div>
+      </TabPanel>
 
       {feedback ? <Toast message={feedback.message} tone={feedback.tone} /> : null}
     </div>
@@ -245,10 +246,10 @@ function RecordHeader({ core, profile }: { core: VendorCoreFacts; profile: Vendo
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate text-2xl font-semibold tracking-tight text-slate-950 sm:text-[28px]">
+              <h2 className="break-words text-2xl font-semibold tracking-tight text-slate-950 sm:text-[28px]">
                 {core.business_name || "Unnamed vendor"}
               </h2>
-              <p className="mt-1 truncate text-[13px] text-slate-500">
+              <p className="mt-1 break-words text-[13px] text-slate-500">
                 {[core.owner_name, core.city, core.service_categories?.[0]].filter(Boolean).join(" · ") || "Core identity details not set"}
               </p>
             </div>

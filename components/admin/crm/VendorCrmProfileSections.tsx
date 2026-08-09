@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   VENDOR_CONTACT_CHANNELS,
   VENDOR_CRM_ONBOARDING_STAGES,
@@ -34,6 +34,7 @@ import {
   StatusBadge,
 } from "../AdminPrimitives";
 import { Pagination } from "../Pagination";
+import { useAdminModalFocus } from "../useAdminModalFocus";
 
 const DATE_FORMAT = new Intl.DateTimeFormat("en-IN", {
   day: "2-digit",
@@ -458,10 +459,10 @@ function ContactForm({
   return (
     <SectionCard title="Add contact" description="Private CRM relationship contact" className="self-start xl:sticky xl:top-24">
       <div className="space-y-3">
-        <Field label="Name"><input value={form.name} disabled={pending} onChange={(event) => setForm({ ...form, name: event.target.value })} className={controlClass} /></Field>
-        <Field label="Role / title"><input value={form.role_title} disabled={pending} onChange={(event) => setForm({ ...form, role_title: event.target.value })} className={controlClass} /></Field>
-        <Field label="Phone" helper="Phone or email is required."><input type="tel" value={form.phone} disabled={pending} onChange={(event) => setForm({ ...form, phone: event.target.value })} className={controlClass} /></Field>
-        <Field label="Email"><input type="email" value={form.email} disabled={pending} onChange={(event) => setForm({ ...form, email: event.target.value })} className={controlClass} /></Field>
+        <Field label="Name (required)"><input required autoComplete="name" value={form.name} disabled={pending} onChange={(event) => setForm({ ...form, name: event.target.value })} className={controlClass} /></Field>
+        <Field label="Role / title"><input autoComplete="organization-title" value={form.role_title} disabled={pending} onChange={(event) => setForm({ ...form, role_title: event.target.value })} className={controlClass} /></Field>
+        <Field label="Phone" helper="Phone or email is required."><input type="tel" autoComplete="tel" value={form.phone} disabled={pending} onChange={(event) => setForm({ ...form, phone: event.target.value })} className={controlClass} /></Field>
+        <Field label="Email" helper="Phone or email is required."><input type="email" autoComplete="email" value={form.email} disabled={pending} onChange={(event) => setForm({ ...form, email: event.target.value })} className={controlClass} /></Field>
         <Field label="Preferred channel">
           <SelectControl value={form.preferred_channel} options={["", ...VENDOR_CONTACT_CHANNELS]} disabled={pending} onChange={(value) => setForm({ ...form, preferred_channel: value })} />
         </Field>
@@ -569,7 +570,7 @@ export function TagsTab({
 
         <SectionCard title="Create tag" description="The server normalizes names and prevents duplicates.">
           <div className="space-y-3">
-            <Field label="Tag name"><input value={name} disabled={pendingKey === "tag-create"} onChange={(event) => setName(event.target.value)} className={controlClass} /></Field>
+            <Field label="Tag name (required)"><input required value={name} disabled={pendingKey === "tag-create"} onChange={(event) => setName(event.target.value)} className={controlClass} /></Field>
             <PrimaryButton
               className="w-full"
               disabled={!name.trim() || pendingKey === "tag-create"}
@@ -634,8 +635,8 @@ export function NotesTab({
           <Field label="Category">
             <SelectControl value={category} options={VENDOR_NOTE_CATEGORIES} disabled={pending} onChange={setCategory} />
           </Field>
-          <Field label="Note body">
-            <textarea value={body} disabled={pending} onChange={(event) => setBody(event.target.value)} className={`${textareaClass} min-h-[150px]`} placeholder="Add factual CRM context…" />
+          <Field label="Note body (required)">
+            <textarea required value={body} disabled={pending} onChange={(event) => setBody(event.target.value)} className={`${textareaClass} min-h-[150px]`} placeholder="Add factual CRM context…" />
           </Field>
           <PrimaryButton
             className="w-full"
@@ -685,7 +686,7 @@ export function TasksTab({
       cell: (task: VendorTask) => (
         <span className="block min-w-[12rem]">
           <span className="block font-semibold text-slate-900">{task.title}</span>
-          {task.description ? <span className="mt-0.5 block max-w-sm truncate text-[11px] text-slate-500">{task.description}</span> : null}
+          {task.description ? <span className="mt-0.5 block max-w-sm whitespace-normal break-words text-[11px] text-slate-500">{task.description}</span> : null}
         </span>
       ),
     },
@@ -780,7 +781,7 @@ function TaskForm({
     <SectionCard title="Create task" description="Manual CRM follow-up" className="self-start xl:sticky xl:top-24">
       <div className="space-y-3">
         <Field label="Task type"><SelectControl value={form.task_type} options={VENDOR_TASK_TYPES} disabled={pending} onChange={(value) => setForm({ ...form, task_type: value })} /></Field>
-        <Field label="Task"><input value={form.title} disabled={pending} onChange={(event) => setForm({ ...form, title: event.target.value })} className={controlClass} /></Field>
+        <Field label="Task title (required)"><input required value={form.title} disabled={pending} onChange={(event) => setForm({ ...form, title: event.target.value })} className={controlClass} /></Field>
         <Field label="Priority"><SelectControl value={form.priority} options={VENDOR_TASK_PRIORITIES} disabled={pending} onChange={(value) => setForm({ ...form, priority: value })} /></Field>
         <Field label="Due date"><input type="date" value={form.due_at} disabled={pending} onChange={(event) => setForm({ ...form, due_at: event.target.value })} className={controlClass} /></Field>
         <PrimaryButton
@@ -810,25 +811,35 @@ function CompletionDialog({
   onComplete: (result: string) => Promise<void>;
 }) {
   const [result, setResult] = useState("");
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !pending) onCancel();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onCancel, pending]);
+  const dialogRef = useRef<HTMLElement>(null);
+  const resultRef = useRef<HTMLTextAreaElement>(null);
+  useAdminModalFocus({
+    open: true,
+    containerRef: dialogRef,
+    initialFocusRef: resultRef,
+    onClose: onCancel,
+    closeOnEscape: !pending,
+  });
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 backdrop-blur-[2px]">
-      <section role="dialog" aria-modal="true" aria-labelledby="task-completion-title" className="w-full max-w-lg rounded-[var(--qfa-radius-lg)] border border-[color:var(--qfa-line)] bg-white p-5 shadow-[var(--qfa-shadow-pop)]">
+      <section
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-completion-title"
+        aria-describedby="task-completion-description"
+        tabIndex={-1}
+        className="w-full max-w-lg rounded-[var(--qfa-radius-lg)] border border-[color:var(--qfa-line)] bg-white p-5 outline-none shadow-[var(--qfa-shadow-pop)]"
+      >
         <h2 id="task-completion-title" className="text-base font-semibold text-slate-950">Complete task</h2>
-        <p className="mt-1 text-[13px] text-slate-500">{task.title}</p>
+        <p id="task-completion-description" className="mt-1 text-[13px] text-slate-500">{task.title}</p>
         <div className="mt-4">
-          <Field label="Completion result" helper="Required. Record the real outcome before closing this task.">
-            <textarea autoFocus value={result} disabled={pending} onChange={(event) => setResult(event.target.value)} className={textareaClass} />
+          <Field label="Completion result (required)" helper="Record the real outcome before closing this task.">
+            <textarea ref={resultRef} required value={result} disabled={pending} onChange={(event) => setResult(event.target.value)} className={textareaClass} />
           </Field>
         </div>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <SecondaryButton disabled={pending} onClick={onCancel}>Keep open</SecondaryButton>
           <PrimaryButton disabled={!result.trim() || pending} onClick={() => onComplete(result.trim())}>
             {pending ? "Completing…" : "Complete task"}

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { browserClient } from "@/lib/supabaseBrowser";
 import { AdminIcon } from "./AdminIcon";
 import { AdminCommandPalette } from "./AdminCommandPalette";
 import { adminNavGroups, getAdminSectionByKey, getAdminSectionByPath } from "./adminConfig";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 const COLLAPSE_STORAGE_KEY = "qf.admin.sidebarCollapsed";
 
@@ -55,6 +56,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
         event.preventDefault();
         setPaletteOpen(true);
       } else if (event.key === "Escape") {
@@ -82,11 +85,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="admin-surface min-h-screen bg-[color:var(--qfa-page)] font-sans text-slate-950">
+      <a
+        href="#admin-main-content"
+        className="qfa-focus sr-only fixed left-3 top-3 z-[90] rounded-[var(--qfa-radius)] bg-[color:var(--qfa-surface)] px-3 py-2 text-sm font-semibold text-slate-950 shadow-[var(--qfa-shadow-pop)] focus:not-sr-only"
+      >
+        Skip to admin content
+      </a>
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
         className="qfa-focus fixed left-3 top-3 z-40 inline-flex h-10 w-10 items-center justify-center rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white text-slate-700 shadow-[var(--qfa-shadow-1)] lg:hidden"
         aria-label="Open admin menu"
+        aria-expanded={mobileOpen}
+        aria-controls="admin-mobile-navigation"
+        aria-hidden={mobileOpen || paletteOpen ? true : undefined}
+        tabIndex={mobileOpen || paletteOpen ? -1 : 0}
       >
         <span className="h-0.5 w-5 rounded bg-current shadow-[0_6px_0_currentColor,0_-6px_0_currentColor]" />
       </button>
@@ -97,11 +110,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
         onToggleCollapsed={toggleCollapsed}
         onClose={() => setMobileOpen(false)}
         onSignOut={signOut}
+        backgroundInert={paletteOpen}
       />
 
       <AdminCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
-      <div className={collapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"}>
+      <div
+        className={collapsed ? "lg:pl-[76px]" : "lg:pl-[264px]"}
+        aria-hidden={mobileOpen || paletteOpen ? true : undefined}
+        inert={mobileOpen || paletteOpen ? ("" as unknown as boolean) : undefined}
+      >
         <header className="sticky top-0 z-30 border-b border-[color:var(--qfa-line)] bg-[color:var(--qfa-page)]/90 px-4 py-2.5 backdrop-blur-xl sm:px-5 lg:px-7">
           <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 pl-12 lg:pl-0">
@@ -119,8 +137,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 </ol>
               </nav>
               <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <h1 className="truncate text-xl font-semibold tracking-tight text-slate-950">{current.label}</h1>
-                <p className="min-w-0 truncate text-[13px] text-slate-500">{current.description}</p>
+                <h1 className="break-words text-xl font-semibold tracking-tight text-slate-950">{current.label}</h1>
+                <p className="min-w-0 break-words text-[13px] text-slate-500">{current.description}</p>
               </div>
             </div>
 
@@ -157,7 +175,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1680px] px-4 py-5 sm:px-5 lg:px-7 lg:py-6">{children}</main>
+        <main id="admin-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1680px] px-4 py-5 outline-none sm:px-5 lg:px-7 lg:py-6">{children}</main>
       </div>
     </div>
   );
@@ -169,14 +187,18 @@ function Sidebar({
   onToggleCollapsed,
   onClose,
   onSignOut,
+  backgroundInert,
 }: {
   open: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onClose: () => void;
   onSignOut: () => void;
+  backgroundInert: boolean;
 }) {
   const pathname = usePathname();
+  const mobileDialogRef = useRef<HTMLDivElement | null>(null);
+  useAdminModalFocus({ open, containerRef: mobileDialogRef, onClose });
 
   return (
     <>
@@ -185,6 +207,8 @@ function Sidebar({
           collapsed ? "w-[76px]" : "w-[264px]"
         }`}
         aria-label="Admin navigation"
+        aria-hidden={backgroundInert ? true : undefined}
+        inert={backgroundInert ? ("" as unknown as boolean) : undefined}
       >
         <SidebarContent
           pathname={pathname}
@@ -195,7 +219,16 @@ function Sidebar({
       </aside>
 
       {open ? (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation">
+        <div
+          ref={mobileDialogRef}
+          id="admin-mobile-navigation"
+          tabIndex={-1}
+          className="fixed inset-0 z-50 outline-none lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-mobile-navigation-title"
+        >
+          <h2 id="admin-mobile-navigation-title" className="sr-only">Admin navigation</h2>
           <button
             type="button"
             aria-label="Close admin menu"
@@ -225,6 +258,8 @@ function SidebarContent({
   onNavigate?: () => void;
   onSignOut: () => void;
 }) {
+  const activeSection = getAdminSectionByPath(pathname);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className={`border-b border-white/10 py-3.5 ${collapsed ? "px-2.5" : "px-4"}`}>
@@ -248,7 +283,7 @@ function SidebarContent({
             <button
               type="button"
               onClick={onToggleCollapsed}
-              aria-pressed={collapsed}
+              aria-expanded={!collapsed}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               className="qfa-focus hidden h-7 w-7 shrink-0 place-items-center rounded-[var(--qfa-radius-sm)] border border-white/10 bg-white/[0.04] text-slate-300 transition-colors hover:bg-white/10 hover:text-white lg:grid"
@@ -274,10 +309,7 @@ function SidebarContent({
               <div className="mt-1.5 space-y-0.5">
                 {group.sections.map((key) => {
                   const section = getAdminSectionByKey(key);
-                  const active =
-                    pathname === section.href ||
-                    pathname.startsWith(`${section.href}/`) ||
-                    (pathname === "/admin" && section.key === "dashboard");
+                  const active = activeSection.key === section.key;
 
                   return (
                     <Link
@@ -286,7 +318,7 @@ function SidebarContent({
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       title={collapsed ? section.label : section.description}
-                      className={`qfa-focus group relative flex min-w-0 items-center gap-2.5 rounded-[var(--qfa-radius)] py-1.5 text-[13px] font-medium transition-colors ${
+                      className={`qfa-focus group relative flex min-h-10 min-w-0 items-center gap-2.5 rounded-[var(--qfa-radius)] py-2 text-[13px] font-medium transition-colors lg:min-h-0 lg:py-1.5 ${
                         collapsed ? "justify-center px-1.5" : "px-2.5"
                       } ${
                         active
@@ -338,7 +370,7 @@ function SidebarContent({
           type="button"
           onClick={onSignOut}
           title={collapsed ? "Sign out" : undefined}
-          className="qfa-focus inline-flex h-8 w-full items-center justify-center rounded-[var(--qfa-radius-sm)] border border-white/10 bg-white/5 text-[13px] font-semibold text-slate-300 transition-colors hover:bg-white hover:text-slate-950"
+          className="qfa-focus inline-flex h-10 w-full items-center justify-center rounded-[var(--qfa-radius-sm)] border border-white/10 bg-white/5 text-[13px] font-semibold text-slate-300 transition-colors hover:bg-white hover:text-slate-950 lg:h-8"
         >
           {collapsed ? <span aria-hidden="true">⏻</span> : "Sign out"}
           {collapsed ? <span className="sr-only">Sign out</span> : null}

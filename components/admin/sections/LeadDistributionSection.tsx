@@ -33,6 +33,7 @@ import {
   SectionCard,
   StatCard,
   StatusBadge,
+  TabPanel,
   Tabs,
 } from "../AdminPrimitives";
 import { Pagination } from "../Pagination";
@@ -151,9 +152,10 @@ export function LeadDistributionPage({
 
   return (
     <div className="space-y-5" aria-busy={loading}>
-      <Tabs tabs={[...TABS]} active={tab} onChange={setTab} label="Lead distribution sections" />
+      <Tabs id="lead-distribution-tabs" tabs={[...TABS]} active={tab} onChange={setTab} label="Lead distribution sections" />
+      <TabPanel id="lead-distribution-tabs" active={tab}>
       {loadError ? (
-        <p className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+        <p role="alert" className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
           {loadError}
         </p>
       ) : null}
@@ -261,6 +263,7 @@ export function LeadDistributionPage({
       ) : (
         <DistributionLogsPanel notify={notify} />
       )}
+      </TabPanel>
     </div>
   );
 }

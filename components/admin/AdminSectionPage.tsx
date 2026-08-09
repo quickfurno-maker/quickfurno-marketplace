@@ -63,7 +63,7 @@ export function AdminSectionPage({ section, payload, error }: { section: AdminSe
   return (
     <div className="space-y-4">
       {error ? (
-        <div className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+        <div role="alert" className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
           This page is showing safe fallback UI because Supabase returned: {error}
         </div>
       ) : null}

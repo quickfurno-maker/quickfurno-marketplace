@@ -112,7 +112,9 @@ export function getAdminSectionByKey(key: AdminSectionKey) {
 }
 
 export function getAdminSectionByPath(pathname: string) {
-  return adminSections.find((section) => pathname === section.href || pathname.startsWith(`${section.href}/`)) ?? adminSections[0];
+  return adminSections
+    .filter((section) => pathname === section.href || pathname.startsWith(`${section.href}/`))
+    .sort((left, right) => right.href.length - left.href.length)[0] ?? adminSections[0];
 }
 
 export function getAdminSectionBySlug(slug: string) {

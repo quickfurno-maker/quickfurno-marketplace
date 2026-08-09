@@ -103,7 +103,7 @@ export function VendorCampaignEditor({
     return (
       <div className="space-y-5">
         <PageHeader title="Campaign" description="Vendor campaign" />
-        <EmptyState title="Campaign unavailable" message={error} />
+        <div role="alert"><EmptyState title="Campaign unavailable" message={error} /></div>
       </div>
     );
   }
@@ -162,15 +162,15 @@ export function VendorCampaignEditor({
       </div>
 
       {message && (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>
+        <div role="status" aria-live="polite" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>
       )}
 
       <SectionCard title="Definition">
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} disabled={!isDraft}
+              <span className="mb-1 block font-medium text-slate-600">Name (required)</span>
+              <input required value={name} onChange={(e) => setName(e.target.value)} disabled={!isDraft}
                 maxLength={CAMPAIGN_MAX_NAME_LENGTH}
                 className="qfa-control w-full px-2.5 outline-none" />
             </label>
@@ -208,8 +208,8 @@ export function VendorCampaignEditor({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Source segment</span>
-              <select value={segmentId} onChange={(e) => setSegmentId(e.target.value)} disabled={!isDraft}
+              <span className="mb-1 block font-medium text-slate-600">Source segment (required)</span>
+              <select required value={segmentId} onChange={(e) => setSegmentId(e.target.value)} disabled={!isDraft}
                 className="qfa-control w-full px-2">
                 <option value="">— select a segment —</option>
                 {segments.map((s) => (
@@ -218,8 +218,8 @@ export function VendorCampaignEditor({
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Template</span>
-              <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)} disabled={!isDraft}
+              <span className="mb-1 block font-medium text-slate-600">Template (required)</span>
+              <select required value={templateKey} onChange={(e) => setTemplateKey(e.target.value)} disabled={!isDraft}
                 className="qfa-control w-full px-2">
                 <option value="">— select a template —</option>
                 {templates.map((t) => (

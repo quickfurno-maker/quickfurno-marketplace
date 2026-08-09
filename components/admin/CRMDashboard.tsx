@@ -29,7 +29,7 @@ import {
   adminPrepareLeadClarification,
   adminUpdateLeadStatus,
 } from "@/app/actions";
-import { NoteBar, Tabs } from "./AdminPrimitives";
+import { NoteBar, TabPanel, Tabs } from "./AdminPrimitives";
 import { Pagination } from "./Pagination";
 import type { Category, City, Lead, Vendor } from "./adminTypes";
 import { emptySnapshot } from "./adminTypes";
@@ -249,13 +249,15 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
         </span>
         <span aria-hidden="true" className="text-slate-300">·</span>
         <span>Priority labels are computed for display only and are never written to the database.</span>
-        {error ? <span className="font-medium text-amber-700">Some data was limited: {error}</span> : null}
+        {error ? <span role="alert" className="font-medium text-amber-700">Some data was limited: {error}</span> : null}
       </div>
 
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Lead CRM sections" />
+      <Tabs id="lead-crm-tabs" tabs={TABS} active={active} onChange={setActive} label="Lead CRM sections" />
+
+      <TabPanel id="lead-crm-tabs" active={active}>
 
       {tabError && active !== "Lead Inbox" ? (
-        <p className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">{tabError}</p>
+        <p role="alert" className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">{tabError}</p>
       ) : null}
 
       {active === "Overview" ? (
@@ -350,6 +352,8 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
           ) : null}
         </div>
       ) : null}
+
+      </TabPanel>
 
       {selected ? (
         <LeadDrawer

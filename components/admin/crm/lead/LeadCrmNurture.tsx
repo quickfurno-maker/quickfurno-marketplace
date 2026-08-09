@@ -39,7 +39,7 @@ export function Nurture({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: Cr
       emptyTitle="No nurture leads"
       emptyMessage="Leads marked for nurture will appear here. Automated nurture sequences are not enabled in this phase."
       columns={[
-        { header: "Client", cell: (row) => <button type="button" onClick={() => onSelect(row)} className="qfa-focus rounded font-semibold text-slate-900 underline-offset-2 hover:underline">{row.name}</button> },
+        { header: "Client", cell: (row) => <button type="button" onClick={() => onSelect(row)} className="qfa-focus inline-flex min-h-10 appearance-none items-center rounded border-0 bg-transparent p-0 font-semibold text-slate-900 underline-offset-2 hover:underline sm:min-h-0">{row.name}</button> },
         { header: "Service", cell: (row) => row.service },
         { header: "City", cell: (row) => row.city },
         { header: "Priority", cell: (row) => <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} /> },

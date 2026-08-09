@@ -84,7 +84,7 @@ export function FollowUps({
                     <button
                       type="button"
                       onClick={() => onSelect(row)}
-                      className="rounded font-semibold text-slate-900 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-slate-300"
+                      className="qfa-focus inline-flex min-h-10 appearance-none items-center rounded border-0 bg-transparent p-0 font-semibold text-slate-900 underline-offset-2 hover:underline sm:min-h-0"
                     >
                       {row.name}
                     </button>

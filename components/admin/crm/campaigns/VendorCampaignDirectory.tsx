@@ -80,8 +80,9 @@ export function VendorCampaignDirectory({
                 header: "Campaign",
                 cell: (c) => (
                   <button
+                    type="button"
                     onClick={() => router.push(`/admin/vendor-crm/campaigns/${c.id}`)}
-                    className="text-left font-semibold text-emerald-700 hover:underline"
+                    className="qfa-focus inline-flex min-h-10 appearance-none items-center rounded border-0 bg-transparent p-0 text-left font-semibold text-emerald-700 hover:underline sm:min-h-0"
                   >
                     {c.name}
                   </button>

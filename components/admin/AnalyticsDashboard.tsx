@@ -12,7 +12,7 @@
 // ============================================================================
 
 import { useMemo, useState } from "react";
-import { DataTable, NoteBar, StatCard, StatusBadge, Tabs } from "./AdminPrimitives";
+import { DataTable, NoteBar, StatCard, StatusBadge, TabPanel, Tabs } from "./AdminPrimitives";
 import type { Snapshot } from "./adminTypes";
 import { formatINR, formatNumber } from "./adminUtils";
 import { buildAnalyticsModel } from "@/lib/analytics/analyticsAdapter";
@@ -52,15 +52,17 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
         as such. Ad-spend, CPL and campaign metrics are not connected and are therefore not shown.
       </NoteBar>
 
-      <Tabs tabs={tabs} active={active} onChange={setActive} />
+      <Tabs id="analytics-tabs" tabs={tabs} active={active} onChange={setActive} />
 
-      {active === "Overview" ? <Overview stats={stats} /> : null}
-      {active === "Lead Sources" ? <LeadSourceAnalytics rows={model.sources} /> : null}
-      {active === "CRM Funnel" ? <FunnelAnalytics rows={model.funnel} /> : null}
-      {active === "Services" ? <ServiceAnalytics rows={model.services} /> : null}
-      {active === "Cities & Areas" ? <AreaAnalytics rows={model.areas} /> : null}
-      {active === "Vendors" ? <VendorAnalytics rows={model.vendors} /> : null}
-      {active === "Revenue" ? <RevenueAnalytics stats={stats} /> : null}
+      <TabPanel id="analytics-tabs" active={active}>
+        {active === "Overview" ? <Overview stats={stats} /> : null}
+        {active === "Lead Sources" ? <LeadSourceAnalytics rows={model.sources} /> : null}
+        {active === "CRM Funnel" ? <FunnelAnalytics rows={model.funnel} /> : null}
+        {active === "Services" ? <ServiceAnalytics rows={model.services} /> : null}
+        {active === "Cities & Areas" ? <AreaAnalytics rows={model.areas} /> : null}
+        {active === "Vendors" ? <VendorAnalytics rows={model.vendors} /> : null}
+        {active === "Revenue" ? <RevenueAnalytics stats={stats} /> : null}
+      </TabPanel>
     </div>
   );
 }

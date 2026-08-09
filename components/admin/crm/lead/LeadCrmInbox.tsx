@@ -176,7 +176,7 @@ export function LeadInbox({
       </div>
 
       {loadError ? (
-        <p className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+        <p role="alert" className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
           {loadError}
         </p>
       ) : null}
@@ -195,7 +195,7 @@ export function LeadInbox({
                 <button
                   type="button"
                   onClick={() => onSelect(row)}
-                  className="qfa-focus block max-w-full truncate rounded text-left text-[13px] font-semibold text-slate-950 underline-offset-2 hover:underline"
+                  className="qfa-focus inline-flex min-h-10 max-w-full appearance-none items-center truncate rounded border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-slate-950 underline-offset-2 hover:underline sm:min-h-0"
                 >
                   {row.name}
                 </button>

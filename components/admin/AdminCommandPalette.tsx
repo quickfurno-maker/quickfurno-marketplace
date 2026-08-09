@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminIcon } from "./AdminIcon";
 import { adminNavGroups, adminSections, getAdminSectionByKey } from "./adminConfig";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 /**
  * Navigation-only command palette.
@@ -25,7 +26,7 @@ export function AdminCommandPalette({
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const restoreFocusTo = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const groupOf = useMemo(() => {
     const map = new Map<string, string>();
@@ -59,18 +60,7 @@ export function AdminCommandPalette({
     setActive(0);
   }, [query]);
 
-  useEffect(() => {
-    if (!open) return;
-    restoreFocusTo.current = document.activeElement as HTMLElement | null;
-    const id = window.setTimeout(() => inputRef.current?.focus(), 0);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.clearTimeout(id);
-      document.body.style.overflow = previousOverflow;
-      restoreFocusTo.current?.focus?.();
-    };
-  }, [open]);
+  useAdminModalFocus({ open, containerRef: dialogRef, initialFocusRef: inputRef, onClose });
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +70,8 @@ export function AdminCommandPalette({
 
   if (!open) return null;
 
+  const activeResultId = results[active] ? `qf-cmdk-option-${results[active].key}` : undefined;
+
   function go(href: string) {
     onClose();
     setQuery("");
@@ -88,6 +80,8 @@ export function AdminCommandPalette({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className="fixed inset-0 z-[70] flex items-start justify-center px-4 pt-[12vh]"
       role="dialog"
       aria-modal="true"
@@ -103,22 +97,6 @@ export function AdminCommandPalette({
 
       <div
         className="qf-cmdk relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onClose();
-          } else if (event.key === "ArrowDown") {
-            event.preventDefault();
-            setActive((i) => (results.length ? (i + 1) % results.length : 0));
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            setActive((i) => (results.length ? (i - 1 + results.length) % results.length : 0));
-          } else if (event.key === "Enter") {
-            event.preventDefault();
-            const hit = results[active];
-            if (hit) go(hit.href);
-          }
-        }}
       >
         <div className="flex items-center gap-3 border-b border-slate-200 px-4">
           <AdminIcon name="reports" className="h-4 w-4 shrink-0 text-slate-400" />
@@ -128,30 +106,53 @@ export function AdminCommandPalette({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Jump to a section…"
             aria-label="Search admin sections"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
             aria-controls="qf-cmdk-results"
+            aria-activedescendant={activeResultId}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setActive((index) => (results.length ? (index + 1) % results.length : 0));
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setActive((index) => (results.length ? (index - 1 + results.length) % results.length : 0));
+              } else if (event.key === "Enter") {
+                event.preventDefault();
+                const hit = results[active];
+                if (hit) go(hit.href);
+              }
+            }}
             className="h-14 w-full border-0 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
           />
-          <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 sm:block">
-            Esc
-          </kbd>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close command palette"
+            className="qfa-focus inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--qfa-radius)] border border-slate-200 text-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
         </div>
 
         <div id="qf-cmdk-results" ref={listRef} role="listbox" className="max-h-[52vh] overflow-y-auto p-2">
           {results.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-slate-500">
+            <p role="status" className="px-3 py-8 text-center text-sm text-slate-500">
               No admin section matches “{query.trim()}”.
             </p>
           ) : (
             results.map((section, index) => (
-              <button
+              <div
                 key={section.key}
-                type="button"
+                id={`qf-cmdk-option-${section.key}`}
                 data-index={index}
                 role="option"
                 aria-selected={index === active}
                 onMouseEnter={() => setActive(index)}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => go(section.href)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                   index === active ? "bg-slate-100" : "hover:bg-slate-50"
                 }`}
               >
@@ -169,7 +170,7 @@ export function AdminCommandPalette({
                 <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:block">
                   {groupOf.get(section.key) ?? "Admin"}
                 </span>
-              </button>
+              </div>
             ))
           )}
         </div>

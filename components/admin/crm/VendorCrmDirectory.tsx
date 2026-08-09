@@ -249,7 +249,7 @@ export function VendorCrmDirectory({
       ) : null}
 
       {error ? (
-        <EmptyState title="Could not load the directory" message={error} />
+        <div role="alert"><EmptyState title="Could not load the directory" message={error} /></div>
       ) : result.rows.length === 0 ? (
         <EmptyState title="No vendors match" message={hasActiveFilter ? "No vendors match the current filters. Reset to see everyone." : "No vendors exist yet. Vendors created in the marketplace will appear here."} />
       ) : (
@@ -266,19 +266,19 @@ export function VendorCrmDirectory({
           </div>
           {/* Boundary pages previously rendered enabled buttons that silently did
               nothing. They are now genuinely disabled so the control never lies. */}
-          <div className="flex items-center justify-between gap-3 text-[13px] text-slate-500">
+          <nav aria-label="Vendor CRM pagination" className="flex items-center justify-between gap-3 text-[13px] text-slate-500">
             <span aria-live="polite">
               Page {result.page} of {totalPages} · {result.total} total
             </span>
             <div className="flex gap-1.5">
-              <SecondaryButton size="sm" disabled={result.page <= 1} onClick={() => apply({ page: String(result.page - 1) })}>
+              <SecondaryButton size="sm" aria-label="Previous page of vendors" disabled={result.page <= 1} onClick={() => apply({ page: String(result.page - 1) })}>
                 Previous
               </SecondaryButton>
-              <SecondaryButton size="sm" disabled={result.page >= totalPages} onClick={() => apply({ page: String(result.page + 1) })}>
+              <SecondaryButton size="sm" aria-label="Next page of vendors" disabled={result.page >= totalPages} onClick={() => apply({ page: String(result.page + 1) })}>
                 Next
               </SecondaryButton>
             </div>
-          </div>
+          </nav>
         </>
       )}
     </div>

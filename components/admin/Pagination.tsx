@@ -46,7 +46,7 @@ export function Pagination({
   if (total <= 0) return null;
 
   const btn =
-    "qfa-focus inline-flex h-8 min-w-8 items-center justify-center rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2 text-xs font-semibold text-slate-700 transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
+    "qfa-focus inline-flex h-10 min-w-10 items-center justify-center rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2 text-xs font-semibold text-slate-700 transition-colors hover:border-[color:var(--qfa-line-strong)] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:min-w-8";
 
   return (
     <nav
@@ -58,7 +58,7 @@ export function Pagination({
         {isPending ? <span className="ml-2 text-slate-400">Loading…</span> : null}
       </p>
       <div className="flex items-center gap-1">
-        <button type="button" className={btn} disabled={current <= 1 || isPending} onClick={() => onPageChange(current - 1)}>
+        <button type="button" aria-label={`Previous page of ${noun}`} className={btn} disabled={current <= 1 || isPending} onClick={() => onPageChange(current - 1)}>
           Previous
         </button>
         <span className="hidden items-center gap-1 sm:flex">
@@ -75,7 +75,7 @@ export function Pagination({
                 onClick={() => onPageChange(item)}
                 className={
                   item === current
-                    ? "qfa-focus inline-flex h-8 min-w-8 items-center justify-center rounded-[var(--qfa-radius-sm)] border border-[#2d7cff]/60 bg-[#2d7cff]/[0.16] px-2 text-xs font-bold text-white shadow-[0_0_12px_rgba(45,124,255,0.2)]"
+                    ? "qfa-focus inline-flex h-10 min-w-10 items-center justify-center rounded-[var(--qfa-radius-sm)] border border-[#2d7cff]/60 bg-[#2d7cff]/[0.16] px-2 text-xs font-bold text-white shadow-[0_0_12px_rgba(45,124,255,0.2)] sm:h-8 sm:min-w-8"
                     : btn
                 }
               >
@@ -87,7 +87,7 @@ export function Pagination({
         <span className="text-[11px] font-medium text-slate-500 sm:hidden">
           Page {formatNumber(current)} of {formatNumber(pageCount)}
         </span>
-        <button type="button" className={btn} disabled={current >= pageCount || isPending} onClick={() => onPageChange(current + 1)}>
+        <button type="button" aria-label={`Next page of ${noun}`} className={btn} disabled={current >= pageCount || isPending} onClick={() => onPageChange(current + 1)}>
           Next
         </button>
       </div>

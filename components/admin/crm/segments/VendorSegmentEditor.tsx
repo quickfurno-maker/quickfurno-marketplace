@@ -97,7 +97,7 @@ export function VendorSegmentEditor({
     return (
       <div className="space-y-5">
         <PageHeader title="Segment" description="Deterministic vendor segment" />
-        <EmptyState title="Segment unavailable" message={error} />
+        <div role="alert"><EmptyState title="Segment unavailable" message={error} /></div>
       </div>
     );
   }
@@ -147,7 +147,7 @@ export function VendorSegmentEditor({
       </div>
 
       {message && (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>
+        <div role="status" aria-live="polite" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>
       )}
       {duplicates.length > 0 && (
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
@@ -161,8 +161,8 @@ export function VendorSegmentEditor({
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} disabled={isArchived}
+              <span className="mb-1 block font-medium text-slate-600">Name (required)</span>
+              <input required value={name} onChange={(e) => setName(e.target.value)} disabled={isArchived}
                 maxLength={120}
                 className="qfa-control w-full px-2.5 outline-none" />
             </label>
@@ -176,8 +176,8 @@ export function VendorSegmentEditor({
 
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-slate-600">Combine groups with</span>
-            <select value={combinator} onChange={(e) => setCombinator(e.target.value)} disabled={isArchived}
-              className="h-9 rounded-lg border border-slate-200 px-2 text-sm font-semibold">
+            <select aria-label="Combine segment groups" value={combinator} onChange={(e) => setCombinator(e.target.value)} disabled={isArchived}
+              className="qfa-control qfa-focus px-2 text-sm font-semibold">
               {SEGMENT_COMBINATORS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             <span className="text-xs text-slate-500">
@@ -190,9 +190,9 @@ export function VendorSegmentEditor({
             <div key={gi} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
               <div className="mb-2 flex items-center gap-2 text-sm">
                 <span className="font-medium text-slate-600">Group {gi + 1} — match</span>
-                <select value={g.combinator} disabled={isArchived}
+                <select aria-label={`Group ${gi + 1} combinator`} value={g.combinator} disabled={isArchived}
                   onChange={(e) => setGroups((gs) => gs.map((x, i) => i === gi ? { ...x, combinator: e.target.value } : x))}
-                  className="h-9 rounded-lg border border-slate-200 px-2 text-sm font-semibold">
+                  className="qfa-control qfa-focus px-2 text-sm font-semibold">
                   {SEGMENT_COMBINATORS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
                 {groups.length > 1 && !isArchived && (
@@ -209,34 +209,34 @@ export function VendorSegmentEditor({
                   const needsValue = !NO_VALUE_OPS.includes(p.op);
                   return (
                     <div key={pi} className="flex flex-wrap items-center gap-2">
-                      <select value={p.field} disabled={isArchived}
+                      <select aria-label={`Group ${gi + 1}, rule ${pi + 1}, field`} value={p.field} disabled={isArchived}
                         onChange={(e) => patchPred(gi, pi, { field: e.target.value, op: SEGMENT_FIELDS[e.target.value].operators[0], value: "" })}
-                        className="h-10 rounded-lg border border-slate-200 px-2 text-sm">
+                        className="qfa-control qfa-focus px-2 text-sm">
                         {FIELD_KEYS.map((f) => <option key={f} value={f}>{f}</option>)}
                       </select>
-                      <select value={p.op} disabled={isArchived}
+                      <select aria-label={`Group ${gi + 1}, rule ${pi + 1}, operator`} value={p.op} disabled={isArchived}
                         onChange={(e) => patchPred(gi, pi, { op: e.target.value, value: "" })}
-                        className="h-10 rounded-lg border border-slate-200 px-2 text-sm">
+                        className="qfa-control qfa-focus px-2 text-sm">
                         {ops.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                       {needsValue && (
                         spec?.values ? (
-                          <select value={p.value} disabled={isArchived}
+                          <select aria-label={`Group ${gi + 1}, rule ${pi + 1}, value`} value={p.value} disabled={isArchived}
                             onChange={(e) => patchPred(gi, pi, { value: e.target.value })}
-                            className="h-10 rounded-lg border border-slate-200 px-2 text-sm">
+                            className="qfa-control qfa-focus px-2 text-sm">
                             <option value="">—</option>
                             {spec.values.map((v) => <option key={v} value={v}>{v}</option>)}
                           </select>
                         ) : (
-                          <input value={p.value} disabled={isArchived} maxLength={200}
+                          <input aria-label={`Group ${gi + 1}, rule ${pi + 1}, value`} value={p.value} disabled={isArchived} maxLength={200}
                             onChange={(e) => patchPred(gi, pi, { value: e.target.value })}
                             placeholder={ARRAY_OPS.includes(p.op) ? "comma-separated" : PAIR_OPS.includes(p.op) ? "lo, hi" : "value"}
-                            className="h-10 w-56 rounded-lg border border-slate-200 px-2 text-sm" />
+                            className="qfa-control qfa-focus w-56 px-2 text-sm" />
                         )
                       )}
                       {g.predicates.length > 1 && !isArchived && (
-                        <button onClick={() => setGroups((gs) => gs.map((x, i) => i !== gi ? x : { ...x, predicates: x.predicates.filter((_, j) => j !== pi) }))}
-                          className="text-xs text-slate-500 hover:text-rose-600">remove</button>
+                        <button type="button" aria-label={`Remove rule ${pi + 1} from group ${gi + 1}`} onClick={() => setGroups((gs) => gs.map((x, i) => i !== gi ? x : { ...x, predicates: x.predicates.filter((_, j) => j !== pi) }))}
+                          className="qfa-focus min-h-10 rounded px-2 text-xs text-slate-500 hover:text-rose-600 sm:min-h-8">Remove rule</button>
                       )}
                     </div>
                   );

@@ -36,15 +36,17 @@ export default async function FrequencyPolicyPage() {
   }
 
   return (
-    <main className="admin-surface">
-      <h1>Communication frequency policies</h1>
-      <p>
+    <div className="space-y-4">
+      <section aria-labelledby="frequency-policies-title" className="qfa-panel p-4 sm:p-5">
+        <h2 id="frequency-policies-title" className="text-base font-semibold text-slate-950">Communication frequency policies</h2>
+        <p className="mt-1 max-w-4xl text-[13px] leading-5 text-slate-500">
         The Core rule that bounds how often a recipient may be contacted. While no active policy
         exists for a channel and purpose, campaign handoff fails closed and no campaign can create
         communication intents.
-      </p>
-      {error ? <p role="alert">{error}</p> : null}
+        </p>
+      </section>
+      {error ? <p role="alert" className="rounded-[var(--qfa-radius)] border border-rose-200 bg-rose-50 p-3 text-[13px] text-rose-700">{error}</p> : null}
       <FrequencyPolicyManager policies={(policies ?? []) as never[]} />
-    </main>
+    </div>
   );
 }

@@ -114,7 +114,9 @@ export function ManualLeadAssignmentPanel({ data, notify }: { data: Snapshot; no
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="All Leads" value={formatNumber(data.leads.length)} helper="Complete lead database" icon="leads" />
+        {/* C-PERF2: this panel receives a bounded working set, not the whole
+            database — the label says exactly what is counted. */}
+        <StatCard label="Working Set" value={formatNumber(data.leads.length)} helper="Latest open unassigned leads" icon="leads" />
         <StatCard label="Manual Top-up Needed" value={formatNumber(topUpNeeded)} helper="Below 3 primary vendors" icon="distribution" tone="amber" />
         <StatCard label="Recovery Available" value={formatNumber(recoveryNeeded)} helper="3/3 primary, room to 9" icon="vendors" tone="indigo" />
         <StatCard label="In View" value={formatNumber(leads.length)} helper="Matching current filter" icon="reports" tone="slate" />

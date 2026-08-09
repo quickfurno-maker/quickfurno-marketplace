@@ -1,30 +1,26 @@
 "use client";
 
+// ============================================================================
+// C-PERF2: server-paged queue visibility (20/page) with LIVE counts. This
+// surface never runs matching, triggers an assignment, deducts a credit or
+// notifies a vendor — queue policy stays entirely in Core.
+// ============================================================================
+
 import {
   DataTable,
   NoteBar,
   StatCard,
   StatusBadge,
 } from "../../AdminPrimitives";
+import { Pagination } from "../../Pagination";
 import {
-  type Assignment,
-  type Lead,
   type LeadAssignmentQueueRow,
-  type Vendor,
 } from "../../adminTypes";
 import {
   formatDate,
   formatNumber,
 } from "../../adminUtils";
-import {
-  followUpDue,
-} from "./leadCrmUtils";
 
-/**
- * Operational VISIBILITY over lead_assignment_queue. This surface never runs
- * matching, triggers an assignment, deducts a credit or notifies a vendor —
- * queue policy stays entirely in Core.
- */
 const QUEUE_STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
   in_progress: "In progress",
@@ -40,15 +36,24 @@ function humanise(value?: string | null): string {
   return raw.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
-export function AssignmentQueue({ queue }: { queue: LeadAssignmentQueueRow[] }) {
-  const active = queue.filter((row) => (row.queue_status ?? "queued") !== "resolved");
+export function AssignmentQueue({
+  result,
+  counts,
+  isPending,
+  onPageChange,
+}: {
+  result: { rows: LeadAssignmentQueueRow[]; page: number; pageSize: number; total: number };
+  counts: { total: number; active: number; resolved: number; dueNow: number };
+  isPending: boolean;
+  onPageChange: (page: number) => void;
+}) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={isPending}>
       <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Queue rows" value={formatNumber(queue.length)} helper="All queue entries" icon="distribution" tone="indigo" />
-        <StatCard label="Active" value={formatNumber(active.length)} helper="Not yet resolved" icon="distribution" tone="amber" />
-        <StatCard label="Resolved" value={formatNumber(queue.length - active.length)} helper="Completed" icon="distribution" tone="emerald" />
-        <StatCard label="Due now" value={formatNumber(active.filter((r) => followUpDue(r.next_retry_at)).length)} helper="Retry time reached" icon="notifications" tone="rose" />
+        <StatCard label="Queue rows" value={formatNumber(counts.total)} helper="All queue entries (live count)" icon="distribution" tone="indigo" />
+        <StatCard label="Active" value={formatNumber(counts.active)} helper="Not yet resolved (live count)" icon="distribution" tone="amber" />
+        <StatCard label="Resolved" value={formatNumber(counts.resolved)} helper="Completed (live count)" icon="distribution" tone="emerald" />
+        <StatCard label="Due now" value={formatNumber(counts.dueNow)} helper="Retry time reached (live count)" icon="notifications" tone="rose" />
       </section>
       <NoteBar>
         Visibility only. Matching, assignment, credit deduction and vendor notification are performed by Core — nothing
@@ -56,7 +61,7 @@ export function AssignmentQueue({ queue }: { queue: LeadAssignmentQueueRow[] }) 
       </NoteBar>
 
       <DataTable
-        rows={queue}
+        rows={result.rows}
         density="compact"
         getRowKey={(row, index) => String(row.id ?? index)}
         emptyTitle="Assignment queue is empty"
@@ -71,6 +76,15 @@ export function AssignmentQueue({ queue }: { queue: LeadAssignmentQueueRow[] }) 
           { header: "Next retry", cell: (row) => <span className="whitespace-nowrap">{row.next_retry_at ? formatDate(row.next_retry_at) : "—"}</span> },
           { header: "Created", cell: (row) => <span className="whitespace-nowrap">{formatDate(row.created_at)}</span> },
         ]}
+      />
+
+      <Pagination
+        page={result.page}
+        pageSize={result.pageSize}
+        total={result.total}
+        noun="queue rows"
+        isPending={isPending}
+        onPageChange={onPageChange}
       />
     </div>
   );

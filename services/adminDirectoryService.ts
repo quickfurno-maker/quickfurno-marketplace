@@ -399,13 +399,15 @@ export async function getCrmInboxPage(query: CrmInboxQuery): Promise<Result<Row>
 }
 
 /** On-demand drawer context for ONE lead — replaces the old pattern of
- *  eagerly shipping 100-row global log tables to the browser. */
+ *  eagerly shipping 100-row global log tables to the browser. Also resolves
+ *  the vendor identities referenced by this lead's assignments (bounded IN
+ *  lookup — never a full vendor directory fetch, never N+1). */
 export async function getAdminLeadContext(leadId: string): Promise<Result<Row>> {
   try {
     const id = sanitizeFilterValue(leadId);
-    if (!id) return ok({ deliveryLogs: [], notificationLogs: [] });
+    if (!id) return ok({ deliveryLogs: [], notificationLogs: [], vendors: [] });
     const db = adminClient();
-    const [deliveryLogs, notificationLogs] = await Promise.all([
+    const [deliveryLogs, notificationLogs, assignments] = await Promise.all([
       safeAggregateRows(
         "lead.context.delivery",
         db.from("lead_delivery_logs").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(ADMIN_DIRECTORY_PAGE_SIZE),
@@ -414,8 +416,24 @@ export async function getAdminLeadContext(leadId: string): Promise<Result<Row>> 
         "lead.context.notifications",
         db.from("client_notification_logs").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(ADMIN_DIRECTORY_PAGE_SIZE),
       ),
+      safeAggregateRows(
+        "lead.context.assignments",
+        db.from("lead_assignments").select("vendor_id").eq("lead_id", id).limit(ADMIN_DIRECTORY_PAGE_SIZE),
+      ),
     ]);
-    return ok({ deliveryLogs, notificationLogs });
+    const vendorIds = [
+      ...new Set([
+        ...assignments.map((a) => String(a.vendor_id ?? "")),
+        ...deliveryLogs.map((l) => String(l.vendor_id ?? "")),
+      ].filter(Boolean)),
+    ];
+    const vendors = vendorIds.length
+      ? await safeAggregateRows(
+          "lead.context.vendors",
+          db.from("vendors").select("id, business_name, city, status").in("id", vendorIds),
+        )
+      : [];
+    return ok({ deliveryLogs, notificationLogs, vendors });
   } catch (e) {
     return fail(e);
   }

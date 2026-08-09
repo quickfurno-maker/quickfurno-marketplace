@@ -1,66 +1,60 @@
 "use client";
 
+// ============================================================================
+// C-PERF2: follow-ups arrive as server-grouped bounded rows (≤20 per group,
+// ordered by follow_up_date) with LIVE group counts — the tab no longer
+// depends on a preloaded lead array. There is still no task model here:
+// nothing is scheduled, completed or persisted from this view.
+// ============================================================================
+
 import { DataTable, EmptyState, StatusBadge } from "../../AdminPrimitives";
 import { formatDate, formatNumber } from "../../adminUtils";
 import { PRIORITY_TONE, type CrmRow } from "./leadCrmTypes";
-import { cap, followUpDue } from "./leadCrmUtils";
+import { cap } from "./leadCrmUtils";
 
-/**
- * Follow-ups grouped by real `follow_up_date` only.
- *
- * There is no task model behind this view: nothing is scheduled, completed or
- * persisted here. It reports the follow-up dates already stored on leads, which
- * is why "Not scheduled" is shown as a plain count rather than as an actionable
- * queue — creating a follow-up is not a capability this phase has.
- */
-function startOfToday(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
+export type FollowUpGroups = { overdue: CrmRow[]; today: CrmRow[]; upcoming: CrmRow[] };
+export type FollowUpCounts = { overdue: number; today: number; upcoming: number; unscheduled: number };
 
-function isTodayDate(value?: string | null): boolean {
-  if (!value) return false;
-  const t = new Date(value).getTime();
-  if (Number.isNaN(t)) return false;
-  return t >= startOfToday() && t < startOfToday() + 86_400_000;
-}
+export function FollowUps({
+  groups,
+  counts,
+  groupLimit,
+  loading,
+  onSelect,
+}: {
+  groups: FollowUpGroups;
+  counts: FollowUpCounts;
+  groupLimit: number;
+  loading: boolean;
+  onSelect: (row: CrmRow) => void;
+}) {
+  const scheduledTotal = counts.overdue + counts.today + counts.upcoming;
 
-export function FollowUps({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: CrmRow) => void }) {
-  const scheduled = rows
-    .filter((row) => row.followUp)
-    .sort((a, b) => new Date(a.followUp ?? 0).getTime() - new Date(b.followUp ?? 0).getTime());
-
-  const today = scheduled.filter((row) => isTodayDate(row.followUp));
-  const overdue = scheduled.filter((row) => followUpDue(row.followUp) && !isTodayDate(row.followUp));
-  const upcoming = scheduled.filter((row) => !followUpDue(row.followUp) && !isTodayDate(row.followUp));
-  const unscheduled = rows.length - scheduled.length;
-
-  const groups: Array<{ key: string; title: string; hint: string; rows: CrmRow[]; urgent: boolean }> = [
-    { key: "overdue", title: "Overdue", hint: "Follow-up date has passed", rows: overdue, urgent: true },
-    { key: "today", title: "Today", hint: "Due today", rows: today, urgent: true },
-    { key: "upcoming", title: "Upcoming", hint: "Scheduled for a future date", rows: upcoming, urgent: false },
+  const sections: Array<{ key: string; title: string; hint: string; rows: CrmRow[]; total: number; urgent: boolean }> = [
+    { key: "overdue", title: "Overdue", hint: "Follow-up date has passed", rows: groups.overdue, total: counts.overdue, urgent: true },
+    { key: "today", title: "Today", hint: "Due today", rows: groups.today, total: counts.today, urgent: true },
+    { key: "upcoming", title: "Upcoming", hint: "Scheduled for a future date", rows: groups.upcoming, total: counts.upcoming, urgent: false },
   ];
 
-  if (!scheduled.length) {
+  if (!scheduledTotal && !loading) {
     return (
       <EmptyState
         title="No scheduled follow-ups"
-        message={`No lead currently has a follow-up date. ${formatNumber(rows.length)} leads are loaded. Scheduling follow-ups is not available in this phase.`}
+        message={`No lead currently has a follow-up date (${formatNumber(counts.unscheduled)} without one). Scheduling follow-ups is not available in this phase.`}
       />
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" aria-busy={loading}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <Pill label="Overdue" value={overdue.length} urgent={overdue.length > 0} />
-        <Pill label="Today" value={today.length} urgent={today.length > 0} />
-        <Pill label="Upcoming" value={upcoming.length} urgent={false} />
-        <Pill label="Not scheduled" value={unscheduled} urgent={false} />
+        <Pill label="Overdue" value={counts.overdue} urgent={counts.overdue > 0} />
+        <Pill label="Today" value={counts.today} urgent={counts.today > 0} />
+        <Pill label="Upcoming" value={counts.upcoming} urgent={false} />
+        <Pill label="Not scheduled" value={counts.unscheduled} urgent={false} />
       </div>
 
-      {groups.map((group) =>
+      {sections.map((group) =>
         group.rows.length ? (
           <section key={group.key} aria-labelledby={`fu-${group.key}`}>
             <div className="mb-2 flex flex-wrap items-baseline gap-2">
@@ -68,7 +62,8 @@ export function FollowUps({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: 
                 {group.title}
               </h3>
               <span className="text-xs text-slate-500">
-                {group.hint} · {formatNumber(group.rows.length)}
+                {group.hint} · {formatNumber(group.total)}
+                {group.total > group.rows.length ? ` (showing first ${formatNumber(group.rows.length)})` : ""}
               </span>
               {group.urgent ? (
                 <span className="rounded-[var(--qfa-radius-xs)] border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
@@ -120,10 +115,10 @@ export function FollowUps({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: 
         ) : null,
       )}
 
-      {unscheduled > 0 ? (
+      {counts.unscheduled > 0 ? (
         <p className="text-xs text-slate-500">
-          {formatNumber(unscheduled)} loaded lead{unscheduled === 1 ? " has" : "s have"} no follow-up date. Scheduling
-          follow-ups is not available in this phase.
+          {formatNumber(counts.unscheduled)} lead{counts.unscheduled === 1 ? " has" : "s have"} no follow-up date (live
+          count). Scheduling follow-ups is not available in this phase.
         </p>
       ) : null}
     </div>

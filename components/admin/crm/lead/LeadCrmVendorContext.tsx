@@ -8,15 +8,14 @@ import {
   SectionCard,
   StatusBadge,
 } from "../../AdminPrimitives";
+import { Pagination } from "../../Pagination";
 import {
-  type Lead,
   type LeadDeliveryLog,
   type Vendor,
 } from "../../adminTypes";
 import {
   formatDate,
 } from "../../adminUtils";
-import { type CrmRow } from "./leadCrmTypes";
 import { MiniStat } from "./leadCrmShared";
 
 /**
@@ -25,25 +24,38 @@ import { MiniStat } from "./leadCrmShared";
  * WORDING MATTERS HERE. This surface was previously titled "Vendor Response",
  * which implied a per-lead accept/reject contract. No such contract exists.
  * `assignment.vendor_status` is the vendor's PROGRESS on a lead already assigned
- * to them (New -> Contacted -> …) — the same field
- * lib/automation/vendorDispatchRegistry.ts describes as "progressed past
- * vendor_status = 'New' … a contact/progress nudge". A vendor never accepts,
- * rejects, declines or awaits acceptance of a lead in QuickFurno.
+ * to them (New -> Contacted -> …). A vendor never accepts, rejects, declines
+ * or awaits acceptance of a lead in QuickFurno.
+ *
+ * C-PERF2: delivery logs are server-paged (20/page, live totals); the
+ * progress distribution comes from a column-only vendor_status projection.
  */
-export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmRow[]; vendorsById: Map<string, Vendor>; deliveryLogs: LeadDeliveryLog[] }) {
+export function VendorResponse({
+  result,
+  progressAgg,
+  counts,
+  vendorsById,
+  isPending,
+  onPageChange,
+}: {
+  result: { rows: LeadDeliveryLog[]; page: number; pageSize: number; total: number };
+  progressAgg: Array<{ vendor_status?: string | null }>;
+  counts: { logsTotal: number; contactShared: number; creditDeducted: number };
+  vendorsById: Map<string, Vendor>;
+  isPending: boolean;
+  onPageChange: (page: number) => void;
+}) {
   const progressCounts = useMemo(() => {
     const map = new Map<string, number>();
-    rows.forEach((row) => row.assignments.forEach((a) => {
-      const status = a.vendor_status || "New";
+    progressAgg.forEach((row) => {
+      const status = row.vendor_status || "New";
       map.set(status, (map.get(status) ?? 0) + 1);
-    }));
+    });
     return [...map.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
-  }, [rows]);
-
-  const recentDeliveries = deliveryLogs.slice(0, 40);
+  }, [progressAgg]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy={isPending}>
       <NoteBar>
         How vendors are <strong className="font-semibold text-slate-800">progressing</strong> leads already assigned to
         them, plus delivery records. Vendors do not accept or reject assigned leads in QuickFurno.
@@ -51,22 +63,17 @@ export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmR
 
       <div className="grid gap-3 lg:grid-cols-2">
         <ChartCard title="Vendor progress on assigned leads" rows={progressCounts} />
-        <SectionCard title="Delivery snapshot" description="Dashboard + WhatsApp-preview delivery logs (preview only — no live sends).">
+        <SectionCard title="Delivery snapshot" description="Dashboard + WhatsApp-preview delivery logs (preview only — no live sends). Live counts.">
           <div className="grid gap-2 sm:grid-cols-3">
-            <MiniStat label="Delivery logs" value={deliveryLogs.length} tone="blue" />
-            <MiniStat label="Contact shared" value={deliveryLogs.filter((l) => l.contact_shared).length} tone="emerald" />
-            <MiniStat label="Credit deducted" value={deliveryLogs.filter((l) => l.credit_deducted).length} tone="amber" />
+            <MiniStat label="Delivery logs" value={counts.logsTotal} tone="blue" />
+            <MiniStat label="Contact shared" value={counts.contactShared} tone="emerald" />
+            <MiniStat label="Credit deducted" value={counts.creditDeducted} tone="amber" />
           </div>
         </SectionCard>
       </div>
-      {deliveryLogs.length > recentDeliveries.length ? (
-        <p className="text-xs text-slate-500">
-          Showing the {recentDeliveries.length} most recent of {deliveryLogs.length} delivery records.
-        </p>
-      ) : null}
 
       <DataTable
-        rows={recentDeliveries}
+        rows={result.rows}
         density="compact"
         getRowKey={(row, index) => String(row.id ?? index)}
         emptyTitle="No delivery logs yet"
@@ -80,6 +87,15 @@ export function VendorResponse({ rows, vendorsById, deliveryLogs }: { rows: CrmR
           { header: "WhatsApp", cell: (row) => <StatusBadge value={row.whatsapp_status || "preview_only"} tone="slate" /> },
           { header: "Created", cell: (row) => <span className="whitespace-nowrap">{formatDate(row.created_at)}</span> },
         ]}
+      />
+
+      <Pagination
+        page={result.page}
+        pageSize={result.pageSize}
+        total={result.total}
+        noun="delivery logs"
+        isPending={isPending}
+        onPageChange={onPageChange}
       />
     </div>
   );

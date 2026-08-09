@@ -5500,6 +5500,23 @@ h1, h2 {
 .admin-surface .qfa-rise-3 { animation-delay: 0.1s; }
 .admin-surface .qfa-rise-4 { animation-delay: 0.15s; }
 
+/* Vendor CRM profile tab content: one restrained route-state transition. */
+@keyframes qfaProfileEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.admin-surface .qfa-profile-enter {
+  animation: qfaProfileEnter 160ms ease-out both;
+  transition: opacity 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-surface .qfa-profile-enter {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Sidebar width animation during collapse/expand. */
 .admin-surface .qf-sidebar {
   transition: width 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);

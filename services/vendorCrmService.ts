@@ -27,6 +27,13 @@ import {
   validateTaskCreate, validateTaskUpdate, requireCompletionResult, requireUuid,
   validateDirectoryQuery, type VendorCrmDirectoryQuery,
 } from "../lib/crm/vendorCrmValidation";
+import { ADMIN_EMBEDDED_PANEL_LIMIT } from "../lib/adminPaging";
+import type {
+  VendorCoreFacts,
+  VendorCrmProfileRecord,
+  VendorTag,
+  VendorTagAssignment,
+} from "../lib/crm/vendorCrmProfileTypes";
 
 /** The six CRM foundation tables — the ONLY tables this service may write. */
 const CRM_NOTES = "vendor_internal_notes" as const;
@@ -38,6 +45,16 @@ const CRM_TASKS = "vendor_tasks" as const;
 
 type Actor = string; // the authorized admin's auth.users.id
 function db() { return adminClient(); }
+
+/** Keep provider/SQL detail inside the service boundary. Routes log only this
+ * stable class/code and render a fixed operator-facing message. */
+function assertCrmRead(error: { code?: string } | null, scope: string): void {
+  if (!error) return;
+  const safe = new Error(`Vendor CRM ${scope} read failed`);
+  safe.name = "VendorCrmReadError";
+  (safe as Error & { code?: string }).code = error.code ?? "CRM_READ_FAILED";
+  throw safe;
+}
 
 export interface VendorCrmDirectoryRow {
   vendor_id: string;
@@ -184,46 +201,42 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
  * it, never mirrors it into vendor_crm_profiles, and never derives assignment
  * eligibility from it (that remains lib/vendors/vendorAutomaticEligibility.ts).
  */
-export async function getVendorCoreFacts(vendorId: string) {
+export async function getVendorCoreFacts(vendorId: string): Promise<VendorCoreFacts | null> {
   const id = requireUuid(vendorId, "vendorId");
-  const { data } = await db().from("vendors")
+  const { data, error } = await db().from("vendors")
     .select("id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, is_active, accepting_leads, total_credits, remaining_credits, last_assigned_at, created_at")
     .eq("id", id).maybeSingle();
-  return data ?? null;
+  assertCrmRead(error, "core facts");
+  return (data as VendorCoreFacts | null) ?? null;
 }
-export async function getVendorCrmProfile(vendorId: string) {
+export async function getVendorCrmProfile(vendorId: string): Promise<VendorCrmProfileRecord | null> {
   const id = requireUuid(vendorId, "vendorId");
-  const { data } = await db().from(CRM_PROFILES).select("*").eq("vendor_id", id).maybeSingle();
-  return data ?? null;
+  const { data, error } = await db().from(CRM_PROFILES)
+    .select("vendor_id, onboarding_stage, relationship_status, account_manager_profile_id, next_follow_up_at, last_interaction_at, inactive_reason, company_type, years_in_business, team_size, capability_notes, residential_commercial_scope, budget_band, monthly_capacity_notes, material_notes, warranty_notes, preferred_localities, excluded_localities, travel_radius_km, campaign_notes, created_at, updated_at, created_by, updated_by")
+    .eq("vendor_id", id).maybeSingle();
+  assertCrmRead(error, "profile");
+  return (data as VendorCrmProfileRecord | null) ?? null;
 }
-export async function listVendorContacts(vendorId: string) {
+
+export async function listVendorTags(): Promise<VendorTag[]> {
+  const { data, error } = await db().from(CRM_TAGS)
+    .select("id, name, normalized_name, description, is_active, created_at")
+    .order("normalized_name", { ascending: true });
+  assertCrmRead(error, "tag vocabulary");
+  return (data ?? []) as VendorTag[];
+}
+export async function listVendorTagAssignments(vendorId: string, limit?: number): Promise<VendorTagAssignment[]> {
   const id = requireUuid(vendorId, "vendorId");
-  const { data } = await db().from(CRM_CONTACTS).select("*").eq("vendor_id", id)
-    .order("is_primary", { ascending: false }).order("created_at", { ascending: false });
-  return data ?? [];
-}
-export async function listVendorTags() {
-  const { data } = await db().from(CRM_TAGS).select("*").order("normalized_name", { ascending: true });
-  return data ?? [];
-}
-export async function listVendorTagAssignments(vendorId: string) {
-  const id = requireUuid(vendorId, "vendorId");
-  const { data } = await db().from(CRM_TAG_ASSIGNMENTS).select("id, tag_id, assigned_at, removed_at, vendor_tags(id, name, is_active)")
-    .eq("vendor_id", id).is("removed_at", null);
-  return data ?? [];
-}
-export async function listVendorNotes(vendorId: string) {
-  const id = requireUuid(vendorId, "vendorId");
-  const { data } = await db().from(CRM_NOTES).select("id, note, category, created_at, created_by, supersedes_note_id")
-    .eq("vendor_id", id).order("created_at", { ascending: false });
-  return data ?? [];
-}
-export async function listVendorTasks(vendorId: string, filters?: { status?: string }) {
-  const id = requireUuid(vendorId, "vendorId");
-  let q = db().from(CRM_TASKS).select("*").eq("vendor_id", id);
-  if (filters?.status) q = q.eq("status", filters.status);
-  const { data } = await q.order("due_at", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false });
-  return data ?? [];
+  let query = db().from(CRM_TAG_ASSIGNMENTS)
+    .select("id, tag_id, assigned_at, removed_at, vendor_tags(id, name, is_active)")
+    .eq("vendor_id", id)
+    .is("removed_at", null)
+    .order("assigned_at", { ascending: false })
+    .order("id", { ascending: true });
+  if (limit !== undefined) query = query.limit(Math.max(1, Math.min(limit, ADMIN_EMBEDDED_PANEL_LIMIT)));
+  const { data, error } = await query;
+  assertCrmRead(error, "tag assignments");
+  return (data ?? []) as unknown as VendorTagAssignment[];
 }
 
 // -- mutations (actor always from the authorized session) ---------------------

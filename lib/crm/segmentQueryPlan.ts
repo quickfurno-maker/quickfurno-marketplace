@@ -29,7 +29,7 @@ import { resolveWindowBoundary } from "./segmentRuleValidation";
 export const SEGMENT_PRERESOLVE_MAX = 2000;
 /** Hard cap on the preview page. */
 export const SEGMENT_PREVIEW_MAX_PAGE_SIZE = 100;
-export const SEGMENT_PREVIEW_DEFAULT_PAGE_SIZE = 25;
+export const SEGMENT_PREVIEW_DEFAULT_PAGE_SIZE = 25; // defensive fallback for malformed input only — every admin caller passes 20 explicitly (C-PERF1)
 
 export class SegmentPlanError extends Error {
   readonly code = "SEGMENT_PLAN";

@@ -125,7 +125,7 @@ export function VendorSegmentEditor({
 
   const runPreview = (page = 1) => start(async () => {
     setMessage(null);
-    const res = await segmentPreview(definition, { page, pageSize: 25 }, {
+    const res = await segmentPreview(definition, { page, pageSize: 20 }, {
       fingerprint: segment?.definition_fingerprint,
       definitionVersion: segment?.definition_version,
     });

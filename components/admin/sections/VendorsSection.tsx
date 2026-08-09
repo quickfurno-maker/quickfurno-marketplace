@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+// C-PERF1: the vendor directory is server-paged (20/page, URL-backed state).
+// Search and the city/category/status/package filters run in the database
+// over ALL vendors; totals are live count queries. The eligibility filter is
+// the one exception — eligibility is computed by the shared client helper
+// (never duplicated into SQL, per policy), so it refines the CURRENT PAGE
+// only and the UI says so.
+
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   adminApproveVendorProfileChangeRequest,
   adminRejectVendorProfileChangeRequest,
@@ -20,87 +27,130 @@ import {
   SectionCard,
   StatCard,
   StatusBadge,
+  Toast,
   Toolbar,
 } from "../AdminPrimitives";
-import { type Category, type City, type Lead, type Snapshot, type Vendor, type VendorSupportMessage } from "../adminTypes";
+import { Pagination } from "../Pagination";
+import { type Lead, type Vendor, type VendorSupportMessage, type VendorsDirectoryData } from "../adminTypes";
 import {
   formatDate,
   formatNumber,
-  includesQuery,
   maskPhone,
   packageName,
   shortId,
-  uniqueOptions,
   vendorName,
 } from "../adminUtils";
 import { ModalShell, CreditsMeter, Strong } from "./shared";
 import { marketplaceSettingsObject } from "./SettingsSection";
-import { activeCityNames, activeCategoryNames } from "./LeadDistributionSection";
 
-export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
+const VENDOR_FILTER_KEYS = ["search", "city", "category", "status", "package"] as const;
+type VendorFilterKey = (typeof VENDOR_FILTER_KEYS)[number];
+
+export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null; error?: string | null }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [city, setCity] = useState("All");
-  const [category, setCategory] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [packageStatus, setPackageStatus] = useState("All");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
   const [eligibility, setEligibility] = useState("All");
   const [selected, setSelected] = useState<Vendor | null>(null);
   const [creditsFor, setCreditsFor] = useState<Vendor | null>(null);
   const [packageFor, setPackageFor] = useState<Vendor | null>(null);
   const [logFor, setLogFor] = useState<Vendor | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const marketplaceSettings = useMemo(() => marketplaceSettingsObject(data.marketplaceSettings), [data.marketplaceSettings]);
+
+  const result = data?.result ?? { rows: [], page: 1, pageSize: 20, total: 0 };
+  const totals = data?.totals ?? { all: 0, approved: 0, pending: 0, lowBalance: 0 };
+  const pageRows = result.rows;
+  const marketplaceSettings = useMemo(() => marketplaceSettingsObject(data?.marketplaceSettings ?? []), [data?.marketplaceSettings]);
+
+  const notify = useCallback((message: string, tone: "success" | "error" | "info" = "info") => {
+    setToast({ message, tone });
+    window.setTimeout(() => setToast(null), 2800);
+  }, []);
+
+  // URL-backed filter state (server-side semantics).
+  const params = useMemo(() => {
+    const out: Record<VendorFilterKey, string> = { search: "", city: "All", category: "All", status: "All", package: "All" };
+    VENDOR_FILTER_KEYS.forEach((key) => {
+      const value = searchParams.get(key);
+      if (value) out[key] = value;
+    });
+    return out;
+  }, [searchParams]);
+  const [searchDraft, setSearchDraft] = useState(params.search);
+  useEffect(() => setSearchDraft(params.search), [params.search]);
+
+  const navigate = useCallback(
+    (updates: Record<string, string | number | null>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === "" || value === "All" || (key === "page" && Number(value) <= 1)) next.delete(key);
+        else next.set(key, String(value));
+      });
+      startTransition(() => {
+        router.replace(`${pathname}${next.size ? `?${next.toString()}` : ""}`, { scroll: false });
+      });
+    },
+    [router, pathname, searchParams],
+  );
+  const setFilter = useCallback((key: VendorFilterKey, value: string) => navigate({ [key]: value, page: null }), [navigate]);
+
+  useEffect(() => {
+    if (searchDraft === params.search) return;
+    const timer = window.setTimeout(() => setFilter("search", searchDraft), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft, params.search, setFilter]);
+
+  // Vendor-name pool for panels/drawers: current page + thin panel rows.
+  const vendorPool = useMemo(() => {
+    const map = new Map<string, Vendor>();
+    [...pageRows, ...(data?.panelVendors ?? [])].forEach((vendor) => map.set(vendor.id, vendor));
+    return [...map.values()];
+  }, [pageRows, data?.panelVendors]);
 
   // Phase 13B: ONE shared eligibility helper, same as the Lead Assignment
-  // Approval Preview, so the two surfaces always agree.
+  // Approval Preview, so the two surfaces always agree. Evaluated for the
+  // rows on THIS page (display + page-scoped refinement only).
   const eligibilityById = useMemo(() => {
     const map = new Map<string, VendorEligibility>();
-    data.vendors.forEach((vendor) => map.set(vendor.id, evaluateVendorEligibility(vendor as Record<string, unknown>)));
+    pageRows.forEach((vendor) => map.set(vendor.id, evaluateVendorEligibility(vendor as Record<string, unknown>)));
     return map;
-  }, [data.vendors]);
+  }, [pageRows]);
   const assignmentEligibilityById = useMemo(() => {
     const map = new Map<string, VendorLeadAssignmentEligibility>();
-    data.vendors.forEach((vendor) => map.set(vendor.id, evaluateVendorLeadAssignmentEligibility(vendor as Record<string, unknown>, null, marketplaceSettings)));
+    pageRows.forEach((vendor) => map.set(vendor.id, evaluateVendorLeadAssignmentEligibility(vendor as Record<string, unknown>, null, marketplaceSettings)));
     return map;
-  }, [data.vendors, marketplaceSettings]);
+  }, [pageRows, marketplaceSettings]);
   const publicVisibilityById = useMemo(() => {
     const map = new Map<string, VendorPublicVisibility>();
-    data.vendors.forEach((vendor) => map.set(vendor.id, getVendorPublicVisibility(vendor as Record<string, unknown>, marketplaceSettings)));
+    pageRows.forEach((vendor) => map.set(vendor.id, getVendorPublicVisibility(vendor as Record<string, unknown>, marketplaceSettings)));
     return map;
-  }, [data.vendors, marketplaceSettings]);
+  }, [pageRows, marketplaceSettings]);
 
-  const packageOptions = useMemo(() => uniqueOptions(data.vendors.map((vendor) => vendorRowPackageStatus(vendor)), "All"), [data.vendors]);
-  const vendors = useMemo(() => data.vendors.filter((vendor) => {
-    const currentPackageStatus = vendorRowPackageStatus(vendor);
-    const isEligible = assignmentEligibilityById.get(vendor.id)?.eligible ?? false;
-    return includesQuery([vendor.business_name, vendor.owner_name, vendor.phone, vendor.city, vendor.status, vendor.service_categories?.join(" "), currentPackageStatus], query)
-      && (city === "All" || vendor.city === city)
-      && (category === "All" || (vendor.service_categories ?? []).includes(category))
-      && (status === "All" || vendor.status === status)
-      && (packageStatus === "All" || currentPackageStatus === packageStatus)
-      && (eligibility === "All" || (eligibility === "Eligible" ? isEligible : !isEligible));
-  }), [data.vendors, assignmentEligibilityById, query, city, category, status, packageStatus, eligibility]);
+  // Eligibility is the documented page-scoped refinement.
+  const vendors = useMemo(
+    () =>
+      pageRows.filter((vendor) => {
+        if (eligibility === "All") return true;
+        const isEligible = assignmentEligibilityById.get(vendor.id)?.eligible ?? false;
+        return eligibility === "Eligible" ? isEligible : !isEligible;
+      }),
+    [pageRows, assignmentEligibilityById, eligibility],
+  );
 
-  const eligibleCount = useMemo(() => [...assignmentEligibilityById.values()].filter((e) => e.eligible).length, [assignmentEligibilityById]);
-  const profileChangeRequests = useMemo(
-    () => (data.vendorProfileChangeRequests ?? []).filter((request) => request.status === "pending"),
-    [data.vendorProfileChangeRequests],
-  );
-  const supportThreads = useMemo(
-    () => (data.vendorSupportThreads ?? []).filter((thread) => (thread.status ?? "open") !== "closed"),
-    [data.vendorSupportThreads],
-  );
+  const profileChangeRequests = data?.profileChangeRequests ?? [];
+  const supportThreads = data?.supportThreads ?? [];
   const supportMessagesByThread = useMemo(() => {
     const map = new Map<string, VendorSupportMessage[]>();
-    (data.vendorSupportMessages ?? []).forEach((message) => {
+    (data?.supportMessages ?? []).forEach((message) => {
       if (!message.thread_id) return;
       const current = map.get(message.thread_id) ?? [];
       current.push(message);
       map.set(message.thread_id, current);
     });
     return map;
-  }, [data.vendorSupportMessages]);
+  }, [data?.supportMessages]);
 
   // Mutations go through the Phase 13B admin APIs, then refresh the snapshot.
   const mutate = useCallback(async (vendorId: string, path: string, body: Record<string, unknown>, successMsg: string) => {
@@ -174,12 +224,18 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
   }, [notify, router]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" aria-busy={isPending}>
+      {error ? (
+        <div className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+          Vendors could not be loaded: {error}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Vendors" value={formatNumber(data.vendors.length)} helper="All vendor records" icon="vendors" />
-        <StatCard label="Paid Lead Eligible" value={formatNumber(eligibleCount)} helper="Paid/trial, active, with credits" icon="vendors" tone="emerald" />
-        <StatCard label="Active Vendors" value={formatNumber(data.stats.active_vendors)} helper="Ready for leads" icon="vendors" tone="indigo" />
-        <StatCard label="Low Credits" value={formatNumber(data.stats.low_balance_vendors)} helper="Renewal risk" icon="notifications" tone="amber" />
+        <StatCard label="Total Vendors" value={formatNumber(totals.all)} helper="All vendor records (live count)" icon="vendors" />
+        <StatCard label="Approved" value={formatNumber(totals.approved)} helper="Verified vendors (live count)" icon="vendors" tone="emerald" />
+        <StatCard label="Pending Approval" value={formatNumber(totals.pending)} helper="Awaiting verification (live count)" icon="vendors" tone="indigo" />
+        <StatCard label="Low Credits" value={formatNumber(totals.lowBalance)} helper="Renewal risk (live count)" icon="notifications" tone="amber" />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -213,19 +269,24 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
       </section>
 
       <Toolbar
-        query={query}
-        setQuery={setQuery}
-        placeholder="Search vendor, masked phone, city, category..."
+        query={searchDraft}
+        setQuery={setSearchDraft}
+        placeholder="Search vendor, owner, phone, city..."
         filters={
           <>
-            <SelectFilter label="City" value={city} onChange={setCity} options={uniqueOptions(activeCityNames(data.cities), "All")} />
-            <SelectFilter label="Category" value={category} onChange={setCategory} options={uniqueOptions(activeCategoryNames(data.categories), "All")} />
-            <SelectFilter label="Status" value={status} onChange={setStatus} options={uniqueOptions(data.vendors.map((vendor) => vendor.status))} />
-            <SelectFilter label="Package" value={packageStatus} onChange={setPackageStatus} options={packageOptions} />
+            <SelectFilter label="City" value={params.city} onChange={(v) => setFilter("city", v)} options={["All", ...(data?.filterOptions.cities ?? [])]} />
+            <SelectFilter label="Category" value={params.category} onChange={(v) => setFilter("category", v)} options={["All", ...(data?.filterOptions.categories ?? [])]} />
+            <SelectFilter label="Status" value={params.status} onChange={(v) => setFilter("status", v)} options={["All", "Pending", "Approved", "Rejected", "Suspended"]} />
+            <SelectFilter label="Package" value={params.package} onChange={(v) => setFilter("package", v)} options={["All", "active", "trial", "expired", "none"]} />
             <SelectFilter label="Eligibility" value={eligibility} onChange={setEligibility} options={["All", "Eligible", "Not eligible"]} />
           </>
         }
       />
+
+      <p className="text-[11px] text-slate-500">
+        Search and the City / Category / Status / Package filters cover the complete vendor database. The Eligibility
+        filter refines the current page only — eligibility is computed by the shared policy helper, never in SQL.
+      </p>
 
       <SectionCard
         title="Profile Change Requests"
@@ -236,7 +297,7 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
           emptyTitle="No pending profile change requests"
           emptyMessage="Vendor profile edits that need approval will appear here."
           columns={[
-            { header: "Vendor", cell: (request) => <Strong title={vendorName(data.vendors, request.vendor_id)} subtitle={formatDate(request.created_at)} /> },
+            { header: "Vendor", cell: (request) => <Strong title={vendorName(vendorPool, request.vendor_id)} subtitle={formatDate(request.created_at)} /> },
             { header: "Current", cell: (request) => <ProfileChangeSnapshot value={request.current_snapshot} /> },
             { header: "Proposed", cell: (request) => <ProfileChangeSnapshot value={request.proposed_changes} /> },
             { header: "Status", cell: (request) => <StatusBadge value={request.status || "pending"} tone="amber" /> },
@@ -262,7 +323,7 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
           emptyTitle="No active support threads"
           emptyMessage="Vendor support threads will appear here after vendors create them."
           columns={[
-            { header: "Vendor", cell: (thread) => <Strong title={vendorName(data.vendors, thread.vendor_id)} subtitle={formatDate(thread.updated_at)} /> },
+            { header: "Vendor", cell: (thread) => <Strong title={vendorName(vendorPool, thread.vendor_id)} subtitle={formatDate(thread.updated_at)} /> },
             { header: "Subject", cell: (thread) => <Strong title={thread.subject || "Support thread"} subtitle={thread.topic || "general"} /> },
             { header: "Status", cell: (thread) => <StatusBadge value={thread.status || "open"} tone={thread.status === "admin_replied" ? "emerald" : "amber"} /> },
             {
@@ -319,6 +380,15 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
         ]}
       />
 
+      <Pagination
+        page={result.page}
+        pageSize={result.pageSize}
+        total={result.total}
+        noun={result.total === totals.all ? "vendors" : "matching vendors"}
+        isPending={isPending}
+        onPageChange={(page) => navigate({ page })}
+      />
+
       {selected ? (
         <VendorDetailDrawer
           vendor={selected}
@@ -331,6 +401,7 @@ export function VendorsPage({ data, notify }: { data: Snapshot; notify: (message
       {creditsFor ? <ManageCreditsModal vendor={creditsFor} busy={busyId === creditsFor.id} onClose={() => setCreditsFor(null)} onSave={(body) => mutate(creditsFor.id, "credits", body, "Credits updated.").then((ok) => { if (ok) setCreditsFor(null); })} /> : null}
       {packageFor ? <AssignPackageModal vendor={packageFor} busy={busyId === packageFor.id} onClose={() => setPackageFor(null)} onSave={(body) => mutate(packageFor.id, "package", body, "Package updated.").then((ok) => { if (ok) setPackageFor(null); })} /> : null}
       {logFor ? <CreditLogModal vendor={logFor} notify={notify} onClose={() => setLogFor(null)} /> : null}
+      {toast ? <Toast message={toast.message} tone={toast.tone} /> : null}
     </div>
   );
 }

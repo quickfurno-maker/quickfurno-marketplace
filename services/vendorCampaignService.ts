@@ -171,7 +171,7 @@ export interface VendorCampaignListResult {
 }
 
 const LIST_MAX_PAGE_SIZE = 100;
-const LIST_DEFAULT_PAGE_SIZE = 25;
+const LIST_DEFAULT_PAGE_SIZE = 20; // C-PERF1 locked admin directory page size
 const AUDIENCE_PAGE_SIZE = 50;
 const EVENT_SCAN_LIMIT = 100;
 /** Bound on any helper read, so nothing materializes an unbounded set in memory. */
@@ -584,7 +584,7 @@ export async function previewCampaignCandidates(campaignId: string, paging: { pa
   if (!campaign.segment_id) throw serviceError("CAMPAIGN_INCOMPLETE");
 
   const segment = await loadLiveSegment(campaign.segment_id);
-  const preview = await previewVendorSegment(segment.definition, { page: paging.page, pageSize: 25 }, {
+  const preview = await previewVendorSegment(segment.definition, { page: paging.page, pageSize: 20 }, {
     fingerprint: segment.definition_fingerprint,
     definitionVersion: segment.definition_version,
   });

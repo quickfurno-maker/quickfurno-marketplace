@@ -42,12 +42,12 @@ import { type AdminSectionKey } from "./adminConfig";
 import {
   AIAgentsPage,
   AdminUsersPage,
+  AosReadinessPage,
   AuditLogsPage,
   AutomationsPage,
   CategoriesPage,
   CitiesPage,
   LeadDistributionPage,
-  LeadsPage,
   NotificationsPage,
   PackagesPage,
   PaymentsPage,
@@ -55,7 +55,6 @@ import {
   ReviewsPage,
   SettingsPage,
   SubscriptionsPage,
-  VendorsPage,
   WebsiteContentPage,
 } from "./sections";
 import { emptySnapshot, type Category, type City, type Lead, type MarketplaceRuntimeSetting, type PackageRow, type Snapshot, type Vendor, type VendorProfileChangeRequest, type VendorSupportMessage, type VendorSupportThread } from "./adminTypes";
@@ -73,7 +72,6 @@ import {
   uniqueOptions,
   vendorName,
 } from "./adminUtils";
-import { AOSControlCenter } from "./AOSControlCenter";
 import { CRMDashboard } from "./CRMDashboard";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { AosAutomationControl } from "./AosAutomationControl";
@@ -165,10 +163,9 @@ function renderSection(
   }
 ) {
   switch (section) {
-    case "leads":
-      return <LeadsPage data={data} {...helpers} />;
-    case "vendors":
-      return <VendorsPage data={data} {...helpers} />;
+    // "leads" and "vendors" are served by dedicated server-paged directory
+    // routes (C-PERF1) and never reach this switch — see
+    // app/admin/[section]/page.tsx.
     case "packages":
       return <PackagesPage data={data} {...helpers} />;
     case "categories":
@@ -184,7 +181,9 @@ function renderSection(
     case "reports":
       return <ReportsPage data={data} />;
     case "aos":
-      return <AOSControlCenter notify={helpers.notify} data={data} />;
+      // C-PERF1 (P0-H): the mock AOS Control Center is no longer rendered —
+      // the section shows a truthful readiness page until real AOS data exists.
+      return <AosReadinessPage notify={helpers.notify} />;
     case "crm":
       return <CRMDashboard data={data} notify={helpers.notify} error={helpers.error} />;
     case "analytics":

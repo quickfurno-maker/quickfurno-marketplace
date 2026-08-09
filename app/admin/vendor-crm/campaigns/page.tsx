@@ -46,7 +46,7 @@ export default async function VendorCampaignDirectoryPage({
 
   return (
     <VendorCampaignDirectory
-      result={result ?? { rows: [], page: 1, pageSize: 25, total: 0 }}
+      result={result ?? { rows: [], page: 1, pageSize: 20, total: 0 }}
       query={query}
       error={error}
     />

@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   adminGetLeadClarificationResponses,
+  adminLeadContext,
   adminPrepareLeadClarification,
   adminSaveLeadClarificationResponses,
   adminUpdateLeadStatus,
@@ -73,6 +74,9 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
   const [active, setActive] = useState(TABS[0]);
   const [selected, setSelected] = useState<CrmRow | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  // C-PERF1: bumping this makes the server-paged Inbox refetch its current
+  // page after a successful mutation, without losing filters or page.
+  const [reloadToken, setReloadToken] = useState(0);
 
   const rows = useMemo(() => buildRows(data), [data]);
 
@@ -84,6 +88,38 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
     return map;
   }, [data.vendors]);
 
+  // C-PERF1: Inbox filter vocabularies come from the config reference tables
+  // (cities / service categories — source of truth), not from loaded rows.
+  const inboxFilterOptions = useMemo(
+    () => ({
+      cities: (data.cities ?? []).filter((c) => c.is_active !== false).map((c) => String(c.name ?? "")).filter(Boolean),
+      services: (data.categories ?? []).filter((c) => c.is_active !== false).map((c) => String(c.name ?? "")).filter(Boolean),
+      sources: uniqueOptions((data.leads ?? []).map((lead) => lead.source || "Website")).filter((v) => v !== "All"),
+    }),
+    [data.cities, data.categories, data.leads],
+  );
+
+  // C-PERF1: drawer history is fetched on demand for the selected lead only
+  // (bounded reads), instead of shipping 100-row global log tables eagerly.
+  // The snapshot maps stay as an instant-display fallback for recent leads.
+  const [drawerContext, setDrawerContext] = useState<{ leadId: string; deliveryLogs: any[]; notificationLogs: any[] } | null>(null);
+  useEffect(() => {
+    if (!selected) {
+      setDrawerContext(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const result = await adminLeadContext(selected.id);
+      if (cancelled || !result.ok) return;
+      const payload = result.data as { deliveryLogs: any[]; notificationLogs: any[] };
+      setDrawerContext({ leadId: selected.id, ...payload });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+
   function updateStatus(leadId: string, status: string) {
     startTransition(async () => {
       const result = await adminUpdateLeadStatus(leadId, status);
@@ -92,6 +128,7 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
         return;
       }
       notify(`Lead marked ${status}.`, "success");
+      setReloadToken((token) => token + 1);
       router.refresh();
     });
   }
@@ -104,6 +141,7 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
         return;
       }
       notify("Clarification preview prepared.", "success");
+      setReloadToken((token) => token + 1);
       router.refresh();
     });
   }
@@ -148,7 +186,6 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
 
       {active === "Lead Inbox" ? (
         <LeadInbox
-          rows={rows}
           quickFilter={quickFilter}
           setQuickFilter={setQuickFilter}
           onSelect={setSelected}
@@ -158,6 +195,8 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
             router.push("/admin/lead-distribution");
           }}
           isPending={isPending}
+          filterOptions={inboxFilterOptions}
+          reloadToken={reloadToken}
         />
       ) : null}
 
@@ -172,8 +211,12 @@ export function CRMDashboard({ data, notify, error }: CRMDashboardProps) {
         <LeadDrawer
           row={selected}
           vendorsById={vendorsById}
-          deliveryLogs={deliveryByLead.get(selected.id) ?? []}
-          notificationLogs={notifByLead.get(selected.id) ?? []}
+          deliveryLogs={
+            drawerContext?.leadId === selected.id ? drawerContext.deliveryLogs : deliveryByLead.get(selected.id) ?? []
+          }
+          notificationLogs={
+            drawerContext?.leadId === selected.id ? drawerContext.notificationLogs : notifByLead.get(selected.id) ?? []
+          }
           onPrepareClarification={prepareClarification}
           onRefresh={() => router.refresh()}
           notify={notify}

@@ -72,7 +72,7 @@ export interface VendorSegmentListResult {
 }
 
 const LIST_MAX_PAGE_SIZE = 100;
-const LIST_DEFAULT_PAGE_SIZE = 25;
+const LIST_DEFAULT_PAGE_SIZE = 20; // C-PERF1 locked admin directory page size
 
 /** Bounded, deterministically ordered segment directory. */
 export async function listVendorSegments(rawQuery: Record<string, unknown> = {}): Promise<VendorSegmentListResult> {

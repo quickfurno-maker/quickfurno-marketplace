@@ -43,6 +43,48 @@ export const aiAgents = [
 ];
 
 /**
+ * C-PERF1 (P0-H): truthful AOS readiness page.
+ *
+ * The previous AOS Control Center rendered a fully fabricated operations
+ * surface: `lead_mock_*` / `report_mock_*` entity ids, invented runs_today,
+ * success rates, average confidence, response times, mock memories, mock cost
+ * logs and mock approvals. None of that data exists anywhere in QuickFurno,
+ * so none of it is rendered any more. This page states exactly what is real:
+ * the AOS foundation is NOT active, and the only live AOS-related control is
+ * the guarded AOS / n8n forwarding switch on the Automations page.
+ */
+export function AosReadinessPage({ notify }: { notify: (message: string, tone?: "success" | "error" | "info") => void }) {
+  return (
+    <div className="space-y-4">
+      <NoteBar>
+        AOS foundation is not active. There are no live agent runs, decisions, memories, approvals or cost
+        records to display — this page will become a real control center only after the AOS backend exists and
+        persists real agent activity.
+      </NoteBar>
+
+      <SectionCard
+        title="What is real today"
+        description="The only live AOS-related control. Everything else previously shown here was sample data and has been removed."
+      >
+        <AosAutomationControl notify={notify} />
+      </SectionCard>
+
+      <SectionCard title="Planned agent roles" description="A roadmap catalogue, not a control surface. Nothing below is running.">
+        <DataTable
+          rows={aiAgents}
+          emptyTitle="No planned agents"
+          emptyMessage="Planned agent roles will be listed here."
+          columns={[
+            { header: "Agent", cell: (row) => <Strong title={row[0]} subtitle={row[1]} /> },
+            { header: "Status", cell: () => <StatusBadge value="Not built" tone="slate" /> },
+          ]}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+/**
  * Planned agent catalogue — a roadmap list, not a control surface.
  *
  * What used to render here was fabricated end to end: a per-agent enable

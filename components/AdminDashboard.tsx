@@ -14,6 +14,9 @@ import {
   StatCard,
   StatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import { AdminIcon } from "@/components/admin/AdminIcon";
+import { AttentionCenter, type AttentionItem } from "@/components/admin/AttentionCenter";
+import type { AdminIconName } from "@/components/admin/adminConfig";
 import { emptySnapshot, type Lead, type Snapshot, type Vendor } from "@/components/admin/adminTypes";
 import {
   assignmentStatus,
@@ -30,6 +33,19 @@ import {
 
 const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
 
+/**
+ * Every entry points at an admin route that already exists in adminConfig.
+ * Nothing here performs a mutation — these are navigation shortcuts only.
+ */
+const quickOperations: Array<{ href: string; label: string; detail: string; icon: AdminIconName }> = [
+  { href: "/admin/vendors", label: "Vendor queue", detail: "Verify and manage vendors", icon: "vendors" },
+  { href: "/admin/lead-distribution", label: "Lead distribution", detail: "Rules, logs, eligibility", icon: "distribution" },
+  { href: "/admin/packages", label: "Packages", detail: "Lead packs and pricing", icon: "packages" },
+  { href: "/admin/cities", label: "Cities", detail: "Coverage and launch status", icon: "cities" },
+  { href: "/admin/categories", label: "Categories", detail: "Services and subcategories", icon: "categories" },
+  { href: "/admin/settings", label: "Settings", detail: "Global marketplace controls", icon: "settings" },
+];
+
 export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null; error?: string | null }) {
   const data = snapshot ?? emptySnapshot();
   const stats = data.stats ?? {};
@@ -44,18 +60,74 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
   const unassignedLeads = data.leads.filter(isUnassignedLead);
   const followUpsDue = Number(stats.pending_followups ?? data.leads.filter((lead) => ["New", "Verified", "Assigned", "Contacted"].includes(lead.status || "")).length);
   const lowBalanceVendors = data.vendors.filter((vendor) => Number(vendor.remaining_credits ?? 0) <= 3);
-  const pendingActions = [
-    { label: "Unassigned leads", value: unassignedLeads.length, href: "/admin/leads", tone: "amber" as const },
-    { label: "Pending vendor approvals", value: Number(stats.pending_vendors ?? 0), href: "/admin/vendors", tone: "blue" as const },
-    { label: "Pending payments", value: Number(stats.pending_payments ?? 0), href: "/admin/payments", tone: "amber" as const },
-    { label: "Low balance vendors", value: lowBalanceVendors.length, href: "/admin/vendor-subscriptions", tone: "rose" as const },
+  // `low_balance_vendors` is a server-side count over ALL vendors. The filtered
+  // list above only covers the latest loaded rows and is used for the detail
+  // table, never for the headline number.
+  const lowBalanceTotal = Number(stats.low_balance_vendors ?? lowBalanceVendors.length);
+
+  const attentionItems: AttentionItem[] = [
+    {
+      id: "unassigned-leads",
+      label: "Unassigned leads",
+      value: unassignedLeads.length,
+      detail: "Leads with no vendor matched yet.",
+      severity: unassignedLeads.length > 0 ? "warning" : "clear",
+      icon: "distribution",
+      href: "/admin/leads",
+      approximate: true,
+    },
+    {
+      id: "pending-vendors",
+      label: "Pending vendor approvals",
+      value: Number(stats.pending_vendors ?? 0),
+      detail: "Vendor accounts awaiting verification.",
+      severity: Number(stats.pending_vendors ?? 0) > 0 ? "warning" : "clear",
+      icon: "vendors",
+      href: "/admin/vendors",
+    },
+    {
+      id: "pending-payments",
+      label: "Pending payments",
+      value: Number(stats.pending_payments ?? 0),
+      detail: "Collections not yet reconciled.",
+      severity: Number(stats.pending_payments ?? 0) > 0 ? "warning" : "clear",
+      icon: "payments",
+      href: "/admin/payments",
+    },
+    {
+      id: "low-balance",
+      label: "Low balance vendors",
+      value: lowBalanceTotal,
+      detail: "Vendors close to running out of lead credits.",
+      severity: lowBalanceTotal > 0 ? "critical" : "clear",
+      icon: "subscriptions",
+      href: "/admin/vendor-subscriptions",
+    },
+    {
+      id: "expired-vendors",
+      label: "Expired packages",
+      value: Number(stats.expired_vendors ?? 0),
+      detail: "Vendors whose package validity has lapsed.",
+      severity: Number(stats.expired_vendors ?? 0) > 0 ? "warning" : "clear",
+      icon: "subscriptions",
+      href: "/admin/vendor-subscriptions",
+    },
+    {
+      id: "bad-lead-reports",
+      label: "Bad lead reports",
+      value: Number(stats.bad_lead_reports_pending ?? 0),
+      detail: "Vendor-reported lead quality disputes awaiting review.",
+      severity: Number(stats.bad_lead_reports_pending ?? 0) > 0 ? "warning" : "clear",
+      icon: "reviews",
+      href: "/admin/lead-distribution",
+    },
   ];
 
   const kpis = [
     ["Total Leads", formatNumber(stats.total_leads), `${formatNumber(stats.leads_this_week)} this week`, "leads", "emerald"],
     ["Leads Today", formatNumber(stats.leads_today), `${formatNumber(stats.leads_this_month)} this month`, "leads", "indigo"],
-    ["Hot Leads", formatNumber(hotLeads.length), "High intent or priority", "notifications", "amber"],
-    ["Unassigned Leads", formatNumber(unassignedLeads.length), "Needs vendor matching", "distribution", "rose"],
+    ["Hot Leads", formatNumber(hotLeads.length), "In latest loaded leads", "notifications", "amber"],
+    ["Unassigned Leads", formatNumber(unassignedLeads.length), "In latest loaded leads", "distribution", "rose"],
     ["Active Vendors", formatNumber(stats.active_vendors), `${formatNumber(stats.pending_vendors)} pending`, "vendors", "emerald"],
     ["Paid Vendors", formatNumber(stats.paid_vendors), `${formatNumber(stats.expired_vendors)} expired`, "subscriptions", "indigo"],
     ["Revenue This Month", formatINR(stats.revenue_this_month), `${formatINR(stats.total_revenue)} lifetime`, "payments", "emerald"],
@@ -119,6 +191,8 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </p>
       ) : null}
 
+      <AttentionCenter items={attentionItems} />
+
       <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <SectionCard
           title="Today's Priority"
@@ -149,12 +223,21 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
           </div>
         </SectionCard>
 
-        <SectionCard title="Pending Actions" description="Operations queues that need a human decision.">
-          <div className="space-y-3">
-            {pendingActions.map((item) => (
-              <Link key={item.label} href={item.href} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5 transition hover:border-emerald-200 hover:bg-emerald-50/30">
-                <span className="text-sm font-semibold text-slate-700">{item.label}</span>
-                <StatusBadge value={formatNumber(item.value)} tone={item.tone} />
+        <SectionCard title="Quick operations" description="Jump straight into an existing admin workspace.">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {quickOperations.map((op) => (
+              <Link
+                key={op.href}
+                href={op.href}
+                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 outline-none transition duration-150 hover:border-slate-300 hover:shadow-sm focus-visible:ring-4 focus-visible:ring-slate-200"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-slate-900 group-hover:text-white">
+                  <AdminIcon name={op.icon} className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-slate-900">{op.label}</span>
+                  <span className="block truncate text-xs text-slate-500">{op.detail}</span>
+                </span>
               </Link>
             ))}
           </div>

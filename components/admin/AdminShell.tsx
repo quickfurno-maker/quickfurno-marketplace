@@ -240,7 +240,7 @@ function SidebarContent({
             {collapsed ? null : (
               <div className="min-w-0">
                 <p className="truncate text-[15px] font-semibold tracking-tight">QuickFurno</p>
-                <p className="truncate text-[11px] text-slate-400">Superadmin</p>
+                <p className="truncate text-[11px] text-slate-400">Command Center</p>
               </div>
             )}
           </Link>
@@ -290,16 +290,16 @@ function SidebarContent({
                         collapsed ? "justify-center px-1.5" : "px-2.5"
                       } ${
                         active
-                          ? "bg-white/95 text-slate-950"
+                          ? "bg-[#2d7cff]/[0.16] text-white shadow-[inset_0_0_0_1px_rgba(45,124,255,0.35),0_0_18px_rgba(45,124,255,0.14)]"
                           : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
                       }`}
                     >
                       {active && !collapsed ? (
-                        <span aria-hidden="true" className="absolute inset-y-1.5 -left-2.5 w-0.5 rounded-full bg-emerald-400" />
+                        <span aria-hidden="true" className="absolute inset-y-1.5 -left-2.5 w-0.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,216,255,0.8)]" />
                       ) : null}
                       <AdminIcon
                         name={section.icon}
-                        className={`h-4 w-4 shrink-0 ${active ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-300"}`}
+                        className={`h-4 w-4 shrink-0 ${active ? "text-cyan-300" : "text-slate-400 group-hover:text-emerald-300"}`}
                       />
                       {collapsed ? (
                         <span className="sr-only">{section.label}</span>

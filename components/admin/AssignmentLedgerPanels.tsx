@@ -323,7 +323,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-sm" onMouseDown={onClose}>
-      <aside className="h-full w-full max-w-xl overflow-y-auto bg-[#f6f8f5] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className="h-full w-full max-w-xl overflow-y-auto bg-[color:var(--qfa-page)] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-950">Assignment preview detail</h2>

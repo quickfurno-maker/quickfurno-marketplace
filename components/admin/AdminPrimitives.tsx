@@ -17,9 +17,10 @@
 //     is the single biggest "generic template" tell.
 //   * Status is never carried by colour alone.
 //
-// NOTE: this module is also imported by components/VendorDashboard.tsx, which
-// renders outside `.admin-surface`. The `.qfa-*` classes are unscoped for that
-// reason; see the token block in app/globals.css.
+// NOTE: the `.qfa-*` classes and `--qfa-*` tokens keep light values on :root
+// and receive the DARK command-center values under `.admin-surface` (see
+// app/globals.css). Every current consumer renders inside `.admin-surface`,
+// so the admin is dark while anything outside that scope stays light.
 // ============================================================================
 
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";

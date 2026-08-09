@@ -1,17 +1,14 @@
 "use client";
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ActionMenu,
   DataTable,
   EmptyState,
   NoteBar,
-  PrimaryButton,
-  SecondaryButton,
   SectionCard,
   StatusBadge,
-  ToggleSwitch,
 } from "../AdminPrimitives";
-import { type Category, type City, type Lead, type Snapshot, type Vendor } from "../adminTypes";
+import { Pagination } from "../Pagination";
 import {
   formatDate,
   formatNumber,
@@ -46,10 +43,10 @@ export const aiAgents = [
  * C-PERF1 (P0-H): truthful AOS readiness page.
  *
  * The previous AOS Control Center rendered a fully fabricated operations
- * surface: `lead_mock_*` / `report_mock_*` entity ids, invented runs_today,
- * success rates, average confidence, response times, mock memories, mock cost
- * logs and mock approvals. None of that data exists anywhere in QuickFurno,
- * so none of it is rendered any more. This page states exactly what is real:
+ * surface: sample entity ids, invented run counts, success rates, average
+ * confidence, response times, sample memories, cost logs and approvals. None
+ * of that data exists anywhere in QuickFurno, so none of it is rendered any
+ * more. This page states exactly what is real:
  * the AOS foundation is NOT active, and the only live AOS-related control is
  * the guarded AOS / n8n forwarding switch on the Automations page.
  */
@@ -198,54 +195,110 @@ export function ReviewsPage() {
   );
 }
 
-export function NotificationsPage({ data }: { data: Snapshot }) {
+/**
+ * C-PERF2: derived alerts over bounded reads (≤10 recent leads + ≤10
+ * low-credit vendors). No notifications table exists, so a paged "directory"
+ * here would be fabricated — the note says exactly what this is.
+ */
+export function NotificationsPage({ data }: { data: { recentLeads: Array<{ id: string; name?: string | null; created_at?: string | null }>; lowCreditVendors: Array<{ id: string; business_name?: string | null; remaining_credits?: number | null; created_at?: string | null }> } | null }) {
   const notifications = [
-    ...data.leads.slice(0, 4).map((lead) => ({ title: "New lead", message: `${lead.name || "Client"} submitted a requirement`, type: "New lead", priority: "High", date: lead.created_at })),
-    ...data.vendors.filter((vendor) => Number(vendor.remaining_credits ?? 0) <= 3).slice(0, 4).map((vendor) => ({ title: "Low balance vendor", message: `${vendor.business_name || "Vendor"} has low lead balance`, type: "Low balance vendor", priority: "Medium", date: vendor.created_at })),
-  ];
+    ...(data?.recentLeads ?? []).map((lead) => ({ id: `lead-${lead.id}`, title: "New lead", message: `${lead.name || "Client"} submitted a requirement`, type: "New lead", priority: "High", date: lead.created_at })),
+    ...(data?.lowCreditVendors ?? []).map((vendor) => ({ id: `vendor-${vendor.id}`, title: "Low balance vendor", message: `${vendor.business_name || "Vendor"} has low lead balance`, type: "Low balance vendor", priority: "Medium", date: vendor.created_at })),
+  ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
   return (
-    <DataTable
-      rows={notifications}
-      emptyTitle="No notifications"
-      emptyMessage="Admin alerts will appear here when notification persistence is connected."
-      columns={[
-        { header: "Title", cell: (row) => <Strong title={row.title} subtitle={row.message} /> },
-        { header: "Type", cell: (row) => row.type },
-        { header: "Priority", cell: (row) => <StatusBadge value={row.priority} /> },
-        { header: "Read", cell: () => <StatusBadge value="Unread" /> },
-        { header: "Date", cell: (row) => formatDate(row.date) },
-        /* "Mark read" only produced a "…placeholder" toast — there is no
-           notification-read state to write. The Read column above is likewise
-           a constant, so it is labelled honestly rather than being actionable. */
-      ]}
-    />
+    <div className="space-y-3">
+      <NoteBar>
+        Derived alerts from live data (latest {formatNumber((data?.recentLeads ?? []).length)} leads and{" "}
+        {formatNumber((data?.lowCreditVendors ?? []).length)} low-credit vendors). No notification persistence or
+        read-state exists yet, so nothing here is markable.
+      </NoteBar>
+      <DataTable
+        rows={notifications}
+        getRowKey={(row) => row.id}
+        emptyTitle="No notifications"
+        emptyMessage="Admin alerts will appear here when notification persistence is connected."
+        columns={[
+          { header: "Title", cell: (row) => <Strong title={row.title} subtitle={row.message} /> },
+          { header: "Type", cell: (row) => row.type },
+          { header: "Priority", cell: (row) => <StatusBadge value={row.priority} /> },
+          { header: "Date", cell: (row) => formatDate(row.date) },
+        ]}
+      />
+    </div>
   );
 }
 
-export function AdminUsersPage({ data }: { data: Snapshot }) {
+/** C-PERF2: server-paged admin profiles (narrow fields only — no auth secrets). */
+export function AdminUsersPage({ data }: { data: { result: { rows: Array<{ id: string; created_at?: string | null; full_name?: string | null; is_active?: boolean | null }>; page: number; pageSize: number; total: number } } | null }) {
+  const result = data?.result ?? { rows: [], page: 1, pageSize: 20, total: 0 };
   return (
-    <DataTable
-      rows={data.profiles.filter((profile) => profile.role === "admin")}
-      emptyTitle="No admin users found"
-      emptyMessage="Supabase Auth users with admin profiles will appear here."
-      columns={[
-        { header: "Name", cell: (profile) => <Strong title={profile.full_name || "Admin user"} subtitle={profile.id} /> },
-        { header: "Email", cell: () => "Managed in Supabase Auth" },
-        { header: "Role", cell: () => <StatusBadge value="Superadmin" /> },
-        { header: "Status", cell: (profile) => <StatusBadge value={profile.is_active === false ? "Disabled" : "Active"} /> },
-        { header: "Last Login", cell: () => "Auth dashboard" },
-        { header: "Created", cell: (profile) => formatDate(profile.created_at) },
-      ]}
-    />
+    <div className="space-y-3">
+      <DataTable
+        rows={result.rows}
+        getRowKey={(profile) => profile.id}
+        emptyTitle="No admin users found"
+        emptyMessage="Supabase Auth users with admin profiles will appear here."
+        columns={[
+          { header: "Name", cell: (profile) => <Strong title={profile.full_name || "Admin user"} subtitle={profile.id} /> },
+          { header: "Email", cell: () => "Managed in Supabase Auth" },
+          { header: "Role", cell: () => <StatusBadge value="Superadmin" /> },
+          { header: "Status", cell: (profile) => <StatusBadge value={profile.is_active === false ? "Disabled" : "Active"} /> },
+          { header: "Last Login", cell: () => "Auth dashboard" },
+          { header: "Created", cell: (profile) => formatDate(profile.created_at) },
+        ]}
+      />
+      <UrlPagination result={result} noun="admin users" />
+    </div>
   );
 }
 
-
-export function AuditLogsPage({ data }: { data: Snapshot }) {
+/** C-PERF2: real bounded audit-log viewer (20/page, thin summary rows). */
+export function AuditLogsPage({ data }: { data: { result: { rows: Array<{ id: string; created_at?: string | null; action?: string | null; entity_type?: string | null; entity_id?: string | null }>; page: number; pageSize: number; total: number }; unavailable?: boolean } | null }) {
+  const result = data?.result ?? { rows: [], page: 1, pageSize: 20, total: 0 };
+  if (data?.unavailable) {
+    return (
+      <EmptyState
+        title="Audit log table not available"
+        message="The audit_logs table is not present in this environment yet. Rows will appear here once it exists."
+      />
+    );
+  }
   return (
-    <EmptyState
-      title="Audit log UI is ready"
-      message={`Admin audit log rows need the audit_logs table exposed to the server snapshot. Current snapshot contains ${formatNumber(data.badReports.length)} bad-lead reports and ${formatNumber(data.assignments.length)} assignments for context.`}
+    <div className="space-y-3">
+      <DataTable
+        rows={result.rows}
+        density="compact"
+        getRowKey={(row) => row.id}
+        emptyTitle="No audit log rows"
+        emptyMessage="Sensitive admin actions are recorded here as they happen."
+        columns={[
+          { header: "When", cell: (row) => <span className="whitespace-nowrap text-[11px] text-slate-500">{formatDate(row.created_at)}</span> },
+          { header: "Action", cell: (row) => <StatusBadge value={row.action || "unknown"} tone="slate" /> },
+          { header: "Entity", cell: (row) => <Strong title={row.entity_type || "—"} subtitle={row.entity_id || ""} /> },
+        ]}
+      />
+      <UrlPagination result={result} noun="audit log rows" />
+    </div>
+  );
+}
+
+/** Shared URL-driven pager for simple ?page= sections. */
+function UrlPagination({ result, noun }: { result: { page: number; pageSize: number; total: number }; noun: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return (
+    <Pagination
+      page={result.page}
+      pageSize={result.pageSize}
+      total={result.total}
+      noun={noun}
+      onPageChange={(page) => {
+        const next = new URLSearchParams(searchParams.toString());
+        if (page <= 1) next.delete("page");
+        else next.set("page", String(page));
+        router.replace(`${pathname}${next.size ? `?${next.toString()}` : ""}`, { scroll: false });
+      }}
     />
   );
 }

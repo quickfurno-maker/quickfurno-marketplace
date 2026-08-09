@@ -10,7 +10,7 @@ import {
   StatusBadge,
   ToggleSwitch,
 } from "../AdminPrimitives";
-import { type City, type Lead, type PackageRow, type Snapshot } from "../adminTypes";
+import { type PackageRow } from "../adminTypes";
 import {
   formatINR,
   formatNumber,
@@ -25,24 +25,26 @@ export const packageTemplates = [
   { name: "Enterprise Package", price: "Custom", leads: "Custom", validity: "Custom", features: ["Dedicated support", "Featured placement", "Custom lead caps"] },
 ];
 
-export function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (message: string) => void; ask: any }) {
-  const activePackages = data.packages.filter((item) => item.is_active !== false).length;
-  const avgLeadPrice = data.packages.length
-    ? Math.round(data.packages.reduce((sum, item) => sum + Number(item.price_per_lead ?? 0), 0) / data.packages.length)
+/** C-PERF2: narrow section contract — packages config + one real revenue
+ *  aggregate. No other marketplace data is fetched for this route. */
+export function PackagesPage({ packages, totalRevenue, notify, ask }: { packages: PackageRow[]; totalRevenue: number; notify: (message: string) => void; ask: any }) {
+  const activePackages = packages.filter((item) => item.is_active !== false).length;
+  const avgLeadPrice = packages.length
+    ? Math.round(packages.reduce((sum, item) => sum + Number(item.price_per_lead ?? 0), 0) / packages.length)
     : 0;
 
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Packages" value={formatNumber(data.packages.length || packageTemplates.length)} helper="Live rows or templates" icon="packages" />
+        <StatCard label="Packages" value={formatNumber(packages.length || packageTemplates.length)} helper="Live rows or templates" icon="packages" />
         <StatCard label="Active" value={formatNumber(activePackages)} helper="Visible for sales" icon="subscriptions" tone="emerald" />
         <StatCard label="Avg Lead Price" value={avgLeadPrice ? formatINR(avgLeadPrice) : "Prepared"} helper="From package rows" icon="payments" tone="indigo" />
-        <StatCard label="Revenue" value={formatINR(data.stats.total_revenue)} helper="Paid collections" icon="reports" tone="amber" />
+        <StatCard label="Revenue" value={formatINR(totalRevenue)} helper="Paid collections" icon="reports" tone="amber" />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {data.packages.length ? (
-          data.packages.map((item) => (
+        {packages.length ? (
+          packages.map((item) => (
             <PackageRowCard key={item.id} item={item} notify={notify} ask={ask} />
           ))
         ) : (
@@ -53,7 +55,7 @@ export function PackagesPage({ data, notify, ask }: { data: Snapshot; notify: (m
       </section>
 
       <DataTable
-        rows={data.packages}
+        rows={packages}
         emptyTitle="No packages in Supabase"
         emptyMessage="Package templates are shown above. Real package rows will appear here after creation."
         columns={[

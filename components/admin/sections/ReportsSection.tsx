@@ -1,31 +1,48 @@
 "use client";
 
+// ============================================================================
+// C-PERF2: narrow section contract — a thin latest-N lead sample only,
+// labelled as such. The previous per-report "Export" buttons performed
+// nothing and are replaced by an honest scope list.
+// ============================================================================
+
 import {
   ChartCard,
+  NoteBar,
+  SectionCard,
+  StatusBadge,
 } from "../AdminPrimitives";
-import { type Category, type City, type Snapshot, type Vendor } from "../adminTypes";
+import type { LeadSampleRow } from "../adminTypes";
 import {
+  formatNumber,
   groupBy,
 } from "../adminUtils";
 
-export function ReportsPage({ data }: { data: Snapshot }) {
+export function ReportsPage({ leadSample }: { leadSample: Array<Pick<LeadSampleRow, "id" | "status" | "city" | "source" | "service_required" | "category">> }) {
   const reports = ["Daily leads", "Weekly leads", "Monthly leads", "Leads by category", "Leads by city", "Leads by source", "Vendor-wise usage", "Revenue by package", "Low balance vendors", "Duplicate/spam leads", "Lost lead reasons"];
   return (
     <div className="space-y-5">
+      <NoteBar>
+        Breakdowns below cover the latest {formatNumber(leadSample.length)} leads and are labelled as such. Accurate
+        marketplace KPI totals live on the Dashboard and Analytics pages.
+      </NoteBar>
       <section className="grid gap-4 xl:grid-cols-3">
-        <ChartCard title="Leads by Category" rows={groupBy(data.leads, (lead) => lead.service_required || lead.category)} />
-        <ChartCard title="Leads by City" rows={groupBy(data.leads, (lead) => lead.city)} />
-        <ChartCard title="Leads by Source" rows={groupBy(data.leads, (lead) => lead.source || "Website")} />
+        <ChartCard title={`Leads by Category (latest ${formatNumber(leadSample.length)})`} rows={groupBy(leadSample, (lead) => lead.service_required || lead.category)} />
+        <ChartCard title={`Leads by City (latest ${formatNumber(leadSample.length)})`} rows={groupBy(leadSample, (lead) => lead.city)} />
+        <ChartCard title={`Leads by Source (latest ${formatNumber(leadSample.length)})`} rows={groupBy(leadSample, (lead) => lead.source || "Website")} />
       </section>
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {reports.map((report) => (
-          <article key={report} className="qfa-panel p-4">
-            <h2 className="text-base font-semibold text-slate-950">{report}</h2>
-            <p className="mt-2 text-sm text-slate-500">CSV, Excel-compatible export, and printable layout placeholder.</p>
-            <button type="button" className="mt-4 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Export</button>
-          </article>
-        ))}
-      </section>
+      {/* The old grid rendered an Export button per report that was wired to
+          nothing. Exports are not built; this list is scope, not controls. */}
+      <SectionCard title="Planned exports" description="Not built yet — no export, CSV or print pipeline exists.">
+        <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+          {reports.map((report) => (
+            <li key={report} className="flex items-center justify-between gap-2 text-[13px] text-slate-700">
+              <span className="min-w-0 truncate">{report}</span>
+              <StatusBadge value="Not built" tone="slate" />
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
     </div>
   );
 }

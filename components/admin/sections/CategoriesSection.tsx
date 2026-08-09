@@ -4,7 +4,7 @@ import {
   StatusBadge,
   ToggleSwitch,
 } from "../AdminPrimitives";
-import { type Category, type Snapshot } from "../adminTypes";
+import { type Category } from "../adminTypes";
 import {
   formatNumber,
   shortId,
@@ -12,9 +12,12 @@ import {
 import { CategoryManager } from "../CategoryManager";
 import { Strong } from "./shared";
 
-export function CategoriesPage({ data, notify }: { data: Snapshot; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
+/** C-PERF2: narrow section contract — the complete (small) category config
+ *  set only. The hierarchy manager requires the full reference set; nothing
+ *  else is fetched for this route. */
+export function CategoriesPage({ categories, notify }: { categories: Category[]; notify: (message: string, tone?: "success" | "error" | "info") => void }) {
   // Phase 14C governance: full admin-only category/subcategory management.
-  return <CategoryManager categories={data.categories} notify={notify} />;
+  return <CategoryManager categories={categories} notify={notify} />;
 }
 
 

@@ -1,44 +1,17 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+// ============================================================================
+// C-PERF2: this shell no longer receives (or renders from) the broad
+// every-table snapshot. The route resolves a SECTION-SCOPED payload first
+// (app/admin/[section]/page.tsx) and this component adapts it to each
+// section's narrow props. Sections with no server data receive none.
+// ============================================================================
+
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  adminApproveVendorProfileChangeRequest,
-  adminRejectVendorProfileChangeRequest,
-  adminReplyVendorSupportThread,
-  adminSetCategoryActive,
-  adminSetCityActive,
-  adminSetPackageActive,
-  adminMarkFreeVendorInterestStatus,
-  adminRecheckLeadAssignmentQueue,
-  adminRunAutoMatchPreview,
-  adminUpdateMarketplaceRuntimeSetting,
-  adminUpdateLeadStatus,
-} from "@/app/actions";
-import { evaluateVendorEligibility, evaluateVendorLeadAssignmentEligibility, type VendorEligibility, type VendorLeadAssignmentEligibility } from "@/lib/vendors/vendorEligibility";
-import { getVendorPublicVisibility, type VendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
-import {
-  ActionMenu,
-  ChartCard,
-  ConfirmDialog,
-  DataTable,
-  Drawer,
-  EmptyState,
-  InfoGrid,
-  PageHeader,
-  PrimaryButton,
-  ProgressBar,
-  SecondaryButton,
-  SelectFilter,
-  SectionCard,
-  StatCard,
-  StatusBadge,
-  Tabs,
-  Toast,
-  ToggleSwitch,
-  Toolbar,
-} from "./AdminPrimitives";
+import { ConfirmDialog, EmptyState, Toast } from "./AdminPrimitives";
 import { type AdminSectionKey } from "./adminConfig";
+import { emptySnapshot, type Snapshot } from "./adminTypes";
 import {
   AIAgentsPage,
   AdminUsersPage,
@@ -57,38 +30,10 @@ import {
   SubscriptionsPage,
   WebsiteContentPage,
 } from "./sections";
-import { emptySnapshot, type Category, type City, type Lead, type MarketplaceRuntimeSetting, type PackageRow, type Snapshot, type Vendor, type VendorProfileChangeRequest, type VendorSupportMessage, type VendorSupportThread } from "./adminTypes";
-import {
-  assignmentStatus,
-  formatDate,
-  formatINR,
-  formatNumber,
-  groupBy,
-  includesQuery,
-  leadName,
-  maskPhone,
-  packageName,
-  shortId,
-  uniqueOptions,
-  vendorName,
-} from "./adminUtils";
 import { CRMDashboard } from "./CRMDashboard";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
-import { AosAutomationControl } from "./AosAutomationControl";
-import { LeadAssignmentApprovalControl } from "./LeadAssignmentApprovalControl";
-import { DistributionLogsPanel, FailedAssignmentsPanel, RecentAssignmentsPanel } from "./AssignmentLedgerPanels";
-import { CategoryManager } from "./CategoryManager";
-import {
-  BadLeadReportsReviewPanel,
-  DeliveryLogsAuditPanel,
-  MatchingRunsAuditPanel,
-  PreviewMessagesPanel,
-} from "./LeadMatchingAuditPanels";
-import { ManualLeadAssignmentPanel } from "./ManualLeadAssignmentPanel";
-import { RequirementGroupsPanel } from "./RequirementGroupsPanel";
 
-export function AdminSectionPage({ section, snapshot, error }: { section: AdminSectionKey; snapshot: Snapshot | null; error?: string | null }) {
-  const data = snapshot ?? emptySnapshot();
+export function AdminSectionPage({ section, payload, error }: { section: AdminSectionKey; payload: any; error?: string | null }) {
   const router = useRouter();
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "info" } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => Promise<{ ok: boolean; error?: string }> } | null>(null);
@@ -117,21 +62,13 @@ export function AdminSectionPage({ section, snapshot, error }: { section: AdminS
 
   return (
     <div className="space-y-4">
-      {/* No page header here on purpose.
-          AdminShell already renders the breadcrumb, the h1 and this section's
-          description, so a second title block only duplicated the page name.
-          The two buttons that used to live here ("Filter" -> "Filter drawer
-          placeholder is ready", and the Add action -> "flow is ready for
-          backend wiring") were placeholder controls: they were styled as the
-          page's primary actions but performed nothing. A control that cannot
-          act must not be rendered. */}
       {error ? (
         <div className="rounded-[var(--qfa-radius)] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
           This page is showing safe fallback UI because Supabase returned: {error}
         </div>
       ) : null}
 
-      {renderSection(section, data, { notify, ask, runAction, isPending, error: error ?? null })}
+      {renderSection(section, payload, { notify, ask, runAction, isPending, error: error ?? null })}
 
       {toast ? <Toast message={toast.message} tone={toast.tone} /> : null}
       {confirm ? (
@@ -153,7 +90,7 @@ export function AdminSectionPage({ section, snapshot, error }: { section: AdminS
 
 function renderSection(
   section: AdminSectionKey,
-  data: Snapshot,
+  payload: any,
   helpers: {
     notify: (message: string, tone?: "success" | "error" | "info") => void;
     ask: (title: string, message: string, action: () => Promise<{ ok: boolean; error?: string }>) => void;
@@ -164,30 +101,37 @@ function renderSection(
 ) {
   switch (section) {
     // "leads" and "vendors" are served by dedicated server-paged directory
-    // routes (C-PERF1) and never reach this switch — see
-    // app/admin/[section]/page.tsx.
+    // routes and never reach this switch — see app/admin/[section]/page.tsx.
     case "packages":
-      return <PackagesPage data={data} {...helpers} />;
+      return <PackagesPage packages={payload?.packages ?? []} totalRevenue={Number(payload?.totalRevenue ?? 0)} notify={helpers.notify} ask={helpers.ask} />;
     case "categories":
-      return <CategoriesPage data={data} {...helpers} />;
+      return <CategoriesPage categories={payload?.categories ?? []} notify={helpers.notify} />;
     case "cities":
-      return <CitiesPage data={data} {...helpers} />;
+      return <CitiesPage cities={payload?.cities ?? []} notify={helpers.notify} ask={helpers.ask} />;
     case "payments":
-      return <PaymentsPage data={data} {...helpers} />;
+      return <PaymentsPage data={payload} />;
     case "lead-distribution":
-      return <LeadDistributionPage data={data} {...helpers} />;
+      return <LeadDistributionPage notify={helpers.notify} runAction={helpers.runAction} />;
     case "vendor-subscriptions":
-      return <SubscriptionsPage data={data} {...helpers} />;
+      return <SubscriptionsPage data={payload} />;
     case "reports":
-      return <ReportsPage data={data} />;
+      return <ReportsPage leadSample={payload?.leadSample ?? []} />;
     case "aos":
-      // C-PERF1 (P0-H): the mock AOS Control Center is no longer rendered —
-      // the section shows a truthful readiness page until real AOS data exists.
       return <AosReadinessPage notify={helpers.notify} />;
     case "crm":
-      return <CRMDashboard data={data} notify={helpers.notify} error={helpers.error} />;
-    case "analytics":
-      return <AnalyticsDashboard data={data} />;
+      return <CRMDashboard base={payload} notify={helpers.notify} error={helpers.error} />;
+    case "analytics": {
+      // AnalyticsDashboard keeps its Snapshot-shaped input; the payload is the
+      // narrow analytics contract (stats + labelled thin samples), adapted here.
+      const analyticsData: Snapshot = {
+        ...emptySnapshot(),
+        stats: payload?.stats ?? {},
+        leads: payload?.leads ?? [],
+        vendors: payload?.vendors ?? [],
+        assignments: payload?.assignments ?? [],
+      };
+      return <AnalyticsDashboard data={analyticsData} />;
+    }
     case "ai-agents":
       return <AIAgentsPage />;
     case "automations":
@@ -197,13 +141,19 @@ function renderSection(
     case "reviews":
       return <ReviewsPage />;
     case "notifications":
-      return <NotificationsPage data={data} />;
+      return <NotificationsPage data={payload} />;
     case "users":
-      return <AdminUsersPage data={data} />;
+      return <AdminUsersPage data={payload} />;
     case "settings":
-      return <SettingsPage data={data} notify={helpers.notify} runAction={helpers.runAction} />;
+      return (
+        <SettingsPage
+          data={{ ...emptySnapshot(), marketplaceSettings: payload?.marketplaceSettings ?? [], settings: payload?.settings ?? [] }}
+          notify={helpers.notify}
+          runAction={helpers.runAction}
+        />
+      );
     case "audit-logs":
-      return <AuditLogsPage data={data} />;
+      return <AuditLogsPage data={payload} />;
     default:
       return <EmptyState title="Page not available" message="This admin page is not configured yet." />;
   }

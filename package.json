@@ -99,7 +99,8 @@
     "test:phase5f:d4c": "node scripts/phase5f-d4c-consent-ack-async-harness.mjs",
     "test:mvp:50-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-3.mjs",
     "test:mvp:50-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs",
-    "test:mvp:50-3-50-4-bridge": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-policy-config-bridge.mjs"
+    "test:mvp:50-3-50-4-bridge": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-policy-config-bridge.mjs",
+    "test:admin:cperf1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-perf1-pagination.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

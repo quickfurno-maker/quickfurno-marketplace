@@ -171,10 +171,23 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
 }
 
 // -- reads --------------------------------------------------------------------
+/**
+ * READ-ONLY projection of Core-owned vendor facts for the Vendor CRM.
+ *
+ * `accepting_leads` is the vendor-level AVAILABILITY switch: whether the vendor
+ * is open to receiving NEW lead assignments. It is emphatically NOT a per-lead
+ * decision — QuickFurno has no vendor accept/reject of an assigned lead, and
+ * this projection must never be presented as one. Correct UI wording is
+ * "Available for new assignments" / "Unavailable for new assignments".
+ *
+ * The field stays Core-owned: it is only SELECTed here. Vendor CRM never writes
+ * it, never mirrors it into vendor_crm_profiles, and never derives assignment
+ * eligibility from it (that remains lib/vendors/vendorAutomaticEligibility.ts).
+ */
 export async function getVendorCoreFacts(vendorId: string) {
   const id = requireUuid(vendorId, "vendorId");
   const { data } = await db().from("vendors")
-    .select("id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, is_active, total_credits, remaining_credits, last_assigned_at, created_at")
+    .select("id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, is_active, accepting_leads, total_credits, remaining_credits, last_assigned_at, created_at")
     .eq("id", id).maybeSingle();
   return data ?? null;
 }

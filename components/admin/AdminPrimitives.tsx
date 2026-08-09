@@ -832,7 +832,7 @@ export function Tabs({
             tabIndex={selected ? 0 : -1}
             onKeyDown={(event) => onKeyDown(event, index)}
             onClick={() => onChange(tab)}
-            className={`qfa-focus -mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-semibold transition-colors ${
+            className={`qfa-focus -mb-px shrink-0 whitespace-nowrap border-b-2 bg-transparent px-3 py-2 text-[13px] font-semibold transition-colors ${
               selected
                 ? "border-emerald-600 text-slate-950"
                 : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"

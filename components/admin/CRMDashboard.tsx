@@ -975,7 +975,13 @@ function LeadDrawer({
             ["Recommended action", (lead.lead_quality_recommended_action || "Not set").replace(/_/g, " ")],
             ["Hard block", (lead.lead_quality_hard_block_reason || "None").replace(/_/g, " ")],
             ["Checked at", lead.lead_quality_checked_at ? formatDate(lead.lead_quality_checked_at) : "Not checked"],
-            ["Breakdown", "Latest score summary is mirrored here. TODO: load restricted lead_scores history for detailed breakdown."],
+            // The row above mirrors the latest score summary carried on the lead
+            // itself. The per-signal history lives in the restricted lead_scores
+            // table, which the admin snapshot does not load — so we say that
+            // plainly instead of rendering a developer TODO into the admin UI.
+            // BACKEND_DEPENDENCY: lead_scores history is not exposed by
+            // getSuperadminSnapshot; a detailed breakdown needs that read first.
+            ["Breakdown", "Summary only — the per-signal history is not loaded in this view."],
           ]} />
         </DrawerSection>
 

@@ -16,6 +16,26 @@ import { VENDOR_CRM_ONBOARDING_STAGES, VENDOR_CRM_RELATIONSHIP_STATUSES } from "
 
 type Query = Record<string, string | undefined>;
 
+/**
+ * Display-only threshold for the directory's "Low" credit hint. The authoritative
+ * warning threshold lives in automation_policy_configs and is enforced server-side
+ * by QF-MVP-50.3; this is a read-only visual cue and grants no authority.
+ */
+const LOW_CREDIT_THRESHOLD = 3;
+
+/** Human labels for the active-filter chips. Keys match the URL query params. */
+const FILTER_LABELS: Record<string, string> = {
+  search: "Search",
+  category: "Category",
+  city: "City",
+  verification: "Verification",
+  enabled: "Enabled",
+  onboarding_stage: "Stage",
+  relationship_status: "Relationship",
+  tagId: "Tag",
+  taskState: "Tasks",
+};
+
 export function VendorCrmDirectory({
   result, query, tags, error,
 }: {
@@ -52,7 +72,25 @@ export function VendorCrmDirectory({
     },
     { header: "Verification", cell: (r: VendorCrmDirectoryRow) => <StatusBadge value={r.status ?? "—"} /> },
     { header: "Enabled", cell: (r: VendorCrmDirectoryRow) => <StatusBadge value={r.is_active === false ? "Disabled" : "Active"} /> },
-    { header: "Credits", cell: (r: VendorCrmDirectoryRow) => <span className="tabular-nums text-slate-700">{r.remaining_credits ?? 0}/{r.total_credits ?? 0}</span> },
+    {
+      header: "Credits",
+      cell: (r: VendorCrmDirectoryRow) => {
+        const remaining = Number(r.remaining_credits ?? 0);
+        const low = remaining <= LOW_CREDIT_THRESHOLD;
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <span className={`tabular-nums ${low ? "font-semibold text-rose-700" : "text-slate-700"}`}>
+              {remaining}/{r.total_credits ?? 0}
+            </span>
+            {low ? (
+              <span className="rounded border border-rose-200 bg-rose-50 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700">
+                Low
+              </span>
+            ) : null}
+          </span>
+        );
+      },
+    },
     { header: "Stage", cell: (r: VendorCrmDirectoryRow) => <StatusBadge value={r.onboarding_stage ?? "—"} /> },
     { header: "Relationship", cell: (r: VendorCrmDirectoryRow) => <StatusBadge value={r.relationship_status ?? "—"} /> },
     { header: "Tags", cell: (r: VendorCrmDirectoryRow) => r.active_tags.length ? <span className="text-xs text-slate-600">{r.active_tags.map((t) => t.name).join(", ")}</span> : <span className="text-slate-300">—</span> },
@@ -64,6 +102,17 @@ export function VendorCrmDirectory({
 
   const hasActiveFilter = ["search", "category", "city", "verification", "enabled", "onboarding_stage", "relationship_status", "tagId", "taskState"].some((k) => query[k]);
 
+  const activeFilters = Object.keys(FILTER_LABELS)
+    .filter((key) => query[key])
+    .map((key) => {
+      const raw = query[key] as string;
+      let value = raw;
+      if (key === "enabled") value = raw === "true" ? "Enabled" : "Disabled";
+      if (key === "taskState") value = raw === "open" ? "Open" : "Overdue";
+      if (key === "tagId") value = tags.find((t) => t.id === raw)?.name ?? raw;
+      return { key, label: FILTER_LABELS[key], value };
+    });
+
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
@@ -72,6 +121,9 @@ export function VendorCrmDirectory({
         meta={<StatusBadge value={`${result.total} vendors`} />}
       />
 
+      {/* Enter submits the search — previously the input only responded to the
+          button, which made the field feel dead to keyboard users. */}
+      <div onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); apply({ search }); } }}>
       <Toolbar
         query={search}
         setQuery={setSearch}
@@ -89,6 +141,26 @@ export function VendorCrmDirectory({
           </div>
         }
       />
+      </div>
+
+      {activeFilters.length ? (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Filtered by</span>
+          {activeFilters.map(({ key, label, value }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => { if (key === "search") setSearch(""); apply({ [key]: undefined }); }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-4 focus-visible:ring-slate-200"
+            >
+              <span className="text-slate-500">{label}:</span>
+              <span className="max-w-[12rem] truncate">{value}</span>
+              <span aria-hidden="true" className="text-slate-400">×</span>
+              <span className="sr-only">Remove {label} filter</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {error ? (
         <EmptyState title="Could not load the directory" message={error} />
@@ -99,11 +171,29 @@ export function VendorCrmDirectory({
           <div aria-busy={pending}>
             <DataTable columns={columns} rows={result.rows} emptyTitle="No vendors match" emptyMessage="Adjust filters to see more." />
           </div>
-          <div className="flex items-center justify-between text-sm text-slate-500">
-            <span>Page {result.page} of {totalPages} · {result.total} total</span>
+          {/* Boundary pages previously rendered enabled buttons that silently did
+              nothing. They are now genuinely disabled so the control never lies. */}
+          <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
+            <span aria-live="polite">
+              Page {result.page} of {totalPages} · {result.total} total
+            </span>
             <div className="flex gap-2">
-              <SecondaryButton onClick={() => result.page > 1 && apply({ page: String(result.page - 1) })}>Previous</SecondaryButton>
-              <SecondaryButton onClick={() => result.page < totalPages && apply({ page: String(result.page + 1) })}>Next</SecondaryButton>
+              <button
+                type="button"
+                disabled={result.page <= 1}
+                onClick={() => apply({ page: String(result.page - 1) })}
+                className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-slate-200"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={result.page >= totalPages}
+                onClick={() => apply({ page: String(result.page + 1) })}
+                className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-slate-200"
+              >
+                Next
+              </button>
             </div>
           </div>
         </>

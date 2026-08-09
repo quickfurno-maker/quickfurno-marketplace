@@ -89,6 +89,124 @@ async function bestEffortSelect(table: string, select = "*") {
   return data ?? [];
 }
 
+// Count-only (head) query wrapper. Never throws: returns 0 if the table /
+// filter is unavailable. Counts are accurate and independent of any row
+// limits applied to loaded arrays.
+export async function safeCount(label: string, query: PromiseLike<{ count: number | null; error: any }>): Promise<number> {
+  try {
+    const { count, error } = await query;
+    if (error) {
+      if (!isMissingRelationError(error)) console.warn(`[admin] count ${label} failed`, { message: error.message });
+      return 0;
+    }
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Tiny column-only projection (no row limit) used only for accurate sums /
+// distinct counts (e.g. amount, remaining_credits, vendor_id). Returns [] on
+// error so KPI totals degrade gracefully.
+export async function safeAggregateRows(label: string, query: PromiseLike<{ data: Array<Record<string, any>> | null; error: any }>): Promise<Array<Record<string, any>>> {
+  try {
+    const { data, error } = await query;
+    if (error) {
+      if (!isMissingRelationError(error)) console.warn(`[admin] aggregate ${label} failed`, { message: error.message });
+      return [];
+    }
+    return data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * C-PERF1: the accurate KPI block shared by the legacy snapshot AND the new
+ * dashboard-specific loader. Every number here is a server-side count(head)
+ * or a narrow column-only aggregate — none of them depend on any limited
+ * row array, so they stay truthful at any database size.
+ */
+export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
+  const now = new Date();
+  const month = startOfMonth(now);
+  const todayIso = startOfDay(now).toISOString();
+  const weekIso = startOfWeek(now).toISOString();
+  const monthIso = month.toISOString();
+
+  const ASSIGNED_STATUSES = ["Assigned", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won"];
+  const FOLLOWUP_STATUSES = ["New", "Verified", "Assigned", "Contacted"];
+
+  const [
+    cTotalLeads, cLeadsToday, cLeadsWeek, cLeadsMonth,
+    cAssignedLeads, cConvertedLeads, cDuplicateLeads, cPendingFollowups,
+    cTotalVendors, cApprovedVendors, cActiveVendors, cPendingVendors,
+    cLowBalanceVendors, cExpiredVendors, cPendingPayments, cBadReportsPending, cLeadsDistributed,
+    cActiveCities,
+  ] = await Promise.all([
+    safeCount("leads.total", head(db.from("leads"))),
+    safeCount("leads.today", head(db.from("leads")).gte("created_at", todayIso)),
+    safeCount("leads.week", head(db.from("leads")).gte("created_at", weekIso)),
+    safeCount("leads.month", head(db.from("leads")).gte("created_at", monthIso)),
+    safeCount("leads.assigned", head(db.from("leads")).in("status", ASSIGNED_STATUSES)),
+    safeCount("leads.converted", head(db.from("leads")).in("status", ["Converted", "Won"])),
+    safeCount("leads.duplicate", head(db.from("leads")).or("is_duplicate.eq.true,status.eq.Duplicate")),
+    safeCount("leads.followups", head(db.from("leads")).in("status", FOLLOWUP_STATUSES)),
+    safeCount("vendors.total", head(db.from("vendors"))),
+    safeCount("vendors.approved", head(db.from("vendors")).eq("status", "Approved")),
+    safeCount("vendors.active", head(db.from("vendors")).eq("is_active", true).in("status", ["Approved", "Active"])),
+    safeCount("vendors.pending", head(db.from("vendors")).eq("status", "Pending")),
+    safeCount("vendors.lowbalance", head(db.from("vendors")).lte("remaining_credits", 3)),
+    safeCount("vendors.expired", head(db.from("vendors")).or("status.eq.Suspended,remaining_credits.lte.0")),
+    safeCount("payments.pending", head(db.from("payments")).eq("payment_status", "Pending")),
+    safeCount("badreports.pending", head(db.from("bad_lead_reports")).eq("status", "Pending")),
+    safeCount("assignments.total", head(db.from("lead_assignments"))),
+    safeCount("cities.active", head(db.from("cities")).eq("is_active", true)),
+  ]);
+
+  const [paidPaymentRowsAll, vendorCreditRowsAll, paidPackageVendorRows] = await Promise.all([
+    safeAggregateRows("payments.paid", db.from("payments").select("amount, created_at, package_id, payment_status").eq("payment_status", "Paid")),
+    safeAggregateRows("vendors.credits", db.from("vendors").select("remaining_credits")),
+    safeAggregateRows("vendor_packages.paid", db.from("vendor_packages").select("vendor_id").or("payment_status.eq.Paid,status.eq.Active")),
+  ]);
+
+  const totalRevenue = sumNumbers(paidPaymentRowsAll, (p) => p.amount);
+  const revenueThisMonth = sumNumbers(
+    paidPaymentRowsAll.filter((p) => { const d = safeDate(p.created_at); return d ? d >= month : false; }),
+    (p) => p.amount,
+  );
+  const remainingVendorCredits = sumNumbers(vendorCreditRowsAll, (v) => v.remaining_credits);
+  const paidVendors = new Set(paidPackageVendorRows.map((r) => r.vendor_id).filter(Boolean)).size;
+
+  const stats = {
+    total_leads: cTotalLeads,
+    leads_today: cLeadsToday,
+    leads_this_week: cLeadsWeek,
+    leads_this_month: cLeadsMonth,
+    assigned_leads: cAssignedLeads,
+    duplicate_leads: cDuplicateLeads,
+    total_vendors: cTotalVendors,
+    approved_vendors: cApprovedVendors,
+    active_vendors: cActiveVendors,
+    paid_vendors: paidVendors,
+    pending_vendors: cPendingVendors,
+    expired_vendors: cExpiredVendors,
+    total_revenue: totalRevenue,
+    revenue_this_month: revenueThisMonth,
+    pending_payments: cPendingPayments,
+    low_balance_vendors: cLowBalanceVendors,
+    active_cities: cActiveCities,
+    pending_followups: cPendingFollowups,
+    conversion_rate: cTotalLeads ? Math.round((cConvertedLeads / cTotalLeads) * 100) : 0,
+    lead_distribution_success_rate: cTotalLeads ? Math.round((cAssignedLeads / cTotalLeads) * 100) : 0,
+    leads_distributed: cLeadsDistributed,
+    remaining_vendor_credits: remainingVendorCredits,
+    bad_lead_reports_pending: cBadReportsPending,
+  };
+
+  return { stats, paidPaymentRowsAll };
+}
+
 async function recordAuditLog(action: string, entityType: string, entityId?: string, metadata: Record<string, unknown> = {}) {
   try {
     const { error } = await adminClient().from("audit_logs").insert({
@@ -183,38 +301,6 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       return [];
     }
 
-    // Count-only (head) query wrapper. Never throws: returns 0 if the table /
-    // filter is unavailable. Counts are accurate and independent of the row
-    // limits applied to the snapshot arrays below.
-    async function safeCount(label: string, query: PromiseLike<{ count: number | null; error: any }>): Promise<number> {
-      try {
-        const { count, error } = await query;
-        if (error) {
-          if (!isMissingRelationError(error)) console.warn(`[admin snapshot] count ${label} failed`, { message: error.message });
-          return 0;
-        }
-        return count ?? 0;
-      } catch {
-        return 0;
-      }
-    }
-
-    // Tiny column-only projection (no row limit) used only for accurate sums /
-    // distinct counts (e.g. amount, remaining_credits, vendor_id). Returns [] on
-    // error so KPI totals degrade gracefully.
-    async function safeAggregateRows(label: string, query: PromiseLike<{ data: Array<Record<string, any>> | null; error: any }>): Promise<Array<Record<string, any>>> {
-      try {
-        const { data, error } = await query;
-        if (error) {
-          if (!isMissingRelationError(error)) console.warn(`[admin snapshot] aggregate ${label} failed`, { message: error.message });
-          return [];
-        }
-        return data ?? [];
-      } catch {
-        return [];
-      }
-    }
-
     const [
       leads,
       vendors,
@@ -288,87 +374,14 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     const badReportRows = badReports;
     const profileRows = profiles;
 
-    const now = new Date();
-    const month = startOfMonth(now);
-    const todayIso = startOfDay(now).toISOString();
-    const weekIso = startOfWeek(now).toISOString();
-    const monthIso = month.toISOString();
-
-    const ASSIGNED_STATUSES = ["Assigned", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won"];
-    const FOLLOWUP_STATUSES = ["New", "Verified", "Assigned", "Contacted"];
-
-    // ── Accurate KPI totals via count(head) queries ──────────────────────────
-    // These are counted server-side and are NOT capped by the row limits above.
-    const [
-      cTotalLeads, cLeadsToday, cLeadsWeek, cLeadsMonth,
-      cAssignedLeads, cConvertedLeads, cDuplicateLeads, cPendingFollowups,
-      cTotalVendors, cApprovedVendors, cActiveVendors, cPendingVendors,
-      cLowBalanceVendors, cExpiredVendors, cPendingPayments, cBadReportsPending, cLeadsDistributed,
-    ] = await Promise.all([
-      safeCount("leads.total", head(db.from("leads"))),
-      safeCount("leads.today", head(db.from("leads")).gte("created_at", todayIso)),
-      safeCount("leads.week", head(db.from("leads")).gte("created_at", weekIso)),
-      safeCount("leads.month", head(db.from("leads")).gte("created_at", monthIso)),
-      safeCount("leads.assigned", head(db.from("leads")).in("status", ASSIGNED_STATUSES)),
-      safeCount("leads.converted", head(db.from("leads")).in("status", ["Converted", "Won"])),
-      safeCount("leads.duplicate", head(db.from("leads")).or("is_duplicate.eq.true,status.eq.Duplicate")),
-      safeCount("leads.followups", head(db.from("leads")).in("status", FOLLOWUP_STATUSES)),
-      safeCount("vendors.total", head(db.from("vendors"))),
-      safeCount("vendors.approved", head(db.from("vendors")).eq("status", "Approved")),
-      safeCount("vendors.active", head(db.from("vendors")).eq("is_active", true).in("status", ["Approved", "Active"])),
-      safeCount("vendors.pending", head(db.from("vendors")).eq("status", "Pending")),
-      safeCount("vendors.lowbalance", head(db.from("vendors")).lte("remaining_credits", 3)),
-      safeCount("vendors.expired", head(db.from("vendors")).or("status.eq.Suspended,remaining_credits.lte.0")),
-      safeCount("payments.pending", head(db.from("payments")).eq("payment_status", "Pending")),
-      safeCount("badreports.pending", head(db.from("bad_lead_reports")).eq("status", "Pending")),
-      safeCount("assignments.total", head(db.from("lead_assignments"))),
-    ]);
-
-    // ── Accurate money + credit sums via tiny column-only projections ────────
-    // Only the needed columns are fetched (no select("*"), no row limit), so
-    // totals stay correct while transfer size stays small.
-    const [paidPaymentRowsAll, vendorCreditRowsAll, paidPackageVendorRows] = await Promise.all([
-      safeAggregateRows("payments.paid", db.from("payments").select("amount, created_at").eq("payment_status", "Paid")),
-      safeAggregateRows("vendors.credits", db.from("vendors").select("remaining_credits")),
-      safeAggregateRows("vendor_packages.paid", db.from("vendor_packages").select("vendor_id").or("payment_status.eq.Paid,status.eq.Active")),
-    ]);
-
-    const totalRevenue = sumNumbers(paidPaymentRowsAll, (p) => p.amount);
-    const revenueThisMonth = sumNumbers(
-      paidPaymentRowsAll.filter((p) => { const d = safeDate(p.created_at); return d ? d >= month : false; }),
-      (p) => p.amount,
-    );
-    const remainingVendorCredits = sumNumbers(vendorCreditRowsAll, (v) => v.remaining_credits);
-    const paidVendors = new Set(paidPackageVendorRows.map((r) => r.vendor_id).filter(Boolean)).size;
-
+    // ── Accurate KPI totals (shared collector; count/aggregate queries) ──────
+    const { stats: kpiStats } = await collectAdminKpiStats(db);
     const stats = {
-      total_leads: cTotalLeads,
-      leads_today: cLeadsToday,
-      leads_this_week: cLeadsWeek,
-      leads_this_month: cLeadsMonth,
-      assigned_leads: cAssignedLeads,
-      duplicate_leads: cDuplicateLeads,
-      total_vendors: cTotalVendors,
-      approved_vendors: cApprovedVendors,
-      active_vendors: cActiveVendors,
-      paid_vendors: paidVendors,
-      pending_vendors: cPendingVendors,
-      expired_vendors: cExpiredVendors,
-      total_revenue: totalRevenue,
-      revenue_this_month: revenueThisMonth,
-      pending_payments: cPendingPayments,
-      low_balance_vendors: cLowBalanceVendors,
-      active_cities: cityRows.filter((city: any) => city.is_active).length,
+      ...kpiStats,
       // top_category / top_city are a display hint derived from the latest limited
       // leads (NOT a KPI total) — documented as approximate.
       top_category: topValue(leadRows, (lead: any) => lead.service_required),
       top_city: topValue(leadRows, (lead: any) => lead.city),
-      pending_followups: cPendingFollowups,
-      conversion_rate: cTotalLeads ? Math.round((cConvertedLeads / cTotalLeads) * 100) : 0,
-      lead_distribution_success_rate: cTotalLeads ? Math.round((cAssignedLeads / cTotalLeads) * 100) : 0,
-      leads_distributed: cLeadsDistributed,
-      remaining_vendor_credits: remainingVendorCredits,
-      bad_lead_reports_pending: cBadReportsPending,
     };
 
     const snapshotMeta = {
@@ -376,7 +389,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
       leadsLimit: DEFAULT_ADMIN_ROW_LIMIT,
       vendorsLimit: DEFAULT_ADMIN_ROW_LIMIT,
       logsLimit: LOG_ROW_LIMIT,
-      totals: { total_leads: cTotalLeads, total_vendors: cTotalVendors },
+      totals: { total_leads: stats.total_leads, total_vendors: stats.total_vendors },
       rowsLoaded: {
         leads: leadRows.length,
         vendors: vendorRows.length,

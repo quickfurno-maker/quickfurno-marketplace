@@ -18,7 +18,13 @@ import {
 } from "@/components/admin/AdminPrimitives";
 import { AdminIcon } from "@/components/admin/AdminIcon";
 import type { AdminIconName } from "@/components/admin/adminConfig";
-import { emptySnapshot, type Lead, type Snapshot, type Vendor } from "@/components/admin/adminTypes";
+import {
+  emptyCommandCenterData,
+  type CommandCenterData,
+  type Lead,
+  type LeadSampleRow,
+  type Vendor,
+} from "@/components/admin/adminTypes";
 import { PIPELINE_COLUMNS } from "@/components/admin/crm/lead/leadCrmTypes";
 import { statusBucket } from "@/components/admin/crm/lead/leadCrmUtils";
 import {
@@ -62,24 +68,33 @@ type QueueItem = {
   approximate?: boolean;
 };
 
-export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null; error?: string | null }) {
-  const data = snapshot ?? emptySnapshot();
-  const stats = data.stats ?? {};
-  // The snapshot returns the latest limited rows (see services/adminService.ts);
-  // KPI totals below come from accurate server-side count queries.
-  const meta = data.snapshotMeta;
-  const totalLeads = meta?.totals?.total_leads ?? Number(stats.total_leads ?? data.leads.length);
+/**
+ * C-PERF1: the dashboard consumes the bounded CommandCenterData contract
+ * (accurate count-query KPIs + ≤10-row previews + a thin ≤50-row aggregate
+ * sample) instead of the broad every-table snapshot. The approved dark
+ * command-center composition is unchanged.
+ */
+export function AdminDashboard({ data, error }: { data: CommandCenterData | null; error?: string | null }) {
+  const d = data ?? emptyCommandCenterData();
+  const stats = d.stats ?? {};
+  const totalLeads = d.meta?.totals?.total_leads ?? Number(stats.total_leads ?? 0);
+  const sampleSize = d.leadSample.length;
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
 
-  const hotLeads = data.leads.filter(isHotLead);
-  const unassignedLeads = data.leads.filter(isUnassignedLead);
-  const followUpsDue = Number(stats.pending_followups ?? data.leads.filter((lead) => ["New", "Verified", "Assigned", "Contacted"].includes(lead.status || "")).length);
-  const lowBalanceVendors = data.vendors.filter((vendor) => Number(vendor.remaining_credits ?? 0) <= 3);
-  // `low_balance_vendors` is a server-side count over ALL vendors. The filtered
-  // list above only covers the latest loaded rows and is used for the detail
-  // table, never for the headline number.
-  const lowBalanceTotal = Number(stats.low_balance_vendors ?? lowBalanceVendors.length);
+  // Sample-scoped figures (labelled as such): derived from the thin latest-N
+  // lead sample, exactly like the previous 50-row snapshot, but ~1/10th the
+  // payload. Nothing here pretends to be a global total.
+  const hotLeads = d.leadSample.filter(isHotLead);
+  const unassignedLeads = d.leadSample.filter(isUnassignedLead);
+  const followUpsDue = Number(stats.pending_followups ?? 0);
+  // Vendor lookup pool for drawers (recent + credit-watch, deduped).
+  const vendorPool = useMemo(() => {
+    const map = new Map<string, Vendor>();
+    [...d.vendors, ...d.creditWatch].forEach((vendor) => map.set(vendor.id, vendor));
+    return [...map.values()];
+  }, [d.vendors, d.creditWatch]);
+  const lowBalanceTotal = Number(stats.low_balance_vendors ?? 0);
 
   const queueItems: QueueItem[] = [
     { id: "unassigned-leads", label: "Unassigned leads", value: unassignedLeads.length, severity: unassignedLeads.length > 0 ? "warning" : "clear", icon: "distribution", href: "/admin/leads", approximate: true },
@@ -106,8 +121,8 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
   }> = [
     { label: "Total Leads", value: formatNumber(stats.total_leads), helper: `${formatNumber(stats.leads_this_week)} this week`, icon: "leads", glow: "qfa-glow-violet", bloom: "rgba(124, 77, 255, 0.22)", href: "/admin/leads" },
     { label: "New Leads Today", value: formatNumber(stats.leads_today), helper: `${formatNumber(stats.leads_this_month)} this month`, icon: "leads", glow: "qfa-glow-cyan", bloom: "rgba(0, 216, 255, 0.18)", href: "/admin/leads" },
-    { label: "Hot Leads", value: formatNumber(hotLeads.length), helper: "In latest loaded leads", icon: "notifications", glow: "qfa-glow-red", bloom: "rgba(255, 77, 103, 0.2)", href: "/admin/crm" },
-    { label: "Unassigned Leads", value: formatNumber(unassignedLeads.length), helper: "Needs your attention", icon: "distribution", glow: "qfa-glow-amber", bloom: "rgba(255, 159, 28, 0.2)", href: "/admin/leads" },
+    { label: "Hot Leads", value: formatNumber(hotLeads.length), helper: `In latest ${formatNumber(sampleSize)} leads`, icon: "notifications", glow: "qfa-glow-red", bloom: "rgba(255, 77, 103, 0.2)", href: "/admin/crm" },
+    { label: "Unassigned Leads", value: formatNumber(unassignedLeads.length), helper: `In latest ${formatNumber(sampleSize)} leads`, icon: "distribution", glow: "qfa-glow-amber", bloom: "rgba(255, 159, 28, 0.2)", href: "/admin/leads" },
     { label: "Follow-ups Due", value: formatNumber(followUpsDue), helper: "Sales queue", icon: "crm", glow: "qfa-glow-blue", bloom: "rgba(45, 124, 255, 0.22)", href: "/admin/crm" },
     { label: "Revenue This Month", value: formatINR(stats.revenue_this_month), helper: `${formatINR(stats.total_revenue)} lifetime`, icon: "payments", glow: "qfa-glow-green", bloom: "rgba(19, 216, 154, 0.2)", href: "/admin/payments" },
   ];
@@ -115,12 +130,12 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
   /**
    * Pipeline stages use the SAME deterministic bucketing as the CRM
    * pipeline view (statusBucket), so the dashboard and CRM never disagree.
-   * Counts cover the leads loaded in this snapshot — labelled as such.
+   * Counts cover the thin latest-N sample — labelled as such.
    */
   const pipeline = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const lead of data.leads) {
-      const bucket = statusBucket(lead, lead.lead_assignments?.length ?? 0);
+    for (const lead of d.leadSample) {
+      const bucket = statusBucket(lead as Lead, lead.lead_assignments?.length ?? 0);
       // "duplicate" shares the Spam / Duplicate column, same as the CRM board.
       const key = bucket === "duplicate" ? "spam" : bucket;
       counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -130,17 +145,20 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
       label: column.label,
       count: counts.get(column.bucket) ?? 0,
     })).filter((stage) => stage.bucket !== "spam" || stage.count > 0);
-  }, [data.leads]);
+  }, [d.leadSample]);
 
-  const cityRows = useMemo(() => groupBy(data.leads, (lead) => lead.city || "City not set"), [data.leads]);
+  const cityRows = useMemo(() => groupBy(d.leadSample, (lead) => lead.city || "City not set"), [d.leadSample]);
   const categoryRows = useMemo(
-    () => groupBy(data.leads, (lead) => lead.service_required || lead.category || "Not specified"),
-    [data.leads],
+    () => groupBy(d.leadSample, (lead) => lead.service_required || lead.category || "Not specified"),
+    [d.leadSample],
   );
-  const revenueRows = useMemo(() => revenueByPackage(data.payments, data.packages), [data.payments, data.packages]);
-  const recentActivity = useMemo(() => buildRecentActivity(data), [data]);
-  const recentLeads = data.leads.slice(0, 10);
-  const vendorHealthRows = (lowBalanceVendors.length ? lowBalanceVendors : data.vendors).slice(0, 5);
+  const sourceRows = useMemo(() => groupBy(d.leadSample, (lead) => lead.source || "Website"), [d.leadSample]);
+  // Revenue-by-package over the FULL paid-payments ledger (column-only
+  // projection) — no longer a latest-50 subset.
+  const revenueRows = useMemo(() => revenueByPackage(d.paidPayments, d.packages), [d.paidPayments, d.packages]);
+  const recentActivity = useMemo(() => buildRecentActivity(d), [d]);
+  const recentLeads = d.recentLeads;
+  const vendorHealthRows = d.creditWatch;
 
   return (
     <div className="space-y-4">
@@ -150,7 +168,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
           <StatusBadge value="Superadmin" tone="slate" />
           <StatusBadge value={`${formatNumber(totalLeads)} leads`} tone="emerald" />
           <StatusBadge value={`${formatNumber(stats.active_vendors)} active vendors`} tone="blue" />
-          <StatusBadge value={`Updated ${formatDate(data.generatedAt)}`} tone="slate" />
+          <StatusBadge value={`Updated ${formatDate(d.generatedAt)}`} tone="slate" />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <LinkButton href="/admin/leads" icon="leads">Review leads</LinkButton>
@@ -161,16 +179,6 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
 
       {error ? (
         <NoteBar tone="warning">Admin data loaded with fallback UI because Supabase returned: {error}</NoteBar>
-      ) : null}
-
-      {data.warnings?.length ? (
-        <SectionCard title="Supabase fallback notices">
-          <ul className="list-disc space-y-1 pl-5 text-[13px] text-slate-600">
-            {data.warnings.slice(0, 4).map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </SectionCard>
       ) : null}
 
       {/* KPI rail — six primary metrics across desktop, each a real route. */}
@@ -196,18 +204,15 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         ))}
       </section>
 
-      {meta ? (
-        <p className="text-[11px] text-slate-500">
-          Showing the latest {formatNumber(meta.rowsLoaded?.leads ?? data.leads.length)} of {formatNumber(totalLeads)} leads
-          and latest {formatNumber(meta.rowsLoaded?.vendors ?? data.vendors.length)} of {formatNumber(meta.totals?.total_vendors ?? data.vendors.length)} vendors.
-          KPI totals are counted live and stay accurate.
-        </p>
-      ) : null}
+      <p className="text-[11px] text-slate-500">
+        KPI totals are live server-side counts. Sample-scoped figures (hot, unassigned, pipeline, distributions) cover the
+        latest {formatNumber(sampleSize)} leads and are labelled as such.
+      </p>
 
       {/* Pipeline overview — same buckets as the CRM board, chevron rail. */}
       <SectionCard
         title="Lead Pipeline Overview"
-        description={`Across the latest ${formatNumber(data.leads.length)} leads loaded in this snapshot.`}
+        description={`Across the latest ${formatNumber(sampleSize)} leads.`}
         action={
           <Link href="/admin/crm" className="qfa-focus rounded text-[13px] font-semibold text-emerald-700 hover:underline">
             View full pipeline
@@ -216,7 +221,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
       >
         <div className="qfa-pipe" role="list" aria-label="Lead pipeline stages">
           {pipeline.map((stage) => {
-            const percent = data.leads.length ? Math.round((stage.count / data.leads.length) * 100) : 0;
+            const percent = sampleSize ? Math.round((stage.count / sampleSize) * 100) : 0;
             return (
               <div key={stage.bucket} role="listitem" className={`qfa-pipe-seg qfa-pipe--${stage.bucket}`}>
                 <p className="qfa-pipe-label truncate text-[11px] font-bold uppercase tracking-wide">{stage.label}</p>
@@ -234,7 +239,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
       <section className="grid gap-4 xl:grid-cols-[1.55fr_0.85fr]">
         <SectionCard
           title="Recent Leads"
-          description="Latest enquiries in this snapshot. Open any row for full detail."
+          description={`Latest ${formatNumber(recentLeads.length)} enquiries. Open any row for full detail.`}
           action={
             <Link href="/admin/leads" className="qfa-focus rounded text-[13px] font-semibold text-emerald-700 hover:underline">
               View all
@@ -309,7 +314,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700 group-hover:text-slate-950">
                   {item.label}
-                  {item.approximate ? <span className="sr-only"> (in loaded leads)</span> : null}
+                  {item.approximate ? <span className="sr-only"> (in latest {sampleSize} leads)</span> : null}
                 </span>
                 <span className={`qfa-count qfa-count--${item.severity}`}>
                   {formatNumber(item.value)}
@@ -318,18 +323,19 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
             ))}
           </div>
           <p className="mt-3 border-t border-[color:var(--qfa-line-soft)] pt-2.5 text-[11px] leading-4 text-slate-500">
-            Unassigned leads are counted over the loaded snapshot; the other counts are live server-side totals.
+            Unassigned leads are counted over the latest {formatNumber(sampleSize)}-lead sample; the other counts are live
+            server-side totals.
           </p>
         </SectionCard>
       </section>
 
-      {/* Analytics band — four compact panels over real snapshot data. */}
+      {/* Analytics band — four compact panels over the labelled sample. */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DonutPanel title="Leads by City" rows={cityRows} total={data.leads.length} />
+        <DonutPanel title="Leads by City" rows={cityRows} total={sampleSize} />
         <ChartCard title="Leads by Category" rows={categoryRows} />
-        <ChartCard title="Lead Sources" rows={groupBy(data.leads, (lead) => lead.source || "Website")} />
+        <ChartCard title="Lead Sources" rows={sourceRows} />
 
-        <SectionCard title="Vendor Credit Balance" description="Lead credits remaining against purchased.">
+        <SectionCard title="Vendor Credit Balance" description="Lowest credit balances across all vendors.">
           <div className="space-y-2">
             {vendorHealthRows.length ? (
               vendorHealthRows.map((vendor) => {
@@ -373,7 +379,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
 
       {/* Secondary band: revenue, activity, quick operations. */}
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Revenue Snapshot" description="Paid collections by package, using current payment data.">
+        <SectionCard title="Revenue Snapshot" description="Paid collections by package, over the full payment ledger.">
           <div className="mb-3 grid grid-cols-2 gap-2">
             <MetricPill label="Month" value={formatINR(stats.revenue_this_month)} />
             <MetricPill label="Lifetime" value={formatINR(stats.total_revenue)} />
@@ -421,7 +427,7 @@ export function AdminDashboard({ snapshot, error }: { snapshot: Snapshot | null;
         </SectionCard>
       </section>
 
-      {selectedLead ? <LeadDrawer lead={selectedLead} vendors={data.vendors} onClose={() => setSelectedLead(null)} /> : null}
+      {selectedLead ? <LeadDrawer lead={selectedLead} vendors={vendorPool} onClose={() => setSelectedLead(null)} /> : null}
       {selectedVendor ? <VendorDrawer vendor={selectedVendor} onClose={() => setSelectedVendor(null)} /> : null}
     </div>
   );
@@ -477,7 +483,7 @@ function DonutPanel({ title, rows, total }: { title: string; rows: Array<{ label
                 <span className="block text-lg font-semibold leading-none tracking-tight text-slate-950 tabular-nums">
                   {formatNumber(total)}
                 </span>
-                <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wide text-slate-500">Loaded</span>
+                <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wide text-slate-500">Latest</span>
               </span>
             </div>
           </div>
@@ -711,21 +717,21 @@ function DrawerBlock({ title, children }: { title: string; children: React.React
   );
 }
 
-function isHotLead(lead: Lead) {
+function isHotLead(lead: LeadSampleRow) {
   const priority = String(lead.lead_priority ?? "").toLowerCase();
   const status = String(lead.status ?? "").toLowerCase();
   const score = Number(lead.lead_quality_score ?? 0);
   return priority.includes("hot") || priority.includes("high") || score >= 70 || status.includes("interested") || status.includes("quotation");
 }
 
-function isUnassignedLead(lead: Lead) {
+function isUnassignedLead(lead: LeadSampleRow) {
   const status = String(lead.status ?? "New").toLowerCase();
   return !closedLeadStatuses.has(status) && (lead.lead_assignments?.length ?? 0) === 0;
 }
 
-function buildRecentActivity(data: Snapshot) {
+function buildRecentActivity(d: CommandCenterData) {
   return [
-    ...data.leads.slice(0, 5).map((lead) => ({
+    ...d.recentLeads.slice(0, 5).map((lead) => ({
       id: lead.id,
       type: "Lead",
       tone: "blue" as const,
@@ -733,7 +739,7 @@ function buildRecentActivity(data: Snapshot) {
       detail: `${lead.service_required || lead.category || "Requirement"} - ${lead.city || "City not set"}`,
       date: lead.created_at,
     })),
-    ...data.vendors.slice(0, 4).map((vendor) => ({
+    ...d.vendors.slice(0, 4).map((vendor) => ({
       id: vendor.id,
       type: "Vendor",
       tone: "emerald" as const,
@@ -741,12 +747,12 @@ function buildRecentActivity(data: Snapshot) {
       detail: `${vendor.city || "City not set"} - ${vendor.status || "Pending"}`,
       date: vendor.created_at,
     })),
-    ...data.payments.slice(0, 4).map((payment) => ({
+    ...d.payments.slice(0, 4).map((payment) => ({
       id: payment.id,
       type: "Payment",
       tone: "amber" as const,
       title: formatINR(payment.amount),
-      detail: `${vendorName(data.vendors, payment.vendor_id)} - ${packageName(data.packages, payment.package_id)}`,
+      detail: `${vendorName(d.vendors, payment.vendor_id)} - ${packageName(d.packages, payment.package_id)}`,
       date: payment.created_at,
     })),
   ]

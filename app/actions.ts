@@ -17,6 +17,7 @@ import * as vendorProfileChanges from "../services/vendorProfileChangeService";
 import * as vendorNotifications from "../services/vendorNotificationService";
 import * as vendorSupport from "../services/vendorSupportService";
 import * as admin from "../services/adminService";
+import * as adminDirectory from "../services/adminDirectoryService";
 import * as audit from "../services/adminAuditService";
 import * as manualAssign from "../services/manualLeadAssignmentService";
 import * as requirementGroups from "../services/clientRequirementGroupService";
@@ -558,6 +559,13 @@ async function asAdmin<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
 
 export const adminStats           = async () => asAdmin(() => admin.getAdminDashboardStats());
 export const adminSnapshot        = async () => asAdmin(() => admin.getSuperadminSnapshot());
+// C-PERF1 — bounded, server-paged admin reads (read-only; the locked
+// pagination policy lives in lib/adminPaging.ts + adminDirectoryService.ts).
+export const adminCommandCenterData = async () => asAdmin(() => adminDirectory.getAdminCommandCenterData());
+export const adminLeadsDirectory  = async (query: adminDirectory.AdminLeadsQuery) => asAdmin(() => adminDirectory.getAdminLeadsDirectory(query));
+export const adminVendorsDirectory = async (query: adminDirectory.AdminVendorsQuery) => asAdmin(() => adminDirectory.getAdminVendorsDirectory(query));
+export const adminCrmInboxPage    = async (query: adminDirectory.CrmInboxQuery) => asAdmin(() => adminDirectory.getCrmInboxPage(query));
+export const adminLeadContext     = async (leadId: string) => asAdmin(() => adminDirectory.getAdminLeadContext(leadId));
 // Safe AOS audit logging. Writes to aos_agent_logs if present; otherwise returns
 // a safe fallback. No AI, WhatsApp, credit, or distribution side effects.
 export const adminLogAosDecision  = async (input: AosDecisionLogInput) => asAdmin(() => aos.logAosAgentDecision(input));

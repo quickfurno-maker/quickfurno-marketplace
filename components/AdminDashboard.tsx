@@ -178,11 +178,13 @@ export function AdminDashboard({ data, error }: { data: CommandCenterData | null
       </div>
 
       {error ? (
-        <NoteBar tone="warning">Admin data loaded with fallback UI because Supabase returned: {error}</NoteBar>
+        <div role="alert">
+          <NoteBar tone="warning">Some admin metrics could not be loaded. Refresh the page or contact engineering if this continues.</NoteBar>
+        </div>
       ) : null}
 
       {/* KPI rail — six primary metrics across desktop, each a real route. */}
-      <section className="grid grid-cols-2 gap-2.5 md:grid-cols-3 2xl:grid-cols-6" aria-label="Marketplace key figures">
+      <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6" aria-label="Marketplace key figures">
         {kpis.map((kpi, index) => (
           <Link
             key={kpi.label}
@@ -194,12 +196,12 @@ export function AdminDashboard({ data, error }: { data: CommandCenterData | null
               <span className={`qfa-glow-chip ${kpi.glow} shrink-0`} aria-hidden="true">
                 <AdminIcon name={kpi.icon} className="h-4 w-4" />
               </span>
-              <span className="min-w-0 truncate text-xs font-semibold text-slate-600">{kpi.label}</span>
+              <span className="min-w-0 break-words text-xs font-semibold text-slate-600">{kpi.label}</span>
             </div>
-            <div className="mt-2.5 truncate text-[26px] font-semibold leading-none tracking-tight text-slate-950 tabular-nums">
+            <div className="mt-2.5 break-words text-[26px] font-semibold leading-none tracking-tight text-slate-950 tabular-nums">
               {kpi.value}
             </div>
-            <p className="mt-2 truncate text-[11px] text-slate-500">{kpi.helper}</p>
+            <p className="mt-2 break-words text-[11px] text-slate-500">{kpi.helper}</p>
           </Link>
         ))}
       </section>
@@ -477,7 +479,7 @@ function DonutPanel({ title, rows, total }: { title: string; rows: Array<{ label
       {segments.length ? (
         <div className="flex items-center gap-4">
           <div className="relative shrink-0" aria-hidden="true">
-            <div className="qfa-donut" style={{ background: `conic-gradient(${stops.join(", ")})` }} />
+            <div aria-hidden="true" className="qfa-donut" style={{ background: `conic-gradient(${stops.join(", ")})` }} />
             <div className="absolute inset-0 grid place-items-center">
               <span className="text-center">
                 <span className="block text-lg font-semibold leading-none tracking-tight text-slate-950 tabular-nums">

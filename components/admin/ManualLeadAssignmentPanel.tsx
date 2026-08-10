@@ -7,12 +7,13 @@
 // Assignment (top-up / fallback / recovery, up to 9) runs server-side through
 // the existing safe RPC; this UI only selects vendors.
 // ============================================================================
-import { type ReactNode, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adminAssignLeadManually, adminPreviewManualLeadAssignment } from "@/app/actions";
 import { DataTable, SectionCard, SecondaryButton, PrimaryButton, StatCard, StatusBadge, Toolbar, SelectFilter } from "./AdminPrimitives";
 import type { Lead, ManualCandidateVendorView, ManualPreviewView, Snapshot } from "./adminTypes";
 import { formatNumber, includesQuery, maskPhone, shortId } from "./adminUtils";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 const PRIMARY_LIMIT = 3;
 const TOTAL_LIMIT = 9;
@@ -114,7 +115,9 @@ export function ManualLeadAssignmentPanel({ data, notify }: { data: Snapshot; no
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="All Leads" value={formatNumber(data.leads.length)} helper="Complete lead database" icon="leads" />
+        {/* C-PERF2: this panel receives a bounded working set, not the whole
+            database — the label says exactly what is counted. */}
+        <StatCard label="Working Set" value={formatNumber(data.leads.length)} helper="Latest open unassigned leads" icon="leads" />
         <StatCard label="Manual Top-up Needed" value={formatNumber(topUpNeeded)} helper="Below 3 primary vendors" icon="distribution" tone="amber" />
         <StatCard label="Recovery Available" value={formatNumber(recoveryNeeded)} helper="3/3 primary, room to 9" icon="vendors" tone="indigo" />
         <StatCard label="In View" value={formatNumber(leads.length)} helper="Matching current filter" icon="reports" tone="slate" />
@@ -248,7 +251,7 @@ function ManualAssignmentModal({ lead, notify, onClose }: { lead: Lead; notify: 
   return (
     <ModalShell title="Assign Vendors Manually" subtitle={lead.name || "Lead"} onClose={onClose}>
       <div className="space-y-4">
-        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+        <article className="qfa-quiet p-3 text-[13px]">
           <div className="grid gap-1.5 sm:grid-cols-2">
             <Detail label="Lead ID" value={shortId(lead.id)} />
             <Detail label="Phone" value={maskPhone(lead.phone)} />
@@ -415,15 +418,20 @@ function Strong({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 function ModalShell({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  useAdminModalFocus({ open: true, containerRef: dialogRef, onClose });
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 py-8 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitle ? descriptionId : undefined} tabIndex={-1} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 outline-none shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+            <h2 id={titleId} className="text-lg font-semibold text-slate-950">{title}</h2>
+            {subtitle ? <p id={descriptionId} className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Close</button>
+          <button type="button" onClick={onClose} className="qfa-focus min-h-10 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 sm:min-h-8">Close</button>
         </div>
         <div className="mt-5">{children}</div>
       </div>

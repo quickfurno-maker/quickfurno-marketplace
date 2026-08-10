@@ -17,6 +17,8 @@ import * as vendorProfileChanges from "../services/vendorProfileChangeService";
 import * as vendorNotifications from "../services/vendorNotificationService";
 import * as vendorSupport from "../services/vendorSupportService";
 import * as admin from "../services/adminService";
+import * as adminDirectory from "../services/adminDirectoryService";
+import * as adminSections from "../services/adminSectionService";
 import * as audit from "../services/adminAuditService";
 import * as manualAssign from "../services/manualLeadAssignmentService";
 import * as requirementGroups from "../services/clientRequirementGroupService";
@@ -558,6 +560,29 @@ async function asAdmin<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
 
 export const adminStats           = async () => asAdmin(() => admin.getAdminDashboardStats());
 export const adminSnapshot        = async () => asAdmin(() => admin.getSuperadminSnapshot());
+// C-PERF1 — bounded, server-paged admin reads (read-only; the locked
+// pagination policy lives in lib/adminPaging.ts + adminDirectoryService.ts).
+export const adminCommandCenterData = async () => asAdmin(() => adminDirectory.getAdminCommandCenterData());
+export const adminLeadsDirectory  = async (query: adminDirectory.AdminLeadsQuery) => asAdmin(() => adminDirectory.getAdminLeadsDirectory(query));
+export const adminVendorsDirectory = async (query: adminDirectory.AdminVendorsQuery) => asAdmin(() => adminDirectory.getAdminVendorsDirectory(query));
+export const adminCrmInboxPage    = async (query: adminDirectory.CrmInboxQuery) => asAdmin(() => adminDirectory.getCrmInboxPage(query));
+export const adminLeadContext     = async (leadId: string) => asAdmin(() => adminDirectory.getAdminLeadContext(leadId));
+// C-PERF2 — section-scoped loaders (read-only; see adminSectionService.ts).
+export const adminPaymentsPage    = async (query: adminSections.AdminPaymentsQuery) => asAdmin(() => adminSections.getAdminPaymentsPage(query));
+export const adminSubscriptionsPage = async (query: adminSections.AdminSubscriptionsQuery) => asAdmin(() => adminSections.getAdminSubscriptionsPage(query));
+export const adminPackagesPage    = async () => asAdmin(() => adminSections.getAdminPackagesPage());
+export const adminCategoriesPage  = async () => asAdmin(() => adminSections.getAdminCategoriesPage());
+export const adminCitiesPage      = async () => asAdmin(() => adminSections.getAdminCitiesPage());
+export const adminSettingsPage    = async () => asAdmin(() => adminSections.getAdminSettingsPage());
+export const adminNotificationsPage = async () => asAdmin(() => adminSections.getAdminNotificationsPage());
+export const adminUsersPage       = async (query: { page?: unknown }) => asAdmin(() => adminSections.getAdminUsersPage(query));
+export const adminAuditLogsPage   = async (query: adminSections.AdminAuditLogsQuery) => asAdmin(() => adminSections.getAdminAuditLogsPage(query));
+export const adminReportsPage     = async () => asAdmin(() => adminSections.getAdminReportsPage());
+export const adminAnalyticsPage   = async () => asAdmin(() => adminSections.getAdminAnalyticsPage());
+export const adminCrmBase         = async () => asAdmin(() => adminSections.getAdminCrmBase());
+export const adminCrmTabData      = async (tab: adminSections.CrmTabKey, page?: unknown) => asAdmin(() => adminSections.getCrmTabData(tab, page));
+export const adminDistributionTab = async (tab: adminSections.DistributionTabKey, page?: unknown) => asAdmin(() => adminSections.getLeadDistributionTab(tab, page));
+export const adminVendorsForEligibility = async (city: string) => asAdmin(() => adminSections.getVendorsForEligibility(city));
 // Safe AOS audit logging. Writes to aos_agent_logs if present; otherwise returns
 // a safe fallback. No AI, WhatsApp, credit, or distribution side effects.
 export const adminLogAosDecision  = async (input: AosDecisionLogInput) => asAdmin(() => aos.logAosAgentDecision(input));

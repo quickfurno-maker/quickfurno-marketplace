@@ -14,10 +14,11 @@
 //   - Public / vendor / client pages are read-only consumers (this manager is
 //     the ONLY place categories are created/edited).
 // ============================================================================
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActionMenu, DataTable, EmptyState, PrimaryButton, SecondaryButton, SectionCard, StatCard, StatusBadge } from "./AdminPrimitives";
 import type { Category } from "./adminTypes";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 type Notify = (message: string, tone?: "success" | "error" | "info") => void;
 
@@ -197,25 +198,32 @@ function CategoryDraftModal({
   const isSub = draft.mode === "add-subcategory" || (draft.mode === "edit" && Boolean(draft.target?.parent_id));
   const [name, setName] = useState(draft.mode === "edit" ? draft.target?.name ?? "" : "");
   const [parentId, setParentId] = useState<string>(draft.target?.parent_id ?? (draft.mode === "add-subcategory" && draft.target ? draft.target.id : ""));
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   const title = draft.mode === "edit" ? "Edit category" : draft.mode === "add-subcategory" ? "Add subcategory" : "Add category";
   const showParent = draft.mode === "add-subcategory" || (draft.mode === "edit");
+  useAdminModalFocus({ open: true, containerRef: dialogRef, initialFocusRef: nameRef, onClose, closeOnEscape: !busy });
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 outline-none shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Close</button>
+          <h2 id={titleId} className="text-lg font-semibold text-slate-950">{title}</h2>
+          <button type="button" disabled={busy} onClick={onClose} className="qfa-focus min-h-10 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 sm:min-h-8">Close</button>
         </div>
         <div className="mt-5 space-y-4">
           <label className="block">
             <span className="text-xs font-semibold uppercase text-slate-500">Name</span>
             <input
+              ref={nameRef}
+              required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={isSub ? "e.g. Modular Factory" : "e.g. Interior"}
-              className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+              className="mt-1 qfa-control w-full px-2.5 outline-none"
             />
           </label>
           {showParent ? (
@@ -224,7 +232,7 @@ function CategoryDraftModal({
               <select
                 value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
-                className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                className="mt-1 qfa-control w-full px-2.5 font-medium outline-none"
               >
                 <option value="">{draft.mode === "edit" ? "None (top-level category)" : "Select a parent…"}</option>
                 {parents.map((p) => (
@@ -233,10 +241,10 @@ function CategoryDraftModal({
               </select>
             </label>
           ) : null}
-          <p className="text-xs text-slate-500">No duplicate names. Categories are never hard-deleted — use Deactivate to hide one safely.</p>
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={() => { if (name.trim()) onSubmit(name.trim(), parentId || null); }}>{busy ? "Saving…" : "Save"}</PrimaryButton>
+          <p id={descriptionId} className="text-xs text-slate-500">No duplicate names. Categories are never hard-deleted — use Deactivate to hide one safely.</p>
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <SecondaryButton disabled={busy} onClick={onClose}>Cancel</SecondaryButton>
+            <PrimaryButton disabled={!name.trim() || busy} onClick={() => { if (name.trim()) onSubmit(name.trim(), parentId || null); }}>{busy ? "Saving…" : "Save"}</PrimaryButton>
           </div>
         </div>
       </div>

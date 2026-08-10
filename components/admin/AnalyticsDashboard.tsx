@@ -1,24 +1,24 @@
 "use client";
 
 // ============================================================================
-// QuickFurno Analytics Dashboard (CRM + Analytics foundation)
-// Display-only superadmin analytics. Uses safe adapter data, with placeholder
-// spend, CPL, conversion, revenue, and AOS metrics until real integrations are
-// explicitly activated later.
+// QuickFurno Analytics Dashboard — REAL DATA ONLY (C-PERF1 P0-H).
+//
+// Every figure rendered here is computed from live marketplace data: the
+// snapshot's count-query stats or the loaded lead/vendor rows (scoped and
+// labelled). The previous version rendered placeholder ad-spend / CPL /
+// conversion / revenue / AOS columns and whole placeholder tabs — those are
+// REMOVED, not restyled. Unconnected integrations are stated as unavailable
+// in plain text; no synthetic values are shown.
 // ============================================================================
 
 import { useMemo, useState } from "react";
-import { DataTable, StatCard, StatusBadge, Tabs } from "./AdminPrimitives";
+import { DataTable, NoteBar, StatCard, StatusBadge, TabPanel, Tabs } from "./AdminPrimitives";
 import type { Snapshot } from "./adminTypes";
-import { formatNumber } from "./adminUtils";
+import { formatINR, formatNumber } from "./adminUtils";
 import { buildAnalyticsModel } from "@/lib/analytics/analyticsAdapter";
 import type {
-  AgentAnalyticsRow,
-  AnalyticsMetric,
   AreaMetric,
-  CampaignMetric,
   FunnelMetric,
-  RevenueMetric,
   ServiceMetric,
   SourceMetric,
   VendorMetric,
@@ -29,58 +29,60 @@ type AnalyticsDashboardProps = {
 };
 
 const tabs = [
-  "Overview Analytics",
-  "Lead Source Analytics",
-  "Campaign Analytics",
-  "CRM Funnel Analytics",
-  "Service Analytics",
-  "City/Area Analytics",
-  "Vendor Analytics",
-  "Revenue Analytics",
-  "AOS Agent Analytics",
+  "Overview",
+  "Lead Sources",
+  "CRM Funnel",
+  "Services",
+  "Cities & Areas",
+  "Vendors",
+  "Revenue",
 ];
 
 export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
   const [active, setActive] = useState(tabs[0]);
   const model = useMemo(() => buildAnalyticsModel(data), [data]);
+  const stats = data.stats ?? {};
+  const sampleSize = data.leads?.length ?? 0;
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm leading-6 text-emerald-900">
-        Analytics foundation is display-only. Ad spend, payment revenue, AOS events, CPL, and
-        conversion metrics are placeholders. No automation, WhatsApp, n8n, credit deduction, or
-        lead assignment is triggered here.
-      </section>
+      <NoteBar>
+        Analytics are computed from live marketplace data. KPI totals are server-side counts; per-source, funnel,
+        service, area and vendor breakdowns cover the latest {formatNumber(sampleSize)} loaded leads and are labelled
+        as such. Ad-spend, CPL and campaign metrics are not connected and are therefore not shown.
+      </NoteBar>
 
-      <Tabs tabs={tabs} active={active} onChange={setActive} />
+      <Tabs id="analytics-tabs" tabs={tabs} active={active} onChange={setActive} />
 
-      {active === "Overview Analytics" ? <Overview cards={model.cards} /> : null}
-      {active === "Lead Source Analytics" ? <LeadSourceAnalytics rows={model.sources} /> : null}
-      {active === "Campaign Analytics" ? <CampaignAnalytics rows={model.campaigns} /> : null}
-      {active === "CRM Funnel Analytics" ? <FunnelAnalytics rows={model.funnel} /> : null}
-      {active === "Service Analytics" ? <ServiceAnalytics rows={model.services} /> : null}
-      {active === "City/Area Analytics" ? <AreaAnalytics rows={model.areas} /> : null}
-      {active === "Vendor Analytics" ? <VendorAnalytics rows={model.vendors} /> : null}
-      {active === "Revenue Analytics" ? <RevenueAnalytics rows={model.revenue} /> : null}
-      {active === "AOS Agent Analytics" ? <AgentAnalytics rows={model.agents} /> : null}
+      <TabPanel id="analytics-tabs" active={active}>
+        {active === "Overview" ? <Overview stats={stats} /> : null}
+        {active === "Lead Sources" ? <LeadSourceAnalytics rows={model.sources} /> : null}
+        {active === "CRM Funnel" ? <FunnelAnalytics rows={model.funnel} /> : null}
+        {active === "Services" ? <ServiceAnalytics rows={model.services} /> : null}
+        {active === "Cities & Areas" ? <AreaAnalytics rows={model.areas} /> : null}
+        {active === "Vendors" ? <VendorAnalytics rows={model.vendors} /> : null}
+        {active === "Revenue" ? <RevenueAnalytics stats={stats} /> : null}
+      </TabPanel>
     </div>
   );
 }
 
-function Overview({ cards }: { cards: AnalyticsMetric[] }) {
-  const toneFor = (kind?: string): "emerald" | "indigo" | "amber" | "rose" | "slate" =>
-    kind === "placeholder" ? "slate" : "indigo";
+/** All Overview cards come from the accurate count/aggregate stats block. */
+function Overview({ stats }: { stats: Record<string, number | string> }) {
+  const cards: Array<{ key: string; label: string; value: React.ReactNode; helper: string; tone: "emerald" | "indigo" | "amber" | "rose" | "slate" }> = [
+    { key: "total_leads", label: "Total Leads", value: formatNumber(stats.total_leads), helper: "Live count", tone: "indigo" },
+    { key: "leads_today", label: "Leads Today", value: formatNumber(stats.leads_today), helper: "Created today (live count)", tone: "emerald" },
+    { key: "assigned_leads", label: "Assigned Leads", value: formatNumber(stats.assigned_leads), helper: "Assigned or later stage (live count)", tone: "indigo" },
+    { key: "conversion_rate", label: "Conversion Rate", value: `${Number(stats.conversion_rate ?? 0)}%`, helper: "Converted / total (live counts)", tone: "emerald" },
+    { key: "active_vendors", label: "Active Vendors", value: formatNumber(stats.active_vendors), helper: "Approved and active (live count)", tone: "indigo" },
+    { key: "paid_vendors", label: "Paid Vendors", value: formatNumber(stats.paid_vendors), helper: "With a paid/active package", tone: "emerald" },
+    { key: "followups_due", label: "Follow-ups Due", value: formatNumber(stats.pending_followups), helper: "Open working statuses (live count)", tone: "amber" },
+    { key: "revenue_month", label: "Revenue This Month", value: formatINR(stats.revenue_this_month), helper: `${formatINR(stats.total_revenue)} lifetime`, tone: "emerald" },
+  ];
   return (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <StatCard
-          key={card.key}
-          label={card.label}
-          value={card.value}
-          helper={card.helper ?? (card.kind === "placeholder" ? "Placeholder" : "Safe read")}
-          icon="reports"
-          tone={toneFor(card.kind)}
-        />
+        <StatCard key={card.key} label={card.label} value={card.value} helper={card.helper} icon="reports" tone={card.tone} />
       ))}
     </section>
   );
@@ -91,7 +93,7 @@ function LeadSourceAnalytics({ rows }: { rows: SourceMetric[] }) {
     <DataTable
       rows={rows}
       emptyTitle="No source analytics"
-      emptyMessage="Lead source placeholder categories are ready."
+      emptyMessage="Lead sources will appear as leads arrive."
       columns={[
         { header: "Source", cell: (row) => row.source },
         { header: "Leads", cell: (row) => formatNumber(row.leads) },
@@ -99,26 +101,6 @@ function LeadSourceAnalytics({ rows }: { rows: SourceMetric[] }) {
         { header: "Assigned", cell: (row) => formatNumber(row.assigned_leads) },
         { header: "Won", cell: (row) => formatNumber(row.won_leads) },
         { header: "Lost", cell: (row) => formatNumber(row.lost_leads) },
-        { header: "Cost placeholder", cell: (row) => row.cost_placeholder ?? "INR --" },
-        { header: "CPL placeholder", cell: (row) => row.cpl_placeholder ?? "INR --" },
-      ]}
-    />
-  );
-}
-
-function CampaignAnalytics({ rows }: { rows: CampaignMetric[] }) {
-  return (
-    <DataTable
-      rows={rows}
-      emptyTitle="No campaign data"
-      emptyMessage="Campaign placeholders will be replaced only after ad integrations are activated."
-      columns={[
-        { header: "Campaign name", cell: (row) => row.campaign },
-        { header: "Source", cell: (row) => row.source },
-        { header: "Spend placeholder", cell: (row) => row.spend_placeholder ?? "INR --" },
-        { header: "Leads", cell: (row) => formatNumber(row.leads) },
-        { header: "CPL placeholder", cell: (row) => row.cpl_placeholder ?? "INR --" },
-        { header: "Conversion placeholder", cell: (row) => row.conversion_placeholder ?? "--" },
       ]}
     />
   );
@@ -127,8 +109,8 @@ function CampaignAnalytics({ rows }: { rows: CampaignMetric[] }) {
 function FunnelAnalytics({ rows }: { rows: FunnelMetric[] }) {
   const max = Math.max(1, ...rows.map((row) => row.count));
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-base font-semibold text-slate-950">CRM Funnel Analytics</h3>
+    <section className="qfa-panel p-4">
+      <h3 className="text-base font-semibold text-slate-950">CRM Funnel</h3>
       <div className="mt-5 space-y-4">
         {rows.map((row) => (
           <div key={row.key} className="space-y-1.5">
@@ -151,15 +133,13 @@ function ServiceAnalytics({ rows }: { rows: ServiceMetric[] }) {
     <DataTable
       rows={rows}
       emptyTitle="No service analytics"
-      emptyMessage="Requested service categories are ready as placeholders."
+      emptyMessage="Service categories will appear as leads arrive."
       columns={[
         { header: "Service category", cell: (row) => row.service },
         { header: "Leads", cell: (row) => formatNumber(row.leads) },
         { header: "Hot leads", cell: (row) => formatNumber(row.hot_leads) },
         { header: "Assigned", cell: (row) => formatNumber(row.assigned) },
         { header: "Won", cell: (row) => formatNumber(row.won) },
-        { header: "Revenue placeholder", cell: (row) => row.revenue_estimate ?? "INR --" },
-        { header: "Supply placeholder", cell: (row) => row.vendor_supply_gap_placeholder ?? "--" },
       ]}
     />
   );
@@ -170,13 +150,12 @@ function AreaAnalytics({ rows }: { rows: AreaMetric[] }) {
     <DataTable
       rows={rows}
       emptyTitle="No city/area analytics"
-      emptyMessage="City and area placeholders are ready."
+      emptyMessage="Cities and areas will appear as leads arrive."
       columns={[
         { header: "City", cell: (row) => row.city },
         { header: "Area/locality", cell: (row) => row.locality },
         { header: "Lead count", cell: (row) => formatNumber(row.lead_count ?? row.leads) },
         { header: "Vendor count", cell: (row) => formatNumber(row.vendor_count) },
-        { header: "Demand/supply placeholder", cell: (row) => <StatusBadge value={row.demand_supply_gap ?? "Placeholder"} /> },
       ]}
     />
   );
@@ -187,50 +166,31 @@ function VendorAnalytics({ rows }: { rows: VendorMetric[] }) {
     <DataTable
       rows={rows}
       emptyTitle="No vendor analytics"
-      emptyMessage="Vendor analytics placeholders are ready."
+      emptyMessage="Vendors will appear after onboarding starts."
       columns={[
         { header: "Vendor name", cell: (row) => row.vendor },
         { header: "Assigned leads", cell: (row) => formatNumber(row.assigned_leads) },
-        { header: "Response rate placeholder", cell: (row) => row.response_rate_placeholder ?? "--" },
-        { header: "Package", cell: (row) => row.package ?? "Package placeholder" },
         { header: "Status", cell: (row) => <StatusBadge value={row.status ?? "Active"} /> },
-        { header: "Lead balance placeholder", cell: (row) => row.lead_balance_placeholder ?? "--" },
+        // Real stored credit balance (was mislabelled "lead balance placeholder").
+        { header: "Credits remaining", cell: (row) => row.lead_balance_placeholder ?? "—" },
       ]}
     />
   );
 }
 
-function RevenueAnalytics({ rows }: { rows: RevenueMetric[] }) {
+/** Real payment-ledger figures from the accurate stats block. */
+function RevenueAnalytics({ stats }: { stats: Record<string, number | string> }) {
+  const cards = [
+    { key: "revenue_month", label: "Revenue This Month", value: formatINR(stats.revenue_this_month), helper: "Paid payments this month", tone: "emerald" as const },
+    { key: "revenue_total", label: "Lifetime Revenue", value: formatINR(stats.total_revenue), helper: "All paid payments", tone: "indigo" as const },
+    { key: "pending_payments", label: "Pending Payments", value: formatNumber(stats.pending_payments), helper: "Awaiting reconciliation (count)", tone: "amber" as const },
+    { key: "expired_vendors", label: "Expired / Renewal Due", value: formatNumber(stats.expired_vendors), helper: "Vendors with lapsed packages", tone: "rose" as const },
+  ];
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {rows.map((row) => (
-        <StatCard
-          key={row.key}
-          label={row.label}
-          value={row.value}
-          helper="Placeholder"
-          icon="payments"
-          tone="slate"
-        />
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map((card) => (
+        <StatCard key={card.key} label={card.label} value={card.value} helper={card.helper} icon="payments" tone={card.tone} />
       ))}
     </section>
-  );
-}
-
-function AgentAnalytics({ rows }: { rows: AgentAnalyticsRow[] }) {
-  return (
-    <DataTable
-      rows={rows}
-      emptyTitle="No AOS agent analytics"
-      emptyMessage="AOS agent analytics are placeholders until agent runs are persisted."
-      columns={[
-        { header: "Agent", cell: (row) => row.agent },
-        { header: "Runs", cell: (row) => row.runs },
-        { header: "Success rate", cell: (row) => row.success_rate },
-        { header: "Error count", cell: (row) => row.error_count },
-        { header: "Avg confidence", cell: (row) => row.avg_confidence },
-        { header: "Last run", cell: (row) => row.last_run },
-      ]}
-    />
   );
 }

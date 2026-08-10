@@ -12,7 +12,6 @@ export type AdminSectionKey =
   | "aos"
   | "crm"
   | "analytics"
-  | "ai-agents"
   | "automations"
   | "website-content"
   | "reviews"
@@ -22,7 +21,8 @@ export type AdminSectionKey =
   | "audit-logs"
   | "vendor-crm"
   | "vendor-segments"
-  | "vendor-campaigns";
+  | "vendor-campaigns"
+  | "whatsapp";
 
 export type AdminIconName =
   | "dashboard"
@@ -38,14 +38,14 @@ export type AdminIconName =
   | "aos"
   | "crm"
   | "analytics"
-  | "ai"
   | "automations"
   | "content"
   | "reviews"
   | "notifications"
   | "users"
   | "settings"
-  | "audit";
+  | "audit"
+  | "whatsapp";
 
 export type AdminSectionConfig = {
   key: AdminSectionKey;
@@ -68,6 +68,7 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "vendor-crm", href: "/admin/vendor-crm", label: "Vendor CRM", description: "Vendor relationships, contacts, tags, notes, tasks", icon: "vendors", addLabel: "" },
   { key: "vendor-segments", href: "/admin/vendor-crm/segments", label: "Vendor Segments", description: "Deterministic saved rules — preview only, never send authorization", icon: "vendors", addLabel: "" },
   { key: "vendor-campaigns", href: "/admin/vendor-crm/campaigns", label: "Vendor Campaigns", description: "Freeze an audience, review it, approve it — approval never sends", icon: "vendors", addLabel: "" },
+  { key: "whatsapp", href: "/admin/whatsapp", label: "WhatsApp", description: "Templates, message delivery, consent and provider readiness", icon: "whatsapp", addLabel: "" },
   { key: "packages", href: "/admin/packages", label: "Packages", description: "Lead packs, pricing, visibility", icon: "packages", addLabel: "Add Package" },
   { key: "categories", href: "/admin/categories", label: "Categories", description: "Services and subcategories", icon: "categories", addLabel: "Add Category" },
   { key: "cities", href: "/admin/cities", label: "Cities & Locations", description: "Cities, localities, launch status", icon: "cities", addLabel: "Add City" },
@@ -75,10 +76,9 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "lead-distribution", href: "/admin/lead-distribution", label: "Lead Distribution", description: "Rules, logs, eligibility", icon: "distribution", addLabel: "Assign Leads" },
   { key: "vendor-subscriptions", href: "/admin/vendor-subscriptions", label: "Vendor Subscriptions", description: "Credits, expiry, renewals", icon: "subscriptions", addLabel: "Renew Package" },
   { key: "reports", href: "/admin/reports", label: "Reports", description: "Exports and business views", icon: "reports", addLabel: "Export Report" },
-  { key: "aos", href: "/admin/aos", label: "AOS Agents", description: "Control center, tests, approvals", icon: "aos", addLabel: "Create Draft" },
+  { key: "aos", href: "/admin/aos", label: "AOS Agents", description: "Readiness status — foundation not active", icon: "aos", addLabel: "" },
   { key: "crm", href: "/admin/crm", label: "CRM", description: "Pipeline, follow-ups, nurture, calendar", icon: "crm", addLabel: "Add Lead" },
   { key: "analytics", href: "/admin/analytics", label: "Analytics", description: "Sources, funnel, services, revenue", icon: "analytics", addLabel: "Export Analytics" },
-  { key: "ai-agents", href: "/admin/ai-agents", label: "AI Agents", description: "Future AI control center", icon: "ai", addLabel: "Create Agent" },
   { key: "automations", href: "/admin/automations", label: "Automations", description: "Webhooks and workflows", icon: "automations", addLabel: "Create Automation" },
   { key: "website-content", href: "/admin/website-content", label: "Website Content", description: "CMS-ready content blocks", icon: "content", addLabel: "Save Content" },
   { key: "reviews", href: "/admin/reviews", label: "Reviews & Ratings", description: "Moderation and trust signals", icon: "reviews", addLabel: "Add Review" },
@@ -99,7 +99,7 @@ export const adminNavGroups: AdminNavGroup[] = [
   },
   {
     title: "Automation",
-    sections: ["analytics", "aos", "ai-agents", "automations", "reports"],
+    sections: ["whatsapp", "analytics", "aos", "automations", "reports"],
   },
   {
     title: "System",
@@ -112,7 +112,9 @@ export function getAdminSectionByKey(key: AdminSectionKey) {
 }
 
 export function getAdminSectionByPath(pathname: string) {
-  return adminSections.find((section) => pathname === section.href || pathname.startsWith(`${section.href}/`)) ?? adminSections[0];
+  return adminSections
+    .filter((section) => pathname === section.href || pathname.startsWith(`${section.href}/`))
+    .sort((left, right) => right.href.length - left.href.length)[0] ?? adminSections[0];
 }
 
 export function getAdminSectionBySlug(slug: string) {

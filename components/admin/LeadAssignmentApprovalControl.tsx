@@ -228,7 +228,7 @@ export function LeadAssignmentApprovalControl({
                 setSelectedLeadId(next);
                 void loadPreview(next);
               }}
-              className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1 qfa-control w-full px-2.5 font-medium outline-none"
             >
               <option value="">Select a lead to review...</option>
               {leadOptions.map((option) => (

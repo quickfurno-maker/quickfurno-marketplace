@@ -19,7 +19,6 @@ const paths: Record<AdminIconName, string[]> = {
   aos: ["M12 3l7 4v6c0 4-2.7 6.8-7 8-4.3-1.2-7-4-7-8V7z", "M9 12h6", "M12 9v6", "M8 17l8-10"],
   crm: ["M4 6h16v12H4z", "M4 10h16", "M8 14h4", "M8 6v12"],
   analytics: ["M4 20V4", "M4 20h16", "M8 16v-5", "M12 16V8", "M16 16v-8", "M20 16v-3"],
-  ai: ["M7 8a5 5 0 0 1 10 0v2a5 5 0 0 1-10 0z", "M9 14l-2 5", "M15 14l2 5", "M10 9h.01", "M14 9h.01"],
   automations: ["M6 12a6 6 0 0 1 10-4", "M18 8V4h-4", "M18 12a6 6 0 0 1-10 4", "M6 16v4h4"],
   content: ["M5 5h14v14H5z", "M8 9h8", "M8 13h6", "M8 17h4"],
   reviews: ["M5 5h14v10H8l-3 3z", "M9 9h6", "M9 12h4"],
@@ -27,6 +26,10 @@ const paths: Record<AdminIconName, string[]> = {
   users: ["M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6", "M3 20a5 5 0 0 1 10 0", "M16 11a3 3 0 1 0 0-6", "M15 15a5 5 0 0 1 6 5"],
   settings: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8", "M12 2v3", "M12 19v3", "M4.93 4.93l2.12 2.12", "M16.95 16.95l2.12 2.12", "M2 12h3", "M19 12h3", "M4.93 19.07l2.12-2.12", "M16.95 7.05l2.12-2.12"],
   audit: ["M6 4h12v16H6z", "M9 8h6", "M9 12h6", "M9 16h4"],
+  // Channel cue only — a conversation bubble drawn in the same 1.8px stroke
+  // vocabulary as every other glyph. Deliberately NOT the WhatsApp brand mark
+  // and never brand-green: the admin stays a dark command center.
+  whatsapp: ["M20 12a8 8 0 0 1-11.8 7L4 20l1-4.2A8 8 0 1 1 20 12z", "M9 10.5c.4 1.6 1.9 3.1 3.5 3.5l1-1.2 1.8.8v1.6c-2.9.3-6.3-2.8-6.6-6.2h1.6l.8 1.8z"],
 };
 
 export function AdminIcon({ name, className = "h-5 w-5" }: AdminIconProps) {

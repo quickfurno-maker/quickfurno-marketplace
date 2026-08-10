@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { adminSnapshot, getAdminSession } from "@/app/actions";
+import { adminCommandCenterData, getAdminSession } from "@/app/actions";
 import { AdminDashboard } from "@/components/AdminDashboard";
 
 export const metadata = { title: "Superadmin Dashboard - QuickFurno" };
@@ -11,12 +11,14 @@ export default async function AdminDashboardPage() {
   if (!session.isLoggedIn) redirect("/admin/login");
   if (!session.isSuperadmin) redirect("/admin/login?error=unauthorized");
 
-  const snapshot = await adminSnapshot();
+  // C-PERF1: dashboard-specific bounded loader — accurate count-query KPIs
+  // plus ≤10-row previews, instead of the broad every-table snapshot.
+  const data = await adminCommandCenterData();
 
   return (
     <AdminDashboard
-      snapshot={snapshot.ok ? (snapshot.data as any) : null}
-      error={!snapshot.ok ? snapshot.error : null}
+      data={data.ok ? (data.data as any) : null}
+      error={!data.ok ? data.error : null}
     />
   );
 }

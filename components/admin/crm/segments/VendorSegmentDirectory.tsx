@@ -9,6 +9,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, DataTable, StatusBadge, SelectFilter, SecondaryButton, EmptyState } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import type { VendorSegmentListResult, VendorSegmentRow } from "@/services/vendorSegmentService";
 
 const STATUS_OPTIONS = ["All", "draft", "active", "archived"];
@@ -71,8 +72,9 @@ export function VendorSegmentDirectory({
                 header: "Segment",
                 cell: (s) => (
                   <button
+                    type="button"
                     onClick={() => router.push(`/admin/vendor-crm/segments/${s.id}`)}
-                    className="text-left font-semibold text-emerald-700 hover:underline"
+                    className="qfa-focus inline-flex min-h-10 appearance-none items-center rounded border-0 bg-transparent p-0 text-left font-semibold text-emerald-700 hover:underline sm:min-h-0"
                   >
                     {s.name}
                   </button>
@@ -88,7 +90,7 @@ export function VendorSegmentDirectory({
                   </code>
                 ),
               },
-              { header: "Updated", cell: (s) => new Date(s.updated_at).toLocaleString() },
+              { header: "Updated", cell: (s) => formatDateTime(s.updated_at) },
             ]}
             rows={result.rows}
             emptyTitle="No segments yet"

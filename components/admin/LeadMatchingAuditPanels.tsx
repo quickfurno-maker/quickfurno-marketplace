@@ -217,7 +217,7 @@ function MatchReasonDetailsDrawer({
       ) : (
         <div className="space-y-5">
           {details.lead ? (
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <article className="qfa-quiet p-3 text-[13px]">
               <p className="font-semibold text-slate-950">{details.lead.name || "Unnamed lead"} · {maskPhone(details.lead.phone)}</p>
               <p className="mt-1 text-xs text-slate-500">
                 {[details.lead.service_required || details.lead.category, [details.lead.area, details.lead.city].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}
@@ -231,7 +231,7 @@ function MatchReasonDetailsDrawer({
           ) : null}
 
           {latestRun ? (
-            <article className="rounded-2xl border border-slate-200 bg-white p-4">
+            <article className="qfa-panel p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-slate-950">Latest run</h3>
                 <StatusBadge value={latestRun.run_status || "started"} tone={runStatusTone(latestRun.run_status)} />
@@ -307,7 +307,7 @@ function MatchReasonDetailsDrawer({
             <p className="text-sm text-slate-500">No matching runs recorded for this lead yet.</p>
           )}
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-4">
+          <article className="qfa-panel p-4">
             <h3 className="text-sm font-semibold text-slate-950">Delivery & preview trail</h3>
             <div className="mt-3 space-y-2">
               {details.deliveryLogs.length === 0 ? <p className="text-sm text-slate-500">No delivery logs for this lead.</p> : details.deliveryLogs.map((log) => (

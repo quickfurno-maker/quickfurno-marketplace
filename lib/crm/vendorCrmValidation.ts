@@ -287,7 +287,7 @@ export function requireCompletionResult(v: unknown): string {
 
 // -- directory query ----------------------------------------------------------
 export const CRM_DIRECTORY_MAX_PAGE_SIZE = 100;
-export const CRM_DIRECTORY_DEFAULT_PAGE_SIZE = 25;
+export const CRM_DIRECTORY_DEFAULT_PAGE_SIZE = 20; // C-PERF1 locked admin directory page size
 export interface VendorCrmDirectoryQuery {
   page: number;
   pageSize: number;

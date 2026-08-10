@@ -61,7 +61,7 @@ export default async function VendorCrmDirectoryPage({
 
   return (
     <VendorCrmDirectory
-      result={result ?? { rows: [], page: 1, pageSize: 25, total: 0 }}
+      result={result ?? { rows: [], page: 1, pageSize: 20, total: 0 }}
       query={query}
       tags={(tags ?? []).filter((t: any) => t.is_active !== false).map((t: any) => ({ id: t.id, name: t.name }))}
       error={error}

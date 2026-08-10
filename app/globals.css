@@ -3556,15 +3556,170 @@ h1, h2, h3 {
 
 /* Reusable premium card shadow so every admin card clearly floats. */
 .admin-surface .qf-card-shadow {
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 16px 38px -18px rgba(15, 23, 42, 0.28);
+  box-shadow: var(--qfa-shadow-1);
 }
 .admin-surface .qf-card-hover:hover {
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08), 0 28px 56px -20px rgba(15, 23, 42, 0.38);
+  box-shadow: var(--qfa-shadow-2);
 }
 
 /* Deep navy premium sidebar (clearly blue, not the old near-black green). */
 .admin-surface .qf-sidebar {
   background: linear-gradient(180deg, #14264a 0%, #0d1a35 52%, #081124 100%);
+}
+
+/* ============================================================
+   Admin Dashboard V2 — premium visual system tokens.
+
+   One place to tune radius, elevation, control height, surface
+   and text colour for the WHOLE admin. Primitives in
+   components/admin/AdminPrimitives.tsx consume these, so a change
+   here moves every admin screen together instead of leaving the
+   product in two competing visual systems.
+
+   The `--qfa-*` variables sit on :root and the `.qfa-*` classes are
+   unprefixed by `.admin-surface` ON PURPOSE: AdminPrimitives is also
+   imported by components/VendorDashboard.tsx, which renders OUTSIDE
+   `.admin-surface`. Scoping these would leave that page unstyled.
+   Both namespaces are new and unique, so nothing on the public site
+   can match them and no existing rule is overridden.
+   ============================================================ */
+:root {
+  /* Radius scale — restrained. Big pill radii read as "template". */
+  --qfa-radius-xs: 6px;
+  --qfa-radius-sm: 8px;
+  --qfa-radius: 10px;
+  --qfa-radius-lg: 14px;
+
+  /* Control heights. Page-level actions 38px, in-row actions 32px. */
+  --qfa-control-h: 38px;
+  --qfa-control-h-sm: 32px;
+
+  /* Surfaces: page ground, raised panel, quiet inset. */
+  --qfa-page: #f4f6fa;
+  --qfa-surface: #ffffff;
+  --qfa-inset: #f8fafc;
+  --qfa-inset-strong: #f1f5f9;
+
+  /* Lines: hairline default, softer separator inside a panel. */
+  --qfa-line: #e2e8f0;
+  --qfa-line-soft: #eef2f6;
+  --qfa-line-strong: #cbd5e1;
+
+  /* Text roles. */
+  --qfa-ink: #0f172a;
+  --qfa-ink-soft: #334155;
+  --qfa-muted: #64748b;
+  --qfa-faint: #94a3b8;
+
+  /* Elevation — deliberately shallow. Depth comes from the line and
+     the inset, not from every block hovering off the page. */
+  --qfa-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
+  --qfa-shadow-2: 0 2px 4px rgba(16, 24, 40, 0.05), 0 8px 20px -12px rgba(15, 23, 42, 0.2);
+  --qfa-shadow-pop: 0 12px 32px -8px rgba(15, 23, 42, 0.22);
+
+  /* Accent + state. */
+  --qfa-accent: #059669;
+  --qfa-accent-soft: #ecfdf5;
+  --qfa-focus: rgba(16, 185, 129, 0.28);
+
+  /* One transition duration for the whole admin (§26: 120–180ms). */
+  --qfa-motion: 150ms;
+}
+
+/* --- Panels ------------------------------------------------- */
+/* Raised surface. Used where a block genuinely is its own object. */
+.qfa-panel {
+  background: var(--qfa-surface);
+  border: 1px solid var(--qfa-line);
+  border-radius: var(--qfa-radius-lg);
+  box-shadow: var(--qfa-shadow-1);
+}
+
+/* Border-only grouping. Used where a block is context, not an object —
+   this is what stops the screen becoming a stack of white rectangles. */
+.qfa-quiet {
+  background: var(--qfa-inset);
+  border: 1px solid var(--qfa-line-soft);
+  border-radius: var(--qfa-radius);
+}
+
+.qfa-divider {
+  border-color: var(--qfa-line-soft);
+}
+
+/* --- Controls ----------------------------------------------- */
+.qfa-control {
+  height: var(--qfa-control-h);
+  border-radius: var(--qfa-radius);
+  border: 1px solid var(--qfa-line);
+  background: var(--qfa-surface);
+  color: var(--qfa-ink);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.qfa-control:hover:not(:disabled) {
+  border-color: var(--qfa-line-strong);
+}
+
+.qfa-control:focus-visible,
+.qfa-control:focus-within {
+  outline: 2px solid var(--qfa-accent);
+  outline-offset: 2px;
+  border-color: var(--qfa-accent);
+  box-shadow: 0 0 0 3px var(--qfa-focus);
+}
+
+/* Native select chrome differs per-OS and is the single biggest
+   "browser default" tell. Strip it and draw our own indicator. */
+.qfa-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+  padding-right: 1.5rem;
+  cursor: pointer;
+}
+
+/* --- Focus -------------------------------------------------- */
+.qfa-focus:focus-visible {
+  outline: 2px solid var(--qfa-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--qfa-focus);
+  border-radius: var(--qfa-radius-sm);
+}
+
+/* --- Table -------------------------------------------------- */
+.qfa-th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--qfa-muted);
+  background: var(--qfa-inset);
+  border-bottom: 1px solid var(--qfa-line);
+}
+
+.qfa-td {
+  border-bottom: 1px solid var(--qfa-line-soft);
+  color: var(--qfa-ink-soft);
+  font-size: 13px;
+}
+
+.qfa-row:hover .qfa-td {
+  background: var(--qfa-inset);
+}
+
+.qfa-row:last-child .qfa-td {
+  border-bottom: 0;
+}
+
+/* Honour the reduced-motion preference across the whole admin. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-surface * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ============================================================
@@ -5016,3 +5171,383 @@ h1, h2 {
   color: #2F7D59;
   font-weight: 800;
 }
+
+/* ============================================================
+   Admin Dashboard V2 — DARK COMMAND CENTER THEME.
+
+   Owner-approved visual direction: dark navy command center with
+   luminous gradients and semantic neon accents.
+
+   CONTAINMENT: every rule below is scoped under `.admin-surface`,
+   which only AdminShell renders. The `--qfa-*` variables on :root
+   keep their light values, so anything consuming the qfa system
+   OUTSIDE the admin stays light. The public site, vendor
+   dashboard and login screen never carry `.admin-surface` and
+   are untouched.
+
+   The block has two parts:
+     1. Token overrides — the same --qfa-* contract, dark values.
+     2. A utility remap — the admin components were written against
+        Tailwind light slate/emerald utilities; remapping those
+        class names INSIDE .admin-surface moves every admin screen
+        to the dark system at once, with zero drift between pages.
+   ============================================================ */
+
+.admin-surface {
+  /* Surfaces */
+  --qfa-page: #07101f;
+  --qfa-surface: #0d1a2d;
+  --qfa-surface-2: #12233a;
+  --qfa-inset: #0a1626;
+  --qfa-inset-strong: #081222;
+
+  /* Lines */
+  --qfa-line: rgba(136, 168, 214, 0.14);
+  --qfa-line-soft: rgba(136, 168, 214, 0.08);
+  --qfa-line-strong: rgba(136, 168, 214, 0.3);
+
+  /* Text roles */
+  --qfa-ink: #f5f8ff;
+  --qfa-ink-soft: #dbe4f3;
+  --qfa-muted: #a5b4c8;
+  --qfa-faint: #71839d;
+
+  /* Semantic neon accents */
+  --qfa-blue: #2d7cff;
+  --qfa-cyan: #00d8ff;
+  --qfa-green: #13d89a;
+  --qfa-amber: #ff9f1c;
+  --qfa-red: #ff4d67;
+  --qfa-violet: #7c4dff;
+
+  --qfa-accent: #13d89a;
+  --qfa-accent-soft: rgba(19, 216, 154, 0.12);
+  --qfa-focus: rgba(0, 216, 255, 0.3);
+
+  /* Depth — real darkness under panels, restrained glow. */
+  --qfa-shadow-1: 0 1px 2px rgba(2, 6, 16, 0.5), 0 10px 28px -22px rgba(2, 6, 16, 0.9);
+  --qfa-shadow-2: 0 2px 6px rgba(2, 6, 16, 0.55), 0 16px 40px -20px rgba(2, 6, 16, 0.9);
+  --qfa-shadow-pop: 0 24px 64px -12px rgba(2, 6, 16, 0.9);
+
+  color: var(--qfa-ink);
+  background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(45, 124, 255, 0.13), transparent 60%),
+    radial-gradient(900px 480px at 88% -12%, rgba(124, 77, 255, 0.1), transparent 55%),
+    radial-gradient(1200px 700px at 50% 115%, rgba(0, 216, 255, 0.05), transparent 60%),
+    linear-gradient(180deg, #081426 0%, #07101f 55%, #060d1a 100%);
+}
+
+.admin-surface ::selection {
+  background: rgba(0, 216, 255, 0.28);
+}
+
+.admin-surface * {
+  scrollbar-color: rgba(136, 168, 214, 0.3) transparent;
+}
+.admin-surface ::-webkit-scrollbar-thumb {
+  background: rgba(136, 168, 214, 0.24);
+  background-clip: content-box;
+}
+.admin-surface ::-webkit-scrollbar-thumb:hover {
+  background: rgba(136, 168, 214, 0.4);
+  background-clip: content-box;
+}
+
+/* Sidebar: deepest layer of the shell, cool navy with a faint blue bloom. */
+.admin-surface .qf-sidebar {
+  background:
+    radial-gradient(420px 260px at 50% -8%, rgba(45, 124, 255, 0.16), transparent 65%),
+    linear-gradient(180deg, #0a1730 0%, #081326 55%, #060e1f 100%);
+}
+
+/* Panels pick up a faint top light so they read as machined surfaces,
+   not flat rectangles. */
+.admin-surface .qfa-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 42%), var(--qfa-surface);
+}
+
+.admin-surface .qfa-quiet {
+  background: var(--qfa-inset);
+}
+
+/* ------------------------------------------------------------
+   2. Utility remap — light Tailwind classes to dark tokens.
+   Scoped selectors outrank the bare utility, so this needs no
+   !important and cannot affect markup outside .admin-surface.
+   ------------------------------------------------------------ */
+
+/* Surfaces */
+.admin-surface .bg-white { background-color: var(--qfa-surface); }
+.admin-surface .hover\:bg-white:hover { background-color: var(--qfa-surface-2); }
+.admin-surface .bg-slate-50,
+.admin-surface .bg-slate-50\/60 { background-color: var(--qfa-inset); }
+.admin-surface .hover\:bg-slate-50:hover { background-color: rgba(136, 168, 214, 0.08); }
+.admin-surface .bg-slate-100 { background-color: var(--qfa-inset-strong); }
+.admin-surface .hover\:bg-slate-100:hover { background-color: rgba(136, 168, 214, 0.1); }
+.admin-surface .bg-slate-300 { background-color: #2c3c58; }
+.admin-surface .bg-slate-400 { background-color: #45587a; }
+.admin-surface .bg-slate-900 { background-color: var(--qfa-blue); }
+.admin-surface .hover\:bg-slate-800:hover { background-color: rgba(136, 168, 214, 0.14); }
+.admin-surface .bg-slate-950\/40 { background-color: rgba(2, 8, 20, 0.68); }
+
+/* Text */
+.admin-surface .text-slate-950,
+.admin-surface .text-slate-900 { color: var(--qfa-ink); }
+.admin-surface .hover\:text-slate-950:hover,
+.admin-surface .hover\:text-slate-900:hover { color: #ffffff; }
+.admin-surface .text-slate-800,
+.admin-surface .text-slate-700 { color: var(--qfa-ink-soft); }
+.admin-surface .text-slate-600,
+.admin-surface .text-slate-500 { color: var(--qfa-muted); }
+.admin-surface .text-slate-400 { color: var(--qfa-faint); }
+.admin-surface .text-slate-300 { color: #4d6079; }
+
+/* Borders */
+.admin-surface .border-slate-100 { border-color: var(--qfa-line-soft); }
+.admin-surface .border-slate-200 { border-color: var(--qfa-line); }
+.admin-surface .border-slate-300 { border-color: var(--qfa-line-strong); }
+.admin-surface .hover\:border-slate-300:hover,
+.admin-surface .hover\:border-slate-400:hover { border-color: var(--qfa-line-strong); }
+
+/* Emerald — success / QuickFurno action green */
+.admin-surface .bg-emerald-50,
+.admin-surface .bg-emerald-50\/60 { background-color: rgba(19, 216, 154, 0.12); }
+.admin-surface .hover\:bg-emerald-100:hover { background-color: rgba(19, 216, 154, 0.18); }
+.admin-surface .border-emerald-200,
+.admin-surface .border-emerald-200\/70,
+.admin-surface .border-emerald-300 { border-color: rgba(19, 216, 154, 0.35); }
+.admin-surface .hover\:border-emerald-200:hover { border-color: rgba(19, 216, 154, 0.4); }
+.admin-surface .text-emerald-900,
+.admin-surface .text-emerald-900\/75,
+.admin-surface .text-emerald-800,
+.admin-surface .text-emerald-700,
+.admin-surface .text-emerald-600 { color: #35e6ae; }
+.admin-surface .hover\:text-emerald-700:hover { color: #5cf0c0; }
+
+/* Amber — pending / warning */
+.admin-surface .bg-amber-50 { background-color: rgba(255, 159, 28, 0.12); }
+.admin-surface .border-amber-200,
+.admin-surface .border-amber-200\/70,
+.admin-surface .border-amber-300 { border-color: rgba(255, 159, 28, 0.35); }
+.admin-surface .text-amber-900,
+.admin-surface .text-amber-800,
+.admin-surface .text-amber-700,
+.admin-surface .text-amber-600 { color: #ffb454; }
+
+/* Rose — failure / critical */
+.admin-surface .bg-rose-50 { background-color: rgba(255, 77, 103, 0.12); }
+.admin-surface .hover\:bg-rose-50:hover { background-color: rgba(255, 77, 103, 0.18); }
+.admin-surface .border-rose-200,
+.admin-surface .border-rose-200\/70 { border-color: rgba(255, 77, 103, 0.35); }
+.admin-surface .text-rose-900,
+.admin-surface .text-rose-800,
+.admin-surface .text-rose-700,
+.admin-surface .text-rose-600 { color: #ff7a8d; }
+.admin-surface .hover\:text-rose-600:hover { color: #ff98a7; }
+
+/* Sky / blue — informational */
+.admin-surface .bg-sky-50,
+.admin-surface .bg-blue-50 { background-color: rgba(45, 124, 255, 0.14); }
+.admin-surface .border-sky-200,
+.admin-surface .border-sky-200\/70,
+.admin-surface .border-blue-200 { border-color: rgba(45, 124, 255, 0.4); }
+.admin-surface .text-sky-900,
+.admin-surface .text-sky-800,
+.admin-surface .text-sky-700,
+.admin-surface .text-blue-800 { color: #6aa5ff; }
+
+/* Violet — premium */
+.admin-surface .bg-violet-50 { background-color: rgba(124, 77, 255, 0.14); }
+.admin-surface .border-violet-200,
+.admin-surface .border-violet-200\/70 { border-color: rgba(124, 77, 255, 0.4); }
+.admin-surface .text-violet-800,
+.admin-surface .text-violet-700 { color: #a98aff; }
+
+/* Cyan */
+.admin-surface .bg-cyan-50 { background-color: rgba(0, 216, 255, 0.1); }
+.admin-surface .border-cyan-200,
+.admin-surface .border-cyan-200\/70 { border-color: rgba(0, 216, 255, 0.35); }
+.admin-surface .text-cyan-800,
+.admin-surface .text-cyan-700 { color: #4fe0ff; }
+
+/* Indigo accents used by a few stat tiles */
+.admin-surface .text-indigo-600 { color: #8ea2ff; }
+
+/* Active tab underline: illuminated cyan instead of light-theme emerald. */
+.admin-surface .border-emerald-600 { border-color: var(--qfa-cyan); }
+
+/* ------------------------------------------------------------
+   3. Command-center components (new in V2 dark).
+   ------------------------------------------------------------ */
+
+/* --- KPI tile ------------------------------------------------ */
+.admin-surface .qfa-kpi {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  border: 1px solid var(--qfa-line);
+  border-radius: var(--qfa-radius-lg);
+  background: linear-gradient(160deg, var(--qfa-surface-2) 0%, var(--qfa-surface) 60%);
+  box-shadow: var(--qfa-shadow-1);
+  transition: border-color var(--qfa-motion) ease, box-shadow var(--qfa-motion) ease,
+    transform var(--qfa-motion) ease;
+}
+.admin-surface .qfa-kpi::after {
+  content: "";
+  position: absolute;
+  top: -55%;
+  right: -25%;
+  width: 65%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--kpi-bloom, rgba(45, 124, 255, 0.22)), transparent 70%);
+  pointer-events: none;
+}
+.admin-surface a.qfa-kpi:hover {
+  border-color: var(--qfa-line-strong);
+  box-shadow: var(--qfa-shadow-2);
+  transform: translateY(-1px);
+}
+
+/* Icon chip with a restrained semantic glow. */
+.admin-surface .qfa-glow-chip {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid;
+}
+.admin-surface .qfa-glow-blue { color: #6aa5ff; border-color: rgba(45, 124, 255, 0.4); background: rgba(45, 124, 255, 0.14); box-shadow: 0 0 16px rgba(45, 124, 255, 0.25); }
+.admin-surface .qfa-glow-cyan { color: #4fe0ff; border-color: rgba(0, 216, 255, 0.35); background: rgba(0, 216, 255, 0.1); box-shadow: 0 0 16px rgba(0, 216, 255, 0.22); }
+.admin-surface .qfa-glow-green { color: #35e6ae; border-color: rgba(19, 216, 154, 0.35); background: rgba(19, 216, 154, 0.12); box-shadow: 0 0 16px rgba(19, 216, 154, 0.22); }
+.admin-surface .qfa-glow-amber { color: #ffb454; border-color: rgba(255, 159, 28, 0.35); background: rgba(255, 159, 28, 0.12); box-shadow: 0 0 16px rgba(255, 159, 28, 0.22); }
+.admin-surface .qfa-glow-red { color: #ff7a8d; border-color: rgba(255, 77, 103, 0.35); background: rgba(255, 77, 103, 0.12); box-shadow: 0 0 16px rgba(255, 77, 103, 0.22); }
+.admin-surface .qfa-glow-violet { color: #a98aff; border-color: rgba(124, 77, 255, 0.4); background: rgba(124, 77, 255, 0.14); box-shadow: 0 0 16px rgba(124, 77, 255, 0.25); }
+
+/* --- Pipeline chevron rail ----------------------------------- */
+.admin-surface .qfa-pipe {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.admin-surface .qfa-pipe-seg {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 108px;
+  padding: 10px 12px 10px 22px;
+  clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%);
+  background: linear-gradient(160deg, var(--seg-strong, rgba(45, 124, 255, 0.24)), var(--seg-soft, rgba(45, 124, 255, 0.07)) 80%);
+}
+.admin-surface .qfa-pipe-seg:first-child {
+  clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);
+  padding-left: 14px;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.admin-surface .qfa-pipe--new { --seg-strong: rgba(45, 124, 255, 0.28); --seg-soft: rgba(45, 124, 255, 0.07); --seg-text: #6aa5ff; }
+.admin-surface .qfa-pipe--contacted { --seg-strong: rgba(0, 216, 255, 0.24); --seg-soft: rgba(0, 216, 255, 0.06); --seg-text: #4fe0ff; }
+.admin-surface .qfa-pipe--assigned { --seg-strong: rgba(255, 159, 28, 0.26); --seg-soft: rgba(255, 159, 28, 0.06); --seg-text: #ffb454; }
+.admin-surface .qfa-pipe--site_visit { --seg-strong: rgba(124, 77, 255, 0.28); --seg-soft: rgba(124, 77, 255, 0.07); --seg-text: #a98aff; }
+.admin-surface .qfa-pipe--quotation { --seg-strong: rgba(142, 162, 255, 0.26); --seg-soft: rgba(142, 162, 255, 0.06); --seg-text: #8ea2ff; }
+.admin-surface .qfa-pipe--won { --seg-strong: rgba(19, 216, 154, 0.28); --seg-soft: rgba(19, 216, 154, 0.07); --seg-text: #35e6ae; }
+.admin-surface .qfa-pipe--lost { --seg-strong: rgba(255, 77, 103, 0.26); --seg-soft: rgba(255, 77, 103, 0.06); --seg-text: #ff7a8d; }
+.admin-surface .qfa-pipe--spam { --seg-strong: rgba(136, 168, 214, 0.18); --seg-soft: rgba(136, 168, 214, 0.05); --seg-text: #a5b4c8; }
+.admin-surface .qfa-pipe-label { color: var(--seg-text, var(--qfa-muted)); }
+
+/* --- Founder action queue ------------------------------------ */
+.admin-surface .qfa-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--qfa-radius);
+  transition: background-color var(--qfa-motion) ease;
+}
+.admin-surface .qfa-queue-row:hover {
+  background: rgba(136, 168, 214, 0.08);
+}
+
+/* Count chips inside the queue. */
+.admin-surface .qfa-count {
+  min-width: 26px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.admin-surface .qfa-count--warning { color: #ffb454; border-color: rgba(255, 159, 28, 0.4); background: rgba(255, 159, 28, 0.12); }
+.admin-surface .qfa-count--critical { color: #ff7a8d; border-color: rgba(255, 77, 103, 0.4); background: rgba(255, 77, 103, 0.12); }
+.admin-surface .qfa-count--clear { color: #35e6ae; border-color: rgba(19, 216, 154, 0.35); background: rgba(19, 216, 154, 0.1); }
+
+/* --- Donut (CSS-only, conic gradient supplied inline) -------- */
+.admin-surface .qfa-donut {
+  width: 116px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(farthest-side, transparent 61%, #000 62%);
+  mask: radial-gradient(farthest-side, transparent 61%, #000 62%);
+}
+
+/* --- Entrance motion (route-load only; reduced-motion safe via
+       the global .admin-surface reduce rule above) ------------- */
+@keyframes qfaRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.admin-surface .qfa-rise { animation: qfaRise 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.admin-surface .qfa-rise-2 { animation-delay: 0.05s; }
+.admin-surface .qfa-rise-3 { animation-delay: 0.1s; }
+.admin-surface .qfa-rise-4 { animation-delay: 0.15s; }
+
+/* Vendor CRM profile tab content: one restrained route-state transition. */
+@keyframes qfaProfileEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.admin-surface .qfa-profile-enter {
+  animation: qfaProfileEnter 160ms ease-out both;
+  transition: opacity 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-surface .qfa-rise,
+  .admin-surface .qfa-rise-2,
+  .admin-surface .qfa-rise-3,
+  .admin-surface .qfa-rise-4,
+  .admin-surface .qfa-profile-enter {
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .admin-surface .qf-sidebar {
+    transition: none !important;
+  }
+
+  .admin-surface a.qfa-kpi:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-surface {
+    --qfa-control-h: 44px;
+  }
+}
+
+/* Sidebar width animation during collapse/expand. */
+.admin-surface .qf-sidebar {
+  transition: width 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Sidebar context corrections: the sidebar was dark BEFORE the theme
+   flip, so its slate text classes need sidebar-tuned values rather
+   than the page-context remap above. */
+.admin-surface .qf-sidebar .text-slate-300 { color: #b9c8de; }
+.admin-surface .qf-sidebar .text-slate-400 { color: #8fa3c0; }
+.admin-surface .qf-sidebar .text-slate-500 { color: #71839d; }

@@ -12,9 +12,10 @@
 // These never write, never assign, never notify, never call n8n. The side-effect
 // badges are ALWAYS shown as disabled to make the preview-only contract obvious.
 // ============================================================================
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DataTable, EmptyState, SecondaryButton, SectionCard, StatusBadge } from "./AdminPrimitives";
 import { formatDate } from "./adminUtils";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 interface VendorSnap {
   id: string;
@@ -293,6 +294,10 @@ export function DistributionLogsPanel({ notify }: { notify: Notify }) {
 function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: Notify; onClose: () => void }) {
   const [detail, setDetail] = useState<LedgerDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const drawerRef = useRef<HTMLElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  useAdminModalFocus({ open: true, containerRef: drawerRef, onClose });
 
   useEffect(() => {
     let active = true;
@@ -323,13 +328,13 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-sm" onMouseDown={onClose}>
-      <aside className="h-full w-full max-w-xl overflow-y-auto bg-[#f6f8f5] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+      <aside ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} className="h-full w-full max-w-xl overflow-y-auto bg-[color:var(--qfa-page)] outline-none shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">Assignment preview detail</h2>
-            <p className="mt-1 text-sm text-slate-500">{detail ? `Record ${detail.id.slice(0, 8)}` : "Loading..."}</p>
+            <h2 id={titleId} className="text-xl font-semibold tracking-tight text-slate-950">Assignment preview detail</h2>
+            <p id={descriptionId} className="mt-1 text-sm text-slate-500">{detail ? `Record ${detail.id.slice(0, 8)}` : "Loading..."}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Close</button>
+          <button type="button" onClick={onClose} className="qfa-focus min-h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 sm:min-h-8">Close</button>
         </div>
 
         <div className="space-y-5 p-5 sm:p-6">
@@ -339,7 +344,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
             <>
               <SafetyLegend />
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Lead</h3>
                 <dl className="mt-3 grid gap-2 text-sm">
                   <Row label="Name" value={detail.leadName || "Not provided"} />
@@ -349,7 +354,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                 </dl>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-semibold text-slate-950">Approval</h3>
                   <div className="flex flex-wrap gap-2">
@@ -367,7 +372,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                 </dl>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Selected vendors ({detail.selectedVendorCount})</h3>
                 <div className="mt-3 space-y-2">
                   {detail.vendors.length ? detail.vendors.map((vendor) => (
@@ -389,7 +394,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                 </div>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article className="qfa-panel p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Side effects</h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Row label="WhatsApp" value="Disabled" />

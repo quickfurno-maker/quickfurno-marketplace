@@ -23,6 +23,7 @@ import {
   PageHeader, SectionCard, InfoGrid, DataTable, StatusBadge,
   PrimaryButton, SecondaryButton, EmptyState,
 } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import {
   CAMPAIGN_PURPOSES, CAMPAIGN_CONSENT_SCOPES, CAMPAIGN_CHANNELS,
   CAMPAIGN_MAX_NAME_LENGTH, CAMPAIGN_MAX_DESCRIPTION_LENGTH,
@@ -103,7 +104,7 @@ export function VendorCampaignEditor({
     return (
       <div className="space-y-5">
         <PageHeader title="Campaign" description="Vendor campaign" />
-        <EmptyState title="Campaign unavailable" message={error} />
+        <div role="alert"><EmptyState title="Campaign unavailable" message={error} /></div>
       </div>
     );
   }
@@ -162,23 +163,23 @@ export function VendorCampaignEditor({
       </div>
 
       {message && (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>
+        <div role="status" aria-live="polite" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>
       )}
 
       <SectionCard title="Definition">
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} disabled={!isDraft}
+              <span className="mb-1 block font-medium text-slate-600">Name (required)</span>
+              <input required value={name} onChange={(e) => setName(e.target.value)} disabled={!isDraft}
                 maxLength={CAMPAIGN_MAX_NAME_LENGTH}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-300" />
+                className="qfa-control w-full px-2.5 outline-none" />
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Description</span>
               <input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!isDraft}
                 maxLength={CAMPAIGN_MAX_DESCRIPTION_LENGTH}
-                className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-300" />
+                className="qfa-control w-full px-2.5 outline-none" />
             </label>
           </div>
 
@@ -186,21 +187,21 @@ export function VendorCampaignEditor({
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Purpose</span>
               <select value={purpose} onChange={(e) => setPurpose(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 {CAMPAIGN_PURPOSES.map((p) => <option key={p} value={p}>{p.replace(/_/g, " ")}</option>)}
               </select>
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Channel</span>
               <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 {CAMPAIGN_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium text-slate-600">Consent scope</span>
               <select value={consentScope} onChange={(e) => setConsentScope(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+                className="qfa-control w-full px-2">
                 {CAMPAIGN_CONSENT_SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
@@ -208,9 +209,9 @@ export function VendorCampaignEditor({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Source segment</span>
-              <select value={segmentId} onChange={(e) => setSegmentId(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+              <span className="mb-1 block font-medium text-slate-600">Source segment (required)</span>
+              <select required value={segmentId} onChange={(e) => setSegmentId(e.target.value)} disabled={!isDraft}
+                className="qfa-control w-full px-2">
                 <option value="">— select a segment —</option>
                 {segments.map((s) => (
                   <option key={s.id} value={s.id}>{s.name} (v{s.definition_version}, {s.status})</option>
@@ -218,9 +219,9 @@ export function VendorCampaignEditor({
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-600">Template</span>
-              <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)} disabled={!isDraft}
-                className="h-11 w-full rounded-xl border border-slate-200 px-2 text-sm">
+              <span className="mb-1 block font-medium text-slate-600">Template (required)</span>
+              <select required value={templateKey} onChange={(e) => setTemplateKey(e.target.value)} disabled={!isDraft}
+                className="qfa-control w-full px-2">
                 <option value="">— select a template —</option>
                 {templates.map((t) => (
                   <option key={t.template_key} value={t.template_key}>
@@ -299,9 +300,8 @@ export function VendorCampaignEditor({
             // prepare and recomputed at approval, so they are shown as evidence.
             ["Template fingerprint", <code key="tf" className="text-xs">{campaign.prepared_template_fingerprint ?? "—"}</code>],
             ["Snapshot fingerprint", <code key="nf" className="text-xs">{campaign.snapshot_fingerprint ?? "—"}</code>],
-            ["Audience evaluated", campaign.audience_evaluated_at
-              ? new Date(campaign.audience_evaluated_at).toLocaleString() : "—"],
-            ["Approved", campaign.approved_at ? new Date(campaign.approved_at).toLocaleString() : "—"],
+            ["Audience evaluated", formatDateTime(campaign.audience_evaluated_at, "—")],
+            ["Approved", formatDateTime(campaign.approved_at, "—")],
           ]} />
         </SectionCard>
       )}
@@ -360,7 +360,7 @@ export function VendorCampaignEditor({
               <div className="text-sm text-slate-600">
                 <strong className="tabular-nums">{preview.total}</strong> vendor
                 {preview.total === 1 ? "" : "s"} match the source segment · evaluated{" "}
-                {new Date(preview.evaluatedAt).toLocaleString()} · page {preview.page} (max {preview.pageSize})
+                {formatDateTime(preview.evaluatedAt)} · page {preview.page} (max {preview.pageSize})
               </div>
               <p className="text-xs text-slate-500">
                 These are segment CANDIDATES, not the audience. Consent, suppression and vendor
@@ -396,7 +396,7 @@ export function VendorCampaignEditor({
               { header: "Event", cell: (e) => e.event_type.replace(/_/g, " ") },
               { header: "Campaign rev", cell: (e) => <span className="tabular-nums">{e.campaign_revision}</span> },
               { header: "Snapshot rev", cell: (e) => <span className="tabular-nums">{e.snapshot_revision ?? "—"}</span> },
-              { header: "When", cell: (e) => new Date(e.occurred_at).toLocaleString() },
+              { header: "When", cell: (e) => formatDateTime(e.occurred_at) },
             ]}
             rows={events}
             emptyTitle="No events"

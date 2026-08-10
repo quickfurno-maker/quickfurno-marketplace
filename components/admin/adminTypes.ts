@@ -496,6 +496,69 @@ export type Snapshot = {
   warnings?: string[];
 };
 
+// ---------------------------------------------------------------------------
+// C-PERF1 — bounded loader shapes (see services/adminDirectoryService.ts).
+// ---------------------------------------------------------------------------
+
+/** One page of a server-paged admin directory. */
+export type DirectoryPageOf<T> = { rows: T[]; page: number; pageSize: number; total: number };
+
+/** Thin lead projection used only for bounded dashboard aggregates
+ *  (pipeline, distribution panels, sample-scoped KPIs). */
+export type LeadSampleRow = Pick<
+  Lead,
+  | "id" | "status" | "city" | "source" | "service_required" | "category"
+  | "is_duplicate" | "lead_quality_class" | "lead_priority" | "lead_quality_score" | "created_at"
+> & { lead_assignments?: Array<{ id: string }> };
+
+/** Dashboard-specific data contract: accurate KPI stats + small bounded
+ *  previews. Replaces the broad Snapshot for /admin/dashboard. */
+export type CommandCenterData = {
+  stats: Record<string, number | string>;
+  generatedAt?: string;
+  meta?: { sampleSize: number; previewLimit: number; totals: { total_leads: number; total_vendors: number } };
+  recentLeads: Lead[];
+  leadSample: LeadSampleRow[];
+  vendors: Vendor[];
+  creditWatch: Vendor[];
+  payments: Payment[];
+  paidPayments: Payment[];
+  packages: PackageRow[];
+};
+
+export function emptyCommandCenterData(): CommandCenterData {
+  return {
+    stats: {},
+    recentLeads: [],
+    leadSample: [],
+    vendors: [],
+    creditWatch: [],
+    payments: [],
+    paidPayments: [],
+    packages: [],
+  };
+}
+
+/** Server-paged Leads directory payload. */
+export type LeadsDirectoryData = {
+  result: DirectoryPageOf<Lead>;
+  totals: { all: number; hot: number; unassigned: number | null };
+  filterOptions: { cities: string[]; categories: string[] };
+};
+
+/** Server-paged Vendors directory payload. */
+export type VendorsDirectoryData = {
+  result: DirectoryPageOf<Vendor>;
+  totals: { all: number; approved: number; pending: number; lowBalance: number };
+  filterOptions: { cities: string[]; categories: string[] };
+  marketplaceSettings: MarketplaceRuntimeSetting[];
+  profileChangeRequests: VendorProfileChangeRequest[];
+  supportThreads: VendorSupportThread[];
+  supportMessages: VendorSupportMessage[];
+  /** Thin name rows for vendors referenced by the moderation panels. */
+  panelVendors: Vendor[];
+};
+
 export function emptySnapshot(): Snapshot {
   return {
     stats: {},

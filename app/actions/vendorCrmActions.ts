@@ -34,20 +34,6 @@ async function run<T>(fn: (actorId: string) => Promise<T>, revalidate?: string[]
 export async function crmDirectory(query: Record<string, unknown>) {
   return run(() => crm.listVendorCrmDirectory(query ?? {}));
 }
-export async function crmVendorProfileBundle(vendorId: string) {
-  return run(async () => {
-    const [core, profile, contacts, tagAssignments, allTags, notes, tasks] = await Promise.all([
-      crm.getVendorCoreFacts(vendorId),
-      crm.getVendorCrmProfile(vendorId),
-      crm.listVendorContacts(vendorId),
-      crm.listVendorTagAssignments(vendorId),
-      crm.listVendorTags(),
-      crm.listVendorNotes(vendorId),
-      crm.listVendorTasks(vendorId),
-    ]);
-    return { core, profile, contacts, tagAssignments, allTags, notes, tasks };
-  });
-}
 
 // -- profile ------------------------------------------------------------------
 export async function crmUpsertProfile(vendorId: string, input: Record<string, unknown>) {

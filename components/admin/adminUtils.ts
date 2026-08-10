@@ -1,5 +1,25 @@
 import type { Assignment, Lead, PackageRow, Payment, Vendor } from "./adminTypes";
 
+export const ADMIN_LOCALE = "en-IN" as const;
+export const ADMIN_TIME_ZONE = "Asia/Kolkata" as const;
+
+const ADMIN_DATE_FORMAT = new Intl.DateTimeFormat(ADMIN_LOCALE, {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  timeZone: ADMIN_TIME_ZONE,
+});
+
+const ADMIN_DATE_TIME_FORMAT = new Intl.DateTimeFormat(ADMIN_LOCALE, {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: ADMIN_TIME_ZONE,
+  timeZoneName: "short",
+});
+
 export function formatNumber(value: unknown) {
   return new Intl.NumberFormat("en-IN").format(Number(value ?? 0));
 }
@@ -12,7 +32,15 @@ export function formatDate(value?: string | null) {
   if (!value) return "Not set";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not set";
-  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+  return ADMIN_DATE_FORMAT.format(date);
+}
+
+/** Stable across server and browser hydration; QuickFurno's business zone is IST. */
+export function formatDateTime(value?: string | null, fallback = "Not set") {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return ADMIN_DATE_TIME_FORMAT.format(date);
 }
 
 export function shortId(value?: string | null) {

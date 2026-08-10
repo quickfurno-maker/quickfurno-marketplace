@@ -12,6 +12,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, DataTable, StatusBadge, SelectFilter, SecondaryButton, EmptyState } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import type { VendorCampaignListResult, VendorCampaignRow } from "@/services/vendorCampaignService";
 
 const STATUS_OPTIONS = ["All", "draft", "ready_for_review", "approved", "cancelled", "archived"];
@@ -80,8 +81,9 @@ export function VendorCampaignDirectory({
                 header: "Campaign",
                 cell: (c) => (
                   <button
+                    type="button"
                     onClick={() => router.push(`/admin/vendor-crm/campaigns/${c.id}`)}
-                    className="text-left font-semibold text-emerald-700 hover:underline"
+                    className="qfa-focus inline-flex min-h-10 appearance-none items-center rounded border-0 bg-transparent p-0 text-left font-semibold text-emerald-700 hover:underline sm:min-h-0"
                   >
                     {c.name}
                   </button>
@@ -103,7 +105,7 @@ export function VendorCampaignDirectory({
                   </span>
                 ),
               },
-              { header: "Updated", cell: (c) => new Date(c.updated_at).toLocaleString() },
+              { header: "Updated", cell: (c) => formatDateTime(c.updated_at) },
             ]}
             rows={result.rows}
             emptyTitle="No campaigns yet"

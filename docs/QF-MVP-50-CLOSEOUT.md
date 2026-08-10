@@ -1,6 +1,7 @@
 # QF-MVP-50 — Automation orchestration closeout
 
-**Status: SOURCE COMPLETE. STAGING APPLICATION OF 50.5 PENDING.**
+**Status: SOURCE COMPLETE. ALL TEN POST-ANCHOR MIGRATIONS APPLIED TO STAGING.
+50.5 DATABASE-LAYER RECOVERY CERTIFIED. SIGNED-HTTP / n8n CERTIFICATION OUTSTANDING.**
 
 This document records what QF-MVP-50 actually delivers and, just as precisely, what it
 does not. It authorizes no production change.
@@ -21,10 +22,19 @@ does not. It authorizes no production change.
 | 50.3 | vendor workflows | complete | applied (histories 26–27) | certified |
 | 50.4 | campaign recipient automation | complete | applied (history 28) | certified |
 | 50.3/50.4 | family-aware claim routing repair | complete | applied (history 29) | certified |
-| **50.5** | **recovery + reconciliation** | **complete** | **PENDING (`20260812000000`)** | **not performed** |
+| **50.5** | **recovery + reconciliation** | **complete** | **applied (history 30)** | **database layer certified 65/65; signed-HTTP/n8n outstanding** |
 
-Staging remote history is **29** at the time of writing. Applying 50.5 would make it 30.
-Local migration count is **97**.
+Staging remote history is **30**. Local migration count is **97**. Every post-anchor
+migration is now APPLIED and the manifest's pending set is present and empty.
+
+`20260812000000` was applied under its own deployment gate: an exact-one dry run naming
+that file alone with `seeds: []` and `roles: []`, one push, then an **independently
+issued** re-list confirming 30 remote versions, zero local-only and zero divergence. A
+before/after catalog diff confirmed the change is exactly the designed surface — four new
+`SECURITY DEFINER` functions, two guards replaced, route vocabulary 3 → 5, state
+vocabulary 5 → 7, and the recover-generation unique index — with no table, column or type
+added and no data row modified. Full evidence:
+`docs/QF-MVP-50-5-STAGING-CERTIFICATION.md`.
 
 ## 2. What the automation lane can now do end to end
 
@@ -81,13 +91,19 @@ These are real gaps, recorded so no later phase inherits an assumption.
   and deliver the recipient a duplicate message. Wiring a governed communication
   due-sweep, and provider/channel operational readiness generally, belongs to the
   applicable QF-MVP-40 and QF-MVP-80 work — **not** to QF-MVP-50.
-- **The 50.5 migration is not applied to staging.** It is pinned PENDING in the staging
-  history manifest with `remoteVersionStatus: NOT_PROVEN_OFFLINE` and
-  `requiresSeparateStagingDeploymentGate: true`.
-- **No 50.5 runtime certification exists.** Real retry, dead-letter, stale-attempt and
-  mixed-queue certification against a live n8n instance has not been performed. Only n8n
-  is production and there is no dedicated Core staging endpoint, so that certification
-  requires its own separately-governed session.
+- **The signed-HTTP and n8n layer of 50.5 is not yet certified.** The database layer is
+  certified against the real staging database — 65 of 65 assertions, covering due-retry
+  recovery, replay, retry-generation uniqueness, negative selection against a genuinely
+  drained queue, stale reconciliation and every guard, the dead-letter boundary, execute
+  reservation ageing, and a three-lane mixed queue. What has **not** been exercised is
+  `/api/internal/automation/n8n/recover` and `…/reconcile` over real signed HTTP driven by
+  a real n8n instance. That is a transport-layer gap, not a logic gap, and it is recorded
+  as outstanding rather than quietly implied.
+- **Provider sending is structurally impossible on staging as configured, and that is a
+  gap as much as a safety property.** `communication_provider_runtime_policies` holds zero
+  rows and all eight provider template mappings are `is_active = false`, so any execution
+  reaching the communication lane fails closed before a provider call. No end-to-end
+  delivery has therefore been demonstrated by QF-MVP-50 at all.
 - **Every n8n workflow candidate is inactive.** All six source workflows carry
   `active: false`, and the transport itself is fail-closed: `QF_N8N_TRANSPORT_ENABLED`
   must equal `true` and the runtime environment must match the transport mode.
@@ -105,12 +121,17 @@ Node 24, with no secrets and no Supabase, database or deployment command:
 
 ## 6. Next steps, in order
 
-1. Apply `20260812000000` to QuickFurno Staging under its own deployment gate; staging
-   history 29 → 30.
-2. Promote the manifest entry from PENDING to APPLIED with a truthful imported evidence
-   marker, and re-pin G1 and its dependents to the new exact truth.
-3. Certify 50.5 against a real n8n runtime: due retry, dead-letter exhaustion, stale
-   reconciliation across all seven evidence cases, and a mixed queue proving that fresh
-   work, due retry and stale reconciliation all progress with no lane stealing another
-   and no SQLSTATE 23505.
-4. Only then consider production, as a separately governed decision.
+1. ~~Apply `20260812000000` to QuickFurno Staging under its own deployment gate.~~
+   **Done — staging history 29 → 30, applied exactly once.**
+2. ~~Promote the manifest entry from PENDING to APPLIED and re-pin G1 and its dependents
+   to the new exact truth.~~ **Done — it is the tenth applied post-anchor record, the only
+   one carrying first-party evidence and `appliedByThisPhase: true`, with ten coupled
+   harnesses re-pinned to exact values rather than loosened.**
+3. ~~Certify recovery behaviour against the real staging database.~~ **Done — 65/65,
+   inside an always-rolled-back transaction leaving zero residue.**
+4. Certify the signed-HTTP layer against a real n8n runtime: the `recover` and `reconcile`
+   routes end to end, including response-signature verification in both directions. This
+   requires a staging-bound Core, which requires the staging `service_role` key; the
+   production key in `.env.local` must never be used for it.
+5. Only then consider production, as a separately governed decision. Production has
+   received none of the QF-MVP-50 migrations.

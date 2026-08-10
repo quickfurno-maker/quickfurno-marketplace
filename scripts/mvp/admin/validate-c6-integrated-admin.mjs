@@ -53,12 +53,13 @@ const waClients = [
 ].map((n) => read(`components/admin/whatsapp/${n}.tsx`));
 
 // ── 1. Every prior gate is still wired ─────────────────────────────────────
-for (const script of ["test:admin:cperf1", "test:admin:cperf2", "test:admin:c4", "test:admin:c5", "test:admin:cwa1", "test:admin:c6"]) {
+for (const script of ["test:admin:cperf1", "test:admin:cperf2", "test:admin:c4", "test:admin:c5", "test:admin:cwa1", "test:admin:cwa1b", "test:admin:c6"]) {
   check(`${script} is wired in package.json`, typeof pkg.scripts[script] === "string" && pkg.scripts[script].length > 0);
 }
 for (const f of [
   "scripts/mvp/admin/validate-c5-responsive-accessibility.mjs",
   "scripts/mvp/admin/validate-c-wa1-whatsapp-control-center.mjs",
+  "scripts/mvp/admin/validate-cwa1b-whatsapp-billing.mjs",
   "scripts/mvp/admin/validate-c-perf2-data-loading.mjs",
 ]) {
   check(`${f.split("/").pop()} still exists`, existsSync(join(root, f)));
@@ -119,6 +120,9 @@ check("no client component fetches", waClients.every((s) => !/\bfetch\s*\(/.test
 check("the read layer never writes", !/\.insert\(|\.update\(|\.upsert\(|\.delete\(|\.rpc\(/.test(serviceCode));
 check("no send/activate/override control is rendered", waClients.every((s) =>
   !/>\s*(Send|Send now|Bulk send|Broadcast|Retry|Resend|Submit to Meta|Activate|Sync|Mark delivered|Override status|Force complete|Unclaim|Release|Run now)\s*</i.test(s)));
+check("Provider retains the C-WA1B Billing & spend surface", /title="Billing & spend"/.test(waClients[6]));
+check("C-WA1B keeps native recharge unsupported", /supported:\s*false/.test(serviceCode));
+check("C-WA1B never turns an unavailable financial fact into zero", !/balance:\s*[^,]*\?\?\s*0|spend:\s*[^,]*\?\?\s*0/.test(serviceCode));
 
 // ── 6. Data architecture (re-proved after the C6 corrections) ─────────────
 check("primary page size is still 20", ADMIN_DIRECTORY_PAGE_SIZE === 20);

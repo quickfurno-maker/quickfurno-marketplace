@@ -105,6 +105,7 @@
     "test:admin:c4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c4-vendor-crm-profile.mjs",
     "test:admin:c5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c5-responsive-accessibility.mjs",
     "test:admin:cwa1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-wa1-whatsapp-control-center.mjs",
+    "test:admin:cwa1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-cwa1b-whatsapp-billing.mjs",
     "test:admin:c6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c6-integrated-admin.mjs"
   },
   "dependencies": {

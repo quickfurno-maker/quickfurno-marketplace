@@ -22,7 +22,8 @@ export type AdminSectionKey =
   | "audit-logs"
   | "vendor-crm"
   | "vendor-segments"
-  | "vendor-campaigns";
+  | "vendor-campaigns"
+  | "whatsapp";
 
 export type AdminIconName =
   | "dashboard"
@@ -45,7 +46,8 @@ export type AdminIconName =
   | "notifications"
   | "users"
   | "settings"
-  | "audit";
+  | "audit"
+  | "whatsapp";
 
 export type AdminSectionConfig = {
   key: AdminSectionKey;
@@ -68,6 +70,7 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "vendor-crm", href: "/admin/vendor-crm", label: "Vendor CRM", description: "Vendor relationships, contacts, tags, notes, tasks", icon: "vendors", addLabel: "" },
   { key: "vendor-segments", href: "/admin/vendor-crm/segments", label: "Vendor Segments", description: "Deterministic saved rules — preview only, never send authorization", icon: "vendors", addLabel: "" },
   { key: "vendor-campaigns", href: "/admin/vendor-crm/campaigns", label: "Vendor Campaigns", description: "Freeze an audience, review it, approve it — approval never sends", icon: "vendors", addLabel: "" },
+  { key: "whatsapp", href: "/admin/whatsapp", label: "WhatsApp", description: "Templates, message delivery, consent and provider readiness", icon: "whatsapp", addLabel: "" },
   { key: "packages", href: "/admin/packages", label: "Packages", description: "Lead packs, pricing, visibility", icon: "packages", addLabel: "Add Package" },
   { key: "categories", href: "/admin/categories", label: "Categories", description: "Services and subcategories", icon: "categories", addLabel: "Add Category" },
   { key: "cities", href: "/admin/cities", label: "Cities & Locations", description: "Cities, localities, launch status", icon: "cities", addLabel: "Add City" },
@@ -99,7 +102,7 @@ export const adminNavGroups: AdminNavGroup[] = [
   },
   {
     title: "Automation",
-    sections: ["analytics", "aos", "ai-agents", "automations", "reports"],
+    sections: ["whatsapp", "analytics", "aos", "ai-agents", "automations", "reports"],
   },
   {
     title: "System",

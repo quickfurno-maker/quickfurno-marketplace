@@ -13,6 +13,8 @@
 // ============================================================================
 
 import { DataTable, SectionCard, StatusBadge } from "../AdminPrimitives";
+import { AdminIcon } from "../AdminIcon";
+import type { AdminIconName } from "../adminConfig";
 import type { WhatsAppAdminOverview, WhatsAppDeliveryRow, WhatsAppMessageRow } from "@/services/adminWhatsAppService";
 import {
   CountValue,
@@ -24,24 +26,35 @@ import {
   when,
 } from "./whatsappShared";
 
-/** One cell of the status rail. Each states its OWN fact and nothing more. */
+/**
+ * One cell of the status rail. Each states its OWN fact and nothing more.
+ *
+ * The mark is the shared `qfa-glow-chip` at its designed 30px size holding an
+ * AdminIcon. It is NOT sized down with utilities: `.admin-surface .qfa-glow-chip`
+ * has specificity (0,2,0) and would win over a `h-2 w-2` utility (0,1,0),
+ * leaving an empty 30px bordered square rather than the intended dot.
+ */
 function RailTile({
   label,
   state,
   tone,
   detail,
   glow,
+  icon,
 }: {
   label: string;
   state: string;
   tone: "emerald" | "blue" | "amber" | "rose" | "slate" | "violet" | "cyan";
   detail: string;
   glow: string;
+  icon: AdminIconName;
 }) {
   return (
     <article className="qfa-panel min-w-0 px-3.5 py-3">
       <div className="flex items-center gap-2">
-        <span className={`qfa-glow-chip ${glow} h-2 w-2 shrink-0 rounded-full p-0`} aria-hidden="true" />
+        <span className={`qfa-glow-chip ${glow} shrink-0`} aria-hidden="true">
+          <AdminIcon name={icon} className="h-3.5 w-3.5" />
+        </span>
         <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           {label}
         </p>
@@ -64,9 +77,6 @@ export function WhatsAppOverviewTab({
   if (!overview) return <FaultNotice fault="UNAVAILABLE" />;
 
   const { readiness } = overview;
-  const operationsByKey = new Map(readiness.operations.map((op) => [op.operation, op]));
-  const outbound = operationsByKey.get("outbound");
-
   // Configuration readiness is the OUTBOUND config alone — deliberately not a
   // roll-up of every operation, because a ready webhook says nothing about it.
   const configurationState = readiness.outboundConfigurationResolved
@@ -125,6 +135,7 @@ export function WhatsAppOverviewTab({
           state={configurationState}
           tone={readinessTone(configurationState)}
           glow="qfa-glow-blue"
+          icon="settings"
           detail={
             readiness.outboundConfigurationResolved
               ? "Outbound variables resolve. This is not permission to send."
@@ -136,6 +147,7 @@ export function WhatsAppOverviewTab({
           state={accountState}
           tone={readiness.account ? readinessTone("READY") : "slate"}
           glow="qfa-glow-cyan"
+          icon="whatsapp"
           detail={
             readiness.accountFault
               ? "The provider-account table could not be read here."
@@ -149,6 +161,7 @@ export function WhatsAppOverviewTab({
           state={runtimeState}
           tone={readiness.runtimePolicy?.outboundEnabled ? "emerald" : "slate"}
           glow="qfa-glow-violet"
+          icon="automations"
           detail={
             readiness.runtimePolicy
               ? `Outbound ${readiness.runtimePolicy.outboundEnabled ? "enabled" : "disabled"} · webhook processing ${readiness.runtimePolicy.webhookProcessingEnabled ? "enabled" : "disabled"}`
@@ -160,6 +173,7 @@ export function WhatsAppOverviewTab({
           state={mappingState}
           tone={(readiness.approvedActiveMappingCount ?? 0) > 0 ? "emerald" : "amber"}
           glow="qfa-glow-green"
+          icon="categories"
           detail="Approved AND active provider mappings. An approved Meta template is not a mapping."
         />
         <RailTile
@@ -167,6 +181,7 @@ export function WhatsAppOverviewTab({
           state={webhookState}
           tone={readiness.webhook.lastVerifiedReceiptAt ? "emerald" : "amber"}
           glow="qfa-glow-amber"
+          icon="notifications"
           detail={
             readiness.webhook.lastVerifiedReceiptAt
               ? `Last verified callback ${when(readiness.webhook.lastVerifiedReceiptAt)}`
@@ -178,6 +193,7 @@ export function WhatsAppOverviewTab({
           state={overview.recentSamplesFault ? "UNKNOWN" : `${failureCount} IN SAMPLE`}
           tone={failureCount > 0 ? "rose" : "slate"}
           glow="qfa-glow-red"
+          icon="reports"
           detail="Bounded sample of the 10 most recent failed delivery events — not a total."
         />
       </section>

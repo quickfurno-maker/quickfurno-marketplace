@@ -18,12 +18,68 @@
 // ============================================================================
 
 import { DataTable, SectionCard, StatusBadge } from "../AdminPrimitives";
-import type { OperationReadiness, WhatsAppProviderReadiness } from "@/services/adminWhatsAppService";
+import type {
+  OperationReadiness,
+  WhatsAppBillingFact,
+  WhatsAppProviderBilling,
+  WhatsAppProviderReadiness,
+} from "@/services/adminWhatsAppService";
 import { CountValue, FactGrid, FaultNotice, ReadOnlyNotice, humanize, readinessTone, when } from "./whatsappShared";
 
-export function WhatsAppProviderTab({ readiness }: { readiness?: WhatsAppProviderReadiness }) {
-  if (!readiness) return <FaultNotice fault="UNAVAILABLE" />;
+const BILLING_UNAVAILABLE_COPY = "Not available from current integration";
 
+function BillingFactValue({ fact }: { fact: WhatsAppBillingFact }) {
+  return fact.state === "available" ? (
+    <span className="font-semibold text-slate-950">{fact.value}</span>
+  ) : (
+    <span className="text-slate-500">{BILLING_UNAVAILABLE_COPY}</span>
+  );
+}
+
+function BillingStatusValue({ fact }: { fact: WhatsAppBillingFact }) {
+  if (fact.state === "unavailable") return <BillingFactValue fact={fact} />;
+  const tone =
+    fact.value === "active"
+      ? "emerald"
+      : fact.value === "suspended"
+        ? "rose"
+        : fact.value === "not_configured"
+          ? "amber"
+          : "slate";
+  return <StatusBadge value={humanize(fact.value)} tone={tone} />;
+}
+
+function BillingMetric({
+  label,
+  fact,
+  detail,
+}: {
+  label: string;
+  fact: WhatsAppBillingFact;
+  detail: string;
+}) {
+  return (
+    <article className="qfa-panel min-w-0 px-3.5 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <div className="mt-2 text-[13px] leading-5">
+        <BillingFactValue fact={fact} />
+      </div>
+      <p className="mt-1.5 text-[11px] leading-4 text-slate-500">{detail}</p>
+    </article>
+  );
+}
+
+export function WhatsAppProviderTab({
+  workspace,
+}: {
+  workspace?: {
+    readonly readiness: WhatsAppProviderReadiness;
+    readonly billing: WhatsAppProviderBilling;
+  };
+}) {
+  if (!workspace) return <FaultNotice fault="UNAVAILABLE" />;
+
+  const { readiness, billing } = workspace;
   const { account, runtimePolicy, webhook } = readiness;
 
   return (
@@ -104,7 +160,6 @@ export function WhatsAppProviderTab({ readiness }: { readiness?: WhatsAppProvide
                 ["Configuration", <StatusBadge key="c" value={humanize(account.configurationStatus)} />],
                 ["Business verification", humanize(account.businessVerificationStatus)],
                 ["Phone number", humanize(account.phoneNumberStatus)],
-                ["Billing", humanize(account.billingStatus)],
                 ["Health", <StatusBadge key="h" value={humanize(account.healthStatus)} />],
                 ["Last health check", when(account.lastHealthCheckAt)],
                 ["Last synced", when(account.lastSyncedAt)],
@@ -141,6 +196,104 @@ export function WhatsAppProviderTab({ readiness }: { readiness?: WhatsAppProvide
           </p>
         </SectionCard>
       </div>
+
+      <SectionCard
+        title="Billing & spend"
+        description="Read-only WhatsApp billing visibility. QuickFurno vendor lead credits are a separate system and never fund Meta messaging."
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="qfa-panel min-w-0 px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Billing status
+            </p>
+            <div className="mt-2">
+              <BillingStatusValue fact={billing.status} />
+            </div>
+            <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
+              Exact QuickFurno provider-account state; not a provider-readiness or business-authorization verdict.
+            </p>
+          </article>
+
+          <BillingMetric
+            label="Operator attention"
+            fact={billing.attention}
+            detail="Derived only from the stored billing status; it does not infer a Meta payment-method state."
+          />
+          <BillingMetric
+            label="Billing model"
+            fact={billing.model}
+            detail="No direct-pay, partner-billed or credit-line model is inferred."
+          />
+          <BillingMetric
+            label="Currency"
+            fact={billing.currency}
+            detail="No INR or other currency is assumed without an adopted authority."
+          />
+          <BillingMetric
+            label="Credit line"
+            fact={billing.creditLine}
+            detail="Meta extended credit is distinct from QuickFurno vendor lead credits."
+          />
+          <BillingMetric
+            label="Spend / usage analytics"
+            fact={billing.spend}
+            detail="Message usage or approximate charges would not represent an invoice or available balance."
+          />
+          <BillingMetric
+            label="Available balance"
+            fact={billing.balance}
+            detail="Never shown as zero unless a real Meta billing authority supplies zero."
+          />
+          <BillingMetric
+            label="Payment method"
+            fact={billing.paymentMethod}
+            detail="No connected or healthy payment method is claimed."
+          />
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="qfa-quiet px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Data source & freshness
+            </p>
+            <FactGrid
+              rows={[
+                [
+                  "Billing status source",
+                  billing.status.state === "available"
+                    ? "QuickFurno provider-account record"
+                    : BILLING_UNAVAILABLE_COPY,
+                ],
+                [
+                  "Provider account last synced",
+                  billing.lastSynced.state === "available"
+                    ? when(billing.lastSynced.value)
+                    : BILLING_UNAVAILABLE_COPY,
+                ],
+                [
+                  "Last health check",
+                  billing.lastHealthCheck.state === "available"
+                    ? when(billing.lastHealthCheck.value)
+                    : BILLING_UNAVAILABLE_COPY,
+                ],
+              ]}
+            />
+          </div>
+
+          <div className="qfa-quiet px-3.5 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Native QuickFurno recharge
+            </p>
+            <p className="mt-2 text-[13px] font-semibold leading-5 text-slate-950">
+              Not supported by current QuickFurno integration
+            </p>
+            <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
+              Manage billing in {billing.management.destination}. QuickFurno exposes no recharge,
+              top-up, payment-method or credit-line write here, and no unverified billing deep link.
+            </p>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Webhook"

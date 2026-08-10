@@ -118,7 +118,7 @@ export function WhatsAppControlCenter({
         ) : payload.tab === "consent" ? (
           <WhatsAppConsentTab result={payload.consent} query={query} setParam={setParam} />
         ) : payload.tab === "provider" ? (
-          <WhatsAppProviderTab readiness={payload.provider} />
+          <WhatsAppProviderTab workspace={payload.provider} />
         ) : (
           <WhatsAppAutomationTab result={payload.automation} query={query} setParam={setParam} />
         )}

@@ -690,17 +690,18 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-50.2-R2-APPLIED-TRUTH: the third post-anchor migration is now APPLIED
 // too (remote history 23), so zero remain pending. Re-pinned, never loosened —
 // the counts stay exact and the pending list must still exist and be empty.
-// QF-MVP-50.5 RE-PIN: nine APPLIED is unchanged; the pending list now holds
-// EXACTLY the one 50.5 recovery migration, which is still awaiting its own staging
-// gate. The applied set and its order are asserted byte-for-byte as before.
-record("G03 exactly nine APPLIED and one PENDING post-anchor migration are declared",
-  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 9 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260812000000" &&
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
+// QF-MVP-50.5 STAGING GATE RE-PIN: the 50.5 recovery migration passed its own
+// staging gate (remote history 29 -> 30), so it moved out of the pending list and
+// became the TENTH applied post-anchor record. The pending list must still exist
+// and now be empty. Re-pinned, never loosened — the counts stay exact.
+record("G03 exactly ten APPLIED and zero PENDING post-anchor migrations are declared",
+  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 10 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
+  manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
   manifest.appliedAnchor?.postAnchorMigrationCount === 10 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&
@@ -760,13 +761,14 @@ record("G09a G1 rejects a demoted, forged or mis-counted applied post-anchor rec
   /post-anchor order swapped/.test(g1Source) &&
   /post-anchor count understated/.test(g1Source));
 record("G10 G1 still rejects an arbitrary newer or drifted migration",
-  // QF-MVP-50.5 RE-PIN: G1's "one past the pinned set" mutant is now the ELEVENTH,
-  // because 20260812000000 is a real pinned pending migration.
+  // QF-MVP-50.5 STAGING GATE RE-PIN: 20260812000000 is now a real APPLIED
+  // post-anchor migration, so G1's "one past the pinned set" mutants are the
+  // eleventh on disk and the eleventh applied record.
   /an eleventh post-anchor migration on disk/.test(g1Source) &&
-  /50\.5 pending entry removed/.test(g1Source) &&
-  /50\.5 promoted to APPLIED in place without evidence/.test(g1Source) &&
+  /50\.5 applied entry removed/.test(g1Source) &&
+  /50\.5 demoted back to PENDING in place/.test(g1Source) &&
   /50\.5 on-disk SHA drift/.test(g1Source) &&
-  /a tenth applied post-anchor migration/.test(g1Source) &&
+  /an eleventh applied post-anchor migration/.test(g1Source) &&
   /50\.2E migration renamed/.test(g1Source) &&
   /50\.2E on-disk SHA drift/.test(g1Source) &&
   /50\.2E manifest SHA drift/.test(g1Source) &&

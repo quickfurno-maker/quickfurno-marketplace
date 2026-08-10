@@ -49,6 +49,7 @@ const EXPECTED_APPLIED = [
   ["20260809000000", 27],
   ["20260810000000", 28],
   ["20260811000000", 29],
+  ["20260812000000", 30],
 ];
 
 const VENDOR_ACTIONS = [
@@ -114,18 +115,22 @@ function validateState(state) {
   const applied = state.manifest.appliedPostAnchorMigrations ?? [];
   const pending = state.manifest.pendingPostAnchorMigrations;
 
-  // QF-MVP-50.5 RE-PIN. Nothing this certification proved about the 50.3/50.4 staging
-  // orchestration changes: histories 21..29 are still applied in exact order. The 50.5
-  // recovery transport adds one further migration, which is PENDING and carries its own
-  // separate staging gate — it is named explicitly, never allowed as "anything newer".
+  // QF-MVP-50.5 STAGING GATE RE-PIN. Nothing this certification proved about the
+  // 50.3/50.4 staging orchestration changes: histories 21..29 are still applied in
+  // exact order. The 50.5 recovery transport cleared its own separate staging gate
+  // and is appended at 30 — named explicitly, never allowed as "anything newer".
   check("local migration count remains exactly 97", state.migrationFiles.length === 97);
-  check("histories 21 through 29 remain applied in exact order",
+  check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set is exactly the pinned 50.5 recovery migration",
-    Array.isArray(pending) && pending.length === 1 &&
-    pending[0].version === "20260812000000" &&
-    pending[0].operationalStatus === "PENDING" &&
-    pending[0].appliedByThisPhase === false);
+  check("the governed pending set is present and empty",
+    Array.isArray(pending) && pending.length === 0);
+  check("the 50.5 recovery migration is applied by its own phase at history 30",
+    (() => {
+      const pin = applied.find((record) => record.version === "20260812000000");
+      return pin?.operationalStatus === "APPLIED" &&
+        pin.remoteHistoryCountAfterApply === 30 &&
+        pin.appliedByThisPhase === true;
+    })());
   check("the forensic reconciliation remains preserved and provenance unknown",
     state.forensic.includes("exactly 29 rows") &&
     state.forensic.includes("APPLY_EXECUTOR_PROVENANCE: UNKNOWN") &&

@@ -564,28 +564,38 @@ record("G02 the local migration set is exactly 97 and 50.5 is the newest",
     return files.length === 97 &&
       files.at(-1) === "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
   })());
-record("G03 the manifest pins 50.5 as PENDING with its own staging gate and no fake evidence",
+record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence, and nothing is left pending",
   (() => {
-    const pins = manifest.pendingPostAnchorMigrations ?? [];
-    const pin = pins.find((r) => r.version === "20260812000000");
-    return pins.length === 1 && pin?.sha256 === MIGRATION_SHA &&
+    const pending = manifest.pendingPostAnchorMigrations ?? null;
+    const pin = (manifest.appliedPostAnchorMigrations ?? []).find((r) => r.version === "20260812000000");
+    return Array.isArray(pending) && pending.length === 0 &&
+      pin?.sha256 === MIGRATION_SHA &&
       pin.path === MIGRATION_PATH && pin.phase === "QF-MVP-50.5" &&
-      pin.operationalStatus === "PENDING" &&
-      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      pin.requiresSeparateStagingDeploymentGate === true &&
-      pin.appliedByThisPhase === false &&
-      !("appliedEvidenceMarker" in pin) && !("remoteHistoryCountAfterApply" in pin);
+      pin.operationalStatus === "APPLIED" &&
+      pin.appliedEvidenceMarker === "QF_MVP_50_5_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+      pin.appliedEvidenceType === "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_STAGING_EXECUTION" &&
+      pin.remoteHistoryCountAfterApply === 30 &&
+      pin.appliedExactlyOnce === true &&
+      pin.appliedByThisPhase === true &&
+      pin.catalogParityVerified === true &&
+      pin.mustApplyAfterVersion === "20260811000000" &&
+      // An APPLIED record must never keep the offline-only "not proven" hedge.
+      !("remoteVersionStatus" in pin) &&
+      !("requiresSeparateStagingDeploymentGate" in pin);
   })());
-record("G04 the nine APPLIED records and their 21-29 histories are untouched",
-  manifest.appliedPostAnchorMigrations.length === 9 &&
+record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor count unchanged",
+  manifest.appliedPostAnchorMigrations.length === 10 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26, 27, 28, 29]) &&
+    [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
+  manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
+  manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
   manifest.appliedAnchor.postAnchorMigrationCount === 10);
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
   /const MIGRATION_COUNT = 97;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 1") &&
-  g1Source.includes("appliedPins.length === 9") &&
+  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("appliedPins.length === 10") &&
+  g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
   !/state\.migrations\.length\s*>=/.test(g1Source) &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source));
 record("G06 this validator is registered and wired into CI immediately after 50.4",
@@ -667,9 +677,23 @@ const mutants = [
   ["silently loosening the G1 pin is impossible",
     () => /const MIGRATION_COUNT = 97;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
-  ["claiming the migration is applied to staging is impossible offline",
+  // The pending set is now empty, so an `every()` over it would be vacuously
+  // true and would guard nothing. The real risk moved: an APPLIED record that
+  // misrepresents HOW it was proven, or a future pending record that claims
+  // applied evidence it does not have. Both are checked concretely.
+  ["a pending record claiming applied evidence is impossible",
     () => (manifest.pendingPostAnchorMigrations ?? []).every((r) =>
-      r.remoteVersionStatus === "NOT_PROVEN_OFFLINE" && !("remoteHistoryCountAfterApply" in r))],
+      r.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+      !("remoteHistoryCountAfterApply" in r) && !("appliedEvidenceMarker" in r))],
+  ["misrepresenting how 50.5 was proven on staging is detectable",
+    () => {
+      const pin = manifest.appliedPostAnchorMigrations.find((r) => r.version === "20260812000000");
+      return pin?.appliedEvidenceType === "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_STAGING_EXECUTION" &&
+        pin.appliedByThisPhase === true &&
+        pin.remoteHistoryCountAfterApply === 30 &&
+        typeof pin.evidencePath === "string" &&
+        existsSync(path.join(ROOT, pin.evidencePath));
+    }],
 ];
 for (const [name, fn] of mutants) {
   let held = false;

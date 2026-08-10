@@ -765,21 +765,28 @@
       "remoteStatementCount": 18,
       "remoteOrderedStatementDigestSha256": "4bc79fb75c34058d91955a79d4fc67eeafe590923b6a31dc9d6c521fc793e8ea",
       "evidencePath": "docs/QF-MVP-50-3-50-4-STAGING-FORENSIC-RECONCILIATION.md"
-    }
-  ],
-  "pendingPostAnchorMigrations": [
+    },
     {
       "version": "20260812000000",
       "name": "qf_mvp_50_5_automation_recovery_reconciliation",
       "path": "supabase/migrations/20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql",
       "sha256": "25a142009bc389ae9e6f1fae95b873e0858c74b4a5792cbf3217dfb4e3af189b",
       "phase": "QF-MVP-50.5",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_50_5_STAGING_MIGRATION_APPLIED_AND_VERIFIED",
+      "appliedEvidenceType": "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_STAGING_EXECUTION",
+      "remoteHistoryCountAfterApply": 30,
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": true,
+      "catalogParityVerified": true,
+      "forensicClassification": "APPLIED_BY_THIS_PHASE_CATALOG_VERIFIED_AGAINST_PRE_APPLY_SNAPSHOT",
+      "applyExecutorProvenance": "SUPABASE_CLI_2_112_0_DB_PUSH_DB_URL_IPV4_POOLER",
+      "migrationHistoryTimestampAvailable": true,
+      "evidencePath": "docs/QF-MVP-50-5-STAGING-CERTIFICATION.md",
+      "mustApplyAfterVersion": "20260811000000"
     }
   ],
+  "pendingPostAnchorMigrations": [],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,

@@ -725,16 +725,18 @@ record("G01 the anchor is untouched",
 // post-anchor migrations are APPLIED and ZERO remain pending.
 // QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
 // (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
-record("G02 exactly nine APPLIED and one PENDING post-anchor migration",
+// QF-MVP-50.5 STAGING GATE RE-PIN: the recovery migration passed its own staging
+// gate, so all TEN post-anchor migrations are APPLIED and none remain pending.
+record("G02 exactly ten APPLIED and zero PENDING post-anchor migrations",
   manifest.appliedAnchor?.postAnchorMigrationCount === 10 &&
-  manifest.appliedPostAnchorMigrations?.length === 9 &&
+  manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 1 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260812000000" &&
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate === true &&
+  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
+  manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply === 30 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G02c 20260808000000 is recorded APPLIED with remote history 25, hash-exact",
   manifest.appliedPostAnchorMigrations[4].version === "20260808000000" &&
   manifest.appliedPostAnchorMigrations[4].sha256 ===
@@ -779,8 +781,15 @@ record("G04 20260805000000 is recorded APPLIED with remote history 22, hash-exac
   manifest.appliedPostAnchorMigrations[1].appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
   manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply === 22 &&
   manifest.appliedPostAnchorMigrations[1].appliedExactlyOnce === true);
-record("G05 no applied record fabricates an offline remote status or self-claims the apply",
-  manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r) && r.appliedByThisPhase === false) &&
+// QF-MVP-50.5 STAGING GATE RE-PIN: exactly one applied record — the 50.5 recovery
+// migration — was applied by the phase that pinned it, through its own staging
+// gate with a first-party exact-one dry run. Every other record stays imported,
+// and no record may fabricate an offline remote status.
+record("G05 no applied record fabricates an offline remote status, and only 50.5 self-claims the apply",
+  manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r)) &&
+  manifest.appliedPostAnchorMigrations.every((r) =>
+    r.appliedByThisPhase === (r.version === "20260812000000")) &&
+  manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
 record("G06 G1 pins the exact count 97, not a lower bound",

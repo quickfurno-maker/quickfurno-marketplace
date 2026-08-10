@@ -14,6 +14,14 @@
 //       printed a confident "0" for a table that does not exist, contradicting
 //       the same page's own NOT_PROVISIONED state. Counts must stay null.
 //
+//   D3  implicit locale/time-zone timestamp rendering produced different
+//       server and browser strings. Admin timestamps now share an explicit
+//       en-IN / Asia-Kolkata convention.
+//
+//   D4  the obsolete AI Agents route and planned-agent catalogue implied a
+//       roadmap surface that no longer exists. The real AOS readiness/runtime
+//       control remains; the placeholder route, nav and catalogue do not.
+//
 // Offline: no database, no network, no provider call, no secret read.
 // The harness does not replace the rendered QA; it prevents its findings from
 // silently regressing.
@@ -45,6 +53,21 @@ const shared = read("components/admin/whatsapp/whatsappShared.tsx");
 const primitives = read("components/admin/AdminPrimitives.tsx");
 const shell = read("components/admin/AdminShell.tsx");
 const css = read("app/globals.css");
+const adminUtils = read("components/admin/adminUtils.ts");
+const sectionPage = read("components/admin/AdminSectionPage.tsx");
+const miscSections = read("components/admin/sections/MiscSections.tsx");
+const dynamicSectionRoute = read("app/admin/[section]/page.tsx");
+
+const adminTimestampConsumers = [
+  shared,
+  read("components/admin/RequirementGroupsPanel.tsx"),
+  read("components/admin/AosAutomationControl.tsx"),
+  read("components/admin/AOSControlCenter.tsx"),
+  read("components/admin/crm/campaigns/VendorCampaignDirectory.tsx"),
+  read("components/admin/crm/campaigns/VendorCampaignEditor.tsx"),
+  read("components/admin/crm/segments/VendorSegmentDirectory.tsx"),
+  read("components/admin/crm/segments/VendorSegmentEditor.tsx"),
+];
 
 const waClients = [
   "WhatsAppControlCenter", "WhatsAppOverviewTab", "WhatsAppTemplatesTab",
@@ -105,6 +128,19 @@ check("the rail mark carries an icon rather than being an empty box", /<AdminIco
 check("the specificity trap is documented where it bites", /specificity \(0,2,0\)/.test(overview));
 check("qfa-glow-chip still has its designed size in the stylesheet", /\.admin-surface \.qfa-glow-chip \{[^}]*width: 30px/.test(css));
 
+// ── 3b. D3 REGRESSION — rendered timestamps are hydration-deterministic ────
+const hasDeterministicAdminDateTime = (source) =>
+  /ADMIN_LOCALE = "en-IN"/.test(source) &&
+  /ADMIN_TIME_ZONE = "Asia\/Kolkata"/.test(source) &&
+  /timeZone: ADMIN_TIME_ZONE/.test(source);
+check("Admin timestamps declare the en-IN / Asia-Kolkata convention", hasDeterministicAdminDateTime(adminUtils));
+check("the WhatsApp timestamp helper delegates to the deterministic formatter", /return formatDateTime\(value, "—"\);/.test(shared));
+check("rendered Admin timestamp paths contain no implicit toLocaleString()", adminTimestampConsumers.every((source) => !/\.toLocaleString\(\)/.test(source)));
+check(
+  "timestamp mutation self-test rejects removal of the explicit business zone",
+  !hasDeterministicAdminDateTime(adminUtils.replaceAll('timeZone: ADMIN_TIME_ZONE', "")),
+);
+
 // ── 4. WhatsApp route + navigation (verified rendered in C6 QA) ────────────
 check("the whatsapp nav item exists", /key: "whatsapp", href: "\/admin\/whatsapp"/.test(config));
 check("the route is server-guarded for superadmin", /session\.isSuperadmin/.test(route) && /getAdminSession\(\)/.test(route));
@@ -112,6 +148,18 @@ check("all seven tabs are declared", (() => {
   const t = read("components/admin/whatsapp/whatsappAdminTypes.ts");
   return ["overview", "templates", "messages", "delivery", "consent", "provider", "automation"].every((x) => t.includes(`"${x}"`));
 })());
+
+// ── 4b. D4 REGRESSION — obsolete AI Agents placeholder is gone ────────────
+const aiPlaceholderSources = [config, sectionPage, miscSections, dynamicSectionRoute].join("\n");
+const hasLegacyAiPlaceholder = (source) =>
+  /ai-agents|AIAgentsPage|\baiAgents\b|label: "AI Agents"|Planned agent roles/.test(source);
+check("the AI Agents nav, route dispatch and catalogue are absent", !hasLegacyAiPlaceholder(aiPlaceholderSources));
+check("the real AOS readiness and runtime control remain", /AosReadinessPage/.test(sectionPage) && /AosAutomationControl/.test(miscSections));
+check("no fake Admin Vision route or production claim was introduced", !/\/admin\/vision|Vision Supervisor|QF VISION/.test(aiPlaceholderSources));
+check(
+  "AI placeholder mutation self-test detects a reintroduced route",
+  hasLegacyAiPlaceholder(`${aiPlaceholderSources}\n{ key: "ai-agents", label: "AI Agents" }`),
+);
 
 // ── 5. No provider call / no send / no activation from the browser ─────────
 check("no client component calls the Meta Graph API", waClients.every((s) => !/graph\.facebook/.test(s)));

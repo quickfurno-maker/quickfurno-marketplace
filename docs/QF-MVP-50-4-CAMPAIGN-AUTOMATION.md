@@ -6,6 +6,7 @@
 | State | Meaning | 50.4 today |
 |---|---|---|
 | SOURCE READY | vehicle contract and producer exist, gates green, migration written | **yes** |
+| STAGING MIGRATIONS RECONCILED | 085/090/100/110 are recorded exactly once and catalog-match accepted source | **yes** - forensic import; this phase did not apply them |
 | STAGING CERTIFIED | migration applied and behaviour observed on staging | no |
 | LIVE PROVIDER READY | approved template + mapping + provider account | no — QF-MVP-40 / QF-MVP-80 |
 
@@ -91,4 +92,4 @@ The claim route accepts exactly two shapes — the byte-compatible legacy three-
 
 The executor slice is now source-complete: the signed `execute-campaign` route, the campaign execution service wired to the binding 40.8 seam, and the **inactive** campaign n8n executor (`automation/n8n/QF-MVP-50-04-Campaign-Execution-Executor.workflow.json`, `active:false`) which claims exactly `workflowFamily = campaign_execution`.
 
-What remains is **operational**, not source: the three pending migrations must be applied to staging exactly once, and the campaign executor must be certified against staging through a real isolated n8n runtime. Until then 50.4 is SOURCE READY only.
+What remains is **operational**, not source: the already-recorded 085/090/100/110 migrations have been forensically reconciled to accepted source without reapplication, but the campaign executor must still be certified against staging through a real isolated n8n runtime. The next allowed action is **real 50.3/50.4 orchestration certification without migration apply**. Until that succeeds, 50.4 is SOURCE READY only and is not staging certified.

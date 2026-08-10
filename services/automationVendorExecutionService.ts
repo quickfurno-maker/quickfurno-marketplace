@@ -464,6 +464,9 @@ async function resolveVendorFacts(
 ): Promise<VendorFactsResult> {
   let vendorId = entityId;
 
+  // A canonical assignment can disappear or lose its vendor before a delayed
+  // executor reaches it. Both are stale business truth and use the existing
+  // definitive pre-communication non-send ruling.
   if (entityType === "lead_assignment") {
     const { data, error } = await adminClient()
       .from("lead_assignments")
@@ -472,9 +475,9 @@ async function resolveVendorFacts(
       .maybeSingle();
     if (error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
     const row = data as { id: string; vendor_id: string | null } | null;
-    if (!row) return { ok: false, code: "QF_EXEC_VENDOR_ASSIGNMENT_NOT_FOUND" };
+    if (!row) return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
     if (!row.vendor_id) {
-      return { ok: false, code: "QF_EXEC_VENDOR_ASSIGNMENT_NOT_FOUND" };
+      return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
     }
     vendorId = row.vendor_id;
   }

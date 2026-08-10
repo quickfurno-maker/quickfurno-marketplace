@@ -353,30 +353,34 @@ record("B07 no campaign schema is touched by the vendor migration",
 // ---------------------------------------------------------------------------
 // G. GOVERNANCE
 // ---------------------------------------------------------------------------
-record("G01 the migration is pinned PENDING with exact identity",
+record("G01 the migration is forensically reconciled APPLIED with exact identity",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations
+    const pin = manifest.appliedPostAnchorMigrations
       .find((r) => r.version === "20260809000000");
     return Boolean(pin) &&
       pin.path === MIGRATION_PATH &&
       pin.sha256 === MIGRATION_SHA &&
-      pin.operationalStatus === "PENDING" &&
-      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      pin.requiresSeparateStagingDeploymentGate === true &&
+      pin.operationalStatus === "APPLIED" &&
+      pin.appliedEvidenceType === "IMPORTED_FOUNDER_ACKNOWLEDGED_EXISTING_STAGING_STATE" &&
+      pin.remoteHistoryCountAfterApply === 27 &&
+      pin.appliedExactlyOnce === true &&
       pin.appliedByThisPhase === false &&
-      !("appliedEvidenceMarker" in pin) &&
-      !("remoteHistoryCountAfterApply" in pin);
+      pin.catalogParityVerified === true &&
+      pin.forensicClassification === "APPLIED_RECORDED_CATALOG_MATCHES_CURRENT_SOURCE" &&
+      pin.applyExecutorProvenance === "UNKNOWN";
   })());
-record("G02 the six applied post-anchor records read 21/22/23/24/25/26",
+record("G02 the nine applied post-anchor records read 21 through 29",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26]));
-record("G03 no fabricated remote history for this migration",
+    [21, 22, 23, 24, 25, 26, 27, 28, 29]));
+record("G03 no stale pending status or fabricated executor for this migration",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations.find((r) => r.version === "20260809000000");
+    const pin = manifest.appliedPostAnchorMigrations.find((r) => r.version === "20260809000000");
     return Boolean(pin) &&
-      pin.operationalStatus === "PENDING" &&
-      !("remoteHistoryCountAfterApply" in pin) &&
-      !("appliedEvidenceMarker" in pin);
+      pin.operationalStatus === "APPLIED" &&
+      pin.remoteHistoryCountAfterApply === 27 &&
+      pin.applyExecutorProvenance === "UNKNOWN" &&
+      !("remoteVersionStatus" in pin) &&
+      !manifest.pendingPostAnchorMigrations.some((r) => r.version === "20260809000000");
   })());
 record("G04 the doc states SOURCE READY, not complete",
   /SOURCE READY/.test(doc) &&
@@ -508,7 +512,7 @@ record("V13 (D) governance records the availability-toggle distinction",
     .guardStillAbortsOnEveryOtherMatch === true);
 record("V14 the 090 pin records the correction and the superseded hash",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations.find((r) => r.version === "20260809000000");
+    const pin = manifest.appliedPostAnchorMigrations.find((r) => r.version === "20260809000000");
     return pin?.sha256 === MIGRATION_SHA &&
       pin.supersededSourceSha256 ===
         "a4b94ac6df39caa71ef9adcb8f40eb19850d425f3724c82fc4a7bc979ed8fb11" &&
@@ -678,17 +682,19 @@ record("K21 the client workflow JSON is byte-unchanged",
   canonicalSha256(readFileSync(path.join(ROOT,
     "automation/n8n/QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json")))
     === "79716cd979aedaaa06aced84d843cad3ca15b47580bbbed8f85175b8c916dad4");
-record("K22 the claim migration is pinned PENDING with exact identity",
+record("K22 the claim migration is forensically reconciled APPLIED with exact identity",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations
+    const pin = manifest.appliedPostAnchorMigrations
       .find((r) => r.version === "20260811000000");
     return Boolean(pin) &&
       pin.path === CLAIM_MIGRATION_PATH &&
       pin.sha256 === CLAIM_MIGRATION_SHA &&
-      pin.operationalStatus === "PENDING" &&
-      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      pin.requiresSeparateStagingDeploymentGate === true &&
-      pin.appliedByThisPhase === false;
+      pin.operationalStatus === "APPLIED" &&
+      pin.remoteHistoryCountAfterApply === 29 &&
+      pin.appliedExactlyOnce === true &&
+      pin.appliedByThisPhase === false &&
+      pin.catalogParityVerified === true &&
+      pin.applyExecutorProvenance === "UNKNOWN";
   })());
 
 const claimMutants = [

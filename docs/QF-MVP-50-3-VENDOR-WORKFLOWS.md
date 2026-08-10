@@ -8,6 +8,7 @@ Three distinct states are tracked separately and must never be conflated:
 | State | Meaning | 50.3 today |
 |---|---|---|
 | SOURCE READY | contracts and producers exist, gates green, migration written | **yes** |
+| STAGING MIGRATIONS RECONCILED | 085/090/100/110 are recorded exactly once and catalog-match accepted source | **yes** - forensic import; this phase did not apply them |
 | STAGING CERTIFIED | migration applied and behaviour observed on staging | no |
 | LIVE PROVIDER READY | an approved template + mapping + provider account exists | no — owned by QF-MVP-40 / QF-MVP-80 |
 
@@ -106,6 +107,6 @@ The claim route accepts exactly two shapes — the byte-compatible legacy three-
 
 The executor slice is now source-complete: the signed `execute-vendor` route, the vendor execution service with all five execution-time reproofs, and the **inactive** vendor n8n executor (`automation/n8n/QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json`, `active:false`) which claims exactly `workflowFamily = vendor_whatsapp`.
 
-What remains is **operational**, not source: the three pending migrations must be applied to staging exactly once, and the vendor executor must be certified against staging through a real isolated n8n runtime. Until then 50.3 is SOURCE READY only.
+What remains is **operational**, not source: the already-recorded 085/090/100/110 migrations have been forensically reconciled to accepted source without reapplication, but the vendor executor must still be certified against staging through a real isolated n8n runtime. The next allowed action is **real 50.3/50.4 orchestration certification without migration apply**. Until that succeeds, 50.3 is SOURCE READY only and is not staging certified.
 
 **Known truthful limitation.** Only `vendor_onboarding_reminder` currently has a bound business variable contract. The other four vendor templates do not, so those actions terminate as a Core-owned `QF_EXEC_VARIABLES_UNRESOLVED` definitive non-send — the same shape two client actions already have. Binding those template variables is QF-MVP-40.12 territory, not this phase.

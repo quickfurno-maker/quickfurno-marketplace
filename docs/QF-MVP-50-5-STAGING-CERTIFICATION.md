@@ -187,6 +187,116 @@ and the n8n Recovery Supervisor graph are certified separately in
 `QF_N8N_TRANSPORT_MODE` stays `off` for staging Core unless a certification run is
 explicitly in progress, and no Meta send is possible in any of it.
 
-## 7. Signed HTTP + n8n certification
+## 7. Signed HTTP + n8n certification — PASSED
 
-_Pending — see the covering pull request for status._
+Real n8n **1.108.2** in a local container, driving **local Core bound to staging**, over
+real HTTPS with real HMAC signing in both directions. The shipped workflow
+`QF-MVP-50-05-Recovery-Supervisor` was imported unmodified and left `active: false`.
+
+**Staging binding was proven, not assumed.** `.env.local` in this repository holds a
+PRODUCTION `service_role` key, so Core was started with the staging values exported
+first and the effective `@next/env` resolution asserted before Next booted. The build was
+then re-made with the staging values so that no `NEXT_PUBLIC_*` value inlined at build
+time could point at production: the production project ref appears in **0** files of the
+server build, the staging ref in 4.
+
+The graph refuses any non-HTTPS base URL (`/^https:\/\//`), so a local TLS terminator
+forwards verbatim to Core — method, path, headers and raw body pass through byte-for-byte,
+because each is a canonical signing field.
+
+### Recover lane — 32 nodes executed, full chain
+Preconditions `configured=true` → exact three-key body → SHA-256 → canonical → HMAC →
+signed POST → **Core 200 `recovery_claimed`** → response SHA-256 → response canonical →
+response HMAC → **`verified=true`** → branch on Core's state.
+
+Core's answer carried `workflowFamily: "client_whatsapp"`, `replayed: false` and the NEW
+attempt identity (`attemptNumber: 2`). Verified in the staging database: a `recover_v1`
+transport row in state `recovered` written by worker `qf-50-5-cert-n8n`, the job moved
+`retry_scheduled → processing`, `attempt_count` 1 → 2, and a new attempt owned by that
+worker.
+
+The lane then forwarded the recovered identity to `execute_v1`, which Core refused with
+**409 `AUTOMATION_EXECUTION_ENTITY_IDENTITY_INVALID`** for the synthetic fixture, because
+Core rebuilds business facts from its own ledgers and the fixture's entity is not a real
+lead. That is correct fail-closed behaviour and a second independent reason no provider
+call was possible.
+
+### Reconcile lane — 17 nodes executed, full chain
+Same signing discipline, ending at **Core 200 `reconcile_finalized`** with
+`jobStatus: "retry_scheduled"`, `classification: "retryable_failure"`,
+`safeCode: "QF_RECOVER_PRE_EXECUTION_ABANDONED"` — evidence case A — and response
+signature `verified=true`. Verified in the database: the attempt was completed through the
+FROZEN `qf_complete_automation_attempt_v1` while **preserving the original owner's
+worker id**, the job's lock was released, and Core set `next_retry_at` from the frozen
+backoff. Exactly one `reconcile_v1` row was recorded.
+
+### HTTP transport fence — 10/10
+Proofs the graph cannot produce on its own, using the graph's canonical scheme verbatim:
+
+| # | Proof |
+| --- | --- |
+| H01 | a correctly signed recover request is accepted (200) |
+| H02 | Core signs its response; version, request id, body hash and signature all verify |
+| H03 | the first answer is not a replay |
+| H04 | a recovered answer carries the new attempt identity and canonical family |
+| H05 | a recovery replay is **suppressed** — 409 `AUTOMATION_RECOVERY_REPLAY_EXECUTION_SUPPRESSED` |
+| H06 | the suppression leaks no attempt identity or family whatsoever |
+| H07 | the suppression answer is itself signed and verifies |
+| H08 | a tampered request signature is refused, 401 `TRANSPORT_SIGNATURE_INVALID` |
+| H09 | an unauthenticated refusal is **not** signed — no signing oracle |
+| H10 | a signature bound to another route cannot authenticate here |
+
+H05 is worth stating precisely, because the service layer is deliberately **stricter than
+SQL**. SQL answers a duplicate request identity with `is_replay=true`; the service refuses
+to convert that into a second executable envelope at all. Across the whole run, duplicated
+`(job_id, attempt_number)` pairs: **0**.
+
+### No provider effect
+`communication_messages` in the entire staging database: **0**, before and after.
+`communication_provider_runtime_policies`: 0 rows. ACTIVE provider template mappings: 0.
+No Meta call occurred or could occur.
+
+## 8. Unintended staging impact — stated in full
+
+The database-layer certification in §5 rolled back and left zero residue. **This
+signed-HTTP certification could not roll back**, because Core and n8n commit in their own
+transactions. It therefore left real state, and more of it than intended.
+
+**What happened.** Recovery selects the globally-oldest due job. The intended protocol was
+to seed a guaranteed-oldest synthetic fixture before *every* run so the selector could
+only ever reach the fixture. That held for the seeded runs, but twice I misread the
+harness: an n8n execution that had genuinely run was reported by my own polling as "0 nodes
+executed", and an activation experiment that I concluded "never fired" had in fact fired
+once a minute for roughly seven minutes. During those unseeded runs the selector correctly
+reached **real** staging jobs.
+
+**Exact impact — 9 real client jobs:**
+
+* **8** moved `retry_scheduled → failed` (terminal), each `definitive_failure /
+  QF_EXEC_LEAD_NOT_FOUND`. These referenced leads that do not exist, so they could never
+  have succeeded; the transition is what any real execution would have produced. Terminal
+  automation jobs are immutable by design, so this is **not reversible**.
+* **1** (`ba0c368b…`) moved `processing → retry_scheduled` via reconciliation, which is the
+  correct treatment of a genuinely abandoned attempt.
+
+**What was NOT touched, verified explicitly rather than inferred:**
+
+* All four QF-MVP-50.3/50.4 **PASS-B delayed jobs** — still `pending 0/5` with
+  `available_at` unchanged: `182813d1…`, `a9dcbaaf…`, `fb354493…`, `6bcf9d90…`.
+* Both **frozen mid-flight processing locks** — still `processing`, `locked_at` unchanged:
+  `98251bf3…` (`qf-cert-50-2-…`, the QF-MVP-50.2B evidence) and `5673ba62…`
+  (`qf-cert-50-3-50-4-isolated`).
+* The parked QF-MVP-50.2 evidence `cf27f3da…`.
+* **Any vendor or campaign job.** Every transport row this certification wrote belongs to
+  the `client_whatsapp` family; vendor and campaign families were never selected.
+* Any business row — no lead, vendor, assignment or communication row was created,
+  modified or deleted, and `communication_messages` remains 0.
+
+**Fixtures left behind**, all tagged `qf505cert-n8n-*`: 7 jobs (6 `processing` at attempt
+2, 1 `retry_scheduled`) plus their action requests and attempts. They are append-only
+history and are deliberately not cleaned up.
+
+**The rule this establishes for any future non-rollbackable staging run:** seed the
+guaranteed-oldest fixture before *every* invocation, and never infer from a harness's own
+"nothing happened" that nothing happened — confirm against the database.
+

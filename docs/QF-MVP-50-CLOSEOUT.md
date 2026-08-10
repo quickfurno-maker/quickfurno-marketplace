@@ -1,7 +1,7 @@
 # QF-MVP-50 — Automation orchestration closeout
 
 **Status: SOURCE COMPLETE. ALL TEN POST-ANCHOR MIGRATIONS APPLIED TO STAGING.
-50.5 DATABASE-LAYER RECOVERY CERTIFIED. SIGNED-HTTP / n8n CERTIFICATION OUTSTANDING.**
+50.5 CERTIFIED AT BOTH LAYERS — DATABASE 65/65 AND SIGNED HTTP THROUGH REAL n8n.**
 
 This document records what QF-MVP-50 actually delivers and, just as precisely, what it
 does not. It authorizes no production change.
@@ -22,7 +22,7 @@ does not. It authorizes no production change.
 | 50.3 | vendor workflows | complete | applied (histories 26–27) | certified |
 | 50.4 | campaign recipient automation | complete | applied (history 28) | certified |
 | 50.3/50.4 | family-aware claim routing repair | complete | applied (history 29) | certified |
-| **50.5** | **recovery + reconciliation** | **complete** | **applied (history 30)** | **database layer certified 65/65; signed-HTTP/n8n outstanding** |
+| **50.5** | **recovery + reconciliation** | **complete** | **applied (history 30)** | **certified: database 65/65 + real n8n signed HTTP, fence 10/10** |
 
 Staging remote history is **30**. Local migration count is **97**. Every post-anchor
 migration is now APPLIED and the manifest's pending set is present and empty.
@@ -91,14 +91,16 @@ These are real gaps, recorded so no later phase inherits an assumption.
   and deliver the recipient a duplicate message. Wiring a governed communication
   due-sweep, and provider/channel operational readiness generally, belongs to the
   applicable QF-MVP-40 and QF-MVP-80 work — **not** to QF-MVP-50.
-- **The signed-HTTP and n8n layer of 50.5 is not yet certified.** The database layer is
-  certified against the real staging database — 65 of 65 assertions, covering due-retry
-  recovery, replay, retry-generation uniqueness, negative selection against a genuinely
-  drained queue, stale reconciliation and every guard, the dead-letter boundary, execute
-  reservation ageing, and a three-lane mixed queue. What has **not** been exercised is
-  `/api/internal/automation/n8n/recover` and `…/reconcile` over real signed HTTP driven by
-  a real n8n instance. That is a transport-layer gap, not a logic gap, and it is recorded
-  as outstanding rather than quietly implied.
+- **The 50.5 signed-HTTP certification left irreversible staging state, including 9 real
+  client jobs it was not meant to touch.** Recovery selects the globally-oldest due job, and
+  two runs proceeded without a guaranteed-oldest fixture in place because the harness
+  misreported them as not having executed. Eight orphaned client jobs whose leads do not
+  exist advanced to terminal `failed / QF_EXEC_LEAD_NOT_FOUND`, and one abandoned attempt
+  was reconciled back to `retry_scheduled`. Every explicitly protected row survived and was
+  verified individually: the four PASS-B delayed vendor jobs, both frozen mid-flight
+  processing locks, the parked 50.2 evidence, and every vendor and campaign job. No business
+  row changed and `communication_messages` is still 0. Full account in
+  `docs/QF-MVP-50-5-STAGING-CERTIFICATION.md` §8.
 - **Provider sending is structurally impossible on staging as configured, and that is a
   gap as much as a safety property.** `communication_provider_runtime_policies` holds zero
   rows and all eight provider template mappings are `is_active = false`, so any execution
@@ -129,9 +131,14 @@ Node 24, with no secrets and no Supabase, database or deployment command:
    harnesses re-pinned to exact values rather than loosened.**
 3. ~~Certify recovery behaviour against the real staging database.~~ **Done — 65/65,
    inside an always-rolled-back transaction leaving zero residue.**
-4. Certify the signed-HTTP layer against a real n8n runtime: the `recover` and `reconcile`
-   routes end to end, including response-signature verification in both directions. This
-   requires a staging-bound Core, which requires the staging `service_role` key; the
-   production key in `.env.local` must never be used for it.
-5. Only then consider production, as a separately governed decision. Production has
+4. ~~Certify the signed-HTTP layer against a real n8n runtime.~~ **Done — real n8n 1.108.2
+   drove both routes end to end against staging-bound Core over real HTTPS, with Core's
+   response signature verified in both directions, plus a 10/10 transport fence covering
+   replay suppression, signature tampering, the absence of a signing oracle, and
+   cross-route signature binding. Provider effects: zero.**
+5. Owner decision outstanding on the staging side effect in §8 of the certification
+   evidence: 9 real client jobs advanced state, 8 of them irreversibly to terminal
+   `failed`. Nothing protected was lost, but if any of those 8 were wanted as future
+   fixtures they must be re-seeded rather than recovered.
+6. Only then consider production, as a separately governed decision. Production has
    received none of the QF-MVP-50 migrations.

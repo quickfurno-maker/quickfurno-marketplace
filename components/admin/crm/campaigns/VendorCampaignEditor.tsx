@@ -23,6 +23,7 @@ import {
   PageHeader, SectionCard, InfoGrid, DataTable, StatusBadge,
   PrimaryButton, SecondaryButton, EmptyState,
 } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import {
   CAMPAIGN_PURPOSES, CAMPAIGN_CONSENT_SCOPES, CAMPAIGN_CHANNELS,
   CAMPAIGN_MAX_NAME_LENGTH, CAMPAIGN_MAX_DESCRIPTION_LENGTH,
@@ -299,9 +300,8 @@ export function VendorCampaignEditor({
             // prepare and recomputed at approval, so they are shown as evidence.
             ["Template fingerprint", <code key="tf" className="text-xs">{campaign.prepared_template_fingerprint ?? "—"}</code>],
             ["Snapshot fingerprint", <code key="nf" className="text-xs">{campaign.snapshot_fingerprint ?? "—"}</code>],
-            ["Audience evaluated", campaign.audience_evaluated_at
-              ? new Date(campaign.audience_evaluated_at).toLocaleString() : "—"],
-            ["Approved", campaign.approved_at ? new Date(campaign.approved_at).toLocaleString() : "—"],
+            ["Audience evaluated", formatDateTime(campaign.audience_evaluated_at, "—")],
+            ["Approved", formatDateTime(campaign.approved_at, "—")],
           ]} />
         </SectionCard>
       )}
@@ -360,7 +360,7 @@ export function VendorCampaignEditor({
               <div className="text-sm text-slate-600">
                 <strong className="tabular-nums">{preview.total}</strong> vendor
                 {preview.total === 1 ? "" : "s"} match the source segment · evaluated{" "}
-                {new Date(preview.evaluatedAt).toLocaleString()} · page {preview.page} (max {preview.pageSize})
+                {formatDateTime(preview.evaluatedAt)} · page {preview.page} (max {preview.pageSize})
               </div>
               <p className="text-xs text-slate-500">
                 These are segment CANDIDATES, not the audience. Consent, suppression and vendor
@@ -396,7 +396,7 @@ export function VendorCampaignEditor({
               { header: "Event", cell: (e) => e.event_type.replace(/_/g, " ") },
               { header: "Campaign rev", cell: (e) => <span className="tabular-nums">{e.campaign_revision}</span> },
               { header: "Snapshot rev", cell: (e) => <span className="tabular-nums">{e.snapshot_revision ?? "—"}</span> },
-              { header: "When", cell: (e) => new Date(e.occurred_at).toLocaleString() },
+              { header: "When", cell: (e) => formatDateTime(e.occurred_at) },
             ]}
             rows={events}
             emptyTitle="No events"

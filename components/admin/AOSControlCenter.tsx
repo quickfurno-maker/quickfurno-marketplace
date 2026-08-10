@@ -12,6 +12,7 @@ import {
   Tabs,
 } from "./AdminPrimitives";
 import type { Snapshot } from "./adminTypes";
+import { formatDateTime as formatAdminDateTime } from "./adminUtils";
 import { AOS_AGENT_REGISTRY } from "@/lib/aos/agents/agentRegistry";
 import { getPreviewWorkflowRoutes } from "@/lib/aos/events/n8nPreviewWorkflowMap";
 import {
@@ -772,11 +773,7 @@ function Bool({ value }: { value: boolean }) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "Not run";
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatAdminDateTime(value, "Not run");
 }
 
 function maskSensitive(value: string) {

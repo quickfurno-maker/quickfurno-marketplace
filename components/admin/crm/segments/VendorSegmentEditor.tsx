@@ -16,6 +16,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, SectionCard, InfoGrid, DataTable, StatusBadge, PrimaryButton, SecondaryButton, EmptyState } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import {
   SEGMENT_FIELDS, SEGMENT_OPERATORS, SEGMENT_COMBINATORS, SEGMENT_MAX_GROUPS,
   SEGMENT_MAX_PREDICATES_PER_GROUP, SEGMENT_MAX_PREDICATES_TOTAL, SEGMENT_SCHEMA_VERSION,
@@ -290,8 +291,8 @@ export function VendorSegmentEditor({
             ["Status", <StatusBadge key="s" value={segment.status} />],
             ["Definition version", <span key="v" className="tabular-nums">v{segment.definition_version}</span>],
             ["Fingerprint", <code key="f" className="text-xs">{segment.definition_fingerprint}</code>],
-            ["Created", new Date(segment.created_at).toLocaleString()],
-            ["Updated", new Date(segment.updated_at).toLocaleString()],
+            ["Created", formatDateTime(segment.created_at)],
+            ["Updated", formatDateTime(segment.updated_at)],
           ]} />
         </SectionCard>
       )}
@@ -301,7 +302,7 @@ export function VendorSegmentEditor({
           <div className="space-y-3">
             <div className="text-sm text-slate-600">
               <strong className="tabular-nums">{preview.total}</strong> vendor{preview.total === 1 ? "" : "s"} match ·
-              evaluated {new Date(preview.evaluatedAt).toLocaleString()} ·
+              evaluated {formatDateTime(preview.evaluatedAt)} ·
               page {preview.page} (max {preview.pageSize})
             </div>
             <DataTable<any>

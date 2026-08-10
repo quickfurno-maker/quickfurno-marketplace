@@ -14,6 +14,7 @@ import {
   adminProcessPreferredVendorWindow,
   adminProcessPreferredVendorRechargeWindows,
 } from "@/app/actions";
+import { formatDateTime } from "./adminUtils";
 
 type GroupCounts = {
   total: number;
@@ -77,10 +78,7 @@ function maskPhone(phone: string | null): string {
 }
 
 function fmt(value: string | null): string {
-  if (!value) return "—";
-  const t = Date.parse(value);
-  if (Number.isNaN(t)) return "—";
-  return new Date(t).toLocaleString();
+  return formatDateTime(value, "—");
 }
 
 function stateLabel(state: string): string {

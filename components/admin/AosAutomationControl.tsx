@@ -12,6 +12,7 @@
 // ============================================================================
 import { useCallback, useEffect, useState } from "react";
 import { PrimaryButton, SecondaryButton, SectionCard, StatCard, StatusBadge } from "./AdminPrimitives";
+import { formatDateTime } from "./adminUtils";
 
 type RuntimeMode = "off" | "preview" | "production_locked";
 
@@ -281,8 +282,5 @@ function modeLabel(mode: RuntimeMode): string {
 }
 
 function formatUpdated(value: string | null): string {
-  if (!value) return "not yet set";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "unknown";
-  return date.toLocaleString();
+  return formatDateTime(value, "not yet set");
 }

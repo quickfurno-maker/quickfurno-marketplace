@@ -12,6 +12,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, DataTable, StatusBadge, SelectFilter, SecondaryButton, EmptyState } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import type { VendorCampaignListResult, VendorCampaignRow } from "@/services/vendorCampaignService";
 
 const STATUS_OPTIONS = ["All", "draft", "ready_for_review", "approved", "cancelled", "archived"];
@@ -104,7 +105,7 @@ export function VendorCampaignDirectory({
                   </span>
                 ),
               },
-              { header: "Updated", cell: (c) => new Date(c.updated_at).toLocaleString() },
+              { header: "Updated", cell: (c) => formatDateTime(c.updated_at) },
             ]}
             rows={result.rows}
             emptyTitle="No campaigns yet"

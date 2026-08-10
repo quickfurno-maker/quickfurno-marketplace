@@ -11,6 +11,7 @@
 
 import type { ReactNode } from "react";
 import { EmptyState, StatusBadge } from "../AdminPrimitives";
+import { formatDateTime } from "../adminUtils";
 import type { SectionFault } from "@/services/adminWhatsAppService";
 import { faultCopy } from "./whatsappAdminTypes";
 
@@ -127,9 +128,7 @@ export function FactGrid({ rows }: { rows: Array<[string, ReactNode]> }) {
 
 /** Timestamp formatting. An absent value is an em dash, never "now" or "never". */
 export function when(value?: string | null): string {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString();
+  return formatDateTime(value, "—");
 }
 
 /** Snake-case vocabulary rendered readably WITHOUT changing the underlying word. */

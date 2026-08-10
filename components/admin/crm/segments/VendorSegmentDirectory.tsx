@@ -9,6 +9,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, DataTable, StatusBadge, SelectFilter, SecondaryButton, EmptyState } from "../../AdminPrimitives";
+import { formatDateTime } from "../../adminUtils";
 import type { VendorSegmentListResult, VendorSegmentRow } from "@/services/vendorSegmentService";
 
 const STATUS_OPTIONS = ["All", "draft", "active", "archived"];
@@ -89,7 +90,7 @@ export function VendorSegmentDirectory({
                   </code>
                 ),
               },
-              { header: "Updated", cell: (s) => new Date(s.updated_at).toLocaleString() },
+              { header: "Updated", cell: (s) => formatDateTime(s.updated_at) },
             ]}
             rows={result.rows}
             emptyTitle="No segments yet"

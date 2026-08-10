@@ -48,9 +48,10 @@ const FROZEN = [
 
 const MIGRATION_COUNT = 96;
 const POST_ANCHOR_COUNT = 9;
-const PENDING_ORDER = ["20260809000000", "20260810000000", "20260811000000"];
+const PENDING_ORDER = [];
 const APPLIED_ORDER = ["20260804000000", "20260805000000", "20260806000000",
-  "20260807000000", "20260808000000", BRIDGE_VERSION];
+  "20260807000000", "20260808000000", BRIDGE_VERSION,
+  "20260809000000", "20260810000000", "20260811000000"];
 const BRIDGE_APPLIED_MARKER = "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED";
 const BRIDGE_REMOTE_HISTORY = 26;
 
@@ -254,7 +255,7 @@ record("G04 the recorded bridge semantics match the SQL",
   bridgeGov?.lowCreditThresholdRemainsOwnedBy === "20260809000000");
 record("G05 the bridge is recorded APPLIED exactly once at remote history 26",
   (() => {
-    const pin = manifest.appliedPostAnchorMigrations?.at(-1);
+    const pin = manifest.appliedPostAnchorMigrations?.find((record) => record.version === BRIDGE_VERSION);
     return pin?.version === BRIDGE_VERSION &&
       pin.sha256 === BRIDGE_SHA &&
       pin.path === BRIDGE_PATH &&
@@ -268,12 +269,12 @@ record("G05 the bridge is recorded APPLIED exactly once at remote history 26",
   })());
 record("G05a the bridge no longer appears as pending",
   !manifest.pendingPostAnchorMigrations.some((r) => r.version === BRIDGE_VERSION));
-record("G06 exactly three pending post-anchor migrations remain, in order",
-  manifest.pendingPostAnchorMigrations?.length === 3 &&
+record("G06 the exact pending post-anchor set is empty",
+  manifest.pendingPostAnchorMigrations?.length === 0 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version), PENDING_ORDER));
-record("G07 the six applied records read 21/22/23/24/25/26 in exact order",
+record("G07 the nine applied records read 21 through 29 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26]) &&
+    [21, 22, 23, 24, 25, 26, 27, 28, 29]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
 record("G08 the anchor post-anchor count agrees at 9",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
@@ -281,8 +282,8 @@ record("G09 G1 was re-pinned to 96 / 9, not loosened",
   /const MIGRATION_COUNT = 96;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 3") &&
-  g1Source.includes("appliedPins.length === 6") &&
+  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("appliedPins.length === 9") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G10 no generic future-migration allowance was granted",
@@ -317,7 +318,7 @@ const mutants = [
     () => canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", FROZEN[0][0]))) === FROZEN[0][1]],
   ["editing the APPLIED bridge is impossible",
     () => canonicalSha256(readFileSync(path.join(ROOT, BRIDGE_PATH))) === BRIDGE_SHA &&
-          manifest.appliedPostAnchorMigrations.at(-1).sha256 === BRIDGE_SHA],
+          manifest.appliedPostAnchorMigrations.find((r) => r.version === BRIDGE_VERSION)?.sha256 === BRIDGE_SHA],
   ["editing the merged 50.4 or family-claim migrations is impossible",
     () => FROZEN.slice(1).every(([f, s]) =>
       canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", f))) === s)],
@@ -355,15 +356,14 @@ const mutants = [
           // exactly the two canonical tables, nothing else from the pre-baseline chain
           (bridge.match(/create table public\./g) ?? []).length === 2],
   ["claiming the bridge was applied more than once is impossible",
-    () => manifest.appliedPostAnchorMigrations.at(-1).appliedExactlyOnce === true &&
+    () => manifest.appliedPostAnchorMigrations.find((r) => r.version === BRIDGE_VERSION)?.appliedExactlyOnce === true &&
           manifest.appliedPostAnchorMigrations.filter((r) => r.version === BRIDGE_VERSION).length === 1 &&
-          manifest.appliedPostAnchorMigrations.length === 6],
-  ["marking 090/100/110 applied before their own gate is impossible",
-    () => manifest.pendingPostAnchorMigrations.length === 3 &&
-          manifest.pendingPostAnchorMigrations.every((r) =>
-            r.operationalStatus === "PENDING" &&
-            r.appliedByThisPhase === false &&
-            !("remoteHistoryCountAfterApply" in r))],
+          manifest.appliedPostAnchorMigrations.length === 9],
+  ["demoting reconciled 090/100/110 back to pending is impossible",
+    () => manifest.pendingPostAnchorMigrations.length === 0 &&
+          ["20260809000000", "20260810000000", "20260811000000"].every((version) =>
+            manifest.appliedPostAnchorMigrations.some((r) =>
+              r.version === version && r.operationalStatus === "APPLIED" && r.appliedByThisPhase === false))],
 ];
 for (const [name, fn] of mutants) {
   let held = false;

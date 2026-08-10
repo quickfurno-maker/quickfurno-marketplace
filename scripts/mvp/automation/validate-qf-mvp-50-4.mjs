@@ -289,27 +289,27 @@ record("X04 QF-MVP-50.2 is not reopened",
 // ---------------------------------------------------------------------------
 // G. GOVERNANCE
 // ---------------------------------------------------------------------------
-record("G01 the migration is pinned PENDING with exact identity",
+record("G01 the migration is forensically reconciled APPLIED with exact identity",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations
+    const pin = manifest.appliedPostAnchorMigrations
       .find((r) => r.version === "20260810000000");
     return Boolean(pin) &&
       pin.path === MIGRATION_PATH &&
       pin.sha256 === MIGRATION_SHA &&
-      pin.operationalStatus === "PENDING" &&
-      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      pin.requiresSeparateStagingDeploymentGate === true &&
+      pin.operationalStatus === "APPLIED" &&
+      pin.appliedEvidenceType === "IMPORTED_FOUNDER_ACKNOWLEDGED_EXISTING_STAGING_STATE" &&
+      pin.remoteHistoryCountAfterApply === 28 &&
+      pin.appliedExactlyOnce === true &&
       pin.appliedByThisPhase === false &&
-      !("appliedEvidenceMarker" in pin) &&
-      !("remoteHistoryCountAfterApply" in pin);
+      pin.catalogParityVerified === true &&
+      pin.forensicClassification === "APPLIED_RECORDED_CATALOG_MATCHES_CURRENT_SOURCE" &&
+      pin.applyExecutorProvenance === "UNKNOWN";
   })());
-record("G02 exactly three pending post-anchor migrations are declared",
-  manifest.pendingPostAnchorMigrations.length === 3 &&
-  same(manifest.pendingPostAnchorMigrations.map((r) => r.version),
-    ["20260809000000", "20260810000000", "20260811000000"]));
-record("G03 the six applied records read 21/22/23/24/25/26",
+record("G02 the exact pending post-anchor set is empty",
+  manifest.pendingPostAnchorMigrations.length === 0);
+record("G03 the nine applied records read 21 through 29",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26]));
+    [21, 22, 23, 24, 25, 26, 27, 28, 29]));
 record("G04 the doc states SOURCE READY, not complete",
   /SOURCE READY/.test(doc) && !/COMPLETE \/ TESTED \/ FROZEN/.test(doc));
 record("G05 the validator is registered and wired into CI after 50.3",
@@ -475,17 +475,19 @@ record("K21 the client workflow JSON is byte-unchanged",
   canonicalSha256(readFileSync(path.join(ROOT,
     "automation/n8n/QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json")))
     === "79716cd979aedaaa06aced84d843cad3ca15b47580bbbed8f85175b8c916dad4");
-record("K22 the claim migration is pinned PENDING with exact identity",
+record("K22 the claim migration is forensically reconciled APPLIED with exact identity",
   (() => {
-    const pin = manifest.pendingPostAnchorMigrations
+    const pin = manifest.appliedPostAnchorMigrations
       .find((r) => r.version === "20260811000000");
     return Boolean(pin) &&
       pin.path === CLAIM_MIGRATION_PATH &&
       pin.sha256 === CLAIM_MIGRATION_SHA &&
-      pin.operationalStatus === "PENDING" &&
-      pin.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      pin.requiresSeparateStagingDeploymentGate === true &&
-      pin.appliedByThisPhase === false;
+      pin.operationalStatus === "APPLIED" &&
+      pin.remoteHistoryCountAfterApply === 29 &&
+      pin.appliedExactlyOnce === true &&
+      pin.appliedByThisPhase === false &&
+      pin.catalogParityVerified === true &&
+      pin.applyExecutorProvenance === "UNKNOWN";
   })());
 
 const claimMutants = [

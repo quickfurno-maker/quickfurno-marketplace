@@ -13,7 +13,6 @@ import { ConfirmDialog, EmptyState, Toast } from "./AdminPrimitives";
 import { type AdminSectionKey } from "./adminConfig";
 import { emptySnapshot, type Snapshot } from "./adminTypes";
 import {
-  AIAgentsPage,
   AdminUsersPage,
   AosReadinessPage,
   AuditLogsPage,
@@ -132,8 +131,6 @@ function renderSection(
       };
       return <AnalyticsDashboard data={analyticsData} />;
     }
-    case "ai-agents":
-      return <AIAgentsPage />;
     case "automations":
       return <AutomationsPage notify={helpers.notify} />;
     case "website-content":

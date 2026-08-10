@@ -70,7 +70,7 @@ async function loadSectionPayload(section: AdminSectionKey, searchParams: Search
     case "crm":
       return adminCrmBase();
     default:
-      // Sections with no server data (aos, ai-agents, automations,
+      // Sections with no server data (aos, automations,
       // website-content, reviews) and self-fetching tabbed sections
       // (lead-distribution) load nothing here.
       return { ok: true as const, data: null };

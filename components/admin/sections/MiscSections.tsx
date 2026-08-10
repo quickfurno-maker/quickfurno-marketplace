@@ -27,18 +27,6 @@ export const automationRows = [
   ["WhatsApp Notification", "Lead assigned", "WhatsApp placeholder", "Disabled"],
 ];
 
-export const aiAgents = [
-  ["Lead Quality Agent", "Analyze lead quality, budget strength, urgency and duplicate suspicion."],
-  ["Vendor Matching Agent", "Suggest best vendors by city, category, rating, balance and response speed."],
-  ["Follow-up Agent", "Detect leads that need follow-up today."],
-  ["Vendor Renewal Agent", "Spot low-balance and expiring vendors."],
-  ["Category Growth Agent", "Suggest categories that need more vendors."],
-  ["City Expansion Agent", "Find city and locality demand signals."],
-  ["Website UX Agent", "Suggest funnel and experience improvements."],
-  ["Content Agent", "Draft homepage, FAQ, category and ad copy ideas."],
-  ["Fraud/Duplicate Lead Agent", "Find repeated phones, spam entries and invalid leads."],
-];
-
 /**
  * C-PERF1 (P0-H): truthful AOS readiness page.
  *
@@ -66,55 +54,6 @@ export function AosReadinessPage({ notify }: { notify: (message: string, tone?: 
         <AosAutomationControl notify={notify} />
       </SectionCard>
 
-      <SectionCard title="Planned agent roles" description="A roadmap catalogue, not a control surface. Nothing below is running.">
-        <DataTable
-          rows={aiAgents}
-          emptyTitle="No planned agents"
-          emptyMessage="Planned agent roles will be listed here."
-          columns={[
-            { header: "Agent", cell: (row) => <Strong title={row[0]} subtitle={row[1]} /> },
-            { header: "Status", cell: () => <StatusBadge value="Not built" tone="slate" /> },
-          ]}
-        />
-      </SectionCard>
-    </div>
-  );
-}
-
-/**
- * Planned agent catalogue — a roadmap list, not a control surface.
- *
- * What used to render here was fabricated end to end: a per-agent enable
- * switch driven by `index < 2` that persisted nothing, a "N suggestions" count
- * derived from the array index, a "Confidence 72%" chip that incremented by
- * position, and a suggestions table of three invented rows with invented
- * confidence scores and Accept/Reject actions wired to `() => {}`.
- *
- * No agent exists, no suggestion exists and no confidence is computed anywhere
- * in QuickFurno, so none of it is rendered. The catalogue below is the only
- * true statement this page can make about itself.
- */
-export function AIAgentsPage() {
-  return (
-    <div className="space-y-4">
-      <NoteBar tone="warning">
-        No AI agent is built, connected or running. There is no agent runtime, no suggestion store and no scoring model
-        in QuickFurno today. This page lists the agents that are planned — it does not control anything.
-      </NoteBar>
-
-      <SectionCard title="Planned agents" description="Scope only. Each entry becomes real work in a later phase.">
-        <ul className="divide-y divide-[color:var(--qfa-line-soft)]">
-          {aiAgents.map(([name, purpose]) => (
-            <li key={name} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-slate-900">{name}</p>
-                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{purpose}</p>
-              </div>
-              <StatusBadge value="Not built" tone="slate" />
-            </li>
-          ))}
-        </ul>
-      </SectionCard>
     </div>
   );
 }

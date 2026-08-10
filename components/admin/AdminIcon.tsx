@@ -19,7 +19,6 @@ const paths: Record<AdminIconName, string[]> = {
   aos: ["M12 3l7 4v6c0 4-2.7 6.8-7 8-4.3-1.2-7-4-7-8V7z", "M9 12h6", "M12 9v6", "M8 17l8-10"],
   crm: ["M4 6h16v12H4z", "M4 10h16", "M8 14h4", "M8 6v12"],
   analytics: ["M4 20V4", "M4 20h16", "M8 16v-5", "M12 16V8", "M16 16v-8", "M20 16v-3"],
-  ai: ["M7 8a5 5 0 0 1 10 0v2a5 5 0 0 1-10 0z", "M9 14l-2 5", "M15 14l2 5", "M10 9h.01", "M14 9h.01"],
   automations: ["M6 12a6 6 0 0 1 10-4", "M18 8V4h-4", "M18 12a6 6 0 0 1-10 4", "M6 16v4h4"],
   content: ["M5 5h14v14H5z", "M8 9h8", "M8 13h6", "M8 17h4"],
   reviews: ["M5 5h14v10H8l-3 3z", "M9 9h6", "M9 12h4"],

@@ -183,6 +183,49 @@ export interface ProviderAccountView {
   readonly lastSyncedAt: string | null;
 }
 
+export type WhatsAppBillingFact =
+  | {
+      readonly state: "available";
+      readonly value: string;
+      readonly source: "quickfurno_provider_account";
+    }
+  | {
+      readonly state: "unavailable";
+      readonly reason: "NOT_AVAILABLE_FROM_CURRENT_INTEGRATION";
+      readonly source: "unavailable";
+    };
+
+/**
+ * Closed, sanitized billing view for the Provider workspace.
+ *
+ * Meta / WhatsApp billing is deliberately distinct from QuickFurno vendor lead
+ * credits. No vendor balance, package credit, payment row or inferred currency
+ * is allowed into this model. Facts without an adopted authority stay
+ * explicitly unavailable rather than falling back to null, zero or INR.
+ */
+export interface WhatsAppProviderBilling {
+  readonly status: WhatsAppBillingFact;
+  readonly attention: WhatsAppBillingFact;
+  readonly model: WhatsAppBillingFact;
+  readonly currency: WhatsAppBillingFact;
+  readonly creditLine: WhatsAppBillingFact;
+  readonly spend: WhatsAppBillingFact;
+  readonly balance: WhatsAppBillingFact;
+  readonly paymentMethod: WhatsAppBillingFact;
+  readonly lastSynced: WhatsAppBillingFact;
+  readonly lastHealthCheck: WhatsAppBillingFact;
+  readonly nativeRecharge: {
+    readonly supported: false;
+    readonly reason: "NOT_SUPPORTED_BY_CURRENT_QUICKFURNO_INTEGRATION";
+  };
+  readonly management: {
+    readonly mode: "guidance_only";
+    readonly destination: "Meta Business Suite / WhatsApp Manager";
+    readonly url: null;
+    readonly reason: "NO_VERIFIED_STABLE_UNIVERSAL_URL";
+  };
+}
+
 export interface RuntimePolicyView {
   readonly providerKey: string;
   readonly activationStatus: string;
@@ -363,6 +406,70 @@ function toAccountView(row: ProviderAccountRow | null): ProviderAccountView | nu
     healthStatus: text("health_status"),
     lastHealthCheckAt: nullableText("last_health_check_at"),
     lastSyncedAt: nullableText("last_synced_at"),
+  };
+}
+
+const BILLING_FACT_UNAVAILABLE: WhatsAppBillingFact = Object.freeze({
+  state: "unavailable",
+  reason: "NOT_AVAILABLE_FROM_CURRENT_INTEGRATION",
+  source: "unavailable",
+});
+
+function providerAccountBillingFact(value: string): WhatsAppBillingFact {
+  return { state: "available", value, source: "quickfurno_provider_account" };
+}
+
+/**
+ * Build billing visibility only when the Provider tab asks for it. This is a
+ * pure projection over the already-bounded provider-account read: it performs
+ * no database query, provider request or write.
+ */
+export function getWhatsAppProviderBilling(
+  readiness: WhatsAppProviderReadiness,
+): WhatsAppProviderBilling {
+  const account = readiness.account;
+  const status = account
+    ? providerAccountBillingFact(account.billingStatus)
+    : BILLING_FACT_UNAVAILABLE;
+
+  let attention = BILLING_FACT_UNAVAILABLE;
+  if (account) {
+    const value =
+      account.billingStatus === "suspended"
+        ? "Billing is marked suspended"
+        : account.billingStatus === "not_configured"
+          ? "Billing is marked not configured"
+          : account.billingStatus === "active"
+            ? "No issue recorded in QuickFurno billing status"
+            : "Billing issue state is unknown";
+    attention = providerAccountBillingFact(value);
+  }
+
+  return {
+    status,
+    attention,
+    model: BILLING_FACT_UNAVAILABLE,
+    currency: BILLING_FACT_UNAVAILABLE,
+    creditLine: BILLING_FACT_UNAVAILABLE,
+    spend: BILLING_FACT_UNAVAILABLE,
+    balance: BILLING_FACT_UNAVAILABLE,
+    paymentMethod: BILLING_FACT_UNAVAILABLE,
+    lastSynced: account?.lastSyncedAt
+      ? providerAccountBillingFact(account.lastSyncedAt)
+      : BILLING_FACT_UNAVAILABLE,
+    lastHealthCheck: account?.lastHealthCheckAt
+      ? providerAccountBillingFact(account.lastHealthCheckAt)
+      : BILLING_FACT_UNAVAILABLE,
+    nativeRecharge: {
+      supported: false,
+      reason: "NOT_SUPPORTED_BY_CURRENT_QUICKFURNO_INTEGRATION",
+    },
+    management: {
+      mode: "guidance_only",
+      destination: "Meta Business Suite / WhatsApp Manager",
+      url: null,
+      reason: "NO_VERIFIED_STABLE_UNIVERSAL_URL",
+    },
   };
 }
 

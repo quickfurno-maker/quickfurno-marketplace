@@ -15,6 +15,7 @@ import type {
   WhatsAppInboundRow,
   WhatsAppMessageDetail,
   WhatsAppMessageRow,
+  WhatsAppProviderBilling,
   WhatsAppProviderReadiness,
   WhatsAppTemplatePageResult,
 } from "@/services/adminWhatsAppService";
@@ -56,7 +57,10 @@ export interface WhatsAppControlCenterPayload {
   readonly messageDetail?: { readonly data: WhatsAppMessageDetail | null; readonly fault: SectionFault | null };
   readonly delivery?: { readonly data: DirectoryPage<WhatsAppDeliveryRow>; readonly fault: SectionFault | null };
   readonly consent?: WhatsAppConsentPageResult;
-  readonly provider?: WhatsAppProviderReadiness;
+  readonly provider?: {
+    readonly readiness: WhatsAppProviderReadiness;
+    readonly billing: WhatsAppProviderBilling;
+  };
   readonly automation?: WhatsAppAutomationPageResult;
 }
 

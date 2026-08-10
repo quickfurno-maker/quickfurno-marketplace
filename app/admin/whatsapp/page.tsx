@@ -24,6 +24,7 @@ import {
   getWhatsAppInboundPage,
   getWhatsAppMessageDetail,
   getWhatsAppMessagePage,
+  getWhatsAppProviderBilling,
   getWhatsAppProviderReadiness,
   getWhatsAppTemplatePage,
 } from "@/services/adminWhatsAppService";
@@ -139,7 +140,14 @@ export default async function AdminWhatsAppPage({
         }),
       };
     } else if (tab === "provider") {
-      payload = { tab, provider: await getWhatsAppProviderReadiness() };
+      const readiness = await getWhatsAppProviderReadiness();
+      payload = {
+        tab,
+        provider: {
+          readiness,
+          billing: getWhatsAppProviderBilling(readiness),
+        },
+      };
     } else if (tab === "automation") {
       payload = {
         tab,

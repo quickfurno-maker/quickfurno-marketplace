@@ -395,10 +395,16 @@ record("I05 the key is never accepted from the request",
 // ---------------------------------------------------------------------------
 record("E01 the migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA);
-record("E02 the route vocabulary is closed to exactly three",
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 3 &&
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") === "claim_v1,complete_v1,execute_v1" &&
-  /check \(route_key in \('claim_v1', 'complete_v1', 'execute_v1'\)\)/.test(migrationCode));
+// QF-MVP-50.5 RE-PIN: the exported vocabulary is now closed to exactly FIVE, still by
+// exact ordered equality. THIS MIGRATION's own text is unchanged and must still declare
+// exactly the three routes it knew about — `recover_v1`/`reconcile_v1` arrive in
+// 20260812000000, so a 50.2E migration mentioning either would mean it had been edited.
+record("E02 the route vocabulary is closed to exactly five",
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 5 &&
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") ===
+    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1" &&
+  /check \(route_key in \('claim_v1', 'complete_v1', 'execute_v1'\)\)/.test(migrationCode) &&
+  !/recover_v1|reconcile_v1/.test(migrationCode));
 record("E03 the state vocabulary adds exactly one new terminal state",
   /check \(state in \('processing', 'claimed', 'empty', 'completed', 'recorded'\)\)/.test(migrationCode));
 record("E04 the recorded state is bound to execute_v1 by the shape check",
@@ -690,16 +696,20 @@ record("N19 every workflow in the tree is inactive and unpublished",
       const wf = JSON.parse(readFileSync(path.join(ROOT, "automation/n8n", f), "utf8"));
       return wf.active === false && !Object.prototype.hasOwnProperty.call(wf, "published");
     }));
-record("N20 exactly five workflow candidates exist, by exact name",
+// QF-MVP-50.5 RE-PIN: six candidates, by exact name. The three certified executors and
+// both dispatcher candidates are unchanged; 50.5 adds ONE new supervisor rather than
+// modifying any of them.
+record("N20 exactly six workflow candidates exist, by exact name",
   (() => {
     const flows = readdirSync(path.join(ROOT, "automation/n8n"))
       .filter((f) => f.endsWith(".workflow.json")).sort();
-    return flows.length === 5 && same(flows, [
+    return flows.length === 6 && same(flows, [
       "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json",
       "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json",
       "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
       "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
       "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
+      "QF-MVP-50-05-Recovery-Supervisor.workflow.json",
     ]);
   })());
 
@@ -715,13 +725,18 @@ record("G01 the anchor is untouched",
 // post-anchor migrations are APPLIED and ZERO remain pending.
 // QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
 // (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
-record("G02 exactly nine APPLIED and zero PENDING post-anchor migrations",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 9 &&
-  manifest.appliedPostAnchorMigrations?.length === 9 &&
+// QF-MVP-50.5 STAGING GATE RE-PIN: the recovery migration passed its own staging
+// gate, so all TEN post-anchor migrations are APPLIED and none remain pending.
+record("G02 exactly ten APPLIED and zero PENDING post-anchor migrations",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 10 &&
+  manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
   manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
+  manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
+  manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply === 30 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G02c 20260808000000 is recorded APPLIED with remote history 25, hash-exact",
   manifest.appliedPostAnchorMigrations[4].version === "20260808000000" &&
   manifest.appliedPostAnchorMigrations[4].sha256 ===
@@ -766,13 +781,20 @@ record("G04 20260805000000 is recorded APPLIED with remote history 22, hash-exac
   manifest.appliedPostAnchorMigrations[1].appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
   manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply === 22 &&
   manifest.appliedPostAnchorMigrations[1].appliedExactlyOnce === true);
-record("G05 no applied record fabricates an offline remote status or self-claims the apply",
-  manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r) && r.appliedByThisPhase === false) &&
+// QF-MVP-50.5 STAGING GATE RE-PIN: exactly one applied record — the 50.5 recovery
+// migration — was applied by the phase that pinned it, through its own staging
+// gate with a first-party exact-one dry run. Every other record stays imported,
+// and no record may fabricate an offline remote status.
+record("G05 no applied record fabricates an offline remote status, and only 50.5 self-claims the apply",
+  manifest.appliedPostAnchorMigrations.every((r) => !("remoteVersionStatus" in r)) &&
+  manifest.appliedPostAnchorMigrations.every((r) =>
+    r.appliedByThisPhase === (r.version === "20260812000000")) &&
+  manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
-record("G06 G1 pins the exact count 96, not a lower bound",
-  /const MIGRATION_COUNT = 96;/.test(g1Source) &&
-  !/>=\s*96|length\s*>=/.test(g1Source));
+record("G06 G1 pins the exact count 97, not a lower bound",
+  /const MIGRATION_COUNT = 97;/.test(g1Source) &&
+  !/>=\s*97|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
   g1Source.includes('version: "20260805000000"') &&
@@ -780,22 +802,25 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
   g1Source.includes('marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"') &&
   g1Source.includes("remoteHistory: 21") &&
   g1Source.includes("remoteHistory: 22"));
-record("G08 the local migration set is exactly 96 and the 50.2 wedge repair is still present in order",
+record("G08 the local migration set is exactly 97 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 96 &&
+    return files.length === 97 &&
       files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
-      files.at(-1) === "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql";
+      files.includes("20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql") &&
+      files.at(-1) === "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 96/.test(d2Source) &&
-  /exactly nine migrations are newer than the anchor/.test(d2Source) &&
-  /claim_v1,complete_v1,execute_v1/.test(d2Source) &&
+  /I05 the local migration count is exactly 97/.test(d2Source) &&
+  /exactly ten migrations are newer than the anchor/.test(d2Source) &&
+  /claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
-record("G10 the completion-path allowlist names exactly the three executors",
-  // Still an EXACT named allowlist, never a class: the client executor plus the
-  // QF-MVP-50.3 vendor and QF-MVP-50.4 campaign executors, and nothing else.
-  /COMPLETION_PATH_ALLOWED_WORKFLOWS = \[\s*\n\s*"QF-MVP-50-02-Client-Whatsapp-Executor\.50\.2E-selfhost-env\.workflow\.json",\s*\n\s*"QF-MVP-50-03-Vendor-Whatsapp-Executor\.workflow\.json",\s*\n\s*"QF-MVP-50-04-Campaign-Execution-Executor\.workflow\.json",\s*\n\s*\]/.test(d2Source));
+record("G10 the completion-path allowlist names exactly the four permitted workflows",
+  // Still an EXACT named allowlist, never a class: the client executor, the
+  // QF-MVP-50.3 vendor and QF-MVP-50.4 campaign executors, and the QF-MVP-50.5
+  // recovery supervisor — which completes a recovered attempt on the SAME frozen
+  // terms — and nothing else.
+  /COMPLETION_PATH_ALLOWED_WORKFLOWS = \[\s*\n\s*"QF-MVP-50-02-Client-Whatsapp-Executor\.50\.2E-selfhost-env\.workflow\.json",\s*\n\s*"QF-MVP-50-03-Vendor-Whatsapp-Executor\.workflow\.json",\s*\n\s*"QF-MVP-50-04-Campaign-Execution-Executor\.workflow\.json",\s*\n\s*"QF-MVP-50-05-Recovery-Supervisor\.workflow\.json",\s*\n\s*\]/.test(d2Source));
 record("G11 no generic future-migration allowance appeared",
   manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&

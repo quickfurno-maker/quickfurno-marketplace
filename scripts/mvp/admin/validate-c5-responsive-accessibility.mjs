@@ -153,7 +153,8 @@ check("no dead click placeholder in active shared UI", !/onClick=\{\(\) => \{\}\
 // 7. Security, migration and dependency containment.
 const browserUi = shell + palette + primitives + dashboard + crm + distribution + analytics + vendorProfile + vendorSections;
 check("no browser service-role credential", !/SUPABASE_SERVICE_ROLE_KEY|process\.env\.[A-Z_]*SERVICE_ROLE/.test(browserUi));
-check("migration count remains 96", readdirSync(join(root, "supabase", "migrations")).length === 96);
+// QF-MVP-50.5 RE-PIN: 96 -> 97. This admin phase still adds no migration of its own.
+check("migration count remains 97", readdirSync(join(root, "supabase", "migrations")).length === 97);
 check("C5 added no accessibility/UI dependency", !Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies }).some((name) => /radix|headlessui|framer|focus-trap|axe/i.test(name)));
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);

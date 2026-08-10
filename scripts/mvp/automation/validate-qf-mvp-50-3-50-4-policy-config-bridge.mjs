@@ -46,12 +46,17 @@ const FROZEN = [
    "fc7efae9c2349854b9856d3b3b3956933bcfe79ed15c1eeb7caf65bc61f8f89d"],
 ];
 
-const MIGRATION_COUNT = 96;
-const POST_ANCHOR_COUNT = 9;
+// QF-MVP-50.5 RE-PIN. The bridge and every 50.3/50.4 record are unchanged; the only
+// difference is that 20260812000000 now exists on disk as a PENDING post-anchor
+// migration. Counts stay exact — no `>=`, no wildcard.
+const MIGRATION_COUNT = 97;
+const POST_ANCHOR_COUNT = 10;
 const PENDING_ORDER = [];
+const RECOVERY_NAME =
+  "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
 const APPLIED_ORDER = ["20260804000000", "20260805000000", "20260806000000",
   "20260807000000", "20260808000000", BRIDGE_VERSION,
-  "20260809000000", "20260810000000", "20260811000000"];
+  "20260809000000", "20260810000000", "20260811000000", "20260812000000"];
 const BRIDGE_APPLIED_MARKER = "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED";
 const BRIDGE_REMOTE_HISTORY = 26;
 
@@ -84,9 +89,13 @@ record("V04 on disk the bridge sorts immediately before the 50.3 producer",
 record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
   migrationFiles.indexOf(BRIDGE_NAME) ===
     migrationFiles.indexOf("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") + 1);
-record("V06 the final four versions are in exact chronological order",
-  same(migrationFiles.slice(-4), [BRIDGE_NAME, ...FROZEN.map(([f]) => f)]));
-record("V07 the local migration set is exactly 96",
+// QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
+// in exactly this order; they are now followed by the 50.5 recovery transport, which is
+// named explicitly rather than allowed as "anything newer".
+record("V06 the final five versions are in exact chronological order",
+  same(migrationFiles.slice(-5),
+    [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME]));
+record("V07 the local migration set is exactly 97",
   migrationFiles.length === MIGRATION_COUNT);
 
 // ---------------------------------------------------------------------------
@@ -269,21 +278,23 @@ record("G05 the bridge is recorded APPLIED exactly once at remote history 26",
   })());
 record("G05a the bridge no longer appears as pending",
   !manifest.pendingPostAnchorMigrations.some((r) => r.version === BRIDGE_VERSION));
-record("G06 the exact pending post-anchor set is empty",
+// QF-MVP-50.5 STAGING GATE RE-PIN: 50.5 cleared its own staging gate, so the
+// pending set is present-and-empty and the applied set grew to ten.
+record("G06 the pending post-anchor set is present and empty",
   manifest.pendingPostAnchorMigrations?.length === 0 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version), PENDING_ORDER));
-record("G07 the nine applied records read 21 through 29 in exact order",
+record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26, 27, 28, 29]) &&
+    [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
-record("G08 the anchor post-anchor count agrees at 9",
+record("G08 the anchor post-anchor count agrees at 10",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 was re-pinned to 96 / 9, not loosened",
-  /const MIGRATION_COUNT = 96;/.test(g1Source) &&
+record("G09 G1 was re-pinned to 97 / 10 applied / 0 pending, not loosened",
+  /const MIGRATION_COUNT = 97;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
   g1Source.includes("pendingPins.length === 0") &&
-  g1Source.includes("appliedPins.length === 9") &&
+  g1Source.includes("appliedPins.length === 10") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G10 no generic future-migration allowance was granted",
@@ -358,7 +369,7 @@ const mutants = [
   ["claiming the bridge was applied more than once is impossible",
     () => manifest.appliedPostAnchorMigrations.find((r) => r.version === BRIDGE_VERSION)?.appliedExactlyOnce === true &&
           manifest.appliedPostAnchorMigrations.filter((r) => r.version === BRIDGE_VERSION).length === 1 &&
-          manifest.appliedPostAnchorMigrations.length === 9],
+          manifest.appliedPostAnchorMigrations.length === 10],
   ["demoting reconciled 090/100/110 back to pending is impossible",
     () => manifest.pendingPostAnchorMigrations.length === 0 &&
           ["20260809000000", "20260810000000", "20260811000000"].every((version) =>

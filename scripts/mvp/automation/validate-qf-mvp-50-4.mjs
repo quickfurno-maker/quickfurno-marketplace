@@ -305,19 +305,24 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
       pin.forensicClassification === "APPLIED_RECORDED_CATALOG_MATCHES_CURRENT_SOURCE" &&
       pin.applyExecutorProvenance === "UNKNOWN";
   })());
-record("G02 the exact pending post-anchor set is empty",
-  manifest.pendingPostAnchorMigrations.length === 0);
-record("G03 the nine applied records read 21 through 29",
+// QF-MVP-50.5 STAGING GATE RE-PIN: the 50.5 recovery migration cleared its own
+// staging deployment gate, so the pending set is present-and-empty and 50.5 is the
+// newest APPLIED record. Nothing 50.4 pinned as APPLIED moved.
+record("G02 the pending post-anchor set is empty and 50.5 is the newest applied record",
+  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
+  manifest.appliedPostAnchorMigrations.at(-1).operationalStatus === "APPLIED");
+record("G03 the ten applied records read 21 through 30",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26, 27, 28, 29]));
+    [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]));
 record("G04 the doc states SOURCE READY, not complete",
   /SOURCE READY/.test(doc) && !/COMPLETE \/ TESTED \/ FROZEN/.test(doc));
 record("G05 the validator is registered and wired into CI after 50.3",
   pkg.scripts["test:mvp:50-4"] ===
     "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs" &&
   /- name: QF-MVP-50\.3 validator\s+run: npm run test:mvp:50-3\s+- name: QF-MVP-50\.4 validator\s+run: npm run test:mvp:50-4/.test(ciWorkflow));
-record("G06 the local migration set is exactly 96",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
+record("G06 the local migration set is exactly 97",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 97);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

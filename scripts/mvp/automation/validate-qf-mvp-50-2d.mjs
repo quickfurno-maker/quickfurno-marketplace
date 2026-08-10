@@ -256,16 +256,20 @@ record("T20 every pre-verification refusal is unsigned",
 record("T21 no second crypto system was introduced",
   !/createHmac|createHash|node:crypto|scrypt|randomBytes/.test(routeCode + completionBody + contractCode + retryCode) &&
   routeCode.includes('from "@/lib/automation/transportAuth"'));
-// QF-MVP-50.2E-R1 RE-PIN. The vocabulary was closed to exactly two routes; it is now
-// closed to exactly three, still by exact ordered equality — never a length lower bound
-// and never a membership test. THIS MIGRATION's own text is unchanged and must still
-// declare exactly the two routes it introduced: `execute_v1` is added by 20260805000000,
-// so a `50.2D` migration that mentions it would mean the historical file had been edited.
-record("T22 the transport route vocabulary is closed to exactly three routes",
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 3 &&
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") === "claim_v1,complete_v1,execute_v1" &&
+// QF-MVP-50.2E-R1 RE-PIN, extended by QF-MVP-50.5-RECOVERY. The vocabulary was closed
+// to two routes, then three, and is now closed to exactly FIVE — still by exact ordered
+// equality, never a length lower bound and never a membership test.
+//
+// THIS MIGRATION's own text is unchanged and must still declare exactly the two routes it
+// introduced. `execute_v1` is added by 20260805000000 and `recover_v1`/`reconcile_v1` by
+// 20260812000000, so a `50.2D` migration that mentions any of them would mean the
+// historical file had been edited.
+record("T22 the transport route vocabulary is closed to exactly five routes",
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 5 &&
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") ===
+    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1" &&
   /check \(route_key in \('claim_v1', 'complete_v1'\)\)/.test(migrationCode) &&
-  !/execute_v1/.test(migrationCode));
+  !/execute_v1|recover_v1|reconcile_v1/.test(migrationCode));
 
 // ---------------------------------------------------------------------------
 // L. LEDGER / REPLAY MODEL
@@ -572,10 +576,17 @@ record("C04 no 50.2D module reaches into the n8n workflow tree",
 // opened: this remains an exact allowlist of THREE named files, every other
 // workflow must stay completion-path-free, and every workflow without exception
 // must still be inactive and unpublished.
+// QF-MVP-50.5 adds the recovery supervisor, which legitimately calls the completion
+// route on the SAME frozen terms: a recovered attempt is an ordinary attempt from the
+// completion boundary's point of view, and it is completed with the executorReference
+// Core itself minted. The class is still NOT opened — this remains an exact allowlist
+// of FOUR named files, every other workflow must stay completion-path-free, and every
+// workflow without exception must still be inactive and unpublished.
 const COMPLETION_PATH_ALLOWED_WORKFLOWS = [
   "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
   "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
   "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
+  "QF-MVP-50-05-Recovery-Supervisor.workflow.json",
 ];
 record("C05 the n8n workflow candidates remain inactive and unpublished",
   (() => {
@@ -630,16 +641,18 @@ record("I02 the 50.2D migration matches its pinned hash",
 // QF-MVP-50.2E-R1 RE-PIN. "Exactly one newer migration" was correct while 50.2D was the
 // only post-anchor candidate. It is re-pinned to exactly TWO, named in exact order — not
 // relaxed to a count floor and not relaxed to "anything newer".
-record("I03 exactly nine migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 9);
-record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, the execute_v1 repair, the fresh-claim wedge repair, then the policy-config bridge ahead of the 50.3/50.4 set",
+record("I03 exactly ten migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 10);
+record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, the execute_v1 repair, the fresh-claim wedge repair, the policy-config bridge, the 50.3/50.4 set, then the 50.5 recovery transport",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
        [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME,
         WEDGE_MIGRATION_NAME,
         "20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql",
         VENDOR_MIGRATION_NAME, CAMPAIGN_MIGRATION_NAME,
-        "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql"]));
-record("I05 the local migration count is exactly 96", migrationFiles.length === 96);
+        "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql",
+        "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql"]));
+// QF-MVP-50.5 RE-PIN: 96 -> 97, adding only 20260812000000. Still exact equality.
+record("I05 the local migration count is exactly 97", migrationFiles.length === 97);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -677,12 +690,18 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-50.2-R2-APPLIED-TRUTH: the third post-anchor migration is now APPLIED
 // too (remote history 23), so zero remain pending. Re-pinned, never loosened —
 // the counts stay exact and the pending list must still exist and be empty.
-record("G03 exactly nine APPLIED and zero PENDING post-anchor migrations are declared",
-  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 9 &&
+// QF-MVP-50.5 STAGING GATE RE-PIN: the 50.5 recovery migration passed its own
+// staging gate (remote history 29 -> 30), so it moved out of the pending list and
+// became the TENTH applied post-anchor record. The pending list must still exist
+// and now be empty. Re-pinned, never loosened — the counts stay exact.
+record("G03 exactly ten APPLIED and zero PENDING post-anchor migrations are declared",
+  Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 9 &&
+  manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
+  manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 10 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000"]));
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
   manifest.appliedPostAnchorMigrations[0].version === "20260804000000" &&
   manifest.appliedPostAnchorMigrations[0].name === "qf_mvp_50_2d_automation_transport_completion_route" &&
@@ -715,9 +734,13 @@ record("G07 no generic future-migration allowance was granted",
   manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
   manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&
   !/version\s*>\s*TARGET_VERSION\s*\)\.length\s*>=|>=\s*90/.test(g1Source));
+// QF-MVP-50.5 RE-PIN: 96 -> 97. The point of this assertion is unchanged — G1 must
+// state an EXACT count with no `>=` anywhere — so the literal moves and the shape
+// requirement does not.
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 96;/.test(g1Source) &&
-  /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source));
+  /const MIGRATION_COUNT = 97;/.test(g1Source) &&
+  /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source) &&
+  !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",
   g1Source.includes(`version: "20260804000000"`) &&
   g1Source.includes(`sha: "${POST_ANCHOR_SHA}"`) &&
@@ -738,8 +761,14 @@ record("G09a G1 rejects a demoted, forged or mis-counted applied post-anchor rec
   /post-anchor order swapped/.test(g1Source) &&
   /post-anchor count understated/.test(g1Source));
 record("G10 G1 still rejects an arbitrary newer or drifted migration",
-  /a tenth post-anchor migration on disk/.test(g1Source) &&
-  /a tenth applied post-anchor migration/.test(g1Source) &&
+  // QF-MVP-50.5 STAGING GATE RE-PIN: 20260812000000 is now a real APPLIED
+  // post-anchor migration, so G1's "one past the pinned set" mutants are the
+  // eleventh on disk and the eleventh applied record.
+  /an eleventh post-anchor migration on disk/.test(g1Source) &&
+  /50\.5 applied entry removed/.test(g1Source) &&
+  /50\.5 demoted back to PENDING in place/.test(g1Source) &&
+  /50\.5 on-disk SHA drift/.test(g1Source) &&
+  /an eleventh applied post-anchor migration/.test(g1Source) &&
   /50\.2E migration renamed/.test(g1Source) &&
   /50\.2E on-disk SHA drift/.test(g1Source) &&
   /50\.2E manifest SHA drift/.test(g1Source) &&
@@ -756,8 +785,8 @@ record("G10 G1 still rejects an arbitrary newer or drifted migration",
   /080 remote history 24 instead of 25/.test(g1Source) &&
   /080 remote history 26 instead of 25/.test(g1Source) &&
   /080 marker forged/.test(g1Source) &&
-  /a new pending entry silently added/.test(g1Source) &&
-  /the pending list key deleted entirely instead of emptied/.test(g1Source));
+  /an unpinned new pending entry silently added/.test(g1Source) &&
+  /the pending list key deleted entirely instead of pinned/.test(g1Source));
 record("G11 G1 rejects a regressed or fabricated post-anchor status",
   /50\.2E left PENDING/.test(g1Source) &&
   /50\.2E applied but marker missing/.test(g1Source) &&

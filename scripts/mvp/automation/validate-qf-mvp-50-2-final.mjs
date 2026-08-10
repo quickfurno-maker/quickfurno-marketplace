@@ -401,7 +401,8 @@ record("R18 the execute_v1 repair is present, ordered immediately before the wed
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 96 &&
+    // QF-MVP-50.5 RE-PIN: 96 -> 97. Still exact equality, still an ordering proof.
+    return files.length === 97 &&
       files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
@@ -487,11 +488,11 @@ record("W17 the repair self-verifies and fails closed",
   /wedge repair aborted: claim uniqueness must not be weakened/.test(wedgeSource));
 record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surface",
   !/provider_template_mappings|send_authority|binding_readiness|n8n|meta|whatsapp|vendor_|campaign|qf-jarvis/i.test(wedgeSql));
-record("W19 the wedge repair is present and the set is exactly 96",
+record("W19 the wedge repair is present and the set is exactly 97",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 96 && files.includes(WEDGE_NAME);
+    return files.length === 97 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -502,7 +503,7 @@ record("W19 the wedge repair is present and the set is exactly 96",
 // execution. This source phase imports that record and applies nothing itself.
 // Zero post-anchor migrations remain pending.
 record("G01 the producer migration is pinned APPLIED at remote history 23",
-  manifest.appliedPostAnchorMigrations.length === 9 &&
+  manifest.appliedPostAnchorMigrations.length === 10 &&
   producerPin?.version === "20260806000000" &&
   producerPin?.sha256 === MIGRATION_SHA &&
   producerPin?.operationalStatus === "APPLIED" &&
@@ -536,23 +537,27 @@ record("G01c the wedge repair is APPLIED at remote history 25",
   wedgePin?.appliedExactlyOnce === true &&
   wedgePin?.appliedByThisPhase === false &&
   !("remoteVersionStatus" in (wedgePin ?? {})));
-record("G02 the nine applied records are 21 through 29 in exact ascending order",
-  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25, 26, 27, 28, 29]) &&
+// QF-MVP-50.5 STAGING GATE RE-PIN: the recovery migration passed its own staging
+// gate at remote history 30, becoming the tenth applied post-anchor record.
+record("G02 the ten applied records are 21 through 30 in exact ascending order",
+  same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
-    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000"]) &&
-  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 9);
-record("G03 post-anchor count and local migration count agree at 9 / 96",
-  manifest.appliedAnchor.postAnchorMigrationCount === 9 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
+    ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]) &&
+  new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 10);
+record("G03 post-anchor count and local migration count agree at 10 / 97",
+  manifest.appliedAnchor.postAnchorMigrationCount === 10 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 97);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
-  g1Source.includes("manifest declares exactly nine APPLIED post-anchor migrations") &&
-  g1Source.includes("the explicit PENDING post-anchor set is empty") &&
+  g1Source.includes("manifest declares exactly ten APPLIED post-anchor migrations") &&
+  // QF-MVP-50.5 STAGING GATE RE-PIN: the APPLIED pin moved to ten and the pending
+  // set is now present-and-empty, because 50.5 cleared its own staging gate.
+  g1Source.includes("the explicit PENDING post-anchor set is present and empty") &&
   // no `>=`, no wildcard: the count assertions stay exact
-  g1Source.includes("appliedPins.length === 9") &&
+  g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("pendingPins.length === 0") &&
-  g1Source.includes("const MIGRATION_COUNT = 96;"));
+  g1Source.includes("const MIGRATION_COUNT = 97;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -672,7 +677,7 @@ const mutants = [
     () => producerPin?.remoteHistoryCountAfterApply === 23],
   ["recording remote history 24 for the producer is impossible",
     () => producerPin?.remoteHistoryCountAfterApply === 23 &&
-          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 29)],
+          manifest.appliedPostAnchorMigrations.every((r) => r.remoteHistoryCountAfterApply <= 30)],
   ["claiming the producer was applied more than once is impossible",
     () => producerPin?.appliedExactlyOnce === true],
   ["claiming this source phase applied the migration is impossible",
@@ -682,7 +687,7 @@ const mutants = [
     () => producerPin?.appliedEvidenceMarker === R2_APPLIED_MARKER &&
           execRepairPin?.appliedEvidenceMarker === REPAIR_MARKER &&
           wedgePin?.appliedEvidenceMarker === WEDGE_MARKER &&
-          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 9],
+          new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 10],
   ["dropping the n8n certification marker is impossible",
     () => doc.includes(N8N_CERTIFIED_MARKER)],
   ["dropping the overall staging-certification marker is impossible",
@@ -787,7 +792,7 @@ const mutants = [
             stripSql(read(`supabase/migrations/${CLAIM_GUARD_NAME}`))) &&
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
-    () => g1Source.includes("appliedPins.length === 9") &&
+    () => g1Source.includes("appliedPins.length === 10") &&
           g1Source.includes("pendingPins.length === 0") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],

@@ -37,14 +37,51 @@ export const N8N_EXECUTE_VENDOR_ROUTE_PATH =
 export const N8N_EXECUTE_CAMPAIGN_ROUTE_PATH =
   "/api/internal/automation/n8n/execute-campaign" as const;
 
-/** Closed transport route vocabulary. Mirrors the ledger's route_key CHECK. */
+/**
+ * QF-MVP-50.5. The two RECOVERY routes. Like every route before them, the exact
+ * path is a canonical HMAC field, so a claim, completion or execute signature can
+ * never authenticate a recovery request and vice versa — and, critically, a
+ * `recover` signature can never authenticate a `reconcile` request, because the
+ * two operations have different authority over the job state machine.
+ */
+export const N8N_RECOVER_ROUTE_PATH =
+  "/api/internal/automation/n8n/recover" as const;
+
+export const N8N_RECONCILE_ROUTE_PATH =
+  "/api/internal/automation/n8n/reconcile" as const;
+
+/**
+ * Closed transport route vocabulary. Mirrors the ledger's route_key CHECK.
+ *
+ * QF-MVP-50.5 RE-PIN, NEVER LOOSEN. History of this constant:
+ *   QF-MVP-50.1C  one route   claim_v1
+ *   QF-MVP-50.2D  two routes  + complete_v1
+ *   QF-MVP-50.2E  three       + execute_v1
+ *   QF-MVP-50.5   five        + recover_v1, reconcile_v1
+ *
+ * Every gate that pins this array does so by EXACT ORDERED EQUALITY — never a
+ * length lower bound and never a membership test — so widening it is a
+ * coordinated re-pin of an exact value, not a relaxation.
+ */
 export const AUTOMATION_TRANSPORT_ROUTE_KEYS = [
   "claim_v1",
   "complete_v1",
   "execute_v1",
+  "recover_v1",
+  "reconcile_v1",
 ] as const;
 export type AutomationTransportRouteKey =
   (typeof AUTOMATION_TRANSPORT_ROUTE_KEYS)[number];
+
+/**
+ * The two routes that RECOVER. Kept as their own named set because the recovery
+ * supervisor is authorized for exactly these and for nothing else: it may never
+ * claim fresh work, and the fresh executors may never recover.
+ */
+export const AUTOMATION_RECOVERY_ROUTE_KEYS = [
+  "recover_v1",
+  "reconcile_v1",
+] as const satisfies readonly AutomationTransportRouteKey[];
 
 export interface N8nClaimRequestBody {
   transportVersion: 1;
@@ -256,6 +293,72 @@ export interface N8nExecuteClientRejectionBody {
 export type N8nExecuteClientResponseBody =
   | N8nExecuteClientSuccessBody
   | N8nExecuteClientRejectionBody;
+
+// ---------------------------------------------------------------------------
+// QF-MVP-50.5 — recovery and reconciliation rows
+// ---------------------------------------------------------------------------
+
+/**
+ * Exactly what the recovery transport RPC returns.
+ *
+ * IDENTITY PLUS FAMILY. `workflow_family` is the ONLY non-identity field, it is
+ * always re-derived from durable action truth (never stored and echoed), and it
+ * exists for one reason: the recovery supervisor must know which family execute
+ * boundary to forward the new attempt to. It carries no outcome, no
+ * classification, no communication status and no business payload.
+ */
+export interface AutomationTransportRecoveryRow {
+  request_id: string;
+  route_key: AutomationTransportRouteKey;
+  state: "recovered" | "empty";
+  is_replay: boolean;
+  job_id: string | null;
+  action_request_id: string | null;
+  attempt_id: string | null;
+  attempt_number: number | null;
+  max_attempts: number | null;
+  workflow_family: string | null;
+}
+
+/**
+ * Exactly what the reconciliation transport RPC returns.
+ *
+ * `job_status`, `attempt_status`, `classification` and `safe_code` are read LIVE
+ * from the job and attempt rows — the transport ledger stores no verdict — so a
+ * replay can never disagree with what actually happened.
+ */
+export interface AutomationTransportReconciliationRow {
+  request_id: string;
+  route_key: AutomationTransportRouteKey;
+  state: "reconciled" | "empty";
+  is_replay: boolean;
+  job_id: string | null;
+  action_request_id: string | null;
+  attempt_id: string | null;
+  attempt_number: number | null;
+  max_attempts: number | null;
+  job_status: string | null;
+  attempt_status: string | null;
+  classification: string | null;
+  safe_code: string | null;
+}
+
+/** Exactly what the read-only stale-candidate selector returns. */
+export interface AutomationStaleAttemptCandidateRow {
+  job_id: string;
+  action_request_id: string;
+  attempt_id: string;
+  attempt_number: number;
+  max_attempts: number;
+  attempt_count: number;
+  workflow_family: string | null;
+  action_type: string;
+  locked_by: string;
+  locked_at: string;
+  execute_request_id: string | null;
+  execute_reserved_at: string | null;
+  execute_reservation_stale: boolean;
+}
 
 export interface AutomationTransportRuntimeConfig {
   mode: "off" | "staging" | "production";

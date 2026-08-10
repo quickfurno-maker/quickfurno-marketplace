@@ -369,9 +369,9 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
       pin.forensicClassification === "APPLIED_RECORDED_CATALOG_MATCHES_CURRENT_SOURCE" &&
       pin.applyExecutorProvenance === "UNKNOWN";
   })());
-record("G02 the nine applied post-anchor records read 21 through 29",
+record("G02 the ten applied post-anchor records read 21 through 30",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
-    [21, 22, 23, 24, 25, 26, 27, 28, 29]));
+    [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]));
 record("G03 no stale pending status or fabricated executor for this migration",
   (() => {
     const pin = manifest.appliedPostAnchorMigrations.find((r) => r.version === "20260809000000");
@@ -399,8 +399,9 @@ record("G08 CI still takes no secret, database, provider or deployment action",
   !ciWorkflow.includes("${{ secrets.") &&
   !/^\s*(?:run:\s*)?(?:npx\s+)?supabase\s+/mi.test(ciWorkflow) &&
   !/\bdb push\b/i.test(ciWorkflow));
-record("G09 the local migration set is exactly 96",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
+// QF-MVP-50.5 RE-PIN: 96 -> 97, adding only the 50.5 recovery transport migration.
+record("G09 the local migration set is exactly 97",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 97);
 
 // ---------------------------------------------------------------------------
 // V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject

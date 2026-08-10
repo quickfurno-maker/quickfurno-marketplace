@@ -145,7 +145,17 @@ function logWhatsAppReadFailure(scope: string, error: unknown): void {
   });
 }
 
-/** Bounded exact count of a whole relation. `head: true` never transfers rows. */
+/**
+ * Bounded exact count of a whole relation. `head: true` never transfers rows.
+ *
+ * IMPORTANT — a null return means "could not be counted", NOT zero. PostgREST
+ * does not raise an error for a head-count against a MISSING relation: it
+ * answers `{ count: null, error: null }`. (A full select on the same missing
+ * relation DOES raise PGRST205 — only the head-count is silent.) Coercing that
+ * null to 0 would print a confident "0 rows" for a table that does not exist in
+ * this environment, so null is preserved all the way to the UI, which renders
+ * it as Unknown. Never write `count ?? 0` against one of these.
+ */
 async function countRows(table: string): Promise<number | null> {
   const { count, error } = await adminClient()
     .from(table)
@@ -1191,8 +1201,10 @@ export async function getWhatsAppConsentPage(
     }
 
     try {
+      // Head-count: a null is the silent missing-relation case, not zero.
       const count = await countRows("communication_suppressions");
-      suppressions = { ...suppressions, total: count ?? 0 };
+      if (count === null) suppressionsFault = "NOT_PROVISIONED";
+      else suppressions = { ...suppressions, total: count };
     } catch (error) {
       suppressionsFault = isMissingRelationError(error) ? "NOT_PROVISIONED" : "UNAVAILABLE";
     }
@@ -1229,8 +1241,10 @@ export async function getWhatsAppConsentPage(
     }
 
     try {
+      // Head-count: a null is the silent missing-relation case, not zero.
       const count = await countRows("communication_preferences");
-      preferences = { ...preferences, total: count ?? 0 };
+      if (count === null) preferencesFault = "NOT_PROVISIONED";
+      else preferences = { ...preferences, total: count };
     } catch (error) {
       preferencesFault = isMissingRelationError(error) ? "NOT_PROVISIONED" : "UNAVAILABLE";
     }
@@ -1411,15 +1425,19 @@ export async function getWhatsAppAdminOverview(): Promise<WhatsAppAdminOverview>
           .eq("channel", CHANNEL)
           .eq("status", status);
         if (error) throw error;
-        return [status, count ?? 0] as const;
+        // null is preserved — see countRows(). A silent null must never become 0.
+        return [status, count] as const;
       }),
     );
-    let total = 0;
+    let total: number | null = 0;
     for (const [status, count] of results) {
       statusCounts[status] = count;
-      total += count;
+      if (count === null) total = null;
+      else if (total !== null) total += count;
     }
     messageTotal = total;
+    // Every status unknown means the ledger itself could not be read here.
+    if (results.every(([, count]) => count === null)) messagesFault = "NOT_PROVISIONED";
   } catch (error) {
     logWhatsAppReadFailure("overview-status-counts", error);
     messagesFault = isMissingRelationError(error) ? "NOT_PROVISIONED" : "UNAVAILABLE";
@@ -1453,8 +1471,10 @@ export async function getWhatsAppAdminOverview(): Promise<WhatsAppAdminOverview>
     ]);
     if (blocked.error) throw blocked.error;
     if (suppressed.error) throw suppressed.error;
-    preferenceBlockedCount = blocked.count ?? 0;
-    activeSuppressionCount = suppressed.count ?? 0;
+    // null-preserving: an uncountable relation stays Unknown, never 0.
+    preferenceBlockedCount = blocked.count;
+    activeSuppressionCount = suppressed.count;
+    if (blocked.count === null && suppressed.count === null) consentFault = "NOT_PROVISIONED";
   } catch (error) {
     logWhatsAppReadFailure("overview-consent-counts", error);
     consentFault = isMissingRelationError(error) ? "NOT_PROVISIONED" : "UNAVAILABLE";
@@ -1498,7 +1518,11 @@ export async function getWhatsAppAdminOverview(): Promise<WhatsAppAdminOverview>
       .select("id", { count: "exact", head: true })
       .in("status", ["pending", "processing", "retry_scheduled"]);
     if (error) throw error;
-    automationOpenJobCount = count ?? 0;
+    automationOpenJobCount = count;
+    // A silent null here is the missing-relation case the head-count does not
+    // report as an error — the Automation tab's own join DOES fail on it, and
+    // the two surfaces must not contradict each other.
+    if (count === null) automationFault = "NOT_PROVISIONED";
   } catch (error) {
     automationFault = isMissingRelationError(error) ? "NOT_PROVISIONED" : "UNAVAILABLE";
   }

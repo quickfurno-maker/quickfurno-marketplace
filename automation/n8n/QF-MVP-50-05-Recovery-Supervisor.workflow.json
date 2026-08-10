@@ -1,0 +1,1833 @@
+{
+  "active": false,
+  "connections": {
+    "QF.50.5 Reconcile Preconditions": {
+      "main": [
+        [
+          {
+            "node": "IF — Reconcile Transport Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger — Reconcile Lane INACTIVE": {
+      "main": [
+        [
+          {
+            "node": "QF.50.5 Reconcile Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger — Reconcile Lane Test": {
+      "main": [
+        [
+          {
+            "node": "QF.50.5 Reconcile Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Reconcile Transport Configured": {
+      "main": [
+        [
+          {
+            "node": "Generate Reconcile Request UUID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reconcile Runtime Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Reconcile Request UUID": {
+      "main": [
+        [
+          {
+            "node": "Build Exact Reconcile Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Exact Reconcile Body": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Reconcile Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Reconcile Body": {
+      "main": [
+        [
+          {
+            "node": "Build Reconcile Request Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reconcile Request Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Reconcile Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Reconcile Request": {
+      "main": [
+        [
+          {
+            "node": "POST Signed Reconcile to Core — STAGING ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Signed Reconcile to Core — STAGING ONLY": {
+      "main": [
+        [
+          {
+            "node": "Normalize Reconcile Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Reconcile Response": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Reconcile Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Reconcile Response Body": {
+      "main": [
+        [
+          {
+            "node": "Build Reconcile Response Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reconcile Response Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Verify Reconcile Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Verify Reconcile Response": {
+      "main": [
+        [
+          {
+            "node": "Verify Signed Reconcile Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signed Reconcile Response": {
+      "main": [
+        [
+          {
+            "node": "IF — Reconcile Response Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Reconcile Response Verified": {
+      "main": [
+        [
+          {
+            "node": "Branch On Core Reconcile State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reject Unverified Reconcile Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch On Core Reconcile State": {
+      "main": [
+        [
+          {
+            "node": "STOP — Reconcile Cycle Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger — Recover Lane INACTIVE": {
+      "main": [
+        [
+          {
+            "node": "QF.50.5 Recover Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger — Recover Lane Test": {
+      "main": [
+        [
+          {
+            "node": "QF.50.5 Recover Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Recover Transport Configured": {
+      "main": [
+        [
+          {
+            "node": "Generate Recover Request UUID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Recover Runtime Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QF.50.5 Recover Preconditions": {
+      "main": [
+        [
+          {
+            "node": "IF — Recover Transport Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Recover Request UUID": {
+      "main": [
+        [
+          {
+            "node": "Build Exact Recover Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Exact Recover Body": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Recover Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Recover Body": {
+      "main": [
+        [
+          {
+            "node": "Build Recover Request Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Recover Request Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Recover Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Recover Request": {
+      "main": [
+        [
+          {
+            "node": "POST Signed Recover to Core — STAGING ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Signed Recover to Core — STAGING ONLY": {
+      "main": [
+        [
+          {
+            "node": "Normalize Recover Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Recover Response": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Recover Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Recover Response Body": {
+      "main": [
+        [
+          {
+            "node": "Build Recover Response Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Recover Response Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Verify Recover Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Verify Recover Response": {
+      "main": [
+        [
+          {
+            "node": "Verify Signed Recover Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signed Recover Response": {
+      "main": [
+        [
+          {
+            "node": "IF — Recover Response Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Recover Response Verified": {
+      "main": [
+        [
+          {
+            "node": "Route On Core Recovered Family",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reject Unverified Recover Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route On Core Recovered Family": {
+      "main": [
+        [
+          {
+            "node": "IF — Core Recovered Executable Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Core Recovered Executable Work": {
+      "main": [
+        [
+          {
+            "node": "Generate Execute Request UUID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — No Due Retry Recovered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Execute Request UUID": {
+      "main": [
+        [
+          {
+            "node": "Build Exact Execute Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Exact Execute Body": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Execute Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Execute Body": {
+      "main": [
+        [
+          {
+            "node": "Build Execute Request Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Execute Request Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Execute Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Execute Request": {
+      "main": [
+        [
+          {
+            "node": "POST Signed Execute to Core — STAGING ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Signed Execute to Core — STAGING ONLY": {
+      "main": [
+        [
+          {
+            "node": "Normalize Execute Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Execute Response": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Execute Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Execute Response Body": {
+      "main": [
+        [
+          {
+            "node": "Build Execute Response Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Execute Response Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Verify Execute Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Verify Execute Response": {
+      "main": [
+        [
+          {
+            "node": "Verify Signed Execute Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signed Execute Response": {
+      "main": [
+        [
+          {
+            "node": "IF — Execute Response Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Execute Response Verified": {
+      "main": [
+        [
+          {
+            "node": "Branch On Core Execute Orchestration State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reject Unverified Execute Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch On Core Execute Orchestration State": {
+      "main": [
+        [
+          {
+            "node": "IF — Completion Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Completion Ready": {
+      "main": [
+        [
+          {
+            "node": "Generate Complete Request UUID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Core Orchestration Terminal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Complete Request UUID": {
+      "main": [
+        [
+          {
+            "node": "Build Exact Complete Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Exact Complete Body": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Complete Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Complete Body": {
+      "main": [
+        [
+          {
+            "node": "Build Complete Request Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Complete Request Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Complete Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Complete Request": {
+      "main": [
+        [
+          {
+            "node": "POST Signed Complete to Core — STAGING ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Signed Complete to Core — STAGING ONLY": {
+      "main": [
+        [
+          {
+            "node": "Normalize Complete Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Complete Response": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Complete Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Complete Response Body": {
+      "main": [
+        [
+          {
+            "node": "Build Complete Response Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Complete Response Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Verify Complete Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Verify Complete Response": {
+      "main": [
+        [
+          {
+            "node": "Verify Signed Complete Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signed Complete Response": {
+      "main": [
+        [
+          {
+            "node": "IF — Complete Response Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Complete Response Verified": {
+      "main": [
+        [
+          {
+            "node": "STOP — QF.50.5 Recovery Execution Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reject Unverified Complete Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "id": "qfmvp5005recoverysupervisor",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "name": "QF-MVP-50-05-Recovery-Supervisor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger — Reconcile Lane INACTIVE",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3000,
+        -700
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger — Reconcile Lane Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3000,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.5 fail-closed runtime preconditions for the reconcile lane.\n// Identical env contract to the certified executors. NO new variable is introduced\n// by 50.5, and no secret VALUE is ever built or logged here.\nconst enabled = $env.QF_N8N_TRANSPORT_ENABLED === 'true';\nconst baseUrl = ($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nconst inbound = $env.QF_N8N_TO_CORE_HMAC_SECRET || '';\nconst response = $env.QF_CORE_TO_N8N_HMAC_SECRET || '';\nconst configured = Boolean(\n  enabled &&\n  /^https:\\/\\//.test(baseUrl) &&\n  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId) &&\n  inbound.length >= 32 &&\n  response.length >= 32 &&\n  inbound !== response\n);\nreturn [{ json: {\n  phase: 'QF-MVP-50.5',\n  lane: 'reconcile',\n  transportVersion: 1,\n  configured,\n  transportEnabled: enabled,\n  secretSource: 'selfhost_env',\n  workerId\n} }];"
+      },
+      "name": "QF.50.5 Reconcile Preconditions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2760,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.configured }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Reconcile Transport Configured",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2520,
+        -620
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reconcile Runtime Not Configured",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "requestId"
+      },
+      "name": "Generate Reconcile Request UUID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The EXACT three-key reconcile body. n8n contributes no job, attempt, family,\n// classification, retry time, staleness threshold, provider, recipient or template:\n// Core selects every one of those. Adding any field here would be rejected by the\n// closed parse on the Core side, which is deliberate.\nconst requestId = $json.requestId;\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new Error('QF_50_5_RECONCILE_REQUEST_ID_INVALID');\nif (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId)) throw new Error('QF_50_5_RECONCILE_WORKER_ID_INVALID');\nconst timestamp = Math.floor(Date.now() / 1000);\nconst rawBody = JSON.stringify({ transportVersion: 1, requestId, workerId });\nreturn [{ json: { requestId, workerId, timestamp, rawBody } }];"
+      },
+      "name": "Build Exact Reconcile Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2060,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawBody }}",
+        "dataPropertyName": "bodySha256"
+      },
+      "name": "SHA256 — Reconcile Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1820,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'N8N_TO_CORE',\n  'POST',\n  '/api/internal/automation/n8n/reconcile',\n  $json.requestId,\n  String($json.timestamp),\n  $json.bodySha256\n].join('\\n');\nreturn [{ json: { ...$json, requestCanonical: canonical } }];"
+      },
+      "name": "Build Reconcile Request Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1580,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.requestCanonical }}",
+        "dataPropertyName": "requestHmac",
+        "secret": "={{ $env.QF_N8N_TO_CORE_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Reconcile Request",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1340,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.5 signed transport. Same discipline as every certified 50.x POST node:\n// request signing stays upstream, response verification stays downstream, and this\n// node emits only plain, fully-serialisable data. No credential, secret value or\n// business field is built here.\nconst items = $input.all();\nif (items.length !== 1) throw new Error('QF_50_5_RECONCILE_ITEM_COUNT_INVALID');\nconst input = items[0].json;\nif (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('QF_50_5_RECONCILE_INPUT_INVALID');\n\nconst pick = (o, k) => { try { return o === null || o === undefined ? undefined : o[k]; } catch (_) { return undefined; } };\nconst scalar = (v) => (typeof v === 'string' ? v : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null);\n\nconst requestId = scalar(input.requestId);\nconst timestamp = scalar(input.timestamp);\nconst bodySha256 = scalar(input.bodySha256);\nconst requestHmac = scalar(input.requestHmac);\nif (!requestId || !timestamp || !bodySha256 || !requestHmac) throw new Error('QF_50_5_RECONCILE_IDENTITY_INVALID');\nif (/[\\r\\n\\u0000]/.test(requestId + timestamp + bodySha256 + requestHmac)) throw new Error('QF_50_5_RECONCILE_IDENTITY_UNSAFE');\n\nconst rawBody = input.rawBody;\nif (typeof rawBody !== 'string' || rawBody.length === 0) throw new Error('QF_50_5_RECONCILE_RAW_BODY_INVALID');\nif (rawBody !== rawBody.trim()) throw new Error('QF_50_5_RECONCILE_RAW_BODY_UNSTABLE');\ntry { JSON.parse(rawBody); } catch (_) { throw new Error('QF_50_5_RECONCILE_RAW_BODY_NOT_JSON'); }\n\nconst baseUrl = String($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nif (!/^https:\\/\\//.test(baseUrl)) throw new Error('QF_50_5_RECONCILE_BASE_URL_INVALID');\nconst routePath = '/api/internal/automation/n8n/reconcile';\n// The signed path and the requested path are the SAME value, re-validated here\n// against the closed route set. A path that is not one of Core's own routes never\n// leaves this node.\nconst ALLOWED_PATHS = new Set([\n  '/api/internal/automation/n8n/recover',\n  '/api/internal/automation/n8n/reconcile',\n  '/api/internal/automation/n8n/execute-client',\n  '/api/internal/automation/n8n/execute-vendor',\n  '/api/internal/automation/n8n/execute-campaign',\n  '/api/internal/automation/n8n/complete'\n]);\nif (!ALLOWED_PATHS.has(routePath)) throw new Error('QF_50_5_RECONCILE_ROUTE_PATH_NOT_ALLOWED');\nconst url = baseUrl + routePath;\n\nlet httpResponse;\ntry {\n  httpResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: url,\n    headers: {\n      'content-type': 'application/json',\n      'x-qf-transport-version': '1',\n      'x-qf-request-id': requestId,\n      'x-qf-timestamp': timestamp,\n      'x-qf-body-sha256': bodySha256,\n      'x-qf-signature': 'v1=' + requestHmac\n    },\n    body: rawBody,\n    timeout: 10000,\n    returnFullResponse: true,\n    encoding: 'text',\n    json: false,\n    ignoreHttpStatusErrors: true,\n    disableFollowRedirect: true\n  });\n} catch (error) {\n  const raw = pick(error, 'code');\n  const c = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'UNKNOWN';\n  throw new Error('QF_50_5_RECONCILE_CALL_FAILED_' + c);\n}\n\nif (!httpResponse || typeof httpResponse !== 'object' || Array.isArray(httpResponse)) throw new Error('QF_50_5_RECONCILE_RESULT_INVALID');\nconst statusCode = pick(httpResponse, 'statusCode');\nconst body = pick(httpResponse, 'body');\nconst headersIn = pick(httpResponse, 'headers');\nif (!Number.isInteger(statusCode)) throw new Error('QF_50_5_RECONCILE_STATUS_INVALID');\nif (statusCode >= 300 && statusCode < 400) throw new Error('QF_50_5_RECONCILE_REDIRECT_REFUSED');\nif (typeof body !== 'string') throw new Error('QF_50_5_RECONCILE_BODY_NOT_STRING');\nif (!headersIn || typeof headersIn !== 'object' || Array.isArray(headersIn)) throw new Error('QF_50_5_RECONCILE_HEADERS_INVALID');\n\nlet entries = Object.entries(headersIn);\nif (entries.length === 0 && typeof pick(headersIn, 'entries') === 'function') {\n  try { entries = Array.from(headersIn.entries()); } catch (_) { entries = []; }\n}\nconst headers = {};\nfor (const pair of entries) {\n  const name = String(pair[0]).toLowerCase();\n  if (name === '__proto__') continue;\n  if (Object.prototype.hasOwnProperty.call(headers, name)) continue;\n  const value = pair[1];\n  const normalized = Array.isArray(value) ? value.map(scalar).filter((x) => x !== null) : scalar(value);\n  if (normalized === null) continue;\n  headers[name] = normalized;\n}\nif (Object.keys(headers).length === 0) throw new Error('QF_50_5_RECONCILE_HEADERS_EMPTY');\n\nreturn [{ json: { statusCode: statusCode, body: body, headers: headers } }];"
+      },
+      "name": "POST Signed Reconcile to Core — STAGING ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst headers = response.headers || {};\nconst rawBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body ?? '');\nconst h = {};\nfor (const [k, v] of Object.entries(headers)) h[String(k).toLowerCase()] = Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '');\nreturn [{ json: {\n  requestId: $('Build Exact Reconcile Body').first().json.requestId,\n  statusCode: Number(response.statusCode),\n  rawResponseBody: rawBody,\n  responseVersion: h['x-qf-response-version'] || '',\n  responseRequestId: h['x-qf-response-request-id'] || '',\n  responseTimestamp: h['x-qf-response-timestamp'] || '',\n  responseBodySha256Header: h['x-qf-response-body-sha256'] || '',\n  responseSignature: h['x-qf-response-signature'] || '',\n  exchange: 'reconcile'\n} }];"
+      },
+      "name": "Normalize Reconcile Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -860,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawResponseBody }}",
+        "dataPropertyName": "actualResponseBodySha256"
+      },
+      "name": "SHA256 — Reconcile Response Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'CORE_TO_N8N_RESPONSE',\n  '/api/internal/automation/n8n/reconcile',\n  $json.responseRequestId,\n  $json.responseTimestamp,\n  $json.actualResponseBodySha256\n].join('\\n');\nreturn [{ json: { ...$json, responseCanonical: canonical } }];"
+      },
+      "name": "Build Reconcile Response Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.responseCanonical }}",
+        "dataPropertyName": "expectedResponseHmac",
+        "secret": "={{ $env.QF_CORE_TO_N8N_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Verify Reconcile Response",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Math.floor(Date.now() / 1000);\nconst ts = Number($json.responseTimestamp);\nconst expectedSig = 'v1=' + $json.expectedResponseHmac;\nconst checks = {\n  version: $json.responseVersion === '1',\n  requestId: $json.responseRequestId === $json.requestId,\n  timestamp: /^\\d{10}$/.test($json.responseTimestamp) && Number.isSafeInteger(ts) && Math.abs(now - ts) <= 300,\n  bodyHash: /^[0-9a-f]{64}$/.test($json.responseBodySha256Header) && $json.responseBodySha256Header === $json.actualResponseBodySha256,\n  signature: /^v1=[0-9a-f]{64}$/.test($json.responseSignature) && $json.responseSignature === expectedSig,\n  status: Number.isInteger($json.statusCode) && $json.statusCode >= 200 && $json.statusCode < 600\n};\nconst verified = Object.values(checks).every(Boolean);\nreturn [{ json: { ...$json, verified, checks } }];"
+      },
+      "name": "Verify Signed Reconcile Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000002",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Reconcile Response Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        -760
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reject Unverified Reconcile Response",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// RECONCILIATION IS TERMINAL FOR n8n. Whatever Core decided, this lane makes no\n// further call: it never executes, never completes and never recovers in response.\n// The four states below are the COMPLETE closed set; anything else stops the lane.\nlet payload;\ntry { payload = JSON.parse($json.rawResponseBody); } catch { throw new Error('QF_50_5_RECONCILE_RESPONSE_JSON_INVALID'); }\nif (!payload || typeof payload !== 'object' || payload.transportVersion !== 1 || payload.requestId !== $json.requestId) {\n  throw new Error('QF_50_5_RECONCILE_RESPONSE_ENVELOPE_INVALID');\n}\nif (payload.route !== 'reconcile_v1') throw new Error('QF_50_5_RECONCILE_RESPONSE_ROUTE_INVALID');\n\nconst CLOSED_STATES = new Set(['reconcile_empty', 'reconcile_finalized', 'reconcile_deferred', 'rejected']);\nif (!CLOSED_STATES.has(payload.orchestrationState)) throw new Error('QF_50_5_RECONCILE_RESPONSE_STATE_INVALID');\n\n// A rejection is an authenticated refusal, not a crash, and not something to retry\n// from here: the stale attempt is unchanged and the next cycle will look again.\nif (payload.orchestrationState === 'rejected' && payload.ok !== false) throw new Error('QF_50_5_RECONCILE_REJECTION_INVARIANT');\nif (payload.orchestrationState !== 'rejected' && payload.ok !== true) throw new Error('QF_50_5_RECONCILE_SUCCESS_INVARIANT');\n\nreturn [{ json: {\n  lane: 'reconcile',\n  orchestrationState: payload.orchestrationState,\n  replayed: payload.replayed === true,\n  // Observability only. This lane branches on orchestrationState and nothing else.\n  jobStatus: typeof payload.jobStatus === 'string' ? payload.jobStatus : '',\n  safeCode: typeof payload.safeCode === 'string' ? payload.safeCode : '',\n  followUpCall: 'none'\n} }];"
+      },
+      "name": "Branch On Core Reconcile State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -900
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reconcile Cycle Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -900
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger — Recover Lane INACTIVE",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3000,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger — Recover Lane Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3000,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.5 fail-closed runtime preconditions for the recover lane.\n// Identical env contract to the certified executors. NO new variable is introduced\n// by 50.5, and no secret VALUE is ever built or logged here.\nconst enabled = $env.QF_N8N_TRANSPORT_ENABLED === 'true';\nconst baseUrl = ($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nconst inbound = $env.QF_N8N_TO_CORE_HMAC_SECRET || '';\nconst response = $env.QF_CORE_TO_N8N_HMAC_SECRET || '';\nconst configured = Boolean(\n  enabled &&\n  /^https:\\/\\//.test(baseUrl) &&\n  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId) &&\n  inbound.length >= 32 &&\n  response.length >= 32 &&\n  inbound !== response\n);\nreturn [{ json: {\n  phase: 'QF-MVP-50.5',\n  lane: 'recover',\n  transportVersion: 1,\n  configured,\n  transportEnabled: enabled,\n  secretSource: 'selfhost_env',\n  workerId\n} }];"
+      },
+      "name": "QF.50.5 Recover Preconditions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2760,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000003",
+              "leftValue": "={{ $json.configured }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Recover Transport Configured",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2520,
+        280
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Recover Runtime Not Configured",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "requestId"
+      },
+      "name": "Generate Recover Request UUID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The EXACT three-key recover body. n8n contributes no job, attempt, family,\n// classification, retry time, staleness threshold, provider, recipient or template:\n// Core selects every one of those. Adding any field here would be rejected by the\n// closed parse on the Core side, which is deliberate.\nconst requestId = $json.requestId;\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new Error('QF_50_5_RECOVER_REQUEST_ID_INVALID');\nif (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId)) throw new Error('QF_50_5_RECOVER_WORKER_ID_INVALID');\nconst timestamp = Math.floor(Date.now() / 1000);\nconst rawBody = JSON.stringify({ transportVersion: 1, requestId, workerId });\nreturn [{ json: { requestId, workerId, timestamp, rawBody } }];"
+      },
+      "name": "Build Exact Recover Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2060,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawBody }}",
+        "dataPropertyName": "bodySha256"
+      },
+      "name": "SHA256 — Recover Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1820,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'N8N_TO_CORE',\n  'POST',\n  '/api/internal/automation/n8n/recover',\n  $json.requestId,\n  String($json.timestamp),\n  $json.bodySha256\n].join('\\n');\nreturn [{ json: { ...$json, requestCanonical: canonical } }];"
+      },
+      "name": "Build Recover Request Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1580,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.requestCanonical }}",
+        "dataPropertyName": "requestHmac",
+        "secret": "={{ $env.QF_N8N_TO_CORE_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Recover Request",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1340,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.5 signed transport. Same discipline as every certified 50.x POST node:\n// request signing stays upstream, response verification stays downstream, and this\n// node emits only plain, fully-serialisable data. No credential, secret value or\n// business field is built here.\nconst items = $input.all();\nif (items.length !== 1) throw new Error('QF_50_5_RECOVER_ITEM_COUNT_INVALID');\nconst input = items[0].json;\nif (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('QF_50_5_RECOVER_INPUT_INVALID');\n\nconst pick = (o, k) => { try { return o === null || o === undefined ? undefined : o[k]; } catch (_) { return undefined; } };\nconst scalar = (v) => (typeof v === 'string' ? v : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null);\n\nconst requestId = scalar(input.requestId);\nconst timestamp = scalar(input.timestamp);\nconst bodySha256 = scalar(input.bodySha256);\nconst requestHmac = scalar(input.requestHmac);\nif (!requestId || !timestamp || !bodySha256 || !requestHmac) throw new Error('QF_50_5_RECOVER_IDENTITY_INVALID');\nif (/[\\r\\n\\u0000]/.test(requestId + timestamp + bodySha256 + requestHmac)) throw new Error('QF_50_5_RECOVER_IDENTITY_UNSAFE');\n\nconst rawBody = input.rawBody;\nif (typeof rawBody !== 'string' || rawBody.length === 0) throw new Error('QF_50_5_RECOVER_RAW_BODY_INVALID');\nif (rawBody !== rawBody.trim()) throw new Error('QF_50_5_RECOVER_RAW_BODY_UNSTABLE');\ntry { JSON.parse(rawBody); } catch (_) { throw new Error('QF_50_5_RECOVER_RAW_BODY_NOT_JSON'); }\n\nconst baseUrl = String($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nif (!/^https:\\/\\//.test(baseUrl)) throw new Error('QF_50_5_RECOVER_BASE_URL_INVALID');\nconst routePath = '/api/internal/automation/n8n/recover';\n// The signed path and the requested path are the SAME value, re-validated here\n// against the closed route set. A path that is not one of Core's own routes never\n// leaves this node.\nconst ALLOWED_PATHS = new Set([\n  '/api/internal/automation/n8n/recover',\n  '/api/internal/automation/n8n/reconcile',\n  '/api/internal/automation/n8n/execute-client',\n  '/api/internal/automation/n8n/execute-vendor',\n  '/api/internal/automation/n8n/execute-campaign',\n  '/api/internal/automation/n8n/complete'\n]);\nif (!ALLOWED_PATHS.has(routePath)) throw new Error('QF_50_5_RECOVER_ROUTE_PATH_NOT_ALLOWED');\nconst url = baseUrl + routePath;\n\nlet httpResponse;\ntry {\n  httpResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: url,\n    headers: {\n      'content-type': 'application/json',\n      'x-qf-transport-version': '1',\n      'x-qf-request-id': requestId,\n      'x-qf-timestamp': timestamp,\n      'x-qf-body-sha256': bodySha256,\n      'x-qf-signature': 'v1=' + requestHmac\n    },\n    body: rawBody,\n    timeout: 10000,\n    returnFullResponse: true,\n    encoding: 'text',\n    json: false,\n    ignoreHttpStatusErrors: true,\n    disableFollowRedirect: true\n  });\n} catch (error) {\n  const raw = pick(error, 'code');\n  const c = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'UNKNOWN';\n  throw new Error('QF_50_5_RECOVER_CALL_FAILED_' + c);\n}\n\nif (!httpResponse || typeof httpResponse !== 'object' || Array.isArray(httpResponse)) throw new Error('QF_50_5_RECOVER_RESULT_INVALID');\nconst statusCode = pick(httpResponse, 'statusCode');\nconst body = pick(httpResponse, 'body');\nconst headersIn = pick(httpResponse, 'headers');\nif (!Number.isInteger(statusCode)) throw new Error('QF_50_5_RECOVER_STATUS_INVALID');\nif (statusCode >= 300 && statusCode < 400) throw new Error('QF_50_5_RECOVER_REDIRECT_REFUSED');\nif (typeof body !== 'string') throw new Error('QF_50_5_RECOVER_BODY_NOT_STRING');\nif (!headersIn || typeof headersIn !== 'object' || Array.isArray(headersIn)) throw new Error('QF_50_5_RECOVER_HEADERS_INVALID');\n\nlet entries = Object.entries(headersIn);\nif (entries.length === 0 && typeof pick(headersIn, 'entries') === 'function') {\n  try { entries = Array.from(headersIn.entries()); } catch (_) { entries = []; }\n}\nconst headers = {};\nfor (const pair of entries) {\n  const name = String(pair[0]).toLowerCase();\n  if (name === '__proto__') continue;\n  if (Object.prototype.hasOwnProperty.call(headers, name)) continue;\n  const value = pair[1];\n  const normalized = Array.isArray(value) ? value.map(scalar).filter((x) => x !== null) : scalar(value);\n  if (normalized === null) continue;\n  headers[name] = normalized;\n}\nif (Object.keys(headers).length === 0) throw new Error('QF_50_5_RECOVER_HEADERS_EMPTY');\n\nreturn [{ json: { statusCode: statusCode, body: body, headers: headers } }];"
+      },
+      "name": "POST Signed Recover to Core — STAGING ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst headers = response.headers || {};\nconst rawBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body ?? '');\nconst h = {};\nfor (const [k, v] of Object.entries(headers)) h[String(k).toLowerCase()] = Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '');\nreturn [{ json: {\n  requestId: $('Build Exact Recover Body').first().json.requestId,\n  statusCode: Number(response.statusCode),\n  rawResponseBody: rawBody,\n  responseVersion: h['x-qf-response-version'] || '',\n  responseRequestId: h['x-qf-response-request-id'] || '',\n  responseTimestamp: h['x-qf-response-timestamp'] || '',\n  responseBodySha256Header: h['x-qf-response-body-sha256'] || '',\n  responseSignature: h['x-qf-response-signature'] || '',\n  exchange: 'recover'\n} }];"
+      },
+      "name": "Normalize Recover Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -860,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawResponseBody }}",
+        "dataPropertyName": "actualResponseBodySha256"
+      },
+      "name": "SHA256 — Recover Response Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'CORE_TO_N8N_RESPONSE',\n  '/api/internal/automation/n8n/recover',\n  $json.responseRequestId,\n  $json.responseTimestamp,\n  $json.actualResponseBodySha256\n].join('\\n');\nreturn [{ json: { ...$json, responseCanonical: canonical } }];"
+      },
+      "name": "Build Recover Response Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.responseCanonical }}",
+        "dataPropertyName": "expectedResponseHmac",
+        "secret": "={{ $env.QF_CORE_TO_N8N_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Verify Recover Response",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Math.floor(Date.now() / 1000);\nconst ts = Number($json.responseTimestamp);\nconst expectedSig = 'v1=' + $json.expectedResponseHmac;\nconst checks = {\n  version: $json.responseVersion === '1',\n  requestId: $json.responseRequestId === $json.requestId,\n  timestamp: /^\\d{10}$/.test($json.responseTimestamp) && Number.isSafeInteger(ts) && Math.abs(now - ts) <= 300,\n  bodyHash: /^[0-9a-f]{64}$/.test($json.responseBodySha256Header) && $json.responseBodySha256Header === $json.actualResponseBodySha256,\n  signature: /^v1=[0-9a-f]{64}$/.test($json.responseSignature) && $json.responseSignature === expectedSig,\n  status: Number.isInteger($json.statusCode) && $json.statusCode >= 200 && $json.statusCode < 600\n};\nconst verified = Object.values(checks).every(Boolean);\nreturn [{ json: { ...$json, verified, checks } }];"
+      },
+      "name": "Verify Signed Recover Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000004",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Recover Response Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        140
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reject Unverified Recover Response",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ROUTING IS DECIDED ONLY BY THE CORE-DERIVED workflowFamily.\n// n8n never reads an action type, never parses an action prefix, never infers what\n// kind of work a job is, and never picks a family. The map below is CLOSED: an\n// unrecognised family produces no route at all and the lane simply stops, which\n// leaves the recovered attempt owned and open for the next reconciliation cycle\n// rather than sending it somewhere wrong.\nlet payload;\ntry { payload = JSON.parse($json.rawResponseBody); } catch { throw new Error('QF_50_5_RECOVER_RESPONSE_JSON_INVALID'); }\nif (!payload || typeof payload !== 'object' || payload.transportVersion !== 1 || payload.requestId !== $json.requestId) {\n  throw new Error('QF_50_5_RECOVER_RESPONSE_ENVELOPE_INVALID');\n}\nif (payload.route !== 'recover_v1') throw new Error('QF_50_5_RECOVER_RESPONSE_ROUTE_INVALID');\n\nconst CLOSED_STATES = new Set(['recovery_empty', 'recovery_claimed', 'rejected']);\nif (!CLOSED_STATES.has(payload.orchestrationState)) throw new Error('QF_50_5_RECOVER_RESPONSE_STATE_INVALID');\nif (payload.orchestrationState === 'rejected' && payload.ok !== false) throw new Error('QF_50_5_RECOVER_REJECTION_INVARIANT');\nif (payload.orchestrationState !== 'rejected' && payload.ok !== true) throw new Error('QF_50_5_RECOVER_SUCCESS_INVARIANT');\n\nconst FAMILY_ROUTES = {\n  client_whatsapp: '/api/internal/automation/n8n/execute-client',\n  vendor_whatsapp: '/api/internal/automation/n8n/execute-vendor',\n  campaign_execution: '/api/internal/automation/n8n/execute-campaign'\n};\n\nconst recovered = payload.orchestrationState === 'recovery_claimed';\n// A replay is NEVER executable. Core already suppresses it, and this is the second,\n// independent refusal so a lost response can never produce a second execution.\nif (recovered && payload.replayed !== false) throw new Error('QF_50_5_RECOVER_REPLAY_INVARIANT');\n\nconst recovery = recovered && payload.recovery && typeof payload.recovery === 'object' ? payload.recovery : null;\nconst workflowFamily = recovered && typeof payload.workflowFamily === 'string' ? payload.workflowFamily : '';\nconst executePath = Object.prototype.hasOwnProperty.call(FAMILY_ROUTES, workflowFamily) ? FAMILY_ROUTES[workflowFamily] : '';\nconst executable = Boolean(recovery) && executePath !== '';\nconst jobId = executable ? String(recovery.jobId || '') : '';\nconst attemptId = executable ? String(recovery.attemptId || '') : '';\nif (executable && (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(jobId) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attemptId))) {\n  throw new Error('QF_50_5_RECOVER_IDENTITY_INVALID');\n}\n\nreturn [{ json: {\n  lane: 'recover',\n  workerId: $env.QF_N8N_WORKER_ID || '',\n  orchestrationState: payload.orchestrationState,\n  workflowFamily,\n  executePath,\n  executable,\n  jobId,\n  attemptId,\n  safeCode: executable ? 'QF_50_5_RECOVERED_ROUTE_SELECTED' : 'QF_50_5_NO_DUE_RETRY_RECOVERED'\n} }];"
+      },
+      "name": "Route On Core Recovered Family",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000005",
+              "leftValue": "={{ $json.executable }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Core Recovered Executable Work",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        -20
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — No Due Retry Recovered",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "requestId"
+      },
+      "name": "Generate Execute Request UUID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The EXACT five-key execute body the frozen 50.2E/50.3/50.4 routes accept. The\n// identity comes from Core's recovery answer; n8n adds nothing and omits nothing.\nconst source = $('Route On Core Recovered Family').first().json;\nconst requestId = $json.requestId;\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new Error('QF_50_5_EXECUTE_REQUEST_ID_INVALID');\nconst workerId = source.workerId;\nconst jobId = source.jobId;\nconst attemptId = source.attemptId;\nconst executePath = source.executePath;\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(jobId) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attemptId)) throw new Error('QF_50_5_EXECUTE_IDENTITY_INVALID');\nif (!/^\\/api\\/internal\\/automation\\/n8n\\/execute-(client|vendor|campaign)$/.test(executePath)) throw new Error('QF_50_5_EXECUTE_PATH_INVALID');\nconst timestamp = Math.floor(Date.now() / 1000);\nconst rawBody = JSON.stringify({ transportVersion: 1, requestId, workerId, jobId, attemptId });\nreturn [{ json: { requestId, workerId, jobId, attemptId, executePath, timestamp, rawBody } }];"
+      },
+      "name": "Build Exact Execute Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawBody }}",
+        "dataPropertyName": "bodySha256"
+      },
+      "name": "SHA256 — Execute Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'N8N_TO_CORE',\n  'POST',\n  $json.executePath,\n  $json.requestId,\n  String($json.timestamp),\n  $json.bodySha256\n].join('\\n');\nreturn [{ json: { ...$json, requestCanonical: canonical } }];"
+      },
+      "name": "Build Execute Request Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.requestCanonical }}",
+        "dataPropertyName": "requestHmac",
+        "secret": "={{ $env.QF_N8N_TO_CORE_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Execute Request",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.5 signed transport. Same discipline as every certified 50.x POST node:\n// request signing stays upstream, response verification stays downstream, and this\n// node emits only plain, fully-serialisable data. No credential, secret value or\n// business field is built here.\nconst items = $input.all();\nif (items.length !== 1) throw new Error('QF_50_5_EXECUTE_ITEM_COUNT_INVALID');\nconst input = items[0].json;\nif (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('QF_50_5_EXECUTE_INPUT_INVALID');\n\nconst pick = (o, k) => { try { return o === null || o === undefined ? undefined : o[k]; } catch (_) { return undefined; } };\nconst scalar = (v) => (typeof v === 'string' ? v : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null);\n\nconst requestId = scalar(input.requestId);\nconst timestamp = scalar(input.timestamp);\nconst bodySha256 = scalar(input.bodySha256);\nconst requestHmac = scalar(input.requestHmac);\nif (!requestId || !timestamp || !bodySha256 || !requestHmac) throw new Error('QF_50_5_EXECUTE_IDENTITY_INVALID');\nif (/[\\r\\n\\u0000]/.test(requestId + timestamp + bodySha256 + requestHmac)) throw new Error('QF_50_5_EXECUTE_IDENTITY_UNSAFE');\n\nconst rawBody = input.rawBody;\nif (typeof rawBody !== 'string' || rawBody.length === 0) throw new Error('QF_50_5_EXECUTE_RAW_BODY_INVALID');\nif (rawBody !== rawBody.trim()) throw new Error('QF_50_5_EXECUTE_RAW_BODY_UNSTABLE');\ntry { JSON.parse(rawBody); } catch (_) { throw new Error('QF_50_5_EXECUTE_RAW_BODY_NOT_JSON'); }\n\nconst baseUrl = String($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nif (!/^https:\\/\\//.test(baseUrl)) throw new Error('QF_50_5_EXECUTE_BASE_URL_INVALID');\nconst routePath = String(input.executePath || '');\n// The signed path and the requested path are the SAME value, re-validated here\n// against the closed route set. A path that is not one of Core's own routes never\n// leaves this node.\nconst ALLOWED_PATHS = new Set([\n  '/api/internal/automation/n8n/recover',\n  '/api/internal/automation/n8n/reconcile',\n  '/api/internal/automation/n8n/execute-client',\n  '/api/internal/automation/n8n/execute-vendor',\n  '/api/internal/automation/n8n/execute-campaign',\n  '/api/internal/automation/n8n/complete'\n]);\nif (!ALLOWED_PATHS.has(routePath)) throw new Error('QF_50_5_EXECUTE_ROUTE_PATH_NOT_ALLOWED');\nconst url = baseUrl + routePath;\n\nlet httpResponse;\ntry {\n  httpResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: url,\n    headers: {\n      'content-type': 'application/json',\n      'x-qf-transport-version': '1',\n      'x-qf-request-id': requestId,\n      'x-qf-timestamp': timestamp,\n      'x-qf-body-sha256': bodySha256,\n      'x-qf-signature': 'v1=' + requestHmac\n    },\n    body: rawBody,\n    timeout: 10000,\n    returnFullResponse: true,\n    encoding: 'text',\n    json: false,\n    ignoreHttpStatusErrors: true,\n    disableFollowRedirect: true\n  });\n} catch (error) {\n  const raw = pick(error, 'code');\n  const c = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'UNKNOWN';\n  throw new Error('QF_50_5_EXECUTE_CALL_FAILED_' + c);\n}\n\nif (!httpResponse || typeof httpResponse !== 'object' || Array.isArray(httpResponse)) throw new Error('QF_50_5_EXECUTE_RESULT_INVALID');\nconst statusCode = pick(httpResponse, 'statusCode');\nconst body = pick(httpResponse, 'body');\nconst headersIn = pick(httpResponse, 'headers');\nif (!Number.isInteger(statusCode)) throw new Error('QF_50_5_EXECUTE_STATUS_INVALID');\nif (statusCode >= 300 && statusCode < 400) throw new Error('QF_50_5_EXECUTE_REDIRECT_REFUSED');\nif (typeof body !== 'string') throw new Error('QF_50_5_EXECUTE_BODY_NOT_STRING');\nif (!headersIn || typeof headersIn !== 'object' || Array.isArray(headersIn)) throw new Error('QF_50_5_EXECUTE_HEADERS_INVALID');\n\nlet entries = Object.entries(headersIn);\nif (entries.length === 0 && typeof pick(headersIn, 'entries') === 'function') {\n  try { entries = Array.from(headersIn.entries()); } catch (_) { entries = []; }\n}\nconst headers = {};\nfor (const pair of entries) {\n  const name = String(pair[0]).toLowerCase();\n  if (name === '__proto__') continue;\n  if (Object.prototype.hasOwnProperty.call(headers, name)) continue;\n  const value = pair[1];\n  const normalized = Array.isArray(value) ? value.map(scalar).filter((x) => x !== null) : scalar(value);\n  if (normalized === null) continue;\n  headers[name] = normalized;\n}\nif (Object.keys(headers).length === 0) throw new Error('QF_50_5_EXECUTE_HEADERS_EMPTY');\n\nreturn [{ json: { statusCode: statusCode, body: body, headers: headers } }];"
+      },
+      "name": "POST Signed Execute to Core — STAGING ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst headers = response.headers || {};\nconst rawBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body ?? '');\nconst h = {};\nfor (const [k, v] of Object.entries(headers)) h[String(k).toLowerCase()] = Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '');\nreturn [{ json: {\n  requestId: $('Build Exact Execute Body').first().json.requestId,\n  statusCode: Number(response.statusCode),\n  rawResponseBody: rawBody,\n  responseVersion: h['x-qf-response-version'] || '',\n  responseRequestId: h['x-qf-response-request-id'] || '',\n  responseTimestamp: h['x-qf-response-timestamp'] || '',\n  responseBodySha256Header: h['x-qf-response-body-sha256'] || '',\n  responseSignature: h['x-qf-response-signature'] || '',\n  exchange: 'execute',\n  executePath: $('Build Exact Execute Body').first().json.executePath\n} }];"
+      },
+      "name": "Normalize Execute Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2460,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawResponseBody }}",
+        "dataPropertyName": "actualResponseBodySha256"
+      },
+      "name": "SHA256 — Execute Response Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        2700,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'CORE_TO_N8N_RESPONSE',\n  $json.executePath,\n  $json.responseRequestId,\n  $json.responseTimestamp,\n  $json.actualResponseBodySha256\n].join('\\n');\nreturn [{ json: { ...$json, responseCanonical: canonical } }];"
+      },
+      "name": "Build Execute Response Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.responseCanonical }}",
+        "dataPropertyName": "expectedResponseHmac",
+        "secret": "={{ $env.QF_CORE_TO_N8N_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Verify Execute Response",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        3180,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Math.floor(Date.now() / 1000);\nconst ts = Number($json.responseTimestamp);\nconst expectedSig = 'v1=' + $json.expectedResponseHmac;\nconst checks = {\n  version: $json.responseVersion === '1',\n  requestId: $json.responseRequestId === $json.requestId,\n  timestamp: /^\\d{10}$/.test($json.responseTimestamp) && Number.isSafeInteger(ts) && Math.abs(now - ts) <= 300,\n  bodyHash: /^[0-9a-f]{64}$/.test($json.responseBodySha256Header) && $json.responseBodySha256Header === $json.actualResponseBodySha256,\n  signature: /^v1=[0-9a-f]{64}$/.test($json.responseSignature) && $json.responseSignature === expectedSig,\n  status: Number.isInteger($json.statusCode) && $json.statusCode >= 200 && $json.statusCode < 600\n};\nconst verified = Object.values(checks).every(Boolean);\nreturn [{ json: { ...$json, verified, checks } }];"
+      },
+      "name": "Verify Signed Execute Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3420,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000006",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Execute Response Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3660,
+        -200
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reject Unverified Execute Response",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3880,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n branches on the Core-authored orchestrationState and on NOTHING else: never\n// the HTTP status, never the presence of a field, never a body heuristic. This is\n// byte-for-byte the same closed vocabulary the certified executors consume, because\n// a recovered attempt is an ordinary attempt from the execute boundary's point of view.\nlet payload;\ntry { payload = JSON.parse($json.rawResponseBody); } catch { throw new Error('QF_50_5_EXECUTE_RESPONSE_JSON_INVALID'); }\nif (!payload || typeof payload !== 'object' || payload.transportVersion !== 1 || payload.requestId !== $json.requestId) {\n  throw new Error('QF_50_5_EXECUTE_RESPONSE_ENVELOPE_INVALID');\n}\nif (payload.route !== 'execute_v1') throw new Error('QF_50_5_EXECUTE_RESPONSE_ROUTE_INVALID');\nconst CLOSED_STATES = new Set(['execution_recorded', 'communication_pending', 'attempt_finalized', 'rejected']);\nif (!CLOSED_STATES.has(payload.orchestrationState)) throw new Error('QF_50_5_EXECUTE_RESPONSE_STATE_INVALID');\n\n// ONLY execution_recorded may be completed, and only with the executorReference\n// Core minted. communication_pending deliberately carries none, so a state-blind\n// orchestrator cannot even build a completion body.\nconst completionReady = payload.orchestrationState === 'execution_recorded';\nconst executorReference = completionReady && typeof payload.executorReference === 'string' ? payload.executorReference : '';\nif (completionReady && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(executorReference)) throw new Error('QF_50_5_EXECUTOR_REFERENCE_INVALID');\nconst source = $('Build Exact Execute Body').first().json;\nreturn [{ json: {\n  workerId: source.workerId,\n  jobId: source.jobId,\n  attemptId: source.attemptId,\n  orchestrationState: payload.orchestrationState,\n  completionReady,\n  executorReference\n} }];"
+      },
+      "name": "Branch On Core Execute Orchestration State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3880,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000007",
+              "leftValue": "={{ $json.completionReady }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Completion Ready",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4120,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Core Orchestration Terminal",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4340,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "requestId"
+      },
+      "name": "Generate Complete Request UUID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        4340,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The EXACT six-key completion body. The classification, safe code and retry\n// timestamp are absent from the schema entirely: Core derives all three from its own\n// communication ledger. The single reference n8n supplies is the executorReference\n// Core itself minted, and Core CHECKS it rather than following it.\nconst source = $('Branch On Core Execute Orchestration State').first().json;\nconst requestId = $json.requestId;\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new Error('QF_50_5_COMPLETE_REQUEST_ID_INVALID');\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(source.executorReference)) throw new Error('QF_50_5_COMPLETE_REFERENCE_INVALID');\nconst timestamp = Math.floor(Date.now() / 1000);\nconst rawBody = JSON.stringify({\n  transportVersion: 1,\n  requestId,\n  workerId: source.workerId,\n  jobId: source.jobId,\n  attemptId: source.attemptId,\n  executorReference: source.executorReference\n});\nreturn [{ json: { requestId, timestamp, rawBody } }];"
+      },
+      "name": "Build Exact Complete Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4580,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawBody }}",
+        "dataPropertyName": "bodySha256"
+      },
+      "name": "SHA256 — Complete Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        4820,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'N8N_TO_CORE',\n  'POST',\n  '/api/internal/automation/n8n/complete',\n  $json.requestId,\n  String($json.timestamp),\n  $json.bodySha256\n].join('\\n');\nreturn [{ json: { ...$json, requestCanonical: canonical } }];"
+      },
+      "name": "Build Complete Request Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.requestCanonical }}",
+        "dataPropertyName": "requestHmac",
+        "secret": "={{ $env.QF_N8N_TO_CORE_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Complete Request",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        5300,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.5 signed transport. Same discipline as every certified 50.x POST node:\n// request signing stays upstream, response verification stays downstream, and this\n// node emits only plain, fully-serialisable data. No credential, secret value or\n// business field is built here.\nconst items = $input.all();\nif (items.length !== 1) throw new Error('QF_50_5_COMPLETE_ITEM_COUNT_INVALID');\nconst input = items[0].json;\nif (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('QF_50_5_COMPLETE_INPUT_INVALID');\n\nconst pick = (o, k) => { try { return o === null || o === undefined ? undefined : o[k]; } catch (_) { return undefined; } };\nconst scalar = (v) => (typeof v === 'string' ? v : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null);\n\nconst requestId = scalar(input.requestId);\nconst timestamp = scalar(input.timestamp);\nconst bodySha256 = scalar(input.bodySha256);\nconst requestHmac = scalar(input.requestHmac);\nif (!requestId || !timestamp || !bodySha256 || !requestHmac) throw new Error('QF_50_5_COMPLETE_IDENTITY_INVALID');\nif (/[\\r\\n\\u0000]/.test(requestId + timestamp + bodySha256 + requestHmac)) throw new Error('QF_50_5_COMPLETE_IDENTITY_UNSAFE');\n\nconst rawBody = input.rawBody;\nif (typeof rawBody !== 'string' || rawBody.length === 0) throw new Error('QF_50_5_COMPLETE_RAW_BODY_INVALID');\nif (rawBody !== rawBody.trim()) throw new Error('QF_50_5_COMPLETE_RAW_BODY_UNSTABLE');\ntry { JSON.parse(rawBody); } catch (_) { throw new Error('QF_50_5_COMPLETE_RAW_BODY_NOT_JSON'); }\n\nconst baseUrl = String($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nif (!/^https:\\/\\//.test(baseUrl)) throw new Error('QF_50_5_COMPLETE_BASE_URL_INVALID');\nconst routePath = '/api/internal/automation/n8n/complete';\n// The signed path and the requested path are the SAME value, re-validated here\n// against the closed route set. A path that is not one of Core's own routes never\n// leaves this node.\nconst ALLOWED_PATHS = new Set([\n  '/api/internal/automation/n8n/recover',\n  '/api/internal/automation/n8n/reconcile',\n  '/api/internal/automation/n8n/execute-client',\n  '/api/internal/automation/n8n/execute-vendor',\n  '/api/internal/automation/n8n/execute-campaign',\n  '/api/internal/automation/n8n/complete'\n]);\nif (!ALLOWED_PATHS.has(routePath)) throw new Error('QF_50_5_COMPLETE_ROUTE_PATH_NOT_ALLOWED');\nconst url = baseUrl + routePath;\n\nlet httpResponse;\ntry {\n  httpResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: url,\n    headers: {\n      'content-type': 'application/json',\n      'x-qf-transport-version': '1',\n      'x-qf-request-id': requestId,\n      'x-qf-timestamp': timestamp,\n      'x-qf-body-sha256': bodySha256,\n      'x-qf-signature': 'v1=' + requestHmac\n    },\n    body: rawBody,\n    timeout: 10000,\n    returnFullResponse: true,\n    encoding: 'text',\n    json: false,\n    ignoreHttpStatusErrors: true,\n    disableFollowRedirect: true\n  });\n} catch (error) {\n  const raw = pick(error, 'code');\n  const c = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'UNKNOWN';\n  throw new Error('QF_50_5_COMPLETE_CALL_FAILED_' + c);\n}\n\nif (!httpResponse || typeof httpResponse !== 'object' || Array.isArray(httpResponse)) throw new Error('QF_50_5_COMPLETE_RESULT_INVALID');\nconst statusCode = pick(httpResponse, 'statusCode');\nconst body = pick(httpResponse, 'body');\nconst headersIn = pick(httpResponse, 'headers');\nif (!Number.isInteger(statusCode)) throw new Error('QF_50_5_COMPLETE_STATUS_INVALID');\nif (statusCode >= 300 && statusCode < 400) throw new Error('QF_50_5_COMPLETE_REDIRECT_REFUSED');\nif (typeof body !== 'string') throw new Error('QF_50_5_COMPLETE_BODY_NOT_STRING');\nif (!headersIn || typeof headersIn !== 'object' || Array.isArray(headersIn)) throw new Error('QF_50_5_COMPLETE_HEADERS_INVALID');\n\nlet entries = Object.entries(headersIn);\nif (entries.length === 0 && typeof pick(headersIn, 'entries') === 'function') {\n  try { entries = Array.from(headersIn.entries()); } catch (_) { entries = []; }\n}\nconst headers = {};\nfor (const pair of entries) {\n  const name = String(pair[0]).toLowerCase();\n  if (name === '__proto__') continue;\n  if (Object.prototype.hasOwnProperty.call(headers, name)) continue;\n  const value = pair[1];\n  const normalized = Array.isArray(value) ? value.map(scalar).filter((x) => x !== null) : scalar(value);\n  if (normalized === null) continue;\n  headers[name] = normalized;\n}\nif (Object.keys(headers).length === 0) throw new Error('QF_50_5_COMPLETE_HEADERS_EMPTY');\n\nreturn [{ json: { statusCode: statusCode, body: body, headers: headers } }];"
+      },
+      "name": "POST Signed Complete to Core — STAGING ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5540,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst headers = response.headers || {};\nconst rawBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body ?? '');\nconst h = {};\nfor (const [k, v] of Object.entries(headers)) h[String(k).toLowerCase()] = Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '');\nreturn [{ json: {\n  requestId: $('Build Exact Complete Body').first().json.requestId,\n  statusCode: Number(response.statusCode),\n  rawResponseBody: rawBody,\n  responseVersion: h['x-qf-response-version'] || '',\n  responseRequestId: h['x-qf-response-request-id'] || '',\n  responseTimestamp: h['x-qf-response-timestamp'] || '',\n  responseBodySha256Header: h['x-qf-response-body-sha256'] || '',\n  responseSignature: h['x-qf-response-signature'] || '',\n  exchange: 'complete'\n} }];"
+      },
+      "name": "Normalize Complete Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5780,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawResponseBody }}",
+        "dataPropertyName": "actualResponseBodySha256"
+      },
+      "name": "SHA256 — Complete Response Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        6020,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'CORE_TO_N8N_RESPONSE',\n  '/api/internal/automation/n8n/complete',\n  $json.responseRequestId,\n  $json.responseTimestamp,\n  $json.actualResponseBodySha256\n].join('\\n');\nreturn [{ json: { ...$json, responseCanonical: canonical } }];"
+      },
+      "name": "Build Complete Response Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6260,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.responseCanonical }}",
+        "dataPropertyName": "expectedResponseHmac",
+        "secret": "={{ $env.QF_CORE_TO_N8N_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Verify Complete Response",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        6500,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Math.floor(Date.now() / 1000);\nconst ts = Number($json.responseTimestamp);\nconst expectedSig = 'v1=' + $json.expectedResponseHmac;\nconst checks = {\n  version: $json.responseVersion === '1',\n  requestId: $json.responseRequestId === $json.requestId,\n  timestamp: /^\\d{10}$/.test($json.responseTimestamp) && Number.isSafeInteger(ts) && Math.abs(now - ts) <= 300,\n  bodyHash: /^[0-9a-f]{64}$/.test($json.responseBodySha256Header) && $json.responseBodySha256Header === $json.actualResponseBodySha256,\n  signature: /^v1=[0-9a-f]{64}$/.test($json.responseSignature) && $json.responseSignature === expectedSig,\n  status: Number.isInteger($json.statusCode) && $json.statusCode >= 200 && $json.statusCode < 600\n};\nconst verified = Object.values(checks).every(Boolean);\nreturn [{ json: { ...$json, verified, checks } }];"
+      },
+      "name": "Verify Signed Complete Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6740,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e50000-0000-4000-8000-000000000008",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Complete Response Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6980,
+        -520
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reject Unverified Complete Response",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        7200,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — QF.50.5 Recovery Execution Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        7200,
+        -680
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## QF-MVP-50.5 — RECOVERY SUPERVISOR (SELF-HOSTED STAGING CANDIDATE)\n\n**KEEP INACTIVE / UNPUBLISHED.**\n\nDefault path is fail-closed because `QF_N8N_TRANSPORT_ENABLED` must equal `true`.\n\nSecrets are runtime env references only; never paste secret values into this workflow.\n\nRequired later on self-hosted n8n: `QF_CORE_STAGING_BASE_URL`, `QF_N8N_WORKER_ID`, `QF_N8N_TO_CORE_HMAC_SECRET`, `QF_CORE_TO_N8N_HMAC_SECRET`, `QF_N8N_TRANSPORT_ENABLED`. **No new variable is introduced by 50.5.**\n\n### TWO INDEPENDENT LANES, ON PURPOSE\n\n`reconcile` and `recover` have their OWN schedule trigger, so they run as separate n8n executions. A failure, a rejection or a slow response in one lane therefore cannot starve the other — which a single fan-out branch could not guarantee. Fresh `pending` work is a third lane entirely, owned by the certified client/vendor/campaign executors and untouched here.\n\nEach lane does at most ONE unit of work per cycle. Reconciliation runs every 5 minutes because nothing is reconcilable until the Core-owned staleness threshold has elapsed; recovery runs every minute so a due retry is picked up promptly.\n\n### n8n OWNS NO BUSINESS AUTHORITY HERE\n\nIt sends three identity fields to `recover` and `reconcile`. It never selects the job, the action, the workflow family, the classification, the retry time, the stale outcome, the dead-letter decision, the provider, the recipient or the template. On a successful recovery it routes ONLY on the Core-returned `workflowFamily`, through a closed three-entry map, to the EXISTING certified execute boundary — and an unrecognised family produces no route at all.\n\nThe `reconcile` lane makes NO follow-up call of any kind. Whatever Core decided is final for this cycle.\n\n### WHAT THIS WORKFLOW CANNOT DO\n\nIt cannot claim fresh work (`claim_v1` is not reachable from here). It cannot retry a communication row — where the communication lane owns a send, Core answers `reconcile_deferred` and this graph stops. It cannot decide that a job is dead: `dead_letter` is computed inside `qf_complete_automation_attempt_v1` and nowhere else.\n\nThe certified QF-MVP-50.2E / 50.3 / 50.4 executor workflows are NOT modified by this phase.",
+        "height": 1180,
+        "width": 900
+      },
+      "name": "SECURITY — QF.50.5 READ FIRST",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3000,
+        -1100
+      ]
+    }
+  ],
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true
+  },
+  "tags": [],
+  "versionId": "50e50001-0000-4000-8000-000000000001"
+}

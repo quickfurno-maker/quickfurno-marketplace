@@ -28,7 +28,14 @@ const SCRIPT_COMMAND =
 const CLASSIFICATION = "APPLIED_RECORDED_CATALOG_MATCHES_CURRENT_SOURCE";
 const FORENSIC_EVIDENCE_TYPE = "IMPORTED_FOUNDER_ACKNOWLEDGED_EXISTING_STAGING_STATE";
 const UNKNOWN_PROVENANCE = "UNKNOWN";
-const MIGRATION_COUNT = 96;
+// QF-MVP-50.5 RE-PIN. The forensic truth this gate certifies — nine APPLIED records at
+// remote history 21..29, with UNKNOWN executor provenance for the last three — is
+// completely unchanged. The only difference is that one further migration
+// (20260812000000, the 50.5 recovery transport) now exists on disk as PENDING.
+const MIGRATION_COUNT = 97;
+const PENDING_VERSION = "20260812000000";
+const PENDING_FILENAME =
+  "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
 
 const EXPECTED_APPLIED = [
   ["20260804000000", 21],
@@ -116,9 +123,10 @@ function validateState(state) {
     ? manifest.pendingPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 96", state.migrationFiles.length === MIGRATION_COUNT);
-  check("the exact final four migration filenames are frozen",
-    same(state.migrationFiles.slice(-4), FORENSIC_MIGRATIONS.map((migration) => migration.filename)));
+  check("migration count is exactly 97", state.migrationFiles.length === MIGRATION_COUNT);
+  check("the exact final four forensic migration filenames are frozen, followed only by the pinned 50.5 pending migration",
+    same(state.migrationFiles.slice(-5),
+      [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), PENDING_FILENAME]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -127,9 +135,16 @@ function validateState(state) {
   check("the remote-history counts are exactly 21 through 29",
     same(applied.map((record) => record.remoteHistoryCountAfterApply),
       EXPECTED_APPLIED.map(([, history]) => history)));
-  check("the manifest retains an explicit empty pending set", pending !== null && pending.length === 0);
-  check("the anchor retains the exact nine-migration post-anchor count",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length);
+  check("the manifest pending set is exactly the pinned 50.5 recovery migration",
+    pending !== null && pending.length === 1 &&
+    pending[0].version === PENDING_VERSION &&
+    pending[0].operationalStatus === "PENDING" &&
+    pending[0].requiresSeparateStagingDeploymentGate === true);
+  check("no forensic applied record was demoted into the pending set",
+    pending !== null &&
+    EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
+  check("the anchor post-anchor count is the nine applied plus the one pending",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 1);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

@@ -105,7 +105,8 @@ check("no Activity tab without a real event stream", !/activity:\s*"Activity"|>A
 
 // 8. No migration mutation in the C4 change set (the harness itself is offline).
 const migrationFiles = readdirSync(join(root, "supabase", "migrations"));
-check("migration count remains 96", migrationFiles.length === 96);
+// QF-MVP-50.5 RE-PIN: 96 -> 97. This admin phase still adds no migration of its own.
+check("migration count remains 97", migrationFiles.length === 97);
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);
 console.log("offline: no database, no network, no provider, no auth bypass");

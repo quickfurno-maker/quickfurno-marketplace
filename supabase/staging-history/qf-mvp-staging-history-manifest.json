@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 9,
+    "postAnchorMigrationCount": 10,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -767,7 +767,19 @@
       "evidencePath": "docs/QF-MVP-50-3-50-4-STAGING-FORENSIC-RECONCILIATION.md"
     }
   ],
-  "pendingPostAnchorMigrations": [],
+  "pendingPostAnchorMigrations": [
+    {
+      "version": "20260812000000",
+      "name": "qf_mvp_50_5_automation_recovery_reconciliation",
+      "path": "supabase/migrations/20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql",
+      "sha256": "25a142009bc389ae9e6f1fae95b873e0858c74b4a5792cbf3217dfb4e3af189b",
+      "phase": "QF-MVP-50.5",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    }
+  ],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,

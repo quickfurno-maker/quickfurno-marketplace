@@ -399,8 +399,9 @@ record("G08 CI still takes no secret, database, provider or deployment action",
   !ciWorkflow.includes("${{ secrets.") &&
   !/^\s*(?:run:\s*)?(?:npx\s+)?supabase\s+/mi.test(ciWorkflow) &&
   !/\bdb push\b/i.test(ciWorkflow));
-record("G09 the local migration set is exactly 96",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 96);
+// QF-MVP-50.5 RE-PIN: 96 -> 97, adding only the 50.5 recovery transport migration.
+record("G09 the local migration set is exactly 97",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 97);
 
 // ---------------------------------------------------------------------------
 // V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject

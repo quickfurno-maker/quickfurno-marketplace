@@ -531,10 +531,36 @@ record("S09 the operator names no production or Jarvis ref as a literal of its o
 record("S10 exactly one new environment variable is introduced, and it is documented",
   A.CANARY_DESTINATION_ENV === "QF_META_CANARY_DESTINATION_E164" &&
   (operatorCode.match(/QF_META_CANARY_DESTINATION_E164/g) ?? []).length === 1);
-record("S11 no runtime write path exists yet — this operator is the DECISION layer",
-  // Stated honestly and asserted, so a future runtime addition must update this gate
-  // rather than inherit a claim it no longer satisfies.
-  !/createClient\(|@supabase\/supabase-js|\.from\(["']communication_/.test(operatorCode));
+/*
+ * QF-MVP-40.13C SUCCESSOR. S11 previously asserted the runtime wiring was ABSENT. The
+ * wiring now exists, so that claim would be false — and the honest replacement is not a
+ * deletion but a set of STRONGER assertions: the wiring is present, it is guarded, and it
+ * still has no provider-send capability whatsoever. Nothing else in 40-13 is relaxed.
+ */
+record("S11a the executable wiring EXISTS and is fully guarded behind isDirect",
+  /const isDirect = process\.argv\[1\]/.test(operatorCode) &&
+  /if \(isDirect\)/.test(operatorCode) &&
+  operatorCode.indexOf("if (isDirect)") < operatorCode.indexOf('await import("@supabase/supabase-js")'));
+record("S11b no client is constructed at import time — only inside the guard, by dynamic import",
+  !/^import .*@supabase\/supabase-js/m.test(operatorCode) &&
+  /await import\("@supabase\/supabase-js"\)/.test(operatorCode));
+record("S11c the staging identity fence runs BEFORE any client or transport exists",
+  operatorCode.indexOf("resolveActivationTarget(process.env") <
+    operatorCode.indexOf('await import("@supabase/supabase-js")') &&
+  operatorCode.indexOf("resolveActivationTarget(process.env") <
+    operatorCode.indexOf("FetchHttpTransport"));
+record("S11d execution is delegated to the runtime module, not reimplemented here",
+  /await import\("\.\/canaryActivationRuntime\.mjs"\)/.test(operatorCode) &&
+  /runtime\.runOperator\(/.test(operatorCode));
+record("S11e the wiring still has NO provider-send capability",
+  A.operatorHasNoSendEndpoint(operatorCode) === true &&
+  !/method:\s*["'](POST|PUT|PATCH|DELETE)["']/i.test(operatorCode) &&
+  !/sendResolvedTemplate|sendTemplateMessage|CommunicationService/.test(operatorCode));
+record("S11f the operator performs no direct table write of its own",
+  !/\.from\(["']communication_[a-z_]+["']\)[\s\S]{0,200}\.(update|insert|upsert|delete)\(/.test(operatorCode));
+record("S11g DISABLE is reachable without a Meta credential or an attestation",
+  /needsCanaryDestination/.test(operatorCode) &&
+  /MODE_REQUIREMENTS\[mode\]\.meta/.test(operatorCode));
 
 // ---------------------------------------------------------------------------
 // MUT. MUTANTS — every guard must be shown capable of failing

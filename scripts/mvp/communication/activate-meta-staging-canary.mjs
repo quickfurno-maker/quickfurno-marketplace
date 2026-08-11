@@ -100,6 +100,11 @@ export const ActivationFailure = Object.freeze({
   WRITE_OUTCOME_UNCERTAIN: "WRITE_OUTCOME_UNCERTAIN",
   READBACK_MISMATCH: "READBACK_MISMATCH",
   SEND_CAPABLE_WITHOUT_EVIDENCE: "SEND_CAPABLE_WITHOUT_EVIDENCE",
+  INDEX_PROOF_UNAVAILABLE: "INDEX_PROOF_UNAVAILABLE",
+  // QF-MVP-40.13C — one effective provider identity, never two contradictory ones.
+  PROVIDER_ENV_MISMATCH: "PROVIDER_ENV_MISMATCH",
+  PROVIDER_ENV_MISSING: "PROVIDER_ENV_MISSING",
+  PROVIDER_MODE_INVALID: "PROVIDER_MODE_INVALID",
 });
 
 /** The env variable carrying the owner-controlled canary destination. */
@@ -616,3 +621,174 @@ export default {
   proveDisabledIsFailClosed,
   verifyAttestation,
 };
+
+// ===========================================================================
+// QF-MVP-40.13C — EXECUTABLE ENTRY POINT.
+//
+// Everything above is import-safe: importing this file constructs no client, opens no
+// socket and reads no credential. The block below runs ONLY when this file is the
+// process entry point, which is what keeps the validator able to import and drive the
+// contract without any of it executing.
+//
+// The real adapters are built here and NOWHERE else, and only AFTER the staging identity
+// fence has passed — so a wrong project ref is refused before a client exists.
+// ===========================================================================
+const isDirect = process.argv[1]
+  && process.argv[1].endsWith("activate-meta-staging-canary.mjs");
+
+if (isDirect) {
+  const argv = process.argv.slice(2);
+  const fail = (code, detail) => {
+    console.error(`REFUSED: ${code}${detail ? ` (${detail})` : ""}`);
+    process.exit(2);
+  };
+
+  const modeResult = resolveMode(argv);
+  if (!modeResult.ok) fail(modeResult.reason, modeResult.detail);
+  const mode = modeResult.mode;
+
+  const runtime = await import("./canaryActivationRuntime.mjs");
+
+  // DISABLE deliberately needs no Meta credential and no canary destination: closing a
+  // gate must never be harder than opening one.
+  const needsCanaryDestination = runtime.MODE_REQUIREMENTS[mode].canaryDestination;
+
+  if (mode === "DRY_RUN") {
+    const out = await runtime.runOperator({ mode: "DRY_RUN" });
+    console.log(JSON.stringify(out, null, 2));
+    console.log("OFFLINE DRY RUN — no credential read, no client constructed, no network, no database.");
+    process.exit(0);
+  }
+
+  const target = resolveActivationTarget(process.env, { requireCanaryDestination: needsCanaryDestination });
+  if (!target.ok) fail(target.reason, target.missing ?? target.detail);
+
+  // One effective provider identity. A WHATSAPP_* counterpart that disagrees refuses here.
+  const reconciled = runtime.reconcileProviderEnv(process.env, { strict: false });
+  if (!reconciled.ok) fail(reconciled.reason, reconciled.fields?.join(","));
+
+  console.log(`Target ref     : ${target.projectRef} (${target.environment}) — identity proven`);
+  console.log(`Mode           : ${mode}`);
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const { FetchHttpTransport } = await import("../../../lib/communication/httpTransport.ts");
+
+  const client = createClient(
+    process.env.QF_STAGING_SUPABASE_URL,
+    process.env.QF_STAGING_SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const db = runtime.createSupabaseDbAdapter(client);
+
+  const expected = {
+    phoneNumberId: process.env.QF_META_PHONE_NUMBER_ID,
+    wabaId: process.env.QF_META_WABA_ID,
+  };
+
+  let meta = null;
+  let health = null;
+  if (runtime.MODE_REQUIREMENTS[mode].meta) {
+    const transport = new FetchHttpTransport();
+    const shared = {
+      transport,
+      token: process.env.QF_META_ACCESS_TOKEN,
+      graphApiVersion: process.env.QF_META_GRAPH_API_VERSION,
+      wabaId: expected.wabaId,
+      phoneNumberId: expected.phoneNumberId,
+    };
+    meta = runtime.createMetaGetAdapter(shared);
+    health = runtime.createHealthAdapter(shared);
+  }
+
+  const selection = runtime.MODE_REQUIREMENTS[mode].meta
+    ? resolveTemplateSelection(argv)
+    : { ok: true, keys: [] };
+  if (!selection.ok) fail(selection.reason, selection.detail);
+
+  const result = await runtime.runOperator({
+    mode,
+    db, meta, health,
+    indexProof: runtime.MODE_REQUIREMENTS[mode].indexProof
+      ? await buildIndexProofAdapter()
+      : { verify: async () => ({ ok: true, hash: null }) },
+    attestationIo: await buildAttestationIo(mode),
+    target,
+    expected,
+    templateKeys: selection.keys,
+    destinationHash: target.destinationHash,
+    now: Date.now(),
+    nonce: randomNonce(),
+    attestationTtlMs: ATTESTATION_TTL_MS,
+    stageForAttestation: argv.includes("--stage=canary") ? "ARM_CANARY" : "ARM_READINESS",
+    branchHead: process.env.QF_ACTIVATION_BRANCH_HEAD ?? null,
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+  if (!result.ok) {
+    console.error(`REFUSED: ${result.reason}${result.detail ? ` (${result.detail})` : ""}`);
+    process.exit(3);
+  }
+  process.exit(0);
+}
+
+function randomNonce() {
+  return createHash("sha256")
+    .update(`${process.pid}:${Date.now()}:${Math.random()}`)
+    .digest("hex");
+}
+
+/** The 40.12 external index proof, consumed through its existing file contract. */
+async function buildIndexProofAdapter() {
+  const { verifyIndexProof } = await import("./seed-meta-staging-inactive-mappings.mjs");
+  const path = process.env.QF_STAGING_INDEX_PROOF_PATH;
+  return {
+    async verify({ projectRef, now }) {
+      if (!path) {
+        return { ok: false, reason: ActivationFailure.INDEX_PROOF_UNAVAILABLE, detail: "QF_STAGING_INDEX_PROOF_PATH is not set" };
+      }
+      if (isInsideRepository(path)) {
+        return { ok: false, reason: ActivationFailure.INDEX_PROOF_UNAVAILABLE, detail: "the proof must live OUTSIDE the repository" };
+      }
+      let parsed;
+      try { parsed = JSON.parse(readFileSync(path, "utf8")); }
+      catch { return { ok: false, reason: ActivationFailure.INDEX_PROOF_UNAVAILABLE, detail: "unreadable or not valid JSON" }; }
+      const verified = verifyIndexProof(parsed, { now: () => now, projectRef });
+      if (!verified.ok) return verified;
+      return { ok: true, hash: parsed.proof_sha256 };
+    },
+  };
+}
+
+/**
+ * Attestation file IO. The file and the consumed-nonce ledger both live OUTSIDE the
+ * repository, exactly as the 40.12 attestation does.
+ */
+async function buildAttestationIo(mode) {
+  const { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync: rf } = await import("node:fs");
+  const { join, dirname } = await import("node:path");
+  const home = process.env.USERPROFILE || process.env.HOME || ".";
+  const dir = join(home, ".qf-mvp-40-canary");
+  const attestationPath = process.env.QF_ACTIVATION_ATTESTATION_PATH || join(dir, "attestation.json");
+  const ledgerPath = join(dir, "consumed-nonces.log");
+  return {
+    async write(body) {
+      if (isInsideRepository(attestationPath)) {
+        throw new Error(`${ActivationFailure.ATTESTATION_MISSING}: must live OUTSIDE the repository`);
+      }
+      mkdirSync(dirname(attestationPath), { recursive: true });
+      writeFileSync(attestationPath, JSON.stringify(body, null, 2), "utf8");
+      console.log(`Attestation    : written outside the repository (${mode})`);
+    },
+    async load() {
+      return loadAttestationFile(attestationPath);
+    },
+    async consumed() {
+      if (!existsSync(ledgerPath)) return [];
+      return rf(ledgerPath, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
+    },
+    async consume(digest) {
+      mkdirSync(dirname(ledgerPath), { recursive: true });
+      appendFileSync(ledgerPath, `${digest}\n`, "utf8");
+    },
+  };
+}

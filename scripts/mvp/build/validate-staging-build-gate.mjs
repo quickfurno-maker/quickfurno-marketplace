@@ -20,6 +20,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import {
   evaluatePreBuildGates, scanBuildOutput, isFlagEnabled, refFromUrl,
   AUTHORIZED_REF, PRODUCTION_REF, JARVIS_REF, OUTBOUND_FLAG_VARS,
+  decodeJwtPayload, jwtProjectRef, jwtRole, MAX_JWT_PAYLOAD_BYTES,
 } from "./stagingBuildGate.mjs";
 import { runStagingBuild, removeBuildOutput } from "./runStagingBuild.mjs";
 
@@ -585,6 +586,171 @@ record("R3-B15 a service_role JWT in a BROWSER chunk is refused",
   }).ok === false);
 
 /* ===========================================================================
+ * 8c. QF-MVP-40-R5 — a prohibited project ref hidden INSIDE a JWT payload.
+ *
+ * R4 measured this exact environment live and the gate returned ok:true with
+ * leakedVariableCount:0 — the staging URL was authentic, but the effective
+ * SUPABASE_SERVICE_ROLE_KEY was a PRODUCTION service_role key whose ref is only
+ * present base64url-encoded. These cases pin the encoding boundary shut.
+ * ========================================================================= */
+
+const PROD_SERVICE_JWT = jwt({ iss: "supabase", ref: PRODUCTION_REF, role: "service_role" });
+const JARVIS_SERVICE_JWT = jwt({ iss: "supabase", ref: JARVIS_REF, role: "service_role" });
+const UNLISTED_SERVICE_JWT = jwt({ iss: "supabase", ref: UNLISTED_REF, role: "service_role" });
+const STAGING_ANON_JWT = jwt({ iss: "supabase", ref: AUTHORIZED_REF, role: "anon" });
+
+// A. the exact R4 environment: staging URL, production-issued privileged key.
+const r4Env = baseEnv({ SUPABASE_SERVICE_ROLE_KEY: PROD_SERVICE_JWT });
+const r4Gates = evaluatePreBuildGates(r4Env);
+record("R5-A FAIL: a legacy service_role JWT issued for the PRODUCTION project",
+  failedWith(r4Gates, "PROHIBITED_REF_IN_JWT_CREDENTIAL"),
+  JSON.stringify(codes(r4Gates)));
+
+// B. the whole point: the ref is NOT visible as plaintext, so the raw substring scan
+//    that guarded this before cannot possibly be what caught it.
+record("R5-B the production ref is invisible to the raw-substring scan (encoding boundary)",
+  !PROD_SERVICE_JWT.includes(PRODUCTION_REF)
+  && !codes(r4Gates).includes("PROHIBITED_REF_IN_ENVIRONMENT")
+  && !r4Gates.ok,
+  "the new claims check, not the legacy leak scan, must be what refuses this");
+
+record("R5-B2 the R4 environment is reported with a non-zero JWT-claims count",
+  r4Gates.evidence.jwtProhibitedVariableCount === 1
+  && r4Gates.evidence.leakedVariableCount === 0,
+  JSON.stringify(r4Gates.evidence));
+
+// C. the correct staging credential still passes end to end.
+record("R5-C PASS: a staging-issued service_role JWT is accepted",
+  evaluatePreBuildGates(baseEnv()).ok === true
+  && jwtProjectRef(SERVICE_JWT) === AUTHORIZED_REF
+  && jwtRole(SERVICE_JWT) === "service_role");
+
+// D. any other prohibited project, not just production.
+record("R5-D FAIL: a service_role JWT issued for the QF-Jarvis project",
+  failedWith(evaluatePreBuildGates(baseEnv({ SUPABASE_SERVICE_ROLE_KEY: JARVIS_SERVICE_JWT })),
+    "PROHIBITED_REF_IN_JWT_CREDENTIAL"));
+
+// D2. an UNLISTED third project is caught by the allow-list, which the deny-list cannot do.
+const unlistedCredGates = evaluatePreBuildGates(baseEnv({ SUPABASE_SERVICE_ROLE_KEY: UNLISTED_SERVICE_JWT }));
+record("R5-D2 FAIL: a credential issued for an UNLISTED project (allow-list, not deny-list)",
+  failedWith(unlistedCredGates, "CREDENTIAL_PROJECT_MISMATCH")
+  && !codes(unlistedCredGates).includes("PROHIBITED_REF_IN_JWT_CREDENTIAL"),
+  JSON.stringify(codes(unlistedCredGates)));
+
+// E-H. malformed input must be treated as opaque and must never throw.
+const malformed = [
+  ["two segments", `${b64({ a: 1 })}.${b64({ ref: PRODUCTION_REF })}`],
+  ["four segments", `a.${b64({ ref: PRODUCTION_REF })}.c.d`],
+  ["empty middle segment", `${b64({ a: 1 })}..${"s".repeat(8)}`],
+  ["empty trailing segment", `${b64({ a: 1 })}.${b64({ ref: "x" })}.`],
+  ["invalid base64url (+/=)", `aaa.${"ab+cd/ef=="}.bbb`],
+  ["invalid base64url (space)", `aaa.${"ab cd"}.bbb`],
+  ["valid base64url, not JSON", `aaa.${Buffer.from("not json at all").toString("base64url")}.bbb`],
+  ["valid base64url, JSON array", `aaa.${Buffer.from("[1,2,3]").toString("base64url")}.bbb`],
+  ["valid base64url, JSON scalar", `aaa.${Buffer.from("42").toString("base64url")}.bbb`],
+  ["oversized payload", `aaa.${Buffer.from(JSON.stringify({ ref: PRODUCTION_REF, pad: "z".repeat(MAX_JWT_PAYLOAD_BYTES * 2) })).toString("base64url")}.bbb`],
+  ["not a string", 12345],
+  ["empty string", ""],
+];
+let malformedThrew = null;
+const malformedDecoded = malformed.map(([label, v]) => {
+  try {
+    return [label, decodeJwtPayload(v), jwtProjectRef(v)];
+  } catch (e) {
+    malformedThrew = `${label}: ${e.message}`;
+    return [label, "THREW", "THREW"];
+  }
+});
+record("R5-EFGH malformed / oversized / non-JWT values decode to null and never throw",
+  malformedThrew === null && malformedDecoded.every(([, payload, ref]) => payload === null && ref === ""),
+  malformedThrew ?? JSON.stringify(malformedDecoded.filter(([, p]) => p !== null).map(([l]) => l)));
+
+record("R5-H the payload bound is enforced before any allocation",
+  MAX_JWT_PAYLOAD_BYTES === 4096
+  && decodeJwtPayload(`aaa.${Buffer.from(JSON.stringify({ ref: AUTHORIZED_REF, pad: "z".repeat(MAX_JWT_PAYLOAD_BYTES) })).toString("base64url")}.bbb`) === null,
+  "an oversized payload is treated as opaque, never decoded");
+
+// E2. an opaque value that merely LOOKS dotted must not disturb a passing gate.
+record("R5-E2 a dotted non-JWT value does not trip the gate",
+  evaluatePreBuildGates(baseEnv({ SOME_DOTTED_VALUE: "service.internal.quickfurno" })).ok === true);
+
+// I / J. modern key shapes are never treated as JWTs.
+record("R5-I a sb_publishable_ browser key is not treated as a JWT",
+  jwtProjectRef(MODERN_PUBLISHABLE) === "" && decodeJwtPayload(MODERN_PUBLISHABLE) === null);
+
+record("R5-J a sb_secret_ server key is not treated as a JWT merely by shape",
+  jwtProjectRef(MODERN_SECRET) === "" && decodeJwtPayload(MODERN_SECRET) === null);
+
+record("R5-IJ2 PASS: opaque modern keys in both credential slots still build",
+  evaluatePreBuildGates(baseEnv({
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: MODERN_PUBLISHABLE,
+    SUPABASE_SERVICE_ROLE_KEY: MODERN_SECRET,
+  })).ok === true,
+  "an undecodable credential must not be refused merely for being opaque");
+
+// Role sanity, both directions.
+record("R5-R1 FAIL: a browser credential that claims service_role",
+  failedWith(evaluatePreBuildGates(baseEnv({ NEXT_PUBLIC_SUPABASE_ANON_KEY: SERVICE_JWT })),
+    "PUBLIC_CREDENTIAL_IS_PRIVILEGED"));
+
+record("R5-R2 FAIL: the privileged slot holding a mere anon JWT",
+  failedWith(evaluatePreBuildGates(baseEnv({ SUPABASE_SERVICE_ROLE_KEY: STAGING_ANON_JWT })),
+    "SERVICE_CREDENTIAL_ROLE_UNEXPECTED"));
+
+// K. the pre-existing plaintext detection is untouched.
+record("R5-K raw plaintext prohibited-ref detection is unchanged",
+  failedWith(evaluatePreBuildGates(baseEnv({ SOME_UNRELATED_URL: `https://${PRODUCTION_REF}.supabase.co/rest` })),
+    "PROHIBITED_REF_IN_ENVIRONMENT")
+  && failedWith(evaluatePreBuildGates(baseEnv({ LEGACY_WEBHOOK: JARVIS_REF })),
+    "PROHIBITED_REF_IN_ENVIRONMENT"));
+
+// L. both new checks proven LOAD-BEARING, each isolated from the other.
+//    A prohibited JWT in a NON-credential variable is caught ONLY by the claims scan.
+const jwtOnlyEnv = baseEnv({ SOME_LEGACY_SERVICE_TOKEN: PROD_SERVICE_JWT });
+const jwtOnlyReal = evaluatePreBuildGates(jwtOnlyEnv);
+const mutantNoJwtRefCheck = await loadMutated(GATE_SRC, (s) =>
+  s.replace(/if \(jwtLeaked\.length > 0\) \{[\s\S]*?\n  \}/, "if (false) { /* mutant */ }"));
+record("R5-L1 removing the decoded-ref check lets a prohibited JWT pass (check is load-bearing)",
+  !jwtOnlyReal.ok
+  && codes(jwtOnlyReal).includes("PROHIBITED_REF_IN_JWT_CREDENTIAL")
+  && mutantNoJwtRefCheck.evaluatePreBuildGates(jwtOnlyEnv).ok === true,
+  `real=${jwtOnlyReal.ok} mutant=${mutantNoJwtRefCheck.evaluatePreBuildGates(jwtOnlyEnv).ok}`);
+
+const mutantNoMismatchCheck = await loadMutated(GATE_SRC, (s) =>
+  s.replace(/if \(mismatched\.length > 0\) \{[\s\S]*?\n  \}/, "if (false) { /* mutant */ }"));
+const unlistedCredEnv = baseEnv({ SUPABASE_SERVICE_ROLE_KEY: UNLISTED_SERVICE_JWT });
+record("R5-L2 removing the credential allow-list lets an UNLISTED project pass (load-bearing)",
+  !evaluatePreBuildGates(unlistedCredEnv).ok
+  && mutantNoMismatchCheck.evaluatePreBuildGates(unlistedCredEnv).ok === true,
+  `real=${evaluatePreBuildGates(unlistedCredEnv).ok} mutant=${mutantNoMismatchCheck.evaluatePreBuildGates(unlistedCredEnv).ok}`);
+
+// The gate must not print a decoded payload or a credential value when it refuses.
+const r4Logged = [];
+const r4Fs = memFs({});
+runStagingBuild({
+  env: r4Env, root: ROOT, fsApi: r4Fs,
+  spawnChild: fakeChild(r4Fs, outputFiles(), 0, null), log: (l) => r4Logged.push(l),
+});
+const r4Text = r4Logged.join("\n");
+record("R5-S the refusal names the VARIABLE, never the credential or its payload",
+  r4Text.includes("SUPABASE_SERVICE_ROLE_KEY")
+  && !r4Text.includes(PROD_SERVICE_JWT)
+  && !r4Text.includes(PROD_SERVICE_JWT.split(".")[1])
+  && !r4Text.includes("service_role\""),
+  "only the variable name and the non-secret governance refs may be reported");
+
+record("R5-S2 the refusal happens BEFORE Next is invoked",
+  (() => {
+    const fs2 = memFs({});
+    const r = runStagingBuild({
+      env: r4Env, root: ROOT, fsApi: fs2,
+      spawnChild: fakeChild(fs2, outputFiles(), 0, null), log: () => {},
+    });
+    return r.code !== 0 && r.stage === "pre-build" && r.child === null && r.scan === null;
+  })(),
+  "a production-issued credential must never reach a build");
+
+/* ===========================================================================
  * 9. The production build path is untouched
  * ========================================================================= */
 
@@ -610,7 +776,8 @@ for (const r of results) {
 }
 console.log("");
 console.log(`checks: ${passed} passed, ${results.length - passed} failed (of ${results.length})`);
-console.log("mutants: 4 (effective-ref check, post-build scan, outbound-flag check, child-failure check)");
+console.log("mutants: 6 (effective-ref check, post-build scan, outbound-flag check, child-failure check,"
+  + " decoded-JWT-ref check, credential allow-list)");
 console.log("no real build, network request or database access is performed by this validator");
 console.log(`RESULT: ${failed ? "FAIL" : "PASS"}`);
 process.exit(failed ? 1 : 0);

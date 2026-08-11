@@ -135,6 +135,84 @@ export function containsModernPrivilegedKey(text) {
   return PRIVILEGED_KEY_RE.test(String(text));
 }
 
+/* ---------------------------------------------------------------------------
+ * QF-MVP-40-R5 — prohibited project refs hidden INSIDE a JWT-shaped credential.
+ *
+ * WHY THIS EXISTS. QF-MVP-40-R4 measured a build environment in which
+ * NEXT_PUBLIC_SUPABASE_URL was the authorised staging project while the effective
+ * SUPABASE_SERVICE_ROLE_KEY was a PRODUCTION `service_role` key. Every gate below
+ * passed: `ok: true`, `leakedVariableCount: 0`. The leak scan compares raw env values
+ * as SUBSTRINGS, but a legacy Supabase JWT carries its project ref in the base64url
+ * PAYLOAD, so the literal ref never appears in the value. The build would have been
+ * attributed to staging while the server held a production RLS-bypassing credential.
+ *
+ * This decodes the payload to read the CLAIMS OF A LOCAL CREDENTIAL. It is not
+ * authentication: no signature is verified, and none is needed — a value that lies
+ * about its own `ref` only ever makes this gate MORE suspicious, never less.
+ *
+ * It is deliberately CONSERVATIVE. Anything that is not an unambiguous, bounded,
+ * strictly-parseable JWT payload is treated as an ordinary opaque value and is left to
+ * the existing rules — so `sb_secret_…`, `sb_publishable_…`, connection strings and
+ * arbitrary dotted text are never misclassified.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Upper bound on a DECODED JWT payload. Generous for any real Supabase credential and
+ * small enough that a hostile value can never make the gate allocate meaningfully.
+ */
+export const MAX_JWT_PAYLOAD_BYTES = 4096;
+
+/** base64url alphabet, unpadded — the encoding every JWT segment actually uses. */
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * The payload object of a JWT-shaped value, or `null` for ANY value that is not one.
+ *
+ * Never throws. `null` means "not a decodable JWT" and is NOT a failure signal on its
+ * own — an opaque credential is perfectly legitimate.
+ */
+export function decodeJwtPayload(value) {
+  if (typeof value !== "string") return null;
+  const parts = value.split(".");
+  // Exactly three non-empty segments. Two dots in prose, or a trailing dot, is not a JWT.
+  if (parts.length !== 3 || parts.some((p) => p.length === 0)) return null;
+
+  const payload = parts[1];
+  // Reject before decoding: a stray '+', '/', '=' or space means this was never base64url.
+  if (!BASE64URL_RE.test(payload)) return null;
+  // 4 encoded chars -> 3 bytes. Refuse oversized input BEFORE allocating anything.
+  if (payload.length > Math.ceil((MAX_JWT_PAYLOAD_BYTES * 4) / 3) + 4) return null;
+
+  let text;
+  try {
+    const buf = Buffer.from(payload, "base64url");
+    if (buf.length === 0 || buf.length > MAX_JWT_PAYLOAD_BYTES) return null;
+    text = buf.toString("utf8");
+  } catch {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    // A JWT payload is a JSON OBJECT. An array or a bare scalar is not one.
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The Supabase project ref claimed by a JWT-shaped value, or "" when there is none. */
+export function jwtProjectRef(value) {
+  const payload = decodeJwtPayload(value);
+  return payload && typeof payload.ref === "string" ? payload.ref : "";
+}
+
+/** The role claimed by a JWT-shaped value, or "" when there is none. */
+export function jwtRole(value) {
+  const payload = decodeJwtPayload(value);
+  return payload && typeof payload.role === "string" ? payload.role : "";
+}
+
 /**
  * PRE-BUILD gates. Evaluated against the EFFECTIVE environment — i.e. after
  * @next/env has merged .env* exactly as `next build` will see it — so this
@@ -190,6 +268,51 @@ export function evaluatePreBuildGates(env = {}) {
     fail("PROHIBITED_REF_IN_ENVIRONMENT", `prohibited project ref present in: ${leaked.sort().join(", ")}`);
   }
 
+  // QF-MVP-40-R5 — the SAME deny-list, applied to the CLAIMS of a JWT-shaped value.
+  // This is the scan above, extended past the encoding boundary that hid the R4
+  // contamination. Only variable NAMES and the (non-secret) governance refs are ever
+  // reported; a decoded payload never leaves this function.
+  const jwtLeaked = [];
+  for (const [name, value] of Object.entries(env)) {
+    if (name === DENY_LIST_VAR) continue;
+    const ref = jwtProjectRef(value);
+    if (ref && PROHIBITED_REFS.includes(ref)) jwtLeaked.push(name);
+  }
+  if (jwtLeaked.length > 0) {
+    fail("PROHIBITED_REF_IN_JWT_CREDENTIAL",
+      `JWT-shaped credential issued for a PROHIBITED project in: ${jwtLeaked.sort().join(", ")}`);
+  }
+
+  // A Supabase credential must bind to the project this build actually targets. This is
+  // an ALLOW-list, so an unlisted third project is refused too — the deny-list alone has
+  // never heard of it, exactly as `EFFECTIVE_REF_NOT_AUTHORIZED` is to the URL.
+  const credentialVars = [...PUBLIC_CREDENTIAL_VARS, ...SERVICE_CREDENTIAL_VARS];
+  const mismatched = credentialVars.filter((name) => {
+    const ref = jwtProjectRef(env[name]);
+    return ref !== "" && ref !== AUTHORIZED_REF;
+  });
+  if (mismatched.length > 0) {
+    fail("CREDENTIAL_PROJECT_MISMATCH",
+      `credential(s) issued for a project other than "${AUTHORIZED_REF}": ${mismatched.sort().join(", ")}`);
+  }
+
+  // Role sanity, in both directions. A browser credential claiming `service_role` would be
+  // INLINED into a client chunk by `next build` — the very leak `scanBuildOutput` refuses
+  // afterwards, refused here BEFORE anything is built.
+  const privilegedPublic = PUBLIC_CREDENTIAL_VARS.filter((n) => jwtRole(env[n]) === "service_role");
+  if (privilegedPublic.length > 0) {
+    fail("PUBLIC_CREDENTIAL_IS_PRIVILEGED",
+      `browser-exposed credential(s) claim service_role: ${privilegedPublic.sort().join(", ")}`);
+  }
+  const wrongServiceRole = SERVICE_CREDENTIAL_VARS.filter((n) => {
+    const role = jwtRole(env[n]);
+    return role !== "" && role !== "service_role";
+  });
+  if (wrongServiceRole.length > 0) {
+    fail("SERVICE_CREDENTIAL_ROLE_UNEXPECTED",
+      `privileged credential slot holds a non-service_role JWT: ${wrongServiceRole.sort().join(", ")}`);
+  }
+
   const enabledFlags = OUTBOUND_FLAG_VARS.filter((f) => isFlagEnabled(env[f]));
   if (enabledFlags.length > 0) {
     fail("OUTBOUND_FLAG_ENABLED", `outbound/provider flag(s) enabled: ${enabledFlags.join(", ")}`);
@@ -211,6 +334,9 @@ export function evaluatePreBuildGates(env = {}) {
       commandWrapper: isFlagEnabled(env[COMMAND_WRAPPER_VAR]),
       denyListComplete: missingFromDenyList.length === 0,
       leakedVariableCount: leaked.length,
+      jwtProhibitedVariableCount: jwtLeaked.length,
+      credentialProjectMismatchCount: mismatched.length,
+      credentialRoleFaultCount: privilegedPublic.length + wrongServiceRole.length,
       enabledOutboundFlagCount: enabledFlags.length,
       publicCredentialPresent: hasPublic,
       serviceCredentialPresent: hasService,

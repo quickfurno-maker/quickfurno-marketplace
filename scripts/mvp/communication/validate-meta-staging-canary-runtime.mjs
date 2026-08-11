@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import * as R from "./canaryActivationRuntime.mjs";
-import { ActivationFailure, attestationDigest, planFingerprint, planCanaryArm, planReadinessArm }
+import { ActivationFailure, AssetScope, attestationDigest, planFingerprint, planCanaryArm, planReadinessArm }
   from "./activate-meta-staging-canary.mjs";
 import { REQUIRED_ACCOUNT_READINESS } from "../../../lib/communication/providers/metaRuntimeGate.ts";
 import { hashPhoneE164 } from "../../../lib/communication/phone.ts";
@@ -107,14 +107,40 @@ function fakeTransport(routes, log = []) {
   };
 }
 
+/** A fictional Meta app id. Digits, because real Meta app ids are digits. */
+const APP_ID = "111222333444555";
+
 const defaultRoutes = () => [
-  ["/subscribed_apps", okResponse({ data: [{ whatsapp_business_api_data: { id: "app-1" } }] })],
+  ["/subscribed_apps", okResponse({ data: [{ whatsapp_business_api_data: { id: APP_ID } }] })],
   ["/message_templates", okResponse({ data: [{ name: TEMPLATE_NAME, language: "en", status: "APPROVED", category: "UTILITY", components: [] }] })],
   [EXPECTED.wabaId, okResponse({ id: EXPECTED.wabaId, business_verification_status: "verified" })],
   [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "VERIFIED", quality_rating: "GREEN" })],
 ];
 
-function buildAdapters({ client = fakeClient(), routes = defaultRoutes(), proof = { ok: true, hash: "p".repeat(64) } } = {}) {
+/**
+ * QF-MVP-40-R3 — a VERIFIED staging-asset proof, as the real adapter would return it.
+ * Every scope-guarded mode needs one; supplying `null` is how the tests below prove that
+ * an unclassified asset refuses.
+ */
+const stagingAssetProof = (over = {}) => ({
+  ok: true,
+  hash: "s".repeat(64),
+  scope: "STAGING_DEDICATED",
+  metaAppId: APP_ID,
+  wabaId: EXPECTED.wabaId,
+  phoneNumberId: EXPECTED.phoneNumberId,
+  branchHead: HEAD,
+  expiresAtMs: NOW + 10 * 60 * 1000,
+  prohibited: { ids: ["999888777666555"], digests: [] },
+  ...over,
+});
+
+function buildAdapters({
+  client = fakeClient(),
+  routes = defaultRoutes(),
+  proof = { ok: true, hash: "p".repeat(64) },
+  assetProof = stagingAssetProof(),
+} = {}) {
   const transportLog = [];
   const transport = fakeTransport(routes, transportLog);
   const shared = { transport, token: "TOKEN-NEVER-LOGGED", graphApiVersion: "v21.0", wabaId: EXPECTED.wabaId, phoneNumberId: EXPECTED.phoneNumberId };
@@ -125,6 +151,7 @@ function buildAdapters({ client = fakeClient(), routes = defaultRoutes(), proof 
     meta: R.createMetaGetAdapter(shared),
     health: R.createHealthAdapter(shared),
     indexProof: { verify: async () => proof },
+    assetProof: assetProof === null ? null : { verify: async () => assetProof },
   };
 }
 
@@ -247,7 +274,7 @@ record("P14 an unapproved / drifted remote template is refused",
   (await R.runOperator(baseCtx({
     mode: "PREFLIGHT_READONLY", attestationIo: fakeAttestationIo(),
     ...buildAdapters({ routes: [
-      ["/subscribed_apps", okResponse({ data: [{ id: "app" }] })],
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })],
       ["/message_templates", okResponse({ data: [{ name: TEMPLATE_NAME, language: "en", status: "PENDING", category: "UTILITY" }] })],
       [EXPECTED.wabaId, okResponse({ id: EXPECTED.wabaId, business_verification_status: "verified" })],
       [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "VERIFIED" })],
@@ -257,7 +284,7 @@ record("P15 a MARKETING remote category is refused",
   (await R.runOperator(baseCtx({
     mode: "PREFLIGHT_READONLY", attestationIo: fakeAttestationIo(),
     ...buildAdapters({ routes: [
-      ["/subscribed_apps", okResponse({ data: [{ id: "app" }] })],
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })],
       ["/message_templates", okResponse({ data: [{ name: TEMPLATE_NAME, language: "en", status: "APPROVED", category: "MARKETING" }] })],
       [EXPECTED.wabaId, okResponse({ id: EXPECTED.wabaId, business_verification_status: "verified" })],
       [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "VERIFIED" })],
@@ -281,7 +308,7 @@ const approvedTemplateRoute = ["/message_templates",
 record("P16 a WABA identity mismatch blocks readiness and writes no attestation",
   (await (async () => {
     const { out, io } = await preflightWithRoutes([
-      ["/subscribed_apps", okResponse({ data: [{ id: "app" }] })], approvedTemplateRoute,
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })], approvedTemplateRoute,
       [EXPECTED.wabaId, okResponse({ id: "999999999999999", business_verification_status: "verified" })],
       [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "VERIFIED" })],
     ]);
@@ -312,7 +339,7 @@ record("P18 a degraded/unhealthy provider blocks readiness and writes no attesta
 record("P18a an aborted identity GET fails hard, before any readiness verdict",
   (await (async () => {
     const { out, io } = await preflightWithRoutes([
-      ["/subscribed_apps", okResponse({ data: [{ id: "app" }] })], approvedTemplateRoute,
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })], approvedTemplateRoute,
       [EXPECTED.wabaId, okResponse({ id: EXPECTED.wabaId, business_verification_status: "verified" })],
       [EXPECTED.phoneNumberId, { kind: "aborted" }],
     ]);
@@ -321,7 +348,7 @@ record("P18a an aborted identity GET fails hard, before any readiness verdict",
 record("P19 an unverified phone-number state blocks readiness",
   (await (async () => {
     const { out } = await preflightWithRoutes([
-      ["/subscribed_apps", okResponse({ data: [{ id: "app" }] })], approvedTemplateRoute,
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })], approvedTemplateRoute,
       [EXPECTED.wabaId, okResponse({ id: EXPECTED.wabaId, business_verification_status: "verified" })],
       [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "PENDING" })],
     ]);
@@ -330,7 +357,7 @@ record("P19 an unverified phone-number state blocks readiness",
 record("P20 absent business verification blocks readiness",
   (await (async () => {
     const { out } = await preflightWithRoutes([
-      ["/subscribed_apps", okResponse({ data: [{ id: "app" }] })], approvedTemplateRoute,
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })], approvedTemplateRoute,
       [EXPECTED.wabaId, okResponse({ id: EXPECTED.wabaId })],
       [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "VERIFIED" })],
     ]);
@@ -741,9 +768,116 @@ record("S08 the operator uses the canonical abortable transport, not a bare fetc
   /FetchHttpTransport/.test(operatorCode) && !/\bfetch\(/.test(runtimeCode));
 
 // ---------------------------------------------------------------------------
+// R3. DEDICATED STAGING META CONTROL PLANE — scope guard
+//
+// The rule: an asset nobody classified is SHARED_OR_UNKNOWN, and SHARED_OR_UNKNOWN is a
+// hard stop before any provider arm. Emergency closure stays exempt.
+// ---------------------------------------------------------------------------
+const armReadyClient = () => fakeClient({ policy: readinessPolicy() });
+
+/** Run a scope-guarded mode with a substituted staging-asset proof. */
+async function withAssetProof(mode, assetProof, { attestation = null, client } = {}) {
+  const c = client ?? armReadyClient();
+  const out = await R.runOperator(baseCtx({
+    mode, ...buildAdapters({ client: c, assetProof }),
+    attestationIo: fakeAttestationIo(attestation),
+    stageForAttestation: mode === "PREFLIGHT_READONLY" ? "ARM_READINESS" : null,
+  }));
+  return { out, client: c };
+}
+
+record("R3-01 MODE_REQUIREMENTS marks every scope-guarded mode",
+  R.MODE_REQUIREMENTS.PREFLIGHT_READONLY.assetScope === true &&
+  R.MODE_REQUIREMENTS.ARM_READINESS.assetScope === true &&
+  R.MODE_REQUIREMENTS.ARM_CANARY.assetScope === true);
+record("R3-02 DRY_RUN and DISABLE are deliberately NOT scope-guarded",
+  R.MODE_REQUIREMENTS.DRY_RUN.assetScope === false &&
+  R.MODE_REQUIREMENTS.DISABLE.assetScope === false);
+record("R3-03 a preflight with a proven staging-dedicated asset records the classification",
+  pfIo.state.written?.asset_scope === "STAGING_DEDICATED" &&
+  pfIo.state.written?.staging_asset_proof_hash === "s".repeat(64));
+record("R3-04 the attestation binds the live Meta asset identity",
+  typeof pfIo.state.written?.meta_asset_identity_digest === "string" &&
+  pfIo.state.written.meta_asset_identity_digest.length > 0);
+record("R3-05 a MISSING staging-asset proof refuses the preflight",
+  (await withAssetProof("PREFLIGHT_READONLY", null)).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-06 an UNVERIFIED staging-asset proof refuses the preflight",
+  (await withAssetProof("PREFLIGHT_READONLY",
+    { ok: false, reason: F.STAGING_ASSET_PROOF_INVALID })).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-07 no attestation is written when the asset scope is unproven",
+  (await (async () => {
+    const io = fakeAttestationIo();
+    const out = await R.runOperator(baseCtx({
+      mode: "PREFLIGHT_READONLY", ...buildAdapters({ assetProof: null }),
+      attestationIo: io, stageForAttestation: "ARM_READINESS",
+    }));
+    return out.ok === false && io.state.written === null;
+  })()));
+record("R3-08 a proof for a DIFFERENT WABA cannot classify this asset",
+  (await withAssetProof("PREFLIGHT_READONLY",
+    stagingAssetProof({ wabaId: "555555555555555" }))).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-09 a proof for a DIFFERENT phone cannot classify this asset",
+  (await withAssetProof("PREFLIGHT_READONLY",
+    stagingAssetProof({ phoneNumberId: "555555555555555" }))).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-10 a proof for a DIFFERENT subscribed app cannot classify this asset",
+  (await withAssetProof("PREFLIGHT_READONLY",
+    stagingAssetProof({ metaAppId: "444444444444444" }))).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-11 a proof minted for a DIFFERENT commit refuses",
+  (await withAssetProof("PREFLIGHT_READONLY",
+    stagingAssetProof({ branchHead: "b".repeat(40) }))).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-12 a live asset on the owner's prohibited list refuses",
+  (await withAssetProof("PREFLIGHT_READONLY",
+    stagingAssetProof({ prohibited: { ids: [EXPECTED.wabaId], digests: [] } }))).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-13 an identity fault still reports the SPECIFIC evidence failure, not a scope verdict",
+  (await (async () => {
+    const { out } = await preflightWithRoutes([
+      ["/subscribed_apps", okResponse({ data: [{ id: APP_ID }] })], approvedTemplateRoute,
+      [EXPECTED.wabaId, okResponse({ id: "999999999999999", business_verification_status: "verified" })],
+      [EXPECTED.phoneNumberId, okResponse({ id: EXPECTED.phoneNumberId, code_verification_status: "VERIFIED" })],
+    ]);
+    return out.reason === F.READINESS_EVIDENCE_INSUFFICIENT;
+  })()));
+
+// ---------------------------------------------------------------------------
 // M. MUTANTS
 // ---------------------------------------------------------------------------
 const mutants = [
+  ["ARM_READINESS refuses without a staging-asset proof, and calls NO rpc",
+    async () => {
+      const { out, client } = await withAssetProof("ARM_READINESS", null,
+        { attestation: readinessMint.attestation });
+      return out.ok === false && out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN && client.log.rpcs.length === 0;
+    }],
+  ["ARM_CANARY refuses without a staging-asset proof, and calls NO rpc",
+    async () => {
+      const { out, client } = await withAssetProof("ARM_CANARY", null,
+        { attestation: canaryMint.attestation, client: fakeClient({ policy: readinessPolicy() }) });
+      return out.ok === false && out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN && client.log.rpcs.length === 0;
+    }],
+  ["an attestation minted as dedicated cannot be spent once the scope degrades",
+    async () => {
+      const { out, client } = await withAssetProof("ARM_READINESS",
+        stagingAssetProof({ metaAppId: "444444444444444" }),
+        { attestation: readinessMint.attestation });
+      return out.ok === false && client.log.rpcs.length === 0;
+    }],
+  ["the scope classification is part of the attestation drift fence",
+    () => /"asset_scope"|asset_scope/.test(runtimeCode) &&
+      /asset_scope[\s\S]{0,200}staging_asset_proof_hash[\s\S]{0,200}meta_asset_identity_digest/.test(runtimeCode)],
+  ["SHARED_OR_UNKNOWN can never be spelled as a third, softer value",
+    () => Object.keys(AssetScope).length === 2 &&
+      AssetScope.STAGING_DEDICATED === "STAGING_DEDICATED" &&
+      AssetScope.SHARED_OR_UNKNOWN === "SHARED_OR_UNKNOWN"],
+  ["emergency disable still works with NO staging-asset proof at all",
+    async () => {
+      const s = disabledState();
+      const c = fakeClient({ ...s, rpcImpl: () => ({ data: [{ policy_activation_status: "disabled" }], error: null }) });
+      const out = await R.runOperator(baseCtx({
+        mode: "DISABLE", db: R.createSupabaseDbAdapter(c),
+        meta: null, health: null, indexProof: null, attestationIo: null, assetProof: null,
+      }));
+      return out.ok === true && c.log.rpcs.length === 1;
+    }],
   ["preflight cannot be made to write",
     () => pf.client.log.writes.length === 0 && pf.client.log.rpcs.length === 0],
   ["a write mode cannot skip its attestation",

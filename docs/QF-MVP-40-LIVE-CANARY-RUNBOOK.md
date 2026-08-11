@@ -3,8 +3,44 @@
 **Status: QF_MVP_40_STATUS: IN_PROGRESS.** Offline lock only. Nothing here has been executed:
 no staging connection, no Meta call, no migration, no send. Production untouched.
 
-Branch `mvp/qf-mvp-40-final-provider-canary`. Migration `20260813000000` is
-**SOURCE-PENDING / NOT_PROVEN_OFFLINE / UNAPPLIED**.
+Branch `mvp/qf-mvp-40-final-provider-canary`. Migration `20260813000000` is **APPLIED to
+staging exactly once** (remote history 30 → 31), its three activation RPCs exist, and the
+rollback-only behavioural certification passed with zero residue. The provider remains
+fail-closed: 8 approved **inactive** mappings, one **disabled** account, **0** runtime
+policies, **0** canary destinations, **0** active mappings, `communication_messages` **0**.
+
+---
+
+## 0. BINDING LOCK — dedicated Meta staging isolation
+
+**Authoritative text: [`QF-MVP-40-R3-STAGING-META-ISOLATION.md`](QF-MVP-40-R3-STAGING-META-ISOLATION.md).**
+Every step in this runbook is subordinate to it.
+
+QF-MVP-40 live certification uses a **dedicated staging Meta app + WABA + sender phone**, with
+a staging-only App Secret, token, WABA ID, Phone Number ID and webhook subscription, and an
+owner-controlled canary recipient distinct from the staging sender.
+
+* The **production** QuickFurno Meta app / WABA / phone are **prohibited certification
+  targets**. The production business number must never be a staging sender, and its webhook
+  must never be repointed for certification.
+* Asset scope `SHARED_OR_UNKNOWN` — which is also what *absence of a classification* means —
+  is a **hard STOP** before any webhook mutation, provider activation or send.
+* No staging callback may replace or repoint the production callback.
+* WABA subscription mutation is permitted **only** after the target WABA is independently
+  proven staging-dedicated, under separate owner authorization.
+* The production phone's health/verification remediation is a **separate operational task**
+  (isolation doc §6) and is not part of staging certification.
+* The provider stays fail-closed until callback + identity + template + health readiness are
+  all proven.
+
+Webhook subscription is made at **WABA level**, so a staging subscription on a WABA that also
+carries the production sender would redirect **production** callbacks. That is why a dedicated
+WABA — not merely a dedicated phone — is required.
+
+**Measured against the current production assets, the scope is `SHARED_OR_UNKNOWN`**: one WABA
+holding exactly one real business phone. Every scope-guarded stage therefore refuses today.
+
+**The locked ten exit criteria in §3 are unchanged, and none is newly marked complete.**
 
 ---
 
@@ -57,9 +93,13 @@ Disable immediately, preserve the evidence, and report the blocker.
 
 Arming is the **last** thing that happens before each send, never the first.
 
+0. **§0 lock first**: the dedicated staging Meta app/WABA/phone exist, and a fresh
+   staging-asset proof classifies them `STAGING_DEDICATED`. `SHARED_OR_UNKNOWN` stops here.
 1. migration / seed / readiness preconditions
-2. `npm run verify:mvp:core-provider-env`
-3. `npm run build:staging:safe`
+2. `npm run verify:mvp:core-provider-env` (needs **both** `WHATSAPP_APP_SECRET` and
+   `WHATSAPP_WEBHOOK_VERIFY_TOKEN`)
+3. `npm run build:staging:safe` with **process-local** staging env — `.env.local` is never
+   edited, renamed or deleted
 4. post-build production-ref + privileged-key + Meta-token scan
 5. start staging-bound Core **with the provider still disabled**
 6. load isolated n8n, **schedules INACTIVE**
@@ -81,7 +121,7 @@ The roadmap's ten criteria, each with its test path and current executability.
 
 | # | Locked criterion | Test path | Expected evidence | Owner phone action | Executable now | Blocker |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | staging webhook verified | Meta GET `/{waba}/subscribed_apps` in preflight + Meta-side subscription | `webhookSubscribed` true; account `webhook_status = verified` | no | **no** | needs credentials + a publicly reachable callback URL |
+| 1 | staging webhook verified | Meta GET `/{waba}/subscribed_apps` in preflight + Meta-side subscription | `webhookSubscribed` true; account `webhook_status = verified` | no | **no** | needs a **dedicated staging WABA** (§0) + a publicly reachable callback URL; measured `subscribed_apps = 0` |
 | 2 | signed inbound callback accepted | owner sends a real inbound to the canary number → `app/api/webhooks/whatsapp/meta/route.ts` | verified signature; `communication_inbound_messages` row; webhook receipt | **yes** | **no** | needs `WHATSAPP_APP_SECRET` + reachable URL |
 | 3 | foreign callback → zero effects | replay a callback whose account/WABA/phone is not the configured account | zero rows written, zero status change | no | **no** | needs a live endpoint |
 | 4 | template send succeeds | vendor cycle step 7, then client cycle step 6 | one `communication_messages` row per canary, provider accepted | no (owner receives) | **no** | needs credentials + armed canary |
@@ -223,8 +263,16 @@ exact-head CI, true merge commit · 56 **no production deployment**.
 *Activation operator:* `QF_STAGING_SUPABASE_URL`, `QF_STAGING_SUPABASE_SERVICE_ROLE_KEY`,
 `QF_META_ACCESS_TOKEN`, `QF_META_WABA_ID`, `QF_META_PHONE_NUMBER_ID`,
 `QF_META_GRAPH_API_VERSION`, `QF_STAGING_INDEX_PROOF_PATH`,
-`QF_META_CANARY_DESTINATION_E164`; optional `QF_ACTIVATION_BRANCH_HEAD` (must equal actual
-HEAD), `QF_ACTIVATION_ATTESTATION_PATH`.
+**`QF_META_STAGING_ASSET_PROOF_PATH`** (§0 lock — external, 15-minute TTL, regenerate
+immediately before the run; without it the asset scope is `SHARED_OR_UNKNOWN` and every
+scope-guarded stage refuses), `QF_META_CANARY_DESTINATION_E164`; optional
+`QF_ACTIVATION_BRANCH_HEAD` (must equal actual HEAD), `QF_ACTIVATION_ATTESTATION_PATH`.
+
+*Staging-safe build (process-local only; `.env.local` is never edited):*
+`QF_STAGING_SAFE_SESSION`, `QF_STAGING_COMMAND_WRAPPER`,
+`QF_AUTHORIZED_SUPABASE_PROJECT_REF`, `QF_PROHIBITED_SUPABASE_PROJECT_REFS`,
+`NEXT_PUBLIC_SUPABASE_URL` (staging), `NEXT_PUBLIC_SUPABASE_ANON_KEY` (staging, browser-safe),
+`SUPABASE_SERVICE_ROLE_KEY` (staging, server only), and every outbound/n8n flag off.
 
 *Canonical Core Meta runtime:* `WHATSAPP_PROVIDER_MODE` (= `meta_cloud`),
 `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID`,

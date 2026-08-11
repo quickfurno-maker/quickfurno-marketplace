@@ -111,7 +111,186 @@ export const ActivationFailure = Object.freeze({
   ATTESTATION_TARGET_NOT_PERMITTED: "ATTESTATION_TARGET_NOT_PERMITTED",
   SOURCE_HEAD_UNPROVEN: "SOURCE_HEAD_UNPROVEN",
   SOURCE_HEAD_MISMATCH: "SOURCE_HEAD_MISMATCH",
+  // QF-MVP-40-R3 — the dedicated staging Meta control plane.
+  STAGING_ASSET_PROOF_MISSING: "STAGING_ASSET_PROOF_MISSING",
+  STAGING_ASSET_PROOF_INVALID: "STAGING_ASSET_PROOF_INVALID",
+  STAGING_ASSET_SCOPE_UNPROVEN: "STAGING_ASSET_SCOPE_UNPROVEN",
 });
+
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R3 — DEDICATED STAGING META CONTROL PLANE
+//
+// THE LIMITATION, STATED PLAINLY
+//   Meta's Graph API exposes no field that says "this WABA is a staging WABA". A WABA
+//   name, a phone's verified_name and a subscribed-app list are all free text or
+//   configuration — none of them proves dedication, and treating any of them as proof
+//   would be exactly the kind of fabricated evidence QF-MVP-40.12-R3 removed.
+//
+//   So dedication is NOT derived. It is ATTESTED by the owner, out of band, in a
+//   short-lived external artifact — and that attestation is NECESSARY BUT NOT
+//   SUFFICIENT. The live Meta GET readback must still match it exactly, the branch HEAD
+//   must still match, and the attested asset must not appear in the owner's own
+//   prohibited list. A proof that says "dedicated" while the live WABA id differs is
+//   refused; a proof for another commit is refused; an expired one is refused.
+//
+//   What this buys is the one thing that matters: an operator can no longer arm, or
+//   mutate a webhook, against an asset nobody ever classified. Absence of a
+//   classification is SHARED_OR_UNKNOWN, and SHARED_OR_UNKNOWN is a hard stop.
+// ---------------------------------------------------------------------------
+
+/** Env var naming the owner-generated external staging-asset attestation. */
+export const STAGING_ASSET_PROOF_ENV = "QF_META_STAGING_ASSET_PROOF_PATH";
+
+export const STAGING_ASSET_PROOF_ARTIFACT = "qf-mvp-40-staging-meta-asset-proof";
+
+/** Same short life as every other artifact in this phase. */
+export const STAGING_ASSET_PROOF_TTL_MS = 15 * 60 * 1000;
+export const STAGING_ASSET_CLOCK_TOLERANCE_MS = 60 * 1000;
+
+/** The only two classifications. There is deliberately no third, softer value. */
+export const AssetScope = Object.freeze({
+  STAGING_DEDICATED: "STAGING_DEDICATED",
+  SHARED_OR_UNKNOWN: "SHARED_OR_UNKNOWN",
+});
+
+/** Stages that may never run against a shared or unclassified Meta asset. */
+export const SCOPE_GUARDED_STAGES = Object.freeze([
+  "PREFLIGHT_READONLY", "ARM_READINESS", "ARM_CANARY", "WEBHOOK_SUBSCRIPTION",
+]);
+
+const META_ID_RE = /^[0-9]{6,}$/;
+const SHA256_RE = /^[0-9a-f]{64}$/;
+
+/** Deterministic digest of a staging-asset proof body, its own signature excluded. */
+export function stagingAssetProofDigest(proof) {
+  const body = { ...proof };
+  delete body.proof_sha256;
+  return createHash("sha256").update(JSON.stringify(body)).digest("hex");
+}
+
+/** A Meta identifier digest. NOT a secrecy device — Meta ids are low entropy. It exists
+ *  so an owner may keep production identifiers out of any file they share. */
+export function assetIdDigest(id) {
+  return createHash("sha256").update(String(id)).digest("hex");
+}
+
+/**
+ * Verify the owner-generated external staging-asset attestation.
+ *
+ * Refuses a missing, malformed, tampered, future-dated, long-lived, expired,
+ * wrong-project, wrong-artifact or self-contradictory proof. `asset_scope` may ONLY be
+ * `STAGING_DEDICATED`: there is no way to attest "shared" and proceed, because
+ * SHARED_OR_UNKNOWN is what absence already means.
+ */
+export function verifyStagingAssetProof(proof, opts = {}) {
+  const now = opts.now ?? (() => Date.now());
+  const projectRef = opts.projectRef ?? AUTHORIZED_STAGING_REF;
+  const bad = (detail) => ({ ok: false, reason: ActivationFailure.STAGING_ASSET_PROOF_INVALID, detail });
+
+  if (!proof || typeof proof !== "object") {
+    return { ok: false, reason: ActivationFailure.STAGING_ASSET_PROOF_MISSING, detail: "no proof supplied" };
+  }
+  if (proof.artifact !== STAGING_ASSET_PROOF_ARTIFACT) return bad("wrong artifact");
+  if (proof.environment !== "STAGING") return bad("not a staging proof");
+  if (proof.project_ref !== projectRef) return bad("wrong project ref");
+  if (proof.asset_scope !== AssetScope.STAGING_DEDICATED) return bad("asset_scope must be STAGING_DEDICATED");
+  if (!GIT_HEAD_RE.test(String(proof.branch_head ?? ""))) return bad("branch_head is not a 40-hex commit");
+  if (typeof proof.nonce !== "string" || proof.nonce.length === 0) return bad("missing nonce");
+
+  for (const field of ["meta_app_id", "waba_id", "phone_number_id"]) {
+    if (!META_ID_RE.test(String(proof[field] ?? ""))) return bad(`${field} is not a Meta identifier`);
+  }
+  if (proof.waba_id === proof.phone_number_id) return bad("waba_id and phone_number_id are identical");
+
+  if (typeof proof.proof_sha256 !== "string" || proof.proof_sha256 !== stagingAssetProofDigest(proof)) {
+    return bad("digest mismatch — the proof was altered after it was issued");
+  }
+
+  const t = now();
+  if (typeof proof.issued_at_ms !== "number" || typeof proof.expires_at_ms !== "number") {
+    return bad("missing issued/expiry timestamps");
+  }
+  if (proof.issued_at_ms > t + STAGING_ASSET_CLOCK_TOLERANCE_MS) return bad("issued in the future");
+  if (proof.expires_at_ms - proof.issued_at_ms > STAGING_ASSET_PROOF_TTL_MS) return bad("ttl exceeds 15 minutes");
+  if (t > proof.expires_at_ms) return bad("expired");
+
+  if (!SCOPE_GUARDED_STAGES.includes(String(proof.intended_stage ?? ""))) {
+    return bad("intended_stage is not a scope-guarded stage");
+  }
+
+  // The owner's own prohibited list. Plain ids OR digests; the artifact lives outside the
+  // repository either way, so no real identifier ever enters git.
+  const ids = Array.isArray(proof.prohibited_asset_ids) ? proof.prohibited_asset_ids : [];
+  const digests = Array.isArray(proof.prohibited_asset_digests) ? proof.prohibited_asset_digests : [];
+  if (ids.length + digests.length === 0) return bad("prohibited asset list is empty");
+  if (!ids.every((v) => META_ID_RE.test(String(v)))) return bad("prohibited_asset_ids contains a non-identifier");
+  if (!digests.every((v) => SHA256_RE.test(String(v)))) return bad("prohibited_asset_digests contains a non-digest");
+
+  // Self-consistency: an asset the owner has declared prohibited cannot also be attested
+  // as the dedicated staging asset.
+  for (const field of ["meta_app_id", "waba_id", "phone_number_id"]) {
+    if (isProhibitedAsset(proof[field], { ids, digests })) {
+      return bad(`${field} appears in the prohibited asset list`);
+    }
+  }
+
+  return {
+    ok: true,
+    hash: proof.proof_sha256,
+    scope: AssetScope.STAGING_DEDICATED,
+    metaAppId: proof.meta_app_id,
+    wabaId: proof.waba_id,
+    phoneNumberId: proof.phone_number_id,
+    branchHead: proof.branch_head,
+    expiresAtMs: proof.expires_at_ms,
+    prohibited: { ids, digests },
+  };
+}
+
+/** True when an identifier is on the owner's prohibited list, by id or by digest. */
+export function isProhibitedAsset(id, { ids = [], digests = [] } = {}) {
+  if (id === undefined || id === null || id === "") return false;
+  const s = String(id);
+  return ids.map(String).includes(s) || digests.map(String).includes(assetIdDigest(s));
+}
+
+/**
+ * Classify the Meta asset scope from a verified attestation AND the live GET readback.
+ *
+ * Returns SHARED_OR_UNKNOWN for every failure mode, never throws, and never upgrades a
+ * classification on partial evidence. The caller decides what a classification permits;
+ * this function never arms, never sends and never mutates anything.
+ */
+export function classifyMetaAssetScope({ proof = null, live = {}, expected = {}, branchHead = null } = {}) {
+  const shared = (reason) => ({ scope: AssetScope.SHARED_OR_UNKNOWN, reason });
+
+  if (!proof || proof.ok !== true) {
+    return shared(proof?.reason ?? ActivationFailure.STAGING_ASSET_PROOF_MISSING);
+  }
+  // The attested commit must be the commit actually running.
+  if (!GIT_HEAD_RE.test(String(branchHead ?? "")) || branchHead !== proof.branchHead) {
+    return shared(ActivationFailure.SOURCE_HEAD_MISMATCH);
+  }
+  // The attested identity must equal the CONFIGURED identity...
+  if (proof.wabaId !== expected.wabaId || proof.phoneNumberId !== expected.phoneNumberId) {
+    return shared(ActivationFailure.META_IDENTITY_MISMATCH);
+  }
+  // ...and the LIVE readback must equal it too. An attestation alone proves nothing.
+  if (live.wabaId !== proof.wabaId || live.phoneNumberId !== proof.phoneNumberId) {
+    return shared(ActivationFailure.META_IDENTITY_MISMATCH);
+  }
+  // When the live subscribed-app list names an app, it must be the attested staging app.
+  if (Array.isArray(live.subscribedAppIds) && live.subscribedAppIds.length > 0) {
+    if (!live.subscribedAppIds.every((id) => String(id) === String(proof.metaAppId))) {
+      return shared(ActivationFailure.META_IDENTITY_MISMATCH);
+    }
+  }
+  // Belt and braces against a live asset the owner prohibited.
+  for (const id of [live.wabaId, live.phoneNumberId, ...(live.subscribedAppIds ?? [])]) {
+    if (isProhibitedAsset(id, proof.prohibited)) return shared(ActivationFailure.STAGING_ASSET_SCOPE_UNPROVEN);
+  }
+  return { scope: AssetScope.STAGING_DEDICATED, reason: null, proofHash: proof.hash, metaAppId: proof.metaAppId };
+}
 
 /** An exact git commit SHA. Branch names are never the load-bearing pin. */
 export const GIT_HEAD_RE = /^[0-9a-f]{40}$/;
@@ -739,6 +918,7 @@ if (isDirect) {
     adapterFactory: buildRealAdapters,
     attestationIoFactory: ({ mode }) => buildAttestationIo(mode),
     indexProofFactory: buildIndexProofAdapter,
+    stagingAssetProofFactory: buildStagingAssetProofAdapter,
     now: () => Date.now(),
     nonce: randomNonce(),
     log: (line) => console.log(line),
@@ -819,6 +999,44 @@ async function buildIndexProofAdapter() {
       const verified = verifyIndexProof(parsed, { now: () => now, projectRef });
       if (!verified.ok) return verified;
       return { ok: true, hash: parsed.proof_sha256 };
+    },
+  };
+}
+
+/**
+ * The QF-MVP-40-R3 owner-generated external staging-asset attestation, consumed through
+ * the same file discipline as the index proof: outside the repository, short-lived,
+ * tamper-evident, and necessary-but-not-sufficient.
+ */
+async function buildStagingAssetProofAdapter() {
+  const path = process.env[STAGING_ASSET_PROOF_ENV];
+  return {
+    async verify({ projectRef, now, branchHead, stage }) {
+      if (!path) {
+        return { ok: false, reason: ActivationFailure.STAGING_ASSET_PROOF_MISSING,
+          detail: `${STAGING_ASSET_PROOF_ENV} is not set. The Meta asset scope is therefore `
+            + `${AssetScope.SHARED_OR_UNKNOWN} and every scope-guarded stage refuses.` };
+      }
+      if (isInsideRepository(path)) {
+        return { ok: false, reason: ActivationFailure.STAGING_ASSET_PROOF_INVALID,
+          detail: "the staging-asset proof must live OUTSIDE the repository" };
+      }
+      let parsed;
+      try { parsed = JSON.parse(readFileSync(path, "utf8")); }
+      catch {
+        return { ok: false, reason: ActivationFailure.STAGING_ASSET_PROOF_INVALID,
+          detail: "unreadable or not valid JSON" };
+      }
+      const verified = verifyStagingAssetProof(parsed, { now: () => now, projectRef });
+      if (!verified.ok) return verified;
+      if (branchHead && verified.branchHead !== branchHead) {
+        return { ok: false, reason: ActivationFailure.SOURCE_HEAD_MISMATCH, detail: "staging-asset proof branch_head" };
+      }
+      if (stage && parsed.intended_stage !== stage) {
+        return { ok: false, reason: ActivationFailure.STAGING_ASSET_PROOF_INVALID,
+          detail: `intended_stage ${parsed.intended_stage} is not ${stage}` };
+      }
+      return verified;
     },
   };
 }

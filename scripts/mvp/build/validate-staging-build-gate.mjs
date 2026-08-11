@@ -493,6 +493,98 @@ record("34 gate output does report the authorised ref and bounded counts",
   loggedText.includes(AUTHORIZED_REF) && /client files scanned\s*:\s*\d+/.test(loggedText));
 
 /* ===========================================================================
+ * 8b. QF-MVP-40-R3 — the process-local staging build path
+ *
+ * The §7 live run refused because `.env.local` is production-attributed and @next/env
+ * surfaced a production Supabase URL plus enabled n8n outbound flags. That refusal is
+ * CORRECT and these prove each half of it is individually load-bearing — a weakened
+ * gate would let a production-attributed build be published as staging evidence.
+ * ========================================================================= */
+
+const R3 = (over) => evaluatePreBuildGates(baseEnv(over));
+const r3Failed = (over, code) => R3(over).failures.some((f) => f.code === code);
+
+record("R3-B01 a production NEXT_PUBLIC ref cannot slip through",
+  r3Failed({ NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co` },
+    "EFFECTIVE_REF_NOT_AUTHORIZED"),
+  "the effective ref is derived from the URL the build would bake in");
+
+record("R3-B02 a Jarvis ref cannot slip through either",
+  r3Failed({ NEXT_PUBLIC_SUPABASE_URL: `https://${JARVIS_REF}.supabase.co` },
+    "EFFECTIVE_REF_NOT_AUTHORIZED"));
+
+record("R3-B03 a production ref ANYWHERE in the effective environment is caught",
+  r3Failed({ SOME_OTHER_VAR: `postgres://${PRODUCTION_REF}.pooler.supabase.com` },
+    "PROHIBITED_REF_IN_ENVIRONMENT"),
+  "this is what caught the live .env.local contamination");
+
+record("R3-B04 every known outbound/provider flag refuses when enabled",
+  OUTBOUND_FLAG_VARS.every((f) => r3Failed({ [f]: "true" }, "OUTBOUND_FLAG_ENABLED")),
+  `${OUTBOUND_FLAG_VARS.length} flags each proven individually load-bearing`);
+
+record("R3-B05 the exact two n8n flags observed enabled in the live run refuse",
+  r3Failed({ N8N_ENABLED: "true" }, "OUTBOUND_FLAG_ENABLED") &&
+  r3Failed({ N8N_OUTBOUND_WEBHOOK_ENABLED: "true" }, "OUTBOUND_FLAG_ENABLED"));
+
+record("R3-B06 a missing safe-session marker refuses",
+  r3Failed({ QF_STAGING_SAFE_SESSION: undefined }, "SAFE_SESSION_MARKER_MISSING"));
+
+record("R3-B07 a missing command-wrapper marker refuses",
+  r3Failed({ QF_STAGING_COMMAND_WRAPPER: undefined }, "COMMAND_WRAPPER_MARKER_MISSING"));
+
+record("R3-B08 an incomplete prohibited-ref deny list refuses",
+  r3Failed({ QF_PROHIBITED_SUPABASE_PROJECT_REFS: PRODUCTION_REF }, "DENY_LIST_INCOMPLETE"),
+  "both prohibited refs must be listed, not just one");
+
+record("R3-B09 a marker that disagrees with the effective URL refuses",
+  r3Failed({ QF_AUTHORIZED_SUPABASE_PROJECT_REF: JARVIS_REF }, "AUTHORIZED_REF_MARKER_WRONG"));
+
+record("R3-B10 a missing staging public credential refuses",
+  r3Failed({ NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined }, "PUBLIC_CREDENTIAL_MISSING"));
+
+record("R3-B11 a fully correct process-local staging environment PASSES",
+  R3({}).ok === true,
+  "so the documented operator sequence is achievable without touching .env.local");
+
+// The wrapper-provided process environment must WIN over a dotenv file. @next/env only
+// assigns keys that are undefined in process.env, which is precisely why a
+// wrapper-mediated build is trustworthy and a bare one is not.
+record("R3-B12 an explicit process-local staging URL wins over a production .env.local value",
+  (() => {
+    const env = baseEnv();                       // wrapper already set the staging URL
+    const dotenvWouldSet = { NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co` };
+    for (const [k, v] of Object.entries(dotenvWouldSet)) if (env[k] === undefined) env[k] = v;
+    return evaluatePreBuildGates(env).ok === true;
+  })(),
+  "@next/env never overwrites an already-defined process variable");
+
+record("R3-B13 and if the wrapper did NOT set it, the dotenv value is caught, not trusted",
+  (() => {
+    const env = baseEnv({ NEXT_PUBLIC_SUPABASE_URL: undefined, SUPABASE_URL: undefined });
+    for (const [k, v] of Object.entries({ NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co` })) {
+      if (env[k] === undefined) env[k] = v;
+    }
+    const out = evaluatePreBuildGates(env);
+    return out.ok === false && out.failures.some((f) => f.code === "EFFECTIVE_REF_NOT_AUTHORIZED");
+  })());
+
+record("R3-B14 a privileged key shape in a BROWSER chunk is refused",
+  (() => {
+    const scan = scanBuildOutput({
+      clientFiles: [{ path: "static/chunks/app.js", text: `var k="sb_secret_${"y".repeat(32)}";` }],
+      serverFiles: [], secrets: [],
+    });
+    return scan.ok === false;
+  })(),
+  "modern sb_secret_ keys are detected by shape, not only by literal match");
+
+record("R3-B15 a service_role JWT in a BROWSER chunk is refused",
+  scanBuildOutput({
+    clientFiles: [{ path: "static/chunks/app.js", text: `var k="${SERVICE_JWT}";` }],
+    serverFiles: [], secrets: [],
+  }).ok === false);
+
+/* ===========================================================================
  * 9. The production build path is untouched
  * ========================================================================= */
 

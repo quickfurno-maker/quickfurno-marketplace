@@ -39,6 +39,8 @@ const F = ActivationFailure;
 const HEAD_A = "a".repeat(40);
 const HEAD_B = "b".repeat(40);
 const EXPECTED = Object.freeze({ phoneNumberId: "123456789012345", wabaId: "987654321098765" });
+/** QF-MVP-40-R3 — a fictional Meta app id. Digits, as real Meta app ids are. */
+const APP_ID = "111222333444555";
 const CANARY_HASH = hashPhoneE164("+15555550100");
 const TEMPLATE_KEY = "vendor_onboarding_reminder";
 const TEMPLATE_NAME = "qf_vendor_onboarding_reminder_v1";
@@ -77,9 +79,10 @@ const okResponse = (body, status = 200) => ({ kind: "response", status, bodyText
 
 /** Records every factory call so a test can prove a factory was NEVER reached. */
 function harness({ policy = null, mappings = [mapping()], canaryRows = [], account = readyAccount(),
-                   rpcImpl, headResolver, storedAttestation = null, proofOk = true } = {}) {
+                   rpcImpl, headResolver, storedAttestation = null, proofOk = true,
+                   assetProofOk = true } = {}) {
   const seen = { adapterFactory: 0, metaBuilt: 0, healthBuilt: 0, indexProof: 0,
-    attestationIo: 0, headResolver: 0, rpcs: [], writes: [], metaRequests: [] };
+    stagingAssetProof: 0, attestationIo: 0, headResolver: 0, rpcs: [], writes: [], metaRequests: [] };
   const state = { armed: false };
 
   const db = {
@@ -96,7 +99,7 @@ function harness({ policy = null, mappings = [mapping()], canaryRows = [], accou
   const transport = {
     async request(req) {
       seen.metaRequests.push({ url: req.url, method: req.method });
-      if (req.url.includes("/subscribed_apps")) return okResponse({ data: [{ id: "app" }] });
+      if (req.url.includes("/subscribed_apps")) return okResponse({ data: [{ id: APP_ID }] });
       if (req.url.includes("/message_templates")) {
         return okResponse({ data: [{ name: TEMPLATE_NAME, language: "en", status: "APPROVED", category: "UTILITY" }] });
       }
@@ -134,6 +137,19 @@ function harness({ policy = null, mappings = [mapping()], canaryRows = [], accou
       seen.indexProof += 1;
       return { verify: async () => (proofOk ? { ok: true, hash: "p".repeat(64) } : { ok: false, reason: F.INDEX_PROOF_UNAVAILABLE }) };
     },
+    // QF-MVP-40-R3 — the owner-generated staging-asset attestation. Bound to whatever HEAD
+    // the harness resolves, so the HEAD-drift tests still exercise the HEAD fence itself.
+    async stagingAssetProofFactory() {
+      seen.stagingAssetProof += 1;
+      return {
+        verify: async ({ branchHead }) => (assetProofOk
+          ? { ok: true, hash: "s".repeat(64), scope: "STAGING_DEDICATED", metaAppId: APP_ID,
+              wabaId: EXPECTED.wabaId, phoneNumberId: EXPECTED.phoneNumberId,
+              branchHead, expiresAtMs: 1_800_000_000_000 + 600_000,
+              prohibited: { ids: ["555444333222111"], digests: [] } }
+          : { ok: false, reason: F.STAGING_ASSET_PROOF_MISSING }),
+      };
+    },
     headResolver: headResolver ?? (async () => { seen.headResolver += 1; return HEAD_A; }),
   };
 }
@@ -144,11 +160,21 @@ const cli = (argv, env, h, over = {}) => R.runCli({
   adapterFactory: h.adapterFactory,
   attestationIoFactory: h.attestationIoFactory,
   indexProofFactory: h.indexProofFactory,
+  stagingAssetProofFactory: h.stagingAssetProofFactory,
   now: () => 1_800_000_000_000,
   nonce: "n".repeat(64),
   log: () => {},
   ...over,
 });
+
+/** A harness whose post-disable readback is genuinely fail-closed, as B01 builds. */
+function disableHarness(over = {}) {
+  const h = harness(over);
+  h.state.afterPolicy = { activation_status: "disabled", outbound_enabled: false, webhook_processing_enabled: false, health_check_enabled: false };
+  h.state.afterMappings = [mapping({ is_active: false })];
+  h.state.afterCanary = [{ provider_key: "meta_whatsapp_cloud", channel: "whatsapp", destination_hash: CANARY_HASH, is_active: false, expires_at: null }];
+  return h;
+}
 
 /** Mint a real attestation for a stage through the real CLI. */
 async function mint(stage, opts = {}) {
@@ -516,7 +542,51 @@ record("R15 the runbook contains no secret value and no plaintext canary number"
 // ---------------------------------------------------------------------------
 // M. MUTANTS — one per repaired defect, at minimum
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// R3. The dedicated-staging scope guard, proven through the REAL CLI path
+// ---------------------------------------------------------------------------
+record("R3-C01 the CLI builds a staging-asset proof for scope-guarded modes",
+  (await (async () => {
+    const h = harness();
+    await cli(["--preflight-readonly", "--attest-for=readiness", `--templates=${TEMPLATE_KEY}`], openEnv(), h);
+    return h.seen.stagingAssetProof === 1;
+  })()));
+record("R3-C02 --preflight-readonly refuses when the staging asset is unclassified",
+  (await cli(["--preflight-readonly", "--attest-for=readiness", `--templates=${TEMPLATE_KEY}`],
+    openEnv(), harness({ assetProofOk: false }))).reason === F.STAGING_ASSET_SCOPE_UNPROVEN);
+record("R3-C03 --arm-readiness refuses when the staging asset is unclassified, and runs NO rpc",
+  (await (async () => {
+    const minted = await mint("ARM_READINESS");
+    const h = harness({ storedAttestation: minted.attestation, assetProofOk: false });
+    const out = await cli(["--arm-readiness", `--templates=${TEMPLATE_KEY}`], openEnv(), h);
+    return out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN && h.seen.rpcs.length === 0;
+  })()));
+record("R3-C04 --arm-canary refuses when the staging asset is unclassified, and runs NO rpc",
+  (await (async () => {
+    const minted = await mint("ARM_CANARY", { policy: READINESS_POSTURE_ROW });
+    const h = harness({ storedAttestation: minted.attestation, policy: READINESS_POSTURE_ROW, assetProofOk: false });
+    const out = await cli(["--arm-canary", `--templates=${TEMPLATE_KEY}`], openEnv(), h);
+    return out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN && h.seen.rpcs.length === 0;
+  })()));
+record("R3-C05 --disable never asks for a staging-asset proof at all",
+  (await (async () => {
+    const h = disableHarness();
+    const out = await cli(["--disable"], disableEnv(), h);
+    return out.ok === true && h.seen.stagingAssetProof === 0;
+  })()));
+
 const mutants = [
+  ["a scope-guarded CLI mode cannot arm against an unclassified Meta asset",
+    async () => {
+      const minted = await mint("ARM_READINESS");
+      const h = harness({ storedAttestation: minted.attestation, assetProofOk: false });
+      return (await cli(["--arm-readiness", `--templates=${TEMPLATE_KEY}`], openEnv(), h)).ok === false && h.seen.rpcs.length === 0;
+    }],
+  ["emergency closure cannot be made to depend on the staging-asset proof",
+    async () => {
+      const h = disableHarness({ assetProofOk: false });
+      return (await cli(["--disable"], disableEnv(), h)).ok === true;
+    }],
   ["DEFECT A cannot regress: a canary attestation is reachable through the real CLI",
     async () => (await mint("ARM_CANARY", { policy: READINESS_POSTURE_ROW })).attestation?.stage === "ARM_CANARY"],
   ["DEFECT A cannot regress: preflight cannot silently default a stage",

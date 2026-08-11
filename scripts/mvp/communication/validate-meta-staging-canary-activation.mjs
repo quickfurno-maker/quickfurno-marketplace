@@ -584,9 +584,117 @@ record("S11g DISABLE is reachable without a Meta credential or an attestation",
   })());
 
 // ---------------------------------------------------------------------------
+// R3. DEDICATED STAGING META CONTROL PLANE — the external asset attestation
+//
+// Dedication is NOT derivable from any Meta GET field, so it is attested out of band and
+// then cross-checked against the live readback. These prove the artifact contract itself.
+// ---------------------------------------------------------------------------
+const R3_HEAD = "c".repeat(40);
+const R3_APP = "111222333444555";
+const R3_WABA = "987654321098765";
+const R3_PHONE = "123456789012345";
+
+function mkAssetProof(over = {}) {
+  const body = {
+    artifact: "qf-mvp-40-staging-meta-asset-proof",
+    environment: "STAGING",
+    project_ref: "uckafzuochmbvtiodmcl",
+    branch_head: R3_HEAD,
+    intended_stage: "ARM_READINESS",
+    meta_app_id: R3_APP,
+    waba_id: R3_WABA,
+    phone_number_id: R3_PHONE,
+    asset_scope: "STAGING_DEDICATED",
+    prohibited_asset_ids: ["555444333222111"],
+    prohibited_asset_digests: [],
+    nonce: "n".repeat(32),
+    issued_at_ms: NOW,
+    expires_at_ms: NOW + 10 * 60 * 1000,
+    ...over,
+  };
+  return { ...body, proof_sha256: A.stagingAssetProofDigest(body) };
+}
+const vProof = (p, o = {}) => A.verifyStagingAssetProof(p, { now: () => NOW, projectRef: "uckafzuochmbvtiodmcl", ...o });
+
+record("R3-A01 a well-formed staging-asset proof verifies",
+  vProof(mkAssetProof()).ok === true);
+record("R3-A02 there are exactly two asset classifications",
+  Object.keys(A.AssetScope).length === 2 &&
+  A.AssetScope.SHARED_OR_UNKNOWN === "SHARED_OR_UNKNOWN");
+record("R3-A03 a missing proof is refused",
+  vProof(null).reason === F.STAGING_ASSET_PROOF_MISSING);
+record("R3-A04 a wrong artifact is refused",
+  vProof(mkAssetProof({ artifact: "something-else" })).ok === false);
+record("R3-A05 a non-staging environment is refused",
+  vProof(mkAssetProof({ environment: "PRODUCTION" })).ok === false);
+record("R3-A06 a wrong project ref is refused",
+  vProof(mkAssetProof({ project_ref: "yqpgcsduqbxulrlzwzap" })).ok === false);
+record("R3-A07 SHARED_OR_UNKNOWN can never be ATTESTED as a scope",
+  vProof(mkAssetProof({ asset_scope: "SHARED_OR_UNKNOWN" })).ok === false);
+record("R3-A08 a tampered proof is refused",
+  (() => { const p = mkAssetProof(); p.waba_id = "111111111111111"; return vProof(p).ok === false; })());
+record("R3-A09 a non-commit branch_head is refused",
+  vProof(mkAssetProof({ branch_head: "not-a-sha" })).ok === false);
+record("R3-A10 a malformed Meta identifier is refused",
+  ["meta_app_id", "waba_id", "phone_number_id"].every(
+    (f) => vProof(mkAssetProof({ [f]: "abc" })).ok === false));
+record("R3-A11 an expired proof is refused",
+  vProof(mkAssetProof(), { now: () => NOW + 11 * 60 * 1000 }).ok === false);
+record("R3-A12 a future-dated proof is refused",
+  vProof(mkAssetProof({ issued_at_ms: NOW + 5 * 60 * 1000 })).ok === false);
+record("R3-A13 a TTL beyond 15 minutes is refused",
+  vProof(mkAssetProof({ expires_at_ms: NOW + 30 * 60 * 1000 })).ok === false);
+record("R3-A14 an unknown intended_stage is refused",
+  vProof(mkAssetProof({ intended_stage: "SEND" })).ok === false);
+record("R3-A15 an EMPTY prohibited-asset list is refused",
+  vProof(mkAssetProof({ prohibited_asset_ids: [], prohibited_asset_digests: [] })).ok === false);
+record("R3-A16 an asset the owner prohibited cannot also be attested as dedicated",
+  vProof(mkAssetProof({ prohibited_asset_ids: [R3_WABA] })).ok === false);
+record("R3-A17 the prohibited list also works by DIGEST, so no real id need be shared",
+  vProof(mkAssetProof({
+    prohibited_asset_ids: [], prohibited_asset_digests: [A.assetIdDigest(R3_PHONE)] })).ok === false);
+record("R3-A18 waba_id and phone_number_id must be distinct",
+  vProof(mkAssetProof({ waba_id: R3_PHONE })).ok === false);
+
+const liveOk = { wabaId: R3_WABA, phoneNumberId: R3_PHONE, subscribedAppIds: [R3_APP] };
+const expOk = { wabaId: R3_WABA, phoneNumberId: R3_PHONE };
+const classify = (o = {}) => A.classifyMetaAssetScope({
+  proof: vProof(mkAssetProof()), live: liveOk, expected: expOk, branchHead: R3_HEAD, ...o });
+
+record("R3-A19 a verified proof matching the live readback classifies STAGING_DEDICATED",
+  classify().scope === "STAGING_DEDICATED");
+record("R3-A20 absence of a proof classifies SHARED_OR_UNKNOWN",
+  A.classifyMetaAssetScope({ proof: null, live: liveOk, expected: expOk, branchHead: R3_HEAD })
+    .scope === "SHARED_OR_UNKNOWN");
+record("R3-A21 a live WABA differing from the attested one classifies SHARED_OR_UNKNOWN",
+  classify({ live: { ...liveOk, wabaId: "222222222222222" } }).scope === "SHARED_OR_UNKNOWN");
+record("R3-A22 a live phone differing from the attested one classifies SHARED_OR_UNKNOWN",
+  classify({ live: { ...liveOk, phoneNumberId: "222222222222222" } }).scope === "SHARED_OR_UNKNOWN");
+record("R3-A23 a foreign subscribed app classifies SHARED_OR_UNKNOWN",
+  classify({ live: { ...liveOk, subscribedAppIds: [R3_APP, "222222222222222"] } }).scope === "SHARED_OR_UNKNOWN");
+record("R3-A24 a different running commit classifies SHARED_OR_UNKNOWN",
+  classify({ branchHead: "d".repeat(40) }).scope === "SHARED_OR_UNKNOWN");
+record("R3-A25 a configured identity differing from the attested one classifies SHARED_OR_UNKNOWN",
+  classify({ expected: { wabaId: "222222222222222", phoneNumberId: R3_PHONE } }).scope === "SHARED_OR_UNKNOWN");
+record("R3-A26 an empty subscribed-app list does not by itself block classification",
+  classify({ live: { ...liveOk, subscribedAppIds: [] } }).scope === "STAGING_DEDICATED");
+record("R3-A27 no real Meta identifier or phone number is hard-coded in the operator",
+  !/\b1[0-9]{14,}\b/.test(operatorCode.replace(/[0-9]{6,}\}/g, "")) &&
+  !/\+[0-9]{10,15}/.test(operatorCode));
+
+// ---------------------------------------------------------------------------
 // MUT. MUTANTS — every guard must be shown capable of failing
 // ---------------------------------------------------------------------------
 const mutants = [
+  ["a shared or unknown Meta asset can never classify as dedicated",
+    () => A.classifyMetaAssetScope({ proof: null, live: liveOk, expected: expOk, branchHead: R3_HEAD })
+      .scope !== "STAGING_DEDICATED"],
+  ["an asset attestation alone is NOT sufficient — the live readback must agree",
+    () => classify({ live: { ...liveOk, wabaId: "222222222222222" } }).scope === "SHARED_OR_UNKNOWN"],
+  ["a staging-asset proof cannot outlive its 15-minute window",
+    () => vProof(mkAssetProof(), { now: () => NOW + 16 * 60 * 1000 }).ok === false],
+  ["the production business asset cannot be attested as the staging asset",
+    () => vProof(mkAssetProof({ prohibited_asset_ids: [R3_APP] })).ok === false],
   ["a sendable posture cannot be earned without evidence",
     () => A.assertWriteIsEarned({ posture: A.CANARY_POSTURE, accountFields: readyAccount(), evidence: null }).ok === false],
   ["stage 1 cannot be coaxed into a sending posture",

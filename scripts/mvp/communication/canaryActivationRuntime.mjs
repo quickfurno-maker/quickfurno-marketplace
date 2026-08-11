@@ -36,11 +36,13 @@
 import {
   ActivationFailure,
   ATTESTATION_TARGETS,
+  AssetScope,
   CANARY_DESTINATION_ENV,
   CANARY_WINDOW_MS,
   ATTESTATION_ARTIFACT,
   GIT_HEAD_RE,
   attestationDigest,
+  classifyMetaAssetScope,
   resolveAttestationTarget,
   resolveMode,
   resolveSourceHead,
@@ -81,11 +83,14 @@ export const FORBIDDEN_DIRECT_WRITE_TABLES = Object.freeze([
  * half-armed staging environment must be recoverable even when Meta is unreachable.
  */
 export const MODE_REQUIREMENTS = Object.freeze({
-  DRY_RUN:             { db: false, meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: false },
-  PREFLIGHT_READONLY:  { db: true,  meta: true,  indexProof: true,  canaryDestination: true,  attestation: false, writes: false },
-  ARM_READINESS:       { db: true,  meta: true,  indexProof: true,  canaryDestination: true,  attestation: true,  writes: true  },
-  ARM_CANARY:          { db: true,  meta: true,  indexProof: true,  canaryDestination: true,  attestation: true,  writes: true  },
-  DISABLE:             { db: true,  meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: true  },
+  DRY_RUN:             { db: false, meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: false, assetScope: false },
+  PREFLIGHT_READONLY:  { db: true,  meta: true,  indexProof: true,  canaryDestination: true,  attestation: false, writes: false, assetScope: true  },
+  ARM_READINESS:       { db: true,  meta: true,  indexProof: true,  canaryDestination: true,  attestation: true,  writes: true,  assetScope: true  },
+  ARM_CANARY:          { db: true,  meta: true,  indexProof: true,  canaryDestination: true,  attestation: true,  writes: true,  assetScope: true  },
+  // QF-MVP-40-R3: emergency closure stays independent of the staging-asset attestation,
+  // for the same reason it is independent of Meta, the index proof and the git HEAD —
+  // closing a gate must never be harder than opening one.
+  DISABLE:             { db: true,  meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: true,  assetScope: false },
 });
 
 // ---------------------------------------------------------------------------
@@ -303,7 +308,10 @@ export function createHealthAdapter({ transport, token, graphApiVersion, phoneNu
  * called here. Returns sanitized observed state, the derived evidence, the readiness
  * verdict and the plan — never a token, never a plaintext destination.
  */
-export async function runPreflight({ db, meta, health, indexProof, target, templateKeys, expected, now }) {
+export async function runPreflight({
+  db, meta, health, indexProof, target, templateKeys, expected, now,
+  assetProof = null, requireDedicatedScope = false, branchHead = null, stage = "PREFLIGHT_READONLY",
+}) {
   const observed = {
     account: await db.readAccount(expected.phoneNumberId),
     policy: await db.readPolicy(),
@@ -363,6 +371,43 @@ export async function runPreflight({ db, meta, health, indexProof, target, templ
 
   const readiness = deriveAccountReadinessFromEvidence(evidence);
 
+  // QF-MVP-40-R3 — DEDICATED STAGING META CONTROL PLANE.
+  //
+  // Classified from the owner's short-lived external attestation AND this very readback.
+  // The attestation alone can never raise the classification: the live WABA id, phone id,
+  // subscribed-app ids and the running commit must all agree with it.
+  const subscribedAppIds = subscribedData
+    .map((a) => a?.whatsapp_business_api_data?.id ?? a?.id)
+    .filter((id) => id !== undefined && id !== null)
+    .map(String);
+
+  const verifiedAssetProof = assetProof
+    ? await assetProof.verify({ projectRef: target.projectRef, now, branchHead, stage })
+    : null;
+
+  const assetScope = classifyMetaAssetScope({
+    proof: verifiedAssetProof,
+    live: { wabaId, phoneNumberId: phoneId, subscribedAppIds },
+    expected,
+    branchHead,
+  });
+
+  // ORDERING. When the live identity already disagrees with the configured identity, the
+  // existing, more specific refusal (READINESS_EVIDENCE_INSUFFICIENT, raised by the plan)
+  // must remain the one the operator sees — a scope verdict must not mask an identity
+  // fault. Nothing can arm in that case either: the plan refuses, and `preflightForWrite`
+  // independently hard-refuses any attestation whose asset_scope is not STAGING_DEDICATED.
+  const identityCoherent = evidence.wabaIdMatches === true && evidence.phoneNumberIdMatches === true;
+
+  if (requireDedicatedScope && identityCoherent && assetScope.scope !== AssetScope.STAGING_DEDICATED) {
+    return {
+      ok: false,
+      reason: ActivationFailure.STAGING_ASSET_SCOPE_UNPROVEN,
+      detail: `${AssetScope.SHARED_OR_UNKNOWN}: ${assetScope.reason ?? "unclassified"}`,
+      assetScope: assetScope.scope,
+    };
+  }
+
   return {
     ok: true,
     observed: sanitizeObserved(observed),
@@ -372,6 +417,9 @@ export async function runPreflight({ db, meta, health, indexProof, target, templ
     indexProofHash: proof.hash,
     templates,
     healthVerdict: { status: verdict.status, reachable: verdict.reachable },
+    assetScope: assetScope.scope,
+    assetProofHash: assetScope.proofHash ?? null,
+    assetIdentity: { wabaId: wabaId ?? null, phoneNumberId: phoneId ?? null, subscribedAppIds },
   };
 }
 
@@ -424,6 +472,12 @@ export function buildAttestationBody({ stage, target, templateKeys, destinationH
     readiness_evidence_digest: digestOf(preflight.evidence),
     health_verdict_digest: digestOf(preflight.healthVerdict),
     index_proof_hash: preflight.indexProofHash ?? null,
+    // QF-MVP-40-R3 — the asset classification and the exact live asset identity are part
+    // of what a plan is approved against, so a changed WABA, phone, subscribed app or
+    // classification invalidates the attestation through the drift fence below.
+    asset_scope: preflight.assetScope ?? AssetScope.SHARED_OR_UNKNOWN,
+    staging_asset_proof_hash: preflight.assetProofHash ?? null,
+    meta_asset_identity_digest: digestOf(preflight.assetIdentity ?? null),
     plan_sha256: planHash,
     nonce,
     issued_at_ms: now,
@@ -590,6 +644,8 @@ async function preflightForWrite(ctx, stage) {
   const preflight = await runPreflight({
     db: ctx.db, meta: ctx.meta, health: ctx.health, indexProof: ctx.indexProof,
     target: ctx.target, templateKeys: ctx.templateKeys, expected: ctx.expected, now: ctx.now,
+    assetProof: ctx.assetProof, requireDedicatedScope: true,
+    branchHead: ctx.branchHead ?? null, stage,
   });
   if (!preflight.ok) return preflight;
   preflight.expected = ctx.expected;
@@ -634,11 +690,19 @@ async function preflightForWrite(ctx, stage) {
     return { ok: false, reason: ActivationFailure.SOURCE_HEAD_MISMATCH, detail: "branch_head" };
   }
 
+  // QF-MVP-40-R3: an attestation minted while the asset was classified STAGING_DEDICATED
+  // must not survive a reclassification, a changed staging-asset proof, or a changed live
+  // WABA/phone/subscribed-app identity.
+  if (fresh.asset_scope !== AssetScope.STAGING_DEDICATED) {
+    return { ok: false, reason: ActivationFailure.STAGING_ASSET_SCOPE_UNPROVEN, detail: fresh.asset_scope };
+  }
+
   for (const field of [
     "policy_observed_digest", "mapping_observed_digest", "remote_template_digest",
     "readiness_evidence_digest", "health_verdict_digest", "index_proof_hash",
     "canary_destination_hash", "account_identity_digest", "plan_sha256",
     "branch_head",
+    "asset_scope", "staging_asset_proof_hash", "meta_asset_identity_digest",
   ]) {
     if (fresh[field] !== loaded.parsed[field]) {
       return { ok: false, reason: ActivationFailure.ATTESTATION_MISMATCH, detail: field };
@@ -704,6 +768,8 @@ export async function runOperator(ctx) {
     const preflight = await runPreflight({
       db: ctx.db, meta: ctx.meta, health: ctx.health, indexProof: ctx.indexProof,
       target: ctx.target, templateKeys: ctx.templateKeys, expected: ctx.expected, now: ctx.now,
+      assetProof: ctx.assetProof, requireDedicatedScope: need.assetScope === true,
+      branchHead: ctx.branchHead ?? null, stage: "PREFLIGHT_READONLY",
     });
     if (!preflight.ok) return preflight;
     preflight.expected = ctx.expected;
@@ -776,6 +842,7 @@ export async function runCli({
   adapterFactory,
   attestationIoFactory,
   indexProofFactory,
+  stagingAssetProofFactory,
   now = () => Date.now(),
   nonce,
   log = () => {},
@@ -833,12 +900,19 @@ export async function runCli({
     ? await indexProofFactory({ target })
     : { verify: async () => ({ ok: true, hash: null }) };
 
+  // QF-MVP-40-R3. Absent for DISABLE and DRY_RUN by design; for every scope-guarded mode
+  // a missing factory yields no proof, which classifies SHARED_OR_UNKNOWN and refuses.
+  const assetProof = need.assetScope && typeof stagingAssetProofFactory === "function"
+    ? await stagingAssetProofFactory({ target })
+    : null;
+
   return runOperator({
     mode,
     db: adapters.db,
     meta: adapters.meta ?? null,
     health: adapters.health ?? null,
     indexProof,
+    assetProof,
     attestationIo,
     target,
     expected: adapters.expected,

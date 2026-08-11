@@ -309,7 +309,7 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // staging deployment gate, so the pending set is present-and-empty and 50.5 is the
 // newest APPLIED record. Nothing 50.4 pinned as APPLIED moved.
 record("G02 the pending post-anchor set is empty and 50.5 is the newest applied record",
-  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.pendingPostAnchorMigrations.length === 1 &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.at(-1).operationalStatus === "APPLIED");
 record("G03 the ten applied records read 21 through 30",
@@ -322,7 +322,7 @@ record("G05 the validator is registered and wired into CI after 50.3",
     "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs" &&
   /- name: QF-MVP-50\.3 validator\s+run: npm run test:mvp:50-3\s+- name: QF-MVP-50\.4 validator\s+run: npm run test:mvp:50-4/.test(ciWorkflow));
 record("G06 the local migration set is exactly 97",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 97);
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 98);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

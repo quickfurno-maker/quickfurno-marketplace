@@ -557,18 +557,23 @@ record("B05 no production deployment is authorized anywhere in this phase",
 // ---------------------------------------------------------------------------
 record("G01 the migration matches its pinned canonical hash",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA);
-record("G02 the local migration set is exactly 97 and 50.5 is the newest",
+// QF-MVP-40.13B RE-PIN: 97 -> 98. 50.5 is no longer the newest file on disk, but it is
+// still the newest APPLIED migration — the 40.13B canary authority is SOURCE-PENDING.
+record("G02 the local migration set is exactly 98 and 50.5 is the newest APPLIED migration",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 97 &&
-      files.at(-1) === "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
+    return files.length === 98 &&
+      files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
+      files.at(-1) === "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql" &&
+      manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000";
   })());
-record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence, and nothing is left pending",
+record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence, and only the 40.13B authority is pending",
   (() => {
     const pending = manifest.pendingPostAnchorMigrations ?? null;
     const pin = (manifest.appliedPostAnchorMigrations ?? []).find((r) => r.version === "20260812000000");
-    return Array.isArray(pending) && pending.length === 0 &&
+    return Array.isArray(pending) && pending.length === 1 &&
+      pending[0].version === "20260813000000" &&
       pin?.sha256 === MIGRATION_SHA &&
       pin.path === MIGRATION_PATH && pin.phase === "QF-MVP-50.5" &&
       pin.operationalStatus === "APPLIED" &&
@@ -589,11 +594,11 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
-  manifest.appliedAnchor.postAnchorMigrationCount === 10);
+  manifest.appliedAnchor.postAnchorMigrationCount === 11);
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 97;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 98;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("pendingPins.length === 1") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
   !/state\.migrations\.length\s*>=/.test(g1Source) &&
@@ -675,16 +680,16 @@ const mutants = [
   ["one lane starving the other is prevented by construction",
     () => workflow.nodes.filter((n) => n.type === "n8n-nodes-base.scheduleTrigger").length === 2],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 97;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 98;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
-  // The pending set is now empty, so an `every()` over it would be vacuously
-  // true and would guard nothing. The real risk moved: an APPLIED record that
-  // misrepresents HOW it was proven, or a future pending record that claims
-  // applied evidence it does not have. Both are checked concretely.
+  // QF-MVP-40.13B: the pending set is non-empty again, so this `every()` is no longer
+  // vacuous — it now genuinely guards the SOURCE-PENDING canary authority. The other
+  // risk is unchanged: an APPLIED record that misrepresents HOW it was proven.
   ["a pending record claiming applied evidence is impossible",
-    () => (manifest.pendingPostAnchorMigrations ?? []).every((r) =>
-      r.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-      !("remoteHistoryCountAfterApply" in r) && !("appliedEvidenceMarker" in r))],
+    () => (manifest.pendingPostAnchorMigrations ?? []).length >= 1 &&
+      (manifest.pendingPostAnchorMigrations ?? []).every((r) =>
+        r.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+        !("remoteHistoryCountAfterApply" in r) && !("appliedEvidenceMarker" in r))],
   ["misrepresenting how 50.5 was proven on staging is detectable",
     () => {
       const pin = manifest.appliedPostAnchorMigrations.find((r) => r.version === "20260812000000");

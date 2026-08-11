@@ -726,12 +726,16 @@ record("G01 the anchor is untouched",
 // QF-MVP-50.2-R2-APPLIED-TRUTH: all three post-anchor migrations are APPLIED
 // (remote history 21 / 22 / 23) and none remain pending. Re-pinned, not loosened.
 // QF-MVP-50.5 STAGING GATE RE-PIN: the recovery migration passed its own staging
-// gate, so all TEN post-anchor migrations are APPLIED and none remain pending.
-record("G02 exactly ten APPLIED and zero PENDING post-anchor migrations",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 10 &&
+// gate, so all TEN post-anchor migrations are APPLIED.
+// QF-MVP-40.13B RE-PIN: the pending set now holds exactly the one SOURCE-PENDING
+// canary activation authority, so the post-anchor total is eleven while APPLIED stays ten.
+record("G02 exactly ten APPLIED and one PENDING post-anchor migration",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 11 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260813000000" &&
+  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
   manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply === 30 &&
@@ -792,9 +796,9 @@ record("G05 no applied record fabricates an offline remote status, and only 50.5
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
-record("G06 G1 pins the exact count 97, not a lower bound",
-  /const MIGRATION_COUNT = 97;/.test(g1Source) &&
-  !/>=\s*97|length\s*>=/.test(g1Source));
+record("G06 G1 pins the exact count 98, not a lower bound",
+  /const MIGRATION_COUNT = 98;/.test(g1Source) &&
+  !/>=\s*98|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
   g1Source.includes('version: "20260805000000"') &&
@@ -802,17 +806,18 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
   g1Source.includes('marker: "QF_MVP_50_2E_S2_STAGING_MIGRATION_APPLIED_AND_VERIFIED"') &&
   g1Source.includes("remoteHistory: 21") &&
   g1Source.includes("remoteHistory: 22"));
-record("G08 the local migration set is exactly 97 and the 50.2 wedge repair is still present in order",
+record("G08 the local migration set is exactly 98 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 97 &&
+    return files.length === 98 &&
       files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
       files.includes("20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql") &&
-      files.at(-1) === "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
+      files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
+      files.at(-1) === "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 97/.test(d2Source) &&
-  /exactly ten migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 98/.test(d2Source) &&
+  /exactly eleven migrations are newer than the anchor/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
 record("G10 the completion-path allowlist names exactly the four permitted workflows",

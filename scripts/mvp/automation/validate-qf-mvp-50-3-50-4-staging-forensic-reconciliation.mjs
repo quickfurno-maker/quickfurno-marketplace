@@ -28,16 +28,19 @@ const SCRIPT_COMMAND =
 const CLASSIFICATION = "APPLIED_RECORDED_CATALOG_MATCHES_CURRENT_SOURCE";
 const FORENSIC_EVIDENCE_TYPE = "IMPORTED_FOUNDER_ACKNOWLEDGED_EXISTING_STAGING_STATE";
 const UNKNOWN_PROVENANCE = "UNKNOWN";
-// QF-MVP-50.5 RE-PIN. The forensic truth this gate certifies — nine APPLIED records at
-// remote history 21..29, with UNKNOWN executor provenance for the last three — is
+// QF-MVP-40.13B RE-PIN. The forensic truth this gate certifies — the APPLIED records at
+// remote history 21..30, with UNKNOWN executor provenance for the reconciled three — is
 // completely unchanged. The only difference is that one further migration
-// (20260812000000, the 50.5 recovery transport) now exists on disk as PENDING.
-const MIGRATION_COUNT = 97;
+// (20260813000000, the canary activation authority) now exists on disk as SOURCE-PENDING.
+const MIGRATION_COUNT = 98;
 // QF-MVP-50.5 STAGING GATE RE-PIN: this version is no longer pending. It cleared
 // its own staging gate at remote history 30 and is now the newest APPLIED record.
 const RECOVERY_VERSION = "20260812000000";
 const RECOVERY_FILENAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
+/** QF-MVP-40.13B — SOURCE ONLY, never applied by this or any prior phase. */
+const CANARY_AUTHORITY_FILENAME =
+  "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql";
 
 const EXPECTED_APPLIED = [
   ["20260804000000", 21],
@@ -126,10 +129,11 @@ function validateState(state) {
     ? manifest.pendingPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 97", state.migrationFiles.length === MIGRATION_COUNT);
-  check("the exact final four forensic migration filenames are frozen, followed only by the pinned 50.5 pending migration",
-    same(state.migrationFiles.slice(-5),
-      [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME]));
+  check("migration count is exactly 98", state.migrationFiles.length === MIGRATION_COUNT);
+  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the pinned SOURCE-PENDING 40.13B authority",
+    same(state.migrationFiles.slice(-6),
+      [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
+       CANARY_AUTHORITY_FILENAME]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -138,8 +142,11 @@ function validateState(state) {
   check("the remote-history counts are exactly 21 through 30",
     same(applied.map((record) => record.remoteHistoryCountAfterApply),
       EXPECTED_APPLIED.map(([, history]) => history)));
-  check("the manifest pending set is present and empty",
-    pending !== null && pending.length === 0);
+  check("the manifest pending set is exactly the SOURCE-PENDING 40.13B authority",
+    pending !== null && pending.length === 1 &&
+    pending[0].version === "20260813000000" &&
+    pending[0].operationalStatus === "PENDING" &&
+    pending[0].requiresSeparateStagingDeploymentGate === true);
   check("the 50.5 recovery migration is APPLIED at remote history 30 by its own phase",
     (() => {
       const pin = applied.find((record) => record.version === RECOVERY_VERSION);
@@ -152,8 +159,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals the ten applied records",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length);
+  check("the anchor post-anchor count equals the ten applied records plus the one SOURCE-PENDING authority",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 1);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

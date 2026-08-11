@@ -44,6 +44,7 @@
     "seed:mvp:40-12": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
     "test:mvp:40-12-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-business-template-bindings.mjs",
     "test:mvp:40-12": "node scripts/mvp/communication/validate-meta-staging-inactive-mapping-seed.mjs",
+    "test:mvp:40-12-prereq": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-internal-staging-template-seed.mjs",
     "test:mvp:40-13": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-activation.mjs",
     "test:mvp:40-13c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-runtime.mjs",
     "test:mvp:40-13c-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-cli.mjs",

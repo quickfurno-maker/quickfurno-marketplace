@@ -55,7 +55,22 @@ const exactRows = expectedRows.map((r) => ({ ...r }));
 
 const R = {
   exactPhase: () => PHASE === "QF-MVP-40.12-PREREQ-R1",
-  exactBranch: () => AUTHORIZED_BRANCH === "mvp/qf-mvp-40-meta-readiness-v1",
+  // QF-MVP-40.13C-R2 RE-PIN: exact equality against the branch that carries the certified
+  // live-run authority. Still ONE literal — never a wildcard, prefix, list or env override.
+  exactBranch: () => AUTHORIZED_BRANCH === "mvp/qf-mvp-40-final-provider-canary",
+  // Asserted over the COMMENT-STRIPPED operator source, so the prose explaining the
+  // re-pin can neither satisfy nor defeat the guard.
+  branchIsExactSingleLiteral: () =>
+    /export const AUTHORIZED_BRANCH = "mvp\/qf-mvp-40-final-provider-canary";/.test(exec)
+    && !/AUTHORIZED_BRANCH\s*=\s*\[/.test(exec)
+    && !/AUTHORIZED_BRANCH\.(startsWith|includes|test)/.test(exec)
+    && !/process\.env\.[A-Z_]*BRANCH/.test(exec)
+    && /git\.branch !== AUTHORIZED_BRANCH/.test(exec),
+  cleanTreeAndHeadPinPreserved: () =>
+    /if \(!git\.clean\)/.test(exec)
+    && /GIT_DIRTY/.test(exec)
+    && /rev-parse", "HEAD"/.test(exec)
+    && /head: git\.head/.test(exec),
   exactTargetSet: () => TARGET_SPEC.length === 8 && TARGET_SPEC.map((t) => t.key).join(",") === [
     "consent_help_response", "consent_stop_acknowledgement", "consent_start_acknowledgement",
     "lead_received", "client_lead_status_update", "client_matching_update",

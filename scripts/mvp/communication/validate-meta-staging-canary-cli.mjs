@@ -426,6 +426,94 @@ record("E05 emergency --disable is NOT burdened with the strict Core-env require
   disOut.ok === true && R.verifyCoreProviderEnv(disableEnv()).ok === false);
 
 // ---------------------------------------------------------------------------
+// R2. LIVE-SEQUENCE LOCK — seed branch authority, two cycles, campaign blocker
+// ---------------------------------------------------------------------------
+const seedSource = read("scripts/mvp/communication/seed-internal-staging-templates.mjs");
+const seedExec = strip(seedSource);
+const runbookRaw = read("docs/QF-MVP-40-LIVE-CANARY-RUNBOOK.md");
+/**
+ * Prose assertions run over a WHITESPACE-NORMALIZED copy. Markdown wraps sentences across
+ * lines, so a newline-sensitive regex would force the document to be reflowed to satisfy
+ * the test — which is the test dictating prose rather than checking it.
+ */
+const runbook = runbookRaw.replace(/\s+/g, " ");
+
+record("R01 the internal-template seed is pinned to the CURRENT certified branch",
+  /export const AUTHORIZED_BRANCH = "mvp\/qf-mvp-40-final-provider-canary";/.test(seedExec) &&
+  !/mvp\/qf-mvp-40-meta-readiness-v1/.test(seedExec));
+record("R02 the seed branch pin is ONE exact literal — no wildcard, list, prefix or env override",
+  !/AUTHORIZED_BRANCH\s*=\s*\[/.test(seedExec) &&
+  !/AUTHORIZED_BRANCH\.(startsWith|includes|test)/.test(seedExec) &&
+  !/process\.env\.[A-Z_]*BRANCH/.test(seedExec) &&
+  /git\.branch !== AUTHORIZED_BRANCH/.test(seedExec) &&
+  (seedExec.match(/AUTHORIZED_BRANCH = /g) ?? []).length === 1);
+record("R03 the seed's clean-tree, HEAD-pin and staging fence survive the re-pin",
+  /if \(!git\.clean\)/.test(seedExec) && /GIT_DIRTY/.test(seedExec) &&
+  /rev-parse", "HEAD"/.test(seedExec) && /head: git\.head/.test(seedExec) &&
+  /AUTHORIZED_STAGING_REF/.test(seedExec) && /FORBIDDEN_PROJECT_REFS/.test(seedExec));
+record("R04 no live operator still names the superseded branch",
+  [operatorCode, runtimeCode, seedExec,
+   strip(read("scripts/mvp/communication/verify-core-provider-env.mjs"))]
+    .every((s) => !/mvp\/qf-mvp-40-meta-readiness-v1/.test(s)));
+record("R05 the runbook locks TWO independent canary cycles, never one",
+  /Vendor cycle/i.test(runbook) && /Client cycle/i.test(runbook) &&
+  /exactly one\*{0,2} ordinary-business mapping/i.test(runbook) &&
+  /never left armed while the client canary is attempted/i.test(runbook) &&
+  /Maximum two real outbound messages/i.test(runbook));
+record("R06 the one-active-mapping invariant is enforced in CODE, not only documented",
+  // SQL refuses an unrelated active mapping, and the pure plan refuses it too.
+  /QF_CANARY_UNRELATED_ACTIVE_MAPPING/.test(read("supabase/migrations/20260813000000_qf_mvp_40_13b_canary_activation_authority.sql")) &&
+  /UNRELATED_ACTIVE_MAPPING/.test(operatorCode));
+record("R07 arming a second template while one is active is refused end to end",
+  (await (async () => {
+    const READY = { activation_status: "readiness_only", outbound_enabled: false,
+      webhook_processing_enabled: true, health_check_enabled: true };
+    const cm = await mint("ARM_CANARY", { policy: READY });
+    const h = harness({
+      policy: READY, storedAttestation: cm.attestation,
+      mappings: [mapping(), mapping({ id: "m2", template_key: "client_matching_update",
+        provider_template_name: "qf_client_matching_update_v1", is_active: true })],
+    });
+    const o = await cli(["--arm-canary", `--templates=${TEMPLATE_KEY}`], openEnv(), h);
+    return o.ok === false && h.seen.rpcs.length === 0;
+  })()));
+record("R08 the campaign criterion is recorded as an OPEN QF-MVP-40 blocker",
+  /campaign canary succeeds/.test(runbook) &&
+  /no approved MARKETING template/i.test(runbook) &&
+  /must \*{0,2}not\*{0,2} be marked complete after the vendor and client utility canaries alone/i.test(runbook) &&
+  /QF_MVP_40_STATUS: IN_PROGRESS/.test(runbook));
+record("R09 the campaign packet forbids every substitute and invents nothing",
+  /qf_consent_help_response_v2/.test(runbook) &&
+  /evidence-bound acknowledgement/i.test(runbook) &&
+  /No consent may be invented/i.test(runbook) &&
+  /OWNER MUST DECIDE/.test(runbook) &&
+  (runbook.match(/OWNER MUST DECIDE/g) ?? []).length === 3);
+record("R10 the packet chooses NO frequency threshold, window or interval",
+  !/max_per_window[^|\n]*\|\s*\d/.test(runbook) &&
+  !/window_length[^|\n]*\|\s*\d+\s*(h|hour)/i.test(runbook) &&
+  /No default is proposed/i.test(runbook));
+record("R11 the packet prefers a ZERO-variable marketing template",
+  /ZERO — recommended/.test(runbook) && /vendor_crm_promotion/.test(runbook));
+record("R12 all TEN locked exit criteria appear with a test path and a blocker column",
+  ["staging webhook verified", "signed inbound callback accepted",
+   "foreign callback", "template send succeeds", "delivery lifecycle updates Core",
+   "STOP blocks future promotional messages", "START restores only permitted communication",
+   "HELP responds safely", "campaign canary succeeds", "no voice path exists"]
+    .every((c) => runbook.includes(c)) &&
+  /Owner phone action/.test(runbook) && /Executable now/.test(runbook) && /Blocker/.test(runbook));
+record("R13 the runbook keeps Core/n8n ready BEFORE any provider gate opens",
+  /Arming is the \*{0,2}last\*{0,2} thing/i.test(runbook) &&
+  /schedules \*{0,2}INACTIVE\*{0,2}/i.test(runbook) &&
+  /guaranteed-oldest/.test(runbook) &&
+  /eight historical failed orphan/i.test(runbook));
+record("R14 the runbook states emergency closure needs only the staging DB identity",
+  /Emergency closure needs ONLY/.test(runbook) &&
+  /QF_STAGING_SUPABASE_SERVICE_ROLE_KEY/.test(runbook));
+record("R15 the runbook contains no secret value and no plaintext canary number",
+  !/sb_secret_[A-Za-z0-9]{10}/.test(runbook) && !/EAA[A-Za-z0-9]{20}/.test(runbook) &&
+  !/\+\d{10,}/.test(runbook));
+
+// ---------------------------------------------------------------------------
 // M. MUTANTS — one per repaired defect, at minimum
 // ---------------------------------------------------------------------------
 const mutants = [
@@ -461,6 +549,36 @@ const mutants = [
     }],
   ["the entry point cannot regain its own argv parsing unnoticed",
     () => !/argv\.includes\(/.test(operatorCode) && !/resolveMode\(process\.argv/.test(operatorCode)],
+
+  // QF-MVP-40.13C-R2 required mutants.
+  ["the SUPERSEDED seed branch cannot be accepted again",
+    () => !/mvp\/qf-mvp-40-meta-readiness-v1/.test(seedExec)],
+  ["a wildcard or arbitrary seed branch cannot be accepted",
+    () => !/AUTHORIZED_BRANCH\s*=\s*\[/.test(seedExec) &&
+          !/AUTHORIZED_BRANCH\.(startsWith|includes|test)/.test(seedExec) &&
+          !/process\.env\.[A-Z_]*BRANCH/.test(seedExec)],
+  ["the seed clean-tree requirement cannot be removed unnoticed",
+    () => /if \(!git\.clean\)/.test(seedExec) && /GIT_DIRTY/.test(seedExec)],
+  ["the seed HEAD pin cannot be removed unnoticed",
+    () => /rev-parse", "HEAD"/.test(seedExec) && /head: git\.head/.test(seedExec)],
+  ["vendor and client cannot be collapsed into ONE active-mapping cycle",
+    async () => {
+      const READY = { activation_status: "readiness_only", outbound_enabled: false,
+        webhook_processing_enabled: true, health_check_enabled: true };
+      const cm = await mint("ARM_CANARY", { policy: READY });
+      const h = harness({
+        policy: READY, storedAttestation: cm.attestation,
+        mappings: [mapping(), mapping({ id: "m2", template_key: "client_matching_update",
+          provider_template_name: "qf_client_matching_update_v1", is_active: true })],
+      });
+      const o = await cli(["--arm-canary", `--templates=${TEMPLATE_KEY}`], openEnv(), h);
+      return o.ok === false && h.seen.rpcs.length === 0;
+    }],
+  ["campaign cannot be marked complete without the marketing prerequisites",
+    () => /QF_MVP_40_STATUS: IN_PROGRESS/.test(runbook) &&
+          /no approved MARKETING template/i.test(runbook) &&
+          !/QF_MVP_40_FINAL_PROVIDER_READINESS_COMPLETE/.test(runbook) &&
+          !/COMPLETE \/ TESTED \/ FROZEN\*{0,2}\s*$/m.test(runbook)],
 ];
 for (const [name, fn] of mutants) {
   let held = false;

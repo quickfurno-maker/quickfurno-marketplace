@@ -22,7 +22,21 @@ import { fileURLToPath } from "node:url";
 
 export const PHASE = "QF-MVP-40.12-PREREQ-R1";
 export const AUTHORIZED_STAGING_REF = "uckafzuochmbvtiodmcl";
-export const AUTHORIZED_BRANCH = "mvp/qf-mvp-40-meta-readiness-v1";
+/**
+ * The EXACT branch this prerequisite seed may run from.
+ *
+ * QF-MVP-40.13C-R2 RE-PIN. It was `mvp/qf-mvp-40-meta-readiness-v1`, the branch that
+ * authored the seed. That branch has long since merged, so the first live prerequisite
+ * would have refused with GIT_BRANCH_MISMATCH before any controlled write — a real
+ * pre-live blocker, not a theoretical one.
+ *
+ * Re-pinned to the branch that actually carries the certified live-run authority. This is
+ * a single exact literal compared with `!==`: no wildcard, no prefix, no list, no
+ * environment override and no bypass. Every other guard is untouched — clean tree, exact
+ * git HEAD in the attestation, the staging-ref fence, the external short-lived single-use
+ * attestation, the eight-row authority and the no-blind-retry rule.
+ */
+export const AUTHORIZED_BRANCH = "mvp/qf-mvp-40-final-provider-canary";
 export const FORBIDDEN_PROJECT_REFS = Object.freeze({
   production: "yqpgcsduqbxulrlzwzap",
   jarvis: "coilipywdvxklewquqvv",

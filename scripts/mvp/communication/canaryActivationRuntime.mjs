@@ -35,10 +35,15 @@
 
 import {
   ActivationFailure,
+  ATTESTATION_TARGETS,
   CANARY_DESTINATION_ENV,
   CANARY_WINDOW_MS,
   ATTESTATION_ARTIFACT,
+  GIT_HEAD_RE,
   attestationDigest,
+  resolveAttestationTarget,
+  resolveMode,
+  resolveSourceHead,
   buildPhoneNumberGetUrl,
   buildSubscribedAppsGetUrl,
   buildWabaGetUrl,
@@ -619,10 +624,21 @@ async function preflightForWrite(ctx, stage) {
     now: loaded.parsed.issued_at_ms, nonce: loaded.parsed.nonce,
     ttlMs: loaded.parsed.expires_at_ms - loaded.parsed.issued_at_ms,
   });
+  // QF-MVP-40.13C-R1: an opening write requires a PROVEN current HEAD, and `branch_head`
+  // is part of the drift comparison below — so a source change after minting refuses the
+  // write instead of arming reviewed-then-edited code.
+  if (!GIT_HEAD_RE.test(String(ctx.branchHead ?? ""))) {
+    return { ok: false, reason: ActivationFailure.SOURCE_HEAD_UNPROVEN };
+  }
+  if (loaded.parsed.branch_head !== ctx.branchHead) {
+    return { ok: false, reason: ActivationFailure.SOURCE_HEAD_MISMATCH, detail: "branch_head" };
+  }
+
   for (const field of [
     "policy_observed_digest", "mapping_observed_digest", "remote_template_digest",
     "readiness_evidence_digest", "health_verdict_digest", "index_proof_hash",
     "canary_destination_hash", "account_identity_digest", "plan_sha256",
+    "branch_head",
   ]) {
     if (fresh[field] !== loaded.parsed[field]) {
       return { ok: false, reason: ActivationFailure.ATTESTATION_MISMATCH, detail: field };
@@ -719,3 +735,124 @@ export async function runOperator(ctx) {
 }
 
 export { CANARY_DESTINATION_ENV, CANARY_WINDOW_MS, resolveActivationTarget, resolveTemplateSelection };
+
+// ---------------------------------------------------------------------------
+// STRICT CORE ENV VERIFICATION — for the later staging Core start, NOT for closure
+// ---------------------------------------------------------------------------
+
+/**
+ * The gate the staging Core launch must pass: every operator alias equals its canonical
+ * `WHATSAPP_*` counterpart, the provider mode is `meta_cloud`, and both webhook secrets
+ * are present. Deliberately SEPARATE from `--disable`, which must never inherit these
+ * requirements.
+ */
+export function verifyCoreProviderEnv(env = {}) {
+  const reconciled = reconcileProviderEnv(env, { strict: true });
+  if (!reconciled.ok) return reconciled;
+  return {
+    ok: true,
+    reconciledAliases: PROVIDER_ENV_ALIASES.length,
+    providerMode: REQUIRED_PROVIDER_MODE,
+    webhookSecretsPresent: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// runCli — THE ONE CLI PATH. The entry point and the tests both call this.
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the direct entry point used to do inline, now exported and injectable.
+ *
+ * QF-MVP-40.13C shipped this logic inside `if (isDirect)`, so no offline test could reach
+ * it — and three defects hid there: the canary attestation target was unreachable,
+ * emergency closure demanded Meta credentials, and the HEAD pin was never verified. There
+ * is deliberately no second parser: the CLI and the tests share this exact function.
+ */
+export async function runCli({
+  argv = [],
+  env = {},
+  headResolver,
+  adapterFactory,
+  attestationIoFactory,
+  indexProofFactory,
+  now = () => Date.now(),
+  nonce,
+  log = () => {},
+}) {
+  const modeResult = resolveMode(argv);
+  if (!modeResult.ok) return { ok: false, reason: modeResult.reason, detail: modeResult.detail };
+  const mode = modeResult.mode;
+  const need = MODE_REQUIREMENTS[mode];
+
+  // The attestation target is validated for EVERY mode: required for preflight, refused
+  // everywhere else.
+  const attestFor = resolveAttestationTarget(argv, mode);
+  if (!attestFor.ok) return attestFor;
+
+  if (mode === "DRY_RUN") {
+    const out = await runOperator({ mode: "DRY_RUN" });
+    log("OFFLINE DRY RUN — no credential read, no client constructed, no network, no database.");
+    return out;
+  }
+
+  // EMERGENCY CLOSURE needs the staging fence and the staging DB credential ONLY. No Meta
+  // identity, no canary destination, no index proof, no attestation, no git HEAD.
+  const target = resolveActivationTarget(env, {
+    requireCanaryDestination: need.canaryDestination,
+    requireMetaIdentity: need.meta,
+  });
+  if (!target.ok) return { ok: false, reason: target.reason, detail: target.missing ?? target.detail };
+
+  if (need.meta) {
+    const reconciled = reconcileProviderEnv(env, { strict: false });
+    if (!reconciled.ok) return { ok: false, reason: reconciled.reason, detail: reconciled.fields?.join(",") };
+  }
+
+  // Opening modes pin the exact reviewed source HEAD. Closure never depends on it.
+  let head = null;
+  if (mode !== "DISABLE") {
+    let resolved = null;
+    try { resolved = await headResolver(); } catch { resolved = null; }
+    const proven = resolveSourceHead({ resolved, envPin: env.QF_ACTIVATION_BRANCH_HEAD });
+    if (!proven.ok) return proven;
+    head = proven.head;
+  }
+
+  const selection = need.meta ? resolveTemplateSelection(argv) : { ok: true, keys: [] };
+  if (!selection.ok) return selection;
+
+  log(`Target ref     : ${target.projectRef} (${target.environment}) — identity proven`);
+  log(`Mode           : ${mode}`);
+
+  const adapters = await adapterFactory({ target, env, need, mode });
+  const attestationIo = need.attestation || mode === "PREFLIGHT_READONLY"
+    ? await attestationIoFactory({ mode })
+    : null;
+  const indexProof = need.indexProof
+    ? await indexProofFactory({ target })
+    : { verify: async () => ({ ok: true, hash: null }) };
+
+  return runOperator({
+    mode,
+    db: adapters.db,
+    meta: adapters.meta ?? null,
+    health: adapters.health ?? null,
+    indexProof,
+    attestationIo,
+    target,
+    expected: adapters.expected,
+    templateKeys: selection.keys,
+    destinationHash: target.destinationHash,
+    now: now(),
+    nonce,
+    attestationTtlMs: ATTESTATION_TTL_MS_EXPORT,
+    stageForAttestation: attestFor.stage ?? null,
+    branchHead: head,
+  });
+}
+
+/** Re-exported so the CLI and the tests agree on the TTL without a second constant. */
+export const ATTESTATION_TTL_MS_EXPORT = 15 * 60 * 1000;
+
+export { ATTESTATION_TARGETS, resolveAttestationTarget, resolveMode, resolveSourceHead, GIT_HEAD_RE };

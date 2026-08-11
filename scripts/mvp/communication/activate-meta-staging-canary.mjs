@@ -35,7 +35,7 @@
 // It never writes a plaintext destination, a token, an App Secret or a verify token.
 // ============================================================================
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 // Reused rather than re-declared: a second copy of the staging fence is exactly how
@@ -105,7 +105,38 @@ export const ActivationFailure = Object.freeze({
   PROVIDER_ENV_MISMATCH: "PROVIDER_ENV_MISMATCH",
   PROVIDER_ENV_MISSING: "PROVIDER_ENV_MISSING",
   PROVIDER_MODE_INVALID: "PROVIDER_MODE_INVALID",
+  // QF-MVP-40.13C-R1 — CLI parity, emergency closure and the HEAD pin.
+  ATTESTATION_TARGET_REQUIRED: "ATTESTATION_TARGET_REQUIRED",
+  ATTESTATION_TARGET_INVALID: "ATTESTATION_TARGET_INVALID",
+  ATTESTATION_TARGET_NOT_PERMITTED: "ATTESTATION_TARGET_NOT_PERMITTED",
+  SOURCE_HEAD_UNPROVEN: "SOURCE_HEAD_UNPROVEN",
+  SOURCE_HEAD_MISMATCH: "SOURCE_HEAD_MISMATCH",
 });
+
+/** An exact git commit SHA. Branch names are never the load-bearing pin. */
+export const GIT_HEAD_RE = /^[0-9a-f]{40}$/;
+
+/**
+ * The exact reviewed source HEAD an opening attestation pins.
+ *
+ * QF-MVP-40.13C stored `branch_head` but never verified it, and the env pin was optional —
+ * so a null or stale head could ride along without refusing a write. HEAD is now proven
+ * from the repository itself; an optional env pin may only AGREE with it, never replace it.
+ */
+export function resolveSourceHead({ resolved, envPin }) {
+  if (typeof resolved !== "string" || !GIT_HEAD_RE.test(resolved)) {
+    return { ok: false, reason: ActivationFailure.SOURCE_HEAD_UNPROVEN };
+  }
+  if (envPin !== undefined && envPin !== null && envPin !== "") {
+    if (!GIT_HEAD_RE.test(envPin)) {
+      return { ok: false, reason: ActivationFailure.SOURCE_HEAD_UNPROVEN, detail: "env pin is not a 40-hex SHA" };
+    }
+    if (envPin !== resolved) {
+      return { ok: false, reason: ActivationFailure.SOURCE_HEAD_MISMATCH, detail: "env pin disagrees with actual HEAD" };
+    }
+  }
+  return { ok: true, head: resolved };
+}
 
 /** The env variable carrying the owner-controlled canary destination. */
 export const CANARY_DESTINATION_ENV = "QF_META_CANARY_DESTINATION_E164";
@@ -174,7 +205,18 @@ export const ACTIVATION_MODES = Object.freeze([
 
 const KNOWN_FLAGS = Object.freeze([
   "--preflight-readonly", "--arm-readiness", "--arm-canary", "--disable", "--templates",
+  // QF-MVP-40.13C-R1. Which opening transition a preflight is approving. It was
+  // previously computed from an undeclared `--stage=canary`, which resolveMode refused as
+  // UNKNOWN_FLAG — so a real CLI preflight could only ever mint a READINESS attestation
+  // and the documented `preflight -> --arm-canary` sequence was unreachable.
+  "--attest-for",
 ]);
+
+/** The closed attestation targets a preflight may approve. */
+export const ATTESTATION_TARGETS = Object.freeze({
+  readiness: "ARM_READINESS",
+  canary: "ARM_CANARY",
+});
 
 /**
  * Exactly one mode per invocation. Two write modes together, or an unknown flag, is a
@@ -198,6 +240,40 @@ export function resolveMode(argv = []) {
     return { ok: true, mode: "PREFLIGHT_READONLY", network: true, writes: false, attested: false };
   }
   return { ok: true, mode: "DRY_RUN", network: false, writes: false, attested: false };
+}
+
+/**
+ * Which opening transition this preflight approves.
+ *
+ * REQUIRED for `--preflight-readonly` and REFUSED for every other mode. There is
+ * deliberately no default: an attestation authorises one specific opening write, and
+ * silently defaulting to readiness is how the canary sequence became unreachable. It is
+ * also never inferred from current database state — an operator states what is being
+ * approved.
+ */
+export function resolveAttestationTarget(argv = [], mode) {
+  const raw = argv.find((a) => a === "--attest-for" || a.startsWith("--attest-for="));
+
+  if (mode !== "PREFLIGHT_READONLY") {
+    if (raw) {
+      return { ok: false, reason: ActivationFailure.ATTESTATION_TARGET_NOT_PERMITTED, detail: mode };
+    }
+    return { ok: true, stage: null };
+  }
+
+  if (!raw || !raw.includes("=")) {
+    return { ok: false, reason: ActivationFailure.ATTESTATION_TARGET_REQUIRED };
+  }
+  const value = raw.slice("--attest-for=".length).trim();
+  const stage = ATTESTATION_TARGETS[value];
+  if (!stage) {
+    return { ok: false, reason: ActivationFailure.ATTESTATION_TARGET_INVALID, detail: value };
+  }
+  // Exactly one selector, so `--attest-for=readiness --attest-for=canary` cannot pass.
+  if (argv.filter((a) => a.startsWith("--attest-for")).length !== 1) {
+    return { ok: false, reason: ActivationFailure.ATTESTATION_TARGET_INVALID, detail: "more than one" };
+  }
+  return { ok: true, stage };
 }
 
 /**
@@ -230,7 +306,19 @@ export function resolveTemplateSelection(argv = []) {
  * Never returns, prints or logs a secret or a plaintext destination — only presence
  * booleans, the non-secret project ref, and the destination HASH.
  */
-export function resolveActivationTarget(env = {}, { requireCanaryDestination = true } = {}) {
+/**
+ * QF-MVP-40.13C-R1. `requireMetaIdentity` exists so EMERGENCY CLOSURE never depends on a
+ * Meta credential. `--disable` needs the staging identity fence and the staging DB
+ * credential and nothing else: it calls one RPC that closes gates and reads back. Making
+ * it demand a Meta token would mean an expired token could keep a canary armed, which is
+ * exactly backwards.
+ *
+ * The staging project-ref fence is NEVER optional and is applied identically in all modes.
+ */
+export function resolveActivationTarget(
+  env = {},
+  { requireCanaryDestination = true, requireMetaIdentity = true } = {},
+) {
   const url = env.QF_STAGING_SUPABASE_URL;
   if (!url) return { ok: false, reason: ActivationFailure.ENV_MISSING, missing: "QF_STAGING_SUPABASE_URL" };
   const ref = parseProjectRef(url);
@@ -247,15 +335,17 @@ export function resolveActivationTarget(env = {}, { requireCanaryDestination = t
   if (!env.QF_STAGING_SUPABASE_SERVICE_ROLE_KEY) {
     return { ok: false, reason: ActivationFailure.ENV_MISSING, missing: "QF_STAGING_SUPABASE_SERVICE_ROLE_KEY" };
   }
-  for (const k of ["QF_META_ACCESS_TOKEN", "QF_META_WABA_ID", "QF_META_PHONE_NUMBER_ID",
-                   "QF_META_GRAPH_API_VERSION"]) {
-    if (!env[k]) return { ok: false, reason: ActivationFailure.ENV_MISSING, missing: k };
-  }
-  if (!/^v\d+\.\d+$/.test(env.QF_META_GRAPH_API_VERSION)) {
-    return { ok: false, reason: ActivationFailure.GRAPH_API_VERSION_INVALID };
-  }
-  for (const k of ["QF_META_WABA_ID", "QF_META_PHONE_NUMBER_ID"]) {
-    if (!/^\d{6,}$/.test(env[k])) return { ok: false, reason: ActivationFailure.IDENTIFIER_MALFORMED, field: k };
+  if (requireMetaIdentity) {
+    for (const k of ["QF_META_ACCESS_TOKEN", "QF_META_WABA_ID", "QF_META_PHONE_NUMBER_ID",
+                     "QF_META_GRAPH_API_VERSION"]) {
+      if (!env[k]) return { ok: false, reason: ActivationFailure.ENV_MISSING, missing: k };
+    }
+    if (!/^v\d+\.\d+$/.test(env.QF_META_GRAPH_API_VERSION)) {
+      return { ok: false, reason: ActivationFailure.GRAPH_API_VERSION_INVALID };
+    }
+    for (const k of ["QF_META_WABA_ID", "QF_META_PHONE_NUMBER_ID"]) {
+      if (!/^\d{6,}$/.test(env[k])) return { ok: false, reason: ActivationFailure.IDENTIFIER_MALFORMED, field: k };
+    }
   }
 
   let destinationHash = null;
@@ -637,90 +727,21 @@ const isDirect = process.argv[1]
   && process.argv[1].endsWith("activate-meta-staging-canary.mjs");
 
 if (isDirect) {
-  const argv = process.argv.slice(2);
-  const fail = (code, detail) => {
-    console.error(`REFUSED: ${code}${detail ? ` (${detail})` : ""}`);
-    process.exit(2);
-  };
-
-  const modeResult = resolveMode(argv);
-  if (!modeResult.ok) fail(modeResult.reason, modeResult.detail);
-  const mode = modeResult.mode;
-
   const runtime = await import("./canaryActivationRuntime.mjs");
 
-  // DISABLE deliberately needs no Meta credential and no canary destination: closing a
-  // gate must never be harder than opening one.
-  const needsCanaryDestination = runtime.MODE_REQUIREMENTS[mode].canaryDestination;
-
-  if (mode === "DRY_RUN") {
-    const out = await runtime.runOperator({ mode: "DRY_RUN" });
-    console.log(JSON.stringify(out, null, 2));
-    console.log("OFFLINE DRY RUN — no credential read, no client constructed, no network, no database.");
-    process.exit(0);
-  }
-
-  const target = resolveActivationTarget(process.env, { requireCanaryDestination: needsCanaryDestination });
-  if (!target.ok) fail(target.reason, target.missing ?? target.detail);
-
-  // One effective provider identity. A WHATSAPP_* counterpart that disagrees refuses here.
-  const reconciled = runtime.reconcileProviderEnv(process.env, { strict: false });
-  if (!reconciled.ok) fail(reconciled.reason, reconciled.fields?.join(","));
-
-  console.log(`Target ref     : ${target.projectRef} (${target.environment}) — identity proven`);
-  console.log(`Mode           : ${mode}`);
-
-  const { createClient } = await import("@supabase/supabase-js");
-  const { FetchHttpTransport } = await import("../../../lib/communication/httpTransport.ts");
-
-  const client = createClient(
-    process.env.QF_STAGING_SUPABASE_URL,
-    process.env.QF_STAGING_SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
-  const db = runtime.createSupabaseDbAdapter(client);
-
-  const expected = {
-    phoneNumberId: process.env.QF_META_PHONE_NUMBER_ID,
-    wabaId: process.env.QF_META_WABA_ID,
-  };
-
-  let meta = null;
-  let health = null;
-  if (runtime.MODE_REQUIREMENTS[mode].meta) {
-    const transport = new FetchHttpTransport();
-    const shared = {
-      transport,
-      token: process.env.QF_META_ACCESS_TOKEN,
-      graphApiVersion: process.env.QF_META_GRAPH_API_VERSION,
-      wabaId: expected.wabaId,
-      phoneNumberId: expected.phoneNumberId,
-    };
-    meta = runtime.createMetaGetAdapter(shared);
-    health = runtime.createHealthAdapter(shared);
-  }
-
-  const selection = runtime.MODE_REQUIREMENTS[mode].meta
-    ? resolveTemplateSelection(argv)
-    : { ok: true, keys: [] };
-  if (!selection.ok) fail(selection.reason, selection.detail);
-
-  const result = await runtime.runOperator({
-    mode,
-    db, meta, health,
-    indexProof: runtime.MODE_REQUIREMENTS[mode].indexProof
-      ? await buildIndexProofAdapter()
-      : { verify: async () => ({ ok: true, hash: null }) },
-    attestationIo: await buildAttestationIo(mode),
-    target,
-    expected,
-    templateKeys: selection.keys,
-    destinationHash: target.destinationHash,
-    now: Date.now(),
+  // ALL CLI logic lives in runtime.runCli, which the offline tests call with fakes. This
+  // block only supplies real dependencies — there is no second parser and no behaviour
+  // here that a test cannot reach.
+  const result = await runtime.runCli({
+    argv: process.argv.slice(2),
+    env: process.env,
+    headResolver: resolveGitHead,
+    adapterFactory: buildRealAdapters,
+    attestationIoFactory: ({ mode }) => buildAttestationIo(mode),
+    indexProofFactory: buildIndexProofAdapter,
+    now: () => Date.now(),
     nonce: randomNonce(),
-    attestationTtlMs: ATTESTATION_TTL_MS,
-    stageForAttestation: argv.includes("--stage=canary") ? "ARM_CANARY" : "ARM_READINESS",
-    branchHead: process.env.QF_ACTIVATION_BRANCH_HEAD ?? null,
+    log: (line) => console.log(line),
   });
 
   console.log(JSON.stringify(result, null, 2));
@@ -731,10 +752,53 @@ if (isDirect) {
   process.exit(0);
 }
 
+/**
+ * Real adapters, constructed here and NOWHERE else — and only after runCli has already
+ * proven the staging identity fence, so a wrong project ref never reaches a client.
+ */
+async function buildRealAdapters({ env, need }) {
+  const { createClient } = await import("@supabase/supabase-js");
+  const client = createClient(
+    env.QF_STAGING_SUPABASE_URL,
+    env.QF_STAGING_SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const runtime = await import("./canaryActivationRuntime.mjs");
+  const expected = {
+    phoneNumberId: env.QF_META_PHONE_NUMBER_ID ?? null,
+    wabaId: env.QF_META_WABA_ID ?? null,
+  };
+  const adapters = { db: runtime.createSupabaseDbAdapter(client), expected, meta: null, health: null };
+  if (need.meta) {
+    const { FetchHttpTransport } = await import("../../../lib/communication/httpTransport.ts");
+    const shared = {
+      transport: new FetchHttpTransport(),
+      token: env.QF_META_ACCESS_TOKEN,
+      graphApiVersion: env.QF_META_GRAPH_API_VERSION,
+      wabaId: expected.wabaId,
+      phoneNumberId: expected.phoneNumberId,
+    };
+    adapters.meta = runtime.createMetaGetAdapter(shared);
+    adapters.health = runtime.createHealthAdapter(shared);
+  }
+  return adapters;
+}
+
+/**
+ * The exact current commit SHA, read from the repository itself rather than trusted from a
+ * typed environment value. A detached HEAD is perfectly valid — the commit is the pin, a
+ * branch name never is.
+ */
+async function resolveGitHead() {
+  const { execFileSync } = await import("node:child_process");
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  return GIT_HEAD_RE.test(head) ? head : null;
+}
+
+/** The standard CSPRNG. A nonce is not a secret, but replay identity should not be seeded
+ *  from a pid and a clock. */
 function randomNonce() {
-  return createHash("sha256")
-    .update(`${process.pid}:${Date.now()}:${Math.random()}`)
-    .digest("hex");
+  return randomBytes(32).toString("hex");
 }
 
 /** The 40.12 external index proof, consumed through its existing file contract. */

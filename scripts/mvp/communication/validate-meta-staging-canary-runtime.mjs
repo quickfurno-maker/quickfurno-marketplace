@@ -139,9 +139,16 @@ function fakeAttestationIo(stored = null) {
   };
 }
 
+/**
+ * QF-MVP-40.13C-R1 adds a proven-HEAD requirement to every opening write, and
+ * `branch_head` is now part of the drift comparison, so the fixtures must carry one.
+ */
+const HEAD = "a".repeat(40);
+
 const baseCtx = (over = {}) => ({
   target: TARGET, expected: EXPECTED, templateKeys: [TEMPLATE_KEY],
   destinationHash: CANARY_HASH, now: NOW, nonce: "n".repeat(64), attestationTtlMs: 10 * 60 * 1000,
+  branchHead: HEAD,
   ...over,
 });
 

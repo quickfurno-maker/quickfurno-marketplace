@@ -549,18 +549,39 @@ record("S11c the staging identity fence runs BEFORE any client or transport exis
     operatorCode.indexOf('await import("@supabase/supabase-js")') &&
   operatorCode.indexOf("resolveActivationTarget(process.env") <
     operatorCode.indexOf("FetchHttpTransport"));
+// QF-MVP-40.13C-R1: delegation tightened. The entry point used to assemble the CLI inline
+// and call runOperator; it now calls runCli and supplies dependencies only, so there is no
+// CLI behaviour an offline test cannot reach.
 record("S11d execution is delegated to the runtime module, not reimplemented here",
   /await import\("\.\/canaryActivationRuntime\.mjs"\)/.test(operatorCode) &&
-  /runtime\.runOperator\(/.test(operatorCode));
+  /runtime\.runCli\(/.test(operatorCode) &&
+  !/resolveMode\(process\.argv/.test(operatorCode) &&
+  !/argv\.includes\(/.test(operatorCode));
 record("S11e the wiring still has NO provider-send capability",
   A.operatorHasNoSendEndpoint(operatorCode) === true &&
   !/method:\s*["'](POST|PUT|PATCH|DELETE)["']/i.test(operatorCode) &&
   !/sendResolvedTemplate|sendTemplateMessage|CommunicationService/.test(operatorCode));
 record("S11f the operator performs no direct table write of its own",
   !/\.from\(["']communication_[a-z_]+["']\)[\s\S]{0,200}\.(update|insert|upsert|delete)\(/.test(operatorCode));
+// QF-MVP-40.13C-R1: the fence itself now takes `requireMetaIdentity`, so emergency
+// closure no longer demands a Meta credential. Proven here at the CONTRACT level; the
+// end-to-end CLI proof lives in test:mvp:40-13c-r1.
 record("S11g DISABLE is reachable without a Meta credential or an attestation",
-  /needsCanaryDestination/.test(operatorCode) &&
-  /MODE_REQUIREMENTS\[mode\]\.meta/.test(operatorCode));
+  /requireMetaIdentity/.test(operatorCode) &&
+  (() => {
+    const stagingOnly = {
+      QF_STAGING_SUPABASE_URL: "https://uckafzuochmbvtiodmcl.supabase.co",
+      QF_STAGING_SUPABASE_SERVICE_ROLE_KEY: "sb_secret_" + "x".repeat(32),
+    };
+    const r = A.resolveActivationTarget(stagingOnly, {
+      requireCanaryDestination: false, requireMetaIdentity: false,
+    });
+    // ...and the staging fence is still absolute in that same mode.
+    const prod = A.resolveActivationTarget(
+      { ...stagingOnly, QF_STAGING_SUPABASE_URL: "https://yqpgcsduqbxulrlzwzap.supabase.co" },
+      { requireCanaryDestination: false, requireMetaIdentity: false });
+    return r.ok === true && prod.reason === F.PROJECT_REF_FORBIDDEN_PRODUCTION;
+  })());
 
 // ---------------------------------------------------------------------------
 // MUT. MUTANTS — every guard must be shown capable of failing

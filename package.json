@@ -44,6 +44,7 @@
     "seed:mvp:40-12": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
     "test:mvp:40-12-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-business-template-bindings.mjs",
     "test:mvp:40-12": "node scripts/mvp/communication/validate-meta-staging-inactive-mapping-seed.mjs",
+    "test:mvp:40-13": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-activation.mjs",
     "test:mvp:50-1a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1a.mjs",
     "test:mvp:50-1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1b.mjs",
     "test:mvp:50-1c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1c.mjs",

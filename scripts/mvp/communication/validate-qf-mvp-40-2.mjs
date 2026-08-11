@@ -19,6 +19,24 @@ const MATRIX = "docs/generated/qf-mvp-40-2-schema-matrix.json";
 const SQL = "scripts/mvp/communication/qf-mvp-40-2-readonly-schema-audit.sql";
 const DOC = "docs/QF-MVP-40-2-MIGRATION-SCHEMA-READINESS.md";
 
+/**
+ * The FIXED commit range over which QF-MVP-40.2's narrowness claim is proved.
+ * Both endpoints are literal: the end is 40.2's own implementation head
+ * ("docs(communication): record QF-MVP-40 schema readiness"), never a moving HEAD.
+ */
+const PHASE_40_2_RANGE_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
+const PHASE_40_2_IMPLEMENTATION_HEAD = "59b9d58f1926425a05aa5501613fa77cd7914605";
+
+/** A pinned range end is only meaningful if it is genuinely in this history. */
+function pinIsAncestorOfHead(pin) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", pin, "HEAD"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const EXPECTED_VERSIONS = Object.freeze([
   "20260708000170", "20260708000190", "20260708000200", "20260709000100",
   "20260709000200", "20260711000100", "20260711000200", "20260712000300",
@@ -169,10 +187,27 @@ const R = {
 
   readinessDocExists: () => existsSync(resolve(DOC)),
 
-  /** No migration file may have been edited on this branch. */
+  /**
+   * QF-MVP-40.2 itself edited no migration file.
+   *
+   * QF-MVP-40-FINAL RE-PIN. The range end was `HEAD`, which is a MOVING endpoint. That
+   * silently converted the claim "QF-MVP-40.2 was narrow" into "no later phase may ever
+   * add a migration", and QF-MVP-50 legitimately added twelve — so the assertion had
+   * become permanently false while measuring work it does not own.
+   *
+   * This is the exact defect QF-MVP-40.1-R already repaired in four other harnesses
+   * (see docs/QF-MVP-40-EXECUTION-DECISIONS.md §5): a historical narrowness claim must be
+   * proved over a FIXED commit range. The end is therefore pinned to QF-MVP-40.2's own
+   * implementation head, and `pinIsAncestorOfHead` proves that pin is a real ancestor of
+   * HEAD so it cannot be an orphaned or fabricated commit.
+   *
+   * NOT a weakening: the claim is unchanged and still fails if 40.2's OWN diff ever
+   * contains a migration. There is no path-allowlist and no exemption.
+   */
   noMigrationEdited: () => {
+    if (!pinIsAncestorOfHead(PHASE_40_2_IMPLEMENTATION_HEAD)) return false;
     const changed = execFileSync("git", ["diff", "--name-only",
-      "1713838401da8b160cbeb9d3b6090bd017bdb958..HEAD"], { encoding: "utf8" })
+      `${PHASE_40_2_RANGE_BASE}..${PHASE_40_2_IMPLEMENTATION_HEAD}`], { encoding: "utf8" })
       .split("\n").map((s) => s.trim()).filter(Boolean);
     return !changed.some((f) => f.startsWith("supabase/migrations/"));
   },

@@ -110,6 +110,32 @@ export function jwtClaimsServiceRole(token) {
 const JWT_RE = /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
 
 /**
+ * QF-MVP-40 — the MODERN Supabase privileged key shapes.
+ *
+ * WHY THIS EXISTS. `jwtClaimsServiceRole` recognises a leaked legacy key from its own
+ * decoded payload, which is what makes detection independent of whether the caller
+ * supplied the literal. A modern `sb_secret_…` key is NOT a JWT, so that branch cannot
+ * see it at all — a leak of the new shape would only have been caught if the literal
+ * happened to be passed in `secrets`. That is a strictly weaker guarantee for the newer
+ * credential, which is the wrong way round.
+ *
+ * `sb_secret_` is the server-only secret key and `sbp_` is a Supabase personal access
+ * token; neither may ever reach a browser chunk. `sb_publishable_` is deliberately NOT
+ * listed — it is public by design, exactly as an anon JWT is.
+ *
+ * This adds DETECTION only. Nothing here validates or reshapes a key: the loaders in
+ * `lib/supabase.ts` and the staging operators check presence and never assume a shape,
+ * so a modern secret key already works unchanged.
+ */
+export const PRIVILEGED_KEY_RE = /\b(?:sb_secret_[A-Za-z0-9_-]{16,}|sbp_[A-Za-z0-9]{16,})/g;
+
+/** True when the text carries a non-JWT privileged Supabase credential. */
+export function containsModernPrivilegedKey(text) {
+  PRIVILEGED_KEY_RE.lastIndex = 0;
+  return PRIVILEGED_KEY_RE.test(String(text));
+}
+
+/**
  * PRE-BUILD gates. Evaluated against the EFFECTIVE environment — i.e. after
  * @next/env has merged .env* exactly as `next build` will see it — so this
  * refuses the very contamination that produced the D-A finding.
@@ -197,7 +223,8 @@ export function evaluatePreBuildGates(env = {}) {
  *
  * `clientFiles` / `serverFiles` are [{ path, text }]. `secrets` may carry literal
  * credential values to search for; detection does NOT depend on them, because a
- * service_role JWT is recognised from its own decoded payload.
+ * service_role JWT is recognised from its own decoded payload and a modern
+ * `sb_secret_`/`sbp_` key is recognised from its own shape.
  */
 export function scanBuildOutput({ clientFiles = [], serverFiles = [], secrets = [] } = {}) {
   const failures = [];
@@ -220,6 +247,8 @@ export function scanBuildOutput({ clientFiles = [], serverFiles = [], secrets = 
     for (const m of text.matchAll(JWT_RE)) {
       if (jwtClaimsServiceRole(m[0])) { hit = true; break; }
     }
+    // A modern secret key carries no decodable payload, so it is recognised by shape.
+    if (!hit && containsModernPrivilegedKey(text)) hit = true;
     if (!hit) {
       for (const s of secrets) {
         if (s && String(s).length > 20 && text.includes(s)) { hit = true; break; }

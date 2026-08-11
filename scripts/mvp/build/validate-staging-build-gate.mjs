@@ -290,6 +290,56 @@ record("26 an anon JWT in the client bundle is accepted (it is public by design)
     serverFiles: [{ path: "s.js", text: cleanServer() }], secrets: [],
   }).ok);
 
+/* QF-MVP-40 — the MODERN Supabase key shapes.
+ *
+ * A `sb_secret_…` key is not a JWT, so the payload-decoding branch above cannot see it.
+ * Before this repair, a leak of the newer credential was caught ONLY when the literal
+ * was passed in `secrets` — a strictly weaker guarantee than the legacy key enjoyed.
+ * These cases pass `secrets: []` on purpose, so they fail if that regresses. */
+const MODERN_SECRET = `sb_secret_${"A".repeat(32)}`;
+const MODERN_PAT = `sbp_${"b".repeat(40)}`;
+const MODERN_PUBLISHABLE = `sb_publishable_${"C".repeat(32)}`;
+
+record("26a FAIL: a modern sb_secret_ key in a client chunk is detected from its own shape",
+  !scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var s="${MODERN_SECRET}";` }],
+    serverFiles: [], secrets: [],
+  }).ok,
+  "detection must not depend on the literal key being supplied");
+
+record("26b FAIL: a Supabase personal access token in a client chunk is detected",
+  !scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var s="${MODERN_PAT}";` }],
+    serverFiles: [], secrets: [],
+  }).ok);
+
+record("26c the modern-key failure is reported as a client-bundle credential leak",
+  failedWith(scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var s="${MODERN_SECRET}";` }],
+    serverFiles: [], secrets: [],
+  }), "SERVICE_CREDENTIAL_IN_CLIENT_BUNDLE"));
+
+record("26d a modern PUBLISHABLE key in the client bundle is accepted (public by design)",
+  scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var p="${MODERN_PUBLISHABLE}";` }],
+    serverFiles: [{ path: "s.js", text: cleanServer() }], secrets: [],
+  }).ok,
+  "sb_publishable_ must never be treated as privileged");
+
+record("26e a modern secret key in a SERVER chunk is not a client-bundle leak",
+  scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: cleanClient() }],
+    serverFiles: [{ path: "s.js", text: `${cleanServer()}exports.k="${MODERN_SECRET}";` }],
+    secrets: [],
+  }).ok,
+  "a server-only chunk is exactly where a service credential legitimately lives");
+
+const modernRun = run(baseEnv(), outputFiles({ client: `${cleanClient()}var s="${MODERN_SECRET}";` }));
+record("26f FAIL: the orchestrated build refuses a modern-key client leak end to end",
+  modernRun.code !== 0 && modernRun.stage === "post-build" &&
+  failedWith(modernRun.scan, "SERVICE_CREDENTIAL_IN_CLIENT_BUNDLE"),
+  modernRun.scan ? JSON.stringify(codes(modernRun.scan)) : "");
+
 const ambiguous = run(baseEnv(), outputFiles({
   extra: { [path.join(ROOT, ".next/server/app/other.js")]: `https://abcdefghijklmnopqrst.supabase.co` },
 }));

@@ -115,6 +115,10 @@ export const ActivationFailure = Object.freeze({
   STAGING_ASSET_PROOF_MISSING: "STAGING_ASSET_PROOF_MISSING",
   STAGING_ASSET_PROOF_INVALID: "STAGING_ASSET_PROOF_INVALID",
   STAGING_ASSET_SCOPE_UNPROVEN: "STAGING_ASSET_SCOPE_UNPROVEN",
+  // QF-MVP-40-R7A — the live subscriber set is not the owner-attested subscriber set.
+  // Distinct from META_IDENTITY_MISMATCH so "an app I never attested is subscribed" is
+  // never confused with "the WABA or phone is the wrong one".
+  META_SUBSCRIBER_SET_MISMATCH: "META_SUBSCRIBER_SET_MISMATCH",
 });
 
 // ---------------------------------------------------------------------------
@@ -161,6 +165,32 @@ export const SCOPE_GUARDED_STAGES = Object.freeze([
 const META_ID_RE = /^[0-9]{6,}$/;
 const SHA256_RE = /^[0-9a-f]{64}$/;
 
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R7A — THE OWNER-ATTESTED SUBSCRIBED-APP SET
+//
+// THE DEFECT THIS CLOSES
+//   R3 required EVERY live subscribed app id to equal `meta_app_id`. A dedicated Meta
+//   TEST WABA legitimately carries more than one subscription — the owner's staging app,
+//   plus whatever platform/test companion Meta attaches to a test WABA. Such a WABA could
+//   therefore only ever classify SHARED_OR_UNKNOWN, and NO owner input could fix it: the
+//   artifact had no field in which a second legitimate subscriber could be declared.
+//
+// THE REPAIR IS NOT TOLERANCE
+//   Extra subscribers are not ignored, and nothing is trusted for being "Meta's". The
+//   owner declares the EXACT id set that may be subscribed, for one short-lived proof, and
+//   the live readback must equal that set exactly — no extra, no missing, order
+//   irrelevant. Trust comes from an attested identifier and nothing else:
+//     * a display name is free text and is never evidence;
+//     * no companion app id is hard-coded here as globally safe, because Meta exposes no
+//       field that proves first-partyness and today's companion id is not a constant;
+//     * an unattested subscriber still fails closed, exactly as before.
+//   So the invariant is unchanged in strength — "one subscribed app only" simply becomes
+//   "the exact owner-attested subscribed-app set only".
+//
+// The bound exists so the field cannot become an unbounded allowlist by degrees.
+// ---------------------------------------------------------------------------
+export const EXPECTED_SUBSCRIBED_APPS_MAX = 8;
+
 /** Deterministic digest of a staging-asset proof body, its own signature excluded. */
 export function stagingAssetProofDigest(proof) {
   const body = { ...proof };
@@ -202,6 +232,35 @@ export function verifyStagingAssetProof(proof, opts = {}) {
   }
   if (proof.waba_id === proof.phone_number_id) return bad("waba_id and phone_number_id are identical");
 
+  // QF-MVP-40-R7A. The attested subscriber set.
+  //
+  // ABSENT is permitted and means EXACTLY the R3 singleton rule — `[meta_app_id]` and
+  // nothing else. Two harnesses build verified-proof objects predating this field, so
+  // absence must keep working; it can only ever be NARROWER than an explicit set, never
+  // broader, so it cannot be used to widen what the live readback may contain.
+  let expectedApps;
+  if (proof.expected_subscribed_app_ids === undefined || proof.expected_subscribed_app_ids === null) {
+    expectedApps = [String(proof.meta_app_id)];
+  } else {
+    const raw = proof.expected_subscribed_app_ids;
+    if (!Array.isArray(raw)) return bad("expected_subscribed_app_ids must be an array");
+    if (raw.length === 0) return bad("expected_subscribed_app_ids is empty");
+    if (raw.length > EXPECTED_SUBSCRIBED_APPS_MAX) {
+      return bad(`expected_subscribed_app_ids exceeds ${EXPECTED_SUBSCRIBED_APPS_MAX} entries`);
+    }
+    const ids = raw.map(String);
+    if (!ids.every((v) => META_ID_RE.test(v))) return bad("expected_subscribed_app_ids contains a non-identifier");
+    // A duplicate would make the declared set size disagree with its own membership, which
+    // is how an "exact set" quietly stops being exact.
+    if (new Set(ids).size !== ids.length) return bad("expected_subscribed_app_ids contains a duplicate");
+    // The owner's own staging app must be in the set it attests. Otherwise the proof would
+    // permit a live WABA that does not carry the app the whole classification is about.
+    if (!ids.includes(String(proof.meta_app_id))) {
+      return bad("expected_subscribed_app_ids does not contain meta_app_id");
+    }
+    expectedApps = ids;
+  }
+
   if (typeof proof.proof_sha256 !== "string" || proof.proof_sha256 !== stagingAssetProofDigest(proof)) {
     return bad("digest mismatch — the proof was altered after it was issued");
   }
@@ -234,6 +293,15 @@ export function verifyStagingAssetProof(proof, opts = {}) {
     }
   }
 
+  // QF-MVP-40-R7A. The same self-consistency rule, applied to every attested subscriber:
+  // an app the owner declared prohibited can never be whitelisted onto a "staging" WABA by
+  // listing it as an expected subscriber.
+  for (const id of expectedApps) {
+    if (isProhibitedAsset(id, { ids, digests })) {
+      return bad("expected_subscribed_app_ids contains an asset on the prohibited list");
+    }
+  }
+
   return {
     ok: true,
     hash: proof.proof_sha256,
@@ -241,6 +309,8 @@ export function verifyStagingAssetProof(proof, opts = {}) {
     metaAppId: proof.meta_app_id,
     wabaId: proof.waba_id,
     phoneNumberId: proof.phone_number_id,
+    // Canonical, so the classifier compares sets rather than orderings.
+    expectedSubscribedAppIds: Object.freeze([...expectedApps].sort()),
     branchHead: proof.branch_head,
     expiresAtMs: proof.expires_at_ms,
     prohibited: { ids, digests },
@@ -279,11 +349,34 @@ export function classifyMetaAssetScope({ proof = null, live = {}, expected = {},
   if (live.wabaId !== proof.wabaId || live.phoneNumberId !== proof.phoneNumberId) {
     return shared(ActivationFailure.META_IDENTITY_MISMATCH);
   }
-  // When the live subscribed-app list names an app, it must be the attested staging app.
-  if (Array.isArray(live.subscribedAppIds) && live.subscribedAppIds.length > 0) {
-    if (!live.subscribedAppIds.every((id) => String(id) === String(proof.metaAppId))) {
-      return shared(ActivationFailure.META_IDENTITY_MISMATCH);
-    }
+  // QF-MVP-40-R7A — EXACT SET EQUALITY against the owner-attested subscriber set.
+  //
+  // Order is irrelevant; membership is absolute. An extra live app the owner never
+  // attested is an unknown subscriber and fails closed. A missing attested app means the
+  // WABA is no longer in the state that was classified, and fails too. An unreadable live
+  // list is not evidence of an empty one, so it also fails — R3 previously let an absent
+  // or empty subscriber list pass, and that is exactly the "nobody checked" case.
+  //
+  // A verified proof always carries a canonical set. The fallback to the R3 singleton
+  // `[metaAppId]` exists only for in-memory callers holding a pre-R7A verified object; it
+  // is strictly narrower than any explicit set and can never widen what live may contain.
+  const attestedApps = Array.isArray(proof.expectedSubscribedAppIds)
+    && proof.expectedSubscribedAppIds.length > 0
+    ? proof.expectedSubscribedAppIds.map(String)
+    : [String(proof.metaAppId)];
+
+  if (!Array.isArray(live.subscribedAppIds)) {
+    return shared(ActivationFailure.META_SUBSCRIBER_SET_MISMATCH);
+  }
+  const liveSet = new Set(live.subscribedAppIds.map(String));
+  const attestedSet = new Set(attestedApps);
+  if (liveSet.size !== attestedSet.size || ![...attestedSet].every((id) => liveSet.has(id))) {
+    return shared(ActivationFailure.META_SUBSCRIBER_SET_MISMATCH);
+  }
+  // Independently of set equality: the owner's staging app must itself be live-subscribed.
+  // A WABA that does not carry it is not the asset this proof classified.
+  if (!liveSet.has(String(proof.metaAppId))) {
+    return shared(ActivationFailure.META_SUBSCRIBER_SET_MISMATCH);
   }
   // Belt and braces against a live asset the owner prohibited.
   for (const id of [live.wabaId, live.phoneNumberId, ...(live.subscribedAppIds ?? [])]) {

@@ -399,7 +399,20 @@ export async function runPreflight({
   // independently hard-refuses any attestation whose asset_scope is not STAGING_DEDICATED.
   const identityCoherent = evidence.wabaIdMatches === true && evidence.phoneNumberIdMatches === true;
 
-  if (requireDedicatedScope && identityCoherent && assetScope.scope !== AssetScope.STAGING_DEDICATED) {
+  // QF-MVP-40-R7A extends that same principle to readiness. Since the attested
+  // subscriber set must now match the live one EXACTLY, a WABA with no subscribed apps at
+  // all is simultaneously "no webhook subscription" and "the staging app is not
+  // subscribed" — and the first is the more specific, more actionable diagnosis. Reporting
+  // the scope verdict there would hide the real fault behind a generic one.
+  //
+  // This changes only WHICH refusal is reported, never WHETHER one happens: an insufficient
+  // readiness verdict makes every plan fail, so no attestation is minted, and
+  // `preflightForWrite` independently refuses any attestation whose asset_scope is not
+  // STAGING_DEDICATED. Nothing can arm through this branch.
+  const readinessCoherent = readiness.ok === true;
+
+  if (requireDedicatedScope && identityCoherent && readinessCoherent
+      && assetScope.scope !== AssetScope.STAGING_DEDICATED) {
     return {
       ok: false,
       reason: ActivationFailure.STAGING_ASSET_SCOPE_UNPROVEN,

@@ -86,6 +86,7 @@ classification, a commit and timestamps.
 | `branch_head` | the exact 40-hex commit the classification was made against |
 | `intended_stage` | one of `PREFLIGHT_READONLY`, `ARM_READINESS`, `ARM_CANARY`, `WEBHOOK_SUBSCRIPTION` |
 | `meta_app_id` / `waba_id` / `phone_number_id` | the dedicated staging asset identifiers |
+| `expected_subscribed_app_ids` | **(R7A)** the exact, complete set of app ids allowed to be subscribed to that WABA. Must contain `meta_app_id`, must hold only Meta identifiers, no duplicates, at most `EXPECTED_SUBSCRIBED_APPS_MAX` (8) entries, and no entry may appear on the prohibited list. Absent means exactly the pre-R7A singleton `[meta_app_id]` — never anything broader |
 | `asset_scope` | **only** `STAGING_DEDICATED` — "shared" is not an attestable value |
 | `prohibited_asset_ids` / `prohibited_asset_digests` | the owner's production deny-list, by id or by SHA-256 digest; at least one entry required |
 | `issued_at_ms` / `expires_at_ms` | TTL of **at most 15 minutes** |
@@ -104,8 +105,44 @@ hold, and `SHARED_OR_UNKNOWN` in every other case:
 * `branch_head` equals the commit actually running;
 * the attested WABA and phone equal the **configured** identity;
 * the attested WABA and phone equal the **live Meta GET readback**;
-* every live subscribed app id equals the attested staging app;
+* the live subscribed-app id set **equals the owner-attested set exactly** — no extra, no
+  missing, order irrelevant — and `meta_app_id` is itself live-subscribed (R7A);
 * no live identifier appears on the owner's prohibited list.
+
+### 2.4.1 R7A — why the subscriber rule is a SET
+
+A dedicated Meta **Test** WABA legitimately carries more than one subscription: the owner's
+staging app, plus whatever platform/test companion Meta attaches to a test WABA. R3 required
+every live subscriber to equal `meta_app_id`, so such a WABA classified `SHARED_OR_UNKNOWN`
+permanently — and **no owner input could fix it**, because the artifact had nowhere to declare
+a second legitimate subscriber.
+
+The repair is **not** tolerance of extra apps. The owner declares the exact allowed id set for
+one short-lived proof, and the live readback must equal it exactly. Consequently:
+
+* an app is trusted because **its id was attested**, never because of its display name — a
+  name is free text and is never evidence;
+* **no companion app id is hard-coded** anywhere as globally safe. Meta exposes no field that
+  proves first-partyness, and today's companion id is not a constant;
+* an **unexpected** subscriber still fails closed, and a **missing** attested subscriber now
+  fails closed too;
+* an **empty or unreadable** live subscriber list now fails closed. R3 let an empty list pass
+  on the reasoning that it names no foreign app; but the staging app must itself be subscribed
+  for the WABA to be the asset that was classified, and "no list" is the *nobody checked* case
+  rather than evidence of cleanliness;
+* an attested subscriber that appears on the prohibited deny-list makes the whole proof
+  invalid, so a production app can never be whitelisted onto a "staging" WABA.
+
+The invariant is therefore unchanged in strength. "One subscribed app only" simply became
+"the exact owner-attested subscribed-app set only".
+
+**Ordering (R7A).** When readiness has already failed — for example a WABA with no subscribed
+apps at all, which is both "no webhook subscription" and "staging app not subscribed" — the
+more specific `READINESS_EVIDENCE_INSUFFICIENT` remains the reported refusal, for the same
+reason an identity fault outranks a scope verdict. This changes only which refusal is
+*reported*: an insufficient readiness verdict makes every plan fail, so no attestation is
+minted, and `preflightForWrite` independently refuses any attestation whose `asset_scope` is
+not `STAGING_DEDICATED`.
 
 So a proof that says "dedicated" while the live WABA differs is refused, and a proof minted
 for another commit is refused. **The classification never arms and never sends** — it only
@@ -272,7 +309,12 @@ any workflow JSON.** Everything is supplied **process-locally** at run time.
    the database, git, a document or a log.
 10. **Do not subscribe the WABA until the staging callback URL is proven** (§4).
 11. After callback proof, subscribe **only** the dedicated staging WABA.
-12. Verify `subscribed_apps` shows **exactly** the staging app and nothing else.
+12. Read `subscribed_apps` and record **every** id it returns. A dedicated Test WABA may
+    legitimately also carry a platform/test companion subscription. Do **not** unsubscribe
+    anything to satisfy the gate: `DELETE /{WABA-ID}/subscribed_apps` unsubscribes *the
+    caller's own app* and has no app-id selector, so using the staging token would remove the
+    staging app itself. Instead list every observed id in `expected_subscribed_app_ids`
+    (§2.3). Attest ids, never names, and re-check the set immediately before each run.
 13. Verify the staging phone's registration and health are acceptable **before any send**.
 14. Produce the §2.3 staging-asset proof and point `QF_META_STAGING_ASSET_PROOF_PATH` at it —
     outside the repository, regenerated immediately before each run because it expires in 15

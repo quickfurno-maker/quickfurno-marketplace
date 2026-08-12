@@ -676,11 +676,123 @@ record("R3-A24 a different running commit classifies SHARED_OR_UNKNOWN",
   classify({ branchHead: "d".repeat(40) }).scope === "SHARED_OR_UNKNOWN");
 record("R3-A25 a configured identity differing from the attested one classifies SHARED_OR_UNKNOWN",
   classify({ expected: { wabaId: "222222222222222", phoneNumberId: R3_PHONE } }).scope === "SHARED_OR_UNKNOWN");
-record("R3-A26 an empty subscribed-app list does not by itself block classification",
-  classify({ live: { ...liveOk, subscribedAppIds: [] } }).scope === "STAGING_DEDICATED");
+// QF-MVP-40-R7A CHANGED THIS ASSERTION, DELIBERATELY AND IN THE STRICTER DIRECTION.
+// R3 let an EMPTY live subscriber list classify STAGING_DEDICATED, on the reasoning that
+// an empty list names no foreign app. But the owner's staging app must itself be
+// subscribed for the WABA to be the asset that was classified, and an empty or unreadable
+// list is the "nobody checked" case rather than evidence of cleanliness. Exact set
+// equality now covers both: empty live cannot equal a non-empty attested set.
+record("R3-A26 an EMPTY live subscribed-app list now fails closed (R7A)",
+  classify({ live: { ...liveOk, subscribedAppIds: [] } }).scope === "SHARED_OR_UNKNOWN");
+record("R3-A26b an unreadable live subscribed-app list fails closed rather than passing",
+  classify({ live: { ...liveOk, subscribedAppIds: undefined } }).scope === "SHARED_OR_UNKNOWN");
 record("R3-A27 no real Meta identifier or phone number is hard-coded in the operator",
   !/\b1[0-9]{14,}\b/.test(operatorCode.replace(/[0-9]{6,}\}/g, "")) &&
   !/\+[0-9]{10,15}/.test(operatorCode));
+
+// ---------------------------------------------------------------------------
+// R7A. THE OWNER-ATTESTED SUBSCRIBED-APP SET
+//
+// A dedicated Meta TEST WABA legitimately carries the owner's staging app PLUS a
+// platform/test companion subscription. R3's "every live subscriber must equal
+// meta_app_id" rule made that WABA permanently SHARED_OR_UNKNOWN with no owner remedy.
+//
+// The repair is exact SET equality against an owner-attested id set — not tolerance, not
+// a name check, and not a hard-coded "first party" id. These prove the set is exact in
+// BOTH directions and that every old guard still bites.
+// ---------------------------------------------------------------------------
+const R7A_B = "333444555666777";   // synthetic platform/test companion subscription
+const R7A_C = "444555666777888";   // synthetic third party nobody attested
+
+const setProof = (apps, over = {}) => vProof(mkAssetProof({ expected_subscribed_app_ids: apps, ...over }));
+const classifyApps = (apps, liveApps, over = {}) => A.classifyMetaAssetScope({
+  proof: setProof(apps),
+  live: { ...liveOk, subscribedAppIds: liveApps },
+  expected: expOk,
+  branchHead: R3_HEAD,
+  ...over,
+});
+const isDedicated = (r) => r.scope === "STAGING_DEDICATED";
+const isShared = (r) => r.scope === "SHARED_OR_UNKNOWN";
+
+record("R7A-A singleton attested set [A] with live [A] classifies STAGING_DEDICATED",
+  isDedicated(classifyApps([R3_APP], [R3_APP])));
+record("R7A-B owner-attested [A,B] with live [A,B] classifies STAGING_DEDICATED",
+  isDedicated(classifyApps([R3_APP, R7A_B], [R3_APP, R7A_B])));
+record("R7A-C an UNEXPECTED third live app fails closed",
+  isShared(classifyApps([R3_APP, R7A_B], [R3_APP, R7A_B, R7A_C])));
+record("R7A-D a MISSING attested subscriber fails closed",
+  isShared(classifyApps([R3_APP, R7A_B], [R3_APP])));
+record("R7A-E live without the owner staging app fails closed",
+  isShared(classifyApps([R3_APP, R7A_B], [R7A_B])));
+record("R7A-F set comparison is order independent",
+  isDedicated(classifyApps([R3_APP, R7A_B], [R7A_B, R3_APP])));
+record("R7A-G a duplicate expected id makes the proof invalid",
+  setProof([R3_APP, R7A_B, R7A_B]).ok === false);
+record("R7A-H a malformed expected app id makes the proof invalid",
+  setProof([R3_APP, "not-an-id"]).ok === false);
+record("R7A-I an expected set omitting meta_app_id makes the proof invalid",
+  setProof([R7A_B, R7A_C]).ok === false);
+record("R7A-J an expected subscriber on prohibited_asset_ids makes the proof invalid",
+  setProof([R3_APP, R7A_B], { prohibited_asset_ids: [R7A_B] }).ok === false);
+record("R7A-K an expected subscriber on prohibited_asset_digests makes the proof invalid",
+  setProof([R3_APP, R7A_B], {
+    prohibited_asset_ids: [], prohibited_asset_digests: [A.assetIdDigest(R7A_B)] }).ok === false);
+record("R7A-L a live app the owner declared prohibited fails closed",
+  isShared(classifyApps([R3_APP], [R3_APP, "555444333222111"])));
+record("R7A-M a live WABA mismatch still fails with an attested set present",
+  isShared(classifyApps([R3_APP, R7A_B], [R3_APP, R7A_B],
+    { live: { ...liveOk, wabaId: "222222222222222", subscribedAppIds: [R3_APP, R7A_B] } })));
+record("R7A-N a live phone mismatch still fails with an attested set present",
+  isShared(classifyApps([R3_APP, R7A_B], [R3_APP, R7A_B],
+    { live: { ...liveOk, phoneNumberId: "222222222222222", subscribedAppIds: [R3_APP, R7A_B] } })));
+record("R7A-O a HEAD mismatch still fails with an attested set present",
+  isShared(classifyApps([R3_APP, R7A_B], [R3_APP, R7A_B], { branchHead: "d".repeat(40) })));
+record("R7A-P an expired proof carrying an attested set is still refused",
+  A.verifyStagingAssetProof(mkAssetProof({ expected_subscribed_app_ids: [R3_APP, R7A_B] }),
+    { now: () => NOW + 16 * 60 * 1000, projectRef: "uckafzuochmbvtiodmcl" }).ok === false);
+record("R7A-Q tampering with the expected set after signing breaks the digest",
+  (() => {
+    const p = mkAssetProof({ expected_subscribed_app_ids: [R3_APP, R7A_B] });
+    p.expected_subscribed_app_ids = [R3_APP, R7A_B, R7A_C];   // signature untouched
+    return vProof(p).ok === false;
+  })());
+record("R7A-R an EMPTY prohibited deny-list is still refused with an attested set present",
+  setProof([R3_APP, R7A_B], { prohibited_asset_ids: [], prohibited_asset_digests: [] }).ok === false);
+record("R7A-S the attested set is bounded and structurally sane",
+  setProof(Array.from({ length: A.EXPECTED_SUBSCRIBED_APPS_MAX + 1 },
+    (_, i) => String(100000000000000 + i)).concat(R3_APP).slice(0, A.EXPECTED_SUBSCRIBED_APPS_MAX + 1)).ok === false
+  && setProof([]).ok === false
+  && vProof(mkAssetProof({ expected_subscribed_app_ids: R3_APP })).ok === false);
+record("R7A-S2 no companion or production app id is hard-coded as trusted in the operator",
+  !/WA\s*DevX|DevX|first[_\s-]?party|1P\s*App/i.test(operatorCode)
+  && !/\b2[0-9]{15}\b/.test(operatorCode));
+record("R7A-S3 trust is never derived from a subscribed-app display NAME",
+  !/subscribedAppNames|app\.name|whatsapp_business_api_data\?\.name/.test(operatorCode));
+record("R7A-T the verified proof carries the canonical attested set, sorted",
+  (() => {
+    const v = setProof([R7A_B, R3_APP]);
+    return v.ok === true && Array.isArray(v.expectedSubscribedAppIds)
+      && v.expectedSubscribedAppIds.join(",") === [R3_APP, R7A_B].sort().join(",");
+  })());
+
+// BACKWARD COMPATIBILITY. Two harnesses build verified-proof objects that predate this
+// field. Absence must keep working AND must mean exactly the old singleton rule.
+record("R7A-U1 a proof with no attested set defaults to the singleton [meta_app_id]",
+  (() => {
+    const v = vProof(mkAssetProof());
+    return v.ok === true && v.expectedSubscribedAppIds.join(",") === R3_APP;
+  })());
+record("R7A-U2 absence preserves the singleton rule — live [A] passes",
+  isDedicated(classify({ live: { ...liveOk, subscribedAppIds: [R3_APP] } })));
+record("R7A-U3 absence NEVER broadens — live [A,B] still fails closed",
+  isShared(classify({ live: { ...liveOk, subscribedAppIds: [R3_APP, R7A_B] } })));
+record("R7A-U4 an in-memory verified object without the field falls back to the singleton",
+  isShared(A.classifyMetaAssetScope({
+    proof: { ok: true, hash: "s".repeat(64), scope: "STAGING_DEDICATED", metaAppId: R3_APP,
+      wabaId: R3_WABA, phoneNumberId: R3_PHONE, branchHead: R3_HEAD,
+      prohibited: { ids: ["555444333222111"], digests: [] } },
+    live: { ...liveOk, subscribedAppIds: [R3_APP, R7A_B] }, expected: expOk, branchHead: R3_HEAD })));
 
 // ---------------------------------------------------------------------------
 // MUT. MUTANTS — every guard must be shown capable of failing
@@ -720,6 +832,17 @@ const mutants = [
       account: readyAccount(), expected: EXPECTED, destinationHash: s.repeat(64), nowMs: NOW })) === true],
   ["the operator cannot acquire a send endpoint without this gate noticing",
     () => A.operatorHasNoSendEndpoint("const u = base + '/messages';") === false],
+  // QF-MVP-40-R7A. Each of these fails if its guard is neutralised, which is the only
+  // reason the exact-set repair is stronger than "ignore the extra app".
+  ["R7A an unattested live subscriber can never ride along on set equality",
+    () => isShared(classifyApps([R3_APP, R7A_B], [R3_APP, R7A_B, R7A_C]))
+      && isShared(classifyApps([R3_APP, R7A_B], [R3_APP]))],
+  ["R7A an attested set that omits the owner staging app cannot be proven",
+    () => setProof([R7A_B, R7A_C]).ok === false],
+  ["R7A a prohibited production asset cannot be attested as an expected subscriber",
+    () => setProof([R3_APP, R7A_B], { prohibited_asset_ids: [R7A_B] }).ok === false
+      && setProof([R3_APP, R7A_B], { prohibited_asset_ids: [],
+           prohibited_asset_digests: [A.assetIdDigest(R7A_B)] }).ok === false],
 ];
 for (const [name, fn] of mutants) {
   let held = false;

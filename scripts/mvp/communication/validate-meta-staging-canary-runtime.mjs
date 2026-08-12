@@ -813,6 +813,52 @@ record("R3-07 no attestation is written when the asset scope is unproven",
     }));
     return out.ok === false && io.state.written === null;
   })()));
+
+// ---------------------------------------------------------------------------
+// R7A. The owner-attested subscriber SET, proven end-to-end through runPreflight rather
+// than only at the classifier. A dedicated Meta TEST WABA carries the owner's staging app
+// plus a platform/test companion; R3 could not express that and refused it forever.
+// ---------------------------------------------------------------------------
+const COMPANION_APP_ID = "333444555666777";   // synthetic companion subscription
+const THIRD_APP_ID = "444555666777888";       // synthetic unattested subscriber
+
+const routesWithApps = (ids) => [
+  ["/subscribed_apps", okResponse({ data: ids.map((id) => ({ whatsapp_business_api_data: { id } })) })],
+  ...defaultRoutes().slice(1),
+];
+async function preflightWithApps(liveIds, assetProof) {
+  const io = fakeAttestationIo();
+  const out = await R.runOperator(baseCtx({
+    mode: "PREFLIGHT_READONLY", stageForAttestation: "ARM_READINESS",
+    ...buildAdapters({ client: armReadyClient(), routes: routesWithApps(liveIds), assetProof }),
+    attestationIo: io,
+  }));
+  return { out, io };
+}
+
+record("R7A-R1 a dedicated TEST WABA with an owner-attested companion app passes preflight",
+  (await (async () => {
+    const { out, io } = await preflightWithApps([APP_ID, COMPANION_APP_ID],
+      stagingAssetProof({ expectedSubscribedAppIds: [APP_ID, COMPANION_APP_ID] }));
+    return out.ok === true && io.state.written?.asset_scope === "STAGING_DEDICATED";
+  })()));
+record("R7A-R2 an unattested third subscriber refuses the preflight and writes nothing",
+  (await (async () => {
+    const { out, io } = await preflightWithApps([APP_ID, COMPANION_APP_ID, THIRD_APP_ID],
+      stagingAssetProof({ expectedSubscribedAppIds: [APP_ID, COMPANION_APP_ID] }));
+    return out.ok === false && out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN && io.state.written === null;
+  })()));
+record("R7A-R3 a missing attested subscriber refuses the preflight",
+  (await (async () => {
+    const { out } = await preflightWithApps([APP_ID],
+      stagingAssetProof({ expectedSubscribedAppIds: [APP_ID, COMPANION_APP_ID] }));
+    return out.ok === false && out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN;
+  })()));
+record("R7A-R4 a pre-R7A proof carrying no attested set still refuses a second subscriber",
+  (await (async () => {
+    const { out } = await preflightWithApps([APP_ID, COMPANION_APP_ID], stagingAssetProof());
+    return out.ok === false && out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN;
+  })()));
 record("R3-08 a proof for a DIFFERENT WABA cannot classify this asset",
   (await withAssetProof("PREFLIGHT_READONLY",
     stagingAssetProof({ wabaId: "555555555555555" }))).out.reason === F.STAGING_ASSET_SCOPE_UNPROVEN);

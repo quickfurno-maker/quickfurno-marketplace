@@ -1,0 +1,151 @@
+{
+  "artifact": "meta-staging-provider-account-rebind",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7C",
+  "operation_id": "R7C-REBIND-provider-account-meta_whatsapp_cloud-whatsapp-staging-dedicated",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "authorizes_activation": false,
+  "purpose": "Scoped, single-operation evidence for ONE governed rebind of the single staging public.communication_provider_accounts row (meta_whatsapp_cloud / whatsapp) from the PRODUCTION Meta asset references to the dedicated STAGING ones. It exists because the audited 40.12 seed correctly refuses this repair — classifyExistingAccount() returns ABORT / ACCOUNT_IDENTITY_CONFLICT when both stored references are non-null and differ — and that conflict rule is a reusable safety property that must not be weakened to unblock one row.",
+  "privacy": "Meta asset identities appear ONLY as SHA-256 digests of the raw id strings. The three PRODUCTION digests are deliberately NOT recorded here: they live only in the owner's external, role-labelled proof file, which is never copied into this repository. This matches the existing posture in docs/provider-manifests/meta-staging-one-shot-template-creation.json and meta-template-remote-state.json. No token, app secret, verify token, phone number, project ref or raw Meta id is recorded here.",
+
+  "relationship_to_audited_seed": {
+    "seed_operator": "scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
+    "seed_changed": false,
+    "classify_existing_account_changed": false,
+    "account_identity_conflict_rule_changed": false,
+    "normalized_disabled_path_changed": false,
+    "note": "The seed continues to ABORT with ACCOUNT_IDENTITY_CONFLICT on a divergent non-null binding, exactly as before. This one-shot authority is separate, targets one pinned row, and hands the NULL-reference case straight back to the seed's NORMALIZED_DISABLED path rather than duplicating it."
+  },
+
+  "owner_authorization": {
+    "granted": true,
+    "rationale": "The staging row was seeded on 2026-08-01 carrying the production WABA and phone references. That binding makes canaryActivationRuntime readAccount() — which filters on phone_number_reference — return null, yielding ACCOUNT_MISSING at plan time, and it leaves production asset identifiers sitting in the staging database as a latent isolation hazard. Correcting the binding is a repair of a seeding error, not an expansion of authority.",
+    "allowed_action": "REBIND_REFERENCES_ONLY",
+    "scope": "the single row provider_key=meta_whatsapp_cloud AND channel=whatsapp in the dedicated staging project, and no other row in any environment",
+    "not_a_general_account_write_permission": true,
+    "create_authority": "NOT_GRANTED",
+    "delete_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "mapping_authority": "DENIED",
+    "provider_authority": "DENIED",
+    "canary_authority": "DENIED",
+    "activation_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED"
+  },
+
+  "owner_proof": {
+    "role": "Supplies the OLD (production) identity digests that define the only writable pre-state.",
+    "env_var": "QF_PRODUCTION_META_DENY_DIGESTS_PATH",
+    "committed_to_repository": false,
+    "must_live_outside_repository": true,
+    "enforcement": "The operator refuses a path that resolves inside the repository, so this proof cannot be normalised into the repo by convenience.",
+    "required_schema_version": 1,
+    "required_roles": [
+      "production_app_id_sha256",
+      "production_waba_id_sha256",
+      "production_phone_number_id_sha256"
+    ],
+    "roles_consumed_by_name_not_position": true,
+    "digests_recorded_here": false,
+    "note": "The file is written with a UTF-8 BOM; the operator strips it before parsing. Three distinct digests are required — a proof that collapses two roles onto one digest is refused, because it could not distinguish a production-WABA binding from a production-phone binding."
+  },
+
+  "staging_asset_identity": {
+    "digest_algorithm": "sha256(utf8(raw_id_string))",
+    "pin_source": "IMPORTED from scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs (EXPECTED_IDENTITY_DIGESTS), not re-declared, so R7B and R7C can never drift apart",
+    "app_label": "QuickFurno Staging",
+    "app_id_sha256": "6de73d8d79a40245af3dfa60065ae6a86274b043d8646ec3a84a0719273ece80",
+    "waba_id_sha256": "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
+    "phone_number_id_sha256": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
+    "written_columns": {
+      "business_account_reference": "the staging WABA id, proven by digest against waba_id_sha256",
+      "phone_number_reference": "the staging phone number id, proven by digest against phone_number_id_sha256"
+    }
+  },
+
+  "execution_contract": {
+    "operator": "scripts/mvp/communication/rebind-meta-staging-provider-account-once.mjs",
+    "validator": "scripts/mvp/communication/validate-meta-staging-provider-account-rebind.mjs",
+    "test_command": "npm run test:mvp:40-r7c",
+    "dry_run_by_default": true,
+    "required_flags": ["--execute", "--owner-authorized-once-rebind"],
+    "env_only_bypass_permitted": false,
+    "unknown_flag_behaviour": "REFUSED — never silently ignored, so a typo cannot degrade to a dry run reported as success",
+    "environment_fence": "resolveStagingTarget() imported from the audited 40.12 seed; runs BEFORE any Supabase client is constructed and refuses the production and Jarvis project refs by ref, not by label",
+    "expected_pre_state": "BOUND_TO_PRODUCTION",
+    "writable_pre_states": ["BOUND_TO_PRODUCTION"],
+    "refused_pre_states": [
+      "ABSENT — creation belongs to the audited 40.12 seed",
+      "AMBIGUOUS — more than one row",
+      "SEND_CAPABLE — readiness_status = provider_ready, checked before binding",
+      "REFERENCES_NULL — deferred to the seed's NORMALIZED_DISABLED path",
+      "UNRECOGNIZED_BINDING — includes any half-migrated row"
+    ],
+    "rebindable_columns": ["business_account_reference", "phone_number_reference"],
+    "max_update_count": 1,
+    "second_update_possible": false,
+    "retry_after_ambiguous_permitted": false,
+    "write_is_compare_and_swap": true,
+    "cas_predicate": "provider_key + channel + the exact OLD business_account_reference + the exact OLD phone_number_reference + readiness_status <> provider_ready",
+    "cas_note": "If the row changed between the read and the write, zero rows update and the operator reports CAS_LOST rather than overwriting an unreviewed state.",
+    "readback_calls_after_write": 1,
+    "post_state_requirements": [
+      "exactly one row",
+      "both references digest-match the staging pins",
+      "readiness_status is still 'disabled'"
+    ],
+    "cannot_make_account_send_capable": "The patch contains only the two reference columns. No readiness, configuration, webhook, health, billing, verification or phone-number-status column is expressible, and the port itself throws PATCH_SHAPE_REFUSED on any other shape.",
+    "idempotence": "A rerun classifies the pre-state first. If the row already carries the staging identity the operator reports ALREADY_REBOUND and exits with zero writes, so the authority closes itself."
+  },
+
+  "structural_guarantees": {
+    "no_insert": true,
+    "no_delete": true,
+    "no_upsert": true,
+    "no_rpc": true,
+    "no_network_call": true,
+    "no_meta_graph_call": true,
+    "no_messaging_endpoint": true,
+    "no_mapping_or_policy_write": true,
+    "row_selector_is_pinned_not_parameterised": true,
+    "no_digest_literal_in_operator": true,
+    "note": "These are properties of the FILE, asserted by the validator against comment-stripped source, so prose in the header can neither satisfy nor defeat them."
+  },
+
+  "downstream_state_after_rebind": {
+    "account_readiness_status": "disabled (unchanged)",
+    "runtime_policy_row": "still absent — provider remains fail-closed",
+    "active_mappings": 0,
+    "active_canary_destinations": 0,
+    "provider_can_send": false,
+    "note": "Rebinding is necessary but NOT sufficient for the R7 canary. It clears the ACCOUNT_MISSING plan-time refusal only. The remaining R7 blockers are unchanged and are not addressed here: qf_vendor_onboarding_reminder_v1 is PENDING (not APPROVED) on the staging WABA, and code_verification_status on the staging phone is NOT_VERIFIED, which still yields READINESS_EVIDENCE_INSUFFICIENT."
+  },
+
+  "dry_run_record": {
+    "performed_at_utc": "2026-08-13",
+    "target_project_ref_environment": "STAGING",
+    "environment_fence": "PASSED",
+    "owner_proof": "LOADED from the external path",
+    "new_identity_authorised": true,
+    "rows_matched": 1,
+    "measured_pre_state": "BOUND_TO_PRODUCTION",
+    "measured_readiness_status": "disabled",
+    "update_attempt_count": 0,
+    "database_writes": 0,
+    "would_rebind": true,
+    "confirms": "The R7A diagnosis is reproduced exactly: one row, not send-capable, still carrying the production asset references. The pre-state is the single writable one, so the guarded UPDATE is the correct and sufficient repair.",
+    "operator_exit_code": 0,
+    "known_defect_corrected": "The first dry run printed the correct RESULT line and then aborted the Node runtime during teardown — 'Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)' — because process.exit() was called while supabase-js/undici sockets were mid-close on Windows, so the shell observed exit code 127 despite a clean read-only run. An exit code that contradicts the printed result is a correctness bug in an auditable authority, so the CLI now sets process.exitCode and lets the loop drain. The pre-client refusal paths still exit immediately, which is safe because they hold no open handle."
+  },
+
+  "execution_record": {
+    "status": "NOT_EXECUTED",
+    "update_attempt_count": 0,
+    "database_writes": 0,
+    "rebind_authority": "OPEN",
+    "note": "No write has been performed. The authority is committed in its unspent state. Execution requires both --execute and --owner-authorized-once-rebind, and this artifact is updated in place with the measured outcome once that run happens."
+  }
+}

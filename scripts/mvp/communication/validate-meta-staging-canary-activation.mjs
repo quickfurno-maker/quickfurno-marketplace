@@ -25,6 +25,10 @@ const operatorSource = readFileSync(path.join(ROOT, OPERATOR_PATH), "utf8");
 /** Comment-stripped, so this file's own prose can never satisfy an executable guard. */
 const operatorCode = operatorSource
   .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+/** QF-MVP-40-R7D — the bootstrap now lives in its own entry module, so the pins move too. */
+const ENTRY_PATH = "scripts/mvp/communication/activate-meta-staging-canary-cli.mjs";
+const entryCode = readFileSync(path.join(ROOT, ENTRY_PATH), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const results = [];
 const record = (name, passed, detail = "") =>
@@ -537,10 +541,19 @@ record("S10 exactly one new environment variable is introduced, and it is docume
  * deletion but a set of STRONGER assertions: the wiring is present, it is guarded, and it
  * still has no provider-send capability whatsoever. Nothing else in 40-13 is relaxed.
  */
-record("S11a the executable wiring EXISTS and is fully guarded behind isDirect",
-  /const isDirect = process\.argv\[1\]/.test(operatorCode) &&
-  /if \(isDirect\)/.test(operatorCode) &&
-  operatorCode.indexOf("if (isDirect)") < operatorCode.indexOf('await import("@supabase/supabase-js")'));
+/*
+ * QF-MVP-40-R7D SUCCESSOR to the isDirect pin. Guarding the bootstrap with `isDirect` was
+ * what made the CLI unrunnable: the guarded block's top-level `await import()` of the
+ * runtime, which statically imports back, deadlocked the moment this file WAS the entry —
+ * exit 13, no output, every mode. Containment replaced the guard, and the pin is stronger
+ * for it: the library must now contain NO self-execution at all, and the wiring must exist
+ * in a dedicated entry module that nothing imports, so the cycle cannot be reconstructed.
+ */
+record("S11a the executable wiring EXISTS in a dedicated entry module the library cannot import",
+  /runCli\(/.test(entryCode) &&
+  !/process\.argv/.test(operatorCode) &&
+  !/isDirect/.test(operatorCode) &&
+  !/activate-meta-staging-canary-cli/.test(operatorCode));
 record("S11b no client is constructed at import time — only inside the guard, by dynamic import",
   !/^import .*@supabase\/supabase-js/m.test(operatorCode) &&
   /await import\("@supabase\/supabase-js"\)/.test(operatorCode));
@@ -552,9 +565,11 @@ record("S11c the staging identity fence runs BEFORE any client or transport exis
 // QF-MVP-40.13C-R1: delegation tightened. The entry point used to assemble the CLI inline
 // and call runOperator; it now calls runCli and supplies dependencies only, so there is no
 // CLI behaviour an offline test cannot reach.
-record("S11d execution is delegated to the runtime module, not reimplemented here",
-  /await import\("\.\/canaryActivationRuntime\.mjs"\)/.test(operatorCode) &&
-  /runtime\.runCli\(/.test(operatorCode) &&
+record("S11d execution is delegated to the runtime module, not reimplemented in either file",
+  /runCli\(/.test(entryCode) &&
+  /from "\.\/canaryActivationRuntime\.mjs"/.test(entryCode) &&
+  !/resolveMode\(/.test(entryCode) &&
+  !/argv\.includes\(/.test(entryCode) &&
   !/resolveMode\(process\.argv/.test(operatorCode) &&
   !/argv\.includes\(/.test(operatorCode));
 record("S11e the wiring still has NO provider-send capability",

@@ -17,6 +17,7 @@
 // test-only parser. No socket is opened and no credential is read.
 // ============================================================================
 
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,6 +32,9 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), "utf8");
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const operatorCode = strip(read("scripts/mvp/communication/activate-meta-staging-canary.mjs"));
 const runtimeCode = strip(read("scripts/mvp/communication/canaryActivationRuntime.mjs"));
+/** QF-MVP-40-R7D — the thin bootstrap that is now the real process entry point. */
+const ENTRY_REL = "scripts/mvp/communication/activate-meta-staging-canary-cli.mjs";
+const entryCode = strip(read(ENTRY_REL));
 
 const results = [];
 const record = (n, p, d = "") => results.push({ name: n, passed: p === true, detail: d });
@@ -385,10 +389,19 @@ record("C09 arm-canary at the same HEAD reaches its RPC when state is correct",
 // ---------------------------------------------------------------------------
 // D. PARITY AND CONTAINMENT
 // ---------------------------------------------------------------------------
+// QF-MVP-40-R7D. The bootstrap moved OUT of the operator into its own entry module, so
+// this pin moves with it — and gains a half: the operator must now be proven to contain no
+// bootstrap at all, which is what makes the old import cycle unconstructible.
 record("D01 the entry point contains NO second parser — it only supplies dependencies",
-  /runtime\.runCli\(/.test(operatorCode) &&
+  /runCli\(/.test(entryCode) &&
+  !/resolveMode\(/.test(entryCode) &&
+  !/argv\.includes\(/.test(entryCode) &&
   !/resolveMode\(process\.argv/.test(operatorCode) &&
   !/argv\.includes\(/.test(operatorCode));
+record("D01a the operator LIBRARY no longer bootstraps itself — no argv, no self-execution",
+  !/process\.argv/.test(operatorCode) &&
+  !/isDirect/.test(operatorCode) &&
+  !/runtime\.runCli\(/.test(operatorCode));
 record("D02 runCli is exported and import-safe",
   typeof R.runCli === "function" && !/process\.env/.test(runtimeCode));
 record("D03 the CLI maps each mode to exactly the intended runtime mode",
@@ -618,7 +631,8 @@ const mutants = [
       return (await cli(["--disable"], disableEnv({ QF_STAGING_SUPABASE_URL: "https://yqpgcsduqbxulrlzwzap.supabase.co" }), h)).ok === false;
     }],
   ["the entry point cannot regain its own argv parsing unnoticed",
-    () => !/argv\.includes\(/.test(operatorCode) && !/resolveMode\(process\.argv/.test(operatorCode)],
+    () => !/argv\.includes\(/.test(operatorCode) && !/resolveMode\(process\.argv/.test(operatorCode)
+      && !/argv\.includes\(/.test(entryCode) && !/resolveMode\(/.test(entryCode)],
 
   // QF-MVP-40.13C-R2 required mutants.
   ["the SUPERSEDED seed branch cannot be accepted again",
@@ -651,6 +665,145 @@ const mutants = [
           !/COMPLETE \/ TESTED \/ FROZEN\*{0,2}\s*$/m.test(runbook)],
 ];
 for (const [name, fn] of mutants) {
+  let held = false;
+  try { held = (await fn()) === true; } catch { held = false; }
+  record(`MUT ${name}`, held);
+}
+
+// ---------------------------------------------------------------------------
+// S. PROCESS STARTUP — QF-MVP-40-R7D
+//
+// THE DEFECT THIS SECTION EXISTS FOR
+//   Every test above imports `runCli` as a module. That makes `isDirect` false, so the
+//   old in-operator bootstrap never ran, its top-level `await import()` never formed a
+//   cycle with `canaryActivationRuntime.mjs`, and 85/85 stayed green while the real CLI
+//   exited 13 with no output in EVERY mode — `--disable` included. A contract test cannot
+//   see a startup defect. Only spawning the process can.
+//
+// WHY THIS IS SAFE TO RUN ANYWHERE, INCLUDING A LIVE OPERATOR SHELL
+//   Every child is spawned with an env from which EVERY `QF_*` and `WHATSAPP_*` variable
+//   has been removed. A real staging credential present in the parent shell therefore
+//   cannot reach a child, so no child can construct a database client, reach Meta, arm
+//   anything or send anything. Each case refuses inside `runCli`'s own fences — which is
+//   precisely what proves the process reached `runCli` at all. Nothing here writes.
+// ---------------------------------------------------------------------------
+
+/** The parent env minus every credential-bearing variable. */
+const SAFE_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !/^(QF_|WHATSAPP_)/.test(k)),
+);
+
+/** Spawn the REAL entry point exactly as the governed npm target does. */
+function spawnCli(args, envOver = {}) {
+  const r = spawnSync(
+    process.execPath,
+    ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+     "--import", "./scripts/mvp/loader/register.mjs", ENTRY_REL, ...args],
+    { cwd: ROOT, env: { ...SAFE_ENV, ...envOver }, encoding: "utf8", timeout: 120_000 },
+  );
+  const stdout = r.stdout ?? "";
+  const stderr = r.stderr ?? "";
+  let json = null;
+  const brace = stdout.indexOf("{");
+  if (brace >= 0) { try { json = JSON.parse(stdout.slice(brace)); } catch { json = null; } }
+  return { status: r.status, stdout, stderr, json };
+}
+
+const spawnNoFlags   = spawnCli([]);
+const spawnDisable   = spawnCli(["--disable"]);
+const spawnProdRef   = spawnCli(["--disable"], { QF_STAGING_SUPABASE_URL: "https://yqpgcsduqbxulrlzwzap.supabase.co", QF_STAGING_SUPABASE_SERVICE_ROLE_KEY: "sb_secret_" + "x".repeat(32) });
+const spawnUnknown   = spawnCli(["--totally-unknown-flag"]);
+const spawnConflict  = spawnCli(["--arm-readiness", "--disable"]);
+const spawnNoAttest  = spawnCli(["--preflight-readonly", `--templates=${TEMPLATE_KEY}`]);
+const ALL_SPAWNS = [spawnNoFlags, spawnDisable, spawnProdRef, spawnUnknown, spawnConflict, spawnNoAttest];
+
+record("S01 the entry point STARTS — no spawned mode exits 13",
+  ALL_SPAWNS.every((s) => s.status !== 13),
+  ALL_SPAWNS.map((s) => s.status).join(","));
+record("S02 no spawned mode emits an unsettled top-level-await warning",
+  ALL_SPAWNS.every((s) => !/unsettled top-level await/i.test(s.stderr)));
+record("S03 every spawned mode produced a parseable result object",
+  ALL_SPAWNS.every((s) => s.json !== null));
+record("S04 no flags reaches the source-defined safe offline path, exit 0",
+  spawnNoFlags.status === 0 && spawnNoFlags.json?.ok === true &&
+  spawnNoFlags.json?.stage === "DRY_RUN" && spawnNoFlags.json?.offline === true);
+record("S05 --disable REACHES the real runCli disable path and refuses on its own fence",
+  spawnDisable.status === 3 && spawnDisable.json?.ok === false &&
+  spawnDisable.json?.reason === F.ENV_MISSING,
+  JSON.stringify(spawnDisable.json ?? spawnDisable.stderr.slice(0, 200)));
+record("S06 the staging fence still refuses PRODUCTION at process level",
+  spawnProdRef.status === 3 && spawnProdRef.json?.reason === F.PROJECT_REF_FORBIDDEN_PRODUCTION);
+record("S07 an unknown flag keeps its refusal semantics through the process",
+  spawnUnknown.status === 3 && spawnUnknown.json?.reason === F.UNKNOWN_FLAG);
+record("S08 two write modes together keep refusing through the process",
+  spawnConflict.status === 3 && spawnConflict.json?.reason === F.MODE_CONFLICT);
+record("S09 preflight without --attest-for keeps refusing through the process",
+  spawnNoAttest.status === 3 && spawnNoAttest.json?.reason === F.ATTESTATION_TARGET_REQUIRED);
+record("S10 spawned DRY_RUN output is IDENTICAL to the in-process runCli result",
+  (await (async () => {
+    const inProc = await cli([], {}, harness());
+    return JSON.stringify(spawnNoFlags.json) === JSON.stringify(inProc);
+  })()));
+record("S11 a refusal exit code is 3 and a success exit code is 0 — the documented contract",
+  spawnNoFlags.status === 0 &&
+  [spawnDisable, spawnProdRef, spawnUnknown, spawnConflict, spawnNoAttest].every((s) => s.status === 3));
+record("S12 no spawned child could have held a credential",
+  Object.keys(SAFE_ENV).every((k) => !/^(QF_|WHATSAPP_)/.test(k)));
+record("S13 a refusal is also reported on stderr for an operator watching a terminal",
+  /REFUSED: /.test(spawnDisable.stderr) && /REFUSED: /.test(spawnUnknown.stderr));
+
+// The containment rules that keep the cycle unconstructible and the authority single.
+record("S14 NOTHING imports the entry module — that is what prevents the cycle",
+  (() => {
+    const base = path.basename(ENTRY_REL);
+    for (const rel of ["scripts/mvp/communication/activate-meta-staging-canary.mjs",
+                       "scripts/mvp/communication/canaryActivationRuntime.mjs",
+                       "scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
+                       "scripts/mvp/communication/verify-core-provider-env.mjs"]) {
+      if (new RegExp(`(import|from)[^\\n]*${base.replace(/[.]/g, "\\.")}`).test(read(rel))) return false;
+    }
+    return true;
+  })());
+record("S15 the entry duplicates NO adapter, credential or attestation wiring",
+  !/createClient|FetchHttpTransport|createSupabaseDbAdapter|createMetaGetAdapter|createHealthAdapter/.test(entryCode) &&
+  !/writeFileSync|appendFileSync|readFileSync/.test(entryCode) &&
+  !/@supabase\/supabase-js/.test(entryCode) &&
+  !/process\.env\.[A-Z_]/.test(entryCode) &&
+  !/QF_[A-Z_]+|WHATSAPP_[A-Z_]+/.test(entryCode));
+record("S16 the entry imports its dependencies from the audited modules, not its own copies",
+  /from "\.\/canaryActivationRuntime\.mjs"/.test(entryCode) &&
+  /from "\.\/activate-meta-staging-canary\.mjs"/.test(entryCode) &&
+  ["buildRealAdapters", "buildAttestationIo", "buildIndexProofAdapter",
+   "buildStagingAssetProofAdapter", "resolveGitHead", "randomNonce"]
+    .every((f) => entryCode.includes(f)));
+record("S17 the entry can neither send, arm nor write — it names no such surface",
+  !/\/messages/.test(entryCode) &&
+  !/method:\s*["'](POST|PUT|PATCH|DELETE)["']/i.test(entryCode) &&
+  !/\.rpc\(|qf_arm_|qf_disable_/.test(entryCode));
+record("S18 the governed npm target invokes the ENTRY, not the library",
+  (() => {
+    const pkg = JSON.parse(read("package.json"));
+    const t = pkg.scripts?.["canary:mvp:40"] ?? "";
+    return t.includes(ENTRY_REL) && !/activate-meta-staging-canary\.mjs(\s|$)/.test(t);
+  })());
+
+const startupMutants = [
+  ["R7D the old TLA import cycle cannot be restored in the library",
+    () => !/process\.argv/.test(operatorCode) && !/isDirect/.test(operatorCode)],
+  ["R7D the entry cannot be pulled back into the import graph",
+    () => !/(import|from)[^\n]*activate-meta-staging-canary-cli/.test(runtimeCode) &&
+          !/(import|from)[^\n]*activate-meta-staging-canary-cli/.test(operatorCode)],
+  ["R7D a second argv parser in the entry is killed",
+    () => !/resolveMode\(/.test(entryCode) && !/argv\.includes\(/.test(entryCode) &&
+          !/startsWith\("--"\)/.test(entryCode) && !/"--(disable|arm-canary|arm-readiness|preflight-readonly)"/.test(entryCode)],
+  ["R7D duplicated adapter wiring in the entry is killed",
+    () => !/createClient|FetchHttpTransport|createSupabaseDbAdapter/.test(entryCode)],
+  ["R7D startup regressions are caught by SPAWNING, not by importing",
+    () => /spawnSync\(/.test(strip(read("scripts/mvp/communication/validate-meta-staging-canary-cli.mjs")))],
+  ["R7D a spawned child can never inherit a live credential",
+    () => /\^\(QF_\|WHATSAPP_\)/.test(read("scripts/mvp/communication/validate-meta-staging-canary-cli.mjs"))],
+];
+for (const [name, fn] of startupMutants) {
   let held = false;
   try { held = (await fn()) === true; } catch { held = false; }
   record(`MUT ${name}`, held);

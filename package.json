@@ -52,6 +52,7 @@
     "test:mvp:40-r7b": "node scripts/mvp/communication/validate-meta-staging-one-shot-template-creation.mjs",
     "test:mvp:40-r7c": "node scripts/mvp/communication/validate-meta-staging-provider-account-rebind.mjs",
     "create:mvp:40-r7b-once": "node scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
+    "canary:mvp:40": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/activate-meta-staging-canary-cli.mjs",
     "test:mvp:50-1a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1a.mjs",
     "test:mvp:50-1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1b.mjs",
     "test:mvp:50-1c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1c.mjs",

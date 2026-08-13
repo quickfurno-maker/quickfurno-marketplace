@@ -30,6 +30,9 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$
 const runtimeCode = strip(runtimeSource);
 const operatorCode = strip(operatorSource);
 const healthServiceSource = read("services/communicationProviderHealthService.ts");
+/** QF-MVP-40-R7D — the bootstrap moved into its own entry module; the pin moves with it. */
+const ENTRY_PATH = "scripts/mvp/communication/activate-meta-staging-canary-cli.mjs";
+const entryCode = strip(read(ENTRY_PATH));
 
 const results = [];
 const record = (name, passed, detail = "") =>
@@ -202,10 +205,18 @@ record("I01 importing the runtime constructs no client, opens no socket, reads n
   !/^\s*(const|let)\s+\w+\s*=\s*createClient\(/m.test(runtimeCode) &&
   !/process\.env\./.test(runtimeCode) &&
   !/new FetchHttpTransport\(/.test(runtimeCode));
-record("I02 the operator guards ALL execution behind isDirect",
-  /const isDirect = process\.argv\[1\]/.test(operatorCode) &&
-  operatorCode.indexOf("if (isDirect)") < operatorCode.indexOf("createClient") &&
-  /await import\("@supabase\/supabase-js"\)/.test(operatorCode));
+// QF-MVP-40-R7D. The isDirect guard is GONE, because it was the defect: its top-level
+// `await import()` of this runtime — which statically imports the operator back — deadlocked
+// whenever the operator was the process entry (exit 13, no output, every mode, --disable
+// included). The library now never self-executes at all, which is strictly stronger than
+// guarding, and the client is still built only inside the exported factory.
+record("I02 the operator never self-executes, and builds a client only inside its factory",
+  !/process\.argv/.test(operatorCode) &&
+  !/isDirect/.test(operatorCode) &&
+  /export async function buildRealAdapters/.test(operatorCode) &&
+  operatorCode.indexOf("export async function buildRealAdapters") < operatorCode.indexOf("createClient") &&
+  /await import\("@supabase\/supabase-js"\)/.test(operatorCode) &&
+  /runCli\(/.test(entryCode));
 record("I03 the real client is constructed only AFTER the staging fence passes",
   operatorCode.indexOf("resolveActivationTarget(process.env") <
     operatorCode.indexOf('await import("@supabase/supabase-js")'));

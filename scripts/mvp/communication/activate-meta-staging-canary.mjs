@@ -985,51 +985,38 @@ export default {
 };
 
 // ===========================================================================
-// QF-MVP-40.13C — EXECUTABLE ENTRY POINT.
+// QF-MVP-40.13C — REAL DEPENDENCY FACTORIES.
 //
-// Everything above is import-safe: importing this file constructs no client, opens no
-// socket and reads no credential. The block below runs ONLY when this file is the
-// process entry point, which is what keeps the validator able to import and drive the
-// contract without any of it executing.
+// QF-MVP-40-R7D — WHY THE ENTRY POINT IS NOT IN THIS FILE.
+//   This module used to end with an `if (isDirect)` bootstrap whose first act was
+//   `await import("./canaryActivationRuntime.mjs")` at TOP LEVEL. That runtime module
+//   STATICALLY imports back from this one, so whenever this file was the process entry
+//   the two modules waited on each other forever: Node reported an unsettled top-level
+//   await and exited 13, with zero output, in EVERY mode — `--disable` included. The
+//   emergency closure path was dead for exactly as long as it existed.
 //
-// The real adapters are built here and NOWHERE else, and only AFTER the staging identity
-// fence has passed — so a wrong project ref is refused before a client exists.
+//   No harness could see it. They all import `runCli` as a module, so `isDirect` was
+//   false, the bootstrap never ran and the cycle never formed. Only spawning the process
+//   exercises it, which `validate-meta-staging-canary-cli.mjs` now does.
+//
+//   The repair is containment, not redesign: the bootstrap moved verbatim into
+//   `activate-meta-staging-canary-cli.mjs`, which NOTHING imports, so no cycle can form.
+//   The factories below did not move — they stay in this audited module and are merely
+//   EXPORTED, so there is still exactly ONE implementation of the adapter, attestation,
+//   index-proof and staging-asset wiring, and still exactly one activation authority.
+//
+// Everything in this file is import-safe: importing it constructs no client, opens no
+// socket, reads no credential and — now that the bootstrap is gone — never inspects
+// `process.argv`. The real adapters are built ONLY inside the exported factories below,
+// and runCli calls them only AFTER the staging identity fence has passed, so a wrong
+// project ref is refused before a client exists.
 // ===========================================================================
-const isDirect = process.argv[1]
-  && process.argv[1].endsWith("activate-meta-staging-canary.mjs");
-
-if (isDirect) {
-  const runtime = await import("./canaryActivationRuntime.mjs");
-
-  // ALL CLI logic lives in runtime.runCli, which the offline tests call with fakes. This
-  // block only supplies real dependencies — there is no second parser and no behaviour
-  // here that a test cannot reach.
-  const result = await runtime.runCli({
-    argv: process.argv.slice(2),
-    env: process.env,
-    headResolver: resolveGitHead,
-    adapterFactory: buildRealAdapters,
-    attestationIoFactory: ({ mode }) => buildAttestationIo(mode),
-    indexProofFactory: buildIndexProofAdapter,
-    stagingAssetProofFactory: buildStagingAssetProofAdapter,
-    now: () => Date.now(),
-    nonce: randomNonce(),
-    log: (line) => console.log(line),
-  });
-
-  console.log(JSON.stringify(result, null, 2));
-  if (!result.ok) {
-    console.error(`REFUSED: ${result.reason}${result.detail ? ` (${result.detail})` : ""}`);
-    process.exit(3);
-  }
-  process.exit(0);
-}
 
 /**
  * Real adapters, constructed here and NOWHERE else — and only after runCli has already
  * proven the staging identity fence, so a wrong project ref never reaches a client.
  */
-async function buildRealAdapters({ env, need }) {
+export async function buildRealAdapters({ env, need }) {
   const { createClient } = await import("@supabase/supabase-js");
   const client = createClient(
     env.QF_STAGING_SUPABASE_URL,
@@ -1062,7 +1049,7 @@ async function buildRealAdapters({ env, need }) {
  * typed environment value. A detached HEAD is perfectly valid — the commit is the pin, a
  * branch name never is.
  */
-async function resolveGitHead() {
+export async function resolveGitHead() {
   const { execFileSync } = await import("node:child_process");
   const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   return GIT_HEAD_RE.test(head) ? head : null;
@@ -1070,12 +1057,12 @@ async function resolveGitHead() {
 
 /** The standard CSPRNG. A nonce is not a secret, but replay identity should not be seeded
  *  from a pid and a clock. */
-function randomNonce() {
+export function randomNonce() {
   return randomBytes(32).toString("hex");
 }
 
 /** The 40.12 external index proof, consumed through its existing file contract. */
-async function buildIndexProofAdapter() {
+export async function buildIndexProofAdapter() {
   const { verifyIndexProof } = await import("./seed-meta-staging-inactive-mappings.mjs");
   const path = process.env.QF_STAGING_INDEX_PROOF_PATH;
   return {
@@ -1101,7 +1088,7 @@ async function buildIndexProofAdapter() {
  * the same file discipline as the index proof: outside the repository, short-lived,
  * tamper-evident, and necessary-but-not-sufficient.
  */
-async function buildStagingAssetProofAdapter() {
+export async function buildStagingAssetProofAdapter() {
   const path = process.env[STAGING_ASSET_PROOF_ENV];
   return {
     async verify({ projectRef, now, branchHead, stage }) {
@@ -1138,7 +1125,7 @@ async function buildStagingAssetProofAdapter() {
  * Attestation file IO. The file and the consumed-nonce ledger both live OUTSIDE the
  * repository, exactly as the 40.12 attestation does.
  */
-async function buildAttestationIo(mode) {
+export async function buildAttestationIo(mode) {
   const { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync: rf } = await import("node:fs");
   const { join, dirname } = await import("node:path");
   const home = process.env.USERPROFILE || process.env.HOME || ".";

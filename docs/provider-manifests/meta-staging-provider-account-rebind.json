@@ -116,10 +116,18 @@
   },
 
   "downstream_state_after_rebind": {
+    "measured_by": "an independent read-only probe run after execution, outside the operator",
+    "account_rows": 1,
     "account_readiness_status": "disabled (unchanged)",
+    "account_configuration_status": "partial (unchanged)",
+    "account_webhook_status": "pending (unchanged)",
+    "account_health_status": "unknown (unchanged)",
+    "runtime_policy_rows": 0,
     "runtime_policy_row": "still absent — provider remains fail-closed",
+    "mapping_rows_total": 8,
     "active_mappings": 0,
     "active_canary_destinations": 0,
+    "communication_messages": 0,
     "provider_can_send": false,
     "note": "Rebinding is necessary but NOT sufficient for the R7 canary. It clears the ACCOUNT_MISSING plan-time refusal only. The remaining R7 blockers are unchanged and are not addressed here: qf_vendor_onboarding_reminder_v1 is PENDING (not APPROVED) on the staging WABA, and code_verification_status on the staging phone is NOT_VERIFIED, which still yields READINESS_EVIDENCE_INSUFFICIENT."
   },
@@ -142,10 +150,30 @@
   },
 
   "execution_record": {
-    "status": "NOT_EXECUTED",
-    "update_attempt_count": 0,
-    "database_writes": 0,
-    "rebind_authority": "OPEN",
-    "note": "No write has been performed. The authority is committed in its unspent state. Execution requires both --execute and --owner-authorized-once-rebind, and this artifact is updated in place with the measured outcome once that run happens."
+    "status": "EXECUTED_ONCE",
+    "executed_at_utc": "2026-08-13",
+    "target_project_ref_environment": "STAGING",
+    "measured_pre_state": "BOUND_TO_PRODUCTION",
+    "update_attempt_count": 1,
+    "rows_updated": 1,
+    "cas_lost": false,
+    "second_update_issued": false,
+    "post_state_proof": true,
+    "post_state_business_account_reference_digest": "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
+    "post_state_phone_number_reference_digest": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
+    "post_state_readiness_status": "disabled",
+    "readiness_escalated": false,
+    "operator_exit_code": 0,
+    "rebind_authority": "CLOSED",
+    "rebind_authority_note": "Spent and self-enforcing. A rerun WITH both execute flags was performed as proof: it classified the pre-state as ALREADY_REBOUND and exited with UPDATE_ATTEMPT_COUNT=0, so the authority cannot write a second time even when fully authorised.",
+    "idempotence_reverified": true,
+    "downstream_authority_unchanged": {
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "provider_authority": "DENIED",
+      "canary_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED"
+    },
+    "reversibility": "The prior binding is recoverable: the production digests remain in the owner's external proof, so the transition can be audited and, if ever required, reversed by a new owner-governed authority. This operator cannot reverse it — ALREADY_REBOUND is a terminal no-write state for it."
   }
 }

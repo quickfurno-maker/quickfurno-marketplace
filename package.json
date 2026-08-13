@@ -48,6 +48,7 @@
     "test:mvp:40-13": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-activation.mjs",
     "test:mvp:40-13c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-runtime.mjs",
     "test:mvp:40-13c-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-cli.mjs",
+    "test:mvp:40-r7f": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-asset-stage-binding.mjs",
     "verify:mvp:core-provider-env": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/verify-core-provider-env.mjs",
     "test:mvp:40-r7b": "node scripts/mvp/communication/validate-meta-staging-one-shot-template-creation.mjs",
     "test:mvp:40-r7c": "node scripts/mvp/communication/validate-meta-staging-provider-account-rebind.mjs",

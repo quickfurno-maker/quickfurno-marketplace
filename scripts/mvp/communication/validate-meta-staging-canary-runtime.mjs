@@ -175,10 +175,18 @@ function fakeAttestationIo(stored = null) {
  */
 const HEAD = "a".repeat(40);
 
+/**
+ * QF-MVP-40-R7F: a preflight now REFUSES without an attestation target, because the
+ * staging-asset proof is verified against the stage being attested for and a defaulted
+ * stage would silently skip that check. The default below keeps every pre-existing
+ * preflight fixture testing what it was written to test; `stageForAttestation: undefined`
+ * still overrides it, which is how the fail-closed cases below are expressed. Write modes
+ * ignore this field — `runCli` refuses `--attest-for` for them outright.
+ */
 const baseCtx = (over = {}) => ({
   target: TARGET, expected: EXPECTED, templateKeys: [TEMPLATE_KEY],
   destinationHash: CANARY_HASH, now: NOW, nonce: "n".repeat(64), attestationTtlMs: 10 * 60 * 1000,
-  branchHead: HEAD,
+  branchHead: HEAD, stageForAttestation: "ARM_READINESS",
   ...over,
 });
 

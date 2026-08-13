@@ -778,16 +778,41 @@ export async function runOperator(ctx) {
     };
   }
   if (mode === "PREFLIGHT_READONLY") {
+    // QF-MVP-40-R7F — THE ASSET PROOF IS VERIFIED AT THE STAGE BEING ATTESTED FOR.
+    //
+    // This used to pass the literal `"PREFLIGHT_READONLY"`, which made the governed arm
+    // path unreachable: the staging-asset proof is stage-bound, the attestation pins
+    // `staging_asset_proof_hash`, and `preflightForWrite` re-verifies at the WRITE stage.
+    // One proof could satisfy the preflight or the write, never both — measured live at
+    // HEAD 14bf8bd as STAGING_ASSET_SCOPE_UNPROVEN one way and
+    // ATTESTATION_MISMATCH(staging_asset_proof_hash) the other.
+    //
+    // A preflight exists only to approve a specific future write, so the stage it must
+    // check is that write's stage. Nothing is loosened: the proof still authorises exactly
+    // ONE stage, the hash is still pinned, and the same file must reappear at the write.
+    //
+    // The target is therefore load-bearing and is validated HERE as well as in `runCli`.
+    // Defaulting it would silently skip the `intended_stage` comparison — the adapter
+    // treats a falsy stage as "no stage to check" — so an absent or unknown target must
+    // refuse before the proof is read at all.
+    const attestedStage = ctx.stageForAttestation ?? null;
+    if (attestedStage === null) {
+      return { ok: false, reason: ActivationFailure.ATTESTATION_TARGET_REQUIRED };
+    }
+    if (!Object.values(ATTESTATION_TARGETS).includes(attestedStage)) {
+      return { ok: false, reason: ActivationFailure.ATTESTATION_TARGET_INVALID, detail: attestedStage };
+    }
+
     const preflight = await runPreflight({
       db: ctx.db, meta: ctx.meta, health: ctx.health, indexProof: ctx.indexProof,
       target: ctx.target, templateKeys: ctx.templateKeys, expected: ctx.expected, now: ctx.now,
       assetProof: ctx.assetProof, requireDedicatedScope: need.assetScope === true,
-      branchHead: ctx.branchHead ?? null, stage: "PREFLIGHT_READONLY",
+      branchHead: ctx.branchHead ?? null, stage: attestedStage,
     });
     if (!preflight.ok) return preflight;
     preflight.expected = ctx.expected;
     preflight.branchHead = ctx.branchHead ?? null;
-    const plan = ctx.stageForAttestation === "ARM_CANARY"
+    const plan = attestedStage === "ARM_CANARY"
       ? planCanaryArm({
           policy: preflight.observedRaw.policy, account: preflight.observedRaw.account,
           mappings: preflight.observedRaw.mappings, canaryRows: preflight.observedRaw.canaryRows,
@@ -798,7 +823,8 @@ export async function runOperator(ctx) {
           evidence: preflight.evidence, expected: ctx.expected });
     if (!plan.ok) return plan;
     const attestation = buildAttestationBody({
-      stage: ctx.stageForAttestation ?? "ARM_READINESS",
+      // The SAME resolved stage the asset proof was verified against — never a default.
+      stage: attestedStage,
       target: ctx.target, templateKeys: ctx.templateKeys, destinationHash: ctx.destinationHash,
       preflight, planHash: planFingerprint(plan.plan), now: ctx.now,
       nonce: ctx.nonce, ttlMs: ctx.attestationTtlMs,

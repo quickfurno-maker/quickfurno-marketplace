@@ -363,7 +363,9 @@ if (isEntry) {
 
     // -- THE single POST -------------------------------------------------------
     const res = await http.createOnce(payloadResult.payload);
-    const classification = classifyCreateResponse(res);
+    // classifyCreateResponse returns { classification, error } — read the FIELD, never the
+    // object, or every outcome degrades to a false "ambiguous" label.
+    const { classification } = classifyCreateResponse(res);
     console.log(`POST_ATTEMPT_COUNT=${http.postCount()}`);
     console.log(`   create classification   : ${classification}`);
     if (classification === CreateClassification.DETERMINISTIC_4XX_REJECTION) {

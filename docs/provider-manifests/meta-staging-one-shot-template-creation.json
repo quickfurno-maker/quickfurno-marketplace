@@ -77,15 +77,29 @@
   },
 
   "execution_record": {
-    "status": "NOT_YET_EXECUTED",
-    "attempted_at_utc": null,
-    "post_attempt_count": 0,
-    "create_classification": null,
-    "remote_template_id_recorded": false,
-    "observed_status": null,
-    "observed_category": null,
-    "observed_language": null,
-    "semantic_match": null,
-    "creation_authority": "OPEN_PENDING_SINGLE_USE"
+    "status": "EXECUTED_ONCE",
+    "attempted_at_utc": "2026-08-13T04:38:00Z",
+    "post_attempt_count": 1,
+    "create_classification": "SUCCESS",
+    "create_http_status": 200,
+    "remote_template_id_sha256": "56db9577b38c1d4e86832e01cf71e6b952dc5273900dcb7daf400d91deab5899",
+    "remote_template_id_raw_committed": false,
+    "remote_template_id_note": "The raw remote template id is deliberately NOT committed. The packet validator rule `noRemoteIdAnywhere` forbids a remote template id in the submission packet and the remote-state ledger, and that ledger states no template id appears in it. Recording the raw id here would make this file the single place that breaks a validator-enforced repository-wide posture, so it is recorded as a digest and was reported to the owner out of band.",
+    "observed_status": "PENDING",
+    "observed_category": "UTILITY",
+    "observed_language": "en",
+    "semantic_match": true,
+    "readback_calls_used": 1,
+    "second_post_issued": false,
+    "creation_authority": "CLOSED",
+    "creation_authority_note": "Spent. The operator is now naturally refused by its own pre-state check: an exact remote row exists in PENDING, so a rerun reports ALREADY_CREATED and exits without posting. Approval follow-up is READ-ONLY; a PENDING row must never be re-created.",
+    "post_creation_hold": "IN_EFFECT",
+    "downstream_authority_unchanged": {
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "provider_authority": "DENIED",
+      "canary_authority": "DENIED"
+    },
+    "known_defect_corrected": "The first execution printed the create classification as '[object Object]' and labelled a clean SUCCESS as CREATE_AMBIGUOUS, because `classifyCreateResponse` returns { classification, error } and the object was compared instead of its field. This affected the OUTCOME LABEL only: the POST count was 1, no retry occurred, and the readback proved exactly one remote row. The operator now reads the field, and validator rules M14c/M14d pin that."
   }
 }

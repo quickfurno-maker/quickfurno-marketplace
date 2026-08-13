@@ -12,6 +12,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { classifyCreateResponse as classifyCreateResponseLocal } from "./submit-meta-templates.mjs";
 import {
   EXPECTED_IDENTITY_DIGESTS, EXPECTED_PAYLOAD_FINGERPRINT, OWNER_ACK_FLAG, Outcome, PreState,
   TARGET_TEMPLATE_KEY, TARGET_TEMPLATE_NAME, classifyLiveAssets, classifyPreState, decide,
@@ -246,6 +247,20 @@ record("M14b exactly one readback follows the single create, and create appears 
 // ---------------------------------------------------------------------------
 // 15-18: structural properties of the FILE.
 // ---------------------------------------------------------------------------
+/**
+ * classifyCreateResponse returns { classification, error }. The first execution of this
+ * operator printed "[object Object]" and mislabelled a clean SUCCESS as CREATE_AMBIGUOUS
+ * because the object was compared instead of its field. The POST count was unaffected —
+ * but an outcome label that cannot say "created" is not evidence, so pin the field access.
+ */
+record("M14c the create classification is read as a FIELD, not as the object",
+  /const \{ classification \} = classifyCreateResponse\(/.test(codeOnly)
+  && !/=\s*classifyCreateResponse\([^)]*\);\s*\n[^\n]*classification ===/.test(codeOnly));
+record("M14d a 2xx create with id+known status classifies SUCCESS end-to-end", (() => {
+  const { classification } = classifyCreateResponseLocal({ threw: false, httpStatus: 200, body: { id: "123", status: "PENDING", category: "UTILITY" } });
+  return classification === "SUCCESS";
+})());
+
 record("M15 no generic template/wave selector exists",
   !/--template\b/.test(codeOnly) && !/--wave\b/.test(codeOnly)
   && /export const TARGET_TEMPLATE_NAME = "qf_vendor_onboarding_reminder_v1"/.test(codeOnly));
@@ -341,6 +356,21 @@ record("G11 the evidence artifact records the global model as unchanged",
 record("G12 the evidence artifact and operator exist where the contract says",
   existsSync(resolve(OPERATOR)) && existsSync(resolve(EVIDENCE))
   && evidence.execution_contract.operator === OPERATOR);
+record("G14 the spent authority is recorded as CLOSED with exactly one POST",
+  evidence.execution_record.status === "EXECUTED_ONCE"
+  && evidence.execution_record.post_attempt_count === 1
+  && evidence.execution_record.second_post_issued === false
+  && evidence.execution_record.creation_authority === "CLOSED"
+  && evidence.execution_record.post_creation_hold === "IN_EFFECT");
+record("G15 the execution record commits no raw remote template id",
+  evidence.execution_record.remote_template_id_raw_committed === false
+  && !/"remote_template_id"\s*:\s*"/.test(JSON.stringify(evidence))
+  && /^[0-9a-f]{64}$/.test(evidence.execution_record.remote_template_id_sha256));
+record("G16 the spent record still denies every downstream authority",
+  evidence.execution_record.downstream_authority_unchanged.send_authority === "DENIED"
+  && evidence.execution_record.downstream_authority_unchanged.mapping_authority === "DENIED"
+  && evidence.execution_record.downstream_authority_unchanged.provider_authority === "DENIED"
+  && evidence.execution_record.downstream_authority_unchanged.canary_authority === "DENIED");
 record("G13 the pinned fingerprint equals the packet's committed fingerprint",
   entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
   && evidence.target.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT

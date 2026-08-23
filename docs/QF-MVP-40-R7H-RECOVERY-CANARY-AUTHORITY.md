@@ -1,8 +1,8 @@
-﻿# QF-MVP-40 — R7H Recovery Canary Authority
+# QF-MVP-40 — R7H Recovery Canary Authority
 
 ## Status
 
-**DRAFT — NO SEND AUTHORIZED YET**
+**AUTHORIZED — EXACTLY ONE R7H RECOVERY CANARY**
 
 This document does not itself authorize a Meta provider invocation.
 
@@ -143,7 +143,29 @@ All remaining locked exit criteria still require their own evidence.
 
 Current state:
 
-**NOT YET AUTHORIZED FOR SEND**
+**AUTHORIZED FOR EXACTLY ONE RECOVERY PROVIDER INVOCATION**
 
-The recovery provider invocation may occur only after explicit owner
-authorization is recorded after review of this authority.
+Owner authorization recorded:
+
+- authorization phrase: `AUTHORIZE R7H RECOVERY CANARY`
+- authorization time: `2026-08-23T10:46:00+05:30`
+- scope: exactly one additional Meta provider invocation
+- environment: QuickFurno staging only
+- recipient: owner-controlled canary only
+- template class: approved UTILITY only
+- execution path: canonical CommunicationService only
+
+This authorization does not itself arm the provider.
+
+The authorization is **single-use**. It is consumed by the first R7H
+Meta provider invocation regardless of whether the outcome is success,
+failure, timeout, transport uncertainty, or callback uncertainty.
+
+After that first provider invocation:
+
+- no second R7H provider invocation is authorized
+- no operator resend is authorized
+- no automatic retry is authorized
+- provider must be disabled immediately after evidence capture
+- historical failures must remain preserved
+- the R7H authority must be updated to `CONSUMED` during closeout

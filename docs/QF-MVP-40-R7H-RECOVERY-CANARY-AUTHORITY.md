@@ -2,7 +2,7 @@
 
 ## Status
 
-**AUTHORIZED — EXACTLY ONE R7H RECOVERY CANARY**
+**CONSUMED — R7H RECOVERY CANARY COMPLETED**
 
 This document does not itself authorize a Meta provider invocation.
 
@@ -143,7 +143,7 @@ All remaining locked exit criteria still require their own evidence.
 
 Current state:
 
-**AUTHORIZED FOR EXACTLY ONE RECOVERY PROVIDER INVOCATION**
+**CONSUMED — NO FURTHER R7H PROVIDER INVOCATION AUTHORIZED**
 
 Owner authorization recorded:
 
@@ -169,3 +169,81 @@ After that first provider invocation:
 - provider must be disabled immediately after evidence capture
 - historical failures must remain preserved
 - the R7H authority must be updated to `CONSUMED` during closeout
+
+## 7. R7H closeout
+
+Final state:
+
+**CONSUMED - SUCCESSFUL DELIVERY CERTIFIED - FAIL-CLOSED RESTORED**
+
+The single authorized R7H Meta provider invocation was consumed on
+2026-08-23.
+
+Certified outbound evidence:
+
+- communication message ID: `6dfbbed2-7e22-45b0-95e0-3b2a0170ba02`
+- provider: `meta_whatsapp_cloud`
+- provider message ID: `wamid.HBgMOTE3NzIwMDAwNTUzFQIAERgSNDJDODkzMTNCOUZGQTIyQzMyAA==`
+- template key: `vendor_onboarding_reminder`
+- approved provider template: `qf_vendor_onboarding_reminder_v1`
+- provider template mapping ID: `5a9deda4-2005-45c9-8d67-79ddb718018c`
+- destination hash: `f39df03d854700db04c7c87b7a9052d4b2b0267f6f7d81be0cbf6930335d2372`
+- provider account ID: `9e589e8b-d96d-4de7-b97b-e4cf49211067`
+- attempt_count: `1`
+- internal retry: `false`
+- failure_code: `null`
+- final lifecycle status: `delivered`
+- accepted_at: `2026-08-23T15:55:23.240Z`
+- delivered_at: `2026-08-23T15:55:24.000Z`
+
+Certified signed-callback evidence:
+
+- webhook receipt ID: `e8a64384-763e-4e21-8f9b-3076b764a3ff`
+- signature_valid: `true`
+- processing_status: `processed`
+- normalized_event_type: `delivered`
+- provider event ID: `meta-wh-02d89d520505fc2a4d981856ee9bc123`
+- duplicate_count: `0`
+- owning provider account matched the outbound provider account
+
+Callback recovery note:
+
+Meta delivered the signed lifecycle callbacks to the locked staging
+ngrok endpoint, but the running staging Core initially rejected them
+with HTTP 401 `invalid_signature`.
+
+The cause was an incorrect `WHATSAPP_APP_SECRET` loaded into the
+staging Core. The correct App Secret for Meta App
+`2097008694503517` was obtained without exposing its value and was
+cryptographically proven against an already-captured Meta callback.
+
+The staging Core was restarted with that verified secret. Because Meta
+had not yet retried after restart, the already-captured, genuinely
+Meta-signed callback for the same provider message ID was replayed
+locally into the canonical QuickFurno webhook endpoint. No outbound
+WhatsApp resend or second Meta provider invocation occurred.
+
+The signed callback passed all signature, identity, runtime and
+provider-account ownership gates and produced the certified
+`delivered` lifecycle state above.
+
+Runtime configuration correction identified during R7H:
+
+- `WHATSAPP_AUTH_HTTP_TIMEOUT_MS=3000`
+- `WHATSAPP_HTTP_TIMEOUT_MS=10000`
+- `WHATSAPP_APP_SECRET` must correspond to Meta App `2097008694503517`
+
+Final independent fail-closed readback after `--disable`:
+
+- activation_status: `disabled`
+- outbound_enabled: `false`
+- webhook_processing_enabled: `false`
+- health_check_enabled: `false`
+- active provider-template mappings: `0`
+- active canary destinations: `0`
+
+The three historical `131042` failures remain preserved.
+
+R7H authority is permanently consumed.
+
+**NO SECOND R7H PROVIDER INVOCATION, RESEND OR RETRY IS AUTHORIZED.**

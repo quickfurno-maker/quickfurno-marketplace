@@ -90,6 +90,15 @@ export const ActivationFailure = Object.freeze({
   META_PHONE_NOT_CONNECTED: "META_PHONE_NOT_CONNECTED",
   META_WEBHOOK_NOT_SUBSCRIBED: "META_WEBHOOK_NOT_SUBSCRIBED",
   META_GET_FAILED: "META_GET_FAILED",
+  // QF-MVP-40-R7I — the remote template proof inside `runPreflight`
+  // (canaryActivationRuntime.mjs) already refuses on these three conditions, but the
+  // constants were never declared here, so each refusal carried `reason: undefined`
+  // instead of a legible code. Declaring them changes no control flow; it only makes
+  // the EXISTING refusals readable (and de-vacuums the runtime validator's assertions,
+  // which were comparing `undefined === undefined`).
+  META_TEMPLATE_AMBIGUOUS: "META_TEMPLATE_AMBIGUOUS",
+  META_STATUS_NOT_APPROVED: "META_STATUS_NOT_APPROVED",
+  META_CATEGORY_MISMATCH: "META_CATEGORY_MISMATCH",
   HEALTH_CHECK_NOT_HEALTHY: "HEALTH_CHECK_NOT_HEALTHY",
   ATTESTATION_MISSING: "ATTESTATION_MISSING",
   ATTESTATION_EXPIRED: "ATTESTATION_EXPIRED",

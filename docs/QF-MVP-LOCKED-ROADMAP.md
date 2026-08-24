@@ -21,9 +21,12 @@ This is the single authoritative plan for reaching a shippable QuickFurno MVP qu
 | QF-MVP-50 | n8n Workflow Automation | Core→n8n→Meta execution with idempotency, without Jarvis |
 | QF-MVP-60 | Jarvis Agent Integration | Riya/Anisha as optional recommenders behind Core validation + kill switches |
 | QF-MVP-70 | Operations & Launch Control | Founder/admin queues, controls, kill switches, KPIs |
+| QF-MVP-75 | QF VISION — Deterministic Operations Orchestration | Durable jobs, leases, retries, reconciliation and recovery without duplicating Core authority |
 | QF-MVP-80 | Staging, Canary & Pune Launch | Migration rehearsal, journeys, canaries, gated production launch |
 
-Dependency spine (critical path): **00 → 10 → 20 → 40 → 50 → 70 → 80**. QF-MVP-30 depends on 10/20 and pairs with 40/50. QF-MVP-60 depends on 50/70 and is optional for launch (Core must run with Jarvis offline).
+Dependency spine (full launch critical path): **00 → 10 → 20 → 40 → 50 → 70 → 75 → 80**. QF-MVP-30 remains the Vendor CRM / campaign-readiness lane: it depends on 10/20 and pairs with the communication and automation work in 40/50. QF-MVP-60 (Jarvis Agent Integration) depends on 50/70, remains a **separate/optional lane**, and is **not** required for the Pune MVP launch — Core must run correctly with Jarvis offline.
+
+**Current remaining critical path** (after the completed work): **40 → 70 → 75 → 80**.
 
 ---
 
@@ -180,6 +183,79 @@ Dependency spine (critical path): **00 → 10 → 20 → 40 → 50 → 70 → 80
 
 **Exit criteria:** no important failure is hidden; admin can pause communication; sensitive corrections require approval; audit records explain every important action; launch KPIs are visible.
 **Effort:** 2–3 focused engineering days.
+
+---
+
+# QF-MVP-75 — QF VISION — Deterministic Operations Orchestration
+
+**Status:** PENDING · locked by explicit owner decision.
+
+**Purpose:** QF VISION is the durable operations/orchestration control plane for QuickFurno.
+
+> **Locked principle:** *"Vision coordinates work; Core decides business outcomes."*
+
+Vision must schedule, claim, retry, reconcile, expose and recover operational work. It **MUST NOT** become a second business-rule engine and **MUST NOT** duplicate existing Core authority for leads, qualification, vendor eligibility/ranking/assignment, packages/credits, consent/suppression, communication-provider eligibility, or audit truth.
+
+### QF-MVP-75.1 / Vision M9 — Lead Orchestration and Assignment Control
+- Durable job creation for required lead-processing/assignment work.
+- Lease/claim semantics so work is owned once at a time.
+- Invoke existing Core lead-quality, eligibility, matching/assignment and replacement authorities; never reimplement them.
+- Idempotency and concurrency safety.
+- Bounded retry/backoff only for retryable operational failure.
+- Deterministic failure/dead-letter state and reconciliation.
+- No AI scoring/ranking.
+
+### QF-MVP-75.2 / Vision M10 — Vendor Automation
+- Durable onboarding/document/package/credit/renewal/inactive-vendor operational tasks.
+- Schedule and coordinate existing Core/CRM actions.
+- Vendor Engagement & Renewal automation may orchestrate existing authorities but owns no authoritative vendor/package/credit fact.
+- Safe retries, dedupe, operator visibility and recovery.
+
+### QF-MVP-75.3 / Vision M11 — Client Lifecycle Automation
+- Durable client follow-up, clarification, status, closure and permitted re-engagement work.
+- Follow-up automation must always pass through existing consent/suppression and communication gates.
+- No provider bypass and no independent send authority.
+- Deterministic schedules, idempotency, cancellation and reconciliation.
+
+### QF-MVP-75.4 / Vision M12 — Operations Console Integration
+- Expose Vision jobs, leases, retries, exhausted/dead-letter work, reconciliation state and timelines to founder/admin operations.
+- Reuse QF-MVP-70/Admin V2 surfaces where practical; do not rebuild another admin product.
+- Safe operator actions only: inspect, retry when policy allows, cancel/pause, reconcile/escalate.
+- Every operator action audited.
+
+### QF-MVP-75.5 / Vision M13 — Production Hardening
+- Crash/restart safety.
+- Lease expiry/reclaim.
+- Duplicate-delivery/replay safety.
+- Retry exhaustion/dead-letter behavior.
+- Reconciliation after ambiguous/partial execution.
+- Shadow mode, canary mode and kill switches.
+- Metrics/alerts for backlog, age, retries, failures and stuck leases.
+- Load/concurrency and recovery tests sized for MVP launch.
+- Core must continue to function when Vision workers are paused; no loss/corruption of authoritative business state.
+
+**Deterministic operational modules.** The following are **orchestration labels, NOT autonomous AI agents**. Each one schedules and coordinates work only, and delegates every business decision to the existing Core authority that already owns it:
+
+- **Lead Quality Agent/module** — delegates all lead-quality and qualification decisions to Core.
+- **Vendor Matching Agent/module** — delegates all eligibility, ranking and assignment decisions to Core.
+- **Follow-up Agent/module** — delegates all consent/suppression and send-eligibility decisions to the existing communication gates.
+- **Vendor Engagement & Renewal Agent/module** — delegates all vendor, package and credit facts to Core.
+
+**Exit criteria:**
+- every launch-critical asynchronous action owned by Vision is durably scheduled/audited;
+- a job cannot be concurrently owned by two healthy workers;
+- idempotent replay cannot duplicate authoritative business effects;
+- retry policy is bounded and classification-driven;
+- exhausted/ambiguous work is visible and recoverable;
+- kill switches/pause work;
+- admin can understand current state and safe next actions;
+- no duplicated Core decision authority exists;
+- no Jarvis dependency is introduced;
+- QF-MVP-80 can run integrated staging/canary launch exercises on top of Vision.
+
+**Non-goals:** no LLM/AI ranking/scoring; no Jarvis/Riya/Anisha implementation; no WhatsApp voice; no duplication of lead/vendor/package/credit/consent/provider business rules; no second admin dashboard rebuild; no Pune production launch itself (QF-MVP-80 owns launch).
+
+**Effort:** 5–8 focused engineering days. This target assumes reuse of the current Core and Admin infrastructure and explicitly **excludes** a duplicate rebuild of any existing Core authority or admin surface.
 
 ---
 

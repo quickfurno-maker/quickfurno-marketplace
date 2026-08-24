@@ -210,6 +210,37 @@
       "category_mismatch_observed_at_utc_date": "2026-08-24"
     },
     {
+      "internal_template_key": "consent_start_acknowledgement",
+      "provider_template_name": "qf_consent_start_acknowledgement_v2",
+      "requested_category": "UTILITY",
+      "last_proven_status": "APPROVED",
+      "last_proven_remote_category": "UTILITY",
+      "readback_semantic_match": true,
+      "create_post_count_at_submission": 1,
+      "create_post_count_at_reconciliation": 0,
+      "reconciliation_outcome": "RECONCILED_APPROVED",
+      "disposition": "APPROVED_UNMAPPED",
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "activation_authority": "NOT_GRANTED",
+      "delete_authority": "NOT_GRANTED",
+      "appeal_authority": "NOT_APPLICABLE",
+      "supersedes": "qf_consent_start_acknowledgement_v1",
+      "closed_by": "QF-MVP-40-R7M",
+      "approval_evidence": "meta-staging-start-ack-v2-approval-evidence",
+      "approval_observed_at_utc_date": "2026-08-24",
+      "evidence": [
+        "meta-staging-start-ack-v2-creation-evidence.json",
+        "meta-staging-start-ack-v2-approval-evidence.json"
+      ],
+      "notes": "QF-MVP-40-R7M category repair, closed. The predecessor qf_consent_start_acknowledgement_v1 was proven APPROVED but MARKETING on the dedicated staging WABA and is QUARANTINED_UNMAPPED; it is not deleted, edited, appealed or repurposed, and its own record is preserved separately. TWO-EVENT LIFECYCLE, recorded separately and never collapsed: (1) CREATION on 2026-08-24 — remote pre-state ABSENT, exactly one create POST (POST_ATTEMPT_COUNT=1, OBSERVED in the operator output, not inferred), create classification SUCCESS, immediate readback ALREADY_CREATED with remote status PENDING, category UTILITY, one component returned and semantic confirmation true; (2) APPROVAL readback later the same day — remote pre-state ALREADY_CREATED, status APPROVED, category UTILITY, create_post_count 0. Because ALREADY_CREATED is only reachable after a full semantic comparison against the committed payload using the REMOTE components, readback_semantic_match is true. The creation authority is CONSUMED and must never be re-run or retried. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase. SCOPE: this consent acknowledgement stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts.",
+      "create_post_count_basis": "OBSERVED",
+      "submission_outcome": "CREATED_PENDING",
+      "remote_status_at_creation": "PENDING",
+      "creation_evidence": "meta-staging-start-ack-v2-creation-evidence",
+      "creation_observed_at_utc_date": "2026-08-24"
+    },
+    {
       "internal_template_key": "vendor_onboarding_reminder",
       "provider_template_name": "qf_vendor_onboarding_reminder_v1",
       "requested_category": "UTILITY",

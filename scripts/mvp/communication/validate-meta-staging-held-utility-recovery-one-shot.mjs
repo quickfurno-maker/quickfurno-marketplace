@@ -655,9 +655,16 @@ record("H09 v1 historical remote truth is APPROVED / MARKETING / quarantined", (
     && e.superseded_by === CURRENT_START_ACK.name
     && e.create_post_count_at_submission === 1;
 })());
-record("H10 v2 has NO ledger entry — the ledger records only PROVEN remote state", (() => {
+record("H10 v2 now has a ledger entry, and v1's quarantined row still sits beside it", (() => {
+  // QF-MVP-40-R7M closeout: the ledger deliberately carried no v2 row until its remote
+  // state was proven. The 2026-08-24 approval readback supplied that proof, so BOTH rows
+  // now exist — the successor never replaces the quarantined predecessor.
   const L = JSON.parse(readFileSync(resolve("docs/provider-manifests/meta-template-remote-state.json"), "utf8"));
-  return !L.entries.some((x) => x.provider_template_name === CURRENT_START_ACK.name);
+  const v2 = L.entries.find((x) => x.provider_template_name === CURRENT_START_ACK.name);
+  const v1 = L.entries.find((x) => x.provider_template_name === "qf_consent_start_acknowledgement_v1");
+  return !!v2 && v2.last_proven_status === "APPROVED" && v2.last_proven_remote_category === "UTILITY"
+    && !!v1 && v1.last_proven_remote_category === "MARKETING"
+    && v1.disposition === "QUARANTINED_UNMAPPED";
 })());
 record("H11 the SEED_SET mapping authority points at v2, not the quarantined v1", (() => {
   const src = readFileSync(resolve("scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs"), "utf8");

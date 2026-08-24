@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   EXPECTED_BODY_TEXT, EXPECTED_IDENTITY_DIGESTS, EXPECTED_PAYLOAD_FINGERPRINT, ExitCode,
@@ -47,6 +47,14 @@ const r7lSrc = readFileSync(resolve(R7L_OPERATOR), "utf8");
 const seederSrc = readFileSync(resolve(SEEDER), "utf8");
 const EVIDENCE = "docs/provider-manifests/meta-staging-start-ack-category-mismatch-evidence.json";
 const evidence = JSON.parse(readFileSync(resolve(EVIDENCE), "utf8"));
+const APPROVAL_EVIDENCE = "docs/provider-manifests/meta-staging-start-ack-v2-approval-evidence.json";
+const approval = JSON.parse(readFileSync(resolve(APPROVAL_EVIDENCE), "utf8"));
+const CREATION_EVIDENCE = "docs/provider-manifests/meta-staging-start-ack-v2-creation-evidence.json";
+const creation = JSON.parse(readFileSync(resolve(CREATION_EVIDENCE), "utf8"));
+const packetValidatorSrc = readFileSync(resolve("scripts/mvp/communication/validate-meta-template-submission-packet.mjs"), "utf8");
+const READINESS = "docs/provider-manifests/meta-template-inactive-mapping-readiness.json";
+const readiness = JSON.parse(readFileSync(resolve(READINESS), "utf8"));
+const internalSeedSrc = readFileSync(resolve("scripts/mvp/communication/seed-internal-staging-templates.mjs"), "utf8");
 const vendorHttpSrc = vendorSrc;
 
 const REAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
@@ -204,8 +212,12 @@ record("Q07 the ledger records v1 as APPROVED / MARKETING / quarantined / supers
     && e.superseded_by === TARGET_TEMPLATE_NAME
     && e.create_post_count_at_submission === 1;
 })());
-record("Q08 v2 has NO ledger entry — the ledger records only PROVEN remote state",
-  !ledger.entries.some((x) => x.provider_template_name === TARGET_TEMPLATE_NAME));
+record("Q08 v2 now HAS a ledger entry, because its remote state is finally PROVEN", (() => {
+  // Before the live creation the ledger deliberately carried no v2 row: it records only
+  // proven remote state. The 2026-08-24 approval readback supplied that proof.
+  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && e.last_proven_status === "APPROVED" && e.last_proven_remote_category === "UTILITY";
+})());
 record("Q09 the canonical packet now names v2 as the active START template",
   entryOf(packet).provider_template_name === TARGET_TEMPLATE_NAME
   && entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT);
@@ -268,11 +280,11 @@ record("P06 submit_now flipped to true is rejected", (() => {
   return loadCanonicalPayload(p).reason === "submit_now_not_held";
 })());
 record("P07 approval_status drift is rejected", (() => {
-  const p = clonePacket(); entryOf(p).local_state.approval_status = "approved";
+  const p = clonePacket(); entryOf(p).local_state.approval_status = "draft";
   return loadCanonicalPayload(p).reason === "approval_status_unexpected";
 })());
 record("P08 submission_state drift is rejected", (() => {
-  const p = clonePacket(); entryOf(p).local_state.submission_state = "APPROVED_UNMAPPED";
+  const p = clonePacket(); entryOf(p).local_state.submission_state = "DRAFT_NOT_SUBMITTED";
   return loadCanonicalPayload(p).reason === "submission_state_unexpected";
 })());
 record("P09 a missing local_state is rejected", (() => {
@@ -318,7 +330,7 @@ record("P19 the pinned fingerprint equals the packet's committed fingerprint",
   entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
   && createHash("sha256").update(JSON.stringify(entryOf(packet).creation_payload)).digest("hex")
      === EXPECTED_PAYLOAD_FINGERPRINT);
-record("P20 the committed packet holds the required draft/held state",
+record("P20 the committed packet holds the required approved/held state",
   entryOf(packet).submit_now === REQUIRED_PACKET_STATE.submitNow
   && entryOf(packet).local_state.approval_status === REQUIRED_PACKET_STATE.approvalStatus
   && entryOf(packet).local_state.submission_state === REQUIRED_PACKET_STATE.submissionState);
@@ -732,6 +744,224 @@ record("W10 the unmutated adapter still passes the same two rules — W09 is not
   return calls[0].url === `${BASE}/message_templates`
     && calls.every((c) => !/\/messages(\?|$)/.test(c.url));
 })());
+
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R7M POST-APPROVAL CLOSEOUT — v2 is now proven APPROVED / UTILITY.
+// ---------------------------------------------------------------------------
+record("K01 the v2 approval evidence artifact exists and is well formed",
+  approval.artifact === "meta-staging-start-ack-v2-approval-evidence"
+  && approval.phase === "QF-MVP-40-R7M"
+  && approval.contains_secrets === false
+  && approval.authorizes_meta_calls === false
+  && approval.authorizes_mapping === false
+  && approval.authorizes_sending === false);
+record("K02 the v2 evidence records APPROVED / UTILITY / en", (() => {
+  const r = approval.approval_readback;
+  return r.remote_status === "APPROVED" && r.remote_category === "UTILITY"
+    && r.remote_language === "en" && r.remote_pre_state === "ALREADY_CREATED";
+})());
+record("K03 the v2 evidence pins the exact fingerprint and remote id",
+  approval.approval_readback.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
+  && approval.approval_readback.provider_template_name === TARGET_TEMPLATE_NAME
+  && approval.approval_readback.remote_template_id === "1338981184671889");
+record("K04 the approval readback issued ZERO POSTs",
+  approval.approval_readback.post_attempt_count === 0
+  && approval.approval_readback.operator_mode === "DRY RUN");
+record("K05 the v2 evidence records the live asset proof it actually observed",
+  approval.approval_readback.phone_quality_rating === "GREEN"
+  && approval.approval_readback.subscriber_count === 1
+  && approval.approval_readback.live_asset_proof === true
+  && approval.approval_readback.identity_authorised === true);
+record("K06 semantic match is DERIVED from ALREADY_CREATED, not asserted independently",
+  approval.semantic_proof.readback_semantic_match === true
+  && /ALREADY_CREATED is only reachable/i.test(approval.semantic_proof.derivation)
+  && /classifyPreState/.test(approval.semantic_proof.authority));
+record("K07 creation provenance is now OBSERVED, and no Meta body is fabricated",
+  approval.creation_provenance.create_post_count_basis === "OBSERVED"
+  && approval.creation_provenance.create_post_count === 1
+  && approval.creation_provenance.submission_outcome === "CREATED_PENDING"
+  && approval.creation_provenance.creation_evidence === "meta-staging-start-ack-v2-creation-evidence"
+  && approval.approval_readback.meta_request_body_captured === false
+  && approval.approval_readback.meta_response_body_captured === false);
+record("K08 the v2 evidence is secret-free", (() => {
+  const raw = JSON.stringify(approval);
+  return !/(EAA[A-Za-z0-9]{20,}|Bearer\s|app_secret|access_token)/i.test(raw)
+    && !/\+\d{10,}/.test(raw)
+    && !new RegExp("2097008694503517|27861262223494153|1333595106493545").test(raw);
+})());
+record("K09 the v1 mismatch evidence artifact remains intact and untouched",
+  evidence.artifact === "meta-staging-start-ack-category-mismatch-evidence"
+  && evidence.observation.actual_category === "MARKETING"
+  && evidence.observation.post_attempt_count === 0
+  && evidence.historical_evidence_non_claim.prior_evidence_unchanged === true);
+record("K10 v1 remains APPROVED / MARKETING / QUARANTINED_UNMAPPED in the ledger", (() => {
+  const e = ledger.entries.find((x) => x.provider_template_name === QUARANTINED_PREDECESSOR.name);
+  return !!e && e.last_proven_status === "APPROVED"
+    && e.last_proven_remote_category === "MARKETING"
+    && e.disposition === "QUARANTINED_UNMAPPED"
+    && e.superseded_by === TARGET_TEMPLATE_NAME
+    && e.category_mismatch_evidence === evidence.artifact;
+})());
+record("K11 the ledger now carries v2 as APPROVED / UTILITY / APPROVED_UNMAPPED", (() => {
+  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && e.internal_template_key === TARGET_TEMPLATE_KEY
+    && e.requested_category === "UTILITY"
+    && e.last_proven_status === "APPROVED"
+    && e.last_proven_remote_category === "UTILITY"
+    && e.readback_semantic_match === true
+    && e.disposition === "APPROVED_UNMAPPED"
+    && e.supersedes === QUARANTINED_PREDECESSOR.name
+    && e.approval_evidence === approval.artifact
+    && e.send_authority === "DENIED" && e.mapping_authority === "DENIED";
+})());
+record("K12 the ledger keeps BOTH rows — the successor never replaces the predecessor",
+  ledger.entries.filter((x) => x.internal_template_key === TARGET_TEMPLATE_KEY).length === 2);
+record("K13 the current canonical packet selects v2, approved and held",
+  entryOf(packet).provider_template_name === TARGET_TEMPLATE_NAME
+  && entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
+  && entryOf(packet).local_state.approval_status === "approved"
+  && entryOf(packet).local_state.submission_state === "APPROVED_UNMAPPED"
+  && entryOf(packet).submit_now === false);
+record("K14 the approved ready set is restored to eight and includes this key", (() => {
+  const approved = packet.templates.filter((t) => t.local_state.approval_status === "approved");
+  return approved.length === 8
+    && approved.some((t) => t.internal_template_key === TARGET_TEMPLATE_KEY);
+})());
+record("K15 the readiness manifest restored the key with the v2 name and fingerprint", (() => {
+  const t = readiness.templates.find((x) => x.internal_template_key === TARGET_TEMPLATE_KEY);
+  return readiness.templates.length === 8
+    && readiness.counts.evidence_bound_ack === 3
+    && readiness.counts.ordinary_business === 5
+    && !!t && t.provider_template_name === TARGET_TEMPLATE_NAME
+    && t.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
+    && t.proven_remote_status === "APPROVED"
+    && t.proven_remote_category === "UTILITY"
+    && t.desired_mapping_state === "INACTIVE"
+    && t.send_authority === "DENIED";
+})());
+record("K16 the internal staging-seed authority restored the key",
+  /key: "consent_start_acknowledgement", classification: "EVIDENCE_BOUND_ACK"/.test(internalSeedSrc));
+record("K17 SEED_SET still points at v2, never the quarantined v1", (() => {
+  const m = seederSrc.match(/export const SEED_SET = Object\.freeze\(\[[\s\S]*?\n\]\);/);
+  return !!m && m[0].includes(TARGET_TEMPLATE_NAME) && m[0].includes(EXPECTED_PAYLOAD_FINGERPRINT)
+    && !m[0].includes(QUARANTINED_PREDECESSOR.name)
+    && !m[0].includes(QUARANTINED_PREDECESSOR.fingerprint);
+})());
+record("K18 the mapping seeder preflight is still fail-closed on status AND category",
+  /r\.status !== "APPROVED"/.test(seederSrc) && /META_STATUS_NOT_APPROVED/.test(seederSrc)
+  && /r\.category !== "UTILITY"/.test(seederSrc) && /META_CATEGORY_MISMATCH/.test(seederSrc));
+record("K19 R7L history is still immutable — registry pins v1 and never names v2",
+  /providerName: "qf_consent_start_acknowledgement_v1"/.test(r7lSrc)
+  && /"70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"/.test(r7lSrc)
+  && !/qf_consent_start_acknowledgement_v2/.test(r7lSrc));
+record("K20 no validator may accept v1 as the current START Utility target", (() => {
+  // The packet no longer names v1, so R7M refuses it outright, and a MARKETING remote row
+  // can never reach ALREADY_CREATED.
+  const p = clonePacket();
+  const e = entryOf(p);
+  e.provider_template_name = QUARANTINED_PREDECESSOR.name;
+  e.creation_payload.name = QUARANTINED_PREDECESSOR.name;
+  return loadCanonicalPayload(p).reason === "still_pinned_to_quarantined_v1"
+    && pre([goodRow({ category: "MARKETING" })]) === RepairPreState.PRESENT_CATEGORY_MISMATCH;
+})());
+
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R7M EVIDENCE TIGHTENING — the creation run is now directly evidenced,
+// so the inferred provenance and the R7M-specific ledger exception are both gone.
+// ---------------------------------------------------------------------------
+record("C01 the v2 creation evidence artifact exists and is well formed",
+  creation.artifact === "meta-staging-start-ack-v2-creation-evidence"
+  && creation.phase === "QF-MVP-40-R7M"
+  && creation.contains_secrets === false
+  && creation.authorizes_meta_calls === false
+  && creation.authorizes_mapping === false
+  && creation.authorizes_sending === false);
+record("C02 the creation artifact pins the exact v2 name and fingerprint",
+  creation.creation_run.provider_template_name === TARGET_TEMPLATE_NAME
+  && creation.creation_run.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
+  && creation.creation_run.internal_template_key === TARGET_TEMPLATE_KEY);
+record("C03 it proves EXACTLY ONE POST, observed not inferred",
+  creation.creation_run.post_attempt_count === 1
+  && creation.post_count_provenance.basis === "OBSERVED"
+  && creation.post_count_provenance.observed_line === "POST_ATTEMPT_COUNT=1"
+  && creation.creation_run.second_post_issued === false
+  && creation.creation_run.retry_issued === false);
+record("C04 it proves SUCCESS / CREATED from an ABSENT pre-state",
+  creation.creation_run.remote_pre_state === "ABSENT"
+  && creation.creation_run.create_classification === "SUCCESS"
+  && creation.creation_run.result === "CREATED"
+  && creation.creation_run.operator_mode === "EXECUTE"
+  && creation.creation_run.operator_exit_code === 0);
+record("C05 it proves the creation readback was PENDING / UTILITY / en",
+  creation.creation_run.readback_state === "ALREADY_CREATED"
+  && creation.creation_run.remote_status_at_creation_readback === "PENDING"
+  && creation.creation_run.remote_category === "UTILITY"
+  && creation.creation_run.remote_language === "en"
+  && creation.creation_run.remote_components_returned === 1
+  && creation.creation_run.remote_template_id === "1338981184671889");
+record("C06 it proves semantic confirmation true",
+  creation.creation_run.semantic_confirmation === true);
+record("C07 it records the repo state the run reported and fabricates no Meta body",
+  creation.creation_run.head_unchanged === true
+  && creation.creation_run.remote_head_unchanged === true
+  && creation.creation_run.worktree_clean === true
+  && creation.creation_run.meta_request_body_captured === false
+  && creation.creation_run.meta_response_body_captured === false);
+record("C08 it declares the creation authority CONSUMED and non-retryable",
+  creation.authority_consumption.creation_authority === "CONSUMED"
+  && creation.authority_consumption.retry_permitted === false
+  && creation.authority_consumption.second_post_possible === false);
+record("C09 the creation artifact is secret-free", (() => {
+  const raw = JSON.stringify(creation);
+  return !/(EAA[A-Za-z0-9]{20,}|Bearer\s|app_secret|access_token)/i.test(raw)
+    && !/\+\d{10,}/.test(raw)
+    && !new RegExp("2097008694503517|27861262223494153|1333595106493545").test(raw);
+})());
+record("C10 the two events are recorded separately and never collapsed",
+  creation.lifecycle_position.sequence === 1 && creation.lifecycle_position.of === 2
+  && creation.lifecycle_position.next_event_artifact === approval.artifact
+  && approval.lifecycle_position.sequence === 2
+  && approval.lifecycle_position.previous_event_artifact === creation.artifact
+  && /never be collapsed/i.test(creation.lifecycle_position.non_collapse_statement));
+record("C11 the two events genuinely differ: PENDING at creation, APPROVED later",
+  creation.creation_run.remote_status_at_creation_readback === "PENDING"
+  && approval.approval_readback.remote_status === "APPROVED"
+  && creation.creation_run.post_attempt_count === 1
+  && approval.approval_readback.post_attempt_count === 0);
+record("C12 the ledger records the OBSERVED creation provenance", (() => {
+  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && e.create_post_count_at_submission === 1
+    && e.create_post_count_basis === "OBSERVED"
+    && e.submission_outcome === "CREATED_PENDING"
+    && e.remote_status_at_creation === "PENDING"
+    && e.creation_evidence === creation.artifact;
+})());
+record("C13 the ledger cites BOTH artifacts in the standard two-evidence shape", (() => {
+  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && Array.isArray(e.evidence) && e.evidence.length === 2
+    && e.evidence.includes("meta-staging-start-ack-v2-creation-evidence.json")
+    && e.evidence.includes("meta-staging-start-ack-v2-approval-evidence.json");
+})());
+record("C14 both cited evidence files actually exist on disk",
+  existsSync(resolve("docs/provider-manifests/meta-staging-start-ack-v2-creation-evidence.json"))
+  && existsSync(resolve("docs/provider-manifests/meta-staging-start-ack-v2-approval-evidence.json")));
+record("C15 the R7M-specific closed-ledger exception was REMOVED",
+  !/r7m/.test(packetValidatorSrc)
+  && /c\.submission_outcome === "CREATED_PENDING"/.test(packetValidatorSrc)
+  && /c\.evidence\.length === 2/.test(packetValidatorSrc));
+record("C16 the v2 ledger row still records the final APPROVED / UTILITY state", (() => {
+  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && e.last_proven_status === "APPROVED"
+    && e.last_proven_remote_category === "UTILITY"
+    && e.reconciliation_outcome === "RECONCILED_APPROVED"
+    && e.create_post_count_at_reconciliation === 0
+    && e.disposition === "APPROVED_UNMAPPED";
+})());
+record("C17 the creation artifact leaves the quarantined predecessor untouched",
+  creation.predecessor.provider_template_name === QUARANTINED_PREDECESSOR.name
+  && creation.predecessor.remote_category === "MARKETING"
+  && creation.predecessor.disposition === "QUARANTINED_UNMAPPED"
+  && creation.predecessor.touched_by_this_operation === false);
 
 console.log(`\nSummary: ${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

@@ -1,0 +1,103 @@
+{
+  "artifact": "meta-staging-start-ack-v2-approval-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7M",
+  "operation_id": "QF-MVP-40-R7M-START-ACK-V2-APPROVAL-2026-08-24",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Immutable record of the GET-only approval readback that closes the QF-MVP-40-R7M category repair. It proves that qf_consent_start_acknowledgement_v2 exists on the dedicated staging WABA as APPROVED with Meta category UTILITY, and that the reading itself issued zero POSTs. It is the durable backing for the v2 entry in meta-template-remote-state.json and for restoring consent_start_acknowledgement to the approved-Utility readiness and internal-seed authorities.",
+  "privacy": "No token, app secret, phone number or WABA id appears here. The remote template id is recorded because the operator output above disclosed it and it is a non-secret Meta object identifier; no credential is derivable from it. No Meta request or response body is reproduced: none was captured, and fabricating one would be evidence forgery.",
+  "approval_readback": {
+    "observed_at_utc_date": "2026-08-24",
+    "observation_method": "GET_ONLY_PRE_STATE_READBACK",
+    "observed_by": "QF-MVP-40-R7M one-shot operator, DRY RUN mode",
+    "operator_mode": "DRY RUN",
+    "internal_template_key": "consent_start_acknowledgement",
+    "provider_template_name": "qf_consent_start_acknowledgement_v2",
+    "remote_template_id": "1338981184671889",
+    "payload_fingerprint": "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054",
+    "remote_status": "APPROVED",
+    "remote_category": "UTILITY",
+    "remote_language": "en",
+    "remote_pre_state": "ALREADY_CREATED",
+    "identity_authorised": true,
+    "canonical_payload_proved": true,
+    "live_asset_proof": true,
+    "phone_quality_rating": "GREEN",
+    "subscriber_count": 1,
+    "post_attempt_count": 0,
+    "operator_result": "ALREADY_CREATED — no POST. The v2 repair is already in place.",
+    "raw_operator_output": [
+      "mode                    : DRY RUN",
+      "target template         : qf_consent_start_acknowledgement_v2",
+      "quarantined predecessor : qf_consent_start_acknowledgement_v1 (MARKETING) — never touched",
+      "identity authorised     : true",
+      "canonical payload proved: true",
+      "payload fingerprint     : 4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054",
+      "live asset proof        : true",
+      "phone quality rating    : GREEN",
+      "subscriber count        : 1",
+      "remote pre-state        : ALREADY_CREATED",
+      "existing row            : status=APPROVED category=UTILITY language=en",
+      "POST_ATTEMPT_COUNT=0",
+      "RESULT: ALREADY_CREATED — no POST. The v2 repair is already in place."
+    ],
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false,
+    "capture_non_claim": "Only the operator's own output lines above were captured. No Meta HTTP request or response body was recorded, and none is reconstructed here."
+  },
+  "semantic_proof": {
+    "readback_semantic_match": true,
+    "derivation": "ALREADY_CREATED is only reachable in the R7M classifier when the remote row is a single exact name+language match, its status is APPROVED or PENDING, its category equals the pinned UTILITY, its components are a usable array, AND templatesAreIdentical() returns true against the committed canonical payload using the REMOTE components only. The observed ALREADY_CREATED therefore proves full semantic identity; it is not asserted independently of the operator's own classification.",
+    "authority": "scripts/mvp/communication/create-meta-staging-start-ack-v2-repair-once.mjs :: classifyPreState"
+  },
+  "creation_provenance": {
+    "created_by": "QF-MVP-40-R7M one-shot operator",
+    "create_post_count": 1,
+    "create_post_count_basis": "OBSERVED",
+    "creation_evidence": "meta-staging-start-ack-v2-creation-evidence",
+    "submission_outcome": "CREATED_PENDING",
+    "remote_status_at_creation": "PENDING",
+    "note": "The creation run's own stdout was supplied and is recorded verbatim in meta-staging-start-ack-v2-creation-evidence.json. This block previously carried an INFERRED post count and declined to state a submission outcome because that evidence was not yet available; both are now OBSERVED. The approval_readback block below is unchanged — it records a strictly later observation."
+  },
+  "predecessor": {
+    "provider_template_name": "qf_consent_start_acknowledgement_v1",
+    "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+    "remote_status": "APPROVED",
+    "remote_category": "MARKETING",
+    "disposition": "QUARANTINED_UNMAPPED",
+    "touched_by_this_operation": false,
+    "statement": "v1 was not modified, deleted, appealed, recreated or repurposed by this operation. Its own evidence lives in meta-staging-start-ack-category-mismatch-evidence.json and is not rewritten."
+  },
+  "authorities_explicitly_not_granted": {
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_APPLICABLE",
+    "recreation_authority": "NOT_GRANTED",
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "provider_arm_authority": "NOT_GRANTED",
+    "activation_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED",
+    "statement": "A Utility approval proves the PROVIDER CONTRACT ONLY. It creates no ordinary consent authority, no mapping authority, no runtime activation and no send authority; those require a later, separately authorized phase. This consent acknowledgement additionally stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
+  },
+  "ledger_linkage": {
+    "ledger_file": "docs/provider-manifests/meta-template-remote-state.json",
+    "ledger_entry_provider_template_name": "qf_consent_start_acknowledgement_v2",
+    "ledger_fields_backed_by_this_artifact": [
+      "last_proven_status = APPROVED",
+      "last_proven_remote_category = UTILITY",
+      "readback_semantic_match = true",
+      "disposition = APPROVED_UNMAPPED",
+      "supersedes = qf_consent_start_acknowledgement_v1"
+    ]
+  },
+  "lifecycle_position": {
+    "sequence": 2,
+    "of": 2,
+    "this_event": "ALREADY_CREATED -> APPROVED / UTILITY -> zero POST",
+    "previous_event": "ABSENT -> exactly one POST -> CREATED -> PENDING / UTILITY",
+    "previous_event_artifact": "meta-staging-start-ack-v2-creation-evidence"
+  }
+}

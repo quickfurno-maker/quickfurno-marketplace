@@ -81,7 +81,7 @@ const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
  */
 const CLOSED_KEYS = ["consent_help_response", "lead_received",
   "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
-  "consent_stop_acknowledgement", "vendor_onboarding_reminder"];
+  "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"];
 /**
  * QF-MVP-40-R7M — SUPERSEDED templates.
  *
@@ -133,6 +133,9 @@ const CLOSED_LEDGER = [
   { key: "consent_stop_acknowledgement", name: "qf_consent_stop_acknowledgement_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T07-17-16-909Z.json",
     rec: "QF-MVP-40-WAVE1-consent_stop_acknowledgement-META-RECONCILIATION-2026-07-31T08-36-22-769Z.json" },
+  { key: "consent_start_acknowledgement", name: "qf_consent_start_acknowledgement_v2",
+    sub: "meta-staging-start-ack-v2-creation-evidence.json",
+    rec: "meta-staging-start-ack-v2-approval-evidence.json" },
   { key: "vendor_onboarding_reminder", name: "qf_vendor_onboarding_reminder_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T11-13-26-322Z.json",
     rec: "QF-MVP-40-WAVE1-vendor_onboarding_reminder-META-RECONCILIATION-2026-07-31T11-20-57-172Z.json" },
@@ -710,8 +713,8 @@ const R = {
     return N.templates.every((t) => {
       // A superseded key keeps its historical evidence pair; only the LEDGER records the
       // later category-mismatch truth, and this subset is not rewritten to match it.
-      const x = CLOSED_LEDGER.find((c) => c.key === t.internal_template_key)
-        ?? SUPERSEDED[t.internal_template_key];
+      const x = SUPERSEDED[t.internal_template_key]
+        ?? CLOSED_LEDGER.find((c) => c.key === t.internal_template_key);
       return !!x
         && t.owner_copy_decision === "APPROVED_BY_OWNER"
         && t.category_review_decision === "UTILITY_MACHINE_PROVEN"

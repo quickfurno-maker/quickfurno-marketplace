@@ -102,14 +102,23 @@ export const QUARANTINED_PREDECESSOR = Object.freeze({
 });
 
 /**
- * The packet state this target MUST be in. v2 has never been submitted anywhere, so
- * `draft` / `DRAFT_NOT_SUBMITTED` is the truthful state, and `submit_now: false` keeps the
- * ordinary submitter out. The operator never WRITES these — it refuses on drift.
+ * The packet state this target MUST be in.
+ *
+ * QF-MVP-40-R7M CLOSEOUT: before the live creation this was `draft` /
+ * `DRAFT_NOT_SUBMITTED`, which was the truthful state for a template that had never been
+ * submitted anywhere. A GET-only readback on 2026-08-24 then proved v2 remotely APPROVED
+ * with category UTILITY, so the canonical packet advanced to `approved` /
+ * `APPROVED_UNMAPPED` — the same posture every other spent one-shot target carries.
+ *
+ * Pinning the stale draft state would make this operator refuse its own idempotent
+ * ALREADY_CREATED path forever, so the pin follows the proven lifecycle. `submit_now`
+ * stays false: creation remains HELD and the ordinary submitter can never pick it up.
+ * The operator never WRITES these — it refuses on drift.
  */
 export const REQUIRED_PACKET_STATE = Object.freeze({
   submitNow: false,
-  approvalStatus: "draft",
-  submissionState: "DRAFT_NOT_SUBMITTED",
+  approvalStatus: "approved",
+  submissionState: "APPROVED_UNMAPPED",
 });
 
 /** The EXACT field set both the pre-state GET and the post-create readback must request. */

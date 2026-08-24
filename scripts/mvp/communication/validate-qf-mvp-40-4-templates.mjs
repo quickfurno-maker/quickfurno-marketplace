@@ -43,7 +43,7 @@ function bodyVars(body) {
  */
 const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
   "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
-  "consent_stop_acknowledgement", "vendor_onboarding_reminder"]);
+  "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
 
 const R = {
   uniqueKeys(m) {

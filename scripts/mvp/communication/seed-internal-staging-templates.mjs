@@ -55,6 +55,7 @@ export const ATTESTATION_TTL_MS = 15 * 60 * 1000;
 export const TARGET_SPEC = Object.freeze([
   Object.freeze({ key: "consent_help_response", classification: "EVIDENCE_BOUND_ACK", category: "authentication" }),
   Object.freeze({ key: "consent_stop_acknowledgement", classification: "EVIDENCE_BOUND_ACK", category: "authentication" }),
+  Object.freeze({ key: "consent_start_acknowledgement", classification: "EVIDENCE_BOUND_ACK", category: "authentication" }),
   Object.freeze({ key: "lead_received", classification: "ORDINARY_BUSINESS", category: "business" }),
   Object.freeze({ key: "client_lead_status_update", classification: "ORDINARY_BUSINESS", category: "business" }),
   Object.freeze({ key: "client_matching_update", classification: "ORDINARY_BUSINESS", category: "business" }),

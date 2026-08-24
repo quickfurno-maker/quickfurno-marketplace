@@ -71,14 +71,14 @@ const R = {
     && /GIT_DIRTY/.test(exec)
     && /rev-parse", "HEAD"/.test(exec)
     && /head: git\.head/.test(exec),
-  exactTargetSet: () => TARGET_SPEC.length === 7 && TARGET_SPEC.map((t) => t.key).join(",") === [
-    "consent_help_response", "consent_stop_acknowledgement",
+  exactTargetSet: () => TARGET_SPEC.length === 8 && TARGET_SPEC.map((t) => t.key).join(",") === [
+    "consent_help_response", "consent_stop_acknowledgement", "consent_start_acknowledgement",
     "lead_received", "client_lead_status_update", "client_matching_update",
     "lead_assignment_alert", "vendor_onboarding_reminder",
   ].join(","),
-  exactClassificationSplit: () => TARGET_SPEC.filter((t) => t.classification === "EVIDENCE_BOUND_ACK").length === 2
+  exactClassificationSplit: () => TARGET_SPEC.filter((t) => t.classification === "EVIDENCE_BOUND_ACK").length === 3
     && TARGET_SPEC.filter((t) => t.classification === "ORDINARY_BUSINESS").length === 5,
-  exactInternalCategories: () => TARGET_SPEC.filter((t) => t.category === "authentication").length === 2
+  exactInternalCategories: () => TARGET_SPEC.filter((t) => t.category === "authentication").length === 3
     && TARGET_SPEC.filter((t) => t.category === "business").length === 5,
   canonicalConstants: () => CHANNEL === "whatsapp" && LANGUAGE === "en"
     && INTERNAL_VERSION === "1.0" && INTERNAL_READINESS === "provider_mapping_required"
@@ -123,7 +123,7 @@ const R = {
   jarvisRefRejected: () => resolveStagingTarget({ ...GOOD_ENV, QF_STAGING_SUPABASE_URL: `https://${FORBIDDEN_PROJECT_REFS.jarvis}.supabase.co` }).reason === SeedFailure.PROJECT_REF_FORBIDDEN_JARVIS,
   otherRefRejected: () => resolveStagingTarget({ ...GOOD_ENV, QF_STAGING_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co" }).reason === SeedFailure.PROJECT_REF_NOT_AUTHORIZED,
 
-  realAuthorityLoads: () => authority.ok === true && expectedRows.length === 7,
+  realAuthorityLoads: () => authority.ok === true && expectedRows.length === 8,
   realAuthorityExactShape: () => authority.ok && expectedRows.every((r) =>
     r.channel === "whatsapp"
     && r.language === "en"
@@ -134,7 +134,7 @@ const R = {
     && r.is_active === true
     && typeof r.description === "string" && r.description.length > 0),
   realAuthorityCategorySplit: () => authority.ok
-    && expectedRows.filter((r) => r.category === "authentication").length === 2
+    && expectedRows.filter((r) => r.category === "authentication").length === 3
     && expectedRows.filter((r) => r.category === "business").length === 5,
 
   missingClassifiesCreate: () => authority.ok && classifyExistingTemplate(null, expectedRows[0]).outcome === "MISSING",
@@ -146,7 +146,7 @@ const R = {
   ].every(([field, value]) => classifyExistingTemplate({ ...expectedRows[0], [field]: value }, expectedRows[0]).outcome === "CONFLICT"),
   emptyPlanCreatesEight: () => {
     const p = buildPlan([], expectedRows);
-    return authority.ok && p.ok && p.missingRows.length === 7
+    return authority.ok && p.ok && p.missingRows.length === 8
       && p.actions.every((a) => a.action === "CREATE_INTERNAL_TEMPLATE");
   },
   exactPlanWritesZero: () => {
@@ -156,14 +156,14 @@ const R = {
   },
   mixedPlanIsBounded: () => {
     const p = buildPlan(exactRows.slice(0, 3), expectedRows);
-    return authority.ok && p.ok && p.missingRows.length === 4 && p.actions.length === 7;
+    return authority.ok && p.ok && p.missingRows.length === 5 && p.actions.length === 8;
   },
   duplicateTargetFailsClosed: () => {
     const p = buildPlan([exactRows[0], exactRows[0]], expectedRows);
     return authority.ok && p.ok === false && p.reason === SeedFailure.INTERNAL_TEMPLATE_CONFLICT;
   },
   readbackExactPasses: () => authority.ok && verifyReadback(exactRows, expectedRows).ok === true,
-  readbackMissingFails: () => authority.ok && verifyReadback(exactRows.slice(0, 6), expectedRows).reason === SeedFailure.READBACK_FAILED,
+  readbackMissingFails: () => authority.ok && verifyReadback(exactRows.slice(0, 7), expectedRows).reason === SeedFailure.READBACK_FAILED,
   readbackExtraFails: () => authority.ok && verifyReadback([...exactRows, { ...exactRows[0], template_key: "extra" }], expectedRows).reason === SeedFailure.READBACK_FAILED,
 
   attestationRoundTrip: () => {
@@ -217,7 +217,7 @@ const R = {
       gitState: () => ({ head: "abc", branch: AUTHORIZED_BRANCH, root: "C:\\repo", clean: true }),
       authorityLoader: () => authority,
     });
-    return r.ok && schemaReads === 1 && targetReads === 1 && writes === 0 && r.missingRows.length === 7;
+    return r.ok && schemaReads === 1 && targetReads === 1 && writes === 0 && r.missingRows.length === 8;
   },
 
   noMetaNetworkSurface: () => !/graph\.facebook|\/messages\b|\bfetch\s*\(/i.test(exec),

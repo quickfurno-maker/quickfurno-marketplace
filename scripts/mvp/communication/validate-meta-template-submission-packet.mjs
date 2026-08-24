@@ -81,7 +81,33 @@ const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
  */
 const CLOSED_KEYS = ["consent_help_response", "lead_received",
   "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
-  "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"];
+  "consent_stop_acknowledgement", "vendor_onboarding_reminder"];
+/**
+ * QF-MVP-40-R7M — SUPERSEDED templates.
+ *
+ * A key lands here when its historically-approved version was later proven on the CURRENT
+ * dedicated WABA to carry a category Meta assigned rather than the one requested, so the
+ * version is quarantined and a NEW version becomes canonical.
+ *
+ * The historical record is FROZEN (name + fingerprint + the remote category actually
+ * returned) while the canonical packet advances to the successor. This is what lets
+ * `consent_start_acknowledgement` leave CLOSED_KEYS without pretending v1 never happened,
+ * and it is why the general Utility invariant below is NOT weakened: only an explicitly
+ * listed historical mismatch record may carry a non-Utility category.
+ */
+const SUPERSEDED = Object.freeze({
+  consent_start_acknowledgement: Object.freeze({
+    historicalName: "qf_consent_start_acknowledgement_v1",
+    historicalFingerprint: "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+    historicalRemoteCategory: "MARKETING",
+    historicalDisposition: "QUARANTINED_UNMAPPED",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
+    rec: "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json",
+    currentName: "qf_consent_start_acknowledgement_v2",
+    currentFingerprint: "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054",
+  }),
+});
+const SUPERSEDED_KEYS = Object.freeze(Object.keys(SUPERSEDED));
 
 /**
  * Every remotely-CLOSED template, with the exact evidence that proves it. Table-driven so
@@ -107,9 +133,6 @@ const CLOSED_LEDGER = [
   { key: "consent_stop_acknowledgement", name: "qf_consent_stop_acknowledgement_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T07-17-16-909Z.json",
     rec: "QF-MVP-40-WAVE1-consent_stop_acknowledgement-META-RECONCILIATION-2026-07-31T08-36-22-769Z.json" },
-  { key: "consent_start_acknowledgement", name: "qf_consent_start_acknowledgement_v1",
-    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
-    rec: "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json" },
   { key: "vendor_onboarding_reminder", name: "qf_vendor_onboarding_reminder_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T11-13-26-322Z.json",
     rec: "QF-MVP-40-WAVE1-vendor_onboarding_reminder-META-RECONCILIATION-2026-07-31T11-20-57-172Z.json" },
@@ -120,7 +143,8 @@ const SUBSET3 = "docs/provider-manifests/meta-wave1-next-utility-subset-3-review
 const DEFERRED_LANES = ["WAVE1_REMAINING_ORDINARY", "WAVE1_COMMERCIAL", "WAVE2_AUTHENTICATION",
   "WAVE3_MARKETING", "WAVE4_ADMIN_ALERTS"];
 /** Historical Wave 0 names that are NOT approved-and-closed but must stay in the ledger. */
-const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2"];
+const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2",
+  "qf_consent_start_acknowledgement_v1"];
 /** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
 const SUBSET1 = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
 const SUBSET1_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
@@ -653,6 +677,18 @@ const R = {
   subset2MatchesPacketVerbatim: (inj) => {
     const N = readSubset2(inj);
     return N.templates.length === 3 && N.templates.every((t, i) => {
+      // SUPERSEDED KEY: the subset must still quote the version it actually reviewed, so it
+      // is pinned to the frozen historical name + fingerprint. The current packet is FREE to
+      // name the successor — that divergence is the supersession, not a drift.
+      const sup = SUPERSEDED[t.internal_template_key];
+      if (sup) {
+        return t.provider_template_name === sup.historicalName
+          && t.payload_fingerprint === sup.historicalFingerprint
+          && t.payload_fingerprint === SUBSET2_FINGERPRINTS[i]
+          && t.payload_fingerprint === sha256(JSON.stringify(t.creation_payload))
+          && t.requested_category === "UTILITY"
+          && t.component_profile === "STANDARD_TEXT";
+      }
       const src = packet.templates.find((x) => x.internal_template_key === t.internal_template_key);
       return !!src && t.provider_template_name === src.provider_template_name
         && t.provider_language === src.provider_language
@@ -672,7 +708,10 @@ const R = {
         || N.counts.pending_owner_review !== 0) return false;
     if (!Array.isArray(N.explicit_non_authorizations) || N.explicit_non_authorizations.length < 6) return false;
     return N.templates.every((t) => {
-      const x = CLOSED_LEDGER.find((c) => c.key === t.internal_template_key);
+      // A superseded key keeps its historical evidence pair; only the LEDGER records the
+      // later category-mismatch truth, and this subset is not rewritten to match it.
+      const x = CLOSED_LEDGER.find((c) => c.key === t.internal_template_key)
+        ?? SUPERSEDED[t.internal_template_key];
       return !!x
         && t.owner_copy_decision === "APPROVED_BY_OWNER"
         && t.category_review_decision === "UTILITY_MACHINE_PROVEN"
@@ -764,8 +803,10 @@ const R = {
     const keys = N.templates.map((t) => t.internal_template_key);
     const closed = N.status === "CLOSED_APPROVED_UNMAPPED";
     const membership = closed
-      ? keys.every((k) => CLOSED_KEYS.includes(k))     // closed => all must be approved
-      : keys.every((k) => !CLOSED_KEYS.includes(k));   // open   => none may be approved
+      // A superseded key was approved-and-closed WHEN THIS SUBSET WAS REVIEWED; the
+      // subset is a historical record, so supersession must not retroactively break it.
+      ? keys.every((k) => CLOSED_KEYS.includes(k) || SUPERSEDED_KEYS.includes(k))
+      : keys.every((k) => !CLOSED_KEYS.includes(k) && !SUPERSEDED_KEYS.includes(k));
     return membership
       && !keys.some((k) => COMMERCIAL_KEYS.includes(k) || SUBSET2_EXCLUDED.includes(k))
       && !N.templates.some((t) => /"type"\s*:\s*"buttons"/i.test(JSON.stringify(t.creation_payload)))
@@ -1088,7 +1129,7 @@ const MUT = [
     p.templates.find((x) => x.internal_template_key === "vendor_new_lead")
       .local_state.approval_status = "approved"; }],
   ["M35b the approved set LOSING a key is rejected", R.approvedSetIsExact, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === "consent_start_acknowledgement")
+    p.templates.find((x) => x.internal_template_key === "consent_stop_acknowledgement")
       .local_state.approval_status = "draft"; }],
   ["M35c a COMMERCIAL template promoted to approved is rejected", R.approvedSetIsExact, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "recharge_reminder")

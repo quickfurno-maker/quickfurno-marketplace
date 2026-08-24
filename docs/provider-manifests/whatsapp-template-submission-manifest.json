@@ -371,14 +371,14 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help.",
+        "body_spec": "QuickFurno received your START request. Messages about your existing QuickFurno enquiries are active again. Reply STOP to stop messages or HELP for help.",
         "variables_schema": {},
         "binding_contract": {
           "binding_readiness": "unresolved",
           "note": "template key is fixed by ackTemplateKeyFor(); mapping is QF-MVP-40.6 work"
         },
-        "approval_status": "approved",
-        "submission_state": "APPROVED_UNMAPPED",
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client_or_vendor",
@@ -397,9 +397,9 @@
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
           "submit_now": false,
-          "closure_note": "QF-MVP-40.10G: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json. SCOPE: approval does NOT place this consent acknowledgement in the ordinary outbound registry. It stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
+          "closure_note": "QF-MVP-40-R7M SUPERSESSION. HISTORY: qf_consent_start_acknowledgement_v1 was submitted ONCE (one create POST, CREATED_PENDING) and reconciled read-only to APPROVED. On the PREVIOUS WABA context the returned category was UTILITY; on the CURRENT dedicated staging WABA a GET-only reconciliation proved status=APPROVED but category=MARKETING, i.e. RECONCILED_CATEGORY_MISMATCH. v1 is therefore QUARANTINED_UNMAPPED with send and mapping DENIED, is NOT deleted, NOT edited and NOT appealed, and its historical record is frozen in docs/provider-manifests/meta-template-remote-state.json and in the QF-MVP-40-R7L frozen registry. CAUSE: the v1 copy named promotional messaging ('Promotional messages need separate consent'), which contradicts this entry's own standing note that the copy must not promise promotional messages resume. CURRENT: the canonical START acknowledgement is now qf_consent_start_acknowledgement_v2, whose body is strictly transactional and names no promotional concept. v2 has NEVER been submitted anywhere, so its local state is honestly draft / DRAFT_NOT_SUBMITTED and creation stays HELD (submit_now false): only the dedicated QF-MVP-40-R7M one-shot operator may create it. R7L owns v1; R7M owns v2; R7L execution authority is never reused for v2. A Utility approval, if granted, proves the PROVIDER CONTRACT ONLY and creates no mapping, activation or send authority. SCOPE: this consent acknowledgement stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
         },
-        "provider_template_name_candidate": "qf_consent_start_acknowledgement_v1"
+        "provider_template_name_candidate": "qf_consent_start_acknowledgement_v2"
       },
       {
         "internal_template_key": "consent_stop_acknowledgement",

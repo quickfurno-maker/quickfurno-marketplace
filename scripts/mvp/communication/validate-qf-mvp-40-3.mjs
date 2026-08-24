@@ -260,7 +260,7 @@ const allTemplates = Object.values(templateManifest.groups).flat();
  */
 const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
   "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
-  "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
+  "consent_stop_acknowledgement", "vendor_onboarding_reminder"]);
 const closedState = (t) => (CLOSED_KEYS_40_10E.includes(t.internal_template_key)
   ? t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
     && t.qf_mvp_40?.submit_now === false

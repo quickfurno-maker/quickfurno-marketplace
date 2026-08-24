@@ -40,7 +40,6 @@ const OUT = "docs/provider-manifests/meta-template-inactive-mapping-readiness.js
 const EXPECTED_ORDER = [
   "consent_help_response",
   "consent_stop_acknowledgement",
-  "consent_start_acknowledgement",
   "lead_received",
   "client_lead_status_update",
   "client_matching_update",
@@ -57,7 +56,6 @@ const EXPECTED_ORDER = [
 const EVIDENCE_BOUND = new Set([
   "consent_help_response",
   "consent_stop_acknowledgement",
-  "consent_start_acknowledgement",
 ]);
 
 const sha256 = (b) => createHash("sha256").update(b).digest("hex");

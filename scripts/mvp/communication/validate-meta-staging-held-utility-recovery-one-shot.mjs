@@ -57,7 +57,50 @@ const clonePacket = () => JSON.parse(JSON.stringify(packet));
 const entryOf = (p, key) => p.templates.find((t) => t.internal_template_key === key);
 const T = RECOVERABLE_TARGETS;
 const ALL = RECOVERABLE_KEYS.map((k) => T[k]);
-const payloadFor = (t) => loadCanonicalPayload(packet, t).payload;
+
+/**
+ * QF-MVP-40-R7M SUPERSESSION.
+ *
+ * R7L's frozen registry is HISTORY: it records exactly what R7L was authorised to create.
+ * `consent_start_acknowledgement` v1 was created and then proven APPROVED/MARKETING on the
+ * current dedicated WABA, so it is quarantined and the canonical packet has advanced to
+ * v2 — which R7M owns, not R7L.
+ *
+ * The old invariant "every R7L target still matches the CURRENT packet" was only ever true
+ * while v1 WAS current. It is NOT repaired by repinning R7L to v2: that would rewrite
+ * history and destroy the evidence of what R7L actually created. Instead the packet
+ * contract is asserted over the targets that are still current, and the superseded target
+ * is asserted against an IMMUTABLE historical fixture plus explicit supersession proofs.
+ */
+const SUPERSEDED_KEYS = Object.freeze(["consent_start_acknowledgement"]);
+const CURRENT = ALL.filter((t) => !SUPERSEDED_KEYS.includes(t.key));
+
+/** The exact v1 payload R7L was authorised to create. Frozen; never read from the packet. */
+const HISTORICAL_PAYLOADS = Object.freeze({
+  consent_start_acknowledgement: Object.freeze({
+    name: "qf_consent_start_acknowledgement_v1",
+    language: "en",
+    category: "UTILITY",
+    components: [Object.freeze({
+      type: "body",
+      text: "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help.",
+    })],
+  }),
+});
+/** The successor that is now canonical. R7M owns it; R7L must never target it. */
+const CURRENT_START_ACK = Object.freeze({
+  name: "qf_consent_start_acknowledgement_v2",
+  fingerprint: "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054",
+});
+
+/**
+ * The payload a target's pre-state fixtures are built from. For a still-current target it
+ * comes from the committed packet, exactly as before. For a superseded target it comes from
+ * the frozen historical fixture, so R7L keeps proving its own v1 contract forever.
+ */
+const payloadFor = (t) => (SUPERSEDED_KEYS.includes(t.key)
+  ? HISTORICAL_PAYLOADS[t.key]
+  : loadCanonicalPayload(packet, t).payload);
 const rowFor = (t, over = {}) => ({
   id: "1234567890",
   name: t.providerName,
@@ -172,116 +215,116 @@ record("C16 every registry key is individually selectable",
 // PACKET / PAYLOAD — driven across ALL FIVE targets.
 // ---------------------------------------------------------------------------
 record("P01 the committed packet passes for all five targets",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const r = loadCanonicalPayload(packet, t);
     return r.ok === true && r.fingerprint === t.fingerprint;
   }));
 record("P02 an unregistered target object is refused",
   loadCanonicalPayload(packet, { key: "vendor_new_lead", providerName: "x", language: "en", category: "UTILITY", wave: 1, fingerprint: "x", placeholders: 1 }).reason === "target_not_recoverable");
 record("P03 a wrong provider name fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).provider_template_name = "qf_wrong_v9";
     return loadCanonicalPayload(p, t).reason === "name_mismatch";
   }));
 record("P04 a wrong wave fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).submission_wave = 4;
     return loadCanonicalPayload(p, t).reason === "wave_mismatch";
   }));
 record("P05 a wrong language fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.language = "en_US";
     return loadCanonicalPayload(p, t).reason === "language_mismatch";
   }));
 record("P06 a wrong category fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.category = "MARKETING";
     return loadCanonicalPayload(p, t).reason === "category_mismatch";
   }));
 record("P07 a changed body fails for every target (fingerprint backstop)",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.components[0].text += " Extra.";
     return loadCanonicalPayload(p, t).ok === false;
   }));
 record("P08 submit_now flipped to true fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).submit_now = true;
     return loadCanonicalPayload(p, t).reason === "submit_now_not_held";
   }));
 record("P09 approval_status drift fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).local_state.approval_status = "pending";
     return loadCanonicalPayload(p, t).reason === "approval_status_unexpected";
   }));
 record("P10 submission_state drift fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).local_state.submission_state = "APPROVED_MAPPED";
     return loadCanonicalPayload(p, t).reason === "submission_state_unexpected";
   }));
 record("P11 a missing local_state fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); delete entryOf(p, t.key).local_state;
     return loadCanonicalPayload(p, t).reason === "local_state_missing";
   }));
 record("P12 a duplicate packet entry fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); p.templates.push(JSON.parse(JSON.stringify(entryOf(p, t.key))));
     return loadCanonicalPayload(p, t).reason === "target_entry_not_unique";
   }));
 record("P13 a missing packet entry fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); p.templates = p.templates.filter((x) => x.internal_template_key !== t.key);
     return loadCanonicalPayload(p, t).reason === "target_entry_not_unique";
   }));
 record("P14 an unreadable packet fails for every target",
   ALL.every((t) => loadCanonicalPayload(null, t).reason === "packet_unreadable"));
 record("P15 an added parameter_format fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.parameter_format = "POSITIONAL";
     return loadCanonicalPayload(p, t).reason === "payload_shape_unexpected";
   }));
 record("P16 an extra component fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.components.push({ type: "footer", text: "x" });
     return loadCanonicalPayload(p, t).reason === "component_count_unexpected";
   }));
 record("P17 a buttons block fails for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.components[0].buttons = [{ type: "QUICK_REPLY", text: "Hi" }];
     return loadCanonicalPayload(p, t).reason === "buttons_present";
   }));
 record("P18 placeholder arity is enforced PER TARGET — adding one to a zero-variable ack fails",
-  ALL.filter((t) => t.placeholders === 0).every((t) => {
+  CURRENT.filter((t) => t.placeholders === 0).every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.components[0].text += " Ref {{1}}.";
     return loadCanonicalPayload(p, t).reason === "variable_shape_unexpected";
   }));
 record("P19 removing the placeholder from a variable-bearing target fails",
-  ALL.filter((t) => t.placeholders === 1).every((t) => {
+  CURRENT.filter((t) => t.placeholders === 1).every((t) => {
     const p = clonePacket();
     const b = entryOf(p, t.key).creation_payload.components[0];
     b.text = b.text.replace(/\{\{1\}\}/, "there");
     return loadCanonicalPayload(p, t).reason === "variable_shape_unexpected";
   }));
 record("P20 a zero-variable target must NOT carry an example block",
-  ALL.filter((t) => t.placeholders === 0).every((t) => {
+  CURRENT.filter((t) => t.placeholders === 0).every((t) => {
     const p = clonePacket();
     entryOf(p, t.key).creation_payload.components[0].example = { body_text: [["x"]] };
     return loadCanonicalPayload(p, t).reason === "body_shape_unexpected";
   }));
 record("P21 a variable-bearing target must carry a correctly-sized example",
-  ALL.filter((t) => t.placeholders === 1).every((t) => {
+  CURRENT.filter((t) => t.placeholders === 1).every((t) => {
     const p = clonePacket();
     entryOf(p, t.key).creation_payload.components[0].example.body_text[0].push("extra");
     return loadCanonicalPayload(p, t).reason === "example_arity_unexpected";
   }));
 record("P22 the pinned fingerprints equal the packet's committed fingerprints",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const e = entryOf(packet, t.key);
     return e.payload_fingerprint === t.fingerprint
       && createHash("sha256").update(JSON.stringify(e.creation_payload)).digest("hex") === t.fingerprint;
   }));
 record("P23 the committed packet still holds all five entries",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const e = entryOf(packet, t.key);
     return e.submit_now === REQUIRED_PACKET_STATE.submitNow
       && e.local_state.approval_status === REQUIRED_PACKET_STATE.approvalStatus
@@ -305,14 +348,14 @@ record("S04 an unsafe status refuses for every target",
 record("S05 a MARKETING category refuses for every target",
   ALL.every((t) => stateFor(t, [rowFor(t, { category: "MARKETING" })]) === HeldPreState.PRESENT_CATEGORY_MISMATCH));
 record("S06 missing remote components refuse for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const r = rowFor(t); delete r.components;
     return stateFor(t, [r]) === HeldPreState.PRESENT_COMPONENTS_UNUSABLE;
   }));
 record("S07 null remote components refuse for every target",
   ALL.every((t) => stateFor(t, [rowFor(t, { components: null })]) === HeldPreState.PRESENT_COMPONENTS_UNUSABLE));
 record("S08 different remote content refuses for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const r = rowFor(t); r.components[0].text = "Totally different body.";
     return stateFor(t, [r]) === HeldPreState.PRESENT_CONTENT_MISMATCH;
   }));
@@ -378,10 +421,10 @@ const decideFor = (t, argv, preState, over = {}) => decide({
   payloadResult: over.payloadResult ?? loadCanonicalPayload(packet, t),
   preState,
 });
-record("D01 ABSENT + both flags is the ONLY POST decision, for every target",
-  ALL.every((t) => decideFor(t, ["--execute", OWNER_ACK_FLAG], HeldPreState.ABSENT).post === true));
+record("D01 ABSENT + both flags is the ONLY POST decision, for every still-current target",
+  CURRENT.every((t) => decideFor(t, ["--execute", OWNER_ACK_FLAG], HeldPreState.ABSENT).post === true));
 record("D02 dry run never posts, for every target",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const d = decideFor(t, [], HeldPreState.ABSENT);
     return d.post === false && d.outcome === Outcome.DRY_RUN_WOULD_POST;
   }));
@@ -390,7 +433,7 @@ record("D03 --execute alone never posts",
 record("D04 owner flag alone never posts",
   ALL.every((t) => decideFor(t, [OWNER_ACK_FLAG], HeldPreState.ABSENT).post === false));
 record("D05 ALREADY_CREATED never posts",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const d = decideFor(t, ["--execute", OWNER_ACK_FLAG], HeldPreState.ALREADY_CREATED);
     return d.post === false && d.outcome === Outcome.ALREADY_CREATED;
   }));
@@ -403,7 +446,7 @@ record("D07 an unauthorised identity never posts",
   ALL.every((t) => decideFor(t, ["--execute", OWNER_ACK_FLAG], HeldPreState.ABSENT, {
     identity: validateIdentity({ ...goodEnv(), QF_META_WABA_ID: "1" }) }).post === false));
 record("D08 a drifted payload never posts",
-  ALL.every((t) => {
+  CURRENT.every((t) => {
     const p = clonePacket(); entryOf(p, t.key).creation_payload.components[0].text += "!";
     return decideFor(t, ["--execute", OWNER_ACK_FLAG], HeldPreState.ABSENT, {
       payloadResult: loadCanonicalPayload(p, t) }).post === false;
@@ -570,6 +613,70 @@ record("Z03 R7K is unchanged",
   && /"ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac"/.test(r7kSrc));
 record("Z04 HeldPreState extends R7B's PreState without redefining any member",
   Object.entries(PreState).every(([k, v]) => HeldPreState[k] === v) && Object.isFrozen(HeldPreState));
+
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R7M SUPERSESSION GOVERNANCE — R7L owns v1, R7M owns v2.
+// ---------------------------------------------------------------------------
+record("H01 R7L frozen registry still pins consent_start_acknowledgement to v1",
+  T.consent_start_acknowledgement.providerName === "qf_consent_start_acknowledgement_v1");
+record("H02 R7L frozen v1 fingerprint is still exactly 70c0ce99...",
+  T.consent_start_acknowledgement.fingerprint
+    === "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a");
+record("H03 the frozen historical v1 payload self-hashes to that exact fingerprint",
+  sha256Hex(JSON.stringify(HISTORICAL_PAYLOADS.consent_start_acknowledgement))
+    === T.consent_start_acknowledgement.fingerprint);
+record("H04 R7L never names the successor v2 anywhere in its source",
+  !/qf_consent_start_acknowledgement_v2/.test(codeOnly));
+record("H05 the CURRENT canonical START template in the packet is v2 / 4e087e60...", (() => {
+  const e = entryOf(packet, "consent_start_acknowledgement");
+  return e.provider_template_name === CURRENT_START_ACK.name
+    && e.payload_fingerprint === CURRENT_START_ACK.fingerprint
+    && e.creation_payload.category === "UTILITY"
+    && e.creation_payload.language === "en";
+})());
+record("H06 the current packet does NOT select v1 as the active START template", (() => {
+  const e = entryOf(packet, "consent_start_acknowledgement");
+  return e.provider_template_name !== "qf_consent_start_acknowledgement_v1"
+    && e.payload_fingerprint !== T.consent_start_acknowledgement.fingerprint;
+})());
+record("H07 R7L can NEVER create the superseded target — the packet no longer names v1",
+  loadCanonicalPayload(packet, T.consent_start_acknowledgement).reason === "name_mismatch");
+record("H08 R7L refuses to POST the superseded target even with both mutation flags",
+  decideFor(T.consent_start_acknowledgement, ["--execute", OWNER_ACK_FLAG], HeldPreState.ABSENT).post === false);
+record("H09 v1 historical remote truth is APPROVED / MARKETING / quarantined", (() => {
+  const L = JSON.parse(readFileSync(resolve("docs/provider-manifests/meta-template-remote-state.json"), "utf8"));
+  const e = L.entries.find((x) => x.provider_template_name === "qf_consent_start_acknowledgement_v1");
+  return !!e && e.last_proven_status === "APPROVED"
+    && e.last_proven_remote_category === "MARKETING"
+    && e.disposition === "QUARANTINED_UNMAPPED"
+    && e.reconciliation_outcome === "RECONCILED_CATEGORY_MISMATCH"
+    && e.send_authority === "DENIED" && e.mapping_authority === "DENIED"
+    && e.delete_authority === "NOT_GRANTED" && e.appeal_authority === "NOT_GRANTED"
+    && e.superseded_by === CURRENT_START_ACK.name
+    && e.create_post_count_at_submission === 1;
+})());
+record("H10 v2 has NO ledger entry — the ledger records only PROVEN remote state", (() => {
+  const L = JSON.parse(readFileSync(resolve("docs/provider-manifests/meta-template-remote-state.json"), "utf8"));
+  return !L.entries.some((x) => x.provider_template_name === CURRENT_START_ACK.name);
+})());
+record("H11 the SEED_SET mapping authority points at v2, not the quarantined v1", (() => {
+  const src = readFileSync(resolve("scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs"), "utf8");
+  const m = src.match(/export const SEED_SET = Object\.freeze\(\[[\s\S]*?\n\]\);/);
+  if (!m) return false;
+  const block = m[0];
+  return block.includes(CURRENT_START_ACK.name)
+    && block.includes(CURRENT_START_ACK.fingerprint)
+    && !block.includes("qf_consent_start_acknowledgement_v1")
+    && !block.includes(T.consent_start_acknowledgement.fingerprint);
+})());
+record("H12 the mapping seeder still refuses anything not remotely APPROVED + UTILITY", (() => {
+  const src = readFileSync(resolve("scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs"), "utf8");
+  return /META_STATUS_NOT_APPROVED/.test(src) && /META_CATEGORY_MISMATCH/.test(src)
+    && /r\.status !== "APPROVED"/.test(src) && /r\.category !== "UTILITY"/.test(src);
+})());
+record("H13 a Marketing row can never satisfy the Utility pre-state for ANY target",
+  ALL.every((t) => stateFor(t, [rowFor(t, { category: "MARKETING" })])
+    === HeldPreState.PRESENT_CATEGORY_MISMATCH));
 
 console.log(`\nSummary: ${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

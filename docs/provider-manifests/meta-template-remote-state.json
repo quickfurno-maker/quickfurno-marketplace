@@ -188,23 +188,26 @@
       "provider_template_name": "qf_consent_start_acknowledgement_v1",
       "requested_category": "UTILITY",
       "last_proven_status": "APPROVED",
-      "last_proven_remote_category": "UTILITY",
-      "readback_semantic_match": true,
+      "last_proven_remote_category": "MARKETING",
+      "readback_semantic_match": false,
       "create_post_count_at_submission": 1,
       "create_post_count_at_reconciliation": 0,
       "submission_outcome": "CREATED_PENDING",
-      "reconciliation_outcome": "RECONCILED_APPROVED",
-      "disposition": "APPROVED_UNMAPPED",
+      "reconciliation_outcome": "RECONCILED_CATEGORY_MISMATCH",
+      "disposition": "QUARANTINED_UNMAPPED",
       "send_authority": "DENIED",
       "mapping_authority": "DENIED",
       "activation_authority": "NOT_GRANTED",
       "delete_authority": "NOT_GRANTED",
-      "appeal_authority": "NOT_APPLICABLE",
+      "appeal_authority": "NOT_GRANTED",
       "evidence": [
         "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
         "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json"
       ],
-      "notes": "Created with exactly one POST (CREATED_PENDING, identity_match true, immediate semantic readback true), then reconciled READ-ONLY to APPROVED with returned_category UTILITY, readback_semantic_match true and create_post_count 0. IMPORTANT: this proves the PROVIDER CONTRACT ONLY. It creates no consent authority, no mapping authority, no runtime activation and no send authority. The template is APPROVED_UNMAPPED and unsendable, creation is HELD so it can never be re-created, no remote template id is stored anywhere in this repository, and it authorizes no further Meta submission. Mapping, activation and sending require a later, separately authorized phase. NOTE ON SCOPE: a Meta Utility approval for this consent acknowledgement does NOT add it to the ordinary outbound registry. It remains evidence-bound and outside lib/communication/outboundConsentScope.ts by design; that absence is the mechanism, and an approval must never be read as granting ordinary consent authority."
+      "notes": "QF-MVP-40-R7M LEDGER TRUTH CORRECTION. This entry previously recorded last_proven_remote_category UTILITY, proven against the PREVIOUS WABA context on 2026-07-31. A GET-only reconciliation against the CURRENT dedicated staging WABA has since proven the remote row is status=APPROVED but category=MARKETING (remote pre-state PRESENT_CATEGORY_MISMATCH, POST_ATTEMPT_COUNT=0, zero POST). The ledger records PROVEN REMOTE state, so the false UTILITY claim is corrected here rather than preserved. readback_semantic_match is now false because the semantic comparison INCLUDES category; this asserts nothing either way about body or component equality. v1 is QUARANTINED_UNMAPPED with send and mapping DENIED, and is deliberately NOT deleted, NOT edited and NOT appealed — exactly as qf_consent_help_response_v2 was handled for the identical condition. The historical submission remains fully preserved: create_post_count_at_submission stays 1 and the original evidence files are unchanged, and the QF-MVP-40-R7L frozen registry still pins v1 and fingerprint 70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a as immutable history. SUPERSEDED BY qf_consent_start_acknowledgement_v2 (fingerprint 4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054), which is the current canonical START acknowledgement and is owned exclusively by the QF-MVP-40-R7M one-shot operator. v2 has NEVER been submitted, so it has no entry in this ledger: this file records only PROVEN remote state.",
+      "superseded_by": "qf_consent_start_acknowledgement_v2",
+      "category_mismatch_evidence": "meta-staging-start-ack-category-mismatch-evidence",
+      "category_mismatch_observed_at_utc_date": "2026-08-24"
     },
     {
       "internal_template_key": "vendor_onboarding_reminder",

@@ -1,0 +1,75 @@
+{
+  "artifact": "meta-staging-start-ack-category-mismatch-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7M",
+  "operation_id": "QF-MVP-40-R7M-START-ACK-CATEGORY-MISMATCH-2026-08-24",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Immutable record of ONE read-only observation: on 2026-08-24 a GET-only R7L pre-state readback against the dedicated staging WABA proved that qf_consent_start_acknowledgement_v1 exists remotely as APPROVED but with Meta category MARKETING, not the requested UTILITY. This artifact exists because the historical submission/reconciliation evidence was captured on 2026-07-31 against a PREVIOUS WABA context and recorded returned_category UTILITY. That older evidence is factually correct for what it observed and is NOT rewritten. This file is the durable backing for the corrected historical state now carried in meta-template-remote-state.json.",
+  "privacy": "No token, app secret, phone number, WABA id or remote template id appears here. Meta asset identities are referenced only by the symbolic labels already used across QF-MVP-40 artifacts. No Meta request or response body is reproduced: none was captured at observation time, and fabricating one would be evidence forgery.",
+  "observation": {
+    "observed_at_utc_date": "2026-08-24",
+    "observation_method": "GET_ONLY_PRE_STATE_READBACK",
+    "observed_by": "QF-MVP-40-R7L bounded held-utility recovery operator, dry-run pre-state classification",
+    "internal_template_key": "consent_start_acknowledgement",
+    "provider_template_name": "qf_consent_start_acknowledgement_v1",
+    "language": "en",
+    "expected_category": "UTILITY",
+    "actual_category": "MARKETING",
+    "status": "APPROVED",
+    "pre_state_classification": "PRESENT_CATEGORY_MISMATCH",
+    "post_attempt_count": 0,
+    "operator_result": "REFUSED (REFUSED: pre_state:PRESENT_CATEGORY_MISMATCH) — zero POST",
+    "raw_operator_output": [
+      "remote pre-state        : PRESENT_CATEGORY_MISMATCH",
+      "existing row            : status=APPROVED category=MARKETING language=en",
+      "POST_ATTEMPT_COUNT=0",
+      "RESULT: REFUSED (REFUSED: pre_state:PRESENT_CATEGORY_MISMATCH) — zero POST"
+    ],
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false,
+    "capture_non_claim": "Only the operator's own classification lines above were captured. No Meta HTTP request or response body was recorded at observation time, and none is reconstructed here."
+  },
+  "disposition": {
+    "provider_template_name": "qf_consent_start_acknowledgement_v1",
+    "disposition": "QUARANTINED_UNMAPPED",
+    "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+    "successor_provider_template_name": "qf_consent_start_acknowledgement_v2",
+    "successor_payload_fingerprint": "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054",
+    "successor_owner": "QF-MVP-40-R7M one-shot operator (scripts/mvp/communication/create-meta-staging-start-ack-v2-repair-once.mjs)",
+    "predecessor_owner": "QF-MVP-40-R7L (frozen registry still pins v1; never repinned to v2)"
+  },
+  "authorities_explicitly_not_granted": {
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "recreation_authority": "NOT_GRANTED",
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "provider_arm_authority": "NOT_GRANTED",
+    "activation_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED",
+    "statement": "This observation grants nothing. v1 is not deleted, not edited, not appealed, not recreated and not mapped. It records a fact and nothing else."
+  },
+  "historical_evidence_non_claim": {
+    "prior_evidence_unchanged": true,
+    "prior_evidence": [
+      "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
+      "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json"
+    ],
+    "statement": "The 2026-07-31 submission and reconciliation evidence observed returned_category UTILITY against the WABA context of that date. Those records are accurate for what they observed, are referenced unchanged by the ledger entry, and are NOT amended to appear to have known the later MARKETING reclassification. This artifact is ADDITIVE: it records a strictly later, independent observation against the current dedicated staging WABA.",
+    "waba_scope_note": "The committed packet and ledger are deliberately WABA-blind (no WABA id may appear in them), which is exactly why one provider template name can carry two different proven remote categories across two WABA contexts. That structural limitation is the reason this artifact is needed."
+  },
+  "ledger_linkage": {
+    "ledger_file": "docs/provider-manifests/meta-template-remote-state.json",
+    "ledger_entry_provider_template_name": "qf_consent_start_acknowledgement_v1",
+    "ledger_fields_backed_by_this_artifact": [
+      "last_proven_remote_category = MARKETING",
+      "readback_semantic_match = false",
+      "reconciliation_outcome = RECONCILED_CATEGORY_MISMATCH",
+      "disposition = QUARANTINED_UNMAPPED",
+      "superseded_by = qf_consent_start_acknowledgement_v2"
+    ]
+  }
+}

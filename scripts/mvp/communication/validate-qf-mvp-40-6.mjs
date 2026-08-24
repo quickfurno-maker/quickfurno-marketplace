@@ -32,7 +32,7 @@ const FOUNDER_MARKETING = Object.freeze(["client_nurture_followup", "dormant_req
  */
 const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
   "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
-  "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
+  "consent_stop_acknowledgement", "vendor_onboarding_reminder"]);
 
 const results = [];
 const add = (name, ok, detail) => results.push({ name, ok: ok === true, detail: detail ?? "" });

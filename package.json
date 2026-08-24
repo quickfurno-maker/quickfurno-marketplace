@@ -60,6 +60,8 @@
     "create:mvp:40-r7k-once": "node scripts/mvp/communication/create-meta-staging-client-lead-status-update-once.mjs",
     "test:mvp:40-r7l": "node scripts/mvp/communication/validate-meta-staging-held-utility-recovery-one-shot.mjs",
     "create:mvp:40-r7l-once": "node scripts/mvp/communication/create-meta-staging-held-utility-recovery-once.mjs",
+    "test:mvp:40-r7m": "node scripts/mvp/communication/validate-meta-staging-start-ack-v2-repair-one-shot.mjs",
+    "create:mvp:40-r7m-once": "node scripts/mvp/communication/create-meta-staging-start-ack-v2-repair-once.mjs",
     "create:mvp:40-r7b-once": "node scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
     "canary:mvp:40": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/activate-meta-staging-canary-cli.mjs",
     "test:mvp:50-1a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1a.mjs",

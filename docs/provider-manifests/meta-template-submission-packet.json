@@ -3,9 +3,9 @@
   "schema_version": "1.0",
   "phase": "QF-MVP-40.10A",
   "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_matching_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
+  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_matching_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "29af5b42235b88e8f647706ac5e94155bdb5fc4841ba8db93783f76a7dacd03d",
+  "source_manifest_fingerprint": "715232c1bbbbd7075765a221ba1343f77a3362340f5b4454dc5f247cae26569b",
   "external_contract_references": [
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
@@ -442,7 +442,7 @@
     },
     {
       "internal_template_key": "consent_start_acknowledgement",
-      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "provider_template_name": "qf_consent_start_acknowledgement_v2",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
@@ -450,23 +450,23 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "approved",
-        "submission_state": "APPROVED_UNMAPPED",
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
         "provider_template_id": null
       },
       "creation_payload": {
-        "name": "qf_consent_start_acknowledgement_v1",
+        "name": "qf_consent_start_acknowledgement_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help."
+            "text": "QuickFurno received your START request. Messages about your existing QuickFurno enquiries are active again. Reply STOP to stop messages or HELP for help."
           }
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"
+      "payload_fingerprint": "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054"
     },
     {
       "internal_template_key": "consent_stop_acknowledgement",

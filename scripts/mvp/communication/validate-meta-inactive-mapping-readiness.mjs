@@ -38,12 +38,12 @@ const DOC = "docs/QF-MVP-40-11-INACTIVE-PROVIDER-MAPPING-READINESS.md";
 const GEN = "scripts/mvp/communication/generate-meta-inactive-mapping-readiness.mjs";
 
 const EXPECTED_ORDER = [
-  "consent_help_response", "consent_stop_acknowledgement", "consent_start_acknowledgement",
+  "consent_help_response", "consent_stop_acknowledgement",
   "lead_received", "client_lead_status_update", "client_matching_update",
   "lead_assignment_alert", "vendor_onboarding_reminder",
 ];
 const EVIDENCE_BOUND = ["consent_help_response", "consent_stop_acknowledgement",
-  "consent_start_acknowledgement"];
+  ];
 const ORDINARY = ["lead_received", "client_lead_status_update", "client_matching_update",
   "lead_assignment_alert", "vendor_onboarding_reminder"];
 /** Lanes that must not be dragged into a mapping plan. */
@@ -91,7 +91,7 @@ const offlineCheck = (src) => {
 
 const R = {
   // ---- A. Readiness artefact ---------------------------------------------
-  exactEightKeysInOrder: (r) => r.templates.length === 8
+  exactEightKeysInOrder: (r) => r.templates.length === 7
     && r.templates.map((t) => t.internal_template_key).join(",") === EXPECTED_ORDER.join(","),
   matchesPacketVerbatim: (r) => r.templates.every((t) => {
     const p = packet.templates.find((x) => x.internal_template_key === t.internal_template_key);
@@ -130,7 +130,7 @@ const R = {
       && t.ordinary_registry_entry === !bound
       && (bound ? t.consent_lane === null && t.consent_scope === null
                 : t.consent_lane === "business" && t.consent_scope === "transactional");
-  }) && r.counts.evidence_bound_ack === 3 && r.counts.ordinary_business === 5,
+  }) && r.counts.evidence_bound_ack === 2 && r.counts.ordinary_business === 5,
   /**
    * The acknowledgements' absence from the ordinary registry IS the security mechanism.
    * A Meta approval, and later a mapping row, must never smuggle them into it.
@@ -279,7 +279,7 @@ const RULES = [
   ["I6  every runtime activation state is DISABLED", R.everyRuntimeDisabled, readiness],
   ["I7  send / write / activation authority is denied everywhere", R.everyAuthorityDenied, readiness],
   ["I8  the artefact authorizes nothing at top level", R.topLevelAuthorizesNothing, readiness],
-  ["I9  classification is exact (3 evidence-bound, 5 ordinary)", R.classificationExact, readiness],
+  ["I9  classification is exact (2 evidence-bound, 5 ordinary)", R.classificationExact, readiness],
   ["I10 consent acknowledgements stay OUT of the ordinary registry", R.acksStayOutOfOrdinaryRegistry, readiness],
   ["I11 ordinary templates keep their business/transactional lane", R.ordinaryLanesUnchanged, readiness],
   ["I12 no auth / marketing / commercial lane leaked in", R.noForbiddenLaneLeaked, readiness],
@@ -351,7 +351,7 @@ const MUT = [
   ["M19 an ordinary template moved to the marketing scope is rejected", R.classificationExact, readiness, (r) => {
     r.templates[3].consent_scope = "marketing"; }],
   ["M20 a drifted classification count is rejected", R.classificationExact, readiness, (r) => {
-    r.counts.evidence_bound_ack = 2; }],
+    r.counts.evidence_bound_ack = 3; }],
   ["M21 an authentication template in the plan is rejected", R.noForbiddenLaneLeaked, readiness, (r) => {
     r.templates[0].internal_template_key = "client_login_otp"; }],
   ["M22 a commercial template in the plan is rejected", R.noForbiddenLaneLeaked, readiness, (r) => {

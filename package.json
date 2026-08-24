@@ -56,6 +56,8 @@
     "test:mvp:40-r7c": "node scripts/mvp/communication/validate-meta-staging-provider-account-rebind.mjs",
     "test:mvp:40-r7i": "node scripts/mvp/communication/validate-meta-staging-client-matching-update-one-shot.mjs",
     "create:mvp:40-r7i-once": "node scripts/mvp/communication/create-meta-staging-client-matching-update-once.mjs",
+    "test:mvp:40-r7k": "node scripts/mvp/communication/validate-meta-staging-client-lead-status-update-one-shot.mjs",
+    "create:mvp:40-r7k-once": "node scripts/mvp/communication/create-meta-staging-client-lead-status-update-once.mjs",
     "create:mvp:40-r7b-once": "node scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
     "canary:mvp:40": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/activate-meta-staging-canary-cli.mjs",
     "test:mvp:50-1a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1a.mjs",

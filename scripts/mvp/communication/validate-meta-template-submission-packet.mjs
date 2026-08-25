@@ -156,20 +156,48 @@ const DEFERRED_LANES = ["WAVE1_REMAINING_ORDINARY", "WAVE1_COMMERCIAL", "WAVE2_A
 const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2",
   "qf_consent_start_acknowledgement_v1", "qf_client_matching_update_v1"];
 /**
- * QF-MVP-40 live batch, created 2026-08-25: six Wave-1 templates plus the final two
- * PENDING at their INTENDED category (seven UTILITY, one MARKETING). A THIRD lifecycle state,
- * approved. Creation authority is CONSUMED so each is held from creation, and each DOES
- * carry a proven remote template id. PENDING IS NOT APPROVED.
+ * QF-MVP-40 2026-08-25 reconciliation outcome. The eight templates created that day were
+ * read back GET-only and split in two:
+ *
+ *   RECONCILED_APPROVED_KEYS - Meta approved them at their INTENDED category. They are
+ *     APPROVED_UNMAPPED and carry a proven remote id. Approval proves the provider contract
+ *     only; it grants no mapping, activation or send authority.
+ *
+ *   QUARANTINED_KEYS - Meta approved them but RECATEGORISED them to MARKETING against a
+ *     UTILITY request. They can never serve the role they were written for, so they are
+ *     QUARANTINED_UNMAPPED with send/mapping/activation denied. Their canonical requested
+ *     category is deliberately NOT rewritten to match Meta.
+ *
+ * PENDING_KEYS is now EMPTY: every submitted template has been reconciled. It is kept so the
+ * pending branch stays live for the next submission rather than being deleted and re-derived.
  */
-const PENDING_KEYS = Object.freeze(["clarification_reminder", "clarification_request",
-  "client_transactional_followup", "low_credit_warning", "vendor_crm_promotion",
-  "vendor_new_lead", "vendor_package_expiry_warning", "vendor_response_reminder"]);
-const PENDING_LEDGER_NAMES = Object.freeze(["qf_clarification_reminder_v1",
+const RECONCILED_APPROVED_KEYS = Object.freeze(["clarification_request",
+  "client_transactional_followup", "vendor_crm_promotion", "vendor_new_lead"]);
+const QUARANTINED_KEYS = Object.freeze(["clarification_reminder", "low_credit_warning",
+  "vendor_package_expiry_warning", "vendor_response_reminder"]);
+const PENDING_KEYS = Object.freeze([]);
+/** Every key whose live creation is proven, and therefore the only ones that may carry an id. */
+const CREATED_KEYS = Object.freeze([...RECONCILED_APPROVED_KEYS, ...QUARANTINED_KEYS,
+  ...PENDING_KEYS]);
+/** Every name whose live creation is proven - the only ones that may carry a remote id. */
+const CREATED_LEDGER_NAMES = Object.freeze(["qf_clarification_reminder_v1",
   "qf_clarification_request_v2", "qf_client_transactional_followup_v1",
   "qf_low_credit_warning_v1", "qf_vendor_crm_promotion_v1", "qf_vendor_new_lead_v1",
   "qf_vendor_package_expiry_warning_v1", "qf_vendor_response_reminder_v1"]);
-/** The one MARKETING template. Its intended category is MARKETING, not UTILITY. */
-const PENDING_MARKETING_NAMES = Object.freeze(["qf_vendor_crm_promotion_v1"]);
+/** Approved at their INTENDED category by the 2026-08-25 reconciliation. */
+const RECONCILED_APPROVED_LEDGER = Object.freeze({
+  qf_clarification_request_v2: "UTILITY",
+  qf_client_transactional_followup_v1: "UTILITY",
+  qf_vendor_new_lead_v1: "UTILITY",
+  qf_vendor_crm_promotion_v1: "MARKETING",
+});
+/** Approved but RECATEGORISED to MARKETING against a UTILITY request. */
+const QUARANTINED_LEDGER_NAMES = Object.freeze(["qf_clarification_reminder_v1",
+  "qf_low_credit_warning_v1", "qf_vendor_package_expiry_warning_v1",
+  "qf_vendor_response_reminder_v1"]);
+const READINESS = "docs/provider-manifests/meta-template-inactive-mapping-readiness.json";
+const RECONCILIATION_INDEX = "docs/provider-manifests/meta-staging-wave1-batch-reconciliation-evidence.json";
+const reconIndex = JSON.parse(readFileSync(resolve(RECONCILIATION_INDEX), "utf8"));
 /** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
 const SUBSET1 = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
 const SUBSET1_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
@@ -358,31 +386,100 @@ const R = {
    * v2 HAS now been submitted once and is PENDING. The honest invariant is no longer
    * "never submitted" but "submitted exactly once, and not claimed approved".
    */
-  v2SubmittedPendingNotApproved: (p) => {
+  /** v2 was created once and is now proven APPROVED at its intended UTILITY category. */
+  v2ApprovedUtilityUnmapped: (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
-    return t.local_state.approval_status === "pending"
-      && t.local_state.submission_state === "SUBMITTED_PENDING"
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const e = L.entries.find((x) => x.provider_template_name === "qf_clarification_request_v2");
+    return t.local_state.approval_status === "approved"
+      && t.local_state.submission_state === "APPROVED_UNMAPPED"
       && typeof t.local_state.provider_template_id === "string"
-      && t.submit_now === false;
+      && t.submit_now === false
+      && !!e && e.last_proven_status === "APPROVED"
+      && e.last_proven_remote_category === "UTILITY"
+      && e.reconciliation_outcome === "RECONCILED_APPROVED"
+      && e.create_post_count_at_reconciliation === 0
+      && e.create_post_count_at_submission === 1;   // creation history intact
   },
   /** No Wave 1 pending template may be recorded as approved anywhere. */
-  pendingNeverClaimsApproval: () => {
-    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
-    return PENDING_LEDGER_NAMES.every((n) => {
+  /** Every RECONCILE_ONLY reading is, by construction, a zero-POST reading. */
+  reconciliationIsZeroPost: (inj) => {
+    const L = readLedger(inj);
+    const allZero = [...reconIndex.approved, ...reconIndex.category_mismatch].length === 8
+      && reconIndex.reconciliation.operation_mode === "RECONCILE_ONLY"
+      && reconIndex.reconciliation.create_post_count_total === 0
+      && reconIndex.reconciliation.templates_created_edited_or_deleted === 0
+      && reconIndex.reconciliation.mappings_activated === 0
+      && reconIndex.reconciliation.messages_sent === 0
+      && reconIndex.contains_secrets === false;
+    return allZero && CREATED_LEDGER_NAMES.every((n) => {
       const e = L.entries.find((x) => x.provider_template_name === n);
-      // Seven are UTILITY, one is MARKETING. Each must record the category it INTENDED,
-      // so a silent recategorisation by Meta would fail here rather than pass unnoticed.
-      const intended = PENDING_MARKETING_NAMES.includes(n) ? "MARKETING" : "UTILITY";
-      return !!e && e.last_proven_status === "PENDING"
-        && e.last_proven_remote_category === intended
-        && e.requested_category === intended
-        && e.current_waba_state === `PRESENT_PENDING_${intended}`
-        && e.disposition === "SUBMITTED_PENDING_UNMAPPED"
-        && e.creation_authority === "CONSUMED"
-        && e.approval_evidence === null
+      return !!e && e.create_post_count_at_reconciliation === 0
+        // A reconciliation may never fabricate a second create event.
+        && e.create_post_count_at_submission === 1
+        && e.create_post_count_basis === "OBSERVED";
+    });
+  },
+  /** Approved keys record the category they INTENDED, so a silent recategorisation fails. */
+  reconciledApprovalsKeepIntendedCategory: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    return Object.entries(RECONCILED_APPROVED_LEDGER).every(([n, cat]) => {
+      const e = L.entries.find((x) => x.provider_template_name === n);
+      return !!e && e.last_proven_status === "APPROVED"
+        && e.last_proven_remote_category === cat
+        && e.requested_category === cat
+        && e.reconciliation_outcome === "RECONCILED_APPROVED"
+        && e.readback_semantic_match === true
+        && e.current_waba_state === `PRESENT_APPROVED_${cat}`
+        && e.disposition === "APPROVED_UNMAPPED"
         && e.mapping_authority === "DENIED"
         && e.send_authority === "DENIED";
     });
+  },
+  /**
+   * A recategorised template stays quarantined and unmapped, and its CANONICAL requested
+   * category is preserved - rewriting it to match Meta would erase the very defect the row
+   * exists to record.
+   */
+  quarantinedStaysUnmapped: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    return QUARANTINED_LEDGER_NAMES.every((n) => {
+      const e = L.entries.find((x) => x.provider_template_name === n);
+      return !!e && e.reconciliation_outcome === "RECONCILED_CATEGORY_MISMATCH"
+        && e.disposition === "QUARANTINED_UNMAPPED"
+        && e.requested_category === "UTILITY"
+        && e.last_proven_remote_category === "MARKETING"
+        && e.current_waba_state === "PRESENT_APPROVED_CATEGORY_MISMATCH"
+        && e.approval_evidence === null
+        && e.mapping_authority === "DENIED"
+        && e.send_authority === "DENIED"
+        && e.activation_authority === "NOT_GRANTED"
+        && e.category_mismatch?.canonical_requested_category_preserved === true
+        && e.category_mismatch?.successor_created === false
+        // The false semantic match is explained by category alone; body identity is UNPROVEN
+        // and must never be asserted from these records.
+        && e.category_mismatch?.body_identity_proven === false;
+    });
+  },
+  /** vendor_crm_promotion is MARKETING and must never appear in Utility mapping readiness. */
+  marketingNeverEntersUtilityReadiness: () => {
+    const r = JSON.parse(readFileSync(resolve(READINESS), "utf8"));
+    const emitted = r.templates.map((t) => t.provider_template_name);
+    const genSrc = readFileSync(resolve("scripts/mvp/communication/generate-meta-inactive-mapping-readiness.mjs"), "utf8");
+    return !emitted.includes("qf_vendor_crm_promotion_v1")
+      && QUARANTINED_LEDGER_NAMES.every((n) => !emitted.includes(n))
+      && /APPROVED_NOT_MAPPABLE/.test(genSrc)
+      && /vendor_crm_promotion/.test(genSrc);
+  },
+  /** Current-WABA truth outranks the stale WABA-blind historical claim. */
+  currentWabaOutranksHistorical: () => {
+    const L = JSON.parse(readFileSync(resolve(READINESS), "utf8"));
+    const ledger = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const emitted = L.templates.map((t) => t.provider_template_name);
+    // Rows whose historical claim says APPROVED but whose CURRENT state does not.
+    const stale = ledger.entries.filter((e) => e.last_proven_status === "APPROVED"
+      && e.current_waba_state !== "PRESENT_APPROVED_UTILITY");
+    return stale.length > 0 && stale.every((e) => !emitted.includes(e.provider_template_name));
   },
 
   // --- v1 rejection evidence ---
@@ -457,18 +554,26 @@ const R = {
   closedStateModel: (p) => {
     const present = p.templates.filter((t) => CLOSED_KEYS.includes(t.internal_template_key));
     if (present.length !== CLOSED_KEYS.length) return false;      // the set itself is pinned
-    if (p.templates.filter((t) => PENDING_KEYS.includes(t.internal_template_key)).length
-        !== PENDING_KEYS.length) return false;
+    if (p.templates.filter((t) => CREATED_KEYS.includes(t.internal_template_key)).length
+        !== CREATED_KEYS.length) return false;
     return p.templates.every((t) => {
       const st = t.local_state;
-      if (PENDING_KEYS.includes(t.internal_template_key)) {
-        // Created live: the remote id is REQUIRED, and creation is HELD afterwards.
-        return typeof st.provider_template_id === "string" && st.provider_template_id.length > 0
-          && st.approval_status === "pending"
-          && st.submission_state === "SUBMITTED_PENDING"
-          && t.submit_now === false;
+      const id = st.provider_template_id;
+      const hasId = typeof id === "string" && id.length > 0;
+      // Every created template is HELD forever: its creation authority is spent.
+      if (RECONCILED_APPROVED_KEYS.includes(t.internal_template_key)) {
+        return hasId && st.approval_status === "approved"
+          && st.submission_state === "APPROVED_UNMAPPED" && t.submit_now === false;
       }
-      if (st.provider_template_id !== null) return false;         // no id without proof
+      if (QUARANTINED_KEYS.includes(t.internal_template_key)) {
+        return hasId && st.approval_status === "quarantined"
+          && st.submission_state === "QUARANTINED_UNMAPPED" && t.submit_now === false;
+      }
+      if (PENDING_KEYS.includes(t.internal_template_key)) {
+        return hasId && st.approval_status === "pending"
+          && st.submission_state === "SUBMITTED_PENDING" && t.submit_now === false;
+      }
+      if (id !== null) return false;                              // no id without proof
       if (CLOSED_KEYS.includes(t.internal_template_key)) {
         return st.approval_status === "approved"
           && st.submission_state === "APPROVED_UNMAPPED"
@@ -479,10 +584,19 @@ const R = {
   },
   /** The approved set is pinned EXACTLY — gaining or losing a key is a failure. */
   approvedSetIsExact: (p) => {
+    const expected = [...CLOSED_KEYS, ...RECONCILED_APPROVED_KEYS].sort();
     const approved = p.templates.filter((t) => t.local_state.approval_status === "approved");
-    return approved.length === CLOSED_KEYS.length
-      && approved.map((t) => t.internal_template_key).sort().join(",")
-         === CLOSED_KEYS.slice().sort().join(",");
+    return approved.length === expected.length
+      && approved.map((t) => t.internal_template_key).sort().join(",") === expected.join(",");
+  },
+  /** The quarantined set is pinned too: a key may not quietly enter or leave it. */
+  quarantinedSetIsExact: (p) => {
+    const q = p.templates.filter((t) => t.local_state.approval_status === "quarantined");
+    return q.length === QUARANTINED_KEYS.length
+      && q.map((t) => t.internal_template_key).sort().join(",")
+         === QUARANTINED_KEYS.slice().sort().join(",")
+      && q.every((t) => t.local_state.submission_state === "QUARANTINED_UNMAPPED"
+        && t.submit_now === false);
   },
   /**
    * A remote id used to be forbidden outright, because nothing had been created. Six
@@ -493,14 +607,14 @@ const R = {
   remoteIdOnlyWhereProven: (p) => {
     const packetOk = p.templates.every((t) => {
       const id = t.local_state.provider_template_id;
-      return PENDING_KEYS.includes(t.internal_template_key)
+      return CREATED_KEYS.includes(t.internal_template_key)
         ? typeof id === "string" && /^[0-9]+$/.test(id)
         : id === null;
     });
     const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
     const ledgerOk = L.entries.every((e) => {
       const id = e.remote_template_id;
-      return PENDING_LEDGER_NAMES.includes(e.provider_template_name)
+      return CREATED_LEDGER_NAMES.includes(e.provider_template_name)
         ? typeof id === "string" && /^[0-9]+$/.test(id)
         : id === undefined || id === null;
     });
@@ -798,9 +912,9 @@ const R = {
   ledgerHasExactEntries: (inj) => {
     const L = readLedger(inj);
     const expected = [...LEDGER_HISTORY_NAMES, ...CLOSED_LEDGER.map((c) => c.name),
-      ...PENDING_LEDGER_NAMES].sort().join(",");
+      ...CREATED_LEDGER_NAMES].sort().join(",");
     return L.entries.length
-        === LEDGER_HISTORY_NAMES.length + CLOSED_LEDGER.length + PENDING_LEDGER_NAMES.length
+        === LEDGER_HISTORY_NAMES.length + CLOSED_LEDGER.length + CREATED_LEDGER_NAMES.length
       && L.entries.map((e) => e.provider_template_name).sort().join(",") === expected;
   },
 
@@ -1005,14 +1119,17 @@ const R = {
     const lanes = pause.deferred_lanes ?? [];
     const released = pause.pause_lift?.released_keys ?? [];
     // Nothing may be declared released unless it is in the proven pending batch.
-    if (!released.every((k) => PENDING_KEYS.includes(k))) return false;
+    if (!released.every((k) => CREATED_KEYS.includes(k))) return false;
     const named = lanes.flatMap((l) => l.keys ?? []);
     return named.length > 0 && named.every((k) => {
       const t = p.templates.find((x) => x.internal_template_key === k);
       if (!t) return false;
       if (released.includes(k)) {
-        return t.local_state.approval_status === "pending"
-          && t.local_state.submission_state === "SUBMITTED_PENDING"
+        // A released key has been created, and has since been reconciled to either an
+        // approval or a quarantine. It may never fall back to draft, and stays held.
+        return ["pending", "approved", "quarantined"].includes(t.local_state.approval_status)
+          && t.local_state.submission_state !== "DRAFT_NOT_SUBMITTED"
+          && typeof t.local_state.provider_template_id === "string"
           && t.submit_now === false;
       }
       return t.local_state.approval_status === "draft"
@@ -1030,15 +1147,18 @@ const R = {
    */
   laterWavesUntouched: (p) => {
     const later = p.templates.filter((t) => t.submission_wave >= 2);
-    // NOTHING in waves 2/3/4 may ever be approved. That half of the rule is absolute.
-    if (later.some((t) => t.local_state.approval_status === "approved")) return false;
+    // A later-wave template may be approved ONLY where a proven reconciliation says so.
+    // Any other approval in waves 2/3/4 is still absolutely forbidden.
+    if (later.some((t) => t.local_state.approval_status === "approved"
+      && !RECONCILED_APPROVED_KEYS.includes(t.internal_template_key))) return false;
     const armingProfile = { 2: false, 3: true, 4: false };
     return later.every((t) => {
-      if (PENDING_KEYS.includes(t.internal_template_key)) {
+      if (CREATED_KEYS.includes(t.internal_template_key)) {
         // A later-wave template may leave draft ONLY by a proven live creation, and it is
-        // then held forever: submit_now false regardless of its wave arming profile.
-        return t.local_state.approval_status === "pending"
-          && t.local_state.submission_state === "SUBMITTED_PENDING"
+        // then held forever: submit_now false regardless of its wave arming profile. An
+        // approval here still grants no mapping and no send authority.
+        return ["pending", "approved", "quarantined"].includes(t.local_state.approval_status)
+          && t.local_state.submission_state !== "DRAFT_NOT_SUBMITTED"
           && typeof t.local_state.provider_template_id === "string"
           && t.submit_now === false;
       }
@@ -1176,8 +1296,12 @@ const RULES = [
   ["S6  the spent name qf_clarification_request_v1 is not reused", R.v1NameNotReused, packet],
   ["S7  the v2 body repairs the exact fault that was rejected", R.v2RepairsTheFault, packet],
   ["S8  v2 keeps the two-parameter variable contract", R.v2KeepsVariableContract, packet],
-  ["S9  v2 is submitted exactly once and PENDING, not approved", R.v2SubmittedPendingNotApproved, packet],
-  ["S13 no pending template claims approval, and each keeps its intended category", R.pendingNeverClaimsApproval, packet],
+  ["S9  v2 is proven APPROVED at UTILITY, unmapped, creation history intact", R.v2ApprovedUtilityUnmapped, packet],
+  ["S13 every RECONCILE_ONLY reading is zero-POST and fabricates no second create", R.reconciliationIsZeroPost, packet],
+  ["S14 reconciled approvals keep their intended category and stay unmapped", R.reconciledApprovalsKeepIntendedCategory, packet],
+  ["S15 recategorised templates stay quarantined, unmapped, canonical category preserved", R.quarantinedStaysUnmapped, packet],
+  ["S16 a MARKETING template can never enter Utility mapping readiness", R.marketingNeverEntersUtilityReadiness, packet],
+  ["S17 current-WABA truth outranks stale historical approval claims", R.currentWabaOutranksHistorical, packet],
   ["S10 the v1 deterministic rejection is recorded", R.v1RejectionRecorded, v1Rejection],
   ["S11 v1 is permanently retired and may never be retried", R.v1PermanentlyRetired, v1Rejection],
   ["S12 a rejected create left no ledger row", R.v1HasNoLedgerRow, remoteLedger],
@@ -1194,8 +1318,9 @@ const RULES = [
   ["P12 provider names valid and unique", R.namesValidAndUnique, packet],
   ["P13 provider names carry no environment name or long id", R.namesCarryNoEnvOrIds, packet],
   ["P14 every payload has a deterministic fingerprint", R.deterministicPayloads, packet],
-  ["P15 three-state model: approved+held, pending+held with proven id, rest draft", R.closedStateModel, packet],
-  ["P90 the approved set is exactly the eight expected templates", R.approvedSetIsExact, packet],
+  ["P15 four-state model: approved / quarantined / pending / draft, ids only where proven", R.closedStateModel, packet],
+  ["P90 the approved set is exactly the closed set plus the reconciled approvals", R.approvedSetIsExact, packet],
+  ["P91 the quarantined set is exactly the recategorised templates, held and unmapped", R.quarantinedSetIsExact, packet],
   ["P80 a remote template id appears only where creation is proven", R.remoteIdOnlyWhereProven, packet],
   ["P16 consent acknowledgements remain outside the ordinary registry", R.acksStayOutOfOrdinaryRegistry, packet],
   ["P17 packet carries no secret, WABA id or PII", R.noSecretOrPii, packet],
@@ -1260,7 +1385,7 @@ const RULES = [
   ["P107 no subset-3 review artefact exists", R.noSubset3Artifact, packet],
   ["P108 every deferred lane is recorded deferred / held / unauthorized", R.deferredLanesIntact, packet],
   ["P109 a deferred lane stays draft unless its pause lift is recorded and proven", R.deferredLanesStillDraft, packet],
-  ["P110 waves 2/3/4 are never approved; only a proven creation may be pending+held", R.laterWavesUntouched, packet],
+  ["P110 waves 2/3/4 leave draft only via a proven creation, and stay held+unmapped", R.laterWavesUntouched, packet],
   ["P101 subset 2 leaks no commercial, closed, excluded, button or URL template", R.subset2LeaksNothing, packet],
   ["P102 subset 2 names the commercial templates as separately held", R.subset2NamesCommercialHold, packet],
   ["P103 subset 2 pins the current source packet fingerprint", R.subset2PinsCurrentPacket, packet],
@@ -1322,11 +1447,32 @@ const MUT = [
   ["MS8 a submittable template with a trailing parameter is rejected", R.submittableBodiesClean, packet, (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "client_nurture_followup");
     t.creation_payload.components[0].text = "Hi there, still planning your project? Ask {{1}}."; }],
-  ["MS22 approving a later-wave template is rejected", R.laterWavesUntouched, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === "vendor_crm_promotion")
+  // Retargeted: vendor_crm_promotion is now legitimately approved by a proven reconciliation,
+  // so promoting it was a no-op. client_nurture_followup has no such proof.
+  ["MS22 approving an unreconciled later-wave template is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "client_nurture_followup")
       .local_state.approval_status = "approved"; }],
   ["MS23 leaving a created later-wave template submittable is rejected", R.laterWavesUntouched, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "vendor_crm_promotion").submit_now = true; }],
+  ["MS24 a reconciliation fabricating a second create POST is rejected", R.reconciliationIsZeroPost,
+    packet, null, () => {
+      const L = clone(JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8")));
+      L.entries.find((e) => e.provider_template_name === "qf_vendor_new_lead_v1")
+        .create_post_count_at_submission = 2;
+      return L;
+    }],
+  ["MS24b a reconciliation claiming a create POST of its own is rejected", R.reconciliationIsZeroPost,
+    packet, null, () => {
+      const L = clone(JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8")));
+      L.entries.find((e) => e.provider_template_name === "qf_vendor_new_lead_v1")
+        .create_post_count_at_reconciliation = 1;
+      return L;
+    }],
+  ["MS25 promoting a quarantined template to approved is rejected", R.quarantinedSetIsExact, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "low_credit_warning")
+      .local_state.approval_status = "approved"; }],
+  ["MS26 un-holding a quarantined template is rejected", R.quarantinedSetIsExact, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "low_credit_warning").submit_now = true; }],
   ["MS21 releasing a key that was never submitted is rejected", R.deferredLanesStillDraft, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "clarification_request")
       .local_state.approval_status = "draft"; }],
@@ -1352,9 +1498,9 @@ const MUT = [
   ["MS14 dropping a variable from the repaired copy is rejected", R.v2KeepsVariableContract, packet, (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
     t.creation_payload.components[0].text = "Hi {{1}}, QuickFurno needs one more detail. Please reply."; }],
-  ["MS15 claiming v2 was already approved is rejected", R.v2SubmittedPendingNotApproved, packet, (p) => {
+  ["MS15 downgrading a proven approval back to pending is rejected", R.v2ApprovedUtilityUnmapped, packet, (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
-    t.local_state.approval_status = "approved"; }],
+    t.local_state.approval_status = "pending"; }],
   ["MS16 softening the v1 error record is rejected", R.v1RejectionRecorded, v1Rejection, (e) => {
     e.proven_facts.meta_error_is_transient = true; }],
   ["MS17 claiming a second POST is rejected", R.v1RejectionRecorded, v1Rejection, (e) => {
@@ -1466,8 +1612,10 @@ const MUT = [
   ["M34 a committed provider id on an approved key is rejected", R.closedStateModel, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "client_lead_status_update")
       .local_state.provider_template_id = "1234567890"; }],
+  // Retargeted: vendor_new_lead is now legitimately approved, so promoting it was a no-op
+  // and the mutation silently survived. A quarantined key is the right subject now.
   ["M35 the approved set GAINING a key is rejected", R.approvedSetIsExact, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === "vendor_new_lead")
+    p.templates.find((x) => x.internal_template_key === "vendor_response_reminder")
       .local_state.approval_status = "approved"; }],
   ["M35b the approved set LOSING a key is rejected", R.approvedSetIsExact, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "consent_stop_acknowledgement")

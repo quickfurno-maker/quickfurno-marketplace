@@ -966,20 +966,48 @@ record("V13 every ledger row carries explicit current-WABA truth from a closed v
     "PRESENT_PENDING_UTILITY",
     // The single MARKETING template (vendor_crm_promotion), created live and PENDING.
     "PRESENT_PENDING_MARKETING",
+    // Proven APPROVED at MARKETING by the 2026-08-25 reconciliation. Approved, but NEVER
+    // admissible to Utility mapping readiness.
+    "PRESENT_APPROVED_MARKETING",
   ]);
   return ledger.entries.length > 0
     && ledger.entries.every((e) => typeof e.current_waba_state === "string"
       && VOCAB.has(e.current_waba_state));
 })());
 record("V16 a PENDING current-WABA row is present but never ready", (() => {
+  // Universally quantified: it holds when no PENDING row remains (every submission has now
+  // been reconciled) and still bites the moment a new one appears.
   const pending = ledger.entries.filter((e) => String(e.current_waba_state).startsWith("PRESENT_PENDING_"));
   const emitted = readiness.templates.map((t) => t.provider_template_name);
-  return pending.length > 0 && pending.every((e) =>
+  return pending.every((e) =>
     e.last_proven_status === "PENDING"
     && e.approval_evidence === null
     && e.mapping_authority === "DENIED"
     && e.send_authority === "DENIED"
     && e.creation_authority === "CONSUMED"
+    && !emitted.includes(e.provider_template_name));
+})());
+// V16 above is now VACUOUS by design: every submission has been reconciled, so no PENDING
+// row remains. These two keep the same ground covered non-vacuously.
+record("V17 an approved-but-MARKETING row is present and never ready", (() => {
+  const m = ledger.entries.filter((e) => e.current_waba_state === "PRESENT_APPROVED_MARKETING");
+  const emitted = readiness.templates.map((t) => t.provider_template_name);
+  return m.length > 0 && m.every((e) => e.last_proven_status === "APPROVED"
+    && e.last_proven_remote_category === "MARKETING"
+    && e.mapping_authority === "DENIED"
+    && e.send_authority === "DENIED"
+    && !emitted.includes(e.provider_template_name));
+})());
+record("V18 a category-mismatched row is quarantined and never ready", (() => {
+  const q = ledger.entries.filter((e) => e.current_waba_state === "PRESENT_APPROVED_CATEGORY_MISMATCH");
+  const emitted = readiness.templates.map((t) => t.provider_template_name);
+  return q.length > 0 && q.every((e) => e.disposition === "QUARANTINED_UNMAPPED"
+    && e.mapping_authority === "DENIED"
+    && e.send_authority === "DENIED"
+    && e.activation_authority === "NOT_GRANTED"
+    // Absent OR null both mean "no approval is claimed". The pre-existing R7I quarantine row
+    // predates the approval_evidence field, so requiring a literal null would fail on truth.
+    && (e.approval_evidence ?? null) === null
     && !emitted.includes(e.provider_template_name));
 })());
 record("V14 only PRESENT_APPROVED_UTILITY rows reach the readiness manifest", (() => {

@@ -47,6 +47,31 @@ const EXPECTED_ORDER = [
   "vendor_onboarding_reminder",
 ];
 /**
+ * QF-MVP-40 2026-08-25. Approved on Meta but NOT eligible for an inactive mapping row.
+ *
+ * Meta approval proves the PROVIDER CONTRACT ONLY. A template may only receive a mapping
+ * row if it is also in the SEED_SET of seed-meta-staging-inactive-mappings.mjs, which is the
+ * only mappable set and is fingerprint-pinned and all-or-nothing. None of these four is in
+ * it, so admitting them here would invent a mapping prerequisite that has not been met.
+ *
+ *   clarification_request          - not in SEED_SET; no runtime binding contract
+ *   vendor_new_lead                - not in SEED_SET; no runtime binding contract
+ *   client_transactional_followup  - not in SEED_SET (zero-variable, so needs no binding)
+ *   vendor_crm_promotion           - MARKETING. It must NEVER enter ordinary Utility mapping
+ *                                    readiness; its send authority additionally depends on
+ *                                    marketing consent, suppression, a frequency policy and
+ *                                    a Core-approved frozen audience, none of which exist.
+ *
+ * Membership below is ASSERTED against the seeder source, not merely asserted here, so this
+ * list cannot silently drift away from the real mappable set.
+ */
+const APPROVED_NOT_MAPPABLE = [
+  "clarification_request",
+  "client_transactional_followup",
+  "vendor_crm_promotion",
+  "vendor_new_lead",
+];
+/**
  * Evidence-bound acknowledgements. These are deliberately ABSENT from the ordinary
  * outbound consent registry (lib/communication/outboundConsentScope.ts) and must stay
  * that way: a Meta approval — and later a mapping row — grants them no ordinary
@@ -74,8 +99,23 @@ const approved = entries.filter((t) => t.approval_status === "approved");
 
 // ---- Fail-closed preconditions --------------------------------------------
 const approvedKeys = approved.map((t) => t.internal_template_key).sort();
-if (approvedKeys.join(",") !== EXPECTED_ORDER.slice().sort().join(",")) {
-  die(`the approved set is not the expected eight templates (found: ${approvedKeys.join(", ")})`);
+const expectedApproved = [...EXPECTED_ORDER, ...APPROVED_NOT_MAPPABLE].sort();
+if (approvedKeys.join(",") !== expectedApproved.join(",")) {
+  die(`the approved set is not the expected set (found: ${approvedKeys.join(", ")})`);
+}
+if (EXPECTED_ORDER.some((k) => APPROVED_NOT_MAPPABLE.includes(k))) {
+  die("a key is declared both mapping-eligible and not mapping-eligible");
+}
+
+// The SEED_SET is the ONLY mappable set. Eligibility is checked against that source rather
+// than trusted from the list above, so the two can never drift apart unnoticed.
+const seederSrc = readFileSync(resolve("scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs"), "utf8");
+const inSeedSet = (key) => new RegExp(`\\{ key: "${key}"`).test(seederSrc);
+for (const key of EXPECTED_ORDER) {
+  if (!inSeedSet(key)) die(`${key}: declared mapping-eligible but absent from the SEED_SET`);
+}
+for (const key of APPROVED_NOT_MAPPABLE) {
+  if (inSeedSet(key)) die(`${key}: declared NOT mapping-eligible but present in the SEED_SET`);
 }
 if (remote.authorizes_meta_calls !== false || remote.authorizes_mapping !== false
     || remote.authorizes_sending !== false) {
@@ -103,6 +143,13 @@ const READY_ORDER = EXPECTED_ORDER.filter((key) => {
   }
   return led.current_waba_state === CURRENT_READY;
 });
+
+// Belt and braces: READY_ORDER is derived from EXPECTED_ORDER, but assert the exclusion
+// explicitly so a future edit that merges the two lists fails here instead of quietly
+// emitting an unmappable template.
+for (const key of APPROVED_NOT_MAPPABLE) {
+  if (READY_ORDER.includes(key)) die(`${key}: approved but not mapping-eligible - it must never enter readiness`);
+}
 
 const records = READY_ORDER.map((key) => {
   const t = approved.find((x) => x.internal_template_key === key);

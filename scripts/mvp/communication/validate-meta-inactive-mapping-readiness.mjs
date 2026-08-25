@@ -273,11 +273,27 @@ const R = {
    * live on 2026-08-25 and is PENDING + held; that is the only way a later-wave entry may
    * leave draft, and it still contributes nothing to readiness.
    */
-  laterWavesUntouched: () => packet.templates.filter((t) => t.submission_wave >= 2)
-    .every((t) => (t.local_state.approval_status === "pending"
-      ? t.local_state.submission_state === "SUBMITTED_PENDING" && t.submit_now === false
-      : t.local_state.approval_status === "draft"
-        && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED")),
+  /**
+   * Waves 2/3/4 contribute nothing to readiness. One wave 3 template (vendor_crm_promotion)
+   * was created and then proven APPROVED at MARKETING on 2026-08-25; it is held and unmapped,
+   * and being MARKETING it can never enter Utility mapping readiness. Anything in these waves
+   * that has NOT been created must still be draft.
+   */
+  laterWavesUntouched: () => {
+    const emitted = readiness.templates.map((t) => t.provider_template_name);
+    return packet.templates.filter((t) => t.submission_wave >= 2).every((t) => {
+      const created = typeof t.local_state.provider_template_id === "string";
+      if (created) {
+        return ["pending", "approved", "quarantined"].includes(t.local_state.approval_status)
+          && t.local_state.submission_state !== "DRAFT_NOT_SUBMITTED"
+          && t.submit_now === false
+          && !emitted.includes(t.provider_template_name);
+      }
+      return t.local_state.approval_status === "draft"
+        && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
+        && !emitted.includes(t.provider_template_name);
+    });
+  },
   docExists: () => existsSync(resolve(DOC)),
 };
 

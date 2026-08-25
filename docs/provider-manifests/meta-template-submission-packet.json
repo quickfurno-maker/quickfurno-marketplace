@@ -3,9 +3,9 @@
   "schema_version": "1.0",
   "phase": "QF-MVP-40.10A",
   "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
+  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: clarification_request (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_transactional_followup (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_crm_promotion (wave 3, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_new_lead (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "7150ec78f7e4ed3c2dcea48407b0317b84a7d3aa3434727534686acd17c5087d",
+  "source_manifest_fingerprint": "43892a392d7bb45f75e417f8c3aefdb8d73d8f2608bfdabb22e3a4a195314f15",
   "external_contract_references": [
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
@@ -177,8 +177,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
         "provider_template_id": "1368369535273954"
       },
       "creation_payload": {
@@ -213,8 +213,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": "1374658884649762"
       },
       "creation_payload": {
@@ -422,8 +422,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": "2924879551180482"
       },
       "creation_payload": {
@@ -639,8 +639,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
         "provider_template_id": "1868167847496096"
       },
       "creation_payload": {
@@ -702,8 +702,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": "2326221901244860"
       },
       "creation_payload": {
@@ -730,8 +730,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
         "provider_template_id": "1569683294809980"
       },
       "creation_payload": {
@@ -853,8 +853,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
         "provider_template_id": "27814489294917998"
       },
       "creation_payload": {
@@ -954,8 +954,8 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "pending",
-        "submission_state": "SUBMITTED_PENDING",
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
         "provider_template_id": "905027118919792"
       },
       "creation_payload": {

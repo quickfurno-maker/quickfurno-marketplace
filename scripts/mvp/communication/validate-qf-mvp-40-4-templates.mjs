@@ -45,14 +45,29 @@ const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_receive
   "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
 /**
- * QF-MVP-40 live batch, created 2026-08-25: six Wave-1 templates plus the final two
- * PENDING and returned category UTILITY: neither draft nor approved, but a THIRD lifecycle
- * state. Creation authority is CONSUMED so they are held, and they DO carry a proven remote
- * template id. PENDING IS NOT APPROVED and none may advance without a GET-only reconciliation.
+ * QF-MVP-40 2026-08-25 reconciliation outcome. The eight templates created that day were
+ * read back GET-only and split in two:
+ *
+ *   RECONCILED_APPROVED_KEYS - Meta approved them at their INTENDED category. They are
+ *     APPROVED_UNMAPPED and carry a proven remote id. Approval proves the provider contract
+ *     only; it grants no mapping, activation or send authority.
+ *
+ *   QUARANTINED_KEYS - Meta approved them but RECATEGORISED them to MARKETING against a
+ *     UTILITY request. They can never serve the role they were written for, so they are
+ *     QUARANTINED_UNMAPPED with send/mapping/activation denied. Their canonical requested
+ *     category is deliberately NOT rewritten to match Meta.
+ *
+ * PENDING_KEYS is now EMPTY: every submitted template has been reconciled. It is kept so the
+ * pending branch stays live for the next submission rather than being deleted and re-derived.
  */
-const PENDING_KEYS = Object.freeze(["clarification_reminder", "clarification_request",
-  "client_transactional_followup", "low_credit_warning", "vendor_crm_promotion",
-  "vendor_new_lead", "vendor_package_expiry_warning", "vendor_response_reminder"]);
+const RECONCILED_APPROVED_KEYS = Object.freeze(["clarification_request",
+  "client_transactional_followup", "vendor_crm_promotion", "vendor_new_lead"]);
+const QUARANTINED_KEYS = Object.freeze(["clarification_reminder", "low_credit_warning",
+  "vendor_package_expiry_warning", "vendor_response_reminder"]);
+const PENDING_KEYS = Object.freeze([]);
+/** Every key whose live creation is proven, and therefore the only ones that may carry an id. */
+const CREATED_KEYS = Object.freeze([...RECONCILED_APPROVED_KEYS, ...QUARANTINED_KEYS,
+  ...PENDING_KEYS]);
 
 const R = {
   uniqueKeys(m) {
@@ -143,21 +158,27 @@ const R = {
     const all = allEntries(m);
     if (all.filter((t) => CLOSED_KEYS_40_10E.includes(t.internal_template_key)).length
         !== CLOSED_KEYS_40_10E.length) return false;
-    if (all.filter((t) => PENDING_KEYS.includes(t.internal_template_key)).length
-        !== PENDING_KEYS.length) return false;
+    if (all.filter((t) => CREATED_KEYS.includes(t.internal_template_key)).length
+        !== CREATED_KEYS.length) return false;
     return all.every((t) => {
+      if (RECONCILED_APPROVED_KEYS.includes(t.internal_template_key)) {
+        return t.approval_status === "approved" && t.submission_state === "APPROVED_UNMAPPED"
+          && typeof t.provider_template_id === "string" && t.provider_template_id.length > 0 && t.qf_mvp_40?.submit_now === false;
+      }
+      if (QUARANTINED_KEYS.includes(t.internal_template_key)) {
+        return t.approval_status === "quarantined" && t.submission_state === "QUARANTINED_UNMAPPED"
+          && typeof t.provider_template_id === "string" && t.provider_template_id.length > 0 && t.qf_mvp_40?.submit_now === false;
+      }
       if (PENDING_KEYS.includes(t.internal_template_key)) {
-        // Created live: a proven remote id is REQUIRED here, and creation stays held.
-        return typeof t.provider_template_id === "string" && t.provider_template_id.length > 0
-          && t.submission_state === "SUBMITTED_PENDING" && t.approval_status === "pending"
-          && t.qf_mvp_40?.submit_now === false;
+        return t.approval_status === "pending" && t.submission_state === "SUBMITTED_PENDING"
+          && typeof t.provider_template_id === "string" && t.provider_template_id.length > 0 && t.qf_mvp_40?.submit_now === false;
       }
-      if (t.provider_template_id !== null) return false;
+      if (t.provider_template_id !== null) return false;   // no remote id without a proven creation
       if (CLOSED_KEYS_40_10E.includes(t.internal_template_key)) {
-        return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
+        return t.approval_status === "approved" && t.submission_state === "APPROVED_UNMAPPED"
           && t.qf_mvp_40?.submit_now === false;
       }
-      return t.submission_state === DRAFT && t.approval_status === "draft";
+      return t.approval_status === "draft" && t.submission_state === "DRAFT_NOT_SUBMITTED";
     });
   },
 
@@ -167,9 +188,10 @@ const R = {
     // "active"/"submitted" remain forbidden outright. "approved" is now permitted for
     // EXACTLY the one Wave 0 entry Meta approved; allDraft pins which one that is.
     if (/"(approval_status|submission_state)"\s*:\s*"(active|submitted)"/.test(raw)) return false;
+    const permitted = [...CLOSED_KEYS_40_10E, ...RECONCILED_APPROVED_KEYS];
     const approved = allEntries(m).filter((t) => t.approval_status === "approved");
-    if (approved.length > CLOSED_KEYS_40_10E.length) return false;
-    if (approved.some((t) => !CLOSED_KEYS_40_10E.includes(t.internal_template_key))) return false;
+    if (approved.length !== permitted.length) return false;
+    if (approved.some((t) => !permitted.includes(t.internal_template_key))) return false;
     return allEntries(m).every((t) => t.binding_contract?.binding_readiness !== "active");
   },
 
@@ -243,7 +265,7 @@ const RULES = [
   ["T8  a marketing consent scope requires the marketing category", R.marketingCategoryIntegrity],
   ["T9  STOP/START/HELP carry no promotional content", R.consentAcksNotPromotional],
   ["T10 the vendor lead offer never claims an assignment", R.leadOfferIsNotAssignment],
-  ["T11 three-state lifecycle: approved+held, pending+held with proven id, rest draft", R.allDraft],
+  ["T11 four-state lifecycle: approved / quarantined / pending / draft, ids only where proven", R.allDraft],
   ["T12 no active or approved provider mapping is asserted", R.noActiveMapping],
   ["T13 example fixtures contain no PII", R.fixturesHaveNoPii],
   ["T14 groups and entries are deterministically ordered", R.deterministicOrdering],

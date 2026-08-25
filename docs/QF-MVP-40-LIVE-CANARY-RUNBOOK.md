@@ -129,7 +129,7 @@ The roadmap's ten criteria, each with its test path and current executability.
 | 6 | STOP blocks future promotional messages | owner sends **STOP** from the canary number | suppression rows for marketing **and** transactional; promotional eligibility denied | **yes** | **no** | needs live inbound |
 | 7 | START restores only permitted communication | owner sends **START** | suppression cleared; marketing **still** default-denied — START never creates marketing consent | **yes** | **no** | needs live inbound |
 | 8 | HELP responds safely | owner sends **HELP** | inbound verified, attributed, persisted; ack only via the evidence-bound one-shot enforcer, or a proven correct no-send | **yes** | **no** | needs live inbound |
-| 9 | campaign canary succeeds | §4 — not currently possible | — | no | **no** | **no approved MARKETING template, no marketing consent, no active frequency policy** |
+| 9 | campaign canary succeeds | §4 + §4.6 | — | no | **no** | template approved 2026-08-25; still blocked on **marketing mapping authority, marketing consent, active frequency policy** |
 | 10 | no voice path exists | offline source guard | zero voice/call/transcription surface | no | **yes** | **none — satisfied** |
 
 **Only criterion 10 is satisfiable offline, and it is satisfied.** Nine of ten are live claims.
@@ -151,7 +151,22 @@ Explicitly forbidden as substitutes: the quarantined `qf_consent_help_response_v
 re-classifying a UTILITY template as marketing. No consent may be invented. No frequency
 threshold or window may be chosen for the owner. Nothing is submitted to Meta by this slice.
 
-### 4.1 Proposed minimal template
+### 4.1 Proposed minimal template — **CREATED AND APPROVED 2026-08-25**
+
+> **Status update (2026-08-25).** This is no longer a proposal. `qf_vendor_crm_promotion_v1`
+> was created live by exactly one create POST and a GET-only reconciliation proved it
+> **APPROVED with Meta category MARKETING** on the current dedicated staging WABA
+> (`readback_semantic_match` true, `create_post_count_at_reconciliation` 0). The owner
+> approved the zero-variable form; the final fixed copy carries an explicit STOP instruction
+> and no free-text campaign parameter. Evidence:
+> `docs/provider-manifests/meta-staging-vendor-crm-promotion-v1-reconciliation.json`,
+> indexed by `meta-staging-wave1-batch-reconciliation-evidence.json`.
+>
+> **This does NOT make criterion 9 complete.** An approval proves the provider contract
+> only. It creates no mapping, no marketing consent, no frequency policy and no send
+> authority. The remaining prerequisites are enumerated in §4.6.
+
+The original proposal is preserved below as the reviewed decision record.
 
 | Field | Proposal |
 | --- | --- |
@@ -199,7 +214,15 @@ No default is proposed. A frequency threshold is a business commitment about how
 person may be contacted, and inventing one would put a number the owner never chose in front
 of customers.
 
-### 4.4 Submission path to resume, for ONE template only
+### 4.4 Submission path to resume, for ONE template only — **SPENT 2026-08-25**
+
+> **Status update (2026-08-25).** Steps 1–5 are done and step 6's condition is now met:
+> the template is APPROVED with category MARKETING, so "only on APPROVED + MARKETING does
+> a mapping become creatable" is satisfied. The creation authority for
+> `qf_vendor_crm_promotion_v1` is CONSUMED and the entry is held from creation
+> (`submit_now` false) — it must never be created again. What remains is the mapping
+> authority itself, which does not yet exist for a MARKETING template (§4.6).
+
 
 The submission pause is `PAUSED`; its resume condition is *"An ACTIVE implementation phase
 must require a specific template. Only then is a new subset proposed, reviewed and separately
@@ -222,6 +245,25 @@ audience snapshot frozen → admin approval → `campaignHandoffService` creates
 `communication_intents` → QF-MVP-50.4 `campaign.execute_recipient` claims one recipient →
 `execute-campaign` → CommunicationService → Meta. Bounded to the single owner-controlled
 canary recipient, armed and disabled as its own third cycle.
+
+### 4.6 Criterion 9 — remaining prerequisites after the 2026-08-25 approval
+
+The template half is done. Nothing below is done, and none of it may be improvised.
+
+| # | Prerequisite | State | Why |
+| --- | --- | --- | --- |
+| 1 | governed provider mapping path for `vendor_crm_promotion` | **SOURCE_GAP** | `seed-meta-staging-inactive-mappings.mjs` is hard-wired to Utility: `PROVIDER_CATEGORY = "utility"`, a per-template `r.category !== "UTILITY"` refusal and a `provider_category` readback check. A MARKETING template fails closed at all three. |
+| 2 | SEED_SET marketing extension vs separate marketing mapping authority | **OWNER_DECISION_REQUIRED** | SEED_SET is exactly eight, fingerprint-pinned and all-or-nothing, and three of its keys are not even creatable yet. Widening it would couple a marketing canary to unrelated Utility work; a separate narrow marketing mapping authority is the smaller change. Owner picks. |
+| 3 | marketing consent for the canary identity | **SOURCE_GAP** | No write path to `communication_preferences` exists anywhere in application source. Every reference is read-only or an explicit assertion that the table is never written. START cannot create it (writer P1/P2). |
+| 4 | active marketing frequency policy | **EXISTS_BUT_REQUIRES_CONFIGURATION** | `communicationFrequencyPolicyService` is a real canonical writer and `communication_frequency_policies` ships empty by design. Only the three business values are missing — see §4.3 and the owner decision table. |
+| 5 | frozen audience of exactly the owner-controlled canary recipient | **EXISTS_BUT_REQUIRES_CONFIGURATION** | The QF-MVP-30.5 segment/snapshot path exists; the canary audience has not been built or frozen. |
+| 6 | campaign approval / handoff path | **EXISTS_AND_READY** | `campaignHandoffService` + `qf_handoff_vendor_campaign_intents_v1` re-prove approval, snapshot fingerprint, template fingerprint, frequency policy and per-recipient consent under lock, inserting zero intents on any failure. No second authority is needed. |
+| 7 | provider canary arm / disable sequencing | **EXISTS_AND_READY** | `activate-meta-staging-canary-cli.mjs` + `canaryActivationRuntime.mjs`, proven by the R7E/R7F arm-and-restore cycle. The campaign canary is its own third cycle. |
+| 8 | delivery / result reconciliation | **EXISTS_AND_READY** | `campaignCommunicationResultService` + the QF-MVP-40.8 result contract. |
+| 9 | fail-closed restoration | **EXISTS_AND_READY** | `--disable` restores provider fail-closed; proven in R7E. |
+
+Items 1 and 3 are genuine source gaps. Item 2 is an owner decision. Criterion 9 stays
+**BLOCKED**, and the change of blocker is not a change of status.
 
 ## 5. Locked live order
 

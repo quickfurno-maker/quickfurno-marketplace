@@ -518,7 +518,16 @@ record("R07 arming a second template while one is active is refused end to end",
   })()));
 record("R08 the campaign criterion is recorded as an OPEN QF-MVP-40 blocker",
   /campaign canary succeeds/.test(runbook) &&
-  /no approved MARKETING template/i.test(runbook) &&
+  // The original form pinned the literal blocker string "no approved MARKETING template".
+  // That became FACTUALLY FALSE on 2026-08-25, when qf_vendor_crm_promotion_v1 was proven
+  // APPROVED/MARKETING. The invariant protected here is "criterion 9 is recorded as OPEN
+  // and cannot be closed by the utility canaries alone" - NOT that one particular blocker
+  // still applies. It now requires the THREE current prerequisites to be documented, which
+  // is strictly more than the single stale sentence it replaces.
+  /marketing mapping authority/i.test(runbook) &&
+  /marketing consent/i.test(runbook) &&
+  /frequency policy/i.test(runbook) &&
+  /does NOT make criterion 9 complete/i.test(runbook) &&
   /must \*{0,2}not\*{0,2} be marked complete after the vendor and client utility canaries alone/i.test(runbook) &&
   /QF_MVP_40_STATUS: IN_PROGRESS/.test(runbook));
 record("R09 the campaign packet forbids every substitute and invents nothing",
@@ -660,7 +669,8 @@ const mutants = [
     }],
   ["campaign cannot be marked complete without the marketing prerequisites",
     () => /QF_MVP_40_STATUS: IN_PROGRESS/.test(runbook) &&
-          /no approved MARKETING template/i.test(runbook) &&
+          /marketing mapping authority/i.test(runbook) &&
+          /does NOT make criterion 9 complete/i.test(runbook) &&
           !/QF_MVP_40_FINAL_PROVIDER_READINESS_COMPLETE/.test(runbook) &&
           !/COMPLETE \/ TESTED \/ FROZEN\*{0,2}\s*$/m.test(runbook)],
 ];

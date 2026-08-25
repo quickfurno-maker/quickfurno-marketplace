@@ -37,6 +37,27 @@ other criterion is a *live* claim about staging and cannot be certified from sou
 
 ## 3. Template truth (recorded remote state, re-read this session)
 
+> **SUPERSEDED IN PART — 2026-08-25 current-WABA reconciliation.** The table below records
+> what was true of the PREVIOUS WABA context and is preserved unamended as history. Against
+> the CURRENT dedicated staging WABA it is stale in four ways:
+>
+> * `lead_received` and `lead_assignment_alert` are **ABSENT** — they do not exist on this
+>   WABA at all, despite the historical APPROVED record below.
+> * `client_matching_update` v1 is **APPROVED but MARKETING**, quarantined and unmappable;
+>   its successor `qf_client_matching_update_v2` has never been created.
+> * `consent_start_acknowledgement` is now v2 (v1 quarantined MARKETING); `consent_help_response`
+>   is v3.
+> * Four newly created Utility templates were **recategorised to MARKETING** by Meta on
+>   2026-08-25 and are quarantined: `clarification_reminder`, `vendor_response_reminder`,
+>   `vendor_package_expiry_warning`, `low_credit_warning`.
+>
+> **The canary conclusion below still holds.** `vendor_onboarding_reminder` and
+> `client_lead_status_update` are both current-WABA APPROVED/UTILITY, both mappable, and both
+> carry a proven binding contract in `lib/communication/businessTemplateVariables.ts`. The
+> vendor canary and the client canary are therefore both satisfiable without
+> `client_matching_update`. Authority: `docs/provider-manifests/meta-template-remote-state.json`.
+
+
 Eight APPROVED UTILITY templates. Five are ordinary business, three are evidence-bound
 consent acknowledgements that are deliberately absent from `outboundConsentScope.ts` and are
 authorised only by the one-shot enforcer bound to a verified inbound command.
@@ -55,6 +76,11 @@ authorised only by the one-shot enforcer bound to a verified inbound command.
 Both intended canary candidates therefore exist and are approved UTILITY:
 **vendor** → `vendor_onboarding_reminder`; **client** → `client_matching_update` or
 `client_lead_status_update`.
+
+> **2026-08-25:** of the two client options only **`client_lead_status_update`** remains
+> valid — `client_matching_update` v1 is quarantined MARKETING and v2 was never created.
+> One valid client Utility canary template is sufficient, so the absent v2 successor is
+> **not** a closeout blocker.
 
 Do not use `qf_consent_help_response_v2`: it is APPROVED but **MARKETING**-category, and
 `qf_consent_help_response_v1` is DELETED and retired — its name must never be reused.

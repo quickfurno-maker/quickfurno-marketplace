@@ -29,11 +29,11 @@
     "note": "No new mapping system, provider-account abstraction, schema or migration is introduced. The existing contracts are authoritative and already express an inactive mapping safely."
   },
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "3a80eb3e5ad5b0afca9a32a56a7f845962f91a06db42ed2b7a8a9f9a5421aaa2",
+  "source_manifest_fingerprint": "598ed108518469280a0e8ec285be4e0fb4cbca66b955a622bf8c8b373260f5a1",
   "source_remote_state": "docs/provider-manifests/meta-template-remote-state.json",
   "source_remote_state_fingerprint": "a8a857badf5761bcf0a65a923b7598f90c1508edde7078df6fb70adef83d69e1",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "8593df65c85a89dbb2295e2c14a042dec2b7c59e7ebdd9ca1896c567a47da27c",
+  "source_packet_fingerprint": "d6f766d9df718b58e9946758cec924bab5519e23e80d2117ef2b832165581458",
   "counts": {
     "total": 5,
     "evidence_bound_ack": 3,

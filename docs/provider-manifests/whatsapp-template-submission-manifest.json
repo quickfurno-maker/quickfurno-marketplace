@@ -773,7 +773,7 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+        "body_spec": "Hi {{1}}, QuickFurno needs one detail to complete your enquiry matching: {{2}}. Please reply with this information.",
         "variables_schema": {
           "1": {
             "type": "text",
@@ -809,9 +809,10 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": true,
+          "closure_note": "QF-MVP-40 CLARIFICATION REQUEST FORMAT REPAIR. HISTORY: qf_clarification_request_v1 was submitted live EXACTLY ONCE on 2026-08-25 with payload fingerprint 9c484b4d7e54929a2ab52b08093e1e719d3dfdb7b7c1741fa8b5e8e1daf85e4b and body \"Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.\". Meta returned a DETERMINISTIC HTTP 400 (code 100, subcode 2388299, OAuthException, non-transient) and the operator stopped: outcome CREATE_REJECTED_4XX, create_post_count 1, no second POST, no other batch template attempted. NO remote template was created, so there is no remote template id, no remote status and no returned category, and no ledger row exists or should exist for v1. CAUSE: subcode 2388299 is the template-format rejection for leading/trailing parameters. The v1 body ended with \"{{2}}.\" - the final parameter was followed only by punctuation, which does not satisfy Meta's requirement for trailing static text. v1 IS CONSUMED AND PERMANENTLY RETIRED: it must never be retried, never resubmitted with modified content, and the name qf_clarification_request_v1 must never be reused. CURRENT: the canonical successor is qf_clarification_request_v2, whose body keeps the exact two-parameter contract ({{1}} client name, {{2}} clarification prompt, in that order) and adds real static text after the final parameter. v2 has NEVER been submitted anywhere, so its local state is honestly draft / DRAFT_NOT_SUBMITTED. Approval would prove the PROVIDER CONTRACT ONLY and would create no mapping, activation or send authority."
         },
-        "provider_template_name_candidate": "qf_clarification_request_v1"
+        "provider_template_name_candidate": "qf_clarification_request_v2"
       },
       {
         "internal_template_key": "client_lead_status_update",

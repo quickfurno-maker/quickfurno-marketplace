@@ -1,0 +1,71 @@
+{
+  "artifact": "meta-staging-clarification-request-v1-rejection-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40",
+  "operation_id": "QF-MVP-40-CLARIFICATION-REQUEST-V1-REJECTION-2026-08-25",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Index record for the ONE live create attempt of qf_clarification_request_v1, which Meta rejected deterministically. It exists so the failure is preserved as history rather than quietly replaced by its successor: the creation authority for that name is spent, and the name must never be reused. The observed facts live in the referenced sanitized record and are deliberately NOT duplicated here.",
+  "privacy": "This index holds no Meta identifier. The referenced record was written by the submitter's own sanitizer and carries no token, app secret, phone number or WABA id. No remote template id exists to record, because no template was created. No Meta request or response body was captured, and none is reconstructed here: the structured error fields below are the only error detail that was retained.",
+  "rejection_evidence": {
+    "path": "docs/provider-manifests/meta-staging-clarification-request-v1-rejection.json",
+    "sha256": "1b51a6609460b47efd207aa16396aa22e2dd5ec3bb9cac94d049909fc9108b1f",
+    "generated_by": "scripts/mvp/communication/submit-meta-templates.mjs (EXECUTE_CREATE)",
+    "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-31-42-120Z.json",
+    "relocated_byte_identical": true,
+    "content_rewritten": false,
+    "note": "Moved out of the repository root into docs/provider-manifests under the kebab-case convention. Content was NOT edited: the sha256 above is the sha256 of the file the submitter emitted."
+  },
+  "proven_facts": {
+    "internal_template_key": "clarification_request",
+    "provider_template_name": "qf_clarification_request_v1",
+    "provider_language": "en",
+    "requested_category": "UTILITY",
+    "payload_fingerprint": "9c484b4d7e54929a2ab52b08093e1e719d3dfdb7b7c1741fa8b5e8e1daf85e4b",
+    "rejected_body": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+    "outcome": "CREATE_REJECTED_4XX",
+    "http_status": 400,
+    "meta_error_code": 100,
+    "meta_error_subcode": 2388299,
+    "meta_error_type": "OAuthException",
+    "meta_error_is_transient": false,
+    "create_post_count": 1,
+    "second_post_issued": false,
+    "other_batch_templates_attempted": 0,
+    "remote_template_id": null,
+    "remote_status": null,
+    "returned_category": null,
+    "readback_semantic_match": null,
+    "identity_match": true,
+    "api_version": "v26.0"
+  },
+  "cause": {
+    "subcode": 2388299,
+    "meaning": "Meta template-format rejection for a leading or trailing parameter.",
+    "diagnosis": "The v1 body ended with \"{{2}}.\" — the final positional parameter was followed only by a full stop. Punctuation alone does not satisfy Meta's requirement that a body must not end with a parameter. The body did have static text before {{1}}, so the leading-parameter half of the rule was already satisfied; only the trailing half failed.",
+    "evidence_basis": "The subcode is read from the sanitized record. The diagnosis is the owner-supplied interpretation of that subcode combined with the committed v1 body; no Meta response body was captured and none is reconstructed."
+  },
+  "retirement": {
+    "state": "CONSUMED_AND_PERMANENTLY_RETIRED",
+    "creation_authority": "SPENT",
+    "may_be_retried": false,
+    "may_be_resubmitted_with_modified_content": false,
+    "name_may_be_reused": false,
+    "statement": "qf_clarification_request_v1 must never be retried, never resubmitted with changed content, and its provider name must never be reused. No remote object exists for it, so it has no ledger row in meta-template-remote-state.json and must never be given one: that ledger records PROVEN REMOTE STATE, and there is no remote state to record.",
+    "successor": "qf_clarification_request_v2",
+    "successor_state": "draft / DRAFT_NOT_SUBMITTED — never submitted anywhere"
+  },
+  "authorities_explicitly_not_granted": {
+    "creation_authority": "NOT_GRANTED",
+    "retry_authority": "DENIED",
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "provider_arm_authority": "NOT_GRANTED",
+    "production_authority": "DENIED",
+    "statement": "This artifact records a failure. It grants nothing. It does not authorise retrying v1, creating v2, mapping any template, arming any provider, or any production action."
+  }
+}

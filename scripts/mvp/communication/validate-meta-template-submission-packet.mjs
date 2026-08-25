@@ -203,6 +203,14 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 
 const manifest = JSON.parse(readFileSync(resolve(MANIFEST), "utf8"));
 const packet = JSON.parse(readFileSync(resolve(PACKET), "utf8"));
+/** QF-MVP-40 clarification-request v1 deterministic rejection (2026-08-25). */
+const V1_REJECTION = "docs/provider-manifests/meta-staging-clarification-request-v1-rejection-evidence.json";
+const v1Rejection = JSON.parse(readFileSync(resolve(V1_REJECTION), "utf8"));
+const V1_REJECTION_RECORD = "docs/provider-manifests/meta-staging-clarification-request-v1-rejection.json";
+const v1RejectionRaw = readFileSync(resolve(V1_REJECTION_RECORD), "utf8");
+const v1RejectionRecord = JSON.parse(v1RejectionRaw);
+const REMOTE_LEDGER = "docs/provider-manifests/meta-template-remote-state.json";
+const remoteLedger = JSON.parse(readFileSync(resolve(REMOTE_LEDGER), "utf8"));
 const bindingSrc = readFileSync(resolve(BINDING_SRC), "utf8");
 const submitSrc = existsSync(resolve(SUBMIT_SCRIPT)) ? readFileSync(resolve(SUBMIT_SCRIPT), "utf8") : "";
 /** Comments and the header block stripped, so prose cannot trip an executable rule. */
@@ -214,8 +222,152 @@ const ADMIN = ["admin_assignment_failure_alert", "admin_automation_failure_alert
 const ACKS = ["consent_stop_acknowledgement", "consent_start_acknowledgement", "consent_help_response"];
 const NAME_RE = /^qf_[a-z0-9_]+_v\d+$/;
 
+// ---------------------------------------------------------------------------
+// STRUCTURAL META PREFLIGHT
+//
+// Meta subcode 2388299 rejects a body that BEGINS or ENDS with a positional
+// parameter. qf_clarification_request_v1 was rejected live on 2026-08-25 because it
+// ended with "{{2}}." - trailing punctuation is not trailing static text. Nothing in
+// this repository caught that before the POST was spent, so the rule lives here now
+// and is enforced over EVERY packet entry.
+//
+// Two Wave 4 admin alerts carry the identical defect. They are NOT silently exempt:
+// they are named below and separately required to stay unsubmittable, so the landmine
+// is recorded rather than hidden, and it must be repaired before Wave 4 can be sent.
+// ---------------------------------------------------------------------------
+const PLACEHOLDER_RE = /\{\{\s*(\d+)\s*\}\}/g;
+const KNOWN_FORMAT_DEFECTS = Object.freeze(["admin_assignment_failure_alert", "admin_policy_block_alert"]);
+
+/** Pure structural audit of one body string. Returns a list of fault codes. */
+export function auditBodyStructure(text) {
+  const faults = [];
+  if (typeof text !== "string" || text.length === 0) return ["body_empty"];
+  if (text.length > 1024) faults.push("body_too_long");
+  const pos = [];
+  let m;
+  PLACEHOLDER_RE.lastIndex = 0;
+  while ((m = PLACEHOLDER_RE.exec(text)) !== null) {
+    pos.push({ n: Number(m[1]), start: m.index, end: m.index + m[0].length });
+  }
+  const nums = pos.map((p) => p.n);
+  if (JSON.stringify(nums) !== JSON.stringify(nums.map((_, i) => i + 1))) {
+    faults.push("placeholders_not_sequential");
+  }
+  if (pos.length > 0) {
+    // A letter is required, not merely a non-empty string: punctuation alone is what
+    // Meta rejected on v1.
+    if (!/\p{L}/u.test(text.slice(0, pos[0].start))) faults.push("leading_parameter");
+    if (!/\p{L}/u.test(text.slice(pos[pos.length - 1].end))) faults.push("trailing_parameter");
+    for (let i = 1; i < pos.length; i++) {
+      if (!/\p{L}/u.test(text.slice(pos[i - 1].end, pos[i].start))) faults.push("consecutive_parameters");
+    }
+    const staticWords = text.replace(PLACEHOLDER_RE, "").trim().split(/\s+/)
+      .filter((w) => /\p{L}/u.test(w)).length;
+    if (staticWords / pos.length < 3) faults.push("static_ratio_too_low");
+  }
+  return faults;
+}
+
+const bodyOf = (t) => t.creation_payload.components.find((c) => c.type === "body");
+const AUTHORED_BODY_EXEMPT_PROFILE = "AUTH_OTP_COPY_CODE";
+const hasAuthoredBody = (t) => typeof bodyOf(t)?.text === "string";
+
 const R = {
   totalIs25: (p) => p.total_templates === 25 && p.templates.length === 25,
+
+  // Every entry that is NOT a named known-defective one must be structurally clean.
+  structurallyCleanBodies: (p) => p.templates.every((t) => {
+    if (!hasAuthoredBody(t)) return true;
+    if (KNOWN_FORMAT_DEFECTS.includes(t.internal_template_key)) return true;
+    return auditBodyStructure(bodyOf(t).text).length === 0;
+  }),
+  // The only entries without an author-supplied body must be the Meta-generated
+  // authentication ones. Anything else missing a body would silently skip the rules above.
+  onlyAuthLacksAuthoredBody: (p) => p.templates.every((t) =>
+    hasAuthoredBody(t) === (t.component_profile !== AUTHORED_BODY_EXEMPT_PROFILE)),
+  // The exemption is not a licence: a known-defective entry must stay unsubmittable,
+  // must still be unsubmitted, and must actually still BE defective - a repaired entry
+  // has to be removed from the list rather than left carrying a stale exemption.
+  knownDefectsHeldAndReal: (p) => KNOWN_FORMAT_DEFECTS.every((k) => {
+    const t = p.templates.find((x) => x.internal_template_key === k);
+    if (!t) return false;
+    return t.submit_now === false
+      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
+      && t.local_state.provider_template_id === null
+      && auditBodyStructure(bodyOf(t).text).includes("trailing_parameter");
+  }),
+  // Any template actually cleared for submission must be structurally clean, with no
+  // exemption path at all.
+  submittableBodiesClean: (p) => p.templates.filter((t) => t.submit_now === true)
+    .every((t) => !hasAuthoredBody(t) || auditBodyStructure(bodyOf(t).text).length === 0),
+  // Examples must match arity and be real fixtures, not generator fallbacks.
+  examplesRealistic: (p) => p.templates.every((t) => {
+    if (!hasAuthoredBody(t)) return true;
+    const b = bodyOf(t);
+    const count = (b.text.match(/\{\{\s*\d+\s*\}\}/g) ?? []).length;
+    if (count === 0) return b.example === undefined;
+    const rows = b.example?.body_text;
+    if (!Array.isArray(rows) || rows.length !== 1 || rows[0].length !== count) return false;
+    return rows[0].every((v) => typeof v === "string" && v.trim().length > 0
+      && !/^EXAMPLE_\d+$/.test(v));
+  }),
+
+  // --- clarification_request v1 -> v2 supersession ---
+  clarificationIsV2: (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    return !!t && t.provider_template_name === "qf_clarification_request_v2"
+      && t.creation_payload.name === "qf_clarification_request_v2"
+      && t.creation_payload.category === "UTILITY"
+      && t.creation_payload.language === "en";
+  },
+  // The spent name must not survive anywhere in the packet, under any key.
+  v1NameNotReused: (p) => !JSON.stringify(p).includes("qf_clarification_request_v1"),
+  // The v2 body must differ from the rejected one AND fix the actual fault.
+  v2RepairsTheFault: (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    const REJECTED = "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.";
+    return !!t && bodyOf(t).text !== REJECTED
+      && auditBodyStructure(REJECTED).includes("trailing_parameter")
+      && auditBodyStructure(bodyOf(t).text).length === 0;
+  },
+  // The variable contract is a repair invariant: the copy changed, the contract did not.
+  v2KeepsVariableContract: (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    const ph = (bodyOf(t).text.match(/\{\{\s*\d+\s*\}\}/g) ?? []).map((x) => x.replace(/\s/g, ""));
+    const rows = bodyOf(t).example?.body_text;
+    return ph.length === 2 && ph[0] === "{{1}}" && ph[1] === "{{2}}"
+      && Array.isArray(rows) && rows[0].length === 2;
+  },
+  // v2 has never been submitted; claiming otherwise would rewrite the failure as a success.
+  v2NeverSubmitted: (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    return t.local_state.approval_status === "draft"
+      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
+      && t.local_state.provider_template_id === null;
+  },
+
+  // --- v1 rejection evidence ---
+  v1RejectionRecorded: (e) => e.contains_secrets === false
+    && e.authorizes_meta_calls === false && e.authorizes_sending === false
+    && e.proven_facts.outcome === "CREATE_REJECTED_4XX"
+    && e.proven_facts.http_status === 400
+    && e.proven_facts.meta_error_code === 100
+    && e.proven_facts.meta_error_subcode === 2388299
+    && e.proven_facts.meta_error_type === "OAuthException"
+    && e.proven_facts.meta_error_is_transient === false
+    && e.proven_facts.create_post_count === 1
+    && e.proven_facts.second_post_issued === false
+    && e.proven_facts.remote_template_id === null
+    && e.proven_facts.remote_status === null
+    && e.proven_facts.returned_category === null,
+  v1PermanentlyRetired: (e) => e.retirement.may_be_retried === false
+    && e.retirement.may_be_resubmitted_with_modified_content === false
+    && e.retirement.name_may_be_reused === false
+    && e.retirement.creation_authority === "SPENT"
+    && e.retirement.successor === "qf_clarification_request_v2",
+  // A rejected create produced no remote object, so it must have no ledger row.
+  v1HasNoLedgerRow: (l) => !l.entries.some(
+    (x) => x.provider_template_name === "qf_clarification_request_v1"),
   reconcileWaves: (p) => Object.values(p.wave_counts).reduce((a, b) => a + b, 0) === 25,
   wave0IsExactlyOne: (p) => p.templates.filter((t) => t.submission_wave === 0).length === 1,
   wave0IsNoVariable: (p) => {
@@ -921,6 +1073,19 @@ const R = {
 
 const RULES = [
   ["P1  packet totals exactly 25 templates", R.totalIs25, packet],
+  ["S1  no body begins or ends with a parameter (subcode 2388299)", R.structurallyCleanBodies, packet],
+  ["S2  known format defects stay held, unsubmitted and genuinely defective", R.knownDefectsHeldAndReal, packet],
+  ["S3  every submittable body is structurally clean, with no exemption", R.submittableBodiesClean, packet],
+  ["S4  every example matches arity and is a real fixture", R.examplesRealistic, packet],
+  ["S4b only Meta-generated auth bodies lack author-supplied text", R.onlyAuthLacksAuthoredBody, packet],
+  ["S5  clarification_request is the v2 successor", R.clarificationIsV2, packet],
+  ["S6  the spent name qf_clarification_request_v1 is not reused", R.v1NameNotReused, packet],
+  ["S7  the v2 body repairs the exact fault that was rejected", R.v2RepairsTheFault, packet],
+  ["S8  v2 keeps the two-parameter variable contract", R.v2KeepsVariableContract, packet],
+  ["S9  v2 is honestly recorded as never submitted", R.v2NeverSubmitted, packet],
+  ["S10 the v1 deterministic rejection is recorded", R.v1RejectionRecorded, v1Rejection],
+  ["S11 v1 is permanently retired and may never be retried", R.v1PermanentlyRetired, v1Rejection],
+  ["S12 a rejected create left no ledger row", R.v1HasNoLedgerRow, remoteLedger],
   ["P2  wave counts reconcile to 25", R.reconcileWaves, packet],
   ["P3  Wave 0 is exactly one template", R.wave0IsExactlyOne, packet],
   ["P4  Wave 0 template has no variables", R.wave0IsNoVariable, packet],
@@ -1035,6 +1200,64 @@ const RULES = [
 for (const [n, fn, arg] of RULES) add(n, fn(arg));
 
 const MUT = [
+  ["MS1 a trailing parameter is rejected", R.structurallyCleanBodies, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text = "Hi {{1}}, QuickFurno needs one detail: {{2}}."; }],
+  ["MS2 a leading parameter is rejected", R.structurallyCleanBodies, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text = "{{1}}, QuickFurno needs {{2}} to continue your enquiry."; }],
+  ["MS3 consecutive parameters are rejected", R.structurallyCleanBodies, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text = "Hi {{1}} {{2}} please reply with this information."; }],
+  ["MS4 non-sequential parameters are rejected", R.structurallyCleanBodies, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text = "Hi {{1}}, QuickFurno needs one detail: {{3}}. Please reply."; }],
+  ["MS5 a starved static-to-parameter ratio is rejected", R.structurallyCleanBodies, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text = "Hi {{1}} and {{2}} ok."; }],
+  ["MS6 making a known-defective admin alert submittable is rejected", R.knownDefectsHeldAndReal, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "admin_assignment_failure_alert").submit_now = true; }],
+  ["MS7 a stale exemption on a repaired entry is rejected", R.knownDefectsHeldAndReal, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "admin_policy_block_alert");
+    t.creation_payload.components[0].text = "QuickFurno admin alert: a policy blocked lead {{1}} just now."; }],
+  ["MS8 a submittable template with a trailing parameter is rejected", R.submittableBodiesClean, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "low_credit_warning");
+    t.creation_payload.components[0].text = "QuickFurno: your credit balance is low: {{1}}."; }],
+  ["MS8b a silently missing body is rejected", R.onlyAuthLacksAuthoredBody, packet, (p) => {
+    delete p.templates.find((x) => x.internal_template_key === "low_credit_warning")
+      .creation_payload.components[0].text; }],
+  ["MS9 a generator fallback example is rejected", R.examplesRealistic, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].example.body_text[0][1] = "EXAMPLE_2"; }],
+  ["MS10 a wrong example arity is rejected", R.examplesRealistic, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].example.body_text[0].pop(); }],
+  ["MS11 reverting the candidate to v1 is rejected", R.clarificationIsV2, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.provider_template_name = "qf_clarification_request_v1";
+    t.creation_payload.name = "qf_clarification_request_v1"; }],
+  ["MS12 reusing the spent v1 name anywhere is rejected", R.v1NameNotReused, packet, (p) => {
+    p.templates[0].notes_for_reviewer = "supersedes qf_clarification_request_v1"; }],
+  ["MS13 restoring the rejected body is rejected", R.v2RepairsTheFault, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text =
+      "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}."; }],
+  ["MS14 dropping a variable from the repaired copy is rejected", R.v2KeepsVariableContract, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.creation_payload.components[0].text = "Hi {{1}}, QuickFurno needs one more detail. Please reply."; }],
+  ["MS15 claiming v2 was already approved is rejected", R.v2NeverSubmitted, packet, (p) => {
+    const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
+    t.local_state.approval_status = "approved"; }],
+  ["MS16 softening the v1 error record is rejected", R.v1RejectionRecorded, v1Rejection, (e) => {
+    e.proven_facts.meta_error_is_transient = true; }],
+  ["MS17 claiming a second POST is rejected", R.v1RejectionRecorded, v1Rejection, (e) => {
+    e.proven_facts.create_post_count = 2; }],
+  ["MS18 inventing a remote id for a rejected create is rejected", R.v1RejectionRecorded, v1Rejection, (e) => {
+    e.proven_facts.remote_template_id = "1234567890"; }],
+  ["MS19 re-opening v1 for retry is rejected", R.v1PermanentlyRetired, v1Rejection, (e) => {
+    e.retirement.may_be_retried = true; }],
+  ["MS20 giving a rejected create a ledger row is rejected", R.v1HasNoLedgerRow, remoteLedger, (l) => {
+    l.entries.push({ provider_template_name: "qf_clarification_request_v1" }); }],
   ["M1  a missing button index is rejected", R.quickReplyIndicesExact, manifest, (m) => {
     const t = Object.values(m.groups).flat().find((x) => x.internal_template_key === "vendor_new_lead");
     delete t.buttons_spec[0].index; }],

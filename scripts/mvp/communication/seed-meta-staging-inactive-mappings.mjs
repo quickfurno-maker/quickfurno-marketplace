@@ -71,8 +71,12 @@ export const SEED_SET = Object.freeze([
   { key: "client_lead_status_update", name: "qf_client_lead_status_update_v1",
     fingerprint: "ce8982c652515e2434abb2159a4024a199de54cede0bd1f95552eb8d6270e7ac",
     classification: "ORDINARY_BUSINESS" },
-  { key: "client_matching_update", name: "qf_client_matching_update_v1",
-    fingerprint: "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+  // QF-MVP-40-R7N — the DESIRED mapping target is the successor v2. v1 was proven
+  // APPROVED/MARKETING on the current dedicated WABA and is quarantined, so it can never
+  // satisfy this seeder's live Utility preflight. Pointing here at v2 activates nothing:
+  // the preflight still refuses until v2 itself is remotely APPROVED with category UTILITY.
+  { key: "client_matching_update", name: "qf_client_matching_update_v2",
+    fingerprint: "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4",
     classification: "ORDINARY_BUSINESS" },
   { key: "lead_assignment_alert", name: "qf_lead_assignment_alert_v1",
     fingerprint: "3f7997be7b8e1b019ba306a058b96f2d68aa84b7a014ea96407510030bb02453",

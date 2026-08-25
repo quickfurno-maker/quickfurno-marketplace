@@ -97,7 +97,7 @@ const mappingRow = (key, over = {}) => ({
 const SEED_NAMES = Object.freeze({
   lead_received: "qf_lead_received_v1",
   client_lead_status_update: "qf_client_lead_status_update_v1",
-  client_matching_update: "qf_client_matching_update_v1",
+  client_matching_update: "qf_client_matching_update_v2",
   lead_assignment_alert: "qf_lead_assignment_alert_v1",
   vendor_onboarding_reminder: "qf_vendor_onboarding_reminder_v1",
 });
@@ -354,7 +354,7 @@ record("C07 a non-approved mapping is refused",
     })).reason === F.MAPPING_NOT_APPROVED));
 record("C08 provider-template-name drift is refused",
   A.planCanaryArm(canaryArmArgs({
-    mappings: [realMapping("client_matching_update", { provider_template_name: "qf_client_matching_update_v2" }),
+    mappings: [realMapping("client_matching_update", { provider_template_name: "qf_client_matching_update_v9" }),
       realMapping("vendor_onboarding_reminder")],
   })).reason === F.MAPPING_MISSING);
 record("C09 an already-active target mapping is refused rather than re-activated",

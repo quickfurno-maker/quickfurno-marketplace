@@ -1,11 +1,10 @@
 // ============================================================================
-// QF-MVP-40-R7M — validator for the START acknowledgement Utility category repair.
+// QF-MVP-40-R7N — validator for the client matching update Utility category repair.
 // OFFLINE. Calls no Meta endpoint, submits nothing, sends nothing, reads no credential.
 //
-// Beyond the usual one-shot safety contract, this validator proves the SUPERSESSION
-// boundary: R7L owns the quarantined v1, R7M owns v2, and neither can reach the other's
-// template. It also proves the v2 copy carries no promotional concept — the defect that
-// caused Meta to classify v1 as MARKETING.
+// It proves the SUPERSESSION boundary (R7I owns the quarantined v1, R7N owns v2), the
+// two-placeholder runtime contract this target is bound to, and that the v2 copy carries
+// no promotional concept — the defect that caused Meta to classify v1 as MARKETING.
 // ============================================================================
 
 import { createHash } from "node:crypto";
@@ -17,15 +16,15 @@ import {
   REQUIRED_TEMPLATE_FIELDS, RepairPreState, TARGET_CATEGORY, TARGET_LANGUAGE,
   TARGET_TEMPLATE_KEY, TARGET_TEMPLATE_NAME, classifyPreState, exitCodeForOutcome,
   loadCanonicalPayload,
-} from "./create-meta-staging-start-ack-v2-repair-once.mjs";
+} from "./create-meta-staging-client-matching-update-v2-once.mjs";
 import {
   classifyLiveAssets, decide, makeHttp, parseFlags, sha256Hex, validateIdentity,
 } from "./create-meta-staging-vendor-onboarding-reminder-once.mjs";
 import { templatesAreIdentical } from "./submit-meta-templates.mjs";
 
-const OPERATOR = "scripts/mvp/communication/create-meta-staging-start-ack-v2-repair-once.mjs";
+const OPERATOR = "scripts/mvp/communication/create-meta-staging-client-matching-update-v2-once.mjs";
 const VENDOR_OPERATOR = "scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs";
-const R7L_OPERATOR = "scripts/mvp/communication/create-meta-staging-held-utility-recovery-once.mjs";
+const R7I_OPERATOR = "scripts/mvp/communication/create-meta-staging-client-matching-update-once.mjs";
 const SEEDER = "scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs";
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
 const LEDGER = "docs/provider-manifests/meta-template-remote-state.json";
@@ -43,18 +42,23 @@ const codeNoStrings = codeOnly
 const packet = JSON.parse(readFileSync(resolve(PACKET), "utf8"));
 const ledger = JSON.parse(readFileSync(resolve(LEDGER), "utf8"));
 const vendorSrc = readFileSync(resolve(VENDOR_OPERATOR), "utf8");
-const r7lSrc = readFileSync(resolve(R7L_OPERATOR), "utf8");
+const r7iSrc = readFileSync(resolve(R7I_OPERATOR), "utf8");
 const seederSrc = readFileSync(resolve(SEEDER), "utf8");
-const EVIDENCE = "docs/provider-manifests/meta-staging-start-ack-category-mismatch-evidence.json";
+const EVIDENCE = "docs/provider-manifests/meta-staging-client-matching-category-mismatch-evidence.json";
 const evidence = JSON.parse(readFileSync(resolve(EVIDENCE), "utf8"));
-const APPROVAL_EVIDENCE = "docs/provider-manifests/meta-staging-start-ack-v2-approval-evidence.json";
-const approval = JSON.parse(readFileSync(resolve(APPROVAL_EVIDENCE), "utf8"));
-const CREATION_EVIDENCE = "docs/provider-manifests/meta-staging-start-ack-v2-creation-evidence.json";
-const creation = JSON.parse(readFileSync(resolve(CREATION_EVIDENCE), "utf8"));
-const packetValidatorSrc = readFileSync(resolve("scripts/mvp/communication/validate-meta-template-submission-packet.mjs"), "utf8");
 const READINESS = "docs/provider-manifests/meta-template-inactive-mapping-readiness.json";
 const readiness = JSON.parse(readFileSync(resolve(READINESS), "utf8"));
 const internalSeedSrc = readFileSync(resolve("scripts/mvp/communication/seed-internal-staging-templates.mjs"), "utf8");
+const SWEEP = "docs/provider-manifests/meta-staging-current-waba-truth-sweep-evidence.json";
+const sweep = JSON.parse(readFileSync(resolve(SWEEP), "utf8"));
+const readinessGenSrc = readFileSync(resolve("scripts/mvp/communication/generate-meta-inactive-mapping-readiness.mjs"), "utf8");
+/** QF-MVP-40 strict current-WABA proof for vendor_onboarding_reminder (2026-08-25). */
+const STRICT_PROOF = "docs/provider-manifests/meta-staging-vendor-onboarding-reminder-strict-proof-evidence.json";
+const strictProof = JSON.parse(readFileSync(resolve(STRICT_PROOF), "utf8"));
+const STRICT_RECON = "docs/provider-manifests/meta-staging-vendor-onboarding-reminder-strict-reconciliation.json";
+const strictReconRaw = readFileSync(resolve(STRICT_RECON), "utf8");
+const strictRecon = JSON.parse(strictReconRaw);
+const submitterSrc = readFileSync(resolve("scripts/mvp/communication/submit-meta-templates.mjs"), "utf8");
 const vendorHttpSrc = vendorSrc;
 
 const REAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
@@ -160,38 +164,47 @@ record("N07 the pinned digests match the public staging asset ids",
 // COPY — the defect that caused the MARKETING classification must not recur.
 // ---------------------------------------------------------------------------
 const BANNED = [/promotion/i, /promotional/i, /offer/i, /discount/i, /package/i, /upsell/i,
-  /marketing/i, /\bdeal\b/i, /\bsale\b/i, /subscribe/i, /advertis/i];
+  /marketing/i, /\bdeal\b/i, /\bsale\b/i, /subscribe/i, /advertis/i, /verified/i,
+  /recommend/i, /browse/i, /purchase/i, /explore/i, /discover/i, /exclusive/i];
+/** The exact v1 copy R7I created, kept only so the Y-series is provably non-vacuous. */
+const V1_BODY = "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.";
 record("Y01 the v2 body carries NO promotional concept",
   BANNED.every((r) => !r.test(EXPECTED_BODY_TEXT)));
-record("Y02 the quarantined v1 body DID name promotional messaging — so Y01 is not vacuous", (() => {
-  const L = ledger.entries.find((e) => e.provider_template_name === QUARANTINED_PREDECESSOR.name);
-  return !!L && /promotional/i.test(
-    "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help.");
+record("Y02 the quarantined v1 body DID carry a promotional adjective — so Y01 is not vacuous",
+  /verified/i.test(V1_BODY) && BANNED.some((r) => r.test(V1_BODY)));
+record("Y03 the v2 body is transactional: it names the recipient's existing enquiry and progress only",
+  /your QuickFurno enquiry/i.test(EXPECTED_BODY_TEXT)
+  && /matched/i.test(EXPECTED_BODY_TEXT)
+  && /your request/i.test(EXPECTED_BODY_TEXT));
+record("Y04 the v2 body keeps the runtime's exact two-placeholder contract", (() => {
+  const ph = (EXPECTED_BODY_TEXT.match(/\{\{\s*\d+\s*\}\}/g) ?? []).map((x) => x.replace(/\s/g, ""));
+  return ph.length === 2 && ph[0] === "{{1}}" && ph[1] === "{{2}}";
 })());
-record("Y03 the v2 body is transactional: it names START, existing enquiries, STOP and HELP",
-  /START/.test(EXPECTED_BODY_TEXT) && /existing/i.test(EXPECTED_BODY_TEXT)
-  && /STOP/.test(EXPECTED_BODY_TEXT) && /HELP/.test(EXPECTED_BODY_TEXT));
-record("Y04 the v2 body is zero-variable",
-  (EXPECTED_BODY_TEXT.match(/\{\{\s*\d+\s*\}\}/g) ?? []).length === 0);
+record("Y06 the runtime binding really is CLIENT_NAME + MATCHED_VENDOR_COUNT, in that order", (() => {
+  const src = readFileSync(resolve("lib/communication/businessTemplateVariables.ts"), "utf8");
+  const blk = src.match(/client_matching_update: Object\.freeze\(\{[\s\S]*?\}\),/);
+  return !!blk && /body\(1, BusinessSourceKey\.CLIENT_NAME\)/.test(blk[0])
+    && /body\(2, BusinessSourceKey\.MATCHED_VENDOR_COUNT\)/.test(blk[0]);
+})());
 record("Y05 the v2 body carries no URL or bare domain",
   !/https?:\/\//i.test(EXPECTED_BODY_TEXT) && !/quickfurno\.[a-z]{2,}/i.test(EXPECTED_BODY_TEXT));
 
 // ---------------------------------------------------------------------------
-// SUPERSESSION BOUNDARY — R7L owns v1, R7M owns v2.
+// SUPERSESSION BOUNDARY — R7L owns v1, R7N owns v2.
 // ---------------------------------------------------------------------------
 record("Q01 the quarantined predecessor is recorded with its proven MARKETING category",
-  QUARANTINED_PREDECESSOR.name === "qf_consent_start_acknowledgement_v1"
-  && QUARANTINED_PREDECESSOR.fingerprint === "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"
+  QUARANTINED_PREDECESSOR.name === "qf_client_matching_update_v1"
+  && QUARANTINED_PREDECESSOR.fingerprint === "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c"
   && QUARANTINED_PREDECESSOR.provenRemoteCategory === "MARKETING");
-record("Q02 R7M targets v2 and never the quarantined v1",
+record("Q02 R7N targets v2 and never the quarantined v1",
   TARGET_TEMPLATE_NAME !== QUARANTINED_PREDECESSOR.name
   && EXPECTED_PAYLOAD_FINGERPRINT !== QUARANTINED_PREDECESSOR.fingerprint);
 record("Q03 R7L's frozen registry STILL pins v1 — history was not rewritten",
-  /providerName: "qf_consent_start_acknowledgement_v1"/.test(r7lSrc)
-  && /"70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"/.test(r7lSrc));
+  /TARGET_TEMPLATE_NAME = "qf_client_matching_update_v1"/.test(r7iSrc)
+  && /"c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c"/.test(r7iSrc));
 record("Q04 R7L never names v2 — R7L execution authority is not reused",
-  !/qf_consent_start_acknowledgement_v2/.test(r7lSrc));
-record("Q05 R7M refuses if the packet still pins the quarantined v1", (() => {
+  !/qf_client_matching_update_v2/.test(r7iSrc));
+record("Q05 R7N refuses if the packet still pins the quarantined v1", (() => {
   const p = clonePacket();
   const e = entryOf(p);
   e.provider_template_name = QUARANTINED_PREDECESSOR.name;
@@ -212,13 +225,9 @@ record("Q07 the ledger records v1 as APPROVED / MARKETING / quarantined / supers
     && e.superseded_by === TARGET_TEMPLATE_NAME
     && e.create_post_count_at_submission === 1;
 })());
-record("Q08 v2 now HAS a ledger entry, because its remote state is finally PROVEN", (() => {
-  // Before the live creation the ledger deliberately carried no v2 row: it records only
-  // proven remote state. The 2026-08-24 approval readback supplied that proof.
-  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
-  return !!e && e.last_proven_status === "APPROVED" && e.last_proven_remote_category === "UTILITY";
-})());
-record("Q09 the canonical packet now names v2 as the active START template",
+record("Q08 v2 has NO ledger entry yet — the ledger records only PROVEN remote state",
+  !ledger.entries.some((x) => x.provider_template_name === TARGET_TEMPLATE_NAME));
+record("Q09 the canonical packet now names v2 as the active client matching template",
   entryOf(packet).provider_template_name === TARGET_TEMPLATE_NAME
   && entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT);
 record("Q10 the SEED_SET mapping authority points at v2, not the quarantined v1", (() => {
@@ -280,11 +289,11 @@ record("P06 submit_now flipped to true is rejected", (() => {
   return loadCanonicalPayload(p).reason === "submit_now_not_held";
 })());
 record("P07 approval_status drift is rejected", (() => {
-  const p = clonePacket(); entryOf(p).local_state.approval_status = "draft";
+  const p = clonePacket(); entryOf(p).local_state.approval_status = "approved";
   return loadCanonicalPayload(p).reason === "approval_status_unexpected";
 })());
 record("P08 submission_state drift is rejected", (() => {
-  const p = clonePacket(); entryOf(p).local_state.submission_state = "DRAFT_NOT_SUBMITTED";
+  const p = clonePacket(); entryOf(p).local_state.submission_state = "APPROVED_UNMAPPED";
   return loadCanonicalPayload(p).reason === "submission_state_unexpected";
 })());
 record("P09 a missing local_state is rejected", (() => {
@@ -307,14 +316,28 @@ record("P13 a buttons block is rejected", (() => {
   const p = clonePacket(); entryOf(p).creation_payload.components[0].buttons = [{ type: "QUICK_REPLY", text: "Hi" }];
   return loadCanonicalPayload(p).reason === "buttons_present";
 })());
-record("P14 an added example block is rejected (this target is zero-variable)", (() => {
-  const p = clonePacket(); entryOf(p).creation_payload.components[0].example = { body_text: [["x"]] };
+record("P14 a removed example block is rejected (this target is variable-bearing)", (() => {
+  const p = clonePacket(); delete entryOf(p).creation_payload.components[0].example;
   return loadCanonicalPayload(p).reason === "body_shape_unexpected";
 })());
-record("P15 an introduced placeholder is rejected", (() => {
+record("P14b a wrong example arity is rejected", (() => {
+  const p = clonePacket(); entryOf(p).creation_payload.components[0].example.body_text[0].push("x");
+  return loadCanonicalPayload(p).reason === "example_arity_unexpected";
+})());
+record("P14c a second example row is rejected", (() => {
+  const p = clonePacket(); entryOf(p).creation_payload.components[0].example.body_text.push(["a", "b"]);
+  return loadCanonicalPayload(p).reason === "example_shape_unexpected";
+})());
+record("P15 a third placeholder is rejected", (() => {
   const p = clonePacket();
   const b = entryOf(p).creation_payload.components[0];
-  b.text = b.text.replace("your START request", "your START request {{1}}");
+  b.text = `${b.text} Ref {{3}}.`;
+  return loadCanonicalPayload(p).reason === "body_text_mismatch";
+})());
+record("P15b out-of-order placeholders are rejected", (() => {
+  const p = clonePacket();
+  const b = entryOf(p).creation_payload.components[0];
+  b.text = "Hi {{2}}, update on your QuickFurno enquiry: {{1}} professionals have been matched to it and may contact you about your request.";
   return loadCanonicalPayload(p).reason === "body_text_mismatch";
 })());
 record("P16 a duplicate packet entry is rejected", (() => {
@@ -330,7 +353,7 @@ record("P19 the pinned fingerprint equals the packet's committed fingerprint",
   entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
   && createHash("sha256").update(JSON.stringify(entryOf(packet).creation_payload)).digest("hex")
      === EXPECTED_PAYLOAD_FINGERPRINT);
-record("P20 the committed packet holds the required approved/held state",
+record("P20 the committed packet holds the required draft/held state",
   entryOf(packet).submit_now === REQUIRED_PACKET_STATE.submitNow
   && entryOf(packet).local_state.approval_status === REQUIRED_PACKET_STATE.approvalStatus
   && entryOf(packet).local_state.submission_state === REQUIRED_PACKET_STATE.submissionState);
@@ -379,7 +402,7 @@ const malformed200 = [
   ["data {}", okGet({ data: {} })],
   ["data is a string", okGet({ data: "none" })],
   ["data contains null row", okGet({ data: [null] })],
-  ["data contains a non-object row", okGet({ data: ["qf_consent_start_acknowledgement_v2"] })],
+  ["data contains a non-object row", okGet({ data: ["qf_client_matching_update_v2"] })],
   ["data contains an array row", okGet({ data: [[]] })],
   ["row without a name", okGet({ data: [{ language: "en", status: "APPROVED" }] })],
   ["row with a non-string name", okGet({ data: [{ name: 123, language: "en" }] })],
@@ -568,8 +591,8 @@ record("Z01 R7B is unchanged",
 // A. DURABLE V1 CATEGORY-MISMATCH EVIDENCE
 // ---------------------------------------------------------------------------
 record("V01 the immutable category-mismatch evidence artifact exists and is well formed",
-  evidence.artifact === "meta-staging-start-ack-category-mismatch-evidence"
-  && evidence.phase === "QF-MVP-40-R7M"
+  evidence.artifact === "meta-staging-client-matching-category-mismatch-evidence"
+  && evidence.phase === "QF-MVP-40-R7N"
   && evidence.contains_secrets === false
   && evidence.authorizes_meta_calls === false
   && evidence.authorizes_mapping === false
@@ -584,15 +607,24 @@ record("V02 it records the exact observed facts", (() => {
     && o.actual_category === "MARKETING"
     && o.status === "APPROVED"
     && o.post_attempt_count === 0
-    && o.pre_state_classification === "PRESENT_CATEGORY_MISMATCH"
-    && o.observation_method === "GET_ONLY_PRE_STATE_READBACK";
+    && o.observation_method === "GET_ONLY_DRY_RUN";
+})());
+record("V02b the artifact does NOT overclaim what the older R7I classifier proved", (() => {
+  // R7I's classifier predates the strict pre-state model: it matches on name+language+status
+  // only, so its ALREADY_CREATED proves neither a category match nor a semantic match. The
+  // artifact records that limitation explicitly instead of borrowing R7K/R7L/R7M semantics.
+  const c = evidence.classifier_non_claim;
+  return !!c && c.reported_pre_state === "ALREADY_CREATED"
+    && c.semantic_match_asserted === false
+    && c.category_match_asserted === false
+    && /does not compare category or components/i.test(c.statement);
 })());
 record("V03 it grants no delete, appeal, recreation, mapping, arm or send authority", (() => {
   const a = evidence.authorities_explicitly_not_granted;
   return a.delete_authority === "NOT_GRANTED" && a.appeal_authority === "NOT_GRANTED"
-    && a.recreation_authority === "NOT_GRANTED" && a.mapping_authority === "NOT_GRANTED"
+    && a.recreation_authority === "NOT_GRANTED" && a.mapping_authority === "DENIED"
     && a.send_authority === "DENIED" && a.provider_arm_authority === "NOT_GRANTED"
-    && a.activation_authority === "NOT_GRANTED" && a.production_authority === "NOT_GRANTED";
+    && a.activation_authority === "NOT_GRANTED" && a.production_authority === "DENIED";
 })());
 record("V04 it fabricates no Meta request/response body",
   evidence.observation.meta_request_body_captured === false
@@ -618,11 +650,11 @@ record("V07 the artifact names exactly the ledger fields it backs", (() => {
     && /disposition = QUARANTINED_UNMAPPED/.test(f)
     && new RegExp("superseded_by = " + TARGET_TEMPLATE_NAME).test(f);
 })());
-record("V08 the OLD R7L evidence references remain byte-unchanged in the ledger", (() => {
+record("V08 the OLD R7I evidence references remain byte-unchanged in the ledger", (() => {
   const e = ledger.entries.find((x) => x.provider_template_name === QUARANTINED_PREDECESSOR.name);
   const expected = [
-    "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T08-40-29-000Z.json",
-    "QF-MVP-40-WAVE1-consent_start_acknowledgement-META-RECONCILIATION-2026-07-31T11-04-28-293Z.json",
+    "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json",
+    "QF-MVP-40-WAVE1-client_matching_update-META-RECONCILIATION-2026-07-31T04-22-20-119Z.json",
   ];
   return !!e && Array.isArray(e.evidence) && e.evidence.length === 2
     && expected.every((x) => e.evidence.includes(x))
@@ -642,9 +674,9 @@ record("V10 v1 remains quarantined and v2 remains the current successor",
 // ---------------------------------------------------------------------------
 // B. THE REAL NETWORK EXECUTION BOUNDARY
 //
-// R7M issues no request itself: it imports `makeHttp` from the R7B operator, which is the
+// R7N issues no request itself: it imports `makeHttp` from the R7B operator, which is the
 // single network adapter. These rules drive that ADAPTER with a recording transport and
-// assert on the URLs and methods it actually emits — not on R7M source text.
+// assert on the URLs and methods it actually emits — not on R7N source text.
 // ---------------------------------------------------------------------------
 const recorder = () => {
   const calls = [];
@@ -746,227 +778,211 @@ record("W10 the unmutated adapter still passes the same two rules — W09 is not
 })());
 
 // ---------------------------------------------------------------------------
-// QF-MVP-40-R7M POST-APPROVAL CLOSEOUT — v2 is now proven APPROVED / UTILITY.
+// CURRENT-WABA TRUTH SWEEP (2026-08-24) — readiness must derive from present proof.
 // ---------------------------------------------------------------------------
-record("K01 the v2 approval evidence artifact exists and is well formed",
-  approval.artifact === "meta-staging-start-ack-v2-approval-evidence"
-  && approval.phase === "QF-MVP-40-R7M"
-  && approval.contains_secrets === false
-  && approval.authorizes_meta_calls === false
-  && approval.authorizes_mapping === false
-  && approval.authorizes_sending === false);
-record("K02 the v2 evidence records APPROVED / UTILITY / en", (() => {
-  const r = approval.approval_readback;
-  return r.remote_status === "APPROVED" && r.remote_category === "UTILITY"
-    && r.remote_language === "en" && r.remote_pre_state === "ALREADY_CREATED";
-})());
-record("K03 the v2 evidence pins the exact fingerprint and remote id",
-  approval.approval_readback.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
-  && approval.approval_readback.provider_template_name === TARGET_TEMPLATE_NAME
-  && approval.approval_readback.remote_template_id === "1338981184671889");
-record("K04 the approval readback issued ZERO POSTs",
-  approval.approval_readback.post_attempt_count === 0
-  && approval.approval_readback.operator_mode === "DRY RUN");
-record("K05 the v2 evidence records the live asset proof it actually observed",
-  approval.approval_readback.phone_quality_rating === "GREEN"
-  && approval.approval_readback.subscriber_count === 1
-  && approval.approval_readback.live_asset_proof === true
-  && approval.approval_readback.identity_authorised === true);
-record("K06 semantic match is DERIVED from ALREADY_CREATED, not asserted independently",
-  approval.semantic_proof.readback_semantic_match === true
-  && /ALREADY_CREATED is only reachable/i.test(approval.semantic_proof.derivation)
-  && /classifyPreState/.test(approval.semantic_proof.authority));
-record("K07 creation provenance is now OBSERVED, and no Meta body is fabricated",
-  approval.creation_provenance.create_post_count_basis === "OBSERVED"
-  && approval.creation_provenance.create_post_count === 1
-  && approval.creation_provenance.submission_outcome === "CREATED_PENDING"
-  && approval.creation_provenance.creation_evidence === "meta-staging-start-ack-v2-creation-evidence"
-  && approval.approval_readback.meta_request_body_captured === false
-  && approval.approval_readback.meta_response_body_captured === false);
-record("K08 the v2 evidence is secret-free", (() => {
-  const raw = JSON.stringify(approval);
-  return !/(EAA[A-Za-z0-9]{20,}|Bearer\s|app_secret|access_token)/i.test(raw)
-    && !/\+\d{10,}/.test(raw)
+record("T01 the sweep artifact covers all eight SEED_SET keys and is secret-free", (() => {
+  const seeded = ["consent_help_response","consent_stop_acknowledgement","consent_start_acknowledgement",
+    "lead_received","client_lead_status_update","client_matching_update","lead_assignment_alert",
+    "vendor_onboarding_reminder"];
+  const got = sweep.results.map((r) => r.internal_template_key).sort();
+  const raw = JSON.stringify(sweep);
+  return sweep.contains_secrets === false && sweep.results.length === 8
+    && got.join(",") === seeded.slice().sort().join(",")
+    && !/(EAA[A-Za-z0-9]{20,}|Bearers|app_secret|access_token)/i.test(raw)
     && !new RegExp("2097008694503517|27861262223494153|1333595106493545").test(raw);
 })());
-record("K09 the v1 mismatch evidence artifact remains intact and untouched",
-  evidence.artifact === "meta-staging-start-ack-category-mismatch-evidence"
-  && evidence.observation.actual_category === "MARKETING"
-  && evidence.observation.post_attempt_count === 0
-  && evidence.historical_evidence_non_claim.prior_evidence_unchanged === true);
-record("K10 v1 remains APPROVED / MARKETING / QUARANTINED_UNMAPPED in the ledger", (() => {
-  const e = ledger.entries.find((x) => x.provider_template_name === QUARANTINED_PREDECESSOR.name);
-  return !!e && e.last_proven_status === "APPROVED"
-    && e.last_proven_remote_category === "MARKETING"
-    && e.disposition === "QUARANTINED_UNMAPPED"
-    && e.superseded_by === TARGET_TEMPLATE_NAME
-    && e.category_mismatch_evidence === evidence.artifact;
+record("T02 every sweep reading issued ZERO POSTs",
+  sweep.method.post_attempt_count_total === 0
+  && sweep.method.mutation_flags_used === "NONE"
+  && sweep.results.every((r) => r.post_attempt_count === 0));
+record("T03 every key carries an explicit current-WABA classification",
+  sweep.results.every((r) => ["PRESENT_APPROVED_UTILITY", "ABSENT"].includes(r.current_waba_state)));
+record("T04 lead_received is ABSENT on the current WABA",
+  sweep.results.find((r) => r.internal_template_key === "lead_received").current_waba_state === "ABSENT");
+record("T05 lead_assignment_alert is ABSENT on the current WABA",
+  sweep.results.find((r) => r.internal_template_key === "lead_assignment_alert").current_waba_state === "ABSENT");
+record("T06 client_matching_update v2 is ABSENT until it is created", (() => {
+  const r = sweep.results.find((x) => x.internal_template_key === "client_matching_update");
+  return r.provider_template_name === TARGET_TEMPLATE_NAME && r.current_waba_state === "ABSENT";
 })());
-record("K11 the ledger now carries v2 as APPROVED / UTILITY / APPROVED_UNMAPPED", (() => {
-  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
-  return !!e && e.internal_template_key === TARGET_TEMPLATE_KEY
-    && e.requested_category === "UTILITY"
-    && e.last_proven_status === "APPROVED"
-    && e.last_proven_remote_category === "UTILITY"
-    && e.readback_semantic_match === true
-    && e.disposition === "APPROVED_UNMAPPED"
-    && e.supersedes === QUARANTINED_PREDECESSOR.name
-    && e.approval_evidence === approval.artifact
-    && e.send_authority === "DENIED" && e.mapping_authority === "DENIED";
+record("T07 the ledger records the ABSENT keys as ABSENT, not as current APPROVED/UTILITY", (() => {
+  const absent = ["qf_lead_received_v1", "qf_lead_assignment_alert_v1"];
+  return absent.every((n) => {
+    const e = ledger.entries.find((x) => x.provider_template_name === n);
+    return !!e && e.current_waba_state === "ABSENT"
+      && e.current_waba_evidence === sweep.artifact
+      && /must NOT be read as current readiness/i.test(e.current_waba_note);
+  });
 })());
-record("K12 the ledger keeps BOTH rows — the successor never replaces the predecessor",
-  ledger.entries.filter((x) => x.internal_template_key === TARGET_TEMPLATE_KEY).length === 2);
-record("K13 the current canonical packet selects v2, approved and held",
-  entryOf(packet).provider_template_name === TARGET_TEMPLATE_NAME
-  && entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
-  && entryOf(packet).local_state.approval_status === "approved"
-  && entryOf(packet).local_state.submission_state === "APPROVED_UNMAPPED"
-  && entryOf(packet).submit_now === false);
-record("K14 THIS key is restored to the approved ready set", (() => {
-  // The GLOBAL approved count is not pinned here: another key's governed supersession
-  // (QF-MVP-40-R7N moved client_matching_update to its own v2) legitimately changes the
-  // total. What R7M owns is that ITS key is approved and held.
-  const approved = packet.templates.filter((t) => t.local_state.approval_status === "approved");
-  const mine = approved.find((t) => t.internal_template_key === TARGET_TEMPLATE_KEY);
-  return !!mine && mine.provider_template_name === TARGET_TEMPLATE_NAME
-    && mine.local_state.submission_state === "APPROVED_UNMAPPED"
-    && mine.submit_now === false;
+record("T08 the ABSENT keys keep their historical record intact", (() => {
+  const absent = ["qf_lead_received_v1", "qf_lead_assignment_alert_v1"];
+  return absent.every((n) => {
+    const e = ledger.entries.find((x) => x.provider_template_name === n);
+    return !!e && e.last_proven_status === "APPROVED" && e.create_post_count_at_submission === 1
+      && Array.isArray(e.evidence) && e.evidence.length === 2;
+  });
 })());
-record("K15 the readiness manifest restored the key with the v2 name and fingerprint", (() => {
-  const t = readiness.templates.find((x) => x.internal_template_key === TARGET_TEMPLATE_KEY);
-  // Again: only THIS key's restoration is R7M's to prove. The evidence-bound count still
-  // includes it; the ordinary count belongs to whichever phase owns those keys.
-  return readiness.counts.evidence_bound_ack === 3
-    && !!t && t.provider_template_name === TARGET_TEMPLATE_NAME
-    && t.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
-    && t.proven_remote_status === "APPROVED"
-    && t.proven_remote_category === "UTILITY"
-    && t.desired_mapping_state === "INACTIVE"
-    && t.send_authority === "DENIED";
+record("T09 the five READY keys are each backed by current-WABA proof", (() => {
+  const ready = ["qf_consent_help_response_v3", "qf_consent_stop_acknowledgement_v1",
+    "qf_consent_start_acknowledgement_v2", "qf_client_lead_status_update_v1",
+    "qf_vendor_onboarding_reminder_v1"];
+  return ready.every((n) => {
+    const e = ledger.entries.find((x) => x.provider_template_name === n);
+    return !!e && e.current_waba_state === "PRESENT_APPROVED_UTILITY"
+      && e.current_waba_evidence === sweep.artifact;
+  });
 })());
-record("K16 the internal staging-seed authority restored the key",
-  /key: "consent_start_acknowledgement", classification: "EVIDENCE_BOUND_ACK"/.test(internalSeedSrc));
-record("K17 SEED_SET still points at v2, never the quarantined v1", (() => {
-  const m = seederSrc.match(/export const SEED_SET = Object\.freeze\(\[[\s\S]*?\n\]\);/);
-  return !!m && m[0].includes(TARGET_TEMPLATE_NAME) && m[0].includes(EXPECTED_PAYLOAD_FINGERPRINT)
-    && !m[0].includes(QUARANTINED_PREDECESSOR.name)
-    && !m[0].includes(QUARANTINED_PREDECESSOR.fingerprint);
+record("T10 the readiness manifest emits EXACTLY the proven-ready set", (() => {
+  const expected = ["consent_help_response", "consent_stop_acknowledgement",
+    "consent_start_acknowledgement", "client_lead_status_update", "vendor_onboarding_reminder"];
+  const got = readiness.templates.map((t) => t.internal_template_key);
+  return got.length === expected.length && got.slice().sort().join(",") === expected.slice().sort().join(",")
+    && !got.includes("lead_received") && !got.includes("lead_assignment_alert")
+    && !got.includes("client_matching_update");
 })());
-record("K18 the mapping seeder preflight is still fail-closed on status AND category",
-  /r\.status !== "APPROVED"/.test(seederSrc) && /META_STATUS_NOT_APPROVED/.test(seederSrc)
-  && /r\.category !== "UTILITY"/.test(seederSrc) && /META_CATEGORY_MISMATCH/.test(seederSrc));
-record("K19 R7L history is still immutable — registry pins v1 and never names v2",
-  /providerName: "qf_consent_start_acknowledgement_v1"/.test(r7lSrc)
-  && /"70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"/.test(r7lSrc)
-  && !/qf_consent_start_acknowledgement_v2/.test(r7lSrc));
-record("K20 no validator may accept v1 as the current START Utility target", (() => {
-  // The packet no longer names v1, so R7M refuses it outright, and a MARKETING remote row
-  // can never reach ALREADY_CREATED.
-  const p = clonePacket();
-  const e = entryOf(p);
-  e.provider_template_name = QUARANTINED_PREDECESSOR.name;
-  e.creation_payload.name = QUARANTINED_PREDECESSOR.name;
-  return loadCanonicalPayload(p).reason === "still_pinned_to_quarantined_v1"
-    && pre([goodRow({ category: "MARKETING" })]) === RepairPreState.PRESENT_CATEGORY_MISMATCH;
+record("T11 readiness is GATED on current-WABA proof, not on the WABA-blind claim",
+  /current_waba_state === CURRENT_READY/.test(readinessGenSrc)
+  && /const CURRENT_READY = "PRESENT_APPROVED_UTILITY";/.test(readinessGenSrc)
+  && /no current_waba_state recorded/.test(readinessGenSrc));
+record("T12 a stale historical-only claim cannot make a key ready", (() => {
+  // Both ABSENT keys still say last_proven_status APPROVED / category UTILITY. If readiness
+  // were derived from those fields they would appear; they do not.
+  const stale = ledger.entries.filter((e) => e.current_waba_state === "ABSENT"
+    && e.last_proven_status === "APPROVED" && e.last_proven_remote_category === "UTILITY");
+  const emitted = readiness.templates.map((t) => t.provider_template_name);
+  return stale.length === 2 && stale.every((e) => !emitted.includes(e.provider_template_name));
+})());
+record("T13 SEED_SET is still exactly eight and still names v2 for this key", (() => {
+  const rows = (seederSrc.match(/{ key: "/g) ?? []).length;
+  return rows === 8 && seederSrc.includes(TARGET_TEMPLATE_NAME);
+})());
+record("T14 the mapping seeder is still all-or-nothing and fail-closed",
+  /r.status !== "APPROVED"/.test(seederSrc) && /META_STATUS_NOT_APPROVED/.test(seederSrc)
+  && /r.category !== "UTILITY"/.test(seederSrc) && /META_CATEGORY_MISMATCH/.test(seederSrc));
+record("T15 the sweep does not rewrite historical evidence",
+  sweep.historical_evidence_non_claim.prior_evidence_unchanged === true
+  && /NOT amended/i.test(sweep.historical_evidence_non_claim.statement));
+// Universally quantified: it holds when no loose reading remains, and still bites the
+// moment one reappears. The earlier form required a loose reading to EXIST, so closing
+// the last loose gap would have failed the suite for the wrong reason.
+record("T16 no LOOSE-classifier reading claims a semantic match",
+  sweep.results.every((r) => (r.classifier === "LOOSE" ? r.semantic_match_asserted === false : true)));
+record("T17 no READY key rests on a LOOSE reading", (() => {
+  const ready = sweep.results.filter((r) => r.current_waba_state === "PRESENT_APPROVED_UTILITY");
+  return ready.length >= 1
+    && ready.every((r) => r.classifier === "STRICT" && r.semantic_match_asserted === true);
 })());
 
 // ---------------------------------------------------------------------------
-// QF-MVP-40-R7M EVIDENCE TIGHTENING — the creation run is now directly evidenced,
-// so the inferred provenance and the R7M-specific ledger exception are both gone.
+// STRICT CURRENT-WABA PROOF — vendor_onboarding_reminder (2026-08-25)
+//
+// This key was the last READY entry whose current-WABA reading came from the LOOSE
+// R7B classifier, which matches name, language and status ONLY. The submitter's
+// RECONCILE_ONLY mode supplied the missing strict semantics without any mutation.
 // ---------------------------------------------------------------------------
-record("C01 the v2 creation evidence artifact exists and is well formed",
-  creation.artifact === "meta-staging-start-ack-v2-creation-evidence"
-  && creation.phase === "QF-MVP-40-R7M"
-  && creation.contains_secrets === false
-  && creation.authorizes_meta_calls === false
-  && creation.authorizes_mapping === false
-  && creation.authorizes_sending === false);
-record("C02 the creation artifact pins the exact v2 name and fingerprint",
-  creation.creation_run.provider_template_name === TARGET_TEMPLATE_NAME
-  && creation.creation_run.payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
-  && creation.creation_run.internal_template_key === TARGET_TEMPLATE_KEY);
-record("C03 it proves EXACTLY ONE POST, observed not inferred",
-  creation.creation_run.post_attempt_count === 1
-  && creation.post_count_provenance.basis === "OBSERVED"
-  && creation.post_count_provenance.observed_line === "POST_ATTEMPT_COUNT=1"
-  && creation.creation_run.second_post_issued === false
-  && creation.creation_run.retry_issued === false);
-record("C04 it proves SUCCESS / CREATED from an ABSENT pre-state",
-  creation.creation_run.remote_pre_state === "ABSENT"
-  && creation.creation_run.create_classification === "SUCCESS"
-  && creation.creation_run.result === "CREATED"
-  && creation.creation_run.operator_mode === "EXECUTE"
-  && creation.creation_run.operator_exit_code === 0);
-record("C05 it proves the creation readback was PENDING / UTILITY / en",
-  creation.creation_run.readback_state === "ALREADY_CREATED"
-  && creation.creation_run.remote_status_at_creation_readback === "PENDING"
-  && creation.creation_run.remote_category === "UTILITY"
-  && creation.creation_run.remote_language === "en"
-  && creation.creation_run.remote_components_returned === 1
-  && creation.creation_run.remote_template_id === "1338981184671889");
-record("C06 it proves semantic confirmation true",
-  creation.creation_run.semantic_confirmation === true);
-record("C07 it records the repo state the run reported and fabricates no Meta body",
-  creation.creation_run.head_unchanged === true
-  && creation.creation_run.remote_head_unchanged === true
-  && creation.creation_run.worktree_clean === true
-  && creation.creation_run.meta_request_body_captured === false
-  && creation.creation_run.meta_response_body_captured === false);
-record("C08 it declares the creation authority CONSUMED and non-retryable",
-  creation.authority_consumption.creation_authority === "CONSUMED"
-  && creation.authority_consumption.retry_permitted === false
-  && creation.authority_consumption.second_post_possible === false);
-record("C09 the creation artifact is secret-free", (() => {
-  const raw = JSON.stringify(creation);
-  return !/(EAA[A-Za-z0-9]{20,}|Bearer\s|app_secret|access_token)/i.test(raw)
-    && !/\+\d{10,}/.test(raw)
-    && !new RegExp("2097008694503517|27861262223494153|1333595106493545").test(raw);
+record("V01 the sweep now classifies vendor_onboarding_reminder as STRICT", (() => {
+  const r = sweep.results.find((x) => x.internal_template_key === "vendor_onboarding_reminder");
+  return !!r && r.classifier === "STRICT" && r.semantic_match_asserted === true
+    && r.current_waba_state === "PRESENT_APPROVED_UTILITY";
 })());
-record("C10 the two events are recorded separately and never collapsed",
-  creation.lifecycle_position.sequence === 1 && creation.lifecycle_position.of === 2
-  && creation.lifecycle_position.next_event_artifact === approval.artifact
-  && approval.lifecycle_position.sequence === 2
-  && approval.lifecycle_position.previous_event_artifact === creation.artifact
-  && /never be collapsed/i.test(creation.lifecycle_position.non_collapse_statement));
-record("C11 the two events genuinely differ: PENDING at creation, APPROVED later",
-  creation.creation_run.remote_status_at_creation_readback === "PENDING"
-  && approval.approval_readback.remote_status === "APPROVED"
-  && creation.creation_run.post_attempt_count === 1
-  && approval.approval_readback.post_attempt_count === 0);
-record("C12 the ledger records the OBSERVED creation provenance", (() => {
-  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
-  return !!e && e.create_post_count_at_submission === 1
-    && e.create_post_count_basis === "OBSERVED"
-    && e.submission_outcome === "CREATED_PENDING"
-    && e.remote_status_at_creation === "PENDING"
-    && e.creation_evidence === creation.artifact;
+record("V02 the sweep carries a zero-POST strict_proof block for that key", (() => {
+  const r = sweep.results.find((x) => x.internal_template_key === "vendor_onboarding_reminder");
+  const p = r && r.strict_proof;
+  return !!p && p.outcome === "RECONCILED_APPROVED" && p.operation_mode === "RECONCILE_ONLY"
+    && p.readback_semantic_match === true && p.identity_match === true
+    && p.create_post_count === 0 && p.post_attempt_count === 0;
 })());
-record("C13 the ledger cites BOTH artifacts in the standard two-evidence shape", (() => {
-  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
-  return !!e && Array.isArray(e.evidence) && e.evidence.length === 2
-    && e.evidence.includes("meta-staging-start-ack-v2-creation-evidence.json")
-    && e.evidence.includes("meta-staging-start-ack-v2-approval-evidence.json");
+record("V03 the sanitized reconciliation proves APPROVED / UTILITY / en for the right template",
+  strictRecon.provider_template_name === "qf_vendor_onboarding_reminder_v1"
+  && strictRecon.provider_language === "en"
+  && strictRecon.status === "APPROVED"
+  && strictRecon.returned_category === "UTILITY"
+  && strictRecon.requested_category === "UTILITY"
+  && strictRecon.outcome === "RECONCILED_APPROVED"
+  && strictRecon.readback_semantic_match === true
+  && strictRecon.identity_match === true);
+record("V04 the strict reconciliation issued ZERO create POSTs",
+  strictRecon.create_post_count === 0 && strictRecon.operation_mode === "RECONCILE_ONLY");
+record("V05 the reconciliation pins the canonical vendor payload fingerprint", (() => {
+  const t = packet.templates.find((x) => x.internal_template_key === "vendor_onboarding_reminder");
+  return !!t && strictRecon.payload_fingerprint === t.payload_fingerprint
+    && strictRecon.payload_fingerprint
+      === "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a";
 })());
-record("C14 both cited evidence files actually exist on disk",
-  existsSync(resolve("docs/provider-manifests/meta-staging-start-ack-v2-creation-evidence.json"))
-  && existsSync(resolve("docs/provider-manifests/meta-staging-start-ack-v2-approval-evidence.json")));
-record("C15 the R7M-specific closed-ledger exception was REMOVED",
-  !/r7m/.test(packetValidatorSrc)
-  && /c\.submission_outcome === "CREATED_PENDING"/.test(packetValidatorSrc)
-  && /c\.evidence\.length === 2/.test(packetValidatorSrc));
-record("C16 the v2 ledger row still records the final APPROVED / UTILITY state", (() => {
-  const e = ledger.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
-  return !!e && e.last_proven_status === "APPROVED"
-    && e.last_proven_remote_category === "UTILITY"
-    && e.reconciliation_outcome === "RECONCILED_APPROVED"
-    && e.create_post_count_at_reconciliation === 0
-    && e.disposition === "APPROVED_UNMAPPED";
+record("V06 the sanitized reconciliation leaks no credential", (() => {
+  const banned = [/token/i, /secret/i, /waba/i, /phone/i, /bearer/i, /authorization/i, /app_id/i];
+  return Object.keys(strictRecon).every((k) => !banned.some((r) => r.test(k)))
+    && !/eyJ|Bearer\s/i.test(strictReconRaw);
 })());
-record("C17 the creation artifact leaves the quarantined predecessor untouched",
-  creation.predecessor.provider_template_name === QUARANTINED_PREDECESSOR.name
-  && creation.predecessor.remote_category === "MARKETING"
-  && creation.predecessor.disposition === "QUARANTINED_UNMAPPED"
-  && creation.predecessor.touched_by_this_operation === false);
+record("V07 the index wrapper addresses the sanitized record by content hash",
+  strictProof.strict_evidence.path === STRICT_RECON
+  && strictProof.strict_evidence.sha256
+    === createHash("sha256").update(strictReconRaw).digest("hex")
+  && strictProof.strict_evidence.relocated_byte_identical === true
+  && strictProof.strict_evidence.content_rewritten === false);
+record("V08 the wrapper declares no secrets and grants no authority",
+  strictProof.contains_secrets === false
+  && strictProof.authorizes_meta_calls === false
+  && strictProof.authorizes_mapping === false
+  && strictProof.authorizes_sending === false
+  && strictProof.zero_mutation_proof.create_post_count === 0
+  && strictProof.zero_mutation_proof.messages_sent === 0
+  && strictProof.zero_mutation_proof.templates_created_edited_or_deleted === 0);
+record("V09 RECONCILED_APPROVED is unreachable without a full semantic comparison",
+  submitterSrc.includes("const semanticMatch = templatesAreIdentical(row, t.creation_payload);")
+  && submitterSrc.includes("finish(ReconcileOutcome.RECONCILED_CATEGORY_MISMATCH, 6);")
+  && submitterSrc.includes("if (!semanticMatch) finish(ReconcileOutcome.RECONCILED_COLLISION, 4);")
+  && submitterSrc.indexOf("const semanticMatch = templatesAreIdentical(row, t.creation_payload);")
+     < submitterSrc.indexOf("finish(ReconcileOutcome.RECONCILED_APPROVED, 0);"));
+record("V10 the reconcile mode cannot reach a create POST", (() => {
+  const branchEnd = submitterSrc.indexOf("finish(ReconcileOutcome.RECONCILED_UNUSABLE_STATUS, 4);");
+  const firstPost = submitterSrc.indexOf('method: "POST"');
+  return branchEnd > 0 && firstPost > 0 && branchEnd < firstPost
+    && /execute && reconcileOnly/.test(submitterSrc);
+})());
+record("V11 the ledger row for the vendor template is backed by the strict evidence", (() => {
+  const e = ledger.entries.find((x) => x.provider_template_name === "qf_vendor_onboarding_reminder_v1");
+  return !!e && e.current_waba_state === "PRESENT_APPROVED_UTILITY"
+    && e.current_waba_strict_outcome === "RECONCILED_APPROVED"
+    && e.current_waba_strict_evidence === strictProof.artifact;
+})());
+record("V12 the sweep itself asserts every READY key now has strict semantic proof",
+  sweep.summary.every_ready_key_has_strict_semantic_proof === true
+  && Array.isArray(sweep.summary.ready_keys_without_strict_semantic_proof)
+  && sweep.summary.ready_keys_without_strict_semantic_proof.length === 0
+  && sweep.summary.ready_keys_with_strict_semantic_proof.length === sweep.summary.ready_count);
+
+// A row with NO current-WABA field is the exact WABA-blind ambiguity this work removes:
+// it would silently fall back to a 2026-07-31 claim. Every row must SAY something, and
+// only one of those somethings can ever mean "ready".
+record("V13 every ledger row carries explicit current-WABA truth from a closed vocabulary", (() => {
+  const VOCAB = new Set([
+    "PRESENT_APPROVED_UTILITY",
+    "PRESENT_APPROVED_CATEGORY_MISMATCH",
+    "ABSENT",
+    "NOT_OBSERVED_ON_CURRENT_WABA",
+  ]);
+  return ledger.entries.length > 0
+    && ledger.entries.every((e) => typeof e.current_waba_state === "string"
+      && VOCAB.has(e.current_waba_state));
+})());
+record("V14 only PRESENT_APPROVED_UTILITY rows reach the readiness manifest", (() => {
+  const emitted = readiness.templates.map((t) => t.provider_template_name);
+  return emitted.length > 0 && emitted.every((name) => {
+    const e = ledger.entries.find((x) => x.provider_template_name === name);
+    return !!e && e.current_waba_state === "PRESENT_APPROVED_UTILITY";
+  });
+})());
+record("V15 a non-UTILITY current state can never be mappable", (() => {
+  const quarantined = ledger.entries.find(
+    (e) => e.provider_template_name === "qf_client_matching_update_v1");
+  const emitted = readiness.templates.map((t) => t.provider_template_name);
+  return !!quarantined
+    && quarantined.current_waba_state === "PRESENT_APPROVED_CATEGORY_MISMATCH"
+    && quarantined.current_waba_semantic_match_asserted === false
+    && !emitted.includes(quarantined.provider_template_name);
+})());
+
 
 console.log(`\nSummary: ${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

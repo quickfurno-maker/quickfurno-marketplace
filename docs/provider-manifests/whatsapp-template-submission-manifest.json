@@ -883,7 +883,7 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+        "body_spec": "Hi {{1}}, update on your QuickFurno enquiry: {{2}} professionals have been matched to it and may contact you about your request.",
         "variables_schema": {
           "1": {
             "type": "text",
@@ -916,8 +916,8 @@
           ],
           "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
-        "approval_status": "approved",
-        "submission_state": "APPROVED_UNMAPPED",
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client",
@@ -941,7 +941,7 @@
           "submit_now": false,
           "closure_note": "QF-MVP-40.10F: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json."
         },
-        "provider_template_name_candidate": "qf_client_matching_update_v1"
+        "provider_template_name_candidate": "qf_client_matching_update_v2"
       },
       {
         "internal_template_key": "lead_assignment_alert",

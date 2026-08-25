@@ -42,7 +42,7 @@ function bodyVars(body) {
  * be a deliberate edit here, not something a per-key test silently tolerates.
  */
 const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
-  "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
+  "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
 
 const R = {

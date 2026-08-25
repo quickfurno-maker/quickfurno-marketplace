@@ -1,0 +1,217 @@
+{
+  "artifact": "meta-staging-current-waba-truth-sweep-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7N",
+  "operation_id": "QF-MVP-40-CURRENT-WABA-TRUTH-SWEEP-2026-08-24",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Immutable record of a bounded GET-only reconciliation of ALL EIGHT SEED_SET keys against the CURRENT dedicated staging WABA on 2026-08-24. It exists because the committed ledger carried 2026-07-31 claims that are WABA-BLIND: several were proven correct here, two templates proved ABSENT despite being recorded APPROVED/UTILITY, and one had already been proven a MARKETING mismatch. Readiness must derive from THIS current-WABA truth, never from the historical claims alone.",
+  "privacy": "No token, app secret, phone number, WABA id or remote template id appears here. No Meta request or response body is reproduced: none was captured, and fabricating one would be evidence forgery. Only each operator's own printed classification lines are recorded.",
+  "method": {
+    "observed_at_utc_date": "2026-08-24",
+    "observation_method": "GET_ONLY_DRY_RUN_PER_TEMPLATE",
+    "mutation_flags_used": "NONE",
+    "post_attempt_count_total": 0,
+    "statement": "Every reading used an existing one-shot operator in its default dry-run mode. In that mode the create path is structurally unreachable: createOnce is only invoked when the pure decide() returns post:true, which requires BOTH --execute and --owner-authorized-once. Each run printed POST_ATTEMPT_COUNT=0.",
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false
+  },
+  "classifier_capability_note": {
+    "strict_operators": [
+      "QF-MVP-40-R7K",
+      "QF-MVP-40-R7L",
+      "QF-MVP-40-R7M",
+      "QF-MVP-40-R7N"
+    ],
+    "loose_operators": [
+      "QF-MVP-40-R7B",
+      "QF-MVP-40-R7I"
+    ],
+    "strict_verifier_generic": "scripts/mvp/communication/submit-meta-templates.mjs --reconcile-only reaches RECONCILED_APPROVED only after an exact single name+language row, an explicit category equality check, templatesAreIdentical() against the committed payload using the REMOTE components, a known APPROVED status and a present remote template id. Its create path is unreachable in that mode, so create_post_count is structurally 0. It is the strict verifier used to close the vendor_onboarding_reminder gap on 2026-08-25.",
+    "loose_readings_remaining": "client_matching_update v1 only. That key is QUARANTINED and NOT READY, so no readiness decision rests on a loose reading.",
+    "statement": "A STRICT classifier reaches ALREADY_CREATED only after matching name, language, an accepted status, the pinned category AND a full semantic comparison against the committed payload using the REMOTE components. A LOOSE classifier (the earlier R7B/R7I model) matches name, language and status only. For a loose reading the category recorded below is taken from the operator's own printed \"existing row\" line, and NO semantic match is asserted."
+  },
+  "results": [
+    {
+      "internal_template_key": "consent_help_response",
+      "provider_template_name": "qf_consent_help_response_v3",
+      "current_waba_state": "PRESENT_APPROVED_UTILITY",
+      "remote_status": "APPROVED",
+      "remote_category": "UTILITY",
+      "remote_language": "en",
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7L",
+      "invocation": "npm run create:mvp:40-r7l-once -- --target consent_help_response",
+      "classifier": "STRICT",
+      "semantic_match_asserted": true,
+      "raw_operator_line": "existing row            : status=APPROVED category=UTILITY language=en"
+    },
+    {
+      "internal_template_key": "consent_stop_acknowledgement",
+      "provider_template_name": "qf_consent_stop_acknowledgement_v1",
+      "current_waba_state": "PRESENT_APPROVED_UTILITY",
+      "remote_status": "APPROVED",
+      "remote_category": "UTILITY",
+      "remote_language": "en",
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7L",
+      "invocation": "npm run create:mvp:40-r7l-once -- --target consent_stop_acknowledgement",
+      "classifier": "STRICT",
+      "semantic_match_asserted": true,
+      "raw_operator_line": "existing row            : status=APPROVED category=UTILITY language=en"
+    },
+    {
+      "internal_template_key": "consent_start_acknowledgement",
+      "provider_template_name": "qf_consent_start_acknowledgement_v2",
+      "current_waba_state": "PRESENT_APPROVED_UTILITY",
+      "remote_status": "APPROVED",
+      "remote_category": "UTILITY",
+      "remote_language": "en",
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7M",
+      "invocation": "npm run create:mvp:40-r7m-once",
+      "classifier": "STRICT",
+      "semantic_match_asserted": true,
+      "raw_operator_line": "existing row            : status=APPROVED category=UTILITY language=en"
+    },
+    {
+      "internal_template_key": "lead_received",
+      "provider_template_name": "qf_lead_received_v1",
+      "current_waba_state": "ABSENT",
+      "remote_status": null,
+      "remote_category": null,
+      "remote_language": null,
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7L",
+      "invocation": "npm run create:mvp:40-r7l-once -- --target lead_received",
+      "classifier": "STRICT",
+      "semantic_match_asserted": false,
+      "raw_operator_line": "remote pre-state        : ABSENT"
+    },
+    {
+      "internal_template_key": "client_lead_status_update",
+      "provider_template_name": "qf_client_lead_status_update_v1",
+      "current_waba_state": "PRESENT_APPROVED_UTILITY",
+      "remote_status": "APPROVED",
+      "remote_category": "UTILITY",
+      "remote_language": "en",
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7K",
+      "invocation": "npm run create:mvp:40-r7k-once",
+      "classifier": "STRICT",
+      "semantic_match_asserted": true,
+      "raw_operator_line": "existing row            : status=APPROVED category=UTILITY language=en"
+    },
+    {
+      "internal_template_key": "client_matching_update",
+      "provider_template_name": "qf_client_matching_update_v2",
+      "current_waba_state": "ABSENT",
+      "remote_status": null,
+      "remote_category": null,
+      "remote_language": null,
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7N",
+      "invocation": "npm run create:mvp:40-r7n-once",
+      "classifier": "STRICT",
+      "semantic_match_asserted": false,
+      "raw_operator_line": "remote pre-state        : ABSENT"
+    },
+    {
+      "internal_template_key": "lead_assignment_alert",
+      "provider_template_name": "qf_lead_assignment_alert_v1",
+      "current_waba_state": "ABSENT",
+      "remote_status": null,
+      "remote_category": null,
+      "remote_language": null,
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7L",
+      "invocation": "npm run create:mvp:40-r7l-once -- --target lead_assignment_alert",
+      "classifier": "STRICT",
+      "semantic_match_asserted": false,
+      "raw_operator_line": "remote pre-state        : ABSENT"
+    },
+    {
+      "internal_template_key": "vendor_onboarding_reminder",
+      "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+      "current_waba_state": "PRESENT_APPROVED_UTILITY",
+      "remote_status": "APPROVED",
+      "remote_category": "UTILITY",
+      "remote_language": "en",
+      "post_attempt_count": 0,
+      "observed_by": "QF-MVP-40-R7B (identity + pre-state) then submit-meta-templates.mjs --reconcile-only (strict semantics)",
+      "invocation": "npm run create:mvp:40-r7b-once",
+      "classifier": "STRICT",
+      "semantic_match_asserted": true,
+      "raw_operator_line": "Outcome: RECONCILED_APPROVED",
+      "strict_proof": {
+        "observed_at_utc_date": "2026-08-25",
+        "strict_verifier": "scripts/mvp/communication/submit-meta-templates.mjs --wave 1 --template vendor_onboarding_reminder --reconcile-only",
+        "operation_mode": "RECONCILE_ONLY",
+        "outcome": "RECONCILED_APPROVED",
+        "remote_status": "APPROVED",
+        "remote_category": "UTILITY",
+        "remote_language": "en",
+        "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+        "readback_semantic_match": true,
+        "component_match": true,
+        "identity_match": true,
+        "create_post_count": 0,
+        "post_attempt_count": 0,
+        "api_version": "v26.0",
+        "evidence": "meta-staging-vendor-onboarding-reminder-strict-proof-evidence",
+        "sanitized_record": "meta-staging-vendor-onboarding-reminder-strict-reconciliation",
+        "supersedes_classification": "The 2026-08-24 reading of this key was LOOSE (name+language+status only). This strict reconciliation replaces that classification. The earlier reading is not deleted; it is simply no longer the strongest proof."
+      }
+    }
+  ],
+  "summary": {
+    "total_keys": 8,
+    "present_approved_utility": [
+      "consent_help_response",
+      "consent_stop_acknowledgement",
+      "consent_start_acknowledgement",
+      "client_lead_status_update",
+      "vendor_onboarding_reminder"
+    ],
+    "absent": [
+      "lead_received",
+      "client_matching_update",
+      "lead_assignment_alert"
+    ],
+    "category_mismatch_quarantined": [
+      "client_matching_update (qf_client_matching_update_v1)"
+    ],
+    "ready_count": 5,
+    "ready_keys_with_strict_semantic_proof": [
+      "consent_help_response",
+      "consent_stop_acknowledgement",
+      "consent_start_acknowledgement",
+      "client_lead_status_update",
+      "vendor_onboarding_reminder"
+    ],
+    "ready_keys_without_strict_semantic_proof": [],
+    "every_ready_key_has_strict_semantic_proof": true,
+    "statement": "Only a PRESENT_APPROVED_UTILITY current-WABA state may count towards mapping readiness. ABSENT keys are not ready no matter what the 2026-07-31 historical record says."
+  },
+  "corrections_forced_by_this_sweep": [
+    "lead_received: ledger recorded APPROVED/UTILITY but the template is ABSENT on the current dedicated WABA.",
+    "lead_assignment_alert: ledger recorded APPROVED/UTILITY but the template is ABSENT on the current dedicated WABA."
+  ],
+  "authorities_explicitly_not_granted": {
+    "creation_authority": "NOT_GRANTED",
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "provider_arm_authority": "NOT_GRANTED",
+    "activation_authority": "NOT_GRANTED",
+    "production_authority": "DENIED",
+    "statement": "This sweep is a reading. It grants nothing. It does not authorise creating the ABSENT templates, mapping any template, arming any provider, or any production action."
+  },
+  "historical_evidence_non_claim": {
+    "prior_evidence_unchanged": true,
+    "statement": "The 2026-07-31 submission and reconciliation records observed a PREVIOUS WABA context and are accurate for what they observed. They are referenced unchanged by their ledger entries and are NOT amended. This artifact is ADDITIVE: it records what is true on the CURRENT dedicated staging WABA today, which the WABA-blind packet and ledger cannot express on their own."
+  }
+}

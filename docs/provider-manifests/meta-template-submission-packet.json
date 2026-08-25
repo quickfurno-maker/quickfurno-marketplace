@@ -3,9 +3,9 @@
   "schema_version": "1.0",
   "phase": "QF-MVP-40.10A",
   "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_matching_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
+  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "68ea3c7ef73115fa50ab8154b71448d539eb6d1277d0989f8981a57289b0779e",
+  "source_manifest_fingerprint": "3a80eb3e5ad5b0afca9a32a56a7f845962f91a06db42ed2b7a8a9f9a5421aaa2",
   "external_contract_references": [
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
@@ -343,7 +343,7 @@
     },
     {
       "internal_template_key": "client_matching_update",
-      "provider_template_name": "qf_client_matching_update_v1",
+      "provider_template_name": "qf_client_matching_update_v2",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
@@ -351,18 +351,18 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "approved",
-        "submission_state": "APPROVED_UNMAPPED",
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
         "provider_template_id": null
       },
       "creation_payload": {
-        "name": "qf_client_matching_update_v1",
+        "name": "qf_client_matching_update_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+            "text": "Hi {{1}}, update on your QuickFurno enquiry: {{2}} professionals have been matched to it and may contact you about your request.",
             "example": {
               "body_text": [
                 [
@@ -375,7 +375,7 @@
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c"
+      "payload_fingerprint": "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4"
     },
     {
       "internal_template_key": "client_nurture_followup",

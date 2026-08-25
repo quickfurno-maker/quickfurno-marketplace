@@ -80,7 +80,7 @@ const REMOTE_STATE = "docs/provider-manifests/meta-template-remote-state.json";
  * silently tolerates.
  */
 const CLOSED_KEYS = ["consent_help_response", "lead_received",
-  "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
+  "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"];
 /**
  * QF-MVP-40-R7M — SUPERSEDED templates.
@@ -96,6 +96,16 @@ const CLOSED_KEYS = ["consent_help_response", "lead_received",
  * listed historical mismatch record may carry a non-Utility category.
  */
 const SUPERSEDED = Object.freeze({
+  client_matching_update: Object.freeze({
+    historicalName: "qf_client_matching_update_v1",
+    historicalFingerprint: "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+    historicalRemoteCategory: "MARKETING",
+    historicalDisposition: "QUARANTINED_UNMAPPED",
+    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json",
+    rec: "QF-MVP-40-WAVE1-client_matching_update-META-RECONCILIATION-2026-07-31T04-22-20-119Z.json",
+    currentName: "qf_client_matching_update_v2",
+    currentFingerprint: "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4",
+  }),
   consent_start_acknowledgement: Object.freeze({
     historicalName: "qf_consent_start_acknowledgement_v1",
     historicalFingerprint: "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
@@ -124,9 +134,6 @@ const CLOSED_LEDGER = [
   { key: "client_lead_status_update", name: "qf_client_lead_status_update_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T03-44-23-042Z.json",
     rec: "QF-MVP-40-WAVE1-client_lead_status_update-META-RECONCILIATION-2026-07-31T03-50-23-839Z.json" },
-  { key: "client_matching_update", name: "qf_client_matching_update_v1",
-    sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json",
-    rec: "QF-MVP-40-WAVE1-client_matching_update-META-RECONCILIATION-2026-07-31T04-22-20-119Z.json" },
   { key: "lead_assignment_alert", name: "qf_lead_assignment_alert_v1",
     sub: "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-970Z.json",
     rec: "QF-MVP-40-WAVE1-lead_assignment_alert-META-RECONCILIATION-2026-07-31T06-13-53-155Z.json" },
@@ -147,7 +154,7 @@ const DEFERRED_LANES = ["WAVE1_REMAINING_ORDINARY", "WAVE1_COMMERCIAL", "WAVE2_A
   "WAVE3_MARKETING", "WAVE4_ADMIN_ALERTS"];
 /** Historical Wave 0 names that are NOT approved-and-closed but must stay in the ledger. */
 const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2",
-  "qf_consent_start_acknowledgement_v1"];
+  "qf_consent_start_acknowledgement_v1", "qf_client_matching_update_v1"];
 /** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
 const SUBSET1 = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
 const SUBSET1_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
@@ -644,7 +651,8 @@ const R = {
     if (N.status !== "CLOSED_APPROVED_UNMAPPED" || N.authorizes_meta_calls !== false) return false;
     if (N.templates.map((t) => t.internal_template_key).join(",") !== SUBSET1_KEYS.join(",")) return false;
     return N.templates.every((t) => {
-      const x = CLOSED_LEDGER.find((c) => c.key === t.internal_template_key);
+      const x = SUPERSEDED[t.internal_template_key]
+        ?? CLOSED_LEDGER.find((c) => c.key === t.internal_template_key);
       return !!x
         && t.owner_copy_decision === "APPROVED_BY_OWNER"
         && t.category_review_decision === "UTILITY_MACHINE_PROVEN"
@@ -1124,7 +1132,7 @@ const MUT = [
     t.local_state.approval_status = "draft";
     t.local_state.submission_state = "DRAFT_NOT_SUBMITTED"; }],
   ["M33 any approved key re-armed for creation is rejected", R.closedStateModel, packet, (p) => {
-    p.templates.find((x) => x.internal_template_key === "client_matching_update").submit_now = true; }],
+    p.templates.find((x) => x.internal_template_key === "lead_received").submit_now = true; }],
   ["M34 a committed provider id on an approved key is rejected", R.closedStateModel, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "client_lead_status_update")
       .local_state.provider_template_id = "1234567890"; }],
@@ -1159,7 +1167,7 @@ const MUT = [
     const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_assignment_alert_v1")
       .last_proven_remote_category = "MARKETING"; return L; }],
   ["M38 a closed-entry semantic mismatch is rejected", R.ledgerClosedEntriesApprovedUtility, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_client_matching_update_v1")
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_received_v1")
       .readback_semantic_match = false; return L; }],
   ["M39 a second create POST on a closed entry is rejected", R.ledgerClosedEntriesApprovedUtility, null, null, () => {
     const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_client_lead_status_update_v1")
@@ -1168,7 +1176,7 @@ const MUT = [
     const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_received_v1")
       .create_post_count_at_submission = 0; return L; }],
   ["M40 an enabled send authority on a closed entry is rejected", R.ledgerClosedAuthoritiesDenied, null, null, () => {
-    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_client_matching_update_v1")
+    const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_received_v1")
       .send_authority = "GRANTED"; return L; }],
   ["M40b a granted mapping authority on a closed entry is rejected", R.ledgerClosedAuthoritiesDenied, null, null, () => {
     const L = readLedger(); L.entries.find((e) => e.provider_template_name === "qf_lead_assignment_alert_v1")
@@ -1178,7 +1186,7 @@ const MUT = [
       .evidence[0] = "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T05-55-04-999Z.json"; return L; }],
   ["M41b two closed entries sharing one evidence file is rejected", R.ledgerClosedCitesExactEvidence, null, null, () => {
     const L = readLedger();
-    const a = L.entries.find((e) => e.provider_template_name === "qf_client_matching_update_v1");
+    const a = L.entries.find((e) => e.provider_template_name === "qf_lead_received_v1");
     a.evidence = L.entries.find((e) => e.provider_template_name === "qf_client_lead_status_update_v1").evidence;
     return L; }],
   ["M42 a ledger that authorizes sending is rejected", R.ledgerTopLevelAuthorizesNothing, null, null, () => {

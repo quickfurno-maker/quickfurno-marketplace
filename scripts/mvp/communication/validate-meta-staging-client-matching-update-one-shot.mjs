@@ -51,7 +51,68 @@ const codeNoStrings = codeOnly
   .replace(/"(?:\\[\s\S]|[^\\"])*"/g, '""')
   .replace(/'(?:\\[\s\S]|[^\\'])*'/g, "''");
 
-const packet = JSON.parse(readFileSync(resolve(PACKET), "utf8"));
+/**
+ * QF-MVP-40-R7N SUPERSESSION.
+ *
+ * R7I is HISTORY: it created qf_client_matching_update_v1, which a GET-only readback later
+ * proved APPROVED but MARKETING on the current dedicated WABA. v1 is quarantined and the
+ * canonical packet has advanced to qf_client_matching_update_v2 — owned by R7N, never by R7I.
+ *
+ * The old invariant "R7I's target matches the CURRENT packet" was only true while v1 WAS
+ * current. It is NOT repaired by repinning R7I to v2: that would rewrite history and destroy
+ * the evidence of what R7I actually created. Instead every existing payload rule below is
+ * driven against an IMMUTABLE HISTORICAL PACKET whose entry is frozen at v1, so R7I keeps
+ * proving its own contract forever, and explicit supersession proofs assert that the LIVE
+ * packet has legitimately moved on.
+ */
+const livePacket = JSON.parse(readFileSync(resolve(PACKET), "utf8"));
+
+/** The exact v1 entry R7I was authorised to create. Frozen; never read from the live packet. */
+const HISTORICAL_V1_ENTRY = Object.freeze({
+  internal_template_key: "client_matching_update",
+  provider_template_name: "qf_client_matching_update_v1",
+  provider_language: "en",
+  category: "UTILITY",
+  component_profile: "STANDARD_TEXT",
+  submission_wave: 1,
+  submit_now: false,
+  external_approval_required: true,
+  local_state: {
+    approval_status: "approved",
+    submission_state: "APPROVED_UNMAPPED",
+    provider_template_id: null,
+  },
+  creation_payload: {
+    name: "qf_client_matching_update_v1",
+    language: "en",
+    category: "UTILITY",
+    components: [{
+      type: "body",
+      text: "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+      example: { body_text: [["Asha", "3"]] },
+    }],
+  },
+  send_contract: null,
+  payload_fingerprint: "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+});
+
+/** The successor that is now canonical. R7N owns it; R7I must never target it. */
+const CURRENT_CLIENT_MATCHING = Object.freeze({
+  name: "qf_client_matching_update_v2",
+  fingerprint: "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4",
+});
+
+/**
+ * The packet R7I's own rules are judged against: the live catalogue with THIS ONE entry
+ * restored to the version R7I actually created. Every other template stays live.
+ */
+const packet = (() => {
+  const clone = JSON.parse(JSON.stringify(livePacket));
+  const i = clone.templates.findIndex((t) => t.internal_template_key === "client_matching_update");
+  if (i < 0) throw new Error("client_matching_update entry missing from packet");
+  clone.templates[i] = JSON.parse(JSON.stringify(HISTORICAL_V1_ENTRY));
+  return clone;
+})();
 const activatorSrc = readFileSync(resolve(ACTIVATOR), "utf8");
 const vendorSrc = readFileSync(resolve(VENDOR_OPERATOR), "utf8");
 
@@ -534,6 +595,60 @@ record("G03 this operator targets a DIFFERENT template than R7B",
   && EXPECTED_PAYLOAD_FINGERPRINT !== "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a");
 record("G04 only ONE client template is in scope — the sibling stays untouched",
   !/client_lead_status_update/.test(codeOnly));
+
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R7N SUPERSESSION GOVERNANCE — R7I owns v1, R7N owns v2.
+// ---------------------------------------------------------------------------
+record("H01 R7I still pins client_matching_update to v1",
+  TARGET_TEMPLATE_NAME === "qf_client_matching_update_v1"
+  && EXPECTED_PAYLOAD_FINGERPRINT === "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c");
+record("H02 the frozen historical v1 payload self-hashes to that exact fingerprint",
+  sha256Hex(JSON.stringify(HISTORICAL_V1_ENTRY.creation_payload)) === EXPECTED_PAYLOAD_FINGERPRINT);
+record("H03 R7I never names the successor v2 anywhere in its source",
+  !/qf_client_matching_update_v2/.test(codeOnly));
+record("H04 the LIVE packet has advanced to v2 / 9d3e900f...", (() => {
+  const e = livePacket.templates.find((t) => t.internal_template_key === "client_matching_update");
+  return !!e && e.provider_template_name === CURRENT_CLIENT_MATCHING.name
+    && e.payload_fingerprint === CURRENT_CLIENT_MATCHING.fingerprint
+    && e.creation_payload.category === "UTILITY"
+    && e.creation_payload.language === "en";
+})());
+record("H05 the live packet no longer selects v1 as the active target", (() => {
+  const e = livePacket.templates.find((t) => t.internal_template_key === "client_matching_update");
+  return e.provider_template_name !== TARGET_TEMPLATE_NAME
+    && e.payload_fingerprint !== EXPECTED_PAYLOAD_FINGERPRINT;
+})());
+record("H06 R7I can NEVER create again — the live packet no longer names v1",
+  loadCanonicalPayload(livePacket).reason === "name_mismatch");
+record("H07 R7I refuses to POST against the live packet even with both flags", (() => {
+  const d = decide({
+    flags: parseFlags(["--execute", OWNER_ACK_FLAG]),
+    identity: validateIdentity(goodEnv()),
+    payloadResult: loadCanonicalPayload(livePacket),
+    preState: PreState.ABSENT,
+  });
+  return d.post === false && d.outcome === Outcome.REFUSED;
+})());
+record("H08 the historical fixture and the live entry genuinely differ",
+  HISTORICAL_V1_ENTRY.payload_fingerprint !== CURRENT_CLIENT_MATCHING.fingerprint
+  && /verified vendors/.test(HISTORICAL_V1_ENTRY.creation_payload.components[0].text));
+record("H09 v1 is recorded APPROVED / MARKETING / quarantined in the ledger", (() => {
+  const L = JSON.parse(readFileSync(resolve("docs/provider-manifests/meta-template-remote-state.json"), "utf8"));
+  const e = L.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && e.last_proven_status === "APPROVED"
+    && e.last_proven_remote_category === "MARKETING"
+    && e.disposition === "QUARANTINED_UNMAPPED"
+    && e.superseded_by === CURRENT_CLIENT_MATCHING.name
+    && e.send_authority === "DENIED" && e.mapping_authority === "DENIED"
+    && e.delete_authority === "NOT_GRANTED" && e.appeal_authority === "NOT_GRANTED";
+})());
+record("H10 the historical creation evidence is preserved unchanged", (() => {
+  const L = JSON.parse(readFileSync(resolve("docs/provider-manifests/meta-template-remote-state.json"), "utf8"));
+  const e = L.entries.find((x) => x.provider_template_name === TARGET_TEMPLATE_NAME);
+  return !!e && Array.isArray(e.evidence) && e.evidence.length === 2
+    && e.evidence.includes("QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json")
+    && e.create_post_count_at_submission === 1;
+})());
 
 console.log(`\nSummary: ${passed} passed, ${failed} failed.`);
 process.exit(failed === 0 ? 0 : 1);

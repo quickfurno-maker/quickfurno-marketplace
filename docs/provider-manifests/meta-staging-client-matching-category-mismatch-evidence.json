@@ -1,0 +1,95 @@
+{
+  "artifact": "meta-staging-client-matching-category-mismatch-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7N",
+  "operation_id": "QF-MVP-40-R7N-CLIENT-MATCHING-CATEGORY-MISMATCH-2026-08-24",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Immutable record of a GET-only readback proving that qf_client_matching_update_v1 exists on the dedicated staging WABA as APPROVED but with Meta category MARKETING, not the requested UTILITY. It exists because the committed ledger still carried a stale claim of UTILITY, proven on 2026-07-31 against a PREVIOUS WABA context. That older evidence is accurate for what it observed and is NOT rewritten. This artifact is the durable backing for the corrected historical state in meta-template-remote-state.json.",
+  "privacy": "No token, app secret, phone number or WABA id appears here. No remote template id is recorded: the readback path used did not print one. No Meta request or response body is reproduced: none was captured, and fabricating one would be evidence forgery.",
+  "observation": {
+    "observed_at_utc_date": "2026-08-24",
+    "observation_method": "GET_ONLY_DRY_RUN",
+    "observed_by": "QF-MVP-40-R7I one-shot operator, DRY RUN mode (no flags, so the create path is unreachable)",
+    "invocation": "npm run create:mvp:40-r7i-once",
+    "internal_template_key": "client_matching_update",
+    "provider_template_name": "qf_client_matching_update_v1",
+    "language": "en",
+    "expected_category": "UTILITY",
+    "actual_category": "MARKETING",
+    "status": "APPROVED",
+    "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+    "identity_authorised": true,
+    "live_asset_proof": true,
+    "phone_quality_rating": "GREEN",
+    "subscriber_count": 1,
+    "post_attempt_count": 0,
+    "operator_result": "ALREADY_CREATED — no POST. Creation authority is spent.",
+    "raw_operator_output": [
+      "== QF-MVP-40-R7I one-shot staging CLIENT template creation ==",
+      "   mode                    : DRY RUN",
+      "   target template         : qf_client_matching_update_v1",
+      "   identity authorised     : true",
+      "   canonical payload proved: true",
+      "   payload fingerprint     : c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+      "   live asset proof        : true",
+      "   phone quality rating    : GREEN",
+      "   subscriber count        : 1",
+      "   remote pre-state        : ALREADY_CREATED",
+      "   existing row            : status=APPROVED category=MARKETING language=en",
+      "POST_ATTEMPT_COUNT=0",
+      "RESULT: ALREADY_CREATED — no POST. Creation authority is spent."
+    ],
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false,
+    "capture_non_claim": "Only the operator's own stdout was captured. No Meta HTTP request or response body was recorded, and none is reconstructed here."
+  },
+  "classifier_non_claim": {
+    "reported_pre_state": "ALREADY_CREATED",
+    "statement": "The R7I classifier predates the stricter pre-state model introduced in R7K/R7L/R7M: it matches on name, language and status ONLY, and does not compare category or components. Its ALREADY_CREATED therefore proves that a row with this exact name and language exists in an accepted lifecycle state — it does NOT assert a category match and does NOT assert a semantic/body match. The category recorded above comes from the operator's own printed 'existing row' line, which reports the remote category verbatim.",
+    "semantic_match_asserted": false,
+    "category_match_asserted": false
+  },
+  "disposition": {
+    "provider_template_name": "qf_client_matching_update_v1",
+    "disposition": "QUARANTINED_UNMAPPED",
+    "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+    "successor_provider_template_name": "qf_client_matching_update_v2",
+    "successor_payload_fingerprint": "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4",
+    "successor_owner": "QF-MVP-40-R7N one-shot operator (scripts/mvp/communication/create-meta-staging-client-matching-update-v2-once.mjs)",
+    "predecessor_owner": "QF-MVP-40-R7I (frozen; its operator still pins v1 and is never repinned to v2)"
+  },
+  "authorities_explicitly_not_granted": {
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "recreation_authority": "NOT_GRANTED",
+    "mapping_authority": "DENIED",
+    "send_authority": "DENIED",
+    "provider_arm_authority": "NOT_GRANTED",
+    "activation_authority": "NOT_GRANTED",
+    "production_authority": "DENIED",
+    "statement": "This observation grants nothing. v1 is not deleted, not edited, not appealed, not recreated and not mapped. MARKETING never satisfies the Utility contract."
+  },
+  "historical_evidence_non_claim": {
+    "prior_evidence_unchanged": true,
+    "prior_evidence": [
+      "QF-MVP-40-WAVE1-META-SUBMISSION-2026-07-31T04-02-38-833Z.json",
+      "QF-MVP-40-WAVE1-client_matching_update-META-RECONCILIATION-2026-07-31T04-22-20-119Z.json"
+    ],
+    "statement": "The 2026-07-31 submission and reconciliation evidence observed returned_category UTILITY against the WABA context of that date. Those records are accurate for what they observed, are referenced unchanged by the ledger entry, and are NOT amended to appear to have known the later MARKETING reclassification. This artifact is ADDITIVE: it records a strictly later, independent observation against the current dedicated staging WABA.",
+    "waba_scope_note": "The committed packet and ledger are deliberately WABA-blind (no WABA id may appear in them), which is why one provider template name can carry two different proven remote categories across two WABA contexts. That structural limitation is the reason this artifact is needed. The identical condition was handled for qf_consent_help_response_v2 and qf_consent_start_acknowledgement_v1."
+  },
+  "ledger_linkage": {
+    "ledger_file": "docs/provider-manifests/meta-template-remote-state.json",
+    "ledger_entry_provider_template_name": "qf_client_matching_update_v1",
+    "ledger_fields_backed_by_this_artifact": [
+      "last_proven_remote_category = MARKETING",
+      "readback_semantic_match = false",
+      "reconciliation_outcome = RECONCILED_CATEGORY_MISMATCH",
+      "disposition = QUARANTINED_UNMAPPED",
+      "superseded_by = qf_client_matching_update_v2"
+    ]
+  }
+}

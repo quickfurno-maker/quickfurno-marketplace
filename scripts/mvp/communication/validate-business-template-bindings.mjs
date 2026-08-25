@@ -42,6 +42,8 @@ const EXPECTED = Object.freeze({
   vendor_onboarding_reminder: [[1, "outstanding_item"]],
 });
 const ACKS = ["consent_help_response", "consent_stop_acknowledgement", "consent_start_acknowledgement"];
+/** Keys whose approved version was superseded and whose successor is not yet created. */
+const SUPERSEDED_KEYS = ["client_matching_update"];
 /** Valid inputs per builder, used to exercise the real construction path. */
 const GOOD_INPUT = Object.freeze({
   lead_received: { clientName: "Asha" },
@@ -233,10 +235,19 @@ const R = {
   acksStayZeroVariableAndOutOfRegistry: () => ACKS.every((k) =>
     Object.keys(byKey.get(k).variables_schema ?? {}).length === 0
     && !new RegExp(`^\\s*${k}\\s*:`, "m").test(registrySrc)),
+  /**
+   * QF-MVP-40-R7N — a SUPERSEDED key is legitimately pre-creation. client_matching_update's
+   * approved v1 was proven MARKETING on the current dedicated WABA and is quarantined; its
+   * successor v2 has never been submitted, so draft / DRAFT_NOT_SUBMITTED is the truthful
+   * state. Creation stays HELD either way, which is the property this rule protects.
+   */
   approvedStateUnchanged: () => Object.keys(EXPECTED).every((k) => {
     const t = byKey.get(k);
-    return t.approval_status === "approved" && t.submission_state === "APPROVED_UNMAPPED"
-      && t.provider_template_id === null && t.qf_mvp_40.submit_now === false;
+    if (t.provider_template_id !== null || t.qf_mvp_40.submit_now !== false) return false;
+    if (SUPERSEDED_KEYS.includes(k)) {
+      return t.approval_status === "draft" && t.submission_state === "DRAFT_NOT_SUBMITTED";
+    }
+    return t.approval_status === "approved" && t.submission_state === "APPROVED_UNMAPPED";
   }),
   ordinaryLanesUnchanged: () => Object.keys(EXPECTED).every((k) =>
     new RegExp(`^\\s*${k}:.*lane: "business".*scope: "transactional"`, "m").test(registrySrc)),

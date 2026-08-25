@@ -32,13 +32,18 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // remote history 21..30, with UNKNOWN executor provenance for the reconciled three — is
 // completely unchanged. The only difference is that one further migration
 // (20260813000000, the canary activation authority) now exists on disk as SOURCE-PENDING.
-const MIGRATION_COUNT = 98;
+// QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
+// canonical marketing-consent writer RPC (20260814000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+const MIGRATION_COUNT = 99;
 // QF-MVP-50.5 STAGING GATE RE-PIN: this version is no longer pending. It cleared
 // its own staging gate at remote history 30 and is now the newest APPLIED record.
 const RECOVERY_VERSION = "20260812000000";
 const RECOVERY_FILENAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
 /** QF-MVP-40.13B — SOURCE ONLY, never applied by this or any prior phase. */
+const MARKETING_CONSENT_FILENAME =
+  "20260814000000_qf_mvp_40_marketing_consent_writer.sql";
 const CANARY_AUTHORITY_FILENAME =
   "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql";
 
@@ -129,11 +134,11 @@ function validateState(state) {
     ? manifest.pendingPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 98", state.migrationFiles.length === MIGRATION_COUNT);
-  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the pinned SOURCE-PENDING 40.13B authority",
-    same(state.migrationFiles.slice(-6),
+  check("migration count is exactly 99", state.migrationFiles.length === MIGRATION_COUNT);
+  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the two pinned SOURCE-PENDING QF-MVP-40 authorities",
+    same(state.migrationFiles.slice(-7),
       [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
-       CANARY_AUTHORITY_FILENAME]));
+       CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -142,11 +147,15 @@ function validateState(state) {
   check("the remote-history counts are exactly 21 through 30",
     same(applied.map((record) => record.remoteHistoryCountAfterApply),
       EXPECTED_APPLIED.map(([, history]) => history)));
-  check("the manifest pending set is exactly the SOURCE-PENDING 40.13B authority",
-    pending !== null && pending.length === 1 &&
+  // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
+  // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
+  // UNCHANGED at ten: neither pending migration has been applied to staging.
+  check("the manifest pending set is exactly the two SOURCE-PENDING QF-MVP-40 authorities",
+    pending !== null && pending.length === 2 &&
     pending[0].version === "20260813000000" &&
-    pending[0].operationalStatus === "PENDING" &&
-    pending[0].requiresSeparateStagingDeploymentGate === true);
+    pending[1].version === "20260814000000" &&
+    pending.every((r) => r.operationalStatus === "PENDING"
+      && r.requiresSeparateStagingDeploymentGate === true));
   check("the 50.5 recovery migration is APPLIED at remote history 30 by its own phase",
     (() => {
       const pin = applied.find((record) => record.version === RECOVERY_VERSION);
@@ -159,8 +168,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals the ten applied records plus the one SOURCE-PENDING authority",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 1);
+  check("the anchor post-anchor count equals the ten applied records plus the two SOURCE-PENDING authorities",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 2);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

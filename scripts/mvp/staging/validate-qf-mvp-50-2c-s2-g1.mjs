@@ -180,6 +180,12 @@ const POST_ANCHOR_PENDING = [
     sha: "517b6ce01e27df8bb32cc473a1fb3d80775ad96190cff71175725ac3053e3a59",
     phase: "QF-MVP-40.13B",
   },
+  {
+    version: "20260814000000",
+    name: "qf_mvp_40_marketing_consent_writer",
+    sha: "0015de5971be5072f78f1daaa49c49a088d29a16d2aaa0b954e08dc29f5ea4fc",
+    phase: "QF-MVP-40",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -189,7 +195,10 @@ const POST_ANCHOR_PENDING = [
 const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING].map((m) => m.version);
 const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING];
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
-const MIGRATION_COUNT = 98;
+// QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
+// canonical marketing-consent writer RPC (20260814000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+const MIGRATION_COUNT = 99;
 
 const APPROVED_COMMON = [
   "20260723000100", "20260723000200", "20260723000300", "20260723000400",
@@ -388,12 +397,12 @@ function validateState(state) {
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
 
-  check("exactly eleven local migrations are newer than the anchor", postAnchorLocal.length === 11, `actual=${postAnchorLocal.length}`);
-  check("the eleven post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 11);
+  check("exactly twelve local migrations are newer than the anchor", postAnchorLocal.length === 12, `actual=${postAnchorLocal.length}`);
+  check("the twelve post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 12);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
-  check("the explicit PENDING post-anchor set holds exactly one entry", pendingPins !== null && pendingPins.length === 1, `actual=${pendingPins?.length}`);
+  check("the explicit PENDING post-anchor set holds exactly two entries", pendingPins !== null && pendingPins.length === 2, `actual=${pendingPins?.length}`);
   check("the pending records match the exact pinned set", same(pendingPins?.map((r) => r.version), POST_ANCHOR_PENDING.map((m) => m.version)));
 
   for (const expected of POST_ANCHOR_PENDING) {

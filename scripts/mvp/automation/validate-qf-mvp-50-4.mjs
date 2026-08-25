@@ -308,8 +308,11 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // QF-MVP-50.5 STAGING GATE RE-PIN: the 50.5 recovery migration cleared its own
 // staging deployment gate, so the pending set is present-and-empty and 50.5 is the
 // newest APPLIED record. Nothing 50.4 pinned as APPLIED moved.
-record("G02 the pending post-anchor set is empty and 50.5 is the newest applied record",
-  manifest.pendingPostAnchorMigrations.length === 1 &&
+// QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
+// (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
+// UNCHANGED at ten: neither pending migration has been applied to staging.
+record("G02 the pending post-anchor set holds exactly two and 50.5 is the newest applied record",
+  manifest.pendingPostAnchorMigrations.length === 2 &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.at(-1).operationalStatus === "APPLIED");
 record("G03 the ten applied records read 21 through 30",
@@ -321,8 +324,13 @@ record("G05 the validator is registered and wired into CI after 50.3",
   pkg.scripts["test:mvp:50-4"] ===
     "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs" &&
   /- name: QF-MVP-50\.3 validator\s+run: npm run test:mvp:50-3\s+- name: QF-MVP-50\.4 validator\s+run: npm run test:mvp:50-4/.test(ciWorkflow));
-record("G06 the local migration set is exactly 97",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 98);
+// QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
+// canonical marketing-consent writer RPC (20260814000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+// The previous LABEL read "97" while the code compared 98 — a stale label left by the
+// 40.13B re-pin. Label and value are now both 99 and agree.
+record("G06 the local migration set is exactly 99",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 99);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

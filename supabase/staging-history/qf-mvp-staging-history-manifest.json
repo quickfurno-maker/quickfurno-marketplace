@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 11,
+    "postAnchorMigrationCount": 12,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -793,6 +793,17 @@
       "path": "supabase/migrations/20260813000000_qf_mvp_40_13b_canary_activation_authority.sql",
       "sha256": "517b6ce01e27df8bb32cc473a1fb3d80775ad96190cff71175725ac3053e3a59",
       "phase": "QF-MVP-40.13B",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    },
+    {
+      "version": "20260814000000",
+      "name": "qf_mvp_40_marketing_consent_writer",
+      "path": "supabase/migrations/20260814000000_qf_mvp_40_marketing_consent_writer.sql",
+      "sha256": "0015de5971be5072f78f1daaa49c49a088d29a16d2aaa0b954e08dc29f5ea4fc",
+      "phase": "QF-MVP-40",
       "operationalStatus": "PENDING",
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "requiresSeparateStagingDeploymentGate": true,

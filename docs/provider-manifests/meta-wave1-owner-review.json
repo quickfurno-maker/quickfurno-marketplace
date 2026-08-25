@@ -6,7 +6,7 @@
   "authorizes_meta_calls": false,
   "note": "NON-SECRET owner-review artefact. It AUTHORIZES ZERO META CALLS. Every entry is copied verbatim from the source submission packet: copy, category, language, component profile, payload and fingerprint are never rewritten here. Group B is a REVIEW BOUNDARY only and asserts nothing about whether its category is correct. client_lead_status_update, client_matching_update, consent_start_acknowledgement, consent_stop_acknowledgement, lead_assignment_alert, lead_received, vendor_onboarding_reminder was submitted once and is now APPROVED / UNMAPPED / HELD FROM CREATION — its one-shot authorization is CONSUMED, and being approved grants no consent, mapping, activation or send authority. The other 7 entries authorize ZERO Meta calls and remain NOT_AUTHORIZED / NOT_SUBMITTED. Nothing here is a blanket Wave 1 authorization: each further submission needs its own explicit owner authorization.",
   "source_packet": "docs/provider-manifests/meta-template-submission-packet.json",
-  "source_packet_fingerprint": "fa19476b198eafa98b0d136c56cf474587dcfbd227a8bb8877f0e2f1879563de",
+  "source_packet_fingerprint": "8c0fdaef648ddae38f80ec7610d87f303fa19e1c181de097f2a5e9ce829dc915",
   "counts": {
     "total": 14,
     "approved_unmapped": 7,
@@ -59,18 +59,18 @@
     },
     {
       "internal_template_key": "clarification_request",
-      "provider_template_name": "qf_clarification_request_v1",
+      "provider_template_name": "qf_clarification_request_v2",
       "provider_language": "en",
       "requested_category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "creation_payload": {
-        "name": "qf_clarification_request_v1",
+        "name": "qf_clarification_request_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+            "text": "Hi {{1}}, QuickFurno needs one detail to complete your enquiry matching: {{2}}. Please reply with this information.",
             "example": {
               "body_text": [
                 [
@@ -82,7 +82,7 @@
           }
         ]
       },
-      "payload_fingerprint": "9c484b4d7e54929a2ab52b08093e1e719d3dfdb7b7c1741fa8b5e8e1daf85e4b",
+      "payload_fingerprint": "b1211ade37ded439861d9ddb8297d9e5c7cb73c4959e68363ab53c5e76933c77",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
       "owner_copy_decision": "PENDING_OWNER_REVIEW",
       "category_review_decision": "REVIEW_REQUIRED",
@@ -123,18 +123,18 @@
     },
     {
       "internal_template_key": "client_matching_update",
-      "provider_template_name": "qf_client_matching_update_v1",
+      "provider_template_name": "qf_client_matching_update_v2",
       "provider_language": "en",
       "requested_category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "creation_payload": {
-        "name": "qf_client_matching_update_v1",
+        "name": "qf_client_matching_update_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+            "text": "Hi {{1}}, update on your QuickFurno enquiry: {{2}} professionals have been matched to it and may contact you about your request.",
             "example": {
               "body_text": [
                 [
@@ -146,7 +146,7 @@
           }
         ]
       },
-      "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c",
+      "payload_fingerprint": "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
       "owner_copy_decision": "APPROVED_BY_OWNER",
       "category_review_decision": "UTILITY_MACHINE_PROVEN",
@@ -155,22 +155,22 @@
     },
     {
       "internal_template_key": "consent_start_acknowledgement",
-      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "provider_template_name": "qf_consent_start_acknowledgement_v2",
       "provider_language": "en",
       "requested_category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "creation_payload": {
-        "name": "qf_consent_start_acknowledgement_v1",
+        "name": "qf_consent_start_acknowledgement_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help."
+            "text": "QuickFurno received your START request. Messages about your existing QuickFurno enquiries are active again. Reply STOP to stop messages or HELP for help."
           }
         ]
       },
-      "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a",
+      "payload_fingerprint": "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054",
       "submission_group": "WAVE1A_ORDINARY_LAUNCH",
       "owner_copy_decision": "APPROVED_BY_OWNER",
       "category_review_decision": "UTILITY_MACHINE_PROVEN",

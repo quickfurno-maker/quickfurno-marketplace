@@ -5,6 +5,7 @@
 // OFFLINE ONLY. No database, no network, no environment secret, no provider call.
 // ============================================================================
 
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,6 +58,79 @@ const resolverSource = read("services/communicationRecipientResolver.ts");
 const consentSource = read("services/outboundConsentEnforcementService.ts");
 const manifest = JSON.parse(read("docs/provider-manifests/whatsapp-template-submission-manifest.json"));
 const packet = JSON.parse(read("docs/provider-manifests/meta-template-submission-packet.json"));
+// ---------------------------------------------------------------------------
+// HISTORICAL AUTHORITY — QF-MVP-50.2C provider-catalogue facts
+//
+// Section D asserts what the provider catalogue looked like WHEN 50.2C WAS ACCEPTED:
+// 25 templates, no client_transactional_followup candidate, clarification entries still
+// unsubmitted drafts. Those were true statements about a completed phase.
+//
+// Evaluating them against the CURRENT tree was a cross-phase bug. QF-MVP-40 legitimately
+// evolved the catalogue afterwards (commit 210f784 added client_transactional_followup as
+// a provider candidate; it was later submitted and approved), which is exactly the
+// "separately governed readiness task" 50.2C said must happen before real execution could
+// stop failing closed. A frozen phase must not veto the evolution it asked for.
+//
+// So the historical claims are now proven against the historical BYTES, read from the
+// 50.2C phase merge head. Current provider truth is owned by the QF-MVP-40 submission,
+// remote-state and readiness validators — deliberately NOT re-pinned here, because pinning
+// today's count would recreate this same bug on the next legitimate 40-side addition.
+// ---------------------------------------------------------------------------
+/** QF-MVP-50.2C phase merge head (PR #19). Frozen: it is this phase's own accepted truth. */
+const QF_MVP_50_2C_IMPLEMENTATION_HEAD = "e511166119703c6044a73d4629a031a6685a3415";
+
+/** A git failure is a FAILURE, never a silent fallback to the current working tree. */
+function gitShowAtHead(relPath) {
+  return execFileSync("git", ["show", `${QF_MVP_50_2C_IMPLEMENTATION_HEAD}:${relPath}`],
+    { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+}
+function commitExists(sha) {
+  try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: ROOT, stdio: "ignore" }); return true; }
+  catch { return false; }
+}
+function isAncestorOfHead(sha) {
+  try { execFileSync("git", ["merge-base", "--is-ancestor", sha, "HEAD"], { cwd: ROOT, stdio: "ignore" }); return true; }
+  catch { return false; }
+}
+
+const MANIFEST_REL = "docs/provider-manifests/whatsapp-template-submission-manifest.json";
+const PACKET_REL = "docs/provider-manifests/meta-template-submission-packet.json";
+
+/**
+ * Loaded ONCE from the frozen head. If the load throws, historicalLoadFailed stays true and
+ * every historical assertion fails — there is no `?? current` and no try/catch that falls
+ * back to the working tree.
+ */
+let historicalLoadFailed = true;
+let historicalManifestRaw = null;
+let historicalPacketRaw = null;
+try {
+  historicalManifestRaw = gitShowAtHead(MANIFEST_REL);
+  historicalPacketRaw = gitShowAtHead(PACKET_REL);
+  historicalLoadFailed = false;
+} catch {
+  historicalLoadFailed = true;
+}
+const historicalManifest = historicalLoadFailed ? null : JSON.parse(historicalManifestRaw);
+const historicalPacket = historicalLoadFailed ? null : JSON.parse(historicalPacketRaw);
+const collectEntries = (root) => {
+  const out = [];
+  (function walk(node) {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node && typeof node === "object") {
+      if (node.internal_template_key) out.push(node);
+      Object.values(node).forEach(walk);
+    }
+  })(root);
+  return out;
+};
+const histManifestEntries = historicalManifest ? collectEntries(historicalManifest) : [];
+const histPacketEntries = historicalPacket ? collectEntries(historicalPacket) : [];
+const histManifestByKey = new Map(histManifestEntries.map((e) => [e.internal_template_key, e]));
+const histPacketByKey = new Map(histPacketEntries.map((e) => [e.internal_template_key, e]));
+/** Guards every historical assertion: an unloadable history can never read as a pass. */
+const hist = (fn) => { if (historicalLoadFailed) return false; try { return fn() === true; } catch { return false; } };
+
 const migrationName = "20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql";
 const migration = read(`supabase/migrations/${migrationName}`);
 const allSource = registrySource + variablesSource + contractSource;
@@ -264,27 +338,52 @@ record("C08 50.2C does not mutate the 40.12 module",
 // ---------------------------------------------------------------------------
 // D. PROVIDER CATALOGUE REMAINS CLOSED
 // ---------------------------------------------------------------------------
-record("D01 provider manifest still holds exactly 25 templates", manifestEntries.length === 25);
-record("D02 submission packet still holds exactly 25 templates", packetEntries.length === 25);
-record("D03 client_transactional_followup is NOT a provider candidate",
-  !manifestByKey.has("client_transactional_followup") && !packetByKey.has("client_transactional_followup"));
-record("D04 no qf_client_transactional_followup provider name exists",
-  !/qf_client_transactional_followup/.test(JSON.stringify(manifest) + JSON.stringify(packet)));
-record("D05 P0 clarification_reminder body is unchanged",
-  packetByKey.get("clarification_reminder").creation_payload.components
+// ---- G0: the historical authority itself -------------------------------------------
+record("D00a the 50.2C implementation head exists",
+  commitExists(QF_MVP_50_2C_IMPLEMENTATION_HEAD));
+record("D00b the 50.2C implementation head is an ancestor of current HEAD",
+  isAncestorOfHead(QF_MVP_50_2C_IMPLEMENTATION_HEAD));
+record("D00c the historical manifest and packet loaded from that exact commit",
+  historicalLoadFailed === false
+  && typeof historicalManifestRaw === "string" && historicalManifestRaw.length > 0
+  && typeof historicalPacketRaw === "string" && historicalPacketRaw.length > 0);
+record("D00d the historical bytes differ from the current tree, proving no fallback", (() => {
+  // If the loader ever silently fell back to the working tree these would be identical,
+  // and every historical assertion below would be re-testing today's catalogue again.
+  const curManifest = read(MANIFEST_REL);
+  const curPacket = read(PACKET_REL);
+  return !historicalLoadFailed
+    && historicalManifestRaw !== curManifest && historicalPacketRaw !== curPacket;
+})());
+
+// ---- HISTORICAL provider-catalogue facts, proven against the frozen head -------------
+record("D01 at the 50.2C head the provider manifest held exactly 25 templates",
+  hist(() => histManifestEntries.length === 25));
+record("D02 at the 50.2C head the submission packet held exactly 25 templates",
+  hist(() => histPacketEntries.length === 25));
+record("D03 at the 50.2C head client_transactional_followup was NOT a provider candidate",
+  hist(() => !histManifestByKey.has("client_transactional_followup")
+    && !histPacketByKey.has("client_transactional_followup")));
+record("D04 at the 50.2C head no qf_client_transactional_followup provider name existed",
+  hist(() => !/qf_client_transactional_followup/.test(historicalManifestRaw + historicalPacketRaw)));
+record("D05 at the 50.2C head the P0 clarification_reminder body was as pinned",
+  hist(() => histPacketByKey.get("clarification_reminder").creation_payload.components
     .find((c) => c.type === "body").text ===
-  "Hi {{1}}, just a reminder from QuickFurno: please share {{2}} so we can complete your match.");
-record("D06 P0 clarification_reminder fingerprint is unchanged",
-  packetByKey.get("clarification_reminder").payload_fingerprint ===
-  "87c5420a8d97ab4de45e6c34eb0312cf957a9c53b28435cfeb3ffe3ce92f1474");
-record("D07 clarification_request/reminder remain unsubmitted drafts",
-  ["clarification_request", "clarification_reminder"].every((k) =>
-    packetByKey.get(k).local_state.approval_status === "draft" &&
-    packetByKey.get(k).local_state.submission_state === "DRAFT_NOT_SUBMITTED" &&
-    packetByKey.get(k).local_state.provider_template_id === null));
-record("D08 binding_readiness for the two draft clarification entries stays unresolved",
-  ["clarification_request", "clarification_reminder"].every((k) =>
-    manifestByKey.get(k).binding_contract.binding_readiness === "unresolved"));
+    "Hi {{1}}, just a reminder from QuickFurno: please share {{2}} so we can complete your match."));
+record("D06 at the 50.2C head the P0 clarification_reminder fingerprint was as pinned",
+  hist(() => histPacketByKey.get("clarification_reminder").payload_fingerprint ===
+    "87c5420a8d97ab4de45e6c34eb0312cf957a9c53b28435cfeb3ffe3ce92f1474"));
+record("D07 at the 50.2C head clarification_request/reminder were unsubmitted drafts",
+  hist(() => ["clarification_request", "clarification_reminder"].every((k) =>
+    histPacketByKey.get(k).local_state.approval_status === "draft" &&
+    histPacketByKey.get(k).local_state.submission_state === "DRAFT_NOT_SUBMITTED" &&
+    histPacketByKey.get(k).local_state.provider_template_id === null)));
+record("D08 at the 50.2C head their binding_readiness was unresolved",
+  hist(() => ["clarification_request", "clarification_reminder"].every((k) =>
+    histManifestByKey.get(k).binding_contract.binding_readiness === "unresolved")));
+// NOTE: there is deliberately NO assertion pinning the CURRENT catalogue count or state.
+// Current provider truth belongs to the QF-MVP-40 validators; re-pinning it here would
+// recreate the very cross-phase coupling this repair removes.
 record("D09 client_nurture_followup remains marketing and is not the followup template",
   manifestByKey.get("client_nurture_followup").category === "marketing" &&
   CLIENT_DISPATCH_REGISTRY["client.transactional_followup"].templateKey !== "client_nurture_followup");
@@ -599,6 +698,101 @@ const BANNED = {
 };
 for (const [label, re] of Object.entries(BANNED)) {
   record(`J-${label}`, !re.test(newModuleCode));
+}
+
+// ---------------------------------------------------------------------------
+// H0. HISTORICAL-DECOUPLING MUTATION SELF-TESTS
+//
+// Each mutant models a way the decoupling could be silently undone — most dangerously by
+// re-pointing the frozen head at HEAD, or by letting a failed history load fall back to the
+// current tree so the "historical" assertions quietly re-test today's catalogue again.
+// Every mutant must be CAUGHT (the corrupted form must evaluate false).
+// ---------------------------------------------------------------------------
+const validatorSource = read("scripts/mvp/automation/validate-qf-mvp-50-2c.mjs");
+const HEAD_SHA = (() => {
+  try { return execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(); }
+  catch { return null; }
+})();
+
+/** Re-runs the historical fact set against an arbitrary commit. */
+const historicalFactsHoldAt = (sha) => {
+  try {
+    const m = execFileSync("git", ["show", `${sha}:${MANIFEST_REL}`],
+      { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const p = execFileSync("git", ["show", `${sha}:${PACKET_REL}`],
+      { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const me = collectEntries(JSON.parse(m));
+    const pe = collectEntries(JSON.parse(p));
+    return me.length === 25 && pe.length === 25
+      && !new Map(me.map((e) => [e.internal_template_key, e])).has("client_transactional_followup")
+      && !/qf_client_transactional_followup/.test(m + p);
+  } catch { return false; }
+};
+
+const H_MUT = [
+  ["M01 pointing the frozen head at current HEAD is caught",
+    () => HEAD_SHA !== null && historicalFactsHoldAt(HEAD_SHA) === false],
+  ["M02 pointing the frozen head at the later QF-MVP-40 catalogue commit is caught",
+    // 210f784 is exactly where QF-MVP-40 legitimately took the catalogue to 26 and added
+    // client_transactional_followup. Re-pointing the frozen head there must NOT satisfy the
+    // historical facts — that is what makes this pin load-bearing rather than decorative.
+    () => historicalFactsHoldAt("210f78442eff0a2adef6561e6692be97412e9171") === false
+      && historicalFactsHoldAt(QF_MVP_50_2C_IMPLEMENTATION_HEAD) === true],
+  ["M03 a nonexistent head is caught, never treated as vacuously true",
+    () => commitExists("0000000000000000000000000000000000000000") === false
+      && historicalFactsHoldAt("0000000000000000000000000000000000000000") === false],
+  ["M04 removing the ancestry check is caught",
+    () => /isAncestorOfHead\(QF_MVP_50_2C_IMPLEMENTATION_HEAD\)/.test(validatorSource)
+      && isAncestorOfHead("0000000000000000000000000000000000000000") === false],
+  ["M05 a manifest loader falling back to the current file is caught",
+    () => hist(() => historicalManifestRaw === read(MANIFEST_REL)) === false],
+  ["M06 a packet loader falling back to the current file is caught",
+    () => hist(() => historicalPacketRaw === read(PACKET_REL)) === false],
+  ["M07 a failed historical load can never read as a pass", () => {
+    // Replicates the guard shape with the failure flag forced true: even a tautology must
+    // return false. Also proves the REAL loader has no `?? current` fallback and that a
+    // throw sets the flag rather than substituting the working tree.
+    const guardWith = (failed) => (fn) => {
+      if (failed) return false;
+      try { return fn() === true; } catch { return false; }
+    };
+    const failClosed = guardWith(true)(() => true) === false
+      && guardWith(false)(() => true) === true;
+    const loader = validatorSource.slice(
+      validatorSource.indexOf("let historicalLoadFailed = true;"),
+      validatorSource.indexOf("const collectEntries"));
+    const noFallback = !/\?\?\s*read\(|\|\|\s*read\(|catch\s*\{[^}]*read\(/.test(loader)
+      && /historicalLoadFailed = true;/.test(loader);
+    return failClosed && noFallback;
+  }],
+  ["M08 changing the historical 25 count is caught",
+    () => histManifestEntries.length !== 26 && histPacketEntries.length !== 26],
+  ["M09 removing the historical client_transactional_followup absence check is caught",
+    () => /at the 50\.2C head client_transactional_followup was NOT a provider candidate/
+      .test(validatorSource)],
+  ["M10 removing the historical qf_client_transactional_followup name check is caught",
+    () => /at the 50\.2C head no qf_client_transactional_followup provider name existed/
+      .test(validatorSource)],
+  ["M11 removing the historical clarification draft-state check is caught",
+    () => /at the 50\.2C head clarification_request\/reminder were unsubmitted drafts/
+      .test(validatorSource)],
+  ["M12 weakening any historical assertion to a floor/range/prefix is caught", () => {
+    const dBlock = validatorSource.slice(validatorSource.indexOf('record("D01'),
+      validatorSource.indexOf('record("D09'));
+    return !/>=|<=|length\s*>|length\s*<|startsWith|\.some\(/.test(dBlock)
+      && /=== 25/.test(dBlock);
+  }],
+  ["M13 no CURRENT catalogue count is pinned anywhere in 50.2C", () => {
+    // Pinning today's count would recreate the cross-phase bug this repair removes.
+    const dBlock = validatorSource.slice(validatorSource.indexOf('record("D00a'),
+      validatorSource.indexOf('record("D09'));
+    return !/manifestEntries\.length ===|packetEntries\.length ===/.test(dBlock);
+  }],
+];
+for (const [name, fn] of H_MUT) {
+  let caught = false;
+  try { caught = fn() === true; } catch { caught = false; }
+  record(`H0-${name}`, caught);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,134 @@
+{
+  "artifact": "meta-staging-wave1-batch-reconciliation-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40",
+  "operation_id": "QF-MVP-40-BATCH-RECONCILIATION-2026-08-25",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Index record for the eight GET-only reconciliations run on 2026-08-25 against the eight templates created earlier that day. Four are APPROVED at their intended category. Four were APPROVED by Meta but RECATEGORISED to MARKETING against a UTILITY request, and are therefore quarantined rather than usable. The observed facts live in the eight referenced sanitized records and are not duplicated beyond the identifiers needed to address them.",
+  "privacy": "No token, app secret, phone number or WABA id appears here or in the referenced records. Remote template ids and Meta request ids ARE recorded: they are non-secret identifiers and are proven remote state. No Meta request or response body was captured, and none is reconstructed.",
+  "reconciliation": {
+    "observed_at_utc_date": "2026-08-25",
+    "observed_by": "scripts/mvp/communication/submit-meta-templates.mjs --wave <n> --template <key> --reconcile-only",
+    "operation_mode": "RECONCILE_ONLY",
+    "templates_read": 8,
+    "create_post_count_total": 0,
+    "identity_match": true,
+    "http_status": 200,
+    "api_version": "v26.0",
+    "messages_sent": 0,
+    "templates_created_edited_or_deleted": 0,
+    "mappings_activated": 0,
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false,
+    "statement": "RECONCILE_ONLY terminates before all create logic, so create_post_count is structurally 0 and every record confirms it. This reading created nothing and changed nothing at the provider."
+  },
+  "approved": [
+    {
+      "internal_template_key": "clarification_request",
+      "provider_template_name": "qf_clarification_request_v2",
+      "remote_template_id": "1374658884649762",
+      "remote_status": "APPROVED",
+      "returned_category": "UTILITY",
+      "readback_semantic_match": true,
+      "evidence": "meta-staging-clarification-request-v2-reconciliation.json",
+      "sha256": "b3b241917c03b5daa465b5c5f138f7b1e684075ff545242cfb6d00a91b77ba44"
+    },
+    {
+      "internal_template_key": "client_transactional_followup",
+      "provider_template_name": "qf_client_transactional_followup_v1",
+      "remote_template_id": "2924879551180482",
+      "remote_status": "APPROVED",
+      "returned_category": "UTILITY",
+      "readback_semantic_match": true,
+      "evidence": "meta-staging-client-transactional-followup-v1-reconciliation.json",
+      "sha256": "ed8f7e31cff3abeb7c74fd3a0908023f4a1a0af8afd01f8c5774e6e6d319ea51"
+    },
+    {
+      "internal_template_key": "vendor_new_lead",
+      "provider_template_name": "qf_vendor_new_lead_v1",
+      "remote_template_id": "1569683294809980",
+      "remote_status": "APPROVED",
+      "returned_category": "UTILITY",
+      "readback_semantic_match": true,
+      "evidence": "meta-staging-vendor-new-lead-v1-reconciliation.json",
+      "sha256": "b6106bfcc8c577510b467e1a28d514b1f6eeba4f65a95c01e6c65db2fea7362d"
+    },
+    {
+      "internal_template_key": "vendor_crm_promotion",
+      "provider_template_name": "qf_vendor_crm_promotion_v1",
+      "remote_template_id": "2326221901244860",
+      "remote_status": "APPROVED",
+      "returned_category": "MARKETING",
+      "readback_semantic_match": true,
+      "evidence": "meta-staging-vendor-crm-promotion-v1-reconciliation.json",
+      "sha256": "773d71cd221f9f89e62a82d914e697fd2eb912d5e5778a8af4c88b9840901dc1"
+    }
+  ],
+  "category_mismatch": [
+    {
+      "internal_template_key": "clarification_reminder",
+      "provider_template_name": "qf_clarification_reminder_v1",
+      "remote_template_id": "1368369535273954",
+      "remote_status": "APPROVED",
+      "requested_category": "UTILITY",
+      "returned_category": "MARKETING",
+      "readback_semantic_match": false,
+      "evidence": "meta-staging-clarification-reminder-v1-reconciliation.json",
+      "sha256": "9c8278805a33d8500a26984846edb27830d302d172c51ddc623a20cf367045e7"
+    },
+    {
+      "internal_template_key": "low_credit_warning",
+      "provider_template_name": "qf_low_credit_warning_v1",
+      "remote_template_id": "1868167847496096",
+      "remote_status": "APPROVED",
+      "requested_category": "UTILITY",
+      "returned_category": "MARKETING",
+      "readback_semantic_match": false,
+      "evidence": "meta-staging-low-credit-warning-v1-reconciliation.json",
+      "sha256": "221cfa48a70ddca5830f69027d6830fb777dc743da53aa783917bdaeb26c1bda"
+    },
+    {
+      "internal_template_key": "vendor_package_expiry_warning",
+      "provider_template_name": "qf_vendor_package_expiry_warning_v1",
+      "remote_template_id": "27814489294917998",
+      "remote_status": "APPROVED",
+      "requested_category": "UTILITY",
+      "returned_category": "MARKETING",
+      "readback_semantic_match": false,
+      "evidence": "meta-staging-vendor-package-expiry-warning-v1-reconciliation.json",
+      "sha256": "31ae25924af6c1c6d14792b1b95fc28d5f8b6dbec75c4e28d7566b6f4bf6d88e"
+    },
+    {
+      "internal_template_key": "vendor_response_reminder",
+      "provider_template_name": "qf_vendor_response_reminder_v1",
+      "remote_template_id": "905027118919792",
+      "remote_status": "APPROVED",
+      "requested_category": "UTILITY",
+      "returned_category": "MARKETING",
+      "readback_semantic_match": false,
+      "evidence": "meta-staging-vendor-response-reminder-v1-reconciliation.json",
+      "sha256": "ee2edda3bcfa31f1565e2e3043c8cbcd1a7fce578a9a9cccbda60128f35ff224"
+    }
+  ],
+  "semantic_match_non_claim": {
+    "statement": "The four category-mismatched records carry readback_semantic_match false. That is FULLY EXPLAINED by the category difference alone: canonicaliseTemplate() includes category in the semantic identity, so a UTILITY-vs-MARKETING difference forces templatesAreIdentical() to false regardless of the body. The RECONCILE_ONLY branch checks category BEFORE the semantic result, so it exits RECONCILED_CATEGORY_MISMATCH either way. These records therefore prove NOTHING about whether the body and components still match, in either direction. Body identity for those four is UNPROVEN and must not be asserted without a fresh comparison.",
+    "body_identity_proven": false,
+    "authority": "scripts/mvp/communication/submit-meta-templates.mjs :: canonicaliseTemplate, RECONCILE_ONLY branch"
+  },
+  "approval_scope_non_claim": {
+    "statement": "A Meta approval proves the PROVIDER CONTRACT ONLY. It creates no mapping, no runtime activation, no consent authority and no send authority. An approved template is APPROVED_UNMAPPED until a separately authorized mapping phase, and the four recategorised templates are not usable at all in their requested role."
+  },
+  "authorities_explicitly_not_granted": {
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "activation_authority": "NOT_GRANTED",
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "successor_creation_authority": "NOT_GRANTED",
+    "production_authority": "DENIED",
+    "statement": "This is a reading. It grants nothing, and in particular it does not authorise creating a replacement template for any recategorised key."
+  }
+}

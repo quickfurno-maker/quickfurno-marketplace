@@ -20,6 +20,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import {
   evaluatePreBuildGates, scanBuildOutput, isFlagEnabled, refFromUrl,
   AUTHORIZED_REF, PRODUCTION_REF, JARVIS_REF, OUTBOUND_FLAG_VARS,
+  decodeJwtPayload, jwtProjectRef, jwtRole, MAX_JWT_PAYLOAD_BYTES,
 } from "./stagingBuildGate.mjs";
 import { runStagingBuild, removeBuildOutput } from "./runStagingBuild.mjs";
 
@@ -290,6 +291,56 @@ record("26 an anon JWT in the client bundle is accepted (it is public by design)
     serverFiles: [{ path: "s.js", text: cleanServer() }], secrets: [],
   }).ok);
 
+/* QF-MVP-40 — the MODERN Supabase key shapes.
+ *
+ * A `sb_secret_…` key is not a JWT, so the payload-decoding branch above cannot see it.
+ * Before this repair, a leak of the newer credential was caught ONLY when the literal
+ * was passed in `secrets` — a strictly weaker guarantee than the legacy key enjoyed.
+ * These cases pass `secrets: []` on purpose, so they fail if that regresses. */
+const MODERN_SECRET = `sb_secret_${"A".repeat(32)}`;
+const MODERN_PAT = `sbp_${"b".repeat(40)}`;
+const MODERN_PUBLISHABLE = `sb_publishable_${"C".repeat(32)}`;
+
+record("26a FAIL: a modern sb_secret_ key in a client chunk is detected from its own shape",
+  !scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var s="${MODERN_SECRET}";` }],
+    serverFiles: [], secrets: [],
+  }).ok,
+  "detection must not depend on the literal key being supplied");
+
+record("26b FAIL: a Supabase personal access token in a client chunk is detected",
+  !scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var s="${MODERN_PAT}";` }],
+    serverFiles: [], secrets: [],
+  }).ok);
+
+record("26c the modern-key failure is reported as a client-bundle credential leak",
+  failedWith(scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var s="${MODERN_SECRET}";` }],
+    serverFiles: [], secrets: [],
+  }), "SERVICE_CREDENTIAL_IN_CLIENT_BUNDLE"));
+
+record("26d a modern PUBLISHABLE key in the client bundle is accepted (public by design)",
+  scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: `${cleanClient()}var p="${MODERN_PUBLISHABLE}";` }],
+    serverFiles: [{ path: "s.js", text: cleanServer() }], secrets: [],
+  }).ok,
+  "sb_publishable_ must never be treated as privileged");
+
+record("26e a modern secret key in a SERVER chunk is not a client-bundle leak",
+  scanBuildOutput({
+    clientFiles: [{ path: "c.js", text: cleanClient() }],
+    serverFiles: [{ path: "s.js", text: `${cleanServer()}exports.k="${MODERN_SECRET}";` }],
+    secrets: [],
+  }).ok,
+  "a server-only chunk is exactly where a service credential legitimately lives");
+
+const modernRun = run(baseEnv(), outputFiles({ client: `${cleanClient()}var s="${MODERN_SECRET}";` }));
+record("26f FAIL: the orchestrated build refuses a modern-key client leak end to end",
+  modernRun.code !== 0 && modernRun.stage === "post-build" &&
+  failedWith(modernRun.scan, "SERVICE_CREDENTIAL_IN_CLIENT_BUNDLE"),
+  modernRun.scan ? JSON.stringify(codes(modernRun.scan)) : "");
+
 const ambiguous = run(baseEnv(), outputFiles({
   extra: { [path.join(ROOT, ".next/server/app/other.js")]: `https://abcdefghijklmnopqrst.supabase.co` },
 }));
@@ -443,6 +494,263 @@ record("34 gate output does report the authorised ref and bounded counts",
   loggedText.includes(AUTHORIZED_REF) && /client files scanned\s*:\s*\d+/.test(loggedText));
 
 /* ===========================================================================
+ * 8b. QF-MVP-40-R3 — the process-local staging build path
+ *
+ * The §7 live run refused because `.env.local` is production-attributed and @next/env
+ * surfaced a production Supabase URL plus enabled n8n outbound flags. That refusal is
+ * CORRECT and these prove each half of it is individually load-bearing — a weakened
+ * gate would let a production-attributed build be published as staging evidence.
+ * ========================================================================= */
+
+const R3 = (over) => evaluatePreBuildGates(baseEnv(over));
+const r3Failed = (over, code) => R3(over).failures.some((f) => f.code === code);
+
+record("R3-B01 a production NEXT_PUBLIC ref cannot slip through",
+  r3Failed({ NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co` },
+    "EFFECTIVE_REF_NOT_AUTHORIZED"),
+  "the effective ref is derived from the URL the build would bake in");
+
+record("R3-B02 a Jarvis ref cannot slip through either",
+  r3Failed({ NEXT_PUBLIC_SUPABASE_URL: `https://${JARVIS_REF}.supabase.co` },
+    "EFFECTIVE_REF_NOT_AUTHORIZED"));
+
+record("R3-B03 a production ref ANYWHERE in the effective environment is caught",
+  r3Failed({ SOME_OTHER_VAR: `postgres://${PRODUCTION_REF}.pooler.supabase.com` },
+    "PROHIBITED_REF_IN_ENVIRONMENT"),
+  "this is what caught the live .env.local contamination");
+
+record("R3-B04 every known outbound/provider flag refuses when enabled",
+  OUTBOUND_FLAG_VARS.every((f) => r3Failed({ [f]: "true" }, "OUTBOUND_FLAG_ENABLED")),
+  `${OUTBOUND_FLAG_VARS.length} flags each proven individually load-bearing`);
+
+record("R3-B05 the exact two n8n flags observed enabled in the live run refuse",
+  r3Failed({ N8N_ENABLED: "true" }, "OUTBOUND_FLAG_ENABLED") &&
+  r3Failed({ N8N_OUTBOUND_WEBHOOK_ENABLED: "true" }, "OUTBOUND_FLAG_ENABLED"));
+
+record("R3-B06 a missing safe-session marker refuses",
+  r3Failed({ QF_STAGING_SAFE_SESSION: undefined }, "SAFE_SESSION_MARKER_MISSING"));
+
+record("R3-B07 a missing command-wrapper marker refuses",
+  r3Failed({ QF_STAGING_COMMAND_WRAPPER: undefined }, "COMMAND_WRAPPER_MARKER_MISSING"));
+
+record("R3-B08 an incomplete prohibited-ref deny list refuses",
+  r3Failed({ QF_PROHIBITED_SUPABASE_PROJECT_REFS: PRODUCTION_REF }, "DENY_LIST_INCOMPLETE"),
+  "both prohibited refs must be listed, not just one");
+
+record("R3-B09 a marker that disagrees with the effective URL refuses",
+  r3Failed({ QF_AUTHORIZED_SUPABASE_PROJECT_REF: JARVIS_REF }, "AUTHORIZED_REF_MARKER_WRONG"));
+
+record("R3-B10 a missing staging public credential refuses",
+  r3Failed({ NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined }, "PUBLIC_CREDENTIAL_MISSING"));
+
+record("R3-B11 a fully correct process-local staging environment PASSES",
+  R3({}).ok === true,
+  "so the documented operator sequence is achievable without touching .env.local");
+
+// The wrapper-provided process environment must WIN over a dotenv file. @next/env only
+// assigns keys that are undefined in process.env, which is precisely why a
+// wrapper-mediated build is trustworthy and a bare one is not.
+record("R3-B12 an explicit process-local staging URL wins over a production .env.local value",
+  (() => {
+    const env = baseEnv();                       // wrapper already set the staging URL
+    const dotenvWouldSet = { NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co` };
+    for (const [k, v] of Object.entries(dotenvWouldSet)) if (env[k] === undefined) env[k] = v;
+    return evaluatePreBuildGates(env).ok === true;
+  })(),
+  "@next/env never overwrites an already-defined process variable");
+
+record("R3-B13 and if the wrapper did NOT set it, the dotenv value is caught, not trusted",
+  (() => {
+    const env = baseEnv({ NEXT_PUBLIC_SUPABASE_URL: undefined, SUPABASE_URL: undefined });
+    for (const [k, v] of Object.entries({ NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co` })) {
+      if (env[k] === undefined) env[k] = v;
+    }
+    const out = evaluatePreBuildGates(env);
+    return out.ok === false && out.failures.some((f) => f.code === "EFFECTIVE_REF_NOT_AUTHORIZED");
+  })());
+
+record("R3-B14 a privileged key shape in a BROWSER chunk is refused",
+  (() => {
+    const scan = scanBuildOutput({
+      clientFiles: [{ path: "static/chunks/app.js", text: `var k="sb_secret_${"y".repeat(32)}";` }],
+      serverFiles: [], secrets: [],
+    });
+    return scan.ok === false;
+  })(),
+  "modern sb_secret_ keys are detected by shape, not only by literal match");
+
+record("R3-B15 a service_role JWT in a BROWSER chunk is refused",
+  scanBuildOutput({
+    clientFiles: [{ path: "static/chunks/app.js", text: `var k="${SERVICE_JWT}";` }],
+    serverFiles: [], secrets: [],
+  }).ok === false);
+
+/* ===========================================================================
+ * 8c. QF-MVP-40-R5 — a prohibited project ref hidden INSIDE a JWT payload.
+ *
+ * R4 measured this exact environment live and the gate returned ok:true with
+ * leakedVariableCount:0 — the staging URL was authentic, but the effective
+ * SUPABASE_SERVICE_ROLE_KEY was a PRODUCTION service_role key whose ref is only
+ * present base64url-encoded. These cases pin the encoding boundary shut.
+ * ========================================================================= */
+
+const PROD_SERVICE_JWT = jwt({ iss: "supabase", ref: PRODUCTION_REF, role: "service_role" });
+const JARVIS_SERVICE_JWT = jwt({ iss: "supabase", ref: JARVIS_REF, role: "service_role" });
+const UNLISTED_SERVICE_JWT = jwt({ iss: "supabase", ref: UNLISTED_REF, role: "service_role" });
+const STAGING_ANON_JWT = jwt({ iss: "supabase", ref: AUTHORIZED_REF, role: "anon" });
+
+// A. the exact R4 environment: staging URL, production-issued privileged key.
+const r4Env = baseEnv({ SUPABASE_SERVICE_ROLE_KEY: PROD_SERVICE_JWT });
+const r4Gates = evaluatePreBuildGates(r4Env);
+record("R5-A FAIL: a legacy service_role JWT issued for the PRODUCTION project",
+  failedWith(r4Gates, "PROHIBITED_REF_IN_JWT_CREDENTIAL"),
+  JSON.stringify(codes(r4Gates)));
+
+// B. the whole point: the ref is NOT visible as plaintext, so the raw substring scan
+//    that guarded this before cannot possibly be what caught it.
+record("R5-B the production ref is invisible to the raw-substring scan (encoding boundary)",
+  !PROD_SERVICE_JWT.includes(PRODUCTION_REF)
+  && !codes(r4Gates).includes("PROHIBITED_REF_IN_ENVIRONMENT")
+  && !r4Gates.ok,
+  "the new claims check, not the legacy leak scan, must be what refuses this");
+
+record("R5-B2 the R4 environment is reported with a non-zero JWT-claims count",
+  r4Gates.evidence.jwtProhibitedVariableCount === 1
+  && r4Gates.evidence.leakedVariableCount === 0,
+  JSON.stringify(r4Gates.evidence));
+
+// C. the correct staging credential still passes end to end.
+record("R5-C PASS: a staging-issued service_role JWT is accepted",
+  evaluatePreBuildGates(baseEnv()).ok === true
+  && jwtProjectRef(SERVICE_JWT) === AUTHORIZED_REF
+  && jwtRole(SERVICE_JWT) === "service_role");
+
+// D. any other prohibited project, not just production.
+record("R5-D FAIL: a service_role JWT issued for the QF-Jarvis project",
+  failedWith(evaluatePreBuildGates(baseEnv({ SUPABASE_SERVICE_ROLE_KEY: JARVIS_SERVICE_JWT })),
+    "PROHIBITED_REF_IN_JWT_CREDENTIAL"));
+
+// D2. an UNLISTED third project is caught by the allow-list, which the deny-list cannot do.
+const unlistedCredGates = evaluatePreBuildGates(baseEnv({ SUPABASE_SERVICE_ROLE_KEY: UNLISTED_SERVICE_JWT }));
+record("R5-D2 FAIL: a credential issued for an UNLISTED project (allow-list, not deny-list)",
+  failedWith(unlistedCredGates, "CREDENTIAL_PROJECT_MISMATCH")
+  && !codes(unlistedCredGates).includes("PROHIBITED_REF_IN_JWT_CREDENTIAL"),
+  JSON.stringify(codes(unlistedCredGates)));
+
+// E-H. malformed input must be treated as opaque and must never throw.
+const malformed = [
+  ["two segments", `${b64({ a: 1 })}.${b64({ ref: PRODUCTION_REF })}`],
+  ["four segments", `a.${b64({ ref: PRODUCTION_REF })}.c.d`],
+  ["empty middle segment", `${b64({ a: 1 })}..${"s".repeat(8)}`],
+  ["empty trailing segment", `${b64({ a: 1 })}.${b64({ ref: "x" })}.`],
+  ["invalid base64url (+/=)", `aaa.${"ab+cd/ef=="}.bbb`],
+  ["invalid base64url (space)", `aaa.${"ab cd"}.bbb`],
+  ["valid base64url, not JSON", `aaa.${Buffer.from("not json at all").toString("base64url")}.bbb`],
+  ["valid base64url, JSON array", `aaa.${Buffer.from("[1,2,3]").toString("base64url")}.bbb`],
+  ["valid base64url, JSON scalar", `aaa.${Buffer.from("42").toString("base64url")}.bbb`],
+  ["oversized payload", `aaa.${Buffer.from(JSON.stringify({ ref: PRODUCTION_REF, pad: "z".repeat(MAX_JWT_PAYLOAD_BYTES * 2) })).toString("base64url")}.bbb`],
+  ["not a string", 12345],
+  ["empty string", ""],
+];
+let malformedThrew = null;
+const malformedDecoded = malformed.map(([label, v]) => {
+  try {
+    return [label, decodeJwtPayload(v), jwtProjectRef(v)];
+  } catch (e) {
+    malformedThrew = `${label}: ${e.message}`;
+    return [label, "THREW", "THREW"];
+  }
+});
+record("R5-EFGH malformed / oversized / non-JWT values decode to null and never throw",
+  malformedThrew === null && malformedDecoded.every(([, payload, ref]) => payload === null && ref === ""),
+  malformedThrew ?? JSON.stringify(malformedDecoded.filter(([, p]) => p !== null).map(([l]) => l)));
+
+record("R5-H the payload bound is enforced before any allocation",
+  MAX_JWT_PAYLOAD_BYTES === 4096
+  && decodeJwtPayload(`aaa.${Buffer.from(JSON.stringify({ ref: AUTHORIZED_REF, pad: "z".repeat(MAX_JWT_PAYLOAD_BYTES) })).toString("base64url")}.bbb`) === null,
+  "an oversized payload is treated as opaque, never decoded");
+
+// E2. an opaque value that merely LOOKS dotted must not disturb a passing gate.
+record("R5-E2 a dotted non-JWT value does not trip the gate",
+  evaluatePreBuildGates(baseEnv({ SOME_DOTTED_VALUE: "service.internal.quickfurno" })).ok === true);
+
+// I / J. modern key shapes are never treated as JWTs.
+record("R5-I a sb_publishable_ browser key is not treated as a JWT",
+  jwtProjectRef(MODERN_PUBLISHABLE) === "" && decodeJwtPayload(MODERN_PUBLISHABLE) === null);
+
+record("R5-J a sb_secret_ server key is not treated as a JWT merely by shape",
+  jwtProjectRef(MODERN_SECRET) === "" && decodeJwtPayload(MODERN_SECRET) === null);
+
+record("R5-IJ2 PASS: opaque modern keys in both credential slots still build",
+  evaluatePreBuildGates(baseEnv({
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: MODERN_PUBLISHABLE,
+    SUPABASE_SERVICE_ROLE_KEY: MODERN_SECRET,
+  })).ok === true,
+  "an undecodable credential must not be refused merely for being opaque");
+
+// Role sanity, both directions.
+record("R5-R1 FAIL: a browser credential that claims service_role",
+  failedWith(evaluatePreBuildGates(baseEnv({ NEXT_PUBLIC_SUPABASE_ANON_KEY: SERVICE_JWT })),
+    "PUBLIC_CREDENTIAL_IS_PRIVILEGED"));
+
+record("R5-R2 FAIL: the privileged slot holding a mere anon JWT",
+  failedWith(evaluatePreBuildGates(baseEnv({ SUPABASE_SERVICE_ROLE_KEY: STAGING_ANON_JWT })),
+    "SERVICE_CREDENTIAL_ROLE_UNEXPECTED"));
+
+// K. the pre-existing plaintext detection is untouched.
+record("R5-K raw plaintext prohibited-ref detection is unchanged",
+  failedWith(evaluatePreBuildGates(baseEnv({ SOME_UNRELATED_URL: `https://${PRODUCTION_REF}.supabase.co/rest` })),
+    "PROHIBITED_REF_IN_ENVIRONMENT")
+  && failedWith(evaluatePreBuildGates(baseEnv({ LEGACY_WEBHOOK: JARVIS_REF })),
+    "PROHIBITED_REF_IN_ENVIRONMENT"));
+
+// L. both new checks proven LOAD-BEARING, each isolated from the other.
+//    A prohibited JWT in a NON-credential variable is caught ONLY by the claims scan.
+const jwtOnlyEnv = baseEnv({ SOME_LEGACY_SERVICE_TOKEN: PROD_SERVICE_JWT });
+const jwtOnlyReal = evaluatePreBuildGates(jwtOnlyEnv);
+const mutantNoJwtRefCheck = await loadMutated(GATE_SRC, (s) =>
+  s.replace(/if \(jwtLeaked\.length > 0\) \{[\s\S]*?\n  \}/, "if (false) { /* mutant */ }"));
+record("R5-L1 removing the decoded-ref check lets a prohibited JWT pass (check is load-bearing)",
+  !jwtOnlyReal.ok
+  && codes(jwtOnlyReal).includes("PROHIBITED_REF_IN_JWT_CREDENTIAL")
+  && mutantNoJwtRefCheck.evaluatePreBuildGates(jwtOnlyEnv).ok === true,
+  `real=${jwtOnlyReal.ok} mutant=${mutantNoJwtRefCheck.evaluatePreBuildGates(jwtOnlyEnv).ok}`);
+
+const mutantNoMismatchCheck = await loadMutated(GATE_SRC, (s) =>
+  s.replace(/if \(mismatched\.length > 0\) \{[\s\S]*?\n  \}/, "if (false) { /* mutant */ }"));
+const unlistedCredEnv = baseEnv({ SUPABASE_SERVICE_ROLE_KEY: UNLISTED_SERVICE_JWT });
+record("R5-L2 removing the credential allow-list lets an UNLISTED project pass (load-bearing)",
+  !evaluatePreBuildGates(unlistedCredEnv).ok
+  && mutantNoMismatchCheck.evaluatePreBuildGates(unlistedCredEnv).ok === true,
+  `real=${evaluatePreBuildGates(unlistedCredEnv).ok} mutant=${mutantNoMismatchCheck.evaluatePreBuildGates(unlistedCredEnv).ok}`);
+
+// The gate must not print a decoded payload or a credential value when it refuses.
+const r4Logged = [];
+const r4Fs = memFs({});
+runStagingBuild({
+  env: r4Env, root: ROOT, fsApi: r4Fs,
+  spawnChild: fakeChild(r4Fs, outputFiles(), 0, null), log: (l) => r4Logged.push(l),
+});
+const r4Text = r4Logged.join("\n");
+record("R5-S the refusal names the VARIABLE, never the credential or its payload",
+  r4Text.includes("SUPABASE_SERVICE_ROLE_KEY")
+  && !r4Text.includes(PROD_SERVICE_JWT)
+  && !r4Text.includes(PROD_SERVICE_JWT.split(".")[1])
+  && !r4Text.includes("service_role\""),
+  "only the variable name and the non-secret governance refs may be reported");
+
+record("R5-S2 the refusal happens BEFORE Next is invoked",
+  (() => {
+    const fs2 = memFs({});
+    const r = runStagingBuild({
+      env: r4Env, root: ROOT, fsApi: fs2,
+      spawnChild: fakeChild(fs2, outputFiles(), 0, null), log: () => {},
+    });
+    return r.code !== 0 && r.stage === "pre-build" && r.child === null && r.scan === null;
+  })(),
+  "a production-issued credential must never reach a build");
+
+/* ===========================================================================
  * 9. The production build path is untouched
  * ========================================================================= */
 
@@ -468,7 +776,8 @@ for (const r of results) {
 }
 console.log("");
 console.log(`checks: ${passed} passed, ${results.length - passed} failed (of ${results.length})`);
-console.log("mutants: 4 (effective-ref check, post-build scan, outbound-flag check, child-failure check)");
+console.log("mutants: 6 (effective-ref check, post-build scan, outbound-flag check, child-failure check,"
+  + " decoded-JWT-ref check, credential allow-list)");
 console.log("no real build, network request or database access is performed by this validator");
 console.log(`RESULT: ${failed ? "FAIL" : "PASS"}`);
 process.exit(failed ? 1 : 0);

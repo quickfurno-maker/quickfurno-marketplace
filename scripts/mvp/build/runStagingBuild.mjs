@@ -84,6 +84,9 @@ export function runStagingBuild({ env, root, fsApi, spawnChild, log = () => {} }
   log(`   command-wrapper marker      : ${preGates.evidence.commandWrapper}`);
   log(`   deny-list complete          : ${preGates.evidence.denyListComplete}`);
   log(`   prohibited-ref leaks        : ${preGates.evidence.leakedVariableCount}`);
+  log(`   prohibited-ref in JWT claims: ${preGates.evidence.jwtProhibitedVariableCount}`);
+  log(`   credential project mismatch : ${preGates.evidence.credentialProjectMismatchCount}`);
+  log(`   credential role faults      : ${preGates.evidence.credentialRoleFaultCount}`);
   log(`   enabled outbound flags      : ${preGates.evidence.enabledOutboundFlagCount}`);
   log(`   public credential present   : ${preGates.evidence.publicCredentialPresent}`);
   log(`   service credential present  : ${preGates.evidence.serviceCredentialPresent}`);

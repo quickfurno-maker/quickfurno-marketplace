@@ -401,8 +401,10 @@ record("R18 the execute_v1 repair is present, ordered immediately before the wed
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    // QF-MVP-50.5 RE-PIN: 96 -> 97. Still exact equality, still an ordering proof.
-    return files.length === 97 &&
+    // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
+    // marketing-consent writer RPC (20260814000000). Still exact equality, still an
+    // ordering proof.
+    return files.length === 99 &&
       files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
@@ -488,11 +490,11 @@ record("W17 the repair self-verifies and fails closed",
   /wedge repair aborted: claim uniqueness must not be weakened/.test(wedgeSource));
 record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surface",
   !/provider_template_mappings|send_authority|binding_readiness|n8n|meta|whatsapp|vendor_|campaign|qf-jarvis/i.test(wedgeSql));
-record("W19 the wedge repair is present and the set is exactly 97",
+record("W19 the wedge repair is present and the set is exactly 99",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 97 && files.includes(WEDGE_NAME);
+    return files.length === 99 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -544,20 +546,22 @@ record("G02 the ten applied records are 21 through 30 in exact ascending order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]) &&
   new Set(manifest.appliedPostAnchorMigrations.map((r) => r.appliedEvidenceMarker)).size === 10);
-record("G03 post-anchor count and local migration count agree at 10 / 97",
-  manifest.appliedAnchor.postAnchorMigrationCount === 10 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 97);
+record("G03 post-anchor count and local migration count agree at 12 / 99",
+  manifest.appliedAnchor.postAnchorMigrationCount === 12 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 99);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
   g1Source.includes("manifest declares exactly ten APPLIED post-anchor migrations") &&
-  // QF-MVP-50.5 STAGING GATE RE-PIN: the APPLIED pin moved to ten and the pending
-  // set is now present-and-empty, because 50.5 cleared its own staging gate.
-  g1Source.includes("the explicit PENDING post-anchor set is present and empty") &&
+  // QF-MVP-50.5 cleared its own staging gate, so the APPLIED pin is ten.
+  // QF-MVP-40.13B RE-PIN: the pending set held exactly one SOURCE-PENDING entry.
+  // QF-MVP-40 MARKETING-CONSENT RE-PIN: it now holds exactly TWO SOURCE-PENDING entries,
+  // so the post-anchor total is twelve while APPLIED stays exactly ten.
+  g1Source.includes("the explicit PENDING post-anchor set holds exactly two entries") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 10") &&
-  g1Source.includes("pendingPins.length === 0") &&
-  g1Source.includes("const MIGRATION_COUNT = 97;"));
+  g1Source.includes("pendingPins.length === 2") &&
+  g1Source.includes("const MIGRATION_COUNT = 99;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -793,7 +797,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 10") &&
-          g1Source.includes("pendingPins.length === 0") &&
+          g1Source.includes("pendingPins.length === 2") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];

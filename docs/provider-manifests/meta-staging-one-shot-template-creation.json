@@ -1,0 +1,105 @@
+{
+  "artifact": "meta-staging-one-shot-template-creation",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7B",
+  "operation_id": "R7B-FIRST-CREATE-vendor_onboarding_reminder-staging-dedicated",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Scoped, single-operation evidence for ONE governed first creation of one named template on the dedicated staging WABA. It exists because the global packet/remote-state model is intentionally name-scoped and WABA-blind and cannot express per-WABA re-creation. This artifact does NOT extend, replace or relax that model.",
+  "privacy": "Meta asset identities appear ONLY as SHA-256 digests of the raw id strings, plus non-sensitive human-readable labels. This deliberately matches the existing posture: the submission packet is forbidden by the validator rule `noSecretOrPii` from carrying a \"waba_id\" key, and docs/provider-manifests/meta-template-remote-state.json states that no WABA id appears in it. Digests were chosen over raw ids so this new file does not become the one place that breaks that posture. No token, app secret, verify token, phone number or template id is recorded here.",
+
+  "relationship_to_global_model": {
+    "global_packet_entry_state": "UNCHANGED — submit_now remains false and the entry remains HELD",
+    "global_packet_changed": false,
+    "remote_state_ledger_schema_changed": false,
+    "closed_keys_changed": false,
+    "closed_state_model_changed": false,
+    "no_secret_or_pii_rule_changed": false,
+    "note": "The audited packet operator scripts/mvp/communication/submit-meta-templates.mjs continues to refuse this template, and every other held template, exactly as before. This one-shot authority is separate and does not read submit_now."
+  },
+
+  "owner_authorization": {
+    "granted": true,
+    "rationale": "The historical APPROVED evidence for this template name was proven on an unidentified historical remote identity. The remote-state ledger intentionally records no WABA id, so that evidence cannot prove approval on the dedicated staging WABA, which did not exist at that time. The historical creation hold remains valid for its historical remote identity; it is NOT a global cross-WABA prohibition.",
+    "allowed_action": "FIRST_CREATE_ONLY",
+    "scope": "the dedicated staging WABA identified by waba_id_sha256 below, and no other",
+    "not_a_global_recreate_permission": true,
+    "send_authority": "DENIED",
+    "mapping_authority": "DENIED",
+    "provider_authority": "DENIED",
+    "canary_authority": "DENIED",
+    "activation_authority": "NOT_GRANTED",
+    "delete_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED"
+  },
+
+  "target": {
+    "internal_template_key": "vendor_onboarding_reminder",
+    "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+    "language": "en",
+    "category": "UTILITY",
+    "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+    "payload_source": "docs/provider-manifests/meta-template-submission-packet.json :: templates[internal_template_key=vendor_onboarding_reminder].creation_payload",
+    "payload_source_note": "The operator reads the canonical payload from the committed packet and refuses unless the recomputed fingerprint equals the pinned value, so the outbound body cannot drift from the audited catalogue."
+  },
+
+  "staging_asset_identity": {
+    "digest_algorithm": "sha256(utf8(raw_id_string))",
+    "app_label": "QuickFurno Staging",
+    "app_id_sha256": "6de73d8d79a40245af3dfa60065ae6a86274b043d8646ec3a84a0719273ece80",
+    "waba_id_sha256": "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
+    "phone_number_id_sha256": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
+    "phone_verified_name_label": "quickfurno.in",
+    "required_code_verification_status": "VERIFIED",
+    "required_subscriber_set": "EXACTLY ONE app, whose id digest equals app_id_sha256"
+  },
+
+  "execution_contract": {
+    "operator": "scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
+    "dry_run_by_default": true,
+    "required_flags": ["--execute", "--owner-authorized-once"],
+    "env_only_bypass_permitted": false,
+    "expected_pre_state": "ABSENT",
+    "max_post_count": 1,
+    "second_post_possible": false,
+    "retry_after_ambiguous_permitted": false,
+    "readback_calls_after_post": 1,
+    "post_state_hold": "PERMANENT_NO_RECREATE_IF_REMOTE_PRESENT",
+    "idempotence": "A rerun performs the exact-name existence check first. If an exact row exists in PENDING or APPROVED the operator reports ALREADY_CREATED and exits without posting; any other existing status is a hard stop with zero POST."
+  },
+
+  "historical_evidence_non_claim": {
+    "historical_approval_was_waba_unbound": true,
+    "used_as_proof_for_this_waba": false,
+    "statement": "docs/provider-manifests/meta-template-remote-state.json records this template name as APPROVED/UTILITY with a semantic readback match, but records no WABA id by design. That evidence is NOT treated here as proof of approval on the dedicated staging WABA, and this operation does not amend, reinterpret or supersede it."
+  },
+
+  "execution_record": {
+    "status": "EXECUTED_ONCE",
+    "attempted_at_utc": "2026-08-13T04:38:00Z",
+    "post_attempt_count": 1,
+    "create_classification": "SUCCESS",
+    "create_http_status": 200,
+    "remote_template_id_sha256": "56db9577b38c1d4e86832e01cf71e6b952dc5273900dcb7daf400d91deab5899",
+    "remote_template_id_raw_committed": false,
+    "remote_template_id_note": "The raw remote template id is deliberately NOT committed. The packet validator rule `noRemoteIdAnywhere` forbids a remote template id in the submission packet and the remote-state ledger, and that ledger states no template id appears in it. Recording the raw id here would make this file the single place that breaks a validator-enforced repository-wide posture, so it is recorded as a digest and was reported to the owner out of band.",
+    "observed_status": "PENDING",
+    "observed_category": "UTILITY",
+    "observed_language": "en",
+    "semantic_match": true,
+    "readback_calls_used": 1,
+    "second_post_issued": false,
+    "creation_authority": "CLOSED",
+    "creation_authority_note": "Spent. The operator is now naturally refused by its own pre-state check: an exact remote row exists in PENDING, so a rerun reports ALREADY_CREATED and exits without posting. Approval follow-up is READ-ONLY; a PENDING row must never be re-created.",
+    "post_creation_hold": "IN_EFFECT",
+    "downstream_authority_unchanged": {
+      "send_authority": "DENIED",
+      "mapping_authority": "DENIED",
+      "provider_authority": "DENIED",
+      "canary_authority": "DENIED"
+    },
+    "known_defect_corrected": "The first execution printed the create classification as '[object Object]' and labelled a clean SUCCESS as CREATE_AMBIGUOUS, because `classifyCreateResponse` returns { classification, error } and the object was compared instead of its field. This affected the OUTCOME LABEL only: the POST count was 1, no retry occurred, and the readback proved exactly one remote row. The operator now reads the field, and validator rules M14c/M14d pin that."
+  }
+}

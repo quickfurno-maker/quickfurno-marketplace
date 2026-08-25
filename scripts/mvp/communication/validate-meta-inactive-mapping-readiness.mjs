@@ -37,15 +37,19 @@ const REGISTRY_SRC = "lib/communication/outboundConsentScope.ts";
 const DOC = "docs/QF-MVP-40-11-INACTIVE-PROVIDER-MAPPING-READINESS.md";
 const GEN = "scripts/mvp/communication/generate-meta-inactive-mapping-readiness.mjs";
 
+/**
+ * QF-MVP-40 CURRENT-WABA TRUTH: only keys the 2026-08-24 GET-only sweep proved
+ * PRESENT_APPROVED_UTILITY on the current dedicated WABA are emitted. lead_received and
+ * lead_assignment_alert proved ABSENT and client_matching_update's successor is not yet
+ * created, so none of them appear here until their own creation is proven.
+ */
 const EXPECTED_ORDER = [
   "consent_help_response", "consent_stop_acknowledgement", "consent_start_acknowledgement",
-  "lead_received", "client_lead_status_update", "client_matching_update",
-  "lead_assignment_alert", "vendor_onboarding_reminder",
+  "client_lead_status_update", "vendor_onboarding_reminder",
 ];
 const EVIDENCE_BOUND = ["consent_help_response", "consent_stop_acknowledgement",
   "consent_start_acknowledgement"];
-const ORDINARY = ["lead_received", "client_lead_status_update", "client_matching_update",
-  "lead_assignment_alert", "vendor_onboarding_reminder"];
+const ORDINARY = ["client_lead_status_update", "vendor_onboarding_reminder"];
 /** Lanes that must not be dragged into a mapping plan. */
 const FORBIDDEN_KEYS = ["client_login_otp", "vendor_whatsapp_verify", "vendor_password_reset",
   "client_nurture_followup", "dormant_requirement_reactivation", "vendor_crm_promotion",
@@ -91,7 +95,7 @@ const offlineCheck = (src) => {
 
 const R = {
   // ---- A. Readiness artefact ---------------------------------------------
-  exactEightKeysInOrder: (r) => r.templates.length === 8
+  exactEightKeysInOrder: (r) => r.templates.length === 5
     && r.templates.map((t) => t.internal_template_key).join(",") === EXPECTED_ORDER.join(","),
   matchesPacketVerbatim: (r) => r.templates.every((t) => {
     const p = packet.templates.find((x) => x.internal_template_key === t.internal_template_key);
@@ -130,7 +134,7 @@ const R = {
       && t.ordinary_registry_entry === !bound
       && (bound ? t.consent_lane === null && t.consent_scope === null
                 : t.consent_lane === "business" && t.consent_scope === "transactional");
-  }) && r.counts.evidence_bound_ack === 3 && r.counts.ordinary_business === 5,
+  }) && r.counts.evidence_bound_ack === 3 && r.counts.ordinary_business === 2,
   /**
    * The acknowledgements' absence from the ordinary registry IS the security mechanism.
    * A Meta approval, and later a mapping row, must never smuggle them into it.
@@ -264,9 +268,32 @@ const R = {
       && s.successor_subset_authorized === false;
   },
   noSubset3Artifact: () => !existsSync(resolve(SUBSET3)),
-  laterWavesUntouched: () => packet.templates.filter((t) => t.submission_wave >= 2)
-    .every((t) => t.local_state.approval_status === "draft"
-      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"),
+  /**
+   * Waves 2/3/4 may NEVER be approved. One wave 3 template (vendor_crm_promotion) was created
+   * live on 2026-08-25 and is PENDING + held; that is the only way a later-wave entry may
+   * leave draft, and it still contributes nothing to readiness.
+   */
+  /**
+   * Waves 2/3/4 contribute nothing to readiness. One wave 3 template (vendor_crm_promotion)
+   * was created and then proven APPROVED at MARKETING on 2026-08-25; it is held and unmapped,
+   * and being MARKETING it can never enter Utility mapping readiness. Anything in these waves
+   * that has NOT been created must still be draft.
+   */
+  laterWavesUntouched: () => {
+    const emitted = readiness.templates.map((t) => t.provider_template_name);
+    return packet.templates.filter((t) => t.submission_wave >= 2).every((t) => {
+      const created = typeof t.local_state.provider_template_id === "string";
+      if (created) {
+        return ["pending", "approved", "quarantined"].includes(t.local_state.approval_status)
+          && t.local_state.submission_state !== "DRAFT_NOT_SUBMITTED"
+          && t.submit_now === false
+          && !emitted.includes(t.provider_template_name);
+      }
+      return t.local_state.approval_status === "draft"
+        && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
+        && !emitted.includes(t.provider_template_name);
+    });
+  },
   docExists: () => existsSync(resolve(DOC)),
 };
 
@@ -279,7 +306,7 @@ const RULES = [
   ["I6  every runtime activation state is DISABLED", R.everyRuntimeDisabled, readiness],
   ["I7  send / write / activation authority is denied everywhere", R.everyAuthorityDenied, readiness],
   ["I8  the artefact authorizes nothing at top level", R.topLevelAuthorizesNothing, readiness],
-  ["I9  classification is exact (3 evidence-bound, 5 ordinary)", R.classificationExact, readiness],
+  ["I9  classification is exact (3 evidence-bound, 2 ordinary)", R.classificationExact, readiness],
   ["I10 consent acknowledgements stay OUT of the ordinary registry", R.acksStayOutOfOrdinaryRegistry, readiness],
   ["I11 ordinary templates keep their business/transactional lane", R.ordinaryLanesUnchanged, readiness],
   ["I12 no auth / marketing / commercial lane leaked in", R.noForbiddenLaneLeaked, readiness],

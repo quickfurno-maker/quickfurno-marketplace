@@ -189,21 +189,63 @@ const gitGrep = (pattern, ...paths) => {
   } catch (e) { return e && e.status === 1 ? "" : "ERROR"; }
 };
 
+/** The same grep, evaluated against a PINNED tree rather than the working tree. */
+const gitGrepAtTree = (pattern, treeish, ...paths) => {
+  try {
+    return execFileSync("git", ["grep", "-il", "-E", pattern, treeish, "--", ...paths],
+      { encoding: "utf8", cwd: ROOT }).trim();
+  } catch (e) { return e && e.status === 1 ? "" : "ERROR"; }
+};
+
 // NOTE: pre-existing Phase 12 AOS routes legitimately reference n8n (the AOS→n8n
 // activation switch). Asserting "no n8n route exists anywhere" would be false and
 // would test the wrong thing. The QF-MVP-40.8 prohibition is that THIS phase must
 // not BUILD one, so the rule audits what the branch ADDED.
+/**
+ * QF-MVP-40-FINAL RE-PIN — the FIXED range these narrowness claims are proved over.
+ *
+ * The end was `HEAD`, a MOVING endpoint. That silently converted "QF-MVP-40.8 built no
+ * dispatcher surface" into "no later phase may ever add an API route or a migration".
+ * QF-MVP-50 legitimately added seven signed n8n routes and twelve migrations — which is
+ * precisely the ownership split QF-MVP-40.8 itself recorded (docs/QF-MVP-40-EXECUTION-
+ * DECISIONS.md §1: campaign job orchestration and the n8n execution loop are 50's) — so
+ * the guards had become permanently false while measuring work 40.8 does not own.
+ *
+ * Same repair QF-MVP-40.1-R applied to four other harnesses: pin the end to this phase's
+ * own implementation head and prove that pin is a real ancestor of HEAD.
+ *
+ * NOT a weakening. Each claim is unchanged and still fails if 40.8's OWN commit range
+ * contains an API route or a migration. No allowlist, no exemption, no `>=`.
+ */
+const PHASE_40_8_RANGE_BASE = "1713838401da8b160cbeb9d3b6090bd017bdb958";
+const PHASE_40_8_IMPLEMENTATION_HEAD = "b6a08f9267f5b397f7d54b68e776707d7d0141f4";
+
+const pinIsAncestorOfHead = (pin) => {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", pin, "HEAD"],
+      { stdio: "ignore", cwd: ROOT });
+    return true;
+  } catch { return false; }
+};
+
+add("G0  the pinned QF-MVP-40.8 implementation head is a real ancestor of HEAD",
+  pinIsAncestorOfHead(PHASE_40_8_IMPLEMENTATION_HEAD), PHASE_40_8_IMPLEMENTATION_HEAD);
+
 const addedFiles = (() => {
   try {
     return execFileSync("git", ["diff", "--name-only", "--diff-filter=A",
-      "1713838401da8b160cbeb9d3b6090bd017bdb958..HEAD"], { encoding: "utf8", cwd: ROOT })
+      `${PHASE_40_8_RANGE_BASE}..${PHASE_40_8_IMPLEMENTATION_HEAD}`],
+      { encoding: "utf8", cwd: ROOT })
       .split("\n").map((x) => x.trim()).filter(Boolean);
   } catch { return ["<unreadable>"]; }
 })();
 add("G1  QF-MVP-40 added no API route (no n8n webhook or callback endpoint)",
   !addedFiles.some((f) => f.startsWith("app/api/")), addedFiles.filter((f) => f.startsWith("app/api/")).join(", "));
+// Scoped to the migration tree AS IT STOOD at 40.8's implementation head. A whole-tree
+// grep would now match QF-MVP-50's automation_jobs migrations, which 40.8 does not own.
 add("G2  no automation-job or campaign-worker table migration was added",
-  gitGrep("automation_job|campaign_dispatch_queue", "supabase/migrations/") === "");
+  gitGrepAtTree("automation_job|campaign_dispatch_queue",
+    PHASE_40_8_IMPLEMENTATION_HEAD, "supabase/migrations/") === "");
 add("G3  the service builds no dispatcher, claimer, scheduler or retry loop",
   !/(setInterval|setTimeout|cron|claimBatch|dispatchLoop|scheduleRetry|while\s*\()/i.test(serviceExec));
 add("G4  the service never mutates vendor_campaigns",
@@ -212,8 +254,10 @@ add("G5  the service calls no provider",
   !/(fetch\(|graph\.facebook|sendResolvedTemplate|MetaCloudWhatsApp)/i.test(serviceExec));
 add("G6  no migration was added on this branch", (() => {
   try {
+    if (!pinIsAncestorOfHead(PHASE_40_8_IMPLEMENTATION_HEAD)) return false;
     const changed = execFileSync("git", ["diff", "--name-only",
-      "1713838401da8b160cbeb9d3b6090bd017bdb958..HEAD"], { encoding: "utf8", cwd: ROOT });
+      `${PHASE_40_8_RANGE_BASE}..${PHASE_40_8_IMPLEMENTATION_HEAD}`],
+      { encoding: "utf8", cwd: ROOT });
     return !changed.split("\n").some((f) => f.trim().startsWith("supabase/migrations/"));
   } catch { return false; }
 })());

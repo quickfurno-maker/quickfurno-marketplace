@@ -1,0 +1,52 @@
+{
+  "artifact": "meta-staging-vendor-onboarding-reminder-strict-proof-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R7N",
+  "operation_id": "QF-MVP-40-VENDOR-ONBOARDING-STRICT-RECONCILIATION-2026-08-25",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Index record for the STRICT current-WABA proof of qf_vendor_onboarding_reminder_v1. The 2026-08-24 truth sweep could only read this key through the QF-MVP-40-R7B classifier, which matches name, language and status ONLY: it asserted no category and no component comparison, so the key was the weakest of the five READY entries. This record points at the sanitized reconciliation the submitter generated on 2026-08-25, which closes that gap. The facts live in the referenced artifact and are deliberately NOT duplicated here.",
+  "privacy": "This index holds no Meta identifier at all. The referenced artifact was written by the submitter's own sanitizer and carries no token, app secret, phone number or WABA id; it does carry the non-secret Meta template object id and the Meta request id, matching the precedent already set by meta-staging-start-ack-v2-approval-evidence. No Meta request or response body was captured, and none is reconstructed.",
+  "strict_evidence": {
+    "path": "docs/provider-manifests/meta-staging-vendor-onboarding-reminder-strict-reconciliation.json",
+    "sha256": "53ad21bc55fe892e38c1009f0fb974c5603ec608c23300b2a02b1f3e88c8b7cc",
+    "generated_by": "scripts/mvp/communication/submit-meta-templates.mjs --wave 1 --template vendor_onboarding_reminder --reconcile-only",
+    "generated_filename": "QF-MVP-40-WAVE1-vendor_onboarding_reminder-META-RECONCILIATION-2026-08-25T03-41-15-543Z.json",
+    "relocated_byte_identical": true,
+    "content_rewritten": false,
+    "note": "Moved out of the repository root into docs/provider-manifests under the kebab-case convention. Content was NOT edited: the sha256 above is the sha256 of the file the submitter emitted."
+  },
+  "identity_corroboration": {
+    "observed_by": "QF-MVP-40-R7B one-shot operator, DRY RUN mode",
+    "invocation": "npm run create:mvp:40-r7b-once",
+    "why": "The submitter's reconcile branch proves only that the WABA self-identifies (idBody.id === QF_META_WABA_ID); it does not hash-pin the staging asset triple. R7B's dry run was run first in the same environment and reported identity authorised: true against its pinned App/WABA/phone digests, so the reconciliation above is proven to have addressed the dedicated staging WABA and not a shared or unknown one.",
+    "identity_authorised": true,
+    "live_asset_proof": true,
+    "post_attempt_count": 0
+  },
+  "semantic_proof": {
+    "readback_semantic_match": true,
+    "derivation": "RECONCILED_APPROVED is reachable in the RECONCILE_ONLY branch only after ALL of: the exact-name GET returned exactly one row matching name AND language; the remote category equals the pinned packet category (a difference exits RECONCILED_CATEGORY_MISMATCH); templatesAreIdentical(remoteRow, packet.creation_payload) returned true using the REMOTE components (a difference exits RECONCILED_COLLISION); the status is a known status and equals APPROVED; and a remote template id is present. The semantic match is therefore established by the operator's own control flow, not asserted independently.",
+    "authority": "scripts/mvp/communication/submit-meta-templates.mjs :: RECONCILE_ONLY branch",
+    "comparator": "templatesAreIdentical / templateIdentity — the same canonical comparator used by the R7K, R7L, R7M and R7N one-shot classifiers."
+  },
+  "zero_mutation_proof": {
+    "create_post_count": 0,
+    "derivation": "The RECONCILE_ONLY branch is placed before all create logic and terminates unconditionally through finish(), so the single create POST in section G is unreachable in this mode. resolveMode() additionally rejects --execute together with --reconcile-only. The emitted record carries create_post_count 0.",
+    "messages_sent": 0,
+    "templates_created_edited_or_deleted": 0,
+    "mappings_activated": 0
+  },
+  "authorities_explicitly_not_granted": {
+    "creation_authority": "NOT_GRANTED",
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "provider_arm_authority": "NOT_GRANTED",
+    "production_authority": "DENIED",
+    "statement": "This is a reading. It grants nothing. It does not authorise creating any absent template, mapping any template, arming any provider, or any production action."
+  }
+}

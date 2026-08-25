@@ -119,11 +119,19 @@ function validateState(state) {
   // 50.3/50.4 staging orchestration changes: histories 21..29 are still applied in
   // exact order. The 50.5 recovery transport cleared its own separate staging gate
   // and is appended at 30 — named explicitly, never allowed as "anything newer".
-  check("local migration count remains exactly 97", state.migrationFiles.length === 97);
+  // QF-MVP-40.13B RE-PIN: 97 -> 98 and the pending set gains exactly the SOURCE-PENDING
+  // canary activation authority. Nothing about the applied 21..30 truth changes.
+  // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99 and the pending set gains exactly the
+  // SOURCE-PENDING marketing-consent writer RPC. The applied 21..30 truth is unchanged.
+  check("local migration count remains exactly 99", state.migrationFiles.length === 99);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set is present and empty",
-    Array.isArray(pending) && pending.length === 0);
+  check("the governed pending set is exactly the two SOURCE-PENDING QF-MVP-40 authorities",
+    Array.isArray(pending) && pending.length === 2 &&
+    pending[0].version === "20260813000000" &&
+    pending[1].version === "20260814000000" &&
+    pending.every((r) => r.operationalStatus === "PENDING"
+      && r.appliedByThisPhase === false));
   check("the 50.5 recovery migration is applied by its own phase at history 30",
     (() => {
       const pin = applied.find((record) => record.version === "20260812000000");

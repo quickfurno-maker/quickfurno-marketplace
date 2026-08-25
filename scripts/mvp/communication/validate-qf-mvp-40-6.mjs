@@ -31,8 +31,32 @@ const FOUNDER_MARKETING = Object.freeze(["client_nurture_followup", "dormant_req
  * be a deliberate edit here, not something a per-key test silently tolerates.
  */
 const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
-  "client_lead_status_update", "client_matching_update", "lead_assignment_alert",
+  "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
+/**
+ * QF-MVP-40 2026-08-25 reconciliation outcome. The eight templates created that day were
+ * read back GET-only and split in two:
+ *
+ *   RECONCILED_APPROVED_KEYS - Meta approved them at their INTENDED category. They are
+ *     APPROVED_UNMAPPED and carry a proven remote id. Approval proves the provider contract
+ *     only; it grants no mapping, activation or send authority.
+ *
+ *   QUARANTINED_KEYS - Meta approved them but RECATEGORISED them to MARKETING against a
+ *     UTILITY request. They can never serve the role they were written for, so they are
+ *     QUARANTINED_UNMAPPED with send/mapping/activation denied. Their canonical requested
+ *     category is deliberately NOT rewritten to match Meta.
+ *
+ * PENDING_KEYS is now EMPTY: every submitted template has been reconciled. It is kept so the
+ * pending branch stays live for the next submission rather than being deleted and re-derived.
+ */
+const RECONCILED_APPROVED_KEYS = Object.freeze(["clarification_request",
+  "client_transactional_followup", "vendor_crm_promotion", "vendor_new_lead"]);
+const QUARANTINED_KEYS = Object.freeze(["clarification_reminder", "low_credit_warning",
+  "vendor_package_expiry_warning", "vendor_response_reminder"]);
+const PENDING_KEYS = Object.freeze([]);
+/** Every key whose live creation is proven, and therefore the only ones that may carry an id. */
+const CREATED_KEYS = Object.freeze([...RECONCILED_APPROVED_KEYS, ...QUARANTINED_KEYS,
+  ...PENDING_KEYS]);
 
 const results = [];
 const add = (name, ok, detail) => results.push({ name, ok: ok === true, detail: detail ?? "" });
@@ -156,12 +180,24 @@ const RULES = {
     if (all.filter((t) => CLOSED_KEYS_40_10E.includes(t.internal_template_key)).length
         !== CLOSED_KEYS_40_10E.length) return false;
     return all.every((t) => {
-      if (t.provider_template_id !== null) return false;
+      if (RECONCILED_APPROVED_KEYS.includes(t.internal_template_key)) {
+        return t.approval_status === "approved" && t.submission_state === "APPROVED_UNMAPPED"
+          && typeof t.provider_template_id === "string" && t.provider_template_id.length > 0 && t.qf_mvp_40?.submit_now === false;
+      }
+      if (QUARANTINED_KEYS.includes(t.internal_template_key)) {
+        return t.approval_status === "quarantined" && t.submission_state === "QUARANTINED_UNMAPPED"
+          && typeof t.provider_template_id === "string" && t.provider_template_id.length > 0 && t.qf_mvp_40?.submit_now === false;
+      }
+      if (PENDING_KEYS.includes(t.internal_template_key)) {
+        return t.approval_status === "pending" && t.submission_state === "SUBMITTED_PENDING"
+          && typeof t.provider_template_id === "string" && t.provider_template_id.length > 0 && t.qf_mvp_40?.submit_now === false;
+      }
+      if (t.provider_template_id !== null) return false;   // no remote id without a proven creation
       if (CLOSED_KEYS_40_10E.includes(t.internal_template_key)) {
-        return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
+        return t.approval_status === "approved" && t.submission_state === "APPROVED_UNMAPPED"
           && t.qf_mvp_40?.submit_now === false;
       }
-      return t.submission_state === "DRAFT_NOT_SUBMITTED" && t.approval_status === "draft";
+      return t.approval_status === "draft" && t.submission_state === "DRAFT_NOT_SUBMITTED";
     });
   },
 
@@ -169,9 +205,13 @@ const RULES = {
     const raw = JSON.stringify(m).toLowerCase();
     if (/"(approval_status|submission_state)"\s*:\s*"(active|submitted)"/.test(raw)) return false;
     // Exactly one approval is permitted, and only for the Wave 0 entry Meta approved.
+    // "approved" is permitted ONLY for the historical closed set plus the keys a proven
+    // 2026-08-25 reconciliation approved. Nothing else may claim it, and an approval still
+    // asserts no mapping.
+    const permitted = [...CLOSED_KEYS_40_10E, ...RECONCILED_APPROVED_KEYS];
     const approved = [...Object.values(m.groups).flat()].filter((t) => t.approval_status === "approved");
-    if (approved.length > CLOSED_KEYS_40_10E.length) return false;
-    if (approved.some((t) => !CLOSED_KEYS_40_10E.includes(t.internal_template_key))) return false;
+    if (approved.length !== permitted.length) return false;
+    if (approved.some((t) => !permitted.includes(t.internal_template_key))) return false;
     return [...Object.values(m.groups).flat()].every((t) => t.binding_contract?.binding_readiness !== "active");
   },
 

@@ -55,16 +55,31 @@ const exactRows = expectedRows.map((r) => ({ ...r }));
 
 const R = {
   exactPhase: () => PHASE === "QF-MVP-40.12-PREREQ-R1",
-  exactBranch: () => AUTHORIZED_BRANCH === "mvp/qf-mvp-40-meta-readiness-v1",
-  exactTargetSet: () => TARGET_SPEC.length === 8 && TARGET_SPEC.map((t) => t.key).join(",") === [
+  // QF-MVP-40.13C-R2 RE-PIN: exact equality against the branch that carries the certified
+  // live-run authority. Still ONE literal — never a wildcard, prefix, list or env override.
+  exactBranch: () => AUTHORIZED_BRANCH === "mvp/qf-mvp-40-final-provider-canary",
+  // Asserted over the COMMENT-STRIPPED operator source, so the prose explaining the
+  // re-pin can neither satisfy nor defeat the guard.
+  branchIsExactSingleLiteral: () =>
+    /export const AUTHORIZED_BRANCH = "mvp\/qf-mvp-40-final-provider-canary";/.test(exec)
+    && !/AUTHORIZED_BRANCH\s*=\s*\[/.test(exec)
+    && !/AUTHORIZED_BRANCH\.(startsWith|includes|test)/.test(exec)
+    && !/process\.env\.[A-Z_]*BRANCH/.test(exec)
+    && /git\.branch !== AUTHORIZED_BRANCH/.test(exec),
+  cleanTreeAndHeadPinPreserved: () =>
+    /if \(!git\.clean\)/.test(exec)
+    && /GIT_DIRTY/.test(exec)
+    && /rev-parse", "HEAD"/.test(exec)
+    && /head: git\.head/.test(exec),
+  exactTargetSet: () => TARGET_SPEC.length === 5 && TARGET_SPEC.map((t) => t.key).join(",") === [
     "consent_help_response", "consent_stop_acknowledgement", "consent_start_acknowledgement",
-    "lead_received", "client_lead_status_update", "client_matching_update",
-    "lead_assignment_alert", "vendor_onboarding_reminder",
+    "client_lead_status_update",
+    "vendor_onboarding_reminder",
   ].join(","),
   exactClassificationSplit: () => TARGET_SPEC.filter((t) => t.classification === "EVIDENCE_BOUND_ACK").length === 3
-    && TARGET_SPEC.filter((t) => t.classification === "ORDINARY_BUSINESS").length === 5,
+    && TARGET_SPEC.filter((t) => t.classification === "ORDINARY_BUSINESS").length === 2,
   exactInternalCategories: () => TARGET_SPEC.filter((t) => t.category === "authentication").length === 3
-    && TARGET_SPEC.filter((t) => t.category === "business").length === 5,
+    && TARGET_SPEC.filter((t) => t.category === "business").length === 2,
   canonicalConstants: () => CHANNEL === "whatsapp" && LANGUAGE === "en"
     && INTERNAL_VERSION === "1.0" && INTERNAL_READINESS === "provider_mapping_required"
     && INTERNAL_IS_ACTIVE === true,
@@ -108,7 +123,7 @@ const R = {
   jarvisRefRejected: () => resolveStagingTarget({ ...GOOD_ENV, QF_STAGING_SUPABASE_URL: `https://${FORBIDDEN_PROJECT_REFS.jarvis}.supabase.co` }).reason === SeedFailure.PROJECT_REF_FORBIDDEN_JARVIS,
   otherRefRejected: () => resolveStagingTarget({ ...GOOD_ENV, QF_STAGING_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co" }).reason === SeedFailure.PROJECT_REF_NOT_AUTHORIZED,
 
-  realAuthorityLoads: () => authority.ok === true && expectedRows.length === 8,
+  realAuthorityLoads: () => authority.ok === true && expectedRows.length === 5,
   realAuthorityExactShape: () => authority.ok && expectedRows.every((r) =>
     r.channel === "whatsapp"
     && r.language === "en"
@@ -120,7 +135,7 @@ const R = {
     && typeof r.description === "string" && r.description.length > 0),
   realAuthorityCategorySplit: () => authority.ok
     && expectedRows.filter((r) => r.category === "authentication").length === 3
-    && expectedRows.filter((r) => r.category === "business").length === 5,
+    && expectedRows.filter((r) => r.category === "business").length === 2,
 
   missingClassifiesCreate: () => authority.ok && classifyExistingTemplate(null, expectedRows[0]).outcome === "MISSING",
   exactClassifiesIdempotent: () => authority.ok && classifyExistingTemplate({ ...expectedRows[0] }, expectedRows[0]).outcome === "ALREADY_PRESENT_EXACT",
@@ -131,7 +146,7 @@ const R = {
   ].every(([field, value]) => classifyExistingTemplate({ ...expectedRows[0], [field]: value }, expectedRows[0]).outcome === "CONFLICT"),
   emptyPlanCreatesEight: () => {
     const p = buildPlan([], expectedRows);
-    return authority.ok && p.ok && p.missingRows.length === 8
+    return authority.ok && p.ok && p.missingRows.length === 5
       && p.actions.every((a) => a.action === "CREATE_INTERNAL_TEMPLATE");
   },
   exactPlanWritesZero: () => {
@@ -141,14 +156,14 @@ const R = {
   },
   mixedPlanIsBounded: () => {
     const p = buildPlan(exactRows.slice(0, 3), expectedRows);
-    return authority.ok && p.ok && p.missingRows.length === 5 && p.actions.length === 8;
+    return authority.ok && p.ok && p.missingRows.length === 2 && p.actions.length === 5;
   },
   duplicateTargetFailsClosed: () => {
     const p = buildPlan([exactRows[0], exactRows[0]], expectedRows);
     return authority.ok && p.ok === false && p.reason === SeedFailure.INTERNAL_TEMPLATE_CONFLICT;
   },
   readbackExactPasses: () => authority.ok && verifyReadback(exactRows, expectedRows).ok === true,
-  readbackMissingFails: () => authority.ok && verifyReadback(exactRows.slice(0, 7), expectedRows).reason === SeedFailure.READBACK_FAILED,
+  readbackMissingFails: () => authority.ok && verifyReadback(exactRows.slice(0, 4), expectedRows).reason === SeedFailure.READBACK_FAILED,
   readbackExtraFails: () => authority.ok && verifyReadback([...exactRows, { ...exactRows[0], template_key: "extra" }], expectedRows).reason === SeedFailure.READBACK_FAILED,
 
   attestationRoundTrip: () => {
@@ -202,7 +217,7 @@ const R = {
       gitState: () => ({ head: "abc", branch: AUTHORIZED_BRANCH, root: "C:\\repo", clean: true }),
       authorityLoader: () => authority,
     });
-    return r.ok && schemaReads === 1 && targetReads === 1 && writes === 0 && r.missingRows.length === 8;
+    return r.ok && schemaReads === 1 && targetReads === 1 && writes === 0 && r.missingRows.length === 5;
   },
 
   noMetaNetworkSurface: () => !/graph\.facebook|\/messages\b|\bfetch\s*\(/i.test(exec),

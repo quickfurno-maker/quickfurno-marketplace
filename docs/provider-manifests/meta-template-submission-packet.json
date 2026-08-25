@@ -3,9 +3,9 @@
   "schema_version": "1.0",
   "phase": "QF-MVP-40.10A",
   "generator": "scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
-  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_matching_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
+  "note": "NON-SECRET local submission/control record. This packet is NOT uniformly draft. APPROVED AND UNMAPPED: clarification_request (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_lead_status_update (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); client_transactional_followup (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_help_response (wave 0, APPROVED_UNMAPPED, HELD FROM CREATION); consent_start_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); consent_stop_acknowledgement (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_assignment_alert (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); lead_received (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_crm_promotion (wave 3, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_new_lead (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION); vendor_onboarding_reminder (wave 1, APPROVED_UNMAPPED, HELD FROM CREATION). Every OTHER entry remains a local candidate that is draft / DRAFT_NOT_SUBMITTED. No entry carries a real provider_template_id, and nothing here is mapped or active. WAVE 0 HISTORY — v1 was created PENDING then DELETED by the former AiSensy partner (Meta Activity Log); AiSensy access was removed and v1 is RETIRED. v2 was created PENDING and Meta APPROVED it as MARKETING rather than the requested UTILITY (RECONCILED_CATEGORY_MISMATCH), so it is QUARANTINED_UNMAPPED with send and mapping DENIED, and is neither deleted nor appealed. v3 was submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, closing the Wave 0 Utility contract. WAVE 1 — lead_received was the canary: submitted with exactly one POST (CREATED_PENDING) and reconciled read-only to APPROVED with returned_category UTILITY and readback_semantic_match true, extending the proven contract to a VARIABLE-BEARING Utility template. Each further approved Wave 1 entry listed above followed the identical one-POST / read-only-reconcile path. Every one of them is APPROVED_UNMAPPED and HELD, and none of them authorizes any further submission. Approval proves the PROVIDER CONTRACT ONLY — it creates no ordinary consent authority, mapping authority, runtime activation or send authority. Remote state lives in docs/provider-manifests/meta-template-remote-state.json.",
   "source_manifest": "docs/provider-manifests/whatsapp-template-submission-manifest.json",
-  "source_manifest_fingerprint": "29af5b42235b88e8f647706ac5e94155bdb5fc4841ba8db93783f76a7dacd03d",
+  "source_manifest_fingerprint": "43892a392d7bb45f75e417f8c3aefdb8d73d8f2608bfdabb22e3a4a195314f15",
   "external_contract_references": [
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components/",
     "https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/copy-code-button-authentication-templates/",
@@ -20,12 +20,12 @@
   },
   "wave_counts": {
     "0": 1,
-    "1": 14,
+    "1": 15,
     "2": 3,
     "3": 3,
     "4": 4
   },
-  "total_templates": 25,
+  "total_templates": 26,
   "templates": [
     {
       "internal_template_key": "admin_assignment_failure_alert",
@@ -174,12 +174,12 @@
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "submission_wave": 1,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
+        "provider_template_id": "1368369535273954"
       },
       "creation_payload": {
         "name": "qf_clarification_reminder_v1",
@@ -205,26 +205,26 @@
     },
     {
       "internal_template_key": "clarification_request",
-      "provider_template_name": "qf_clarification_request_v1",
+      "provider_template_name": "qf_clarification_request_v2",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "submission_wave": 1,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
+        "provider_template_id": "1374658884649762"
       },
       "creation_payload": {
-        "name": "qf_clarification_request_v1",
+        "name": "qf_clarification_request_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+            "text": "Hi {{1}}, QuickFurno needs one detail to complete your enquiry matching: {{2}}. Please reply with this information.",
             "example": {
               "body_text": [
                 [
@@ -237,7 +237,7 @@
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "9c484b4d7e54929a2ab52b08093e1e719d3dfdb7b7c1741fa8b5e8e1daf85e4b"
+      "payload_fingerprint": "b1211ade37ded439861d9ddb8297d9e5c7cb73c4959e68363ab53c5e76933c77"
     },
     {
       "internal_template_key": "client_lead_status_update",
@@ -343,7 +343,7 @@
     },
     {
       "internal_template_key": "client_matching_update",
-      "provider_template_name": "qf_client_matching_update_v1",
+      "provider_template_name": "qf_client_matching_update_v2",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
@@ -351,18 +351,18 @@
       "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "approved",
-        "submission_state": "APPROVED_UNMAPPED",
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
         "provider_template_id": null
       },
       "creation_payload": {
-        "name": "qf_client_matching_update_v1",
+        "name": "qf_client_matching_update_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+            "text": "Hi {{1}}, update on your QuickFurno enquiry: {{2}} professionals have been matched to it and may contact you about your request.",
             "example": {
               "body_text": [
                 [
@@ -375,7 +375,7 @@
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "c0930db5a9beee61de0076caf234b36f950554bc21c60b697845028a8d057e1c"
+      "payload_fingerprint": "9d3e900fb42fb23e5059e10ab5ff1bad09ef2cf8f70d86e26387652e74c553d4"
     },
     {
       "internal_template_key": "client_nurture_followup",
@@ -413,6 +413,34 @@
       "payload_fingerprint": "deec11cbbc27bc10a10dd471391f5b02d765185915ffaf598ee3527ddcb1ca7f"
     },
     {
+      "internal_template_key": "client_transactional_followup",
+      "provider_template_name": "qf_client_transactional_followup_v1",
+      "provider_language": "en",
+      "category": "UTILITY",
+      "component_profile": "STANDARD_TEXT",
+      "submission_wave": 1,
+      "submit_now": false,
+      "external_approval_required": true,
+      "local_state": {
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
+        "provider_template_id": "2924879551180482"
+      },
+      "creation_payload": {
+        "name": "qf_client_transactional_followup_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "body",
+            "text": "QuickFurno is following up on your existing enquiry. Reply here if you still need assistance with this enquiry."
+          }
+        ]
+      },
+      "send_contract": null,
+      "payload_fingerprint": "34f170d7784fc26f3366e81c49073d5c75ac0b053f68b6421cd34c635e093bc0"
+    },
+    {
       "internal_template_key": "consent_help_response",
       "provider_template_name": "qf_consent_help_response_v3",
       "provider_language": "en",
@@ -442,7 +470,7 @@
     },
     {
       "internal_template_key": "consent_start_acknowledgement",
-      "provider_template_name": "qf_consent_start_acknowledgement_v1",
+      "provider_template_name": "qf_consent_start_acknowledgement_v2",
       "provider_language": "en",
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
@@ -455,18 +483,18 @@
         "provider_template_id": null
       },
       "creation_payload": {
-        "name": "qf_consent_start_acknowledgement_v1",
+        "name": "qf_consent_start_acknowledgement_v2",
         "language": "en",
         "category": "UTILITY",
         "components": [
           {
             "type": "body",
-            "text": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help."
+            "text": "QuickFurno received your START request. Messages about your existing QuickFurno enquiries are active again. Reply STOP to stop messages or HELP for help."
           }
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "70c0ce994180c2ea62ff3413d12d460734f5c004c40eb4d056925feec7e7251a"
+      "payload_fingerprint": "4e087e60d0dc99a287216167f0881dcb7676fc0793e12466a394c127ed0e9054"
     },
     {
       "internal_template_key": "consent_stop_acknowledgement",
@@ -608,12 +636,12 @@
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "submission_wave": 1,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
+        "provider_template_id": "1868167847496096"
       },
       "creation_payload": {
         "name": "qf_low_credit_warning_v1",
@@ -671,12 +699,12 @@
       "category": "MARKETING",
       "component_profile": "STANDARD_TEXT",
       "submission_wave": 3,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
+        "provider_template_id": "2326221901244860"
       },
       "creation_payload": {
         "name": "qf_vendor_crm_promotion_v1",
@@ -685,19 +713,12 @@
         "components": [
           {
             "type": "body",
-            "text": "QuickFurno update for partners: {{1}}. Reply STOP to opt out of promotional messages.",
-            "example": {
-              "body_text": [
-                [
-                  "New interior categories are now live in Pune"
-                ]
-              ]
-            }
+            "text": "QuickFurno partner update: new business opportunities and platform updates are available for eligible vendors. Open your QuickFurno dashboard to learn more. Reply STOP to opt out of promotional messages."
           }
         ]
       },
       "send_contract": null,
-      "payload_fingerprint": "ea9ac92d66861fbdccbc26d3bfcb58f7acdb3163fb76aa0ab9f79b0029a2dc46"
+      "payload_fingerprint": "87c58dc5b2426f0c863be16ed824b6f4b69674174abfaa10b82498c20163a745"
     },
     {
       "internal_template_key": "vendor_new_lead",
@@ -706,12 +727,12 @@
       "category": "UTILITY",
       "component_profile": "QUICK_REPLY",
       "submission_wave": 1,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
+        "provider_template_id": "1569683294809980"
       },
       "creation_payload": {
         "name": "qf_vendor_new_lead_v1",
@@ -829,12 +850,12 @@
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "submission_wave": 1,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
+        "provider_template_id": "27814489294917998"
       },
       "creation_payload": {
         "name": "qf_vendor_package_expiry_warning_v1",
@@ -930,12 +951,12 @@
       "category": "UTILITY",
       "component_profile": "STANDARD_TEXT",
       "submission_wave": 1,
-      "submit_now": true,
+      "submit_now": false,
       "external_approval_required": true,
       "local_state": {
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
+        "provider_template_id": "905027118919792"
       },
       "creation_payload": {
         "name": "qf_vendor_response_reminder_v1",

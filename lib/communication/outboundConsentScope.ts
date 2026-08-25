@@ -63,6 +63,10 @@ const REGISTRY: Readonly<Record<string, RegistryEntry>> = Object.freeze({
   // Reviewed transactional types from the QF-MVP-40.4 catalogue. Each is listed EXPLICITLY by exact
   // key, exactly like the admin alerts above — no prefix, no pattern, no wildcard.
   client_lead_status_update: { templateKey: "client_lead_status_update", lane: "business", scope: "transactional" },
+  // QF-MVP-40.4 CLIENT transactional follow-up. Listed EXPLICITLY by exact key like every
+  // entry above. Scope is transactional, NOT marketing: the copy is tied to an existing
+  // enquiry and carries no promotional content, so it must not require marketing consent.
+  client_transactional_followup: { templateKey: "client_transactional_followup", lane: "business", scope: "transactional" },
   client_matching_update: { templateKey: "client_matching_update", lane: "business", scope: "transactional" },
   vendor_response_reminder: { templateKey: "vendor_response_reminder", lane: "business", scope: "transactional" },
   vendor_onboarding_reminder: { templateKey: "vendor_onboarding_reminder", lane: "business", scope: "transactional" },

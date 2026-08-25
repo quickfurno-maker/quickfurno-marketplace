@@ -234,7 +234,14 @@
           "vendor_response_reminder"
         ],
         "state": "DEFERRED_UNTIL_REQUIRED",
-        "note": "Draft and unauthorized. Deferred until an active implementation phase needs them — deferral is sequencing, not rejection."
+        "note": "Draft and unauthorized. Deferred until an active implementation phase needs them — deferral is sequencing, not rejection.",
+        "released_keys": [
+          "clarification_request",
+          "clarification_reminder",
+          "vendor_new_lead",
+          "vendor_response_reminder"
+        ],
+        "still_deferred_keys": []
       },
       {
         "lane": "WAVE1_COMMERCIAL",
@@ -244,7 +251,14 @@
           "vendor_package_expiry_warning"
         ],
         "state": "HELD_FOR_EXPLICIT_CATEGORY_REVIEW",
-        "note": "Credit / recharge / renewal copy. Held for a separate explicit CATEGORY review; never promoted implicitly with the Utility lane."
+        "note": "Credit / recharge / renewal copy. Held for a separate explicit CATEGORY review; never promoted implicitly with the Utility lane.",
+        "released_keys": [
+          "low_credit_warning",
+          "vendor_package_expiry_warning"
+        ],
+        "still_deferred_keys": [
+          "recharge_reminder"
+        ]
       },
       {
         "lane": "WAVE2_AUTHENTICATION",
@@ -261,6 +275,20 @@
         "state": "DEFERRED",
         "note": "Admin alerts remain Wave 4 / QF-MVP-70 and deferred."
       }
-    ]
+    ],
+    "pause_lift": {
+      "lifted_at_utc_date": "2026-08-25",
+      "released_keys": [
+        "clarification_request",
+        "clarification_reminder",
+        "vendor_new_lead",
+        "vendor_response_reminder",
+        "low_credit_warning",
+        "vendor_package_expiry_warning"
+      ],
+      "evidence": "meta-staging-wave1-batch-creation-evidence",
+      "statement": "The submission pause was LIFTED for exactly these six keys, which were then created live on 2026-08-25 (one create POST each, all CREATED_PENDING / UTILITY). The lift covers creation ONLY: it grants no mapping, activation, consent or send authority, and it does not release any other key. recharge_reminder remains HELD_FOR_EXPLICIT_CATEGORY_REVIEW in the WAVE1_COMMERCIAL lane and was deliberately NOT submitted. Waves 2, 3 and 4 remain NOT_AUTHORIZED / DEFERRED and are untouched.",
+      "still_deferred_note": "A released key is no longer required to be draft, because it has been submitted. Every key NOT listed here must still be draft and unsubmitted."
+    }
   }
 }

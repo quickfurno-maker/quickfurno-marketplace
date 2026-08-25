@@ -1,0 +1,81 @@
+{
+  "artifact": "qf-mvp-40-marketing-canary-policy-contract",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40",
+  "operation_id": "QF-MVP-40-CRITERION-9-POLICY-CONTRACT",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "authorizes_db_write": false,
+  "purpose": "Records the OWNER-CHOSEN marketing frequency policy values for the first controlled QF-MVP-40 marketing canary, so the eventual operator applies exactly these numbers and cannot silently substitute its own. A frequency threshold is a business commitment about how often a real person may be contacted; it is never invented by an engineer or defaulted by a script.",
+  "applied": false,
+  "applied_note": "NOT APPLIED. No row exists in communication_frequency_policies and none is written by this artifact. Applying it to staging or production is a separately authorized step.",
+  "policy": {
+    "channel": "whatsapp",
+    "scope": "marketing",
+    "max_per_window": 1,
+    "window_length": "30 days",
+    "min_interval": "30 days",
+    "is_active": true,
+    "profile": "CONSERVATIVE_MVP",
+    "operational_meaning": "At most one marketing message per recipient per 30 days, with at least 30 days between two marketing messages. For the canary the audience is a single owner-controlled recipient, so this permits exactly one send."
+  },
+  "schema_constraint_verification": {
+    "source": "supabase/migrations/20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql",
+    "checks": [
+      {
+        "constraint": "cfp_channel_check",
+        "requirement": "channel in ('whatsapp','sms','email','dashboard')",
+        "value": "whatsapp",
+        "satisfied": true
+      },
+      {
+        "constraint": "cfp_scope_check",
+        "requirement": "scope in ('transactional','marketing')",
+        "value": "marketing",
+        "satisfied": true
+      },
+      {
+        "constraint": "cfp_max_per_window_check",
+        "requirement": "max_per_window >= 0 and <= 1000",
+        "value": 1,
+        "satisfied": true
+      },
+      {
+        "constraint": "cfp_window_length_check",
+        "requirement": "window_length > '0 second' and <= '365 days'",
+        "value": "30 days",
+        "satisfied": true
+      },
+      {
+        "constraint": "cfp_min_interval_check",
+        "requirement": "min_interval >= '0 second' and <= '365 days'",
+        "value": "30 days",
+        "satisfied": true
+      },
+      {
+        "constraint": "cfp_policy_reference_check",
+        "requirement": "char_length between 3 and 200",
+        "value": "set by the operator at apply time from this artifact name",
+        "satisfied": true
+      }
+    ],
+    "all_satisfied": true
+  },
+  "writer": {
+    "canonical_writer": "services/communicationFrequencyPolicyService.ts",
+    "new_writer_required": false,
+    "note": "A canonical writer already exists and supports exactly these values. No second frequency-policy authority is built. The table is append-only with one active row per (channel, scope), so activation is a deliberate insert, not an update."
+  },
+  "substitution_fence": {
+    "statement": "The eventual operator MUST read these exact values from this artifact and refuse if the values it is about to apply differ. The offline evaluator asserts the numbers here, so an engineer changing them silently fails a committed gate rather than shipping a different business commitment."
+  },
+  "authorities_explicitly_not_granted": {
+    "db_write_authority": "NOT_GRANTED",
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "campaign_authority": "NOT_GRANTED",
+    "production_authority": "DENIED"
+  }
+}

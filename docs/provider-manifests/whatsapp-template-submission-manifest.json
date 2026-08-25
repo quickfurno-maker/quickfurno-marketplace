@@ -371,7 +371,7 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "QuickFurno: you have been resubscribed to updates about your enquiries. Promotional messages need separate consent. Reply STOP to opt out, or HELP for help.",
+        "body_spec": "QuickFurno received your START request. Messages about your existing QuickFurno enquiries are active again. Reply STOP to stop messages or HELP for help.",
         "variables_schema": {},
         "binding_contract": {
           "binding_readiness": "unresolved",
@@ -397,9 +397,9 @@
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
           "submit_now": false,
-          "closure_note": "QF-MVP-40.10G: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json. SCOPE: approval does NOT place this consent acknowledgement in the ordinary outbound registry. It stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
+          "closure_note": "QF-MVP-40-R7M SUPERSESSION. HISTORY: qf_consent_start_acknowledgement_v1 was submitted ONCE (one create POST, CREATED_PENDING) and reconciled read-only to APPROVED. On the PREVIOUS WABA context the returned category was UTILITY; on the CURRENT dedicated staging WABA a GET-only reconciliation proved status=APPROVED but category=MARKETING, i.e. RECONCILED_CATEGORY_MISMATCH. v1 is therefore QUARANTINED_UNMAPPED with send and mapping DENIED, is NOT deleted, NOT edited and NOT appealed, and its historical record is frozen in docs/provider-manifests/meta-template-remote-state.json and in the QF-MVP-40-R7L frozen registry. CAUSE: the v1 copy named promotional messaging ('Promotional messages need separate consent'), which contradicts this entry's own standing note that the copy must not promise promotional messages resume. CURRENT: the canonical START acknowledgement is now qf_consent_start_acknowledgement_v2, whose body is strictly transactional and names no promotional concept. v2 has NEVER been submitted anywhere, so its local state is honestly draft / DRAFT_NOT_SUBMITTED and creation stays HELD (submit_now false): only the dedicated QF-MVP-40-R7M one-shot operator may create it. R7L owns v1; R7M owns v2; R7L execution authority is never reused for v2. CLOSED 2026-08-24: v2 was created by the R7M one-shot operator and a GET-only readback proved it APPROVED with returned_category UTILITY (remote pre-state ALREADY_CREATED, POST_ATTEMPT_COUNT 0), so this entry is now approved / APPROVED_UNMAPPED. Creation remains HELD (submit_now false) so it can never be re-created. A Utility approval proves the PROVIDER CONTRACT ONLY and creates no mapping, activation or send authority. SCOPE: this consent acknowledgement stays evidence-bound and deliberately absent from lib/communication/outboundConsentScope.ts."
         },
-        "provider_template_name_candidate": "qf_consent_start_acknowledgement_v1"
+        "provider_template_name_candidate": "qf_consent_start_acknowledgement_v2"
       },
       {
         "internal_template_key": "consent_stop_acknowledgement",
@@ -525,39 +525,33 @@
         "provider_template_name": null,
         "language": "en",
         "category": "marketing",
-        "body_spec": "QuickFurno update for partners: {{1}}. Reply STOP to opt out of promotional messages.",
-        "variables_schema": {
-          "1": {
-            "type": "text",
-            "description": "admin-approved campaign message body"
-          }
-        },
+        "body_spec": "QuickFurno partner update: new business opportunities and platform updates are available for eligible vendors. Open your QuickFurno dashboard to learn more. Reply STOP to opt out of promotional messages.",
+        "variables_schema": {},
         "binding_contract": {
-          "binding_readiness": "unresolved",
-          "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
+          "binding_readiness": "not_required",
+          "note": "Zero-variable template: the free-text campaign parameter was removed, so there is no source key to prove and no binding to resolve."
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null,
+        "approval_status": "approved",
+        "submission_state": "APPROVED_UNMAPPED",
+        "provider_template_id": "2326221901244860",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Delivers an admin-approved CRM campaign message to a vendor audience.",
           "consent_scope": "marketing",
-          "suppression_rule": "Requires explicit marketing consent AND absence of any suppression. A user STOP blocks it. Frequency policy applies.",
+          "suppression_rule": "Requires explicit marketing consent AND absence of any suppression. A user STOP blocks it. A frequency policy is REQUIRED but is not yet defined; none is fabricated here. START never creates marketing opt-in.",
           "outside_customer_service_window": true,
           "provider_account_required": true,
           "external_approval_required": true,
           "owning_subphase": "QF-MVP-50.4",
-          "example_fixture": {
-            "1": "New interior categories are now live in Pune"
-          },
-          "notes": "The ONLY marketing-category template. Campaign orchestration and per-recipient execution are QF-MVP-50, per the locked campaign-ownership decision; QF-MVP-40 supplies transport, template resolution and the result-ingestion contract only.",
+          "example_fixture": {},
+          "notes": "The ONLY marketing-category template. Campaign orchestration and per-recipient execution are QF-MVP-50, per the locked campaign-ownership decision; QF-MVP-40 supplies transport, template resolution and the result-ingestion contract only. SUPERSEDED DRAFT DECISION (preserved, never submitted): the earlier draft body was \"QuickFurno update for partners: {{1}}. Reply STOP to opt out of promotional messages.\" with variables_schema {\"1\":{\"type\":\"text\",\"description\":\"admin-approved campaign message body\"}} - a single admin-supplied free-text campaign parameter. That draft was never submitted to Meta and has no remote state. It was replaced BEFORE submission because an arbitrary admin-provided free-text parameter is an open-ended campaign contract: the approved template would carry no reviewed copy, any future campaign text would ship under an approval Meta granted for different words, and the unresolved campaign-copy conflict could not be settled by a binding. The CURRENT candidate is fixed, reviewed, zero-variable copy with an explicit STOP instruction. STILL REQUIRED and deliberately NOT claimed here: explicit marketing consent, suppression, a frequency policy (none is fabricated in this task), and a frozen audience approved by Core. START must never create marketing opt-in. Mapping and send authority remain absent.",
           "registry_expectation": "ORDINARY_REGISTRY",
           "ordinary_registry_entry": true,
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 3,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.4 FINAL REQUIRED TEMPLATE, LIVE CREATION CLOSED 2026-08-25. qf_vendor_crm_promotion_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category MARKETING - the INTENDED category, so it was not recategorised. The immediate post-create readback matched the committed canonical payload semantically. CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false). PENDING IS NOT APPROVED. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with the intended category on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-vendor-crm-promotion-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: a GET-only readback proved APPROVED at the intended category MARKETING with a full semantic match and create_post_count 0. Approval proves the PROVIDER CONTRACT ONLY and grants no mapping, activation, consent or send authority."
         },
         "provider_template_name_candidate": "qf_vendor_crm_promotion_v1"
       }
@@ -743,9 +737,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
         },
-        "approval_status": "draft",
-        "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "quarantined",
+        "provider_template_id": "1368369535273954",
+        "submission_state": "QUARANTINED_UNMAPPED",
         "qf_mvp_40": {
           "recipient_type": "client",
           "purpose": "Reminds a client that requested information is still missing.",
@@ -764,7 +758,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40 WAVE 1 LIVE CREATION CLOSED 2026-08-25. qf_clarification_reminder_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY, and the immediate post-create readback matched the committed canonical payload semantically (readback_semantic_match true). CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false) so the ordinary submitter can never pick it up. PENDING IS NOT APPROVED. Meta has accepted it for review and has not approved it. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with returned category UTILITY on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: it creates no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-clarification-reminder-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: Meta APPROVED this template but RECATEGORISED it to MARKETING against a UTILITY request (create_post_count 0). It is QUARANTINED_UNMAPPED and can never serve its intended UTILITY role. Send, mapping and activation are DENIED. The canonical requested category is deliberately NOT rewritten to match Meta. No successor was created in this task, and none is authorized by this record."
         },
         "provider_template_name_candidate": "qf_clarification_reminder_v1"
       },
@@ -773,7 +768,7 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, QuickFurno needs one detail to match you better: {{2}}.",
+        "body_spec": "Hi {{1}}, QuickFurno needs one detail to complete your enquiry matching: {{2}}. Please reply with this information.",
         "variables_schema": {
           "1": {
             "type": "text",
@@ -788,9 +783,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
         },
-        "approval_status": "draft",
-        "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "provider_template_id": "1374658884649762",
+        "submission_state": "APPROVED_UNMAPPED",
         "qf_mvp_40": {
           "recipient_type": "client",
           "purpose": "Asks the client a specific question needed to qualify the enquiry.",
@@ -809,9 +804,10 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40 WAVE 1 LIVE CREATION CLOSED 2026-08-25. qf_clarification_request_v2 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY, and the immediate post-create readback matched the committed canonical payload semantically (readback_semantic_match true). CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false) so the ordinary submitter can never pick it up. PENDING IS NOT APPROVED. Meta has accepted it for review and has not approved it. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with returned category UTILITY on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: it creates no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-clarification-request-v2-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: a GET-only readback proved APPROVED at the intended category UTILITY with a full semantic match and create_post_count 0. Approval proves the PROVIDER CONTRACT ONLY and grants no mapping, activation, consent or send authority."
         },
-        "provider_template_name_candidate": "qf_clarification_request_v1"
+        "provider_template_name_candidate": "qf_clarification_request_v2"
       },
       {
         "internal_template_key": "client_lead_status_update",
@@ -883,7 +879,7 @@
         "provider_template_name": null,
         "language": "en",
         "category": "utility",
-        "body_spec": "Hi {{1}}, QuickFurno has matched your enquiry with {{2}} verified vendors. They may contact you shortly.",
+        "body_spec": "Hi {{1}}, update on your QuickFurno enquiry: {{2}} professionals have been matched to it and may contact you about your request.",
         "variables_schema": {
           "1": {
             "type": "text",
@@ -916,8 +912,8 @@
           ],
           "note": "Source keys are proven by the canonical typed builder contract in lib/communication/businessTemplateVariables.ts (BUSINESS_TEMPLATE_CONTRACTS + the named builder), which is the ONLY accepted construction path for these variables and from which the mapping variables_schema is derived — so the names in the database and the names a caller supplies cannot drift. HONEST SCOPE: these keys were NOT found in a pre-existing live caller; the business automation trigger wiring remains PENDING and no automation was enabled by this phase. This grants no mapping, activation or send authority."
         },
-        "approval_status": "approved",
-        "submission_state": "APPROVED_UNMAPPED",
+        "approval_status": "draft",
+        "submission_state": "DRAFT_NOT_SUBMITTED",
         "provider_template_id": null,
         "qf_mvp_40": {
           "recipient_type": "client",
@@ -941,7 +937,42 @@
           "submit_now": false,
           "closure_note": "QF-MVP-40.10F: submitted ONCE with exactly one create POST, which returned PENDING; a later READ-ONLY reconciliation (create_post_count 0) proved the remote template is APPROVED with returned_category UTILITY and readback_semantic_match true. The template is therefore APPROVED / UNMAPPED / UNSENDABLE: creation is HELD (submit_now false) so it can never be re-created, and the provider template id is intentionally NOT committed to this repository. A Utility approval proves the PROVIDER CONTRACT ONLY — a later provider mapping, runtime activation or send requires a separate, explicit authorization. Remote state lives in docs/provider-manifests/meta-template-remote-state.json."
         },
-        "provider_template_name_candidate": "qf_client_matching_update_v1"
+        "provider_template_name_candidate": "qf_client_matching_update_v2"
+      },
+      {
+        "internal_template_key": "client_transactional_followup",
+        "provider_template_name": null,
+        "language": "en",
+        "category": "utility",
+        "body_spec": "QuickFurno is following up on your existing enquiry. Reply here if you still need assistance with this enquiry.",
+        "variables_schema": {},
+        "binding_contract": {
+          "binding_readiness": "not_required",
+          "note": "Zero-variable template: there are no positional parameters, so there is no source key to prove and no binding to resolve. Mapping still requires a separate authorized phase."
+        },
+        "approval_status": "approved",
+        "provider_template_id": "2924879551180482",
+        "submission_state": "APPROVED_UNMAPPED",
+        "qf_mvp_40": {
+          "recipient_type": "client",
+          "purpose": "Transactional follow-up on an existing QuickFurno enquiry, inviting the client to reply if they still need help with THAT enquiry.",
+          "consent_scope": "transactional",
+          "suppression_rule": "Blocked by a user STOP and by any stronger suppression.",
+          "outside_customer_service_window": true,
+          "provider_account_required": true,
+          "external_approval_required": true,
+          "owning_subphase": "QF-MVP-40.4",
+          "example_fixture": {},
+          "notes": "Satisfies the locked 40.4 CLIENT transactional follow-up requirement. Deliberately distinct from client_nurture_followup, which is MARKETING scope: the locked decision is that marketing and transactional purposes are never merged. The copy is strictly tied to an EXISTING enquiry and carries no promotion, no upsell, no new-service discovery, no discount and no package offer. Zero variables were chosen so no runtime binding has to be invented for MVP.",
+          "registry_expectation": "ORDINARY_REGISTRY",
+          "ordinary_registry_entry": true,
+          "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
+          "component_profile": "STANDARD_TEXT",
+          "submission_wave": 1,
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.4 FINAL REQUIRED TEMPLATE, LIVE CREATION CLOSED 2026-08-25. qf_client_transactional_followup_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY - the INTENDED category, so it was not recategorised. The immediate post-create readback matched the committed canonical payload semantically. CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false). PENDING IS NOT APPROVED. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with the intended category on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-client-transactional-followup-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: a GET-only readback proved APPROVED at the intended category UTILITY with a full semantic match and create_post_count 0. Approval proves the PROVIDER CONTRACT ONLY and grants no mapping, activation, consent or send authority."
+        },
+        "provider_template_name_candidate": "qf_client_transactional_followup_v1"
       },
       {
         "internal_template_key": "lead_assignment_alert",
@@ -1064,9 +1095,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
         },
-        "approval_status": "draft",
-        "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "quarantined",
+        "provider_template_id": "1868167847496096",
+        "submission_state": "QUARANTINED_UNMAPPED",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Warns a vendor that the lead-credit balance is low.",
@@ -1084,7 +1115,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40 WAVE 1 LIVE CREATION CLOSED 2026-08-25. qf_low_credit_warning_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY, and the immediate post-create readback matched the committed canonical payload semantically (readback_semantic_match true). CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false) so the ordinary submitter can never pick it up. PENDING IS NOT APPROVED. Meta has accepted it for review and has not approved it. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with returned category UTILITY on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: it creates no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-low-credit-warning-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: Meta APPROVED this template but RECATEGORISED it to MARKETING against a UTILITY request (create_post_count 0). It is QUARANTINED_UNMAPPED and can never serve its intended UTILITY role. Send, mapping and activation are DENIED. The canonical requested category is deliberately NOT rewritten to match Meta. No successor was created in this task, and none is authorized by this record."
         },
         "provider_template_name_candidate": "qf_low_credit_warning_v1"
       },
@@ -1141,9 +1173,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; deferred to Phase 5F-D governance"
         },
-        "approval_status": "draft",
-        "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "approved",
+        "provider_template_id": "1569683294809980",
+        "submission_state": "APPROVED_UNMAPPED",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Offers a new lead to a vendor and invites accept or reject. This template CARRIES the accept/reject request; no separate accept/reject template exists.",
@@ -1163,7 +1195,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "QUICK_REPLY",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40 WAVE 1 LIVE CREATION CLOSED 2026-08-25. qf_vendor_new_lead_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY, and the immediate post-create readback matched the committed canonical payload semantically (readback_semantic_match true). CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false) so the ordinary submitter can never pick it up. PENDING IS NOT APPROVED. Meta has accepted it for review and has not approved it. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with returned category UTILITY on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: it creates no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-vendor-new-lead-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: a GET-only readback proved APPROVED at the intended category UTILITY with a full semantic match and create_post_count 0. Approval proves the PROVIDER CONTRACT ONLY and grants no mapping, activation, consent or send authority."
         },
         "buttons_spec": [
           {
@@ -1290,9 +1323,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null,
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
+        "provider_template_id": "27814489294917998",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Warns a vendor that the package is close to expiry.",
@@ -1311,7 +1344,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40 WAVE 1 LIVE CREATION CLOSED 2026-08-25. qf_vendor_package_expiry_warning_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY, and the immediate post-create readback matched the committed canonical payload semantically (readback_semantic_match true). CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false) so the ordinary submitter can never pick it up. PENDING IS NOT APPROVED. Meta has accepted it for review and has not approved it. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with returned category UTILITY on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: it creates no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-vendor-package-expiry-warning-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: Meta APPROVED this template but RECATEGORISED it to MARKETING against a UTILITY request (create_post_count 0). It is QUARANTINED_UNMAPPED and can never serve its intended UTILITY role. Send, mapping and activation are DENIED. The canonical requested category is deliberately NOT rewritten to match Meta. No successor was created in this task, and none is authorized by this record."
         },
         "provider_template_name_candidate": "qf_vendor_package_expiry_warning_v1"
       },
@@ -1331,9 +1365,9 @@
           "binding_readiness": "unresolved",
           "note": "source keys not proven from repository call sites; the outbound consent-scope registry entry and provider mapping are QF-MVP-40.6 work"
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null,
+        "approval_status": "quarantined",
+        "submission_state": "QUARANTINED_UNMAPPED",
+        "provider_template_id": "905027118919792",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Reminds a vendor that a lead offer is still unanswered.",
@@ -1352,7 +1386,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40 WAVE 1 LIVE CREATION CLOSED 2026-08-25. qf_vendor_response_reminder_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY, and the immediate post-create readback matched the committed canonical payload semantically (readback_semantic_match true). CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false) so the ordinary submitter can never pick it up. PENDING IS NOT APPROVED. Meta has accepted it for review and has not approved it. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with returned category UTILITY on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: it creates no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-vendor-response-reminder-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence. RECONCILED 2026-08-25: Meta APPROVED this template but RECATEGORISED it to MARKETING against a UTILITY request (create_post_count 0). It is QUARANTINED_UNMAPPED and can never serve its intended UTILITY role. Send, mapping and activation are DENIED. The canonical requested category is deliberately NOT rewritten to match Meta. No successor was created in this task, and none is authorized by this record."
         },
         "provider_template_name_candidate": "qf_vendor_response_reminder_v1"
       }

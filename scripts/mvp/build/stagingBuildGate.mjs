@@ -110,6 +110,110 @@ export function jwtClaimsServiceRole(token) {
 const JWT_RE = /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
 
 /**
+ * QF-MVP-40 — the MODERN Supabase privileged key shapes.
+ *
+ * WHY THIS EXISTS. `jwtClaimsServiceRole` recognises a leaked legacy key from its own
+ * decoded payload, which is what makes detection independent of whether the caller
+ * supplied the literal. A modern `sb_secret_…` key is NOT a JWT, so that branch cannot
+ * see it at all — a leak of the new shape would only have been caught if the literal
+ * happened to be passed in `secrets`. That is a strictly weaker guarantee for the newer
+ * credential, which is the wrong way round.
+ *
+ * `sb_secret_` is the server-only secret key and `sbp_` is a Supabase personal access
+ * token; neither may ever reach a browser chunk. `sb_publishable_` is deliberately NOT
+ * listed — it is public by design, exactly as an anon JWT is.
+ *
+ * This adds DETECTION only. Nothing here validates or reshapes a key: the loaders in
+ * `lib/supabase.ts` and the staging operators check presence and never assume a shape,
+ * so a modern secret key already works unchanged.
+ */
+export const PRIVILEGED_KEY_RE = /\b(?:sb_secret_[A-Za-z0-9_-]{16,}|sbp_[A-Za-z0-9]{16,})/g;
+
+/** True when the text carries a non-JWT privileged Supabase credential. */
+export function containsModernPrivilegedKey(text) {
+  PRIVILEGED_KEY_RE.lastIndex = 0;
+  return PRIVILEGED_KEY_RE.test(String(text));
+}
+
+/* ---------------------------------------------------------------------------
+ * QF-MVP-40-R5 — prohibited project refs hidden INSIDE a JWT-shaped credential.
+ *
+ * WHY THIS EXISTS. QF-MVP-40-R4 measured a build environment in which
+ * NEXT_PUBLIC_SUPABASE_URL was the authorised staging project while the effective
+ * SUPABASE_SERVICE_ROLE_KEY was a PRODUCTION `service_role` key. Every gate below
+ * passed: `ok: true`, `leakedVariableCount: 0`. The leak scan compares raw env values
+ * as SUBSTRINGS, but a legacy Supabase JWT carries its project ref in the base64url
+ * PAYLOAD, so the literal ref never appears in the value. The build would have been
+ * attributed to staging while the server held a production RLS-bypassing credential.
+ *
+ * This decodes the payload to read the CLAIMS OF A LOCAL CREDENTIAL. It is not
+ * authentication: no signature is verified, and none is needed — a value that lies
+ * about its own `ref` only ever makes this gate MORE suspicious, never less.
+ *
+ * It is deliberately CONSERVATIVE. Anything that is not an unambiguous, bounded,
+ * strictly-parseable JWT payload is treated as an ordinary opaque value and is left to
+ * the existing rules — so `sb_secret_…`, `sb_publishable_…`, connection strings and
+ * arbitrary dotted text are never misclassified.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Upper bound on a DECODED JWT payload. Generous for any real Supabase credential and
+ * small enough that a hostile value can never make the gate allocate meaningfully.
+ */
+export const MAX_JWT_PAYLOAD_BYTES = 4096;
+
+/** base64url alphabet, unpadded — the encoding every JWT segment actually uses. */
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * The payload object of a JWT-shaped value, or `null` for ANY value that is not one.
+ *
+ * Never throws. `null` means "not a decodable JWT" and is NOT a failure signal on its
+ * own — an opaque credential is perfectly legitimate.
+ */
+export function decodeJwtPayload(value) {
+  if (typeof value !== "string") return null;
+  const parts = value.split(".");
+  // Exactly three non-empty segments. Two dots in prose, or a trailing dot, is not a JWT.
+  if (parts.length !== 3 || parts.some((p) => p.length === 0)) return null;
+
+  const payload = parts[1];
+  // Reject before decoding: a stray '+', '/', '=' or space means this was never base64url.
+  if (!BASE64URL_RE.test(payload)) return null;
+  // 4 encoded chars -> 3 bytes. Refuse oversized input BEFORE allocating anything.
+  if (payload.length > Math.ceil((MAX_JWT_PAYLOAD_BYTES * 4) / 3) + 4) return null;
+
+  let text;
+  try {
+    const buf = Buffer.from(payload, "base64url");
+    if (buf.length === 0 || buf.length > MAX_JWT_PAYLOAD_BYTES) return null;
+    text = buf.toString("utf8");
+  } catch {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    // A JWT payload is a JSON OBJECT. An array or a bare scalar is not one.
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The Supabase project ref claimed by a JWT-shaped value, or "" when there is none. */
+export function jwtProjectRef(value) {
+  const payload = decodeJwtPayload(value);
+  return payload && typeof payload.ref === "string" ? payload.ref : "";
+}
+
+/** The role claimed by a JWT-shaped value, or "" when there is none. */
+export function jwtRole(value) {
+  const payload = decodeJwtPayload(value);
+  return payload && typeof payload.role === "string" ? payload.role : "";
+}
+
+/**
  * PRE-BUILD gates. Evaluated against the EFFECTIVE environment — i.e. after
  * @next/env has merged .env* exactly as `next build` will see it — so this
  * refuses the very contamination that produced the D-A finding.
@@ -164,6 +268,51 @@ export function evaluatePreBuildGates(env = {}) {
     fail("PROHIBITED_REF_IN_ENVIRONMENT", `prohibited project ref present in: ${leaked.sort().join(", ")}`);
   }
 
+  // QF-MVP-40-R5 — the SAME deny-list, applied to the CLAIMS of a JWT-shaped value.
+  // This is the scan above, extended past the encoding boundary that hid the R4
+  // contamination. Only variable NAMES and the (non-secret) governance refs are ever
+  // reported; a decoded payload never leaves this function.
+  const jwtLeaked = [];
+  for (const [name, value] of Object.entries(env)) {
+    if (name === DENY_LIST_VAR) continue;
+    const ref = jwtProjectRef(value);
+    if (ref && PROHIBITED_REFS.includes(ref)) jwtLeaked.push(name);
+  }
+  if (jwtLeaked.length > 0) {
+    fail("PROHIBITED_REF_IN_JWT_CREDENTIAL",
+      `JWT-shaped credential issued for a PROHIBITED project in: ${jwtLeaked.sort().join(", ")}`);
+  }
+
+  // A Supabase credential must bind to the project this build actually targets. This is
+  // an ALLOW-list, so an unlisted third project is refused too — the deny-list alone has
+  // never heard of it, exactly as `EFFECTIVE_REF_NOT_AUTHORIZED` is to the URL.
+  const credentialVars = [...PUBLIC_CREDENTIAL_VARS, ...SERVICE_CREDENTIAL_VARS];
+  const mismatched = credentialVars.filter((name) => {
+    const ref = jwtProjectRef(env[name]);
+    return ref !== "" && ref !== AUTHORIZED_REF;
+  });
+  if (mismatched.length > 0) {
+    fail("CREDENTIAL_PROJECT_MISMATCH",
+      `credential(s) issued for a project other than "${AUTHORIZED_REF}": ${mismatched.sort().join(", ")}`);
+  }
+
+  // Role sanity, in both directions. A browser credential claiming `service_role` would be
+  // INLINED into a client chunk by `next build` — the very leak `scanBuildOutput` refuses
+  // afterwards, refused here BEFORE anything is built.
+  const privilegedPublic = PUBLIC_CREDENTIAL_VARS.filter((n) => jwtRole(env[n]) === "service_role");
+  if (privilegedPublic.length > 0) {
+    fail("PUBLIC_CREDENTIAL_IS_PRIVILEGED",
+      `browser-exposed credential(s) claim service_role: ${privilegedPublic.sort().join(", ")}`);
+  }
+  const wrongServiceRole = SERVICE_CREDENTIAL_VARS.filter((n) => {
+    const role = jwtRole(env[n]);
+    return role !== "" && role !== "service_role";
+  });
+  if (wrongServiceRole.length > 0) {
+    fail("SERVICE_CREDENTIAL_ROLE_UNEXPECTED",
+      `privileged credential slot holds a non-service_role JWT: ${wrongServiceRole.sort().join(", ")}`);
+  }
+
   const enabledFlags = OUTBOUND_FLAG_VARS.filter((f) => isFlagEnabled(env[f]));
   if (enabledFlags.length > 0) {
     fail("OUTBOUND_FLAG_ENABLED", `outbound/provider flag(s) enabled: ${enabledFlags.join(", ")}`);
@@ -185,6 +334,9 @@ export function evaluatePreBuildGates(env = {}) {
       commandWrapper: isFlagEnabled(env[COMMAND_WRAPPER_VAR]),
       denyListComplete: missingFromDenyList.length === 0,
       leakedVariableCount: leaked.length,
+      jwtProhibitedVariableCount: jwtLeaked.length,
+      credentialProjectMismatchCount: mismatched.length,
+      credentialRoleFaultCount: privilegedPublic.length + wrongServiceRole.length,
       enabledOutboundFlagCount: enabledFlags.length,
       publicCredentialPresent: hasPublic,
       serviceCredentialPresent: hasService,
@@ -197,7 +349,8 @@ export function evaluatePreBuildGates(env = {}) {
  *
  * `clientFiles` / `serverFiles` are [{ path, text }]. `secrets` may carry literal
  * credential values to search for; detection does NOT depend on them, because a
- * service_role JWT is recognised from its own decoded payload.
+ * service_role JWT is recognised from its own decoded payload and a modern
+ * `sb_secret_`/`sbp_` key is recognised from its own shape.
  */
 export function scanBuildOutput({ clientFiles = [], serverFiles = [], secrets = [] } = {}) {
   const failures = [];
@@ -220,6 +373,8 @@ export function scanBuildOutput({ clientFiles = [], serverFiles = [], secrets = 
     for (const m of text.matchAll(JWT_RE)) {
       if (jwtClaimsServiceRole(m[0])) { hit = true; break; }
     }
+    // A modern secret key carries no decodable payload, so it is recognised by shape.
+    if (!hit && containsModernPrivilegedKey(text)) hit = true;
     if (!hit) {
       for (const s of secrets) {
         if (s && String(s).length > 20 && text.includes(s)) { hit = true; break; }

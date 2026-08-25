@@ -43,9 +43,33 @@ const EXPECTED_ORDER = [
   "consent_start_acknowledgement",
   "lead_received",
   "client_lead_status_update",
-  "client_matching_update",
   "lead_assignment_alert",
   "vendor_onboarding_reminder",
+];
+/**
+ * QF-MVP-40 2026-08-25. Approved on Meta but NOT eligible for an inactive mapping row.
+ *
+ * Meta approval proves the PROVIDER CONTRACT ONLY. A template may only receive a mapping
+ * row if it is also in the SEED_SET of seed-meta-staging-inactive-mappings.mjs, which is the
+ * only mappable set and is fingerprint-pinned and all-or-nothing. None of these four is in
+ * it, so admitting them here would invent a mapping prerequisite that has not been met.
+ *
+ *   clarification_request          - not in SEED_SET; no runtime binding contract
+ *   vendor_new_lead                - not in SEED_SET; no runtime binding contract
+ *   client_transactional_followup  - not in SEED_SET (zero-variable, so needs no binding)
+ *   vendor_crm_promotion           - MARKETING. It must NEVER enter ordinary Utility mapping
+ *                                    readiness; its send authority additionally depends on
+ *                                    marketing consent, suppression, a frequency policy and
+ *                                    a Core-approved frozen audience, none of which exist.
+ *
+ * Membership below is ASSERTED against the seeder source, not merely asserted here, so this
+ * list cannot silently drift away from the real mappable set.
+ */
+const APPROVED_NOT_MAPPABLE = [
+  "clarification_request",
+  "client_transactional_followup",
+  "vendor_crm_promotion",
+  "vendor_new_lead",
 ];
 /**
  * Evidence-bound acknowledgements. These are deliberately ABSENT from the ordinary
@@ -75,15 +99,59 @@ const approved = entries.filter((t) => t.approval_status === "approved");
 
 // ---- Fail-closed preconditions --------------------------------------------
 const approvedKeys = approved.map((t) => t.internal_template_key).sort();
-if (approvedKeys.join(",") !== EXPECTED_ORDER.slice().sort().join(",")) {
-  die(`the approved set is not the expected eight templates (found: ${approvedKeys.join(", ")})`);
+const expectedApproved = [...EXPECTED_ORDER, ...APPROVED_NOT_MAPPABLE].sort();
+if (approvedKeys.join(",") !== expectedApproved.join(",")) {
+  die(`the approved set is not the expected set (found: ${approvedKeys.join(", ")})`);
+}
+if (EXPECTED_ORDER.some((k) => APPROVED_NOT_MAPPABLE.includes(k))) {
+  die("a key is declared both mapping-eligible and not mapping-eligible");
+}
+
+// The SEED_SET is the ONLY mappable set. Eligibility is checked against that source rather
+// than trusted from the list above, so the two can never drift apart unnoticed.
+const seederSrc = readFileSync(resolve("scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs"), "utf8");
+const inSeedSet = (key) => new RegExp(`\\{ key: "${key}"`).test(seederSrc);
+for (const key of EXPECTED_ORDER) {
+  if (!inSeedSet(key)) die(`${key}: declared mapping-eligible but absent from the SEED_SET`);
+}
+for (const key of APPROVED_NOT_MAPPABLE) {
+  if (inSeedSet(key)) die(`${key}: declared NOT mapping-eligible but present in the SEED_SET`);
 }
 if (remote.authorizes_meta_calls !== false || remote.authorizes_mapping !== false
     || remote.authorizes_sending !== false) {
   die("the remote-state ledger claims an authority it must never claim");
 }
 
-const records = EXPECTED_ORDER.map((key) => {
+/**
+ * QF-MVP-40 CURRENT-WABA TRUTH GATE.
+ *
+ * The `last_proven_*` fields describe the 2026-07-31 PREVIOUS WABA context and are
+ * WABA-BLIND, so they can never establish present readiness on their own. A key is emitted
+ * ONLY when the ledger records current_waba_state === "PRESENT_APPROVED_UTILITY", proven by
+ * the GET-only sweep recorded in meta-staging-current-waba-truth-sweep-evidence.json.
+ * A key that is ABSENT or category-mismatched here simply does not appear, and the count
+ * therefore falls out of proof rather than being pinned.
+ */
+const CURRENT_READY = "PRESENT_APPROVED_UTILITY";
+const READY_ORDER = EXPECTED_ORDER.filter((key) => {
+  const t = approved.find((x) => x.internal_template_key === key);
+  if (!t) return false;
+  const led = remote.entries.find((e) => e.provider_template_name === t.provider_template_name_candidate);
+  if (!led) return false;
+  if (typeof led.current_waba_state !== "string") {
+    die(`${key}: no current_waba_state recorded — current-WABA truth is unproven`);
+  }
+  return led.current_waba_state === CURRENT_READY;
+});
+
+// Belt and braces: READY_ORDER is derived from EXPECTED_ORDER, but assert the exclusion
+// explicitly so a future edit that merges the two lists fails here instead of quietly
+// emitting an unmappable template.
+for (const key of APPROVED_NOT_MAPPABLE) {
+  if (READY_ORDER.includes(key)) die(`${key}: approved but not mapping-eligible - it must never enter readiness`);
+}
+
+const records = READY_ORDER.map((key) => {
   const t = approved.find((x) => x.internal_template_key === key);
   const name = t.provider_template_name_candidate;
   const led = remote.entries.find((e) => e.provider_template_name === name);
@@ -99,6 +167,7 @@ const records = EXPECTED_ORDER.map((key) => {
   if (t.submission_state !== "APPROVED_UNMAPPED") die(`${key}: local submission_state is not APPROVED_UNMAPPED`);
   if (t.provider_template_id !== null) die(`${key}: a provider template id is committed locally`);
   if (t.qf_mvp_40.submit_now !== false) die(`${key}: creation is not held (submit_now must be false)`);
+  if (led.current_waba_state !== CURRENT_READY) die(`${key}: current-WABA state is not ${CURRENT_READY}`);
   if (led.last_proven_status !== "APPROVED") die(`${key}: remote status is not APPROVED`);
   if (led.last_proven_remote_category !== "UTILITY") die(`${key}: remote category is not UTILITY`);
   if (led.readback_semantic_match !== true) die(`${key}: readback_semantic_match is not true`);
@@ -115,8 +184,10 @@ const records = EXPECTED_ORDER.map((key) => {
     requested_category: pkt.category,
     component_profile: pkt.component_profile,
     payload_fingerprint: pkt.payload_fingerprint,
-    proven_remote_status: "APPROVED",
-    proven_remote_category: "UTILITY",
+    proven_remote_status: led.last_proven_status,
+    proven_remote_category: led.last_proven_remote_category,
+    current_waba_state: led.current_waba_state,
+    current_waba_evidence: led.current_waba_evidence ?? null,
     readback_semantic_match: true,
     local_submission_state: "APPROVED_UNMAPPED",
     desired_mapping_state: "INACTIVE",

@@ -1943,9 +1943,36 @@ const PHASE_8B1BC_5FB_PREDECESSOR_BLOB = "811aa832cb2bcbdae7f9d3b178cf23c62bdbeb
  *     predecessor's sidecar at startup, handles signals, and reports recovery separately
  *     from the verdict. Proven with a SIGKILL mid-run.
  */
+/*
+ * QF-MVP-40-FINAL — EXPLICIT AUTHORITY TRANSFER for lib/communication/types.ts.
+ *
+ *   pinned C8B-1B-C blob   f61e099d4c3d72f013ea11cd6003389141a8992f
+ *   reviewed successor     620417762cff40d67e1c2fc1e239d6d1c1c62309
+ *   intervening hops       exactly ONE — 48c5807 "feat(automation): add client dispatch
+ *                          authority contract" (QF-MVP-50.2C)
+ *
+ * REVIEWED, not waived. `git show 48c5807 --numstat -- lib/communication/types.ts` is
+ * `8 0` — eight insertions, ZERO deletions. The whole change is the addition of `lead`
+ * to `CommunicationRecipientType` plus its explanatory comment. Nothing was removed,
+ * renamed or re-typed.
+ *
+ * WHY IT CANNOT WEAKEN WHAT THIS HARNESS PROTECTS. d3b freezes the OUTBOUND CONSENT
+ * AUTHORITY. `lead` is a recipient REFERENCE, not a consent principal:
+ * `CONSENT_PRINCIPAL_TYPES` stays exactly `("client","vendor","admin")`, so a lead
+ * derives an UNKNOWN consent identity — the branch this authority already documents as
+ * safe, where destination-hash suppression still applies and marketing default-denies.
+ * That same commit ADDED an executable assertion pinning `CONSENT_PRINCIPAL_TYPES` to
+ * those three values, so the intervening hop strengthened the invariant rather than
+ * relaxing it.
+ *
+ * This transfer moves ONE path to ONE exact reviewed blob. It is not a path prefix, not
+ * a directory, not a regex and not an exemption: any further byte change to this file
+ * fails again and requires its own transfer.
+ */
 const QF_MVP_40_ONDISK_SUCCESSORS = new Map([
   ["scripts/phase5f-b-whatsapp-cloud-api-harness.mjs", "286af0d1010c580925bbbf8456e9de339175549b"],
   ["scripts/phase8b1bb-outbound-account-attribution-harness.mjs", "8b9fae2762a608499b866b6309067d7b56418bb4"],
+  ["lib/communication/types.ts", "620417762cff40d67e1c2fc1e239d6d1c1c62309"],
 ]);
 
 /** EXACT ordered succession table: [path, historical 8B-1B-B blob, reviewed C8B-1B-C successor blob]. */

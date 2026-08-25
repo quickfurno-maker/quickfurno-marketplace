@@ -8,8 +8,20 @@
   "authorizes_mapping": false,
   "authorizes_sending": false,
   "purpose": "Scoped, single-operation evidence for ONE governed first creation of one named template on the dedicated staging WABA. It exists because the global packet/remote-state model is intentionally name-scoped and WABA-blind and cannot express per-WABA re-creation. This artifact does NOT extend, replace or relax that model.",
+  "identity_boundary_correction": {
+    "corrected_by": "QF-MVP-40-R8",
+    "correction_artifact": "docs/provider-manifests/meta-staging-identity-boundary-correction.json",
+    "corrected_on_utc_date": "2026-08-25",
+    "identity_classification": "HISTORICAL_MIXED_AND_INCONSISTENT",
+    "statement": "The digests recorded in this file under a 'staging' label are NOT the dedicated staging/test assets. Live read-only diagnosis on 2026-08-25 proved the app id digest is the genuine QuickFurno Staging app, but the WABA and phone-number digests are the PRODUCTION WABA and PRODUCTION phone number. The values below are left byte-for-byte unchanged because they are the true record of what this operation executed against.",
+    "execution_record_altered": false,
+    "timestamps_altered": false,
+    "what_this_file_still_proves": "That the recorded operation occurred, with the recorded attempt counts and classifications, against the historical mixed remote identity.",
+    "what_this_file_does_not_prove": "Anything about the state of the ACTUAL dedicated staging/test WABA.",
+    "operator_status": "RETIRED — read-only forever; its mutation gate is forced false and its identity pins remain bound to the historical mixed triple.",
+    "successor_authority": "scripts/mvp/communication/create-actual-staging-vendor-onboarding-reminder-once.mjs (QF-MVP-40-R8B) — NOT YET EXECUTED"
+  },
   "privacy": "Meta asset identities appear ONLY as SHA-256 digests of the raw id strings, plus non-sensitive human-readable labels. This deliberately matches the existing posture: the submission packet is forbidden by the validator rule `noSecretOrPii` from carrying a \"waba_id\" key, and docs/provider-manifests/meta-template-remote-state.json states that no WABA id appears in it. Digests were chosen over raw ids so this new file does not become the one place that breaks that posture. No token, app secret, verify token, phone number or template id is recorded here.",
-
   "relationship_to_global_model": {
     "global_packet_entry_state": "UNCHANGED — submit_now remains false and the entry remains HELD",
     "global_packet_changed": false,
@@ -19,7 +31,6 @@
     "no_secret_or_pii_rule_changed": false,
     "note": "The audited packet operator scripts/mvp/communication/submit-meta-templates.mjs continues to refuse this template, and every other held template, exactly as before. This one-shot authority is separate and does not read submit_now."
   },
-
   "owner_authorization": {
     "granted": true,
     "rationale": "The historical APPROVED evidence for this template name was proven on an unidentified historical remote identity. The remote-state ledger intentionally records no WABA id, so that evidence cannot prove approval on the dedicated staging WABA, which did not exist at that time. The historical creation hold remains valid for its historical remote identity; it is NOT a global cross-WABA prohibition.",
@@ -34,7 +45,6 @@
     "delete_authority": "NOT_GRANTED",
     "production_authority": "NOT_GRANTED"
   },
-
   "target": {
     "internal_template_key": "vendor_onboarding_reminder",
     "provider_template_name": "qf_vendor_onboarding_reminder_v1",
@@ -44,7 +54,6 @@
     "payload_source": "docs/provider-manifests/meta-template-submission-packet.json :: templates[internal_template_key=vendor_onboarding_reminder].creation_payload",
     "payload_source_note": "The operator reads the canonical payload from the committed packet and refuses unless the recomputed fingerprint equals the pinned value, so the outbound body cannot drift from the audited catalogue."
   },
-
   "staging_asset_identity": {
     "digest_algorithm": "sha256(utf8(raw_id_string))",
     "app_label": "QuickFurno Staging",
@@ -53,13 +62,16 @@
     "phone_number_id_sha256": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
     "phone_verified_name_label": "quickfurno.in",
     "required_code_verification_status": "VERIFIED",
-    "required_subscriber_set": "EXACTLY ONE app, whose id digest equals app_id_sha256"
+    "required_subscriber_set": "EXACTLY ONE app, whose id digest equals app_id_sha256",
+    "QF_MVP_40_R8_CORRECTION": "MISLABELLED. waba_id_sha256 and phone_number_id_sha256 below are the PRODUCTION WABA and phone. app_id_sha256 is the genuine staging app. Values retained as historical evidence; see identity_boundary_correction above."
   },
-
   "execution_contract": {
     "operator": "scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
     "dry_run_by_default": true,
-    "required_flags": ["--execute", "--owner-authorized-once"],
+    "required_flags": [
+      "--execute",
+      "--owner-authorized-once"
+    ],
     "env_only_bypass_permitted": false,
     "expected_pre_state": "ABSENT",
     "max_post_count": 1,
@@ -69,13 +81,11 @@
     "post_state_hold": "PERMANENT_NO_RECREATE_IF_REMOTE_PRESENT",
     "idempotence": "A rerun performs the exact-name existence check first. If an exact row exists in PENDING or APPROVED the operator reports ALREADY_CREATED and exits without posting; any other existing status is a hard stop with zero POST."
   },
-
   "historical_evidence_non_claim": {
     "historical_approval_was_waba_unbound": true,
     "used_as_proof_for_this_waba": false,
     "statement": "docs/provider-manifests/meta-template-remote-state.json records this template name as APPROVED/UTILITY with a semantic readback match, but records no WABA id by design. That evidence is NOT treated here as proof of approval on the dedicated staging WABA, and this operation does not amend, reinterpret or supersede it."
   },
-
   "execution_record": {
     "status": "EXECUTED_ONCE",
     "attempted_at_utc": "2026-08-13T04:38:00Z",

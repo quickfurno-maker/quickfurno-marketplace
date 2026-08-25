@@ -8,6 +8,19 @@
   "authorizes_mapping": false,
   "authorizes_sending": false,
   "purpose": "Immutable record of a bounded GET-only reconciliation of ALL EIGHT SEED_SET keys against the CURRENT dedicated staging WABA on 2026-08-24. It exists because the committed ledger carried 2026-07-31 claims that are WABA-BLIND: several were proven correct here, two templates proved ABSENT despite being recorded APPROVED/UTILITY, and one had already been proven a MARKETING mismatch. Readiness must derive from THIS current-WABA truth, never from the historical claims alone.",
+  "identity_boundary_correction": {
+    "corrected_by": "QF-MVP-40-R8",
+    "correction_artifact": "docs/provider-manifests/meta-staging-identity-boundary-correction.json",
+    "corrected_on_utc_date": "2026-08-25",
+    "status": "SUPERSEDED_AS_TO_IDENTITY_ONLY",
+    "statement": "Every reading in this sweep was taken through an operator pinned to the HISTORICAL MIXED identity triple (genuine QuickFurno Staging app, but the PRODUCTION WABA and PRODUCTION phone). Live diagnosis on 2026-08-25 proved the actual dedicated staging/test WABA is a different asset. The eight results below therefore describe the historical remote identity, NOT the actual staging WABA.",
+    "method_and_counts_still_valid": true,
+    "per_key_observations_still_valid_for": "HISTORICAL_MIXED_IDENTITY",
+    "usable_as_actual_staging_truth": false,
+    "results_altered": false,
+    "timestamps_altered": false,
+    "readiness_consequence": "No QF-MVP-40 readiness or canary decision for the actual staging WABA may rest on any reading in this file. Actual-staging template state must be re-measured, read-only, against the corrected identity boundary first."
+  },
   "privacy": "No token, app secret, phone number, WABA id or remote template id appears here. No Meta request or response body is reproduced: none was captured, and fabricating one would be evidence forgery. Only each operator's own printed classification lines are recorded.",
   "method": {
     "observed_at_utc_date": "2026-08-24",

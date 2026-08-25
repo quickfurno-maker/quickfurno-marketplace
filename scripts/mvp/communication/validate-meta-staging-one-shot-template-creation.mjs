@@ -37,22 +37,24 @@ const codeOnly = code
 const packet = JSON.parse(readFileSync(resolve(PACKET), "utf8"));
 const evidence = JSON.parse(readFileSync(resolve(EVIDENCE), "utf8"));
 
-// The real staging identity is supplied by the OWNER at runtime and is never committed.
-// These fixtures are the raw ids whose digests the operator pins; they are public Meta
-// asset ids, not secrets, and they appear only here so the rules can be driven.
-const REAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
+// QF-MVP-40-R8 - THESE ARE THE HISTORICAL MIXED IDENTITY IDS, NOT STAGING IDS.
+// The app id is the genuine QuickFurno Staging app; the WABA and phone ids are the
+// PRODUCTION assets. They are public Meta ids, not secrets, and they appear here only
+// so this operator's pins can be driven with the values it actually executed against.
+// The ACTUAL staging identity lives in metaStagingIdentity.mjs and is never used here.
+const HISTORICAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
 const goodEnv = () => ({
   QF_META_GRAPH_API_VERSION: "v26.0",
-  QF_META_WABA_ID: REAL.waba,
-  QF_META_PHONE_NUMBER_ID: REAL.phone,
-  QF_META_APP_ID: REAL.app,
+  QF_META_WABA_ID: HISTORICAL.waba,
+  QF_META_PHONE_NUMBER_ID: HISTORICAL.phone,
+  QF_META_APP_ID: HISTORICAL.app,
   QF_META_ACCESS_TOKEN: "irrelevant-not-a-real-token",
 });
 const okGet = (body) => ({ ok: true, status: 200, body });
 const goodAssets = () => ({
-  waba: okGet({ id: REAL.waba }),
-  phones: okGet({ data: [{ id: REAL.phone, verified_name: "quickfurno.in", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] }),
-  subs: okGet({ data: [{ whatsapp_business_api_data: { id: REAL.app, name: "QuickFurno Staging" } }] }),
+  waba: okGet({ id: HISTORICAL.waba }),
+  phones: okGet({ data: [{ id: HISTORICAL.phone, verified_name: "quickfurno.in", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] }),
+  subs: okGet({ data: [{ whatsapp_business_api_data: { id: HISTORICAL.app, name: "QuickFurno Staging" } }] }),
 });
 const clonePacket = () => JSON.parse(JSON.stringify(packet));
 const entryOf = (p) => p.templates.find((t) => t.internal_template_key === TARGET_TEMPLATE_KEY);
@@ -225,7 +227,7 @@ record("M12d the operator declares no env-only bypass",
 const singlePostProof = await (async () => {
   let calls = 0;
   const fetchImpl = async () => { calls += 1; return { ok: true, status: 200, json: async () => ({ id: "x" }) }; };
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl });
   await http.createOnce({ a: 1 });
   let threw = false;
   try { await http.createOnce({ a: 1 }); } catch { threw = true; }
@@ -283,7 +285,7 @@ record("M18c the bearer token is never printed",
 // ---------------------------------------------------------------------------
 record("M20 an extra subscriber app is rejected", (() => {
   const a = goodAssets();
-  a.subs = okGet({ data: [{ whatsapp_business_api_data: { id: REAL.app } }, { whatsapp_business_api_data: { id: "999999999999999" } }] });
+  a.subs = okGet({ data: [{ whatsapp_business_api_data: { id: HISTORICAL.app } }, { whatsapp_business_api_data: { id: "999999999999999" } }] });
   return classifyLiveAssets(a).ok === false;
 })());
 record("M20b a wrong single subscriber app is rejected", (() => {
@@ -301,12 +303,12 @@ record("M20d a live WABA id mismatch is rejected", (() => {
 })());
 record("M20e an unverified phone is rejected", (() => {
   const a = goodAssets();
-  a.phones = okGet({ data: [{ id: REAL.phone, code_verification_status: "NOT_VERIFIED", quality_rating: "GREEN" }] });
+  a.phones = okGet({ data: [{ id: HISTORICAL.phone, code_verification_status: "NOT_VERIFIED", quality_rating: "GREEN" }] });
   return classifyLiveAssets(a).faults.includes("phone_not_code_verified");
 })());
 record("M20f an extra phone on the WABA is rejected", (() => {
   const a = goodAssets();
-  a.phones = okGet({ data: [{ id: REAL.phone, code_verification_status: "VERIFIED" }, { id: "1333595106493546", code_verification_status: "VERIFIED" }] });
+  a.phones = okGet({ data: [{ id: HISTORICAL.phone, code_verification_status: "VERIFIED" }, { id: "1333595106493546", code_verification_status: "VERIFIED" }] });
   return classifyLiveAssets(a).faults.includes("phone_set_mismatch");
 })());
 record("M20g an unreadable asset response is rejected", (() => {
@@ -326,15 +328,15 @@ record("G03 CLOSED_KEYS still contains the target key",
 record("G04 the packet still carries no waba_id key",
   !/"waba_id"/i.test(JSON.stringify(packet)));
 record("G05 the evidence artifact commits no raw Meta asset id",
-  !new RegExp(`${REAL.waba}|${REAL.app}|${REAL.phone}`).test(JSON.stringify(evidence)));
+  !new RegExp(`${HISTORICAL.waba}|${HISTORICAL.app}|${HISTORICAL.phone}`).test(JSON.stringify(evidence)));
 record("G06 the evidence artifact pins the same digests as the operator",
   evidence.staging_asset_identity.waba_id_sha256 === EXPECTED_IDENTITY_DIGESTS.wabaId
   && evidence.staging_asset_identity.app_id_sha256 === EXPECTED_IDENTITY_DIGESTS.appId
   && evidence.staging_asset_identity.phone_number_id_sha256 === EXPECTED_IDENTITY_DIGESTS.phoneNumberId);
 record("G07 the evidence digests actually match the real staging ids",
-  sha256Hex(REAL.waba) === evidence.staging_asset_identity.waba_id_sha256
-  && sha256Hex(REAL.app) === evidence.staging_asset_identity.app_id_sha256
-  && sha256Hex(REAL.phone) === evidence.staging_asset_identity.phone_number_id_sha256);
+  sha256Hex(HISTORICAL.waba) === evidence.staging_asset_identity.waba_id_sha256
+  && sha256Hex(HISTORICAL.app) === evidence.staging_asset_identity.app_id_sha256
+  && sha256Hex(HISTORICAL.phone) === evidence.staging_asset_identity.phone_number_id_sha256);
 record("G08 the evidence artifact denies every downstream authority",
   evidence.owner_authorization.send_authority === "DENIED"
   && evidence.owner_authorization.mapping_authority === "DENIED"

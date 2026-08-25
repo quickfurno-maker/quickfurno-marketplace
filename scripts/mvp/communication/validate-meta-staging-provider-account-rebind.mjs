@@ -44,7 +44,12 @@ const codeOnly = code
 // digests the R7B authority pinned. The PRODUCTION digests here are SYNTHETIC — the
 // real ones live only in the owner's external proof and are never committed.
 // ---------------------------------------------------------------------------
-const REAL = { waba: "27861262223494153", phone: "1333595106493545" };
+// QF-MVP-40-R8 - THESE ARE THE HISTORICAL MIXED IDENTITY IDS, NOT STAGING IDS.
+// The app id is the genuine QuickFurno Staging app; the WABA and phone ids are the
+// PRODUCTION assets. They are public Meta ids, not secrets, and they appear here only
+// so this operator's pins can be driven with the values it actually executed against.
+// The ACTUAL staging identity lives in metaStagingIdentity.mjs and is never used here.
+const HISTORICAL = { waba: "27861262223494153", phone: "1333595106493545" };
 const FAKE_PROD = {
   appId: sha256Hex("synthetic-production-app"),
   wabaId: sha256Hex("synthetic-production-waba"),
@@ -52,7 +57,7 @@ const FAKE_PROD = {
 };
 const PROD_RAW = { waba: "synthetic-production-waba", phone: "synthetic-production-phone" };
 
-const goodEnv = () => ({ QF_META_WABA_ID: REAL.waba, QF_META_PHONE_NUMBER_ID: REAL.phone });
+const goodEnv = () => ({ QF_META_WABA_ID: HISTORICAL.waba, QF_META_PHONE_NUMBER_ID: HISTORICAL.phone });
 const goodProofText = () => JSON.stringify({
   schema_version: 1,
   production_app_id_sha256: FAKE_PROD.appId,
@@ -67,7 +72,7 @@ const prodRow = (over = {}) => ({
   ...over,
 });
 const stagingRow = (over = {}) => prodRow({
-  business_account_reference: REAL.waba, phone_number_reference: REAL.phone, ...over,
+  business_account_reference: HISTORICAL.waba, phone_number_reference: HISTORICAL.phone, ...over,
 });
 const okFlags = () => parseFlags(["--execute", OWNER_ACK_FLAG]);
 const okProof = () => parseDenyProof(goodProofText());
@@ -96,8 +101,8 @@ record("B05 the pinned staging triple is the SAME one R7B pinned",
   STAGING_IDENTITY_DIGESTS.wabaId === R7B_DIGESTS.wabaId
   && STAGING_IDENTITY_DIGESTS.phoneNumberId === R7B_DIGESTS.phoneNumberId);
 record("B06 the pinned digests actually match the real staging ids",
-  sha256Hex(REAL.waba) === STAGING_IDENTITY_DIGESTS.wabaId
-  && sha256Hex(REAL.phone) === STAGING_IDENTITY_DIGESTS.phoneNumberId);
+  sha256Hex(HISTORICAL.waba) === STAGING_IDENTITY_DIGESTS.wabaId
+  && sha256Hex(HISTORICAL.phone) === STAGING_IDENTITY_DIGESTS.phoneNumberId);
 /**
  * ANTI-VACUITY. The structural rules below scan `codeOnly`. If comment-stripping ever
  * over-matched and gutted the file, every "no X exists" rule would pass for the wrong
@@ -192,7 +197,7 @@ record("I02 a wrong phone number id is refused", (() => {
   return r.ok === false && r.faults.some((f) => f.startsWith(RebindFailure.IDENTITY_UNAUTHORIZED));
 })());
 record("I03 a missing id is refused", (() => {
-  const r = validateNewIdentity({ QF_META_WABA_ID: REAL.waba }, FAKE_PROD);
+  const r = validateNewIdentity({ QF_META_WABA_ID: HISTORICAL.waba }, FAKE_PROD);
   return r.ok === false && r.faults.some((f) => f.startsWith(RebindFailure.IDENTITY_MISSING));
 })());
 record("I04 an empty-string id is refused",
@@ -224,8 +229,8 @@ record("S06 one NULL reference also defers",
   pre([prodRow({ phone_number_reference: null })]) === PreState.REFERENCES_NULL);
 record("S07 an already-staging row is ALREADY_REBOUND", pre([stagingRow()]) === PreState.ALREADY_REBOUND);
 record("S08 a HALF-migrated row is unrecognized, not close enough",
-  pre([prodRow({ business_account_reference: REAL.waba })]) === PreState.UNRECOGNIZED_BINDING
-  && pre([prodRow({ phone_number_reference: REAL.phone })]) === PreState.UNRECOGNIZED_BINDING);
+  pre([prodRow({ business_account_reference: HISTORICAL.waba })]) === PreState.UNRECOGNIZED_BINDING
+  && pre([prodRow({ phone_number_reference: HISTORICAL.phone })]) === PreState.UNRECOGNIZED_BINDING);
 record("S09 an unknown third-party binding is refused",
   pre([prodRow({ business_account_reference: "111", phone_number_reference: "222" })])
     === PreState.UNRECOGNIZED_BINDING);

@@ -39,19 +39,24 @@ const vendorSrc = readFileSync(resolve(VENDOR_OPERATOR), "utf8");
 const r7iSrc = readFileSync(resolve(R7I_OPERATOR), "utf8");
 const r7kSrc = readFileSync(resolve(R7K_OPERATOR), "utf8");
 
-const REAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
+// QF-MVP-40-R8 - THESE ARE THE HISTORICAL MIXED IDENTITY IDS, NOT STAGING IDS.
+// The app id is the genuine QuickFurno Staging app; the WABA and phone ids are the
+// PRODUCTION assets. They are public Meta ids, not secrets, and they appear here only
+// so this operator's pins can be driven with the values it actually executed against.
+// The ACTUAL staging identity lives in metaStagingIdentity.mjs and is never used here.
+const HISTORICAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
 const goodEnv = () => ({
   QF_META_GRAPH_API_VERSION: "v26.0",
-  QF_META_WABA_ID: REAL.waba,
-  QF_META_PHONE_NUMBER_ID: REAL.phone,
-  QF_META_APP_ID: REAL.app,
+  QF_META_WABA_ID: HISTORICAL.waba,
+  QF_META_PHONE_NUMBER_ID: HISTORICAL.phone,
+  QF_META_APP_ID: HISTORICAL.app,
   QF_META_ACCESS_TOKEN: "irrelevant-not-a-real-token",
 });
 const okGet = (body) => ({ ok: true, status: 200, body });
 const goodAssets = () => ({
-  waba: okGet({ id: REAL.waba }),
-  phones: okGet({ data: [{ id: REAL.phone, verified_name: "quickfurno.in", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] }),
-  subs: okGet({ data: [{ whatsapp_business_api_data: { id: REAL.app, name: "QuickFurno Staging" } }] }),
+  waba: okGet({ id: HISTORICAL.waba }),
+  phones: okGet({ data: [{ id: HISTORICAL.phone, verified_name: "quickfurno.in", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] }),
+  subs: okGet({ data: [{ whatsapp_business_api_data: { id: HISTORICAL.app, name: "QuickFurno Staging" } }] }),
 });
 const clonePacket = () => JSON.parse(JSON.stringify(packet));
 const entryOf = (p, key) => p.templates.find((t) => t.internal_template_key === key);
@@ -467,29 +472,29 @@ record("V03 the operator declares NO second identity pin set — it imports R7B'
   !/EXPECTED_IDENTITY_DIGESTS\s*=\s*Object\.freeze/.test(codeOnly)
   && /import\s*\{[\s\S]*?EXPECTED_IDENTITY_DIGESTS[\s\S]*?\}\s*from\s*["'][^"']*create-meta-staging-vendor-onboarding-reminder-once\.mjs["']/.test(codeOnly));
 record("V04 no raw staging id literal appears in the operator",
-  !new RegExp(REAL.waba).test(code) && !new RegExp(REAL.app).test(code) && !new RegExp(REAL.phone).test(code));
+  !new RegExp(HISTORICAL.waba).test(code) && !new RegExp(HISTORICAL.app).test(code) && !new RegExp(HISTORICAL.phone).test(code));
 record("V05 the pinned digests match the public staging asset ids",
-  sha256Hex(REAL.app) === EXPECTED_IDENTITY_DIGESTS.appId
-  && sha256Hex(REAL.waba) === EXPECTED_IDENTITY_DIGESTS.wabaId
-  && sha256Hex(REAL.phone) === EXPECTED_IDENTITY_DIGESTS.phoneNumberId);
+  sha256Hex(HISTORICAL.app) === EXPECTED_IDENTITY_DIGESTS.appId
+  && sha256Hex(HISTORICAL.waba) === EXPECTED_IDENTITY_DIGESTS.wabaId
+  && sha256Hex(HISTORICAL.phone) === EXPECTED_IDENTITY_DIGESTS.phoneNumberId);
 
 // ---------------------------------------------------------------------------
 // TRANSPORT
 // ---------------------------------------------------------------------------
 record("T01 the inherited one-POST boundary rejects a second POST", await (async () => {
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ id: "1" }) }) });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ id: "1" }) }) });
   await http.createOnce({});
   let threw = false;
   try { await http.createOnce({}); } catch { threw = true; }
   return threw === true && http.postCount() === 1;
 })());
 record("T02 a throwing transport still consumes the single POST budget", await (async () => {
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl: async () => { throw new Error("net"); } });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl: async () => { throw new Error("net"); } });
   const r = await http.createOnce({});
   return r.threw === true && http.postCount() === 1;
 })());
 record("T03 GET never consumes the POST budget", await (async () => {
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) }) });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) }) });
   await http.get("/message_templates");
   await http.get("/subscribed_apps");
   return http.postCount() === 0;

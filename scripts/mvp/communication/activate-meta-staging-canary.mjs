@@ -166,9 +166,22 @@ export const AssetScope = Object.freeze({
   SHARED_OR_UNKNOWN: "SHARED_OR_UNKNOWN",
 });
 
-/** Stages that may never run against a shared or unclassified Meta asset. */
+/** Stages that may never run against a shared or unclassified Meta asset.
+ *
+ *  QF-MVP-40-R8 added TEMPLATE_CREATION. A governed template creation against the
+ *  dedicated staging WABA needs exactly this classification — the WABA legitimately
+ *  carries more than one subscribed app, so only the owner-attested EXACT subscriber set
+ *  can authorise it, and a hard-coded count or a trusted display name never may.
+ *
+ *  Being listed here grants NOTHING on its own. It only makes `intended_stage:
+ *  "TEMPLATE_CREATION"` a *valid* value for an attestation. The proof adapter still
+ *  compares the attested stage against the stage the caller declares, so a
+ *  TEMPLATE_CREATION proof cannot arm readiness or a canary, and an ARM_* proof cannot
+ *  create a template. The stages remain mutually non-substitutable.
+ */
 export const SCOPE_GUARDED_STAGES = Object.freeze([
   "PREFLIGHT_READONLY", "ARM_READINESS", "ARM_CANARY", "WEBHOOK_SUBSCRIPTION",
+  "TEMPLATE_CREATION",
 ]);
 
 const META_ID_RE = /^[0-9]{6,}$/;

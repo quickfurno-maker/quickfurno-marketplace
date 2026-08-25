@@ -115,22 +115,28 @@ const packet = (() => {
 })();
 const activatorSrc = readFileSync(resolve(ACTIVATOR), "utf8");
 const vendorSrc = readFileSync(resolve(VENDOR_OPERATOR), "utf8");
+const identitySrc = readFileSync(resolve("scripts/mvp/communication/metaStagingIdentity.mjs"), "utf8");
 
 // Public, non-secret Meta asset ids, used ONLY as offline fixtures so the pinned digest
 // rules can be driven. The real values are supplied by the owner at runtime.
-const REAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
+// QF-MVP-40-R8 - THESE ARE THE HISTORICAL MIXED IDENTITY IDS, NOT STAGING IDS.
+// The app id is the genuine QuickFurno Staging app; the WABA and phone ids are the
+// PRODUCTION assets. They are public Meta ids, not secrets, and they appear here only
+// so this operator's pins can be driven with the values it actually executed against.
+// The ACTUAL staging identity lives in metaStagingIdentity.mjs and is never used here.
+const HISTORICAL = { app: "2097008694503517", waba: "27861262223494153", phone: "1333595106493545" };
 const goodEnv = () => ({
   QF_META_GRAPH_API_VERSION: "v26.0",
-  QF_META_WABA_ID: REAL.waba,
-  QF_META_PHONE_NUMBER_ID: REAL.phone,
-  QF_META_APP_ID: REAL.app,
+  QF_META_WABA_ID: HISTORICAL.waba,
+  QF_META_PHONE_NUMBER_ID: HISTORICAL.phone,
+  QF_META_APP_ID: HISTORICAL.app,
   QF_META_ACCESS_TOKEN: "irrelevant-not-a-real-token",
 });
 const okGet = (body) => ({ ok: true, status: 200, body });
 const goodAssets = () => ({
-  waba: okGet({ id: REAL.waba }),
-  phones: okGet({ data: [{ id: REAL.phone, verified_name: "quickfurno.in", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] }),
-  subs: okGet({ data: [{ whatsapp_business_api_data: { id: REAL.app, name: "QuickFurno Staging" } }] }),
+  waba: okGet({ id: HISTORICAL.waba }),
+  phones: okGet({ data: [{ id: HISTORICAL.phone, verified_name: "quickfurno.in", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] }),
+  subs: okGet({ data: [{ whatsapp_business_api_data: { id: HISTORICAL.app, name: "QuickFurno Staging" } }] }),
 });
 const clonePacket = () => JSON.parse(JSON.stringify(packet));
 const entryOf = (p) => p.templates.find((t) => t.internal_template_key === TARGET_TEMPLATE_KEY);
@@ -191,7 +197,14 @@ record("M03b an arbitrary/production-shaped identity is rejected (allow-list of 
 record("M03c the operator declares NO second identity pin set — it imports R7B's",
   !/EXPECTED_IDENTITY_DIGESTS\s*=\s*Object\.freeze/.test(codeOnly)
   && /import\s*\{[\s\S]*?EXPECTED_IDENTITY_DIGESTS[\s\S]*?\}\s*from\s*["'][^"']*create-meta-staging-vendor-onboarding-reminder-once\.mjs["']/.test(codeOnly)
-  && /EXPECTED_IDENTITY_DIGESTS\s*=\s*Object\.freeze/.test(vendorSrc));
+  // QF-MVP-40-R8. R7B no longer declares the digest literals itself: it binds
+  // EXPECTED_IDENTITY_DIGESTS to HISTORICAL_MIXED_IDENTITY_DIGESTS, imported from the
+  // canonical boundary module, which is where the frozen literals now live. The chain is
+  // asserted end to end so the single-declaration-site property still holds — and so the
+  // historical pins can never be quietly repointed at the actual staging WABA.
+  && /EXPECTED_IDENTITY_DIGESTS\s*=\s*HISTORICAL_MIXED_IDENTITY_DIGESTS/.test(vendorSrc)
+  && /import\s*\{[\s\S]*?HISTORICAL_MIXED_IDENTITY_DIGESTS[\s\S]*?\}\s*from\s*["'][^"']*metaStagingIdentity\.mjs["']/.test(vendorSrc)
+  && /HISTORICAL_MIXED_IDENTITY_DIGESTS\s*=\s*Object\.freeze/.test(identitySrc));
 
 // ---------------------------------------------------------------------------
 // Payload — the pinned fingerprint is the backstop behind every field rule.
@@ -365,21 +378,21 @@ record("D12 a truthy env var is NOT an acknowledgement", (() => {
 // Transport — ONE POST per process, inherited from R7B's audited makeHttp.
 // ---------------------------------------------------------------------------
 record("T01 the inherited one-POST boundary rejects a second POST", await (async () => {
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ id: "1" }) }) });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ id: "1" }) }) });
   await http.createOnce({});
   let threw = false;
   try { await http.createOnce({}); } catch { threw = true; }
   return threw === true && http.postCount() === 1;
 })());
 record("T02 a throwing transport still consumes the single POST budget", await (async () => {
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl: async () => { throw new Error("net"); } });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl: async () => { throw new Error("net"); } });
   const r = await http.createOnce({});
   let threw = false;
   try { await http.createOnce({}); } catch { threw = true; }
   return r.threw === true && threw === true && http.postCount() === 1;
 })());
 record("T03 GET never consumes the POST budget", await (async () => {
-  const http = makeHttp({ version: "v26.0", wabaId: REAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) }) });
+  const http = makeHttp({ version: "v26.0", wabaId: HISTORICAL.waba, token: "t", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) }) });
   await http.get("/message_templates");
   return http.postCount() === 0;
 })());
@@ -586,9 +599,9 @@ record("G01 the pinned fingerprint equals the packet's committed fingerprint",
   entryOf(packet).payload_fingerprint === EXPECTED_PAYLOAD_FINGERPRINT
   && createHash("sha256").update(JSON.stringify(entryOf(packet).creation_payload)).digest("hex") === EXPECTED_PAYLOAD_FINGERPRINT);
 record("G02 the pinned digests match the public staging asset ids",
-  sha256Hex(REAL.app) === EXPECTED_IDENTITY_DIGESTS.appId
-  && sha256Hex(REAL.waba) === EXPECTED_IDENTITY_DIGESTS.wabaId
-  && sha256Hex(REAL.phone) === EXPECTED_IDENTITY_DIGESTS.phoneNumberId);
+  sha256Hex(HISTORICAL.app) === EXPECTED_IDENTITY_DIGESTS.appId
+  && sha256Hex(HISTORICAL.waba) === EXPECTED_IDENTITY_DIGESTS.wabaId
+  && sha256Hex(HISTORICAL.phone) === EXPECTED_IDENTITY_DIGESTS.phoneNumberId);
 record("G03 this operator targets a DIFFERENT template than R7B",
   TARGET_TEMPLATE_KEY === "client_matching_update"
   && TARGET_TEMPLATE_NAME === "qf_client_matching_update_v1"

@@ -51,6 +51,7 @@ import {
   EXPECTED_IDENTITY_DIGESTS as STAGING_IDENTITY_DIGESTS,
 } from "./create-meta-staging-vendor-onboarding-reminder-once.mjs";
 import { resolveStagingTarget } from "./seed-meta-staging-inactive-mappings.mjs";
+import { historicalRetirementBanner, retireHistoricalMutation } from "./metaStagingIdentity.mjs";
 
 /** The ONE row this operator may ever touch. Neither value is a parameter. */
 export const PROVIDER_KEY = "meta_whatsapp_cloud";
@@ -383,7 +384,10 @@ const isEntry = process.argv[1] && import.meta.url === pathToFileURL(resolve(pro
 
 if (isEntry) {
   const env = process.env;
-  const flags = parseFlags(process.argv.slice(2));
+  const parsedFlags = parseFlags(process.argv.slice(2));
+  // QF-MVP-40-R8 — spent historical authority: the write bit is forced false here,
+  // before the Supabase client is constructed. Dry-run reading still works.
+  const flags = retireHistoricalMutation(parsedFlags, { operatorId: "QF-MVP-40-R7C", mutationKey: "mayWrite" });
 
   console.log("== QF-MVP-40-R7C one-shot staging provider-account rebind ==");
   if (!flags.ok) {
@@ -391,6 +395,7 @@ if (isEntry) {
     process.exit(1);
   }
   console.log(`   mode                    : ${flags.mayWrite ? "EXECUTE" : "DRY RUN"}`);
+  console.log(historicalRetirementBanner(flags.retiredOperatorId));
   console.log(`   target row              : ${PROVIDER_KEY} / ${CHANNEL}`);
 
   // -- The environment identity fence, BEFORE any client exists --------------

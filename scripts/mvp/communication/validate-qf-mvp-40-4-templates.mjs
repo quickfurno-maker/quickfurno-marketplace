@@ -44,6 +44,15 @@ function bodyVars(body) {
 const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_received",
   "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
+/**
+ * QF-MVP-40 Wave 1 live batch, created 2026-08-25. Accepted by Meta with remote status
+ * PENDING and returned category UTILITY: neither draft nor approved, but a THIRD lifecycle
+ * state. Creation authority is CONSUMED so they are held, and they DO carry a proven remote
+ * template id. PENDING IS NOT APPROVED and none may advance without a GET-only reconciliation.
+ */
+const PENDING_KEYS_WAVE1 = Object.freeze(["clarification_reminder", "clarification_request",
+  "low_credit_warning", "vendor_new_lead", "vendor_package_expiry_warning",
+  "vendor_response_reminder"]);
 
 const R = {
   uniqueKeys(m) {
@@ -126,14 +135,23 @@ const R = {
  * consent_help_response was approved by Meta as UTILITY and is now
  * approved / APPROVED_UNMAPPED / held from creation. Relaxing this to
  * "anything may be approved" would delete the guard, so it becomes a CLOSED
- * state model: Wave 0 must be EXACTLY that, every other entry must still be
- * draft, and no entry may ever carry a provider template id.
+ * state model with THREE states: the approved set must be exactly that, the live
+ * Wave 1 batch must be pending+held with a proven remote id, and every other entry
+ * must still be draft with no id at all.
  */
   allDraft(m) {
     const all = allEntries(m);
     if (all.filter((t) => CLOSED_KEYS_40_10E.includes(t.internal_template_key)).length
         !== CLOSED_KEYS_40_10E.length) return false;
+    if (all.filter((t) => PENDING_KEYS_WAVE1.includes(t.internal_template_key)).length
+        !== PENDING_KEYS_WAVE1.length) return false;
     return all.every((t) => {
+      if (PENDING_KEYS_WAVE1.includes(t.internal_template_key)) {
+        // Created live: a proven remote id is REQUIRED here, and creation stays held.
+        return typeof t.provider_template_id === "string" && t.provider_template_id.length > 0
+          && t.submission_state === "SUBMITTED_PENDING" && t.approval_status === "pending"
+          && t.qf_mvp_40?.submit_now === false;
+      }
       if (t.provider_template_id !== null) return false;
       if (CLOSED_KEYS_40_10E.includes(t.internal_template_key)) {
         return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
@@ -225,7 +243,7 @@ const RULES = [
   ["T8  a marketing consent scope requires the marketing category", R.marketingCategoryIntegrity],
   ["T9  STOP/START/HELP carry no promotional content", R.consentAcksNotPromotional],
   ["T10 the vendor lead offer never claims an assignment", R.leadOfferIsNotAssignment],
-  ["T11 every entry is DRAFT_NOT_SUBMITTED with no provider template id", R.allDraft],
+  ["T11 three-state lifecycle: approved+held, pending+held with proven id, rest draft", R.allDraft],
   ["T12 no active or approved provider mapping is asserted", R.noActiveMapping],
   ["T13 example fixtures contain no PII", R.fixturesHaveNoPii],
   ["T14 groups and entries are deterministically ordered", R.deterministicOrdering],

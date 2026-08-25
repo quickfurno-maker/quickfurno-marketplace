@@ -155,6 +155,18 @@ const DEFERRED_LANES = ["WAVE1_REMAINING_ORDINARY", "WAVE1_COMMERCIAL", "WAVE2_A
 /** Historical Wave 0 names that are NOT approved-and-closed but must stay in the ledger. */
 const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2",
   "qf_consent_start_acknowledgement_v1", "qf_client_matching_update_v1"];
+/**
+ * QF-MVP-40 Wave 1 live batch, created 2026-08-25: accepted by Meta with remote status
+ * PENDING and returned category UTILITY. A THIRD lifecycle state, neither draft nor
+ * approved. Creation authority is CONSUMED so each is held from creation, and each DOES
+ * carry a proven remote template id. PENDING IS NOT APPROVED.
+ */
+const PENDING_KEYS_WAVE1 = Object.freeze(["clarification_reminder", "clarification_request",
+  "low_credit_warning", "vendor_new_lead", "vendor_package_expiry_warning",
+  "vendor_response_reminder"]);
+const PENDING_LEDGER_NAMES = Object.freeze(["qf_clarification_reminder_v1",
+  "qf_clarification_request_v2", "qf_low_credit_warning_v1", "qf_vendor_new_lead_v1",
+  "qf_vendor_package_expiry_warning_v1", "qf_vendor_response_reminder_v1"]);
 /** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
 const SUBSET1 = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
 const SUBSET1_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
@@ -273,7 +285,7 @@ const AUTHORED_BODY_EXEMPT_PROFILE = "AUTH_OTP_COPY_CODE";
 const hasAuthoredBody = (t) => typeof bodyOf(t)?.text === "string";
 
 const R = {
-  totalIs25: (p) => p.total_templates === 25 && p.templates.length === 25,
+  totalIs25: (p) => p.total_templates === 26 && p.templates.length === 26,
 
   // Every entry that is NOT a named known-defective one must be structurally clean.
   structurallyCleanBodies: (p) => p.templates.every((t) => {
@@ -339,11 +351,30 @@ const R = {
       && Array.isArray(rows) && rows[0].length === 2;
   },
   // v2 has never been submitted; claiming otherwise would rewrite the failure as a success.
-  v2NeverSubmitted: (p) => {
+  /**
+   * v2 HAS now been submitted once and is PENDING. The honest invariant is no longer
+   * "never submitted" but "submitted exactly once, and not claimed approved".
+   */
+  v2SubmittedPendingNotApproved: (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
-    return t.local_state.approval_status === "draft"
-      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
-      && t.local_state.provider_template_id === null;
+    return t.local_state.approval_status === "pending"
+      && t.local_state.submission_state === "SUBMITTED_PENDING"
+      && typeof t.local_state.provider_template_id === "string"
+      && t.submit_now === false;
+  },
+  /** No Wave 1 pending template may be recorded as approved anywhere. */
+  pendingNeverClaimsApproval: () => {
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    return PENDING_LEDGER_NAMES.every((n) => {
+      const e = L.entries.find((x) => x.provider_template_name === n);
+      return !!e && e.last_proven_status === "PENDING"
+        && e.last_proven_remote_category === "UTILITY"
+        && e.disposition === "SUBMITTED_PENDING_UNMAPPED"
+        && e.creation_authority === "CONSUMED"
+        && e.approval_evidence === null
+        && e.mapping_authority === "DENIED"
+        && e.send_authority === "DENIED";
+    });
   },
 
   // --- v1 rejection evidence ---
@@ -368,7 +399,7 @@ const R = {
   // A rejected create produced no remote object, so it must have no ledger row.
   v1HasNoLedgerRow: (l) => !l.entries.some(
     (x) => x.provider_template_name === "qf_clarification_request_v1"),
-  reconcileWaves: (p) => Object.values(p.wave_counts).reduce((a, b) => a + b, 0) === 25,
+  reconcileWaves: (p) => Object.values(p.wave_counts).reduce((a, b) => a + b, 0) === 26,
   wave0IsExactlyOne: (p) => p.templates.filter((t) => t.submission_wave === 0).length === 1,
   wave0IsNoVariable: (p) => {
     const w0 = p.templates.find((t) => t.submission_wave === 0);
@@ -418,9 +449,18 @@ const R = {
   closedStateModel: (p) => {
     const present = p.templates.filter((t) => CLOSED_KEYS.includes(t.internal_template_key));
     if (present.length !== CLOSED_KEYS.length) return false;      // the set itself is pinned
+    if (p.templates.filter((t) => PENDING_KEYS_WAVE1.includes(t.internal_template_key)).length
+        !== PENDING_KEYS_WAVE1.length) return false;
     return p.templates.every((t) => {
       const st = t.local_state;
-      if (st.provider_template_id !== null) return false;         // never a remote id
+      if (PENDING_KEYS_WAVE1.includes(t.internal_template_key)) {
+        // Created live: the remote id is REQUIRED, and creation is HELD afterwards.
+        return typeof st.provider_template_id === "string" && st.provider_template_id.length > 0
+          && st.approval_status === "pending"
+          && st.submission_state === "SUBMITTED_PENDING"
+          && t.submit_now === false;
+      }
+      if (st.provider_template_id !== null) return false;         // no id without proof
       if (CLOSED_KEYS.includes(t.internal_template_key)) {
         return st.approval_status === "approved"
           && st.submission_state === "APPROVED_UNMAPPED"
@@ -436,9 +476,27 @@ const R = {
       && approved.map((t) => t.internal_template_key).sort().join(",")
          === CLOSED_KEYS.slice().sort().join(",");
   },
-  noRemoteIdAnywhere: (p) => {
-    const raw = JSON.stringify(p) + readFileSync(resolve(REMOTE_STATE), "utf8");
-    return !/"(provider_template_id|template_id)"\s*:\s*"/.test(raw);
+  /**
+   * A remote id used to be forbidden outright, because nothing had been created. Six
+   * templates now exist remotely, so the rule becomes: an id may appear ONLY against a
+   * name whose creation is proven, and it must appear there. A fabricated id on anything
+   * else, or a created template hiding its id, both fail.
+   */
+  remoteIdOnlyWhereProven: (p) => {
+    const packetOk = p.templates.every((t) => {
+      const id = t.local_state.provider_template_id;
+      return PENDING_KEYS_WAVE1.includes(t.internal_template_key)
+        ? typeof id === "string" && /^[0-9]+$/.test(id)
+        : id === null;
+    });
+    const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
+    const ledgerOk = L.entries.every((e) => {
+      const id = e.remote_template_id;
+      return PENDING_LEDGER_NAMES.includes(e.provider_template_name)
+        ? typeof id === "string" && /^[0-9]+$/.test(id)
+        : id === undefined || id === null;
+    });
+    return packetOk && ledgerOk;
   },
   acksStayOutOfOrdinaryRegistry: () => ACKS.every((k) => !new RegExp(`^\\s*${k}\\s*:`, "m")
     .test(readFileSync(resolve("lib/communication/outboundConsentScope.ts"), "utf8"))),
@@ -731,8 +789,10 @@ const R = {
   // ---- QF-MVP-40.10D Wave 0 closure --------------------------------------
   ledgerHasExactEntries: (inj) => {
     const L = readLedger(inj);
-    const expected = [...LEDGER_HISTORY_NAMES, ...CLOSED_LEDGER.map((c) => c.name)].sort().join(",");
-    return L.entries.length === LEDGER_HISTORY_NAMES.length + CLOSED_LEDGER.length
+    const expected = [...LEDGER_HISTORY_NAMES, ...CLOSED_LEDGER.map((c) => c.name),
+      ...PENDING_LEDGER_NAMES].sort().join(",");
+    return L.entries.length
+        === LEDGER_HISTORY_NAMES.length + CLOSED_LEDGER.length + PENDING_LEDGER_NAMES.length
       && L.entries.map((e) => e.provider_template_name).sort().join(",") === expected;
   },
 
@@ -926,13 +986,28 @@ const R = {
     return !!com && com.state === "HELD_FOR_EXPLICIT_CATEGORY_REVIEW"
       && COMMERCIAL_KEYS.every((k) => (com.keys ?? []).includes(k));
   },
-  /** A deferred lane's templates must actually still be draft in the packet. */
+  /**
+   * A deferred lane's templates must still be draft UNLESS the artifact itself records that
+   * the pause was lifted for that exact key AND the key is one whose live creation is proven.
+   * A key cannot escape the lane by being edited to look submitted, and a key cannot be
+   * listed as released without actually being in the proven Wave 1 batch.
+   */
   deferredLanesStillDraft: (p) => {
-    const lanes = readSubset2().submission_pause?.deferred_lanes ?? [];
+    const pause = readSubset2().submission_pause ?? {};
+    const lanes = pause.deferred_lanes ?? [];
+    const released = pause.pause_lift?.released_keys ?? [];
+    // Nothing may be declared released unless it is in the proven pending batch.
+    if (!released.every((k) => PENDING_KEYS_WAVE1.includes(k))) return false;
     const named = lanes.flatMap((l) => l.keys ?? []);
     return named.length > 0 && named.every((k) => {
       const t = p.templates.find((x) => x.internal_template_key === k);
-      return !!t && t.local_state.approval_status === "draft"
+      if (!t) return false;
+      if (released.includes(k)) {
+        return t.local_state.approval_status === "pending"
+          && t.local_state.submission_state === "SUBMITTED_PENDING"
+          && t.submit_now === false;
+      }
+      return t.local_state.approval_status === "draft"
         && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED";
     });
   },
@@ -1072,7 +1147,7 @@ const R = {
 };
 
 const RULES = [
-  ["P1  packet totals exactly 25 templates", R.totalIs25, packet],
+  ["P1  packet totals exactly 26 templates", R.totalIs25, packet],
   ["S1  no body begins or ends with a parameter (subcode 2388299)", R.structurallyCleanBodies, packet],
   ["S2  known format defects stay held, unsubmitted and genuinely defective", R.knownDefectsHeldAndReal, packet],
   ["S3  every submittable body is structurally clean, with no exemption", R.submittableBodiesClean, packet],
@@ -1082,11 +1157,12 @@ const RULES = [
   ["S6  the spent name qf_clarification_request_v1 is not reused", R.v1NameNotReused, packet],
   ["S7  the v2 body repairs the exact fault that was rejected", R.v2RepairsTheFault, packet],
   ["S8  v2 keeps the two-parameter variable contract", R.v2KeepsVariableContract, packet],
-  ["S9  v2 is honestly recorded as never submitted", R.v2NeverSubmitted, packet],
+  ["S9  v2 is submitted exactly once and PENDING, not approved", R.v2SubmittedPendingNotApproved, packet],
+  ["S13 no pending Wave 1 template claims approval or authority", R.pendingNeverClaimsApproval, packet],
   ["S10 the v1 deterministic rejection is recorded", R.v1RejectionRecorded, v1Rejection],
   ["S11 v1 is permanently retired and may never be retried", R.v1PermanentlyRetired, v1Rejection],
   ["S12 a rejected create left no ledger row", R.v1HasNoLedgerRow, remoteLedger],
-  ["P2  wave counts reconcile to 25", R.reconcileWaves, packet],
+  ["P2  wave counts reconcile to 26", R.reconcileWaves, packet],
   ["P3  Wave 0 is exactly one template", R.wave0IsExactlyOne, packet],
   ["P4  Wave 0 template has no variables", R.wave0IsNoVariable, packet],
   ["P5  four QF-MVP-70 admin alerts are deferred (wave 4, submit_now false)", R.adminDeferred, packet],
@@ -1099,9 +1175,9 @@ const RULES = [
   ["P12 provider names valid and unique", R.namesValidAndUnique, packet],
   ["P13 provider names carry no environment name or long id", R.namesCarryNoEnvOrIds, packet],
   ["P14 every payload has a deterministic fingerprint", R.deterministicPayloads, packet],
-  ["P15 closed state model: the closed set is approved+held, all others draft", R.closedStateModel, packet],
+  ["P15 three-state model: approved+held, pending+held with proven id, rest draft", R.closedStateModel, packet],
   ["P90 the approved set is exactly the eight expected templates", R.approvedSetIsExact, packet],
-  ["P80 no remote template id anywhere in packet or ledger", R.noRemoteIdAnywhere, packet],
+  ["P80 a remote template id appears only where creation is proven", R.remoteIdOnlyWhereProven, packet],
   ["P16 consent acknowledgements remain outside the ordinary registry", R.acksStayOutOfOrdinaryRegistry, packet],
   ["P17 packet carries no secret, WABA id or PII", R.noSecretOrPii, packet],
   ["P18 official contract references are recorded", R.contractReferencesRecorded, packet],
@@ -1149,7 +1225,7 @@ const RULES = [
   ["P77 ledger cites the exact reconciliation evidence file", R.ledgerCitesReconciliationEvidence, packet],
   ["P78 ledger makes no body/component equality claim", R.ledgerMakesNoBodyEqualityClaim, packet],
   ["P79 ledger carries no template/WABA/request id, token or raw body", R.ledgerCarriesNoIdentifiers, packet],
-  ["P81 ledger holds exactly the expected entry set (history + closed)", R.ledgerHasExactEntries, packet],
+  ["P81 ledger holds exactly the expected entry set (history + closed + pending)", R.ledgerHasExactEntries, packet],
   ["P91 ledger records every closed entry APPROVED as UTILITY with proven counts", R.ledgerClosedEntriesApprovedUtility, packet],
   ["P92 ledger denies send/mapping/activation/delete on every closed entry", R.ledgerClosedAuthoritiesDenied, packet],
   ["P93 ledger cites the exact two evidence files for every closed entry", R.ledgerClosedCitesExactEvidence, packet],
@@ -1164,7 +1240,7 @@ const RULES = [
   ["P106 template submission is PAUSED with no successor proposed or authorized", R.submissionIsPaused, packet],
   ["P107 no subset-3 review artefact exists", R.noSubset3Artifact, packet],
   ["P108 every deferred lane is recorded deferred / held / unauthorized", R.deferredLanesIntact, packet],
-  ["P109 templates named in a deferred lane are still draft", R.deferredLanesStillDraft, packet],
+  ["P109 a deferred lane stays draft unless its pause lift is recorded and proven", R.deferredLanesStillDraft, packet],
   ["P110 waves 2/3/4 remain entirely unapproved and held", R.laterWavesUntouched, packet],
   ["P101 subset 2 leaks no commercial, closed, excluded, button or URL template", R.subset2LeaksNothing, packet],
   ["P102 subset 2 names the commercial templates as separately held", R.subset2NamesCommercialHold, packet],
@@ -1220,9 +1296,14 @@ const MUT = [
   ["MS7 a stale exemption on a repaired entry is rejected", R.knownDefectsHeldAndReal, packet, (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "admin_policy_block_alert");
     t.creation_payload.components[0].text = "QuickFurno admin alert: a policy blocked lead {{1}} just now."; }],
+  // low_credit_warning was the original target but is now submitted and held, so it is no
+  // longer in the submittable set and could never have failed this rule again.
   ["MS8 a submittable template with a trailing parameter is rejected", R.submittableBodiesClean, packet, (p) => {
-    const t = p.templates.find((x) => x.internal_template_key === "low_credit_warning");
-    t.creation_payload.components[0].text = "QuickFurno: your credit balance is low: {{1}}."; }],
+    const t = p.templates.find((x) => x.internal_template_key === "client_transactional_followup");
+    t.creation_payload.components[0].text = "QuickFurno is following up on your enquiry {{1}}."; }],
+  ["MS21 releasing a key that was never submitted is rejected", R.deferredLanesStillDraft, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "clarification_request")
+      .local_state.approval_status = "draft"; }],
   ["MS8b a silently missing body is rejected", R.onlyAuthLacksAuthoredBody, packet, (p) => {
     delete p.templates.find((x) => x.internal_template_key === "low_credit_warning")
       .creation_payload.components[0].text; }],
@@ -1245,7 +1326,7 @@ const MUT = [
   ["MS14 dropping a variable from the repaired copy is rejected", R.v2KeepsVariableContract, packet, (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
     t.creation_payload.components[0].text = "Hi {{1}}, QuickFurno needs one more detail. Please reply."; }],
-  ["MS15 claiming v2 was already approved is rejected", R.v2NeverSubmitted, packet, (p) => {
+  ["MS15 claiming v2 was already approved is rejected", R.v2SubmittedPendingNotApproved, packet, (p) => {
     const t = p.templates.find((x) => x.internal_template_key === "clarification_request");
     t.local_state.approval_status = "approved"; }],
   ["MS16 softening the v1 error record is rejected", R.v1RejectionRecorded, v1Rejection, (e) => {

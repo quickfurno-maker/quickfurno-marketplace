@@ -1,0 +1,122 @@
+{
+  "artifact": "meta-staging-wave1-batch-creation-evidence",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40",
+  "operation_id": "QF-MVP-40-WAVE1-BATCH-CREATION-2026-08-25",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "purpose": "Index record for the six Wave-1 live template creations executed on 2026-08-25. Each was a single create POST that Meta accepted with remote status PENDING and returned category UTILITY. This index exists so the batch is addressable as one governed event and so each creation authority can be shown as CONSUMED. The observed facts live in the six referenced sanitized records and are deliberately NOT duplicated beyond the identifiers needed to address them.",
+  "privacy": "No token, app secret, phone number or WABA id appears here or in the referenced records, which the submitter's own sanitizer produced. The remote template ids ARE recorded: they are non-secret Meta object identifiers and are proven remote state, matching the precedent in meta-staging-start-ack-v2-creation-evidence. No Meta request or response body was captured, and none is reconstructed.",
+  "batch": {
+    "observed_at_utc_date": "2026-08-25",
+    "submitted_by": "scripts/mvp/communication/submit-meta-templates.mjs --wave 1 --template <key> --execute",
+    "operation_mode": "EXECUTE_CREATE",
+    "templates_created": 6,
+    "create_post_count_total": 6,
+    "create_post_count_per_template": 1,
+    "create_post_count_basis": "OBSERVED",
+    "second_post_issued": false,
+    "identity_match": true,
+    "all_outcomes": "CREATED_PENDING",
+    "all_returned_categories": "UTILITY",
+    "all_remote_statuses_at_creation": "PENDING",
+    "messages_sent": 0,
+    "templates_edited_or_deleted": 0,
+    "mappings_activated": 0,
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false
+  },
+  "semantic_proof": {
+    "readback_semantic_match": true,
+    "derivation": "The submitter sets readback_semantic_match only after the post-create readback returned exactly one row matching the exact name and language AND templatesAreIdentical() returned true against the committed creation_payload using the REMOTE components. Every one of the six records carries readback_semantic_match true, so each created template is semantically identical to the canonical packet payload it was generated from.",
+    "authority": "scripts/mvp/communication/submit-meta-templates.mjs"
+  },
+  "creation_authority": {
+    "state": "CONSUMED",
+    "statement": "All six provider names now exist remotely. Their creation authority is SPENT: none may be live-created again, and each is held from creation in the source manifest (submit_now false). A second create for any of these names would be a duplicate-name collision, not a retry."
+  },
+  "approval_non_claim": {
+    "approved": false,
+    "statement": "PENDING is not APPROVED. Meta accepted the submissions for review; it has not approved them. No approval is claimed anywhere, and none may be recorded until a separate GET-only reconciliation proves it. Until then these templates are UNMAPPED and UNSENDABLE."
+  },
+  "authorities_explicitly_not_granted": {
+    "mapping_authority": "NOT_GRANTED",
+    "send_authority": "DENIED",
+    "activation_authority": "NOT_GRANTED",
+    "delete_authority": "NOT_GRANTED",
+    "appeal_authority": "NOT_GRANTED",
+    "further_submission_authority": "NOT_GRANTED",
+    "production_authority": "DENIED",
+    "statement": "A Meta submission proves the PROVIDER CONTRACT ONLY. It creates no mapping, no runtime activation, no consent authority and no send authority, and it authorizes no further Meta submission."
+  },
+  "records": [
+    {
+      "internal_template_key": "clarification_request",
+      "provider_template_name": "qf_clarification_request_v2",
+      "remote_template_id": "1374658884649762",
+      "payload_fingerprint": "b1211ade37ded439861d9ddb8297d9e5c7cb73c4959e68363ab53c5e76933c77",
+      "remote_status_at_creation": "PENDING",
+      "returned_category": "UTILITY",
+      "path": "docs/provider-manifests/meta-staging-clarification-request-v2-creation.json",
+      "sha256": "acbafb8e7de5c312ba09c7e4c48194d7701bee09d9042327835c54c4c543d185",
+      "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-10-416Z.json"
+    },
+    {
+      "internal_template_key": "clarification_reminder",
+      "provider_template_name": "qf_clarification_reminder_v1",
+      "remote_template_id": "1368369535273954",
+      "payload_fingerprint": "87c5420a8d97ab4de45e6c34eb0312cf957a9c53b28435cfeb3ffe3ce92f1474",
+      "remote_status_at_creation": "PENDING",
+      "returned_category": "UTILITY",
+      "path": "docs/provider-manifests/meta-staging-clarification-reminder-v1-creation.json",
+      "sha256": "27f8959c55d58500f8035c25def4e4ebe61b8939e629cc1a2d8260e164549d3a",
+      "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-16-998Z.json"
+    },
+    {
+      "internal_template_key": "vendor_new_lead",
+      "provider_template_name": "qf_vendor_new_lead_v1",
+      "remote_template_id": "1569683294809980",
+      "payload_fingerprint": "64e1e629d71a394843949ebe9ae1fb3e0a0c81187d7868c330dfb4bc19541fe1",
+      "remote_status_at_creation": "PENDING",
+      "returned_category": "UTILITY",
+      "path": "docs/provider-manifests/meta-staging-vendor-new-lead-v1-creation.json",
+      "sha256": "4caf318b37ef3174c222572ecef8780c5da4a32c1a3fc2b64bed878204938b65",
+      "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-23-802Z.json"
+    },
+    {
+      "internal_template_key": "vendor_response_reminder",
+      "provider_template_name": "qf_vendor_response_reminder_v1",
+      "remote_template_id": "905027118919792",
+      "payload_fingerprint": "a3833a69b3699f8750152350ec7ca877861d46d33a173168b54ba895633b8743",
+      "remote_status_at_creation": "PENDING",
+      "returned_category": "UTILITY",
+      "path": "docs/provider-manifests/meta-staging-vendor-response-reminder-v1-creation.json",
+      "sha256": "47fc75ccada9c773c590eff9bb20556c296554fd894a850aa0ddd76b5b0d0781",
+      "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-30-199Z.json"
+    },
+    {
+      "internal_template_key": "vendor_package_expiry_warning",
+      "provider_template_name": "qf_vendor_package_expiry_warning_v1",
+      "remote_template_id": "27814489294917998",
+      "payload_fingerprint": "91767b9a3214f06915fd2eb688b57ccc90db1a7fa9570db8aa9631c582f7b404",
+      "remote_status_at_creation": "PENDING",
+      "returned_category": "UTILITY",
+      "path": "docs/provider-manifests/meta-staging-vendor-package-expiry-warning-v1-creation.json",
+      "sha256": "ce030eaaf4424daef068dd695f6c7d98fe0d9168c59bd22b9a922bb5aac6f114",
+      "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-37-672Z.json"
+    },
+    {
+      "internal_template_key": "low_credit_warning",
+      "provider_template_name": "qf_low_credit_warning_v1",
+      "remote_template_id": "1868167847496096",
+      "payload_fingerprint": "e6158d328586d1c5366afdb8de5763a5d8733936b203652aa2eeb28fe0645589",
+      "remote_status_at_creation": "PENDING",
+      "returned_category": "UTILITY",
+      "path": "docs/provider-manifests/meta-staging-low-credit-warning-v1-creation.json",
+      "sha256": "77edfb74864bc5767939302e028555c8bef8ec740ad469c3fa129d492c1d52d0",
+      "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-43-957Z.json"
+    }
+  ]
+}

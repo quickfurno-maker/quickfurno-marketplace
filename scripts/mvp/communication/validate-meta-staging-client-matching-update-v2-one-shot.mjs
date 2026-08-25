@@ -961,10 +961,24 @@ record("V13 every ledger row carries explicit current-WABA truth from a closed v
     "PRESENT_APPROVED_CATEGORY_MISMATCH",
     "ABSENT",
     "NOT_OBSERVED_ON_CURRENT_WABA",
+    // Created live on 2026-08-25 and PROVEN present with remote status PENDING. It is a
+    // present-and-real state, but it is NOT approved and must never satisfy readiness.
+    "PRESENT_PENDING_UTILITY",
   ]);
   return ledger.entries.length > 0
     && ledger.entries.every((e) => typeof e.current_waba_state === "string"
       && VOCAB.has(e.current_waba_state));
+})());
+record("V16 a PENDING current-WABA row is present but never ready", (() => {
+  const pending = ledger.entries.filter((e) => e.current_waba_state === "PRESENT_PENDING_UTILITY");
+  const emitted = readiness.templates.map((t) => t.provider_template_name);
+  return pending.length > 0 && pending.every((e) =>
+    e.last_proven_status === "PENDING"
+    && e.approval_evidence === null
+    && e.mapping_authority === "DENIED"
+    && e.send_authority === "DENIED"
+    && e.creation_authority === "CONSUMED"
+    && !emitted.includes(e.provider_template_name));
 })());
 record("V14 only PRESENT_APPROVED_UTILITY rows reach the readiness manifest", (() => {
   const emitted = readiness.templates.map((t) => t.provider_template_name);

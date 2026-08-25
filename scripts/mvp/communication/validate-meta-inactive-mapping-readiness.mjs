@@ -268,9 +268,16 @@ const R = {
       && s.successor_subset_authorized === false;
   },
   noSubset3Artifact: () => !existsSync(resolve(SUBSET3)),
+  /**
+   * Waves 2/3/4 may NEVER be approved. One wave 3 template (vendor_crm_promotion) was created
+   * live on 2026-08-25 and is PENDING + held; that is the only way a later-wave entry may
+   * leave draft, and it still contributes nothing to readiness.
+   */
   laterWavesUntouched: () => packet.templates.filter((t) => t.submission_wave >= 2)
-    .every((t) => t.local_state.approval_status === "draft"
-      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"),
+    .every((t) => (t.local_state.approval_status === "pending"
+      ? t.local_state.submission_state === "SUBMITTED_PENDING" && t.submit_now === false
+      : t.local_state.approval_status === "draft"
+        && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED")),
   docExists: () => existsSync(resolve(DOC)),
 };
 

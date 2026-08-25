@@ -262,22 +262,22 @@ const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_receive
   "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
 /**
- * QF-MVP-40 Wave 1 live batch, created 2026-08-25. Each was accepted by Meta with remote
- * status PENDING and returned category UTILITY, so they are neither draft nor approved:
+ * QF-MVP-40 live batch, created 2026-08-25: six Wave-1 templates plus the final two
+ * required QF-MVP-40.4 templates. All eight are PENDING, so they are neither draft nor approved:
  * they are a THIRD lifecycle state. Their creation authority is CONSUMED, so they are held
  * from creation, and they DO carry a proven remote template id - which is exactly why the
  * old "no id anywhere" rule had to become "an id only where creation is proven".
  * PENDING IS NOT APPROVED: none of these may be advanced without a GET-only reconciliation.
  */
-const PENDING_KEYS_WAVE1 = Object.freeze(["clarification_reminder", "clarification_request",
-  "low_credit_warning", "vendor_new_lead", "vendor_package_expiry_warning",
-  "vendor_response_reminder"]);
+const PENDING_KEYS = Object.freeze(["clarification_reminder", "clarification_request",
+  "client_transactional_followup", "low_credit_warning", "vendor_crm_promotion",
+  "vendor_new_lead", "vendor_package_expiry_warning", "vendor_response_reminder"]);
 const closedState = (t) => {
   if (CLOSED_KEYS_40_10E.includes(t.internal_template_key)) {
     return t.submission_state === "APPROVED_UNMAPPED" && t.approval_status === "approved"
       && t.qf_mvp_40?.submit_now === false;
   }
-  if (PENDING_KEYS_WAVE1.includes(t.internal_template_key)) {
+  if (PENDING_KEYS.includes(t.internal_template_key)) {
     return t.submission_state === "SUBMITTED_PENDING" && t.approval_status === "pending"
       && t.qf_mvp_40?.submit_now === false;
   }
@@ -286,11 +286,11 @@ const closedState = (t) => {
 add("F1  submission state is closed: approved+held, pending+held, all others draft",
   allTemplates.every(closedState)
   && allTemplates.filter((t) => t.approval_status === "approved").length === CLOSED_KEYS_40_10E.length
-  && allTemplates.filter((t) => t.approval_status === "pending").length === PENDING_KEYS_WAVE1.length);
+  && allTemplates.filter((t) => t.approval_status === "pending").length === PENDING_KEYS.length);
 // A remote id is now PERMITTED, but ONLY where creation is proven, and it is REQUIRED
 // there - an unsubmitted template inventing an id, and a created one hiding it, both fail.
 add("F2  a provider template id appears only where creation is proven",
-  allTemplates.every((t) => (PENDING_KEYS_WAVE1.includes(t.internal_template_key)
+  allTemplates.every((t) => (PENDING_KEYS.includes(t.internal_template_key)
     ? typeof t.provider_template_id === "string" && t.provider_template_id.length > 0
     : t.provider_template_id === null)));
 add("F3  acknowledgement Meta category candidate remains utility",

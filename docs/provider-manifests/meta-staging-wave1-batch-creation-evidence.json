@@ -26,7 +26,8 @@
     "templates_edited_or_deleted": 0,
     "mappings_activated": 0,
     "meta_request_body_captured": false,
-    "meta_response_body_captured": false
+    "meta_response_body_captured": false,
+    "templates_created_total_including_final_two": 8
   },
   "semantic_proof": {
     "readback_semantic_match": true,
@@ -35,11 +36,11 @@
   },
   "creation_authority": {
     "state": "CONSUMED",
-    "statement": "All six provider names now exist remotely. Their creation authority is SPENT: none may be live-created again, and each is held from creation in the source manifest (submit_now false). A second create for any of these names would be a duplicate-name collision, not a retry."
+    "statement": "All six provider names now exist remotely. Their creation authority is SPENT: none may be live-created again, and each is held from creation in the source manifest (submit_now false). A second create for any of these names would be a duplicate-name collision, not a retry. The final two required templates (see final_two) are covered by the same rule: their creation authority is likewise CONSUMED and they are held from creation."
   },
   "approval_non_claim": {
     "approved": false,
-    "statement": "PENDING is not APPROVED. Meta accepted the submissions for review; it has not approved them. No approval is claimed anywhere, and none may be recorded until a separate GET-only reconciliation proves it. Until then these templates are UNMAPPED and UNSENDABLE."
+    "statement": "PENDING is not APPROVED. Meta accepted the submissions for review; it has not approved them. No approval is claimed anywhere, and none may be recorded until a separate GET-only reconciliation proves it. Until then these templates are UNMAPPED and UNSENDABLE. This applies identically to the final two: both are PENDING, not approved."
   },
   "authorities_explicitly_not_granted": {
     "mapping_authority": "NOT_GRANTED",
@@ -118,5 +119,52 @@
       "sha256": "77edfb74864bc5767939302e028555c8bef8ec740ad469c3fa129d492c1d52d0",
       "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T04-58-43-957Z.json"
     }
-  ]
+  ],
+  "final_two": {
+    "observed_at_utc_date": "2026-08-25",
+    "submitted_by": "scripts/mvp/communication/submit-meta-templates.mjs --wave <n> --template <key> --execute",
+    "operation_mode": "EXECUTE_CREATE",
+    "templates_created": 2,
+    "create_post_count_total": 2,
+    "create_post_count_per_template": 1,
+    "create_post_count_basis": "OBSERVED",
+    "second_post_issued": false,
+    "identity_match": true,
+    "all_outcomes": "CREATED_PENDING",
+    "all_remote_statuses_at_creation": "PENDING",
+    "returned_categories": {
+      "qf_client_transactional_followup_v1": "UTILITY",
+      "qf_vendor_crm_promotion_v1": "MARKETING"
+    },
+    "category_note": "These two do NOT share a category: the client follow-up is UTILITY and the vendor CRM promotion is MARKETING. Meta returned each template's INTENDED category, so neither was silently recategorised.",
+    "messages_sent": 0,
+    "templates_edited_or_deleted": 0,
+    "mappings_activated": 0,
+    "meta_request_body_captured": false,
+    "meta_response_body_captured": false,
+    "records": [
+      {
+        "internal_template_key": "client_transactional_followup",
+        "provider_template_name": "qf_client_transactional_followup_v1",
+        "remote_template_id": "2924879551180482",
+        "payload_fingerprint": "34f170d7784fc26f3366e81c49073d5c75ac0b053f68b6421cd34c635e093bc0",
+        "remote_status_at_creation": "PENDING",
+        "returned_category": "UTILITY",
+        "path": "docs/provider-manifests/meta-staging-client-transactional-followup-v1-creation.json",
+        "sha256": "698ccb0aa3d43c0af145e1393761d62b627cb1c93e28037b99d6c6f0226d6b30",
+        "generated_filename": "QF-MVP-40-WAVE1-META-SUBMISSION-2026-08-25T05-19-10-977Z.json"
+      },
+      {
+        "internal_template_key": "vendor_crm_promotion",
+        "provider_template_name": "qf_vendor_crm_promotion_v1",
+        "remote_template_id": "2326221901244860",
+        "payload_fingerprint": "87c58dc5b2426f0c863be16ed824b6f4b69674174abfaa10b82498c20163a745",
+        "remote_status_at_creation": "PENDING",
+        "returned_category": "MARKETING",
+        "path": "docs/provider-manifests/meta-staging-vendor-crm-promotion-v1-creation.json",
+        "sha256": "634f7ba11d1e17c9a46d2e573e9cbd5c887330dcaa869389ca856bb56f2f9e87",
+        "generated_filename": "QF-MVP-40-WAVE3-META-SUBMISSION-2026-08-25T05-19-15-927Z.json"
+      }
+    ]
+  }
 }

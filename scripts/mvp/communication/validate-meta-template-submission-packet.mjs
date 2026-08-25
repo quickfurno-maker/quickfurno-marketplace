@@ -156,17 +156,20 @@ const DEFERRED_LANES = ["WAVE1_REMAINING_ORDINARY", "WAVE1_COMMERCIAL", "WAVE2_A
 const LEDGER_HISTORY_NAMES = ["qf_consent_help_response_v1", "qf_consent_help_response_v2",
   "qf_consent_start_acknowledgement_v1", "qf_client_matching_update_v1"];
 /**
- * QF-MVP-40 Wave 1 live batch, created 2026-08-25: accepted by Meta with remote status
- * PENDING and returned category UTILITY. A THIRD lifecycle state, neither draft nor
+ * QF-MVP-40 live batch, created 2026-08-25: six Wave-1 templates plus the final two
+ * PENDING at their INTENDED category (seven UTILITY, one MARKETING). A THIRD lifecycle state,
  * approved. Creation authority is CONSUMED so each is held from creation, and each DOES
  * carry a proven remote template id. PENDING IS NOT APPROVED.
  */
-const PENDING_KEYS_WAVE1 = Object.freeze(["clarification_reminder", "clarification_request",
-  "low_credit_warning", "vendor_new_lead", "vendor_package_expiry_warning",
-  "vendor_response_reminder"]);
+const PENDING_KEYS = Object.freeze(["clarification_reminder", "clarification_request",
+  "client_transactional_followup", "low_credit_warning", "vendor_crm_promotion",
+  "vendor_new_lead", "vendor_package_expiry_warning", "vendor_response_reminder"]);
 const PENDING_LEDGER_NAMES = Object.freeze(["qf_clarification_reminder_v1",
-  "qf_clarification_request_v2", "qf_low_credit_warning_v1", "qf_vendor_new_lead_v1",
+  "qf_clarification_request_v2", "qf_client_transactional_followup_v1",
+  "qf_low_credit_warning_v1", "qf_vendor_crm_promotion_v1", "qf_vendor_new_lead_v1",
   "qf_vendor_package_expiry_warning_v1", "qf_vendor_response_reminder_v1"]);
+/** The one MARKETING template. Its intended category is MARKETING, not UTILITY. */
+const PENDING_MARKETING_NAMES = Object.freeze(["qf_vendor_crm_promotion_v1"]);
 /** Subset 1 — proposed in 40.10E, CLOSED in 40.10F. */
 const SUBSET1 = "docs/provider-manifests/meta-wave1-next-utility-subset-review.json";
 const SUBSET1_KEYS = ["client_lead_status_update", "client_matching_update", "lead_assignment_alert"];
@@ -367,8 +370,13 @@ const R = {
     const L = JSON.parse(readFileSync(resolve(REMOTE_STATE), "utf8"));
     return PENDING_LEDGER_NAMES.every((n) => {
       const e = L.entries.find((x) => x.provider_template_name === n);
+      // Seven are UTILITY, one is MARKETING. Each must record the category it INTENDED,
+      // so a silent recategorisation by Meta would fail here rather than pass unnoticed.
+      const intended = PENDING_MARKETING_NAMES.includes(n) ? "MARKETING" : "UTILITY";
       return !!e && e.last_proven_status === "PENDING"
-        && e.last_proven_remote_category === "UTILITY"
+        && e.last_proven_remote_category === intended
+        && e.requested_category === intended
+        && e.current_waba_state === `PRESENT_PENDING_${intended}`
         && e.disposition === "SUBMITTED_PENDING_UNMAPPED"
         && e.creation_authority === "CONSUMED"
         && e.approval_evidence === null
@@ -449,11 +457,11 @@ const R = {
   closedStateModel: (p) => {
     const present = p.templates.filter((t) => CLOSED_KEYS.includes(t.internal_template_key));
     if (present.length !== CLOSED_KEYS.length) return false;      // the set itself is pinned
-    if (p.templates.filter((t) => PENDING_KEYS_WAVE1.includes(t.internal_template_key)).length
-        !== PENDING_KEYS_WAVE1.length) return false;
+    if (p.templates.filter((t) => PENDING_KEYS.includes(t.internal_template_key)).length
+        !== PENDING_KEYS.length) return false;
     return p.templates.every((t) => {
       const st = t.local_state;
-      if (PENDING_KEYS_WAVE1.includes(t.internal_template_key)) {
+      if (PENDING_KEYS.includes(t.internal_template_key)) {
         // Created live: the remote id is REQUIRED, and creation is HELD afterwards.
         return typeof st.provider_template_id === "string" && st.provider_template_id.length > 0
           && st.approval_status === "pending"
@@ -485,7 +493,7 @@ const R = {
   remoteIdOnlyWhereProven: (p) => {
     const packetOk = p.templates.every((t) => {
       const id = t.local_state.provider_template_id;
-      return PENDING_KEYS_WAVE1.includes(t.internal_template_key)
+      return PENDING_KEYS.includes(t.internal_template_key)
         ? typeof id === "string" && /^[0-9]+$/.test(id)
         : id === null;
     });
@@ -997,7 +1005,7 @@ const R = {
     const lanes = pause.deferred_lanes ?? [];
     const released = pause.pause_lift?.released_keys ?? [];
     // Nothing may be declared released unless it is in the proven pending batch.
-    if (!released.every((k) => PENDING_KEYS_WAVE1.includes(k))) return false;
+    if (!released.every((k) => PENDING_KEYS.includes(k))) return false;
     const named = lanes.flatMap((l) => l.keys ?? []);
     return named.length > 0 && named.every((k) => {
       const t = p.templates.find((x) => x.internal_template_key === k);
@@ -1022,12 +1030,23 @@ const R = {
    */
   laterWavesUntouched: (p) => {
     const later = p.templates.filter((t) => t.submission_wave >= 2);
-    const unapproved = later.every((t) => t.local_state.approval_status === "draft"
-      && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
-      && t.local_state.provider_template_id === null);
+    // NOTHING in waves 2/3/4 may ever be approved. That half of the rule is absolute.
+    if (later.some((t) => t.local_state.approval_status === "approved")) return false;
     const armingProfile = { 2: false, 3: true, 4: false };
-    const armingPinned = later.every((t) => t.submit_now === armingProfile[t.submission_wave]);
-    return unapproved && armingPinned;
+    return later.every((t) => {
+      if (PENDING_KEYS.includes(t.internal_template_key)) {
+        // A later-wave template may leave draft ONLY by a proven live creation, and it is
+        // then held forever: submit_now false regardless of its wave arming profile.
+        return t.local_state.approval_status === "pending"
+          && t.local_state.submission_state === "SUBMITTED_PENDING"
+          && typeof t.local_state.provider_template_id === "string"
+          && t.submit_now === false;
+      }
+      return t.local_state.approval_status === "draft"
+        && t.local_state.submission_state === "DRAFT_NOT_SUBMITTED"
+        && t.local_state.provider_template_id === null
+        && t.submit_now === armingProfile[t.submission_wave];
+    });
   },
   /**
    * QF-MVP-40.10G: subset 2 is now CLOSED, so its own keys are legitimately in
@@ -1158,7 +1177,7 @@ const RULES = [
   ["S7  the v2 body repairs the exact fault that was rejected", R.v2RepairsTheFault, packet],
   ["S8  v2 keeps the two-parameter variable contract", R.v2KeepsVariableContract, packet],
   ["S9  v2 is submitted exactly once and PENDING, not approved", R.v2SubmittedPendingNotApproved, packet],
-  ["S13 no pending Wave 1 template claims approval or authority", R.pendingNeverClaimsApproval, packet],
+  ["S13 no pending template claims approval, and each keeps its intended category", R.pendingNeverClaimsApproval, packet],
   ["S10 the v1 deterministic rejection is recorded", R.v1RejectionRecorded, v1Rejection],
   ["S11 v1 is permanently retired and may never be retried", R.v1PermanentlyRetired, v1Rejection],
   ["S12 a rejected create left no ledger row", R.v1HasNoLedgerRow, remoteLedger],
@@ -1241,7 +1260,7 @@ const RULES = [
   ["P107 no subset-3 review artefact exists", R.noSubset3Artifact, packet],
   ["P108 every deferred lane is recorded deferred / held / unauthorized", R.deferredLanesIntact, packet],
   ["P109 a deferred lane stays draft unless its pause lift is recorded and proven", R.deferredLanesStillDraft, packet],
-  ["P110 waves 2/3/4 remain entirely unapproved and held", R.laterWavesUntouched, packet],
+  ["P110 waves 2/3/4 are never approved; only a proven creation may be pending+held", R.laterWavesUntouched, packet],
   ["P101 subset 2 leaks no commercial, closed, excluded, button or URL template", R.subset2LeaksNothing, packet],
   ["P102 subset 2 names the commercial templates as separately held", R.subset2NamesCommercialHold, packet],
   ["P103 subset 2 pins the current source packet fingerprint", R.subset2PinsCurrentPacket, packet],
@@ -1298,9 +1317,16 @@ const MUT = [
     t.creation_payload.components[0].text = "QuickFurno admin alert: a policy blocked lead {{1}} just now."; }],
   // low_credit_warning was the original target but is now submitted and held, so it is no
   // longer in the submittable set and could never have failed this rule again.
+  // Retargeted twice as templates were submitted and became held: the rule only applies to
+  // the still-submittable set, so the mutation must target something still in it.
   ["MS8 a submittable template with a trailing parameter is rejected", R.submittableBodiesClean, packet, (p) => {
-    const t = p.templates.find((x) => x.internal_template_key === "client_transactional_followup");
-    t.creation_payload.components[0].text = "QuickFurno is following up on your enquiry {{1}}."; }],
+    const t = p.templates.find((x) => x.internal_template_key === "client_nurture_followup");
+    t.creation_payload.components[0].text = "Hi there, still planning your project? Ask {{1}}."; }],
+  ["MS22 approving a later-wave template is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "vendor_crm_promotion")
+      .local_state.approval_status = "approved"; }],
+  ["MS23 leaving a created later-wave template submittable is rejected", R.laterWavesUntouched, packet, (p) => {
+    p.templates.find((x) => x.internal_template_key === "vendor_crm_promotion").submit_now = true; }],
   ["MS21 releasing a key that was never submitted is rejected", R.deferredLanesStillDraft, packet, (p) => {
     p.templates.find((x) => x.internal_template_key === "clarification_request")
       .local_state.approval_status = "draft"; }],

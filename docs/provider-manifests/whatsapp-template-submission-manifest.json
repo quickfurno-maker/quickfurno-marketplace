@@ -531,9 +531,9 @@
           "binding_readiness": "not_required",
           "note": "Zero-variable template: the free-text campaign parameter was removed, so there is no source key to prove and no binding to resolve."
         },
-        "approval_status": "draft",
-        "submission_state": "DRAFT_NOT_SUBMITTED",
-        "provider_template_id": null,
+        "approval_status": "pending",
+        "submission_state": "SUBMITTED_PENDING",
+        "provider_template_id": "2326221901244860",
         "qf_mvp_40": {
           "recipient_type": "vendor",
           "purpose": "Delivers an admin-approved CRM campaign message to a vendor audience.",
@@ -550,7 +550,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 3,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.4 FINAL REQUIRED TEMPLATE, LIVE CREATION CLOSED 2026-08-25. qf_vendor_crm_promotion_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category MARKETING - the INTENDED category, so it was not recategorised. The immediate post-create readback matched the committed canonical payload semantically. CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false). PENDING IS NOT APPROVED. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with the intended category on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-vendor-crm-promotion-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence."
         },
         "provider_template_name_candidate": "qf_vendor_crm_promotion_v1"
       }
@@ -949,9 +950,9 @@
           "binding_readiness": "not_required",
           "note": "Zero-variable template: there are no positional parameters, so there is no source key to prove and no binding to resolve. Mapping still requires a separate authorized phase."
         },
-        "approval_status": "draft",
-        "provider_template_id": null,
-        "submission_state": "DRAFT_NOT_SUBMITTED",
+        "approval_status": "pending",
+        "provider_template_id": "2924879551180482",
+        "submission_state": "SUBMITTED_PENDING",
         "qf_mvp_40": {
           "recipient_type": "client",
           "purpose": "Transactional follow-up on an existing QuickFurno enquiry, inviting the client to reply if they still need help with THAT enquiry.",
@@ -968,7 +969,8 @@
           "authority_path": "lib/communication/outboundConsentScope.ts (ordinary D3-B path)",
           "component_profile": "STANDARD_TEXT",
           "submission_wave": 1,
-          "submit_now": true
+          "submit_now": false,
+          "closure_note": "QF-MVP-40.4 FINAL REQUIRED TEMPLATE, LIVE CREATION CLOSED 2026-08-25. qf_client_transactional_followup_v1 was created live by EXACTLY ONE create POST (create_post_count 1, OBSERVED, no second POST). Meta accepted it with remote status PENDING and returned category UTILITY - the INTENDED category, so it was not recategorised. The immediate post-create readback matched the committed canonical payload semantically. CREATION AUTHORITY IS CONSUMED: this provider name must never be live-created again, and creation is now HELD (submit_now false). PENDING IS NOT APPROVED. This entry must NOT be advanced to approved / APPROVED_UNMAPPED until a separate GET-only reconciliation proves APPROVED with the intended category on the current dedicated staging WABA. Until then the template is UNMAPPED and UNSENDABLE. A submission proves the PROVIDER CONTRACT ONLY: no mapping, no runtime activation, no consent authority and no send authority. EVIDENCE: meta-staging-client-transactional-followup-v1-creation.json indexed by meta-staging-wave1-batch-creation-evidence."
         },
         "provider_template_name_candidate": "qf_client_transactional_followup_v1"
       },

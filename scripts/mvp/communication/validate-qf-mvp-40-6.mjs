@@ -34,16 +34,16 @@ const CLOSED_KEYS_40_10E = Object.freeze(["consent_help_response", "lead_receive
   "client_lead_status_update", "lead_assignment_alert",
   "consent_stop_acknowledgement", "consent_start_acknowledgement", "vendor_onboarding_reminder"]);
 /**
- * QF-MVP-40 Wave 1 live batch, created 2026-08-25. Each was accepted by Meta with remote
- * status PENDING and returned category UTILITY, so they are neither draft nor approved:
+ * QF-MVP-40 live batch, created 2026-08-25: six Wave-1 templates plus the final two
+ * required QF-MVP-40.4 templates. All eight are PENDING, so they are neither draft nor approved:
  * they are a THIRD lifecycle state. Their creation authority is CONSUMED, so they are held
  * from creation, and they DO carry a proven remote template id - which is exactly why the
  * old "no id anywhere" rule had to become "an id only where creation is proven".
  * PENDING IS NOT APPROVED: none of these may be advanced without a GET-only reconciliation.
  */
-const PENDING_KEYS_WAVE1 = Object.freeze(["clarification_reminder", "clarification_request",
-  "low_credit_warning", "vendor_new_lead", "vendor_package_expiry_warning",
-  "vendor_response_reminder"]);
+const PENDING_KEYS = Object.freeze(["clarification_reminder", "clarification_request",
+  "client_transactional_followup", "low_credit_warning", "vendor_crm_promotion",
+  "vendor_new_lead", "vendor_package_expiry_warning", "vendor_response_reminder"]);
 
 const results = [];
 const add = (name, ok, detail) => results.push({ name, ok: ok === true, detail: detail ?? "" });
@@ -167,7 +167,7 @@ const RULES = {
     if (all.filter((t) => CLOSED_KEYS_40_10E.includes(t.internal_template_key)).length
         !== CLOSED_KEYS_40_10E.length) return false;
     return all.every((t) => {
-      if (PENDING_KEYS_WAVE1.includes(t.internal_template_key)) {
+      if (PENDING_KEYS.includes(t.internal_template_key)) {
         // Created live: a proven remote id is required, and creation is held afterwards.
         return typeof t.provider_template_id === "string" && t.provider_template_id.length > 0
           && t.submission_state === "SUBMITTED_PENDING" && t.approval_status === "pending"

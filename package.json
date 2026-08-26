@@ -57,6 +57,8 @@
     "test:mvp:40-r8a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-account-identity-repair.mjs",
     "repair:mvp:40-r8a-once": "node scripts/mvp/communication/repair-meta-staging-account-identity-once.mjs",
     "test:mvp:40-r8b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-actual-staging-vendor-onboarding-reminder-one-shot.mjs",
+    "test:mvp:40-r8c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-actual-staging-remaining-seven-one-shot.mjs",
+    "create:mvp:40-r8c-once": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/create-actual-staging-remaining-seven-once.mjs",
     "create:mvp:40-r8b-once": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/create-actual-staging-vendor-onboarding-reminder-once.mjs",
     "test:mvp:40-r7c": "node scripts/mvp/communication/validate-meta-staging-provider-account-rebind.mjs",
     "test:mvp:40-r7i": "node scripts/mvp/communication/validate-meta-staging-client-matching-update-one-shot.mjs",

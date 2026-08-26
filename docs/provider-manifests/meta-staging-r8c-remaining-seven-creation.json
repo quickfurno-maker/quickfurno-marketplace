@@ -1,0 +1,191 @@
+{
+  "artifact": "meta-staging-r8c-remaining-seven-creation",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R8C",
+  "operation_id": "QF-MVP-40-R8C-ACTUAL-STAGING-REMAINING-SEVEN-2026-08-26",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "authorizes_database_writes": false,
+  "purpose": "Scoped, single-operation evidence for the governed creation of the REMAINING SEVEN canonical seed templates on the ACTUAL dedicated staging WABA. It exists because QF-MVP-40-R8B created exactly one template there and its authority is spent, while a GET-only truth sweep proved the other seven are absent. This artifact records that live truth, the frozen target set, and the bounds on the new authority. It is ADDITIVE and rewrites no history.",
+  "privacy": "Meta asset identities are not recorded here in raw form. No token, app secret, verify token, phone number or remote template id appears. Template NAMES are recorded because they are the operation's subject and are already committed throughout the packet and the SEED_SET.",
+
+  "source_of_truth": {
+    "payload_contract": "The canonical packet docs/provider-manifests/meta-template-submission-packet.json supplies every creation_payload, and the committed SEED_SET supplies every provider_template_name and payload fingerprint. These remain authoritative for WHAT is created.",
+    "remote_existence_and_status": "Derived EXCLUSIVELY from fresh live GET calls against the actual staging WABA at run time. Nothing in the repository is treated as evidence of remote state.",
+    "historical_state_explicitly_not_read": [
+      "submit_now",
+      "local_state.approval_status",
+      "local_state.submission_state",
+      "provider_template_id"
+    ],
+    "why": "Those fields originate from the pre-QF-MVP-40-R8 MIXED IDENTITY period, when the repository believed a production WABA was staging. They describe a different remote identity and are not current actual-staging truth. See docs/provider-manifests/meta-staging-identity-boundary-correction.json."
+  },
+
+  "live_truth_sweep": {
+    "method": "GET_ONLY",
+    "mutation_flags_used": "NONE",
+    "meta_post_count": 0,
+    "expected_template_count": 8,
+    "approved_utility_en": 1,
+    "absent": 7,
+    "other_or_not_ready": 0,
+    "statement": "Of the eight canonical seed templates, exactly one exists on the actual staging WABA and it is APPROVED / UTILITY / en. The remaining seven are ABSENT."
+  },
+
+  "r8b_anchor": {
+    "internal_template_key": "vendor_onboarding_reminder",
+    "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+    "post_attempt_count": 1,
+    "create_classification": "SUCCESS",
+    "readback_state": "ALREADY_CREATED",
+    "remote_status_at_creation": "PENDING",
+    "current_remote_status": "APPROVED",
+    "current_remote_category": "UTILITY",
+    "current_remote_language": "en",
+    "semantic_match": true,
+    "second_post_issued": false,
+    "authority": "SPENT",
+    "authority_note": "The R8B creation authority is consumed. It is not reopened, not repointed and not rerun by R8C. R8C imports only R8B's PURE asset-scope layer (validateIdentity, readLiveAssets, proveAssets, INTENDED_STAGE, ADVISORY_PHONE_FIELDS) and never its acknowledgement flag or its CLI.",
+    "role_in_r8c": "ANCHOR. Before any R8C POST, this template must read back APPROVED / UTILITY / en with a semantic match against its committed payload. That is what proves R8C is operating on the same actual staging WABA where R8B genuinely succeeded."
+  },
+
+  "targets": [
+    { "internal_template_key": "consent_help_response", "provider_template_name": "qf_consent_help_response_v3", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" },
+    { "internal_template_key": "consent_stop_acknowledgement", "provider_template_name": "qf_consent_stop_acknowledgement_v1", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" },
+    { "internal_template_key": "consent_start_acknowledgement", "provider_template_name": "qf_consent_start_acknowledgement_v2", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" },
+    { "internal_template_key": "lead_received", "provider_template_name": "qf_lead_received_v1", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" },
+    { "internal_template_key": "client_lead_status_update", "provider_template_name": "qf_client_lead_status_update_v1", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" },
+    { "internal_template_key": "client_matching_update", "provider_template_name": "qf_client_matching_update_v2", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" },
+    { "internal_template_key": "lead_assignment_alert", "provider_template_name": "qf_lead_assignment_alert_v1", "language": "en", "category": "UTILITY", "live_state_at_sweep": "ABSENT" }
+  ],
+  "target_set_derivation": {
+    "derived_from": "the committed SEED_SET in scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
+    "rule": "SEED_SET minus the R8B anchor key",
+    "re_declared_in_operator": false,
+    "frozen": true,
+    "count_asserted_at_module_load": 7,
+    "why": "Deriving rather than re-declaring means the seven cannot drift from the canonical catalogue, and there is no local list in which an eighth target could be introduced by an edit."
+  },
+
+  "authority": {
+    "operator": "scripts/mvp/communication/create-actual-staging-remaining-seven-once.mjs",
+    "validator": "scripts/mvp/communication/validate-actual-staging-remaining-seven-one-shot.mjs",
+    "test_command": "npm run test:mvp:40-r8c",
+    "run_command": "npm run create:mvp:40-r8c-once",
+    "execution_status": "NOT_EXECUTED",
+    "dry_run_by_default": true,
+    "required_flags": ["--execute", "--owner-authorized-once-actual-staging-seven-create"],
+    "acknowledgement_is_new": true,
+    "reuses_spent_acknowledgement": false,
+    "spent_acknowledgements_explicitly_refused": [
+      "--owner-authorized-once",
+      "--owner-authorized-once-rebind",
+      "--owner-authorized-once-identity-repair",
+      "--owner-authorized-once-actual-staging-create"
+    ],
+    "template_selector_exists": false,
+    "arbitrary_name_input_possible": false,
+    "max_post_count_total": 7,
+    "max_post_count_per_target": 1,
+    "posts_are_sequential": true,
+    "posts_are_concurrent": false,
+    "second_post_per_target_possible": false,
+    "retry_after_ambiguous_permitted": false,
+    "readback_calls_after_each_post": 1,
+    "creation_is_not_approval": true,
+    "creation_is_not_approval_note": "A clean create commonly reads back PENDING. That is creation success, not approval. The operator never reports APPROVED and activates nothing."
+  },
+
+  "complete_preflight_before_first_post": {
+    "statement": "Every condition for every target is proved BEFORE the first POST. There is no code path in which creation begins from a partial preflight.",
+    "conditions": [
+      "actual staging identity exact (App, WABA, Phone) against ACTUAL_STAGING_IDENTITY_DIGESTS",
+      "owner asset proof valid, fresh (<=15 min), tamper-evident, HEAD-bound, project-ref-bound and stage-bound to TEMPLATE_CREATION",
+      "live WABA equals the exact actual staging WABA",
+      "exactly one phone on the WABA, matching the exact actual staging phone identity",
+      "live subscribed-app set EXACTLY equals the owner-attested set",
+      "no known production asset anywhere in the live readback",
+      "canonical payload present for all seven targets and for the anchor",
+      "every payload fingerprint matches its committed SEED_SET pin",
+      "every target language is en",
+      "every target category is UTILITY",
+      "the R8B anchor reads back APPROVED / UTILITY / en with a semantic match",
+      "every one of the seven target names is ABSENT"
+    ],
+    "on_any_failure": "POST_ATTEMPT_COUNT=0 and RESULT=REFUSED"
+  },
+
+  "failure_semantics": {
+    "after_each_post": "exactly one GET-only exact-name readback, requiring one exact row, exact name, exact language, category UTILITY and a semantic payload match",
+    "deterministic_rejection": "STOP. No retry. No further POST.",
+    "ambiguous_transport_outcome": "STOP. No retry. No further POST.",
+    "readback_absent": "STOP. No retry. No further POST.",
+    "readback_semantic_mismatch": "STOP. No retry. No further POST.",
+    "readback_wrong_category_or_language": "STOP. No retry. No further POST.",
+    "partial_success": "Recorded truthfully as CREATED_PARTIAL with a non-zero exit code. Never a trigger for automatic continuation.",
+    "recovery": "Requires fresh GET-only reconciliation and a NEW authority. This operator cannot resume a stopped run."
+  },
+
+  "phone_state_rule": {
+    "inherits": "QF-MVP-40-R8B-R1",
+    "phone_identity_required": true,
+    "exactly_one_phone_required": true,
+    "production_phone_refused": true,
+    "code_verification_status": "ADVISORY for WABA-level template creation — observed and printed, never a gate",
+    "observed_live": "NOT_VERIFIED with quality_rating GREEN",
+    "global_send_readiness_rules_changed": false,
+    "note": "Send and readiness paths continue to require full phone readiness. R8C changes none of them."
+  },
+
+  "structural_prohibitions": {
+    "messages_endpoint": "ABSENT",
+    "whatsapp_send": "IMPOSSIBLE",
+    "delete_put_patch": "ABSENT",
+    "database_access": "ABSENT",
+    "supabase_write_authority": "ABSENT",
+    "mapping_activation": "ABSENT",
+    "readiness_activation": "ABSENT",
+    "canary_activation": "ABSENT",
+    "webhook_mutation": "ABSENT",
+    "provider_account_mutation": "ABSENT",
+    "consent_state_mutation": "ABSENT",
+    "production_mutation": "IMPOSSIBLE",
+    "template_deletion": "ABSENT",
+    "template_editing": "ABSENT",
+    "template_retry": "ABSENT",
+    "mutation_loop": "ABSENT — the operator contains no for/while/do construct at all",
+    "consent_note": "Creating the three consent acknowledgement/help templates does NOT create consent evidence and does not confer ordinary send authority. A template's existence is not a permission to send it."
+  },
+
+  "spent_authorities_untouched": {
+    "statement": "R8C neither reopens nor repoints any prior authority. The retired R7 operators are not imported at all; R7B contributes only its transport helper makeHttp; R8B contributes only its pure asset-scope layer.",
+    "not_reopened": ["QF-MVP-40-R7B", "QF-MVP-40-R7I", "QF-MVP-40-R7K", "QF-MVP-40-R7L", "QF-MVP-40-R7M", "QF-MVP-40-R7N", "QF-MVP-40-R8B"]
+  },
+
+  "execution_counts_at_authoring": {
+    "meta_post_count": 0,
+    "meta_template_mutations": 0,
+    "whatsapp_sends": 0,
+    "provider_arms": 0,
+    "canary_arms": 0,
+    "database_writes": 0,
+    "webhook_mutations": 0,
+    "production_mutations": 0,
+    "deployments": 0
+  },
+
+  "authorities_explicitly_not_granted": {
+    "send_authority": "DENIED",
+    "mapping_authority": "DENIED",
+    "provider_authority": "DENIED",
+    "readiness_arm_authority": "NOT_GRANTED",
+    "canary_arm_authority": "NOT_GRANTED",
+    "webhook_mutation_authority": "NOT_GRANTED",
+    "template_delete_authority": "NOT_GRANTED",
+    "template_edit_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED",
+    "statement": "This artifact is a repository change only. It authorises no Meta call by itself. R8C remains dry-run by default, unexecuted, and requires both exact flags plus a fresh stage-bound owner attestation."
+  }
+}

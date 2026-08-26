@@ -78,6 +78,7 @@ import {
   sha256Hex,
   validateIdentity,
 } from "./create-meta-staging-vendor-onboarding-reminder-once.mjs";
+import { historicalRetirementBanner, retireHistoricalMutation } from "./metaStagingIdentity.mjs";
 
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
 
@@ -402,7 +403,10 @@ export function decide({ cli, identity, payloadResult, preState }) {
 const isEntry = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntry) {
-  const cli = parseCli(process.argv.slice(2));
+  const parsedCli = parseCli(process.argv.slice(2));
+  // QF-MVP-40-R8 — spent historical authority: the mutation bit is forced false here,
+  // before any decision, network call or readback. Dry-run reading still works.
+  const cli = retireHistoricalMutation(parsedCli, { operatorId: "QF-MVP-40-R7L", mutationKey: "mayPost" });
 
   console.log("== QF-MVP-40-R7L bounded held-Utility recovery ==");
   console.log(`   recoverable targets     : ${RECOVERABLE_KEYS.join(", ")}`);
@@ -417,6 +421,7 @@ if (isEntry) {
   const env = process.env;
 
   console.log(`   mode                    : ${cli.mayPost ? "EXECUTE" : "DRY RUN"}`);
+  console.log(historicalRetirementBanner(cli.retiredOperatorId));
   console.log(`   target key              : ${target.key}`);
   console.log(`   target template         : ${target.providerName}`);
   console.log(`   target wave/category    : ${target.wave} / ${target.category}`);

@@ -69,6 +69,7 @@ import {
   sha256Hex,
   validateIdentity,
 } from "./create-meta-staging-vendor-onboarding-reminder-once.mjs";
+import { historicalRetirementBanner, retireHistoricalMutation } from "./metaStagingIdentity.mjs";
 
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
 
@@ -220,11 +221,15 @@ export function classifyPreState(lookup) {
 const isEntry = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntry) {
-  const flags = parseFlags(process.argv.slice(2));
+  const parsedFlags = parseFlags(process.argv.slice(2));
+  // QF-MVP-40-R8 — spent historical authority: the mutation bit is forced false here,
+  // before any decision, network call or readback. Dry-run reading still works.
+  const flags = retireHistoricalMutation(parsedFlags, { operatorId: "QF-MVP-40-R7I", mutationKey: "mayPost" });
   const env = process.env;
 
   console.log("== QF-MVP-40-R7I one-shot staging CLIENT template creation ==");
   console.log(`   mode                    : ${flags.mayPost ? "EXECUTE" : "DRY RUN"}`);
+  console.log(historicalRetirementBanner(flags.retiredOperatorId));
   console.log(`   target template         : ${TARGET_TEMPLATE_NAME}`);
 
   const identity = validateIdentity(env);

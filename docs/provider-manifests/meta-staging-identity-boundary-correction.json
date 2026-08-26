@@ -1,0 +1,264 @@
+{
+  "artifact": "meta-staging-identity-boundary-correction",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R8",
+  "operation_id": "QF-MVP-40-R8-STAGING-META-IDENTITY-BOUNDARY-CORRECTION-2026-08-25",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "authorizes_database_writes": false,
+  "purpose": "Additive, superseding correction of the Meta STAGING IDENTITY BOUNDARY. Live read-only diagnosis on 2026-08-25 proved that the WABA and phone-number digests the repository had pinned as 'the dedicated staging assets' since QF-MVP-40-R7B are in fact the PRODUCTION WABA and PRODUCTION phone number. This artifact records that finding, restates what the earlier evidence does and does not prove, and records the two NEW one-shot authorities created to move forward. It deletes nothing and re-dates nothing.",
+  "privacy": "Meta asset identities appear ONLY as SHA-256 digests of the raw id strings. No token, app secret, webhook verify token, service-role key, phone number, canary recipient or remote template id appears here. This matches the posture the packet validator rule `noSecretOrPii` and the remote-state ledger already enforce.",
+
+  "correction_type": "ADDITIVE_SUPERSESSION",
+  "supersession": {
+    "deletes_history": false,
+    "alters_historical_timestamps": false,
+    "alters_historical_execution_records": false,
+    "claims_historical_actions_ran_on_actual_staging": false,
+    "statement": "The historical execution records remain exactly as written. They are truthful records of operations that really happened against a real remote identity. What is corrected here is the LABEL that identity was given, and therefore what those records may be used to prove going forward.",
+    "superseded_interpretation": "Any reading of an earlier artifact in which the phrases 'the dedicated staging WABA', 'the current staging WABA' or 'the real staging identity' are taken to mean the ACTUAL Meta test/staging WABA.",
+    "not_superseded": "The fact that each recorded operation occurred, its POST/UPDATE counts, its classifications and its observed remote states. Those remain authoritative FOR THE REMOTE IDENTITY THEY ACTUALLY OBSERVED."
+  },
+
+  "identity_boundary": {
+    "digest_algorithm": "sha256(utf8(raw_id_string))",
+    "canonical_source_of_truth": "scripts/mvp/communication/metaStagingIdentity.mjs",
+    "actual_staging": {
+      "app_label": "QuickFurno Staging",
+      "app_id_sha256": "6de73d8d79a40245af3dfa60065ae6a86274b043d8646ec3a84a0719273ece80",
+      "waba_id_sha256": "0ffbaea4f1e46fced957497877dbbd974597ecae5bb317437a9e60b49a69fae0",
+      "phone_number_id_sha256": "0a9b1bb3881a05e5b4d49ccf040180174e9fd37b7d7a86aada6d5eb101979edb",
+      "proven_live_at_utc_date": "2026-08-25"
+    },
+    "production": {
+      "app_id_sha256": "6ce1cc0c3ba0d2d1daf40bdfa0e0448ae5e3a52ea8f20a521b68f988c0701da3",
+      "waba_id_sha256": "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
+      "phone_number_id_sha256": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
+      "role": "DENY_LIST_ONLY — never a target, and never a valid staging classification"
+    },
+    "historical_mixed_triple": {
+      "used_by": ["QF-MVP-40-R7B", "QF-MVP-40-R7C", "QF-MVP-40-R7I", "QF-MVP-40-R7K", "QF-MVP-40-R7L", "QF-MVP-40-R7M", "QF-MVP-40-R7N"],
+      "app_id_sha256": "6de73d8d79a40245af3dfa60065ae6a86274b043d8646ec3a84a0719273ece80",
+      "waba_id_sha256": "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
+      "phone_number_id_sha256": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
+      "classification": "MIXED_AND_INCONSISTENT",
+      "statement": "The app pin was the genuine QuickFurno Staging app. The WABA and phone pins were the PRODUCTION assets. The triple therefore never described a single coherent environment, and the repository contained no rule that could detect this because nothing asserted that the production assets are not the staging assets."
+    }
+  },
+
+  "live_diagnosis_2026_08_25": {
+    "method": "GET_ONLY",
+    "mutation_flags_used": "NONE",
+    "meta_post_count": 0,
+    "database_write_count": 0,
+    "token_scope_verified": true,
+    "token_app_match": true,
+    "token_explicitly_targets_actual_staging_waba": true,
+    "token_note": "A fresh staging token with whatsapp_business_management and whatsapp_business_messaging, granular management scope present, granular target count 1, explicitly targeting the actual staging WABA. The findings below are therefore NOT explained by a token permission gap.",
+    "actual_staging_waba_template_inventory": [
+      { "name": "hello_world", "language": "en_US", "status": "APPROVED", "category": "UTILITY" },
+      { "name": "jaspers_market_image_cta_v1", "language": "en_US", "status": "APPROVED", "category": "MARKETING" },
+      { "name": "jaspers_market_media_carousel_v1", "language": "en_US", "status": "APPROVED", "category": "MARKETING" },
+      { "name": "jaspers_market_order_confirmation_v1", "language": "en_US", "status": "APPROVED", "category": "UTILITY" },
+      { "name": "jaspers_market_plain_text_v1", "language": "en_US", "status": "APPROVED", "category": "MARKETING" }
+    ],
+    "actual_staging_waba_inventory_note": "Every row above is a Meta-provided sample template. No QuickFurno-authored template was returned.",
+    "qf_vendor_onboarding_reminder_v1_on_actual_staging": {
+      "language_queried": "en",
+      "rows_returned": 0,
+      "state": "ABSENT_AT_DIAGNOSIS"
+    },
+    "actual_staging_waba_subscribed_apps": {
+      "subscriber_count": 2,
+      "staging_app_present": true,
+      "production_app_present": false,
+      "companion_app_present": true,
+      "companion_app_id_sha256": "7623b80370413d7f59addff8782e3c5287100a9c9ed38c28e1769b8595be53e0",
+      "companion_app_trust_statement": "The companion app is NOT trusted, NOT hard-coded and NOT allow-listed anywhere in source. A dedicated Meta test WABA legitimately carries more than one subscription, so the ONLY thing that may authorise a two-app WABA is the owner's short-lived external attestation of the EXACT subscribed-app id set, verified against the live readback by exact set equality. A display name is free text and is never evidence."
+    }
+  },
+
+  "what_the_earlier_evidence_does_and_does_not_prove": {
+    "does_prove": "That each recorded operation ran, with the recorded POST/UPDATE counts and classifications, against the historical mixed remote identity.",
+    "does_not_prove": "Anything at all about the state of the ACTUAL dedicated staging/test WABA.",
+    "vendor_onboarding_reminder_specifically": {
+      "historical_record": "docs/provider-manifests/meta-staging-one-shot-template-creation.json records EXECUTED_ONCE with post_attempt_count 1 and a remote template id digest.",
+      "corrected_reading": "That creation occurred on the historical mixed remote identity, not on the actual staging WABA.",
+      "remote_template_id_readability": "The remote template id recorded in docs/provider-manifests/meta-staging-vendor-onboarding-reminder-strict-reconciliation.json is not readable on the actual staging WABA with the fresh staging token.",
+      "deletion_claim": "NONE. It is NOT known whether that template was ever deleted. What is known, and all that is claimed here, is that it is NOT VISIBLE on the actual staging WABA at the time of diagnosis. No Meta deletion event is asserted, and no request or response body is reproduced, because none was captured and fabricating one would be evidence forgery."
+    },
+    "current_waba_truth_sweep": {
+      "artifact": "docs/provider-manifests/meta-staging-current-waba-truth-sweep-evidence.json",
+      "observed_at_utc_date": "2026-08-24",
+      "status": "SUPERSEDED_AS_TO_IDENTITY_ONLY",
+      "statement": "All eight SEED_SET readings in that sweep were taken through operators pinned to the historical mixed triple, so every one of them describes the historical remote identity. The sweep's method, its zero POST counts and its per-key observations remain truthful for that identity. None of the eight may be carried forward as actual-staging truth.",
+      "readings_now_identity_corrected": [
+        { "internal_template_key": "consent_help_response", "recorded_state": "PRESENT_APPROVED_UTILITY", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "consent_stop_acknowledgement", "recorded_state": "PRESENT_APPROVED_UTILITY", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "consent_start_acknowledgement", "recorded_state": "PRESENT_APPROVED_UTILITY", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "lead_received", "recorded_state": "ABSENT", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "client_lead_status_update", "recorded_state": "PRESENT_APPROVED_UTILITY", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "client_matching_update", "recorded_state": "ABSENT", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "lead_assignment_alert", "recorded_state": "ABSENT", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "UNPROVEN" },
+        { "internal_template_key": "vendor_onboarding_reminder", "recorded_state": "PRESENT_APPROVED_UTILITY", "applies_to": "HISTORICAL_MIXED_IDENTITY", "actual_staging_state": "ABSENT_AT_DIAGNOSIS" }
+      ],
+      "readiness_consequence": "No QF-MVP-40 readiness decision for the actual staging WABA may rest on any of the eight readings above. Actual-staging template state must be re-measured, read-only, against the corrected identity before any readiness or canary step is considered."
+    }
+  },
+
+  "staging_database_state_at_correction": {
+    "project": "QuickFurno Staging",
+    "table": "public.communication_provider_accounts",
+    "row": "provider_key=meta_whatsapp_cloud AND channel=whatsapp",
+    "row_count": 1,
+    "stored_business_account_reference_sha256": "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
+    "stored_phone_number_reference_sha256": "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
+    "stored_identity_classification": "PRODUCTION_ASSETS_STORED_IN_STAGING",
+    "readiness_status": "disabled",
+    "configuration_status": "partial",
+    "webhook_status": "pending",
+    "health_status": "unknown",
+    "fail_closed": true,
+    "send_capability_proven": false,
+    "active_canary_proven": false,
+    "statement": "The row remains fail-closed and is left untouched by this correction. No safety field is altered by this artifact or by the code it accompanies."
+  },
+
+  "historical_authority_retirement": {
+    "model": "READ_ONLY_FOREVER",
+    "retired_operators": [
+      { "phase": "QF-MVP-40-R7B", "operator": "scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs", "mutation_gate": "mayPost" },
+      { "phase": "QF-MVP-40-R7I", "operator": "scripts/mvp/communication/create-meta-staging-client-matching-update-once.mjs", "mutation_gate": "mayPost" },
+      { "phase": "QF-MVP-40-R7K", "operator": "scripts/mvp/communication/create-meta-staging-client-lead-status-update-once.mjs", "mutation_gate": "mayPost" },
+      { "phase": "QF-MVP-40-R7L", "operator": "scripts/mvp/communication/create-meta-staging-held-utility-recovery-once.mjs", "mutation_gate": "mayPost" },
+      { "phase": "QF-MVP-40-R7M", "operator": "scripts/mvp/communication/create-meta-staging-start-ack-v2-repair-once.mjs", "mutation_gate": "mayPost" },
+      { "phase": "QF-MVP-40-R7N", "operator": "scripts/mvp/communication/create-meta-staging-client-matching-update-v2-once.mjs", "mutation_gate": "mayPost" },
+      { "phase": "QF-MVP-40-R7C", "operator": "scripts/mvp/communication/rebind-meta-staging-provider-account-once.mjs", "mutation_gate": "mayWrite" }
+    ],
+    "all_were_already_spent": true,
+    "pending_work_lost": "NONE — every listed authority records EXECUTED_ONCE, CONSUMED or SPENT, and no target was awaiting execution.",
+    "mechanism": "Each CLI passes its parsed flags through retireHistoricalMutation() immediately after parsing and before any network call, database client or decision, so the mutation bit is false regardless of which flags are typed. Dry-run reading still works, deliberately, because read-only reconciliation against the historical identity remains legitimate evidence-gathering.",
+    "second_independent_fence": "Their identity pins remain bound to the historical mixed triple, so pointing one at the actual staging WABA fails its own identity check. Neither fence can be lifted by editing a constant.",
+    "why_not_repointed": "Repointing a spent one-shot's constants would convert an already-consumed authority into a live authority against a DIFFERENT WABA. New work on the actual staging assets requires a NEW operator with its OWN owner acknowledgement."
+  },
+
+  "new_authorities": {
+    "note": "Both are DRY RUN BY DEFAULT and NEITHER HAS BEEN EXECUTED. Each requires its own, previously unused, exact acknowledgement flag. Neither grants send, mapping, provider, readiness or canary authority.",
+    "database_identity_repair": {
+      "phase": "QF-MVP-40-R8A",
+      "operator": "scripts/mvp/communication/repair-meta-staging-account-identity-once.mjs",
+      "validator": "scripts/mvp/communication/validate-meta-staging-account-identity-repair.mjs",
+      "test_command": "npm run test:mvp:40-r8a",
+      "execution_status": "NOT_EXECUTED",
+      "dry_run_by_default": true,
+      "required_flags": ["--execute", "--owner-authorized-once-identity-repair"],
+      "acknowledgement_is_new": true,
+      "reuses_spent_acknowledgement": false,
+      "target": "the single row provider_key=meta_whatsapp_cloud AND channel=whatsapp in the authorized QuickFurno Staging project, and no other row in any environment",
+      "writable_pre_state": "BOUND_TO_HISTORICAL_MIXED — exactly one row, readiness_status disabled, BOTH stored references matching the historical pins",
+      "refused_pre_states": ["ABSENT", "AMBIGUOUS", "SEND_CAPABLE", "REFERENCES_NULL", "UNRECOGNIZED_BINDING (includes any half-migrated row)"],
+      "already_repaired_behaviour": "ALREADY_REPAIRED, zero writes",
+      "written_columns": ["business_account_reference", "phone_number_reference"],
+      "written_column_count": 2,
+      "forbidden_columns": ["readiness_status", "configuration_status", "business_verification_status", "phone_number_status", "webhook_status", "health_status", "billing_status", "runtime policy", "template mapping", "canary destination"],
+      "write_is_compare_and_swap": true,
+      "max_update_count": 1,
+      "second_update_possible": false,
+      "retry_after_uncertain_permitted": false,
+      "readback_calls_after_write": 1,
+      "post_state_requirement": "both references carry the actual staging digests AND readiness_status is still disabled",
+      "insert_delete_upsert_rpc": "NOT EXPRESSIBLE — the database port has no such method",
+      "meta_network_calls": 0,
+      "owner_proof": {
+        "env_var": "QF_PRODUCTION_META_DENY_DIGESTS_PATH",
+        "committed_to_repository": false,
+        "must_live_outside_repository": true,
+        "roles_consumed_by_name_not_position": true,
+        "new_requirement": "The refreshed proof MUST declare the historical WABA and phone digests as the production WABA and phone. R7C's own rule refuses to write an identity that appears in the deny-proof; R7C's write succeeded on 2026-08-13, so the proof it was given did not name those digests as production. Today they are known to be. This operator therefore refuses with DENY_PROOF_CONTRADICTS_BOUNDARY unless the owner's external artifact and the committed boundary agree."
+      }
+    },
+    "actual_staging_template_creation": {
+      "phase": "QF-MVP-40-R8B",
+      "operator": "scripts/mvp/communication/create-actual-staging-vendor-onboarding-reminder-once.mjs",
+      "validator": "scripts/mvp/communication/validate-actual-staging-vendor-onboarding-reminder-one-shot.mjs",
+      "test_command": "npm run test:mvp:40-r8b",
+      "execution_status": "NOT_EXECUTED",
+      "dry_run_by_default": true,
+      "required_flags": ["--execute", "--owner-authorized-once-actual-staging-create"],
+      "acknowledgement_is_new": true,
+      "reuses_spent_acknowledgement": false,
+      "target": {
+        "internal_template_key": "vendor_onboarding_reminder",
+        "provider_template_name": "qf_vendor_onboarding_reminder_v1",
+        "language": "en",
+        "category": "UTILITY",
+        "payload_fingerprint": "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+        "payload_source": "docs/provider-manifests/meta-template-submission-packet.json :: templates[internal_template_key=vendor_onboarding_reminder].creation_payload"
+      },
+      "packet_model_unchanged": {
+        "global_packet_changed": false,
+        "submit_now_read_or_written": false,
+        "closed_keys_changed": false,
+        "closed_state_model_changed": false
+      },
+      "writable_pre_state": "ABSENT only",
+      "refused_pre_states": ["ALREADY_CREATED (APPROVED or PENDING) — reported, not an error", "PRESENT_OTHER_STATUS including REJECTED", "AMBIGUOUS (duplicate exact rows)", "UNREADABLE"],
+      "max_post_count": 1,
+      "second_post_possible": false,
+      "retry_after_ambiguous_permitted": false,
+      "readback_calls_after_post": 1,
+      "http_methods_used": ["GET", "POST"],
+      "delete_put_patch": "NOT USED",
+      "messages_endpoint": "NOT USED",
+      "database_access": "NONE",
+      "asset_scope_proof": {
+        "model": "QF-MVP-40-R7A owner-attested EXACT subscribed-app set, reused from activate-meta-staging-canary.mjs rather than reimplemented",
+        "env_var": "QF_META_STAGING_ASSET_PROOF_PATH",
+        "must_live_outside_repository": true,
+        "ttl_max_ms": 900000,
+        "bound_to_branch_head": true,
+        "bound_to_project_ref": true,
+        "intended_stage": "TEMPLATE_CREATION",
+        "subscriber_rule": "live subscribed-app id set must EQUAL the owner-attested set exactly — no extra, no missing, order irrelevant",
+        "hard_coded_count_used": false,
+        "companion_app_hard_coded": false,
+        "display_name_trusted": false,
+        "prohibited_assets_still_forbidden": true
+      }
+    }
+  },
+
+  "new_activation_stage": {
+    "stage": "TEMPLATE_CREATION",
+    "added_to": "SCOPE_GUARDED_STAGES in scripts/mvp/communication/activate-meta-staging-canary.mjs",
+    "grants_by_itself": "NOTHING — it only makes the value legal in an attestation",
+    "stage_substitution_possible": false,
+    "statement": "The proof adapter compares the attested intended_stage against the stage the caller declares, by exact equality. A TEMPLATE_CREATION proof cannot arm readiness, arm a canary or mutate a webhook subscription, and an ARM_READINESS, ARM_CANARY, PREFLIGHT_READONLY or WEBHOOK_SUBSCRIPTION proof cannot create a template. The four pre-existing stages are unchanged.",
+    "exact_set_equality_weakened": false
+  },
+
+  "authorities_explicitly_not_granted": {
+    "send_authority": "DENIED",
+    "mapping_authority": "DENIED",
+    "provider_authority": "DENIED",
+    "readiness_arm_authority": "NOT_GRANTED",
+    "canary_arm_authority": "NOT_GRANTED",
+    "template_delete_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED",
+    "webhook_mutation_authority": "NOT_GRANTED",
+    "statement": "This correction is a repository change only. It authorises no Meta call, no database write, no deployment and no activation. Both new operators remain unexecuted and dry-run by default."
+  },
+
+  "execution_counts_at_authoring": {
+    "meta_post_count": 0,
+    "meta_template_mutations": 0,
+    "whatsapp_sends": 0,
+    "provider_arms": 0,
+    "canary_arms": 0,
+    "database_writes": 0,
+    "production_mutations": 0,
+    "deployments": 0
+  }
+}

@@ -46,6 +46,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { API_VERSION_PATTERN, classifyCreateResponse, safeMetaError, templatesAreIdentical, validateEnvironment, CreateClassification } from "./submit-meta-templates.mjs";
+import { HISTORICAL_MIXED_IDENTITY_DIGESTS, historicalRetirementBanner, retireHistoricalMutation } from "./metaStagingIdentity.mjs";
 
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
 const GRAPH = "https://graph.facebook.com";
@@ -60,12 +61,22 @@ export const TARGET_CATEGORY = "UTILITY";
 export const EXPECTED_PAYLOAD_FINGERPRINT =
   "c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a";
 
-/** SHA-256 digests of the ONLY authorised staging identity triple. */
-export const EXPECTED_IDENTITY_DIGESTS = Object.freeze({
-  appId: "6de73d8d79a40245af3dfa60065ae6a86274b043d8646ec3a84a0719273ece80",
-  wabaId: "c9b1f7e0bda69377219b80f8ca73b91475405aefe1e48babd0dc24231cc8037a",
-  phoneNumberId: "1b93eabc591212e3cfa0cd53423d6ebb333afa0f07f7e4a5a4ea246d736c969c",
-});
+/**
+ * QF-MVP-40-R8 — CORRECTED LABEL, IDENTICAL VALUE.
+ *
+ * These three digests are what this operator, and the five creation operators that
+ * import them, ACTUALLY executed against. Live diagnosis on 2026-08-25 proved the triple
+ * is MIXED: `appId` is the genuine QuickFurno Staging app, but `wabaId` and
+ * `phoneNumberId` are the PRODUCTION WABA and phone. The values are therefore left
+ * byte-for-byte unchanged — they are historical evidence — and are now sourced from the
+ * canonical boundary module under their true name, `HISTORICAL_MIXED_IDENTITY_DIGESTS`.
+ *
+ * This is NOT a staging identity and must never again be described as one. The actual
+ * staging pins live in ACTUAL_STAGING_IDENTITY_DIGESTS and are deliberately NOT wired
+ * here: repointing a spent authority by editing its constant is exactly the move R8
+ * forbids.
+ */
+export const EXPECTED_IDENTITY_DIGESTS = HISTORICAL_MIXED_IDENTITY_DIGESTS;
 
 /** The exact acknowledgement flag. A truthy env var is deliberately NOT accepted. */
 export const OWNER_ACK_FLAG = "--owner-authorized-once";
@@ -292,11 +303,15 @@ export function makeHttp({ version, wabaId, token, fetchImpl = fetch }) {
 const isEntry = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntry) {
-  const flags = parseFlags(process.argv.slice(2));
+  const parsedFlags = parseFlags(process.argv.slice(2));
+  // QF-MVP-40-R8 — spent historical authority: the mutation bit is forced false here,
+  // before any decision, network call or readback. Dry-run reading still works.
+  const flags = retireHistoricalMutation(parsedFlags, { operatorId: "QF-MVP-40-R7B", mutationKey: "mayPost" });
   const env = process.env;
 
   console.log("== QF-MVP-40-R7B one-shot staging template creation ==");
   console.log(`   mode                    : ${flags.mayPost ? "EXECUTE" : "DRY RUN"}`);
+  console.log(historicalRetirementBanner(flags.retiredOperatorId));
   console.log(`   target template         : ${TARGET_TEMPLATE_NAME}`);
 
   const identity = validateIdentity(env);

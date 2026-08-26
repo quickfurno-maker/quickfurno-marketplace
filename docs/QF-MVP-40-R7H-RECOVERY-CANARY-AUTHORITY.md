@@ -4,6 +4,23 @@
 
 **CONSUMED — R7H RECOVERY CANARY COMPLETED**
 
+> ### QF-MVP-40-R8 IDENTITY CORRECTION - 2026-08-25
+>
+> **The WABA and Phone Number ID recorded below under "Dedicated staging" are the
+> PRODUCTION WABA and PRODUCTION phone number.** Live read-only diagnosis on
+> 2026-08-25 proved the actual dedicated staging/test WABA is a different asset,
+> carrying only Meta sample templates. The Meta App id recorded below
+> (`2097008694503517`) *is* the genuine QuickFurno Staging app, so the triple in this
+> document is mixed and inconsistent.
+>
+> The identifiers, timestamps and outcomes below are **left unchanged** - they are the
+> true record of what was observed at the time, on the identity that was actually
+> observed. Nothing here is deleted, re-dated or reclassified.
+>
+> What changes is only what this document may be used to prove: it is evidence for the
+> historical mixed remote identity, and it is **not** evidence about the actual staging
+> WABA. See `docs/provider-manifests/meta-staging-identity-boundary-correction.json`.
+
 This document does not itself authorize a Meta provider invocation.
 
 It exists because the original QF-MVP-40 live canary runbook limits the

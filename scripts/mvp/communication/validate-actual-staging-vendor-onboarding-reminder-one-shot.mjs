@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  ADVISORY_PHONE_FIELDS,
   ALREADY_CREATED_STATUSES,
   CreateFailure,
   EXPECTED_PAYLOAD_FINGERPRINT,
@@ -54,6 +55,7 @@ import { OWNER_ACK_FLAG as R7B_ACK } from "./create-meta-staging-vendor-onboardi
 const OPERATOR = "scripts/mvp/communication/create-actual-staging-vendor-onboarding-reminder-once.mjs";
 const PACKET = "docs/provider-manifests/meta-template-submission-packet.json";
 const EVIDENCE = "docs/provider-manifests/meta-staging-identity-boundary-correction.json";
+const PHONE_CORRECTION = "docs/provider-manifests/meta-staging-r8b-phone-state-correction.json";
 const AUTHORIZED_STAGING_REF = "uckafzuochmbvtiodmcl";
 
 const code = readFileSync(resolve(OPERATOR), "utf8");
@@ -122,7 +124,10 @@ const verifiedProof = (over = {}) =>
 const liveGets = (over = {}) => ({
   waba: { ok: true, status: 200, body: { id: ACTUAL.waba } },
   phones: { ok: true, status: 200, body: { data: [{ id: ACTUAL.phone, verified_name: "n/a",
-    quality_rating: "GREEN", code_verification_status: "VERIFIED" }] } },
+    // QF-MVP-40-R8B-R1: the DEFAULT fixture mirrors the state measured live on the actual
+    // staging WABA on 2026-08-26 — NOT_VERIFIED / GREEN. Every test below therefore runs
+    // against the real environment contract, not an idealized one.
+    quality_rating: "GREEN", code_verification_status: "NOT_VERIFIED" }] } },
   subs: { ok: true, status: 200, body: { data: [
     { whatsapp_business_api_data: { id: ACTUAL.app } },
     { whatsapp_business_api_data: { id: COMPANION_APP } },
@@ -235,9 +240,64 @@ record("A12 more than one phone on the WABA fails",
   proveWith({ phones: { ok: true, body: { data: [
     { id: ACTUAL.phone, code_verification_status: "VERIFIED" },
     { id: "555444333222111", code_verification_status: "VERIFIED" }] } } }).ok === false);
-record("A13 an unverified phone fails",
+// ---------------------------------------------------------------------------
+// QF-MVP-40-R8B-R1 — PHONE STATE IS OBSERVED, NOT ENFORCED.
+//
+// The invariant this replaces ("an unverified phone fails") was wrong for this
+// authority. R8B posts to the WABA-level `/{WABA-ID}/message_templates` endpoint, which
+// takes no phone number, so requiring the phone to be code-verified imposed a SEND
+// precondition on an operation that cannot send. Live on the actual staging WABA the
+// exact attested phone reports NOT_VERIFIED / GREEN, which made the governed path
+// unreachable for a reason unrelated to its authority.
+//
+// The correct narrower invariant: phone IDENTITY is still proved exactly; phone
+// SEND-READINESS is not this operator's business. The tests below pin both halves — the
+// relaxation AND everything it must not have relaxed.
+// ---------------------------------------------------------------------------
+record("A13 an unverified phone PASSES — exact identity, exact WABA, exact attested set",
+  proveWith().ok === true && proveWith().scope === AssetScope.STAGING_DEDICATED);
+record("A13a the default fixture really is the measured live state (NOT_VERIFIED/GREEN)", (() => {
+  const r = readLiveAssets(liveGets());
+  return r.codeVerificationStatus === "NOT_VERIFIED" && r.qualityRating === "GREEN";
+})());
+record("A13b a VERIFIED phone still passes — the relaxation is not an inversion",
   proveWith({ phones: { ok: true, body: { data: [
-    { id: ACTUAL.phone, code_verification_status: "NOT_VERIFIED" }] } } }).ok === false);
+    { id: ACTUAL.phone, quality_rating: "GREEN", code_verification_status: "VERIFIED" }] } } }).ok === true);
+record("A13c any code_verification_status value is accepted, none is a gate",
+  ["VERIFIED", "NOT_VERIFIED", "EXPIRED", "PENDING", "", null, undefined].every((v) =>
+    proveWith({ phones: { ok: true, body: { data: [
+      { id: ACTUAL.phone, quality_rating: "GREEN", code_verification_status: v }] } } }).ok === true));
+record("A13d a WRONG phone id still fails, whatever its verification state",
+  proveWith({ phones: { ok: true, body: { data: [
+    { id: "555444333222111", quality_rating: "GREEN", code_verification_status: "VERIFIED" }] } } }).ok === false);
+record("A13e the PRODUCTION phone still fails, even when VERIFIED", (() => {
+  const r = proveWith({ phones: { ok: true, body: { data: [
+    { id: PRODUCTION.phone, quality_rating: "GREEN", code_verification_status: "VERIFIED" }] } } });
+  const raw = readLiveAssets(liveGets({ phones: { ok: true, body: { data: [
+    { id: PRODUCTION.phone, code_verification_status: "VERIFIED" }] } } }));
+  return r.ok === false && raw.faults.includes(CreateFailure.LIVE_ASSET_IS_PRODUCTION);
+})());
+record("A13f an unreadable phones response still fails",
+  proveWith({ phones: { ok: false, body: null } }).ok === false);
+record("A13g a phones response with NO data array still fails",
+  proveWith({ phones: { ok: true, body: {} } }).ok === false);
+record("A13h an EMPTY phone list still fails",
+  proveWith({ phones: { ok: true, body: { data: [] } } }).ok === false);
+record("A13i the operator source contains NO code_verification_status gate", (() => {
+  // Comment-stripped: the file legitimately EXPLAINS why it does not gate on this.
+  const gated = /code_verification_status[\s\S]{0,40}(!==|===)\s*["'`]?VERIFIED/.test(codeOnly)
+    || /PHONE_NOT_CODE_VERIFIED/.test(codeOnly);
+  return gated === false;
+})());
+record("A13j the field is still OBSERVED and reported, not silently dropped",
+  /codeVerificationStatus/.test(codeOnly)
+  && /phone code verification/.test(code)
+  && ADVISORY_PHONE_FIELDS.includes("code_verification_status"));
+record("A13k quality_rating likewise remains advisory, not a gate",
+  ["GREEN", "YELLOW", "RED", null].every((q) =>
+    proveWith({ phones: { ok: true, body: { data: [
+      { id: ACTUAL.phone, quality_rating: q, code_verification_status: "NOT_VERIFIED" }] } } }).ok === true)
+  && ADVISORY_PHONE_FIELDS.includes("quality_rating"));
 record("A14 a live PRODUCTION asset anywhere in the readback fails", (() => {
   const r = readLiveAssets(liveGets({ waba: { ok: true, body: { id: PRODUCTION.waba } } }));
   return r.ok === false && r.faults.includes(CreateFailure.LIVE_ASSET_IS_PRODUCTION);
@@ -454,6 +514,44 @@ if (ev) {
     && ev.authorities_explicitly_not_granted?.canary_arm_authority === "NOT_GRANTED");
   record("E11 it reproduces no Meta request or response body",
     !JSON.stringify(ev).includes("\"response_body\"") && !JSON.stringify(ev).includes("\"request_body\""));
+}
+
+// -- QF-MVP-40-R8B-R1 forward correction record ------------------------------
+let r1 = null;
+try { r1 = JSON.parse(readFileSync(resolve(PHONE_CORRECTION), "utf8")); } catch { r1 = null; }
+record("E20 the phone-state correction artifact exists", r1 !== null);
+if (r1) {
+  record("E21 it is a FORWARD correction, not a historical rewrite",
+    r1.correction_type === "FORWARD_LIVE_EVIDENCE_CORRECTION"
+    && r1.not_a_historical_rewrite?.alters_r7_evidence === false
+    && r1.not_a_historical_rewrite?.alters_any_execution_record === false);
+  record("E22 it records that the validator was green before live execution",
+    r1.pre_correction_state?.validator_was_green_offline === true
+    && r1.pre_correction_state?.validator_result_before_live_execution === "101 passed, 0 failed");
+  record("E23 it records zero POSTs during discovery",
+    r1.live_evidence_2026_08_26?.meta_post_count === 0
+    && r1.execution_counts_at_authoring?.meta_post_count === 0);
+  record("E24 it records that no R8B authority was consumed",
+    r1.live_evidence_2026_08_26?.authority_consumption?.r8b_creation_authority === "NOT_CONSUMED"
+    && r1.authorities_explicitly_not_granted?.r8b_execution_status === "NOT_EXECUTED");
+  record("E25 it states the correction makes nothing send-capable",
+    r1.behavioral_change?.makes_anything_send_capable === false
+    && r1.behavioral_change?.changes_global_rules === false);
+  record("E26 it records the live phone state that triggered the correction",
+    r1.live_evidence_2026_08_26?.get_only_phone_diagnosis?.code_verification_status === "NOT_VERIFIED"
+    && r1.live_evidence_2026_08_26?.get_only_phone_diagnosis?.phone_count === 1
+    && r1.live_evidence_2026_08_26?.get_only_phone_diagnosis?.expected_phone_match === true);
+  record("E27 it deletes no tests", r1.validator?.tests_deleted === 0);
+  record("E28 every retained fence it claims is one this suite actually proves", (() => {
+    const f = r1.fences_explicitly_retained ?? [];
+    return Array.isArray(f) && f.length >= 15
+      && f.some((s) => /EXACTLY equal the owner-attested set/.test(s))
+      && f.some((s) => /maximum ONE POST/i.test(s))
+      && f.some((s) => /no database access/i.test(s));
+  })());
+  record("E29 it names the send-capable paths it left untouched",
+    (r1.untouched_send_capable_paths?.files ?? []).length === 3
+    && r1.untouched_send_capable_paths?.r8a_database_repair_unchanged === true);
 }
 
 // ===========================================================================

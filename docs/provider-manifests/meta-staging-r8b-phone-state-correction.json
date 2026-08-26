@@ -1,0 +1,168 @@
+{
+  "artifact": "meta-staging-r8b-phone-state-correction",
+  "schema_version": "1.0",
+  "phase": "QF-MVP-40-R8B-R1",
+  "operation_id": "QF-MVP-40-R8B-R1-PHONE-STATE-CORRECTION-2026-08-26",
+  "contains_secrets": false,
+  "authorizes_meta_calls": false,
+  "authorizes_mapping": false,
+  "authorizes_sending": false,
+  "authorizes_database_writes": false,
+  "purpose": "FORWARD live-evidence correction to the QF-MVP-40-R8B actual-staging template creation authority. A read-only dry run against the exact actual-staging identity proved that the operator's asset-scope layer imposed a SEND-eligibility precondition (phone code_verification_status = VERIFIED) on an operation that cannot send. This artifact records the live evidence, the narrowed invariant and the fences that were deliberately left intact.",
+  "privacy": "Meta asset identities appear ONLY as SHA-256 digests of the raw id strings. No token, app secret, verify token, phone number or remote template id appears here.",
+
+  "correction_type": "FORWARD_LIVE_EVIDENCE_CORRECTION",
+  "not_a_historical_rewrite": {
+    "alters_r7_evidence": false,
+    "alters_r8_identity_boundary_correction": false,
+    "alters_any_execution_record": false,
+    "alters_any_timestamp": false,
+    "statement": "Nothing historical is amended. R8B had never executed, so there is no execution record to correct. This is a forward change to an unconsumed authority, recorded before its first use."
+  },
+
+  "pre_correction_state": {
+    "validator_result_before_live_execution": "101 passed, 0 failed",
+    "validator_was_green_offline": true,
+    "statement": "The R8B validator passed 101/101 offline before any live execution. The defect was NOT a coding error the offline suite could have caught: the suite encoded the same incorrect environment assumption the operator did, using a VERIFIED phone fixture. Only live evidence could expose it."
+  },
+
+  "live_evidence_2026_08_26": {
+    "method": "GET_ONLY",
+    "mutation_flags_used": "NONE",
+    "meta_post_count": 0,
+    "database_write_count": 0,
+    "whatsapp_send_count": 0,
+    "supabase_project_ref": "uckafzuochmbvtiodmcl",
+    "provider_account_readiness_status": "disabled",
+    "dry_run_observed": {
+      "mode": "DRY RUN",
+      "target_template": "qf_vendor_onboarding_reminder_v1 (en, UTILITY)",
+      "attestation_stage": "TEMPLATE_CREATION",
+      "identity_authorised": true,
+      "canonical_payload_proved": true,
+      "owner_asset_proof": "VERIFIED (external)",
+      "live_asset_scope": "SHARED_OR_UNKNOWN -> PHONE_NOT_CODE_VERIFIED",
+      "phone_quality_rating": "GREEN",
+      "subscriber_count": 2,
+      "post_attempt_count": 0,
+      "result": "REFUSED (live asset proof) — zero POST"
+    },
+    "get_only_phone_diagnosis": {
+      "endpoint": "GET /{WABA-ID}/phone_numbers?fields=id,verified_name,quality_rating,code_verification_status",
+      "phone_count": 1,
+      "expected_phone_match": true,
+      "code_verification_status": "NOT_VERIFIED",
+      "quality_rating": "GREEN",
+      "meta_post_count": 0
+    },
+    "subscribed_app_set_proven": {
+      "count": 2,
+      "staging_app_present": true,
+      "companion_app_present": true,
+      "production_app_present": false,
+      "note": "Both ids were independently proven and are supplied only through the owner's external attestation. Neither is hard-coded, and no display name is trusted."
+    },
+    "authority_consumption": {
+      "r8b_creation_authority": "NOT_CONSUMED",
+      "statement": "No prior R8B mutation authority has been consumed. Zero POSTs occurred during discovery, and the operator remains unexecuted."
+    }
+  },
+
+  "root_cause": {
+    "file": "scripts/mvp/communication/create-actual-staging-vendor-onboarding-reminder-once.mjs",
+    "function": "readLiveAssets",
+    "defect": "code_verification_status === 'VERIFIED' was a mandatory asset-scope condition. Any other value pushed PHONE_NOT_CODE_VERIFIED, which made readLiveAssets().ok false, which made proveAssets() return SHARED_OR_UNKNOWN, which is a hard stop.",
+    "why_it_is_wrong": "R8B creates a template through the WABA-level endpoint POST /{WABA-ID}/message_templates. That endpoint accepts no phone number, and a template's existence, category and approval are properties of the WABA, not of any sender. Phone registration and send eligibility are therefore not authority this operator needs or exercises.",
+    "why_it_bit_now": "The dedicated Meta TEST phone on the actual staging WABA legitimately reports NOT_VERIFIED. The historical mixed-identity environment corrected by QF-MVP-40-R8 had pointed at a production phone, which was VERIFIED — so the incorrect precondition was never exercised against the real staging asset until the identity boundary was repaired.",
+    "classifier_note": "classifyMetaAssetScope never inspected phone verification. The gate existed solely in readLiveAssets, and PHONE_NOT_CODE_VERIFIED was referenced nowhere else in the repository."
+  },
+
+  "behavioral_change": {
+    "removed": "code_verification_status as a blocking asset-scope condition, and the now-unreachable PHONE_NOT_CODE_VERIFIED failure constant.",
+    "added": "codeVerificationStatus is returned as an OBSERVED field and printed by the CLI as an explicitly advisory line. ADVISORY_PHONE_FIELDS names the fields this operator reports but never gates on.",
+    "scope": "QF-MVP-40-R8B TEMPLATE_CREATION only.",
+    "makes_anything_send_capable": false,
+    "changes_global_rules": false,
+    "statement": "Phone verification remains fully relevant to phone registration and sending paths. It is removed only as an unrelated prerequisite for WABA-level template creation."
+  },
+
+  "fences_explicitly_retained": [
+    "phones GET must succeed",
+    "exactly ONE phone must exist on the WABA",
+    "that phone id must equal the pinned actual-staging phone identity via proveAssets / classifyMetaAssetScope",
+    "configured App, WABA and Phone must all match ACTUAL_STAGING_IDENTITY_DIGESTS",
+    "the production deny list remains an independent and mandatory layer",
+    "live WABA must equal the exact actual-staging WABA",
+    "live subscribed-app set must EXACTLY equal the owner-attested set — no extra, no missing",
+    "staging asset proof must be external, fresh (<=15 min), tamper-evident, stage-bound to TEMPLATE_CREATION and bound to the exact source HEAD",
+    "canonical payload fingerprint remains pinned to c6e95a38dde899f717999520082feddf4c91f2a33c84650c72538ef2c111199a",
+    "exact-name remote lookup must be ABSENT before any POST",
+    "both execution flags remain mandatory (--execute and --owner-authorized-once-actual-staging-create)",
+    "maximum ONE POST, structurally enforced",
+    "no retry after an ambiguous POST",
+    "no /messages endpoint",
+    "no DELETE / PUT / PATCH",
+    "no database access",
+    "no readiness, canary, mapping or webhook authority"
+  ],
+
+  "untouched_send_capable_paths": {
+    "statement": "Phone code verification remains enforced wherever sending or readiness is actually at stake. These files are byte-identical to the merged QF-MVP-40-R8 line.",
+    "files": [
+      "lib/communication/providers/metaCloudWhatsAppProvider.ts",
+      "scripts/mvp/communication/canaryActivationRuntime.mjs",
+      "scripts/mvp/communication/activate-meta-staging-canary.mjs"
+    ],
+    "historical_creation_operators_unchanged": true,
+    "r8a_database_repair_unchanged": true,
+    "identity_boundary_module_unchanged": true
+  },
+
+  "validator": {
+    "file": "scripts/mvp/communication/validate-actual-staging-vendor-onboarding-reminder-one-shot.mjs",
+    "test_command": "npm run test:mvp:40-r8b",
+    "before": "101 passed, 0 failed",
+    "after": "112 passed, 0 failed",
+    "tests_deleted": 0,
+    "invariant_replaced": "A13 'an unverified phone fails' -> A13 'an unverified phone PASSES — exact identity, exact WABA, exact attested set'",
+    "default_fixture_changed_to_measured_live_state": "code_verification_status NOT_VERIFIED / quality_rating GREEN, so the whole suite now runs against the real environment contract",
+    "new_rules": [
+      "A13  unverified phone passes with exact identity + exact WABA + exact attested set",
+      "A13a the default fixture really is the measured live state",
+      "A13b a VERIFIED phone still passes — the relaxation is not an inversion",
+      "A13c every code_verification_status value is accepted; none is a gate",
+      "A13d a WRONG phone id still fails, whatever its verification state",
+      "A13e the PRODUCTION phone still fails, even when VERIFIED",
+      "A13f an unreadable phones response still fails",
+      "A13g a phones response with no data array still fails",
+      "A13h an EMPTY phone list still fails",
+      "A13i the operator source contains NO code_verification_status gate",
+      "A13j the field is still observed and reported, not silently dropped",
+      "A13k quality_rating likewise remains advisory, not a gate"
+    ]
+  },
+
+  "execution_counts_at_authoring": {
+    "meta_post_count": 0,
+    "meta_template_mutations": 0,
+    "whatsapp_sends": 0,
+    "provider_arms": 0,
+    "canary_arms": 0,
+    "database_writes": 0,
+    "webhook_mutations": 0,
+    "production_mutations": 0,
+    "deployments": 0
+  },
+
+  "authorities_explicitly_not_granted": {
+    "send_authority": "DENIED",
+    "mapping_authority": "DENIED",
+    "provider_authority": "DENIED",
+    "readiness_arm_authority": "NOT_GRANTED",
+    "canary_arm_authority": "NOT_GRANTED",
+    "webhook_mutation_authority": "NOT_GRANTED",
+    "production_authority": "NOT_GRANTED",
+    "r8b_execution_status": "NOT_EXECUTED",
+    "statement": "This correction is a repository change only. R8B remains dry-run by default, unexecuted, and still requires both exact execution flags plus a fresh stage-bound owner attestation."
+  }
+}

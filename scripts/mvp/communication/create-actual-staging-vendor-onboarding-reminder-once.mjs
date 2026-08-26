@@ -35,6 +35,13 @@
 //   equal that set exactly — no extra, no missing, order irrelevant. A display name such
 //   as any "1P App" label is free text and is never evidence here.
 //
+// PHONE STATE IS OBSERVED, NOT ENFORCED (QF-MVP-40-R8B-R1)
+//   The WABA-level template endpoint takes no phone number. This operator therefore
+//   proves the phone's IDENTITY exactly — one phone on the WABA, matching the pinned
+//   actual-staging phone digest — but does NOT require it to be code-verified. See the
+//   block comment above readLiveAssets for the live evidence and the reasoning. Send
+//   readiness remains mandatory on every send-capable path; none of them is touched here.
+//
 // WHAT IT CANNOT DO — enforced below and asserted by the validator
 //   * no messaging/send endpoint;   * no DELETE / PUT / PATCH;
 //   * no database access;            * no provider / mapping / canary / readiness authority;
@@ -122,7 +129,9 @@ export const CreateFailure = Object.freeze({
   IDENTITY_UNAUTHORIZED: "IDENTITY_UNAUTHORIZED",
   ASSET_SCOPE_UNPROVEN: "ASSET_SCOPE_UNPROVEN",
   PHONE_SET_MISMATCH: "PHONE_SET_MISMATCH",
-  PHONE_NOT_CODE_VERIFIED: "PHONE_NOT_CODE_VERIFIED",
+  // QF-MVP-40-R8B-R1 removed PHONE_NOT_CODE_VERIFIED. It was a send-eligibility
+  // predicate on an operation that cannot send, and it is not re-declared here: a
+  // failure constant that can never fire is a false claim about what this file enforces.
   LIVE_ASSET_IS_PRODUCTION: "LIVE_ASSET_IS_PRODUCTION",
   SOURCE_HEAD_UNPROVEN: "SOURCE_HEAD_UNPROVEN",
 });
@@ -173,9 +182,39 @@ export function validateIdentity(env = {}) {
 
 // ---------------------------------------------------------------------------
 // PURE: reduce the three live GET responses to the shape classifyMetaAssetScope reads,
-// and apply the two checks it deliberately does not make — the phone must be the ONLY
-// phone on the WABA and must be code-verified.
+// and apply the one check it deliberately does not make — the phone must be the ONLY
+// phone on the WABA.
+//
+// QF-MVP-40-R8B-R1 — WHY `code_verification_status` IS OBSERVED BUT NOT ENFORCED
+//   R8B creates a template through the WABA-level endpoint
+//   `POST /{WABA-ID}/message_templates`. That endpoint takes no phone number, and a
+//   template's existence and approval are properties of the WABA, not of any sender.
+//   Requiring the phone to be code-verified therefore imposed a SEND-eligibility
+//   precondition on an operation that cannot send.
+//
+//   Measured live on the actual staging WABA on 2026-08-26: the exact attested staging
+//   phone (the one matching the pinned phone digest) reports
+//   `code_verification_status = NOT_VERIFIED` with `quality_rating = GREEN`, and it is
+//   the ONLY phone on that WABA. That is a legitimate state for a Meta TEST number, and it
+//   turned an otherwise EXACT actual-staging identity proof into SHARED_OR_UNKNOWN,
+//   making the governed creation path unreachable for a reason unrelated to its authority.
+//
+//   THIS IS A NARROWING, NOT A WEAKENING. The phone is still read live, must still be the
+//   ONLY phone on the WABA, and its id must still equal the pinned actual-staging phone
+//   identity through proveAssets/classifyMetaAssetScope. What is removed is exclusively
+//   the send-eligibility predicate. Phone registration and send readiness remain
+//   REQUIRED on every send-capable path (the canary runtime and the Meta provider gate
+//   are untouched by this correction), and nothing here makes anything send-capable.
 // ---------------------------------------------------------------------------
+
+/**
+ * Live phone fields this operator OBSERVES and reports, but deliberately does NOT gate on.
+ * `quality_rating` was already advisory here; `code_verification_status` joins it under
+ * QF-MVP-40-R8B-R1. Neither may ever become a precondition for template creation, and
+ * neither is evidence of identity — identity is digest equality and nothing else.
+ */
+export const ADVISORY_PHONE_FIELDS = Object.freeze(["code_verification_status", "quality_rating"]);
+
 export function readLiveAssets({ waba, phones, subs } = {}) {
   const faults = [];
 
@@ -185,9 +224,8 @@ export function readLiveAssets({ waba, phones, subs } = {}) {
   const phoneRows = Array.isArray(phones?.body?.data) ? phones.body.data : [];
   if (phones?.ok !== true) faults.push("phones_unreadable");
   else if (phoneRows.length !== 1) faults.push(CreateFailure.PHONE_SET_MISMATCH);
-  else if (String(phoneRows[0].code_verification_status ?? "").toUpperCase() !== "VERIFIED") {
-    faults.push(CreateFailure.PHONE_NOT_CODE_VERIFIED);
-  }
+  // NOTE: no `code_verification_status` branch. See the block comment above. A phone that
+  // is not code-verified is reported below and changes no decision in this operator.
   const phoneNumberId = phoneRows.length === 1 ? String(phoneRows[0]?.id ?? "") : "";
 
   // An unreadable subscriber list is NOT evidence of an empty one: leave it undefined so
@@ -209,6 +247,10 @@ export function readLiveAssets({ waba, phones, subs } = {}) {
     faults,
     live: { wabaId, phoneNumberId, subscribedAppIds },
     qualityRating: phoneRows.length === 1 ? (phoneRows[0]?.quality_rating ?? null) : null,
+    // Advisory only — reported so an operator run is never silent about the phone's real
+    // state, and never consulted by any decision in this file.
+    codeVerificationStatus: phoneRows.length === 1
+      ? (phoneRows[0]?.code_verification_status ?? null) : null,
     subscriberCount: Array.isArray(subscribedAppIds) ? subscribedAppIds.length : null,
   };
 }
@@ -326,7 +368,8 @@ if (isEntry) {
       branchHead,
     });
     console.log(`   live asset scope        : ${assetProof.scope}${assetProof.ok ? "" : " -> " + assetProof.faults.join(", ")}`);
-    console.log(`   phone quality rating    : ${assets.qualityRating ?? "(unproven)"}`);
+    console.log(`   phone quality rating    : ${assets.qualityRating ?? "(unproven)"} (advisory)`);
+    console.log(`   phone code verification : ${assets.codeVerificationStatus ?? "(unproven)"} (advisory — not a gate for template creation)`);
     console.log(`   subscriber count        : ${assets.subscriberCount ?? "(unreadable)"} (exact attested set required)`);
 
     if (!assetProof.ok) {

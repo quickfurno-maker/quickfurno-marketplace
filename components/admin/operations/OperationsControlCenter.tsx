@@ -100,7 +100,7 @@ export function OperationsControlCenter({
 
       <TabPanel id="qf-operations" active={OPERATIONS_TAB_LABELS[payload.tab]}>
         {payload.tab === "overview" ? (
-          <OperationsOverviewTab overview={payload.overview} />
+          <OperationsOverviewTab overview={payload.overview} launch={payload.launch} />
         ) : (
           <OperationsIncidentsTab
             incidents={payload.incidents}

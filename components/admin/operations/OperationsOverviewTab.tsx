@@ -16,11 +16,14 @@ import type {
   OperationalSubsystemSummary,
   OperationsOverview,
 } from "@/services/adminOperationsService";
+import type { OperationsLaunchSnapshot } from "@/services/adminLaunchControlService";
 import type { AdminIconName } from "../adminConfig";
 import { AdminIcon } from "../AdminIcon";
 import { EmptyState, NoteBar, SectionCard, StatusBadge } from "../AdminPrimitives";
 import { formatDateTime } from "../adminUtils";
 import { AttentionCenter, type AttentionItem, type AttentionSeverity } from "../AttentionCenter";
+import { OperationsControlState } from "./OperationsControlState";
+import { OperationsLaunchReadiness } from "./OperationsLaunchReadiness";
 import {
   HEALTH_LABELS,
   faultCopy,
@@ -163,7 +166,13 @@ function SubsystemCard({ summary }: { summary: OperationalSubsystemSummary }) {
   );
 }
 
-export function OperationsOverviewTab({ overview }: { overview?: OperationsOverview }) {
+export function OperationsOverviewTab({
+  overview,
+  launch,
+}: {
+  overview?: OperationsOverview;
+  launch?: OperationsLaunchSnapshot;
+}) {
   if (!overview) {
     return (
       <EmptyState
@@ -221,6 +230,21 @@ export function OperationsOverviewTab({ overview }: { overview?: OperationsOverv
             : ""}
         </NoteBar>
       ) : null}
+
+      {/* QF-MVP-70.03 — launch cockpit. Rendered above the queue because the
+          founder's first question is whether launch is safe at all; the 70.02
+          attention queue below it is unchanged. */}
+      {launch ? (
+        <>
+          <OperationsLaunchReadiness launch={launch} />
+          <OperationsControlState controls={launch.controls} />
+        </>
+      ) : (
+        <NoteBar tone="warning">
+          Launch readiness could not be assembled. No verdict is shown rather than one that might be
+          wrong.
+        </NoteBar>
+      )}
 
       <AttentionCenter items={items} />
 

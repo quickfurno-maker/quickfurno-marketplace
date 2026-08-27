@@ -727,6 +727,117 @@ function rollUp(
 }
 
 // ===========================================================================
+// FOUNDER ATTENTION PROJECTION  (QF-MVP-70.02)
+// ===========================================================================
+//
+// A pure, in-memory projection over the class summaries the overview has ALREADY
+// read. It issues no query of its own — there is deliberately no second
+// per-class read loop — and it persists nothing: no incident row, no incident
+// table, no acknowledgement state, no second state machine beside the ones
+// automation, communication and lead assignment already own.
+
+const ATTENTION_SEVERITY_RANK: Readonly<Record<OperationalSeverity, number>> = Object.freeze({
+  critical: 0,
+  warning: 1,
+  info: 2,
+});
+
+/**
+ * Identity of the UNDERLYING row, independent of which class projected it.
+ *
+ * `OperationalIncident.id` is `<class>:<row id>`, so stripping the class prefix
+ * yields the source row. That makes cross-class duplicate detection exact rather
+ * than heuristic — two classes describing the same row produce the same key.
+ */
+function sourceRowKey(incident: OperationalIncident): string {
+  return `${incident.subsystem}|${incident.id.slice(incident.class.length + 1)}`;
+}
+
+/**
+ * The deterministic founder-attention order.
+ *
+ *   1. severity           critical, then warning, then info
+ *   2. older first        a longer-open incident outranks a newer one
+ *   3. unknown age last   an unprovable age is never promoted above a proven one
+ *   4. id                 a stable lexical tie-break, so the order never flickers
+ *
+ * Revenue, package tier and every other commercial signal are deliberately
+ * absent: this ranks operational damage, not account value.
+ */
+export function compareAttentionIncidents(
+  left: OperationalIncident,
+  right: OperationalIncident,
+): number {
+  const bySeverity =
+    ATTENTION_SEVERITY_RANK[left.severity] - ATTENTION_SEVERITY_RANK[right.severity];
+  if (bySeverity !== 0) return bySeverity;
+
+  if (left.ageSeconds !== right.ageSeconds) {
+    if (left.ageSeconds === null) return 1;
+    if (right.ageSeconds === null) return -1;
+    return right.ageSeconds - left.ageSeconds;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+/**
+ * At most ONE concrete incident per class — the `oldest` each summary already
+ * carries — ranked, then de-duplicated by underlying row.
+ *
+ * A class whose read faulted, or whose count is zero, contributes NOTHING here:
+ * an incident that was never read is never invented. The aggregate unavailable
+ * state stays visible through the class summaries themselves, which is where an
+ * unreadable source is honestly reported.
+ *
+ * DE-DUPLICATION. Ranking happens BEFORE the de-duplication pass, so when two
+ * classes describe the same row the survivor is the higher-ranked one. That is
+ * what makes the required lead-queue rule fall out by construction rather than
+ * by a special case: `lead_assignment.queue_unresolved` is a superset of
+ * `lead_assignment.queue_overdue`, and because overdue is `critical` while
+ * unresolved is `info`, the overdue projection always sorts first and the
+ * unresolved duplicate is the one suppressed.
+ *
+ * Class COUNTS and the paged class lists are untouched by any of this — the
+ * suppression applies to the founder attention queue alone.
+ */
+function projectAttentionIncidents(
+  summaries: readonly OperationalClassSummary[],
+): readonly OperationalIncident[] {
+  const ranked = summaries
+    .map((entry) => entry.oldest)
+    .filter((incident): incident is OperationalIncident => incident !== null)
+    .sort(compareAttentionIncidents);
+
+  const seen = new Set<string>();
+  const queue: OperationalIncident[] = [];
+
+  for (const incident of ranked) {
+    const key = sourceRowKey(incident);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    queue.push(incident);
+  }
+
+  return Object.freeze(queue);
+}
+
+/**
+ * Resolve a requested incident id against an ALREADY-LOADED pool.
+ *
+ * This is a lookup, not a query. There is no by-id read anywhere in this
+ * service, so a URL cannot address an arbitrary row of an arbitrary table: an
+ * id that is not in the bounded payload the page already holds resolves to
+ * null, and the caller fails closed.
+ */
+export function findIncidentInPool(
+  pool: readonly OperationalIncident[],
+  incidentId: string,
+): OperationalIncident | null {
+  return pool.find((incident) => incident.id === incidentId) ?? null;
+}
+
+// ===========================================================================
 // RECOVERY INFERENCE
 // ===========================================================================
 
@@ -791,6 +902,12 @@ export interface OperationsOverview {
   readonly recovery: OperationalRecoveryInference;
   /** Number of subsystems whose verdict is UNAVAILABLE. */
   readonly unavailableSubsystems: number;
+  /**
+   * QF-MVP-70.02 — the founder triage queue: at most one concrete incident per
+   * class, ranked and de-duplicated, derived IN MEMORY from the summaries above.
+   * It costs no additional database read and is never persisted.
+   */
+  readonly attentionIncidents: readonly OperationalIncident[];
 }
 
 /**
@@ -829,6 +946,8 @@ export async function getOperationsOverview(): Promise<OperationsOverview> {
     subsystems,
     recovery: inferRecovery(overdue ?? UNREADABLE_OVERDUE_CLASS),
     unavailableSubsystems: subsystems.filter((entry) => entry.health === "UNAVAILABLE").length,
+    // Derived from `summaries` — the reads above — not from any new query.
+    attentionIncidents: projectAttentionIncidents(summaries),
   };
 }
 

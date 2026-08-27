@@ -11,6 +11,7 @@
 import Link from "next/link";
 import type {
   OperationalClassSummary,
+  OperationalIncident,
   OperationalSubsystem,
   OperationalSubsystemSummary,
   OperationsOverview,
@@ -20,7 +21,14 @@ import { AdminIcon } from "../AdminIcon";
 import { EmptyState, NoteBar, SectionCard, StatusBadge } from "../AdminPrimitives";
 import { formatDateTime } from "../adminUtils";
 import { AttentionCenter, type AttentionItem, type AttentionSeverity } from "../AttentionCenter";
-import { HEALTH_LABELS, faultCopy, formatAge, healthTone, severityTone } from "./operationsTypes";
+import {
+  HEALTH_LABELS,
+  faultCopy,
+  formatAge,
+  healthTone,
+  incidentSelectionHref,
+  severityTone,
+} from "./operationsTypes";
 
 const SUBSYSTEM_ICONS: Readonly<Record<OperationalSubsystem, AdminIconName>> = Object.freeze({
   automation: "automations",
@@ -35,8 +43,19 @@ const SUBSYSTEM_ICONS: Readonly<Record<OperationalSubsystem, AdminIconName>> = O
  * An unknown count is passed through as `null`. AttentionCenter then forces the
  * row into its `unavailable` state, so an unreadable source can never be ranked,
  * labelled or coloured as a healthy zero.
+ *
+ * QF-MVP-70.02: `attentionIncident` is the class's concrete triage item, taken
+ * from the already-computed `overview.attentionIncidents`. When present the row
+ * opens that exact incident; when the class contributed none — because it is
+ * clear, unreadable, or its oldest row was suppressed as a cross-class duplicate
+ * — the row falls back to the existing evidence route, which is what it did
+ * before this slice.
  */
-function toAttentionItem(entry: OperationalClassSummary, icon: AdminIconName): AttentionItem {
+function toAttentionItem(
+  entry: OperationalClassSummary,
+  icon: AdminIconName,
+  attentionIncident: OperationalIncident | undefined,
+): AttentionItem {
   // A single decision, made once: either the count is a proven number, or the
   // whole row is unknown. There is no third branch in which a null becomes 0.
   const value: number | null = entry.fault !== null ? null : entry.count;
@@ -58,7 +77,12 @@ function toAttentionItem(entry: OperationalClassSummary, icon: AdminIconName): A
     detail,
     severity,
     icon,
-    href: entry.evidenceHref ?? undefined,
+    // Ranking input only — the longer-open class sorts first inside its band.
+    ageSeconds: attentionIncident?.ageSeconds ?? null,
+    href: attentionIncident
+      ? incidentSelectionHref(attentionIncident.id)
+      : (entry.evidenceHref ?? undefined),
+    actionLabel: attentionIncident ? "Open incident" : "Open evidence",
   };
 }
 
@@ -149,8 +173,17 @@ export function OperationsOverviewTab({ overview }: { overview?: OperationsOverv
     );
   }
 
+  // The triage queue is already ranked and de-duplicated server-side; indexing
+  // it by class is all the view needs. A class absent from this map contributed
+  // no concrete incident and keeps its evidence link.
+  const attentionByClass = new Map(
+    overview.attentionIncidents.map((incident) => [incident.class, incident]),
+  );
+
   const items: AttentionItem[] = overview.subsystems.flatMap((summary) =>
-    summary.classes.map((entry) => toAttentionItem(entry, SUBSYSTEM_ICONS[summary.subsystem])),
+    summary.classes.map((entry) =>
+      toAttentionItem(entry, SUBSYSTEM_ICONS[summary.subsystem], attentionByClass.get(entry.key)),
+    ),
   );
 
   return (
@@ -201,7 +234,10 @@ export function OperationsOverviewTab({ overview }: { overview?: OperationsOverv
         Every figure above is an exact server-side count over the canonical table named in each row, or
         an explicit Unavailable. Nothing on this page is sampled, estimated or projected, and no
         external system was contacted to produce it — recovery status is inferred from job timestamps
-        alone. This page is read-only: it exposes no retry, cancel, pause or resume control.
+        alone. Rows that name a concrete item open its details in place; the queue lists the
+        longest-open item per class, and where two classes describe the same record it appears once,
+        under the more specific one. This page is read-only: it exposes no retry, cancel, pause or
+        resume control.
       </p>
     </div>
   );

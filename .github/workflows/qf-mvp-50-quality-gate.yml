@@ -124,6 +124,23 @@ jobs:
       - name: QF-MVP-50.3/50.4 staging orchestration certification
         run: npm run test:mvp:50-3-50-4-cert
 
+      # QF-MVP-70 Operations & Launch Control. The admin cockpit reads the same
+      # canonical automation, communication, webhook and lead-assignment rows the
+      # 50.x orchestration owns, so its read-only and fail-closed guarantees are
+      # proved at the same exact head. All four are offline file-level harnesses:
+      # no secrets, no Supabase, no Meta, no n8n.
+      - name: QF-MVP-70.01 operations control center
+        run: npm run test:mvp:70-01
+
+      - name: QF-MVP-70.02 attention queue and incident detail
+        run: npm run test:mvp:70-02
+
+      - name: QF-MVP-70.03 launch control consolidation
+        run: npm run test:mvp:70-03
+
+      - name: QF-MVP-70.04 final certification
+        run: npm run test:mvp:70-04
+
       - name: Typecheck
         run: npm run typecheck
 

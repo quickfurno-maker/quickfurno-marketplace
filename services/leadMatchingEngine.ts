@@ -18,6 +18,19 @@ import {
 import { haversineKm, isValidCoordinate } from "../lib/geo/distance";
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
+import { MAX_CANONICAL_CANDIDATE_POOL } from "../lib/marketplace/canonicalAssignmentContract";
+// QF-MVP-75.01 — the pure MatchCore decision contract. The comparator, the
+// ranked-candidate normalization rule and the cap accounting live there so the
+// authority, this matcher and the offline suite all describe ONE order.
+import {
+  CANONICAL_REQUEST_FINGERPRINT_VERSION,
+  MATCHCORE_AUTOMATIC_CONTRACT_VERSION,
+  classifyCapDeferred,
+  compareAutomaticMatchDecisions,
+  splitRankedPool,
+  type AutomaticMatchDecision,
+  type AutomaticMatchRejectReason,
+} from "../lib/matchcore/automaticMatchDecision";
 import {
   assignLeadToMatchedVendors,
   createClientAssignedVendorsPreview,
@@ -76,7 +89,11 @@ export type AutoLeadMatchingResult = {
 export type SkippedVendorAudit = {
   vendor_id: string;
   business_name?: string | null;
-  reasons: string[];
+  /**
+   * QF-MVP-75.01: explicit MatchCore reject reasons, never a collapsed
+   * `vendor_not_eligible`. See lib/matchcore/automaticMatchDecision.
+   */
+  reasons: AutomaticMatchRejectReason[];
 };
 
 export type VendorMatchEvaluation = {
@@ -86,13 +103,20 @@ export type VendorMatchEvaluation = {
 };
 
 const MAX_VENDOR_MATCHES = 3;
-// Phase 4 fill-until-3: pass a bounded RANKED candidate pool (ordering unchanged)
-// to the atomic RPC, which iterates candidates in JS order, skips any that fail a
-// transactional recheck, and stops after MAX_VENDOR_MATCHES SUCCESSFUL assignments
-// (never more) even if higher-ranked candidates lose their last credit concurrently.
-// The RPC — never this layer — enforces the max-3-successful cap atomically. Must
-// agree with MAX_ASSIGNMENT_CANDIDATE_POOL in services/leadDeliveryService.ts.
-const MAX_ASSIGNMENT_CANDIDATE_POOL = 20;
+// Phase 4 fill-until-3: pass a bounded RANKED candidate pool to the atomic RPC,
+// which skips any candidate that fails a transactional recheck and stops after
+// MAX_VENDOR_MATCHES SUCCESSFUL assignments (never more) even if higher-ranked
+// candidates lose their last credit concurrently. The RPC — never this layer —
+// enforces the max-3-successful cap atomically.
+//
+// QF-MVP-75.01: the RPC now consumes this pool in RANK ORDER. Before 75.01 it
+// re-ordered the pool by ascending vendor uuid, so this ranking decided nothing
+// once more than MAX_VENDOR_MATCHES pool members were eligible. See migration
+// 20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql.
+//
+// The pool bound is imported rather than re-declared, so the matcher and the
+// transport seam cannot drift apart on the value.
+const MAX_ASSIGNMENT_CANDIDATE_POOL = MAX_CANONICAL_CANDIDATE_POOL;
 const VENDOR_PAGE_SIZE = 500;
 const MAX_VENDOR_SCAN = 5000;
 // Audit snapshots list per-vendor skip reasons up to this cap; reason counts
@@ -163,17 +187,33 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
     const { eligible, skipped, skippedReasonCounts } = evaluation.data;
 
-    // Ranked candidate POOL (ordering unchanged). Recorded as selected_vendor_ids
-    // so diagnostics keep `assigned ⊆ selected`; the RPC caps SUCCESSFUL at 3.
-    const selectedVendorIds = eligible.slice(0, MAX_ASSIGNMENT_CANDIDATE_POOL).map((vendor) => vendor.id);
-    // Audit-only: who was evaluated and why they were not selected. Eligible
-    // vendors beyond the cap of 3 are recorded as max_vendor_cap_reached.
+    // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
+    // `assigned ⊆ selected`; the authority caps SUCCESSFUL at 3.
+    //
+    // QF-MVP-75.01: this order is now BINDING. The authority consumes exactly
+    // this list, in exactly this order, and fills the remaining active slots
+    // with the first eligible entries by rank.
+    const rankedPool = splitRankedPool(
+      eligible.map((vendor) => vendor.id),
+      MAX_ASSIGNMENT_CANDIDATE_POOL,
+    );
+    const selectedVendorIds = rankedPool.pool;
+    // Audit-only: who was evaluated and why they were not selected.
     const matchAudit = {
       // Phase 3A metadata (top-level in every snapshot via the spreads below).
       matching_model_version: MATCHING_MODEL_VERSION,
+      // QF-MVP-75.01 evidence. `ranked_candidate_order` is the exact ordered
+      // list submitted to the authority, so a reader can prove after the fact
+      // WHICH order decided the outcome rather than inferring it.
+      matchcore_contract_version: MATCHCORE_AUTOMATIC_CONTRACT_VERSION,
+      request_fingerprint_version: CANONICAL_REQUEST_FINGERPRINT_VERSION,
+      candidate_order_is_binding: true,
+      ranked_candidate_order: selectedVendorIds,
       skipped,
       skipped_reason_counts: skippedReasonCounts,
-      max_vendor_cap_reached_vendor_ids: eligible.slice(MAX_ASSIGNMENT_CANDIDATE_POOL).map((vendor) => vendor.id),
+      // Eligible and ranked, but beyond the bounded transport pool, so never
+      // submitted at all. Distinct from `cap_deferred_vendor_ids` below.
+      max_vendor_cap_reached_vendor_ids: rankedPool.beyondPool,
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
@@ -209,6 +249,22 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
 
     const assigned = assignment.data.assigned.slice(0, MAX_VENDOR_MATCHES);
 
+    // QF-MVP-75.01 evidence — did an eligible ranked candidate lose ONLY to the
+    // active cap?
+    //
+    // The authority records a per-vendor skip for every candidate it actually
+    // evaluated, and stops the moment the cap is reached. A submitted pool member
+    // in neither the assigned nor the skipped list was therefore never reached:
+    // it lost to the cap alone, not to an eligibility failure. Derived, so no new
+    // column and no new table is needed to prove it.
+    const outcomeAudit = {
+      cap_deferred_vendor_ids: classifyCapDeferred(
+        selectedVendorIds,
+        assignment.data.assigned.map((vendor) => vendor.vendor_id),
+        assignment.data.skipped,
+      ),
+    };
+
     // Concurrent-retry safety (Phase 3B correction): the assignment boundary
     // reports a replay when this lead's assignments already exist (its idempotent
     // short-circuit / a race with another retry). Those assignments — and their
@@ -233,6 +289,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
           selected: selectedVendorIds,
           eligible,
           ...matchAudit,
+          ...outcomeAudit,
           assignment: assignment.data,
           assignment_reused: true,
         },
@@ -254,7 +311,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
         selected_vendor_ids: selectedVendorIds,
         assigned_vendor_ids: [],
         failure_reason: assignment.data.status,
-        matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit, assignment: assignment.data },
+        matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit, ...outcomeAudit, assignment: assignment.data },
       });
       return ok({
         leadId,
@@ -278,7 +335,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       selected_vendor_ids: selectedVendorIds,
       assigned_vendor_ids: assigned.map((vendor) => vendor.vendor_id),
       failure_reason: null,
-      matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit, assignment: assignment.data },
+      matching_snapshot: { lead: summarizeLead(leadRow), selected: selectedVendorIds, eligible, ...matchAudit, ...outcomeAudit, assignment: assignment.data },
     });
 
     return ok({
@@ -335,8 +392,10 @@ export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Res
 /**
  * PURE ranking: given a lead and a set of vendor rows, classify commercial
  * eligibility → city hard gate → category tier → distance/area, then rank per the
- * approved order and fill (the caller applies max-3). No I/O — deterministic and
- * unit-testable. Returns the SAME shape as evaluateVendorsForLead.
+ * approved order and fill (the caller applies max-3). No I/O — unit-testable, and
+ * deterministic for a fixed instant: the ONE clock read below is taken once per
+ * run and injected, so no two vendors in the same run are judged against
+ * different instants. Returns the SAME shape as evaluateVendorsForLead.
  */
 export function rankVendorsForLead(
   lead: LeadForMatching,
@@ -350,17 +409,31 @@ export function rankVendorsForLead(
   // has coordinates; manual leads rank by tier + soft area affinity + fairness.
   const leadHasCoords = isValidCoordinate(lead.latitude, lead.longitude);
   const leadParentGroup = getParentCategoryGroup([lead.subcategory, lead.service_required, lead.category]);
+  // QF-MVP-75.01: ONE clock read for the whole run, injected into every
+  // eligibility evaluation. The assignment-suspension window is the only
+  // clock-sensitive gate, and since this ranking is now BINDING on the
+  // authority, every vendor in a single run must be judged against the SAME
+  // instant rather than each against its own Date.now().
+  const nowMs = Date.now();
 
   for (const vendor of rows) {
     const id = asText(vendor.id);
     if (!id) continue;
 
     // Phase 4 canonical commercial eligibility ONLY: approved + active +
-    // accepting_leads + remaining_credits >= LEAD_CREDIT_COST. Package/paid_status
-    // are NOT eligibility inputs anymore. City and category are gated below so we
-    // can still distinguish Tier 0 vs Tier 1 fallback. Must match the RPC gate.
-    const wallet = evaluateVendorAutomaticLeadEligibility(vendor);
-    const reasons: string[] = [...wallet.reasons];
+    // accepting_leads + NOT assignment-suspended + remaining_credits >=
+    // LEAD_CREDIT_COST. Package/paid_status are NOT eligibility inputs. City and
+    // category are gated below so we can still distinguish Tier 0 vs Tier 1
+    // fallback. Must match the RPC gate.
+    //
+    // QF-MVP-75.01: the helper now also mirrors the assignment-suspension window
+    // that public.qf_vendor_assignment_eligible has always enforced. Before this
+    // slice the matcher could rank a suspended vendor into the bounded pool,
+    // consume one of its slots, and learn nothing more than the authority's
+    // coarse `vendor_not_eligible`. Every reason below is now an explicit
+    // AutomaticMatchRejectReason, so a skipped candidate is explainable HERE.
+    const wallet = evaluateVendorAutomaticLeadEligibility(vendor, { nowMs });
+    const reasons: AutomaticMatchRejectReason[] = [...wallet.reasons];
 
     // City HARD gate — normalized text comparison (not exact-case).
     if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");
@@ -403,21 +476,42 @@ export function rankVendorsForLead(
       coordinate_source: coords.source,
       area_affinity: areaAffinity,
       rank_reason: "",
-      __lastAssignedAt: asText(vendor.last_assigned_at),
-      __rating: Number.isFinite(Number(vendor.rating)) ? Number(vendor.rating) : 0,
+      // QF-MVP-75.01: the pure MatchCore decision record this candidate is
+      // ranked by. Kept alongside the public row so the comparator has exactly
+      // the contract's fields and nothing else.
+      __decision: {
+        vendor_id: id,
+        eligible: true,
+        reason_codes: [],
+        match_tier: tier,
+        match_type: matchType,
+        has_coordinates: hasCoordinates,
+        coordinate_source: coords.source,
+        distance_km: distanceKm,
+        area_affinity: areaAffinity,
+        last_assigned_at: asText(vendor.last_assigned_at),
+        rating: Number.isFinite(Number(vendor.rating)) ? Number(vendor.rating) : 0,
+        rank_position: null,
+      },
     });
   }
 
   // Rank: category tier first (0 before 1), then distance-aware ordering, then
   // soft area affinity, fairness (last_assigned_at asc, nulls first), rating, id.
-  eligible.sort((a, b) => compareCandidates(a, b, leadHasCoords));
+  //
+  // QF-MVP-75.01: the comparator is now the shared MatchCore contract
+  // (lib/matchcore/automaticMatchDecision). The order is unchanged; what changed
+  // is that the persistence authority is bound by it, so this is no longer an
+  // advisory ordering. The contract also hardens the fairness key: an
+  // unparseable last_assigned_at previously produced NaN, which made the
+  // comparator non-total and let the same input sort differently.
+  eligible.sort((a, b) => compareAutomaticMatchDecisions(a.__decision, b.__decision, leadHasCoords));
 
   // Finalize audit: rank position + human reason; strip internal sort-only fields.
   eligible.forEach((vendor, index) => {
     vendor.rank_position = index + 1;
     vendor.rank_reason = buildRankReason(vendor, leadHasCoords);
-    delete (vendor as Record<string, unknown>).__lastAssignedAt;
-    delete (vendor as Record<string, unknown>).__rating;
+    delete (vendor as Record<string, unknown>).__decision;
   });
 
   return { eligible, skipped, skippedReasonCounts };
@@ -521,26 +615,20 @@ function computeAreaAffinity(vendor: Record<string, unknown>, lead: LeadForMatch
   return 0;
 }
 
-type RankableCandidate = EligibleMatchedVendor & { __lastAssignedAt: string | null; __rating: number };
-
-// Approved order: category_tier ASC, has_coordinates DESC, distance_km ASC,
-// area_affinity DESC, last_assigned_at ASC (nulls first), rating DESC, id ASC.
-// Coordinate/distance keys apply only when the LEAD has coordinates.
-function compareCandidates(a: RankableCandidate, b: RankableCandidate, leadHasCoords: boolean): number {
-  if (a.match_tier !== b.match_tier) return a.match_tier - b.match_tier;
-  if (leadHasCoords) {
-    if (a.has_coordinates !== b.has_coordinates) return a.has_coordinates ? -1 : 1;
-    const ad = a.distance_km ?? Number.POSITIVE_INFINITY;
-    const bd = b.distance_km ?? Number.POSITIVE_INFINITY;
-    if (ad !== bd) return ad - bd;
-  }
-  if (a.area_affinity !== b.area_affinity) return b.area_affinity - a.area_affinity;
-  const at = a.__lastAssignedAt ? Date.parse(a.__lastAssignedAt) : Number.NEGATIVE_INFINITY;
-  const bt = b.__lastAssignedAt ? Date.parse(b.__lastAssignedAt) : Number.NEGATIVE_INFINITY;
-  if (at !== bt) return at - bt; // never-assigned (nulls) first for fairness
-  if (a.__rating !== b.__rating) return b.__rating - a.__rating;
-  return a.id.localeCompare(b.id);
-}
+/**
+ * A ranked row carries the public audit shape plus the pure MatchCore decision
+ * record it is ordered by. `__decision` is stripped before the row is returned,
+ * so the persisted snapshot shape is unchanged.
+ *
+ * QF-MVP-75.01: the comparator itself moved to
+ * lib/matchcore/automaticMatchDecision.compareAutomaticMatchDecisions. The
+ * approved order is unchanged — category_tier ASC, has_coordinates DESC,
+ * distance_km ASC, area_affinity DESC, last_assigned_at ASC (nulls first),
+ * rating DESC, id ASC, with the coordinate/distance keys applying only when the
+ * LEAD has coordinates — but it now has ONE definition that the authority is
+ * bound by and the offline suite can exercise directly.
+ */
+type RankableCandidate = EligibleMatchedVendor & { __decision: AutomaticMatchDecision };
 
 function buildRankReason(vendor: EligibleMatchedVendor, leadHasCoords: boolean): string {
   const parts = [`tier${vendor.match_tier}:${vendor.match_type}`];

@@ -18,6 +18,12 @@ const eligUrl = new URL("../lib/vendors/vendorAutomaticEligibility.ts", import.m
 const elig = (await import(eligUrl)) as typeof import("../lib/vendors/vendorAutomaticEligibility");
 const { evaluateVendorAutomaticLeadEligibility, normalizeAcceptingLeads, LEAD_CREDIT_COST } = elig;
 
+// QF-MVP-75.01: the executable candidate-pool contract, so H13 can assert the
+// invariant instead of an implementation spelling.
+const contractUrl = new URL("../lib/marketplace/canonicalAssignmentContract.ts", import.meta.url).href;
+const contract = (await import(contractUrl)) as typeof import("../lib/marketplace/canonicalAssignmentContract");
+const { MAX_CANONICAL_CANDIDATE_POOL } = contract;
+
 let passed = 0;
 let failed = 0;
 const failures: string[] = [];
@@ -117,7 +123,26 @@ check("H11 [static] refund helper uses invalid_lead_refund reference (idempotent
 // H12 — invalid negative mutation cannot silently clamp to zero.
 check("H12 [static] canonical RPC raises INSUFFICIENT_CREDITS, no clamp", /INSUFFICIENT_CREDITS/.test(c141) && !/greatest\(0,\s*v_before\s*\+\s*p_delta\)/.test(c141));
 // H13 — candidate pool > 6 works; constants agree at 20.
-check("H13 [static] MAX_ASSIGNMENT_CANDIDATE_POOL = 20 in both matcher and delivery", /MAX_ASSIGNMENT_CANDIDATE_POOL = 20/.test(matcherSrc) && /MAX_ASSIGNMENT_CANDIDATE_POOL = 20/.test(deliverySrc));
+// H13 — the candidate-pool bound is 20 and both consumers agree on it.
+//
+// QF-MVP-75.01 REPAIR. This check used to require the literal source string
+// `MAX_ASSIGNMENT_CANDIDATE_POOL = 20` in BOTH files. That coupled the assertion
+// to one implementation SPELLING rather than to the invariant: when
+// services/leadDeliveryService.ts started deriving its bound from the canonical
+// contract (`= MAX_CANONICAL_CANDIDATE_POOL`) the value stayed 20 but the check
+// went red, and it was still red at clean main when QF-MVP-75.00 audited it.
+//
+// It now proves the invariant SEMANTICALLY: the canonical constant is exactly
+// 20, and both consumers bind their pool to that same constant. The 20-candidate
+// invariant is not weakened — it is checked against the executable contract
+// instead of against a string.
+check(
+  "H13 [static] candidate pool bound is the canonical 20, shared by matcher and delivery",
+  MAX_CANONICAL_CANDIDATE_POOL === 20 &&
+    /MAX_ASSIGNMENT_CANDIDATE_POOL\s*=\s*(20|MAX_CANONICAL_CANDIDATE_POOL)\b/.test(matcherSrc) &&
+    /MAX_ASSIGNMENT_CANDIDATE_POOL\s*=\s*(20|MAX_CANONICAL_CANDIDATE_POOL)\b/.test(deliverySrc),
+  `canonical=${String(MAX_CANONICAL_CANDIDATE_POOL)}`,
+);
 {
   const ranked = Array.from({ length: 8 }, (_, i) => `c${i + 1}`);
   check("H13b [pure] pool of 8 candidates → exactly 3 assigned", simulateFillUntilSuccessful(ranked, 3, () => true).length === 3);

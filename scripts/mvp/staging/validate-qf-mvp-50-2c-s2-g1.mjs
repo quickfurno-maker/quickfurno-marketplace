@@ -186,6 +186,16 @@ const POST_ANCHOR_PENDING = [
     sha: "0015de5971be5072f78f1daaa49c49a088d29a16d2aaa0b954e08dc29f5ea4fc",
     phase: "QF-MVP-40",
   },
+  {
+    // QF-MVP-75.01 — the MatchCore binding-rank-order replacement of
+    // public.qf_assign_lead_vendors_v2. SOURCE ONLY: it has NOT been applied to
+    // staging, it carries no applied evidence and no remote history count, and
+    // it still requires its own separate staging deployment gate.
+    version: "20260815000000",
+    name: "qf_mvp_75_01_matchcore_binding_rank_order",
+    sha: "ea65d8803f3d2510357d19a7aa779e74efc112089e787cc8c9802a13a4666707",
+    phase: "QF-MVP-75.01",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -198,7 +208,10 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 99;
+// QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
+// binding-rank-order authority replacement (20260815000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+const MIGRATION_COUNT = 100;
 
 const APPROVED_COMMON = [
   "20260723000100", "20260723000200", "20260723000300", "20260723000400",
@@ -397,12 +410,12 @@ function validateState(state) {
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
 
-  check("exactly twelve local migrations are newer than the anchor", postAnchorLocal.length === 12, `actual=${postAnchorLocal.length}`);
+  check("exactly thirteen local migrations are newer than the anchor", postAnchorLocal.length === 13, `actual=${postAnchorLocal.length}`);
   check("the twelve post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 12);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 13);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
-  check("the explicit PENDING post-anchor set holds exactly two entries", pendingPins !== null && pendingPins.length === 2, `actual=${pendingPins?.length}`);
+  check("the explicit PENDING post-anchor set holds exactly three entries", pendingPins !== null && pendingPins.length === 3, `actual=${pendingPins?.length}`);
   check("the pending records match the exact pinned set", same(pendingPins?.map((r) => r.version), POST_ANCHOR_PENDING.map((m) => m.version)));
 
   for (const expected of POST_ANCHOR_PENDING) {
@@ -550,7 +563,7 @@ function runMutants(pristineState) {
     // 20260812000000 is now a REAL pinned pending migration.
     // QF-MVP-40.13B RE-PIN: the fake version moved to 20260814000000 because
     // 20260813000000 is now a REAL pinned pending migration.
-    ["an unpinned new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260814000000", name: "twelfth", path: "supabase/migrations/20260814000000_twelfth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.6", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
+    ["an unpinned new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260816000000", name: "thirteenth", path: "supabase/migrations/20260816000000_thirteenth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.6", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
     ["the pending list key deleted entirely instead of pinned", (state) => { delete state.manifest.pendingPostAnchorMigrations; }],
 
     // --- QF-MVP-40.13B: the pinned PENDING canary-activation authority --------
@@ -583,7 +596,7 @@ function runMutants(pristineState) {
     }],
     ["40.13B also listed as applied", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.pendingPostAnchorMigrations[0])); }],
     ["an eleventh applied post-anchor migration", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
-    ["a twelfth post-anchor migration on disk", (state) => { state.migrations.push({ filename: "20260814000000_twelfth.sql", version: "20260814000000", name: "twelfth", sha256: "c".repeat(64), malformed: false }); }],
+    ["a twelfth post-anchor migration on disk", (state) => { state.migrations.push({ filename: "20260816000000_thirteenth.sql", version: "20260816000000", name: "thirteenth", sha256: "c".repeat(64), malformed: false }); }],
 
     // --- QF-MVP-50.5-RECOVERY: the newly APPLIED post-anchor record ------------
     // Index 9 is 20260812000000, the tenth and newest applied post-anchor entry.

@@ -55,15 +55,21 @@ const FROZEN = [
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 99;
-const POST_ANCHOR_COUNT = 12;
-const PENDING_ORDER = ["20260813000000", "20260814000000"];
+// QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
+// binding-rank-order authority replacement (20260815000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+const MIGRATION_COUNT = 100;
+const POST_ANCHOR_COUNT = 13;
+const PENDING_ORDER = ["20260813000000", "20260814000000", "20260815000000"];
 const RECOVERY_NAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
 const MARKETING_CONSENT_NAME =
   "20260814000000_qf_mvp_40_marketing_consent_writer.sql";
 const CANARY_AUTHORITY_NAME =
   "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql";
+/** QF-MVP-75.01 — SOURCE ONLY, never applied by this or any prior phase. */
+const MATCHCORE_RANK_ORDER_NAME =
+  "20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql";
 const APPLIED_ORDER = ["20260804000000", "20260805000000", "20260806000000",
   "20260807000000", "20260808000000", BRIDGE_VERSION,
   "20260809000000", "20260810000000", "20260811000000", "20260812000000"];
@@ -102,11 +108,11 @@ record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
 // QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
 // in exactly this order; they are now followed by the 50.5 recovery transport, which is
 // named explicitly rather than allowed as "anything newer".
-record("V07a the final seven versions are in exact chronological order",
-  same(migrationFiles.slice(-7),
+record("V07a the final eight versions are in exact chronological order",
+  same(migrationFiles.slice(-8),
     [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
-     MARKETING_CONSENT_NAME]));
-record("V07 the local migration set is exactly 99",
+     MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME]));
+record("V07 the local migration set is exactly 100",
   migrationFiles.length === MIGRATION_COUNT);
 
 // ---------------------------------------------------------------------------
@@ -294,8 +300,8 @@ record("G05a the bridge no longer appears as pending",
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G06 the pending post-anchor set is exactly the two SOURCE-PENDING QF-MVP-40 authorities",
-  manifest.pendingPostAnchorMigrations?.length === 2 &&
+record("G06 the pending post-anchor set is exactly the three SOURCE-PENDING governed authorities",
+  manifest.pendingPostAnchorMigrations?.length === 3 &&
   same(manifest.pendingPostAnchorMigrations.map((r) => r.version), PENDING_ORDER));
 record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
@@ -304,10 +310,10 @@ record("G07 the ten applied records read 21 through 30 in exact order",
 record("G08 the anchor post-anchor count agrees at 12",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
 record("G09 G1 was re-pinned to 99 / 10 applied / 2 pending, not loosened",
-  /const MIGRATION_COUNT = 99;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 100;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 2") &&
+  g1Source.includes("pendingPins.length === 3") &&
   g1Source.includes("appliedPins.length === 10") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));

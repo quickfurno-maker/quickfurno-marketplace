@@ -141,6 +141,24 @@ jobs:
       - name: QF-MVP-70.04 final certification
         run: npm run test:mvp:70-04
 
+      # QF-MVP-75.01 — the marketplace MONEY PATH. The QF-MVP-75.00 audit proved
+      # this gate did not cover matching or assignment at all, while 75.01 changes
+      # which eligible vendors actually win a lead and therefore which wallets are
+      # debited. These four are the minimum that must be green at the exact head
+      # before such a change can merge. All offline file-level harnesses: no
+      # secrets, no Supabase, no Meta, no n8n.
+      - name: QF-MVP-75.01 MatchCore binding rank order
+        run: npm run test:mvp:75-01
+
+      - name: Marketplace eligibility and category contract
+        run: npm run test:mvp:marketplace
+
+      - name: Canonical assignment-authority contract
+        run: npm run test:mvp:assignment-authority
+
+      - name: Phase 4 credit wallet and candidate-pool invariants
+        run: npm run test:phase4
+
       - name: Typecheck
         run: npm run typecheck
 

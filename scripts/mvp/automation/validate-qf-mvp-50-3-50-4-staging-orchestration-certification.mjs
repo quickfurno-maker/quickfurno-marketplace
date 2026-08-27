@@ -123,13 +123,14 @@ function validateState(state) {
   // canary activation authority. Nothing about the applied 21..30 truth changes.
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99 and the pending set gains exactly the
   // SOURCE-PENDING marketing-consent writer RPC. The applied 21..30 truth is unchanged.
-  check("local migration count remains exactly 99", state.migrationFiles.length === 99);
+  check("local migration count remains exactly 100", state.migrationFiles.length === 100);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set is exactly the two SOURCE-PENDING QF-MVP-40 authorities",
-    Array.isArray(pending) && pending.length === 2 &&
+  check("the governed pending set is exactly the three SOURCE-PENDING governed authorities",
+    Array.isArray(pending) && pending.length === 3 &&
     pending[0].version === "20260813000000" &&
     pending[1].version === "20260814000000" &&
+    pending[2].version === "20260815000000" &&
     pending.every((r) => r.operationalStatus === "PENDING"
       && r.appliedByThisPhase === false));
   check("the 50.5 recovery migration is applied by its own phase at history 30",

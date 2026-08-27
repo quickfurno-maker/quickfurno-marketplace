@@ -107,7 +107,9 @@ check("no Activity tab without a real event stream", !/activity:\s*"Activity"|>A
 const migrationFiles = readdirSync(join(root, "supabase", "migrations"));
 // QF-MVP-70.04 RE-PIN: 98 -> 99. This admin phase still adds no migration of its own;
 // the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
-check("migration count remains 99", migrationFiles.length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100. This admin phase still adds no migration of its own;
+// the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql).
+check("migration count remains 100", migrationFiles.length === 100);
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);
 console.log("offline: no database, no network, no provider, no auth bypass");

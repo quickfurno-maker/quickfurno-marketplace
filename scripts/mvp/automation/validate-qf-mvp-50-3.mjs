@@ -405,8 +405,11 @@ record("G08 CI still takes no secret, database, provider or deployment action",
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("G09 the local migration set is exactly 99",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
+// binding-rank-order authority replacement (20260815000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+record("G09 the local migration set is exactly 100",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 100);
 
 // ---------------------------------------------------------------------------
 // V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject

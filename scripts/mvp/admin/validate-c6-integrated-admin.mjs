@@ -217,7 +217,9 @@ check("no consumer-green WhatsApp clone styling", waClients.every((s) => !/#25D3
 const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
 // QF-MVP-70.04 RE-PIN: 98 -> 99. This admin phase still adds no migration of its own;
 // the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
-check("migration count is unchanged at 99", migrations.length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100. This admin phase still adds no migration of its own;
+// the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql).
+check("migration count is unchanged at 100", migrations.length === 100);
 
 console.log(`\nC6 integrated Admin V2: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

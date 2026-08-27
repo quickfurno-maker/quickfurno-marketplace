@@ -62,7 +62,9 @@ const allCode = allSources.map(stripComments).join("\n");
 
 // ── 1. No new backend, no new control system ───────────────────────────────
 const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
-check("migration count is unchanged at 99", migrations.length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100. This phase still adds no migration of its own;
+// the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql). Phase 70 behaviour is unchanged.
+check("migration count is unchanged at 100", migrations.length === 100);
 check("QF-MVP-70 added no migration", !migrations.some((f) => /qf_mvp_70|mvp70|operations|incident/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("no source creates a function, index or policy", allSources.every((s) => !/create (or replace )?function|create index|create policy/i.test(s)));

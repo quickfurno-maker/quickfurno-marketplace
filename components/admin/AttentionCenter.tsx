@@ -4,13 +4,27 @@ import Link from "next/link";
 import { AdminIcon } from "./AdminIcon";
 import type { AdminIconName } from "./adminConfig";
 
-export type AttentionSeverity = "critical" | "warning" | "info" | "clear";
+/**
+ * `unavailable` is not a degree of severity — it is the absence of a fact.
+ *
+ * It exists because an operations queue that cannot read a source must say so.
+ * Rendering an unreadable source as a calm zero is the one failure mode this
+ * component is not allowed to have, so `unavailable` is a first-class state
+ * with its own word, its own rail and its own rank.
+ */
+export type AttentionSeverity = "critical" | "unavailable" | "warning" | "info" | "clear";
 
 export type AttentionItem = {
   id: string;
   label: string;
-  /** Real count from the snapshot. Never fabricated. */
-  value: number;
+  /**
+   * A PROVEN count, or null when the source could not be read.
+   *
+   * null is NOT zero. It is never coerced, never summed, never sorted as zero
+   * and never rendered as a number — it renders as "Unavailable" and forces the
+   * row into the `unavailable` state regardless of the severity passed in.
+   */
+  value: number | null;
   /** What the number actually means, in plain words. */
   detail: string;
   severity: AttentionSeverity;
@@ -33,6 +47,12 @@ const TONE: Record<AttentionSeverity, { rail: string; chip: string; icon: string
     icon: "text-rose-600",
     word: "Critical",
   },
+  unavailable: {
+    rail: "bg-slate-400",
+    chip: "border-dashed border-slate-400 bg-slate-50 text-slate-700",
+    icon: "text-slate-500",
+    word: "Unavailable",
+  },
   warning: {
     rail: "bg-amber-500",
     chip: "border-amber-200 bg-amber-50 text-amber-900",
@@ -54,22 +74,59 @@ const TONE: Record<AttentionSeverity, { rail: string; chip: string; icon: string
 };
 
 /**
- * The operational queue for the dashboard.
+ * An unreadable count outranks every state except a proven critical one: it may
+ * be concealing a critical, so it must never sink below the healthy rows.
+ */
+const SEVERITY_ORDER: AttentionSeverity[] = ["critical", "unavailable", "warning", "info", "clear"];
+
+/**
+ * The single place severity is decided.
  *
- * Previously six equally-sized coloured cards in a grid — which made a critical
- * queue look exactly as important as a cleared one and consumed most of the
- * fold. It is now a ranked list: severity rail, the count, what it means, and
- * the route that actions it. Scanning top-to-bottom answers "what do I do
- * next?" in one pass.
+ * A null value forces `unavailable` whatever the caller passed, which is what
+ * makes "sorted as a healthy zero" and "labelled Clear" structurally
+ * unreachable rather than merely discouraged.
+ */
+function effectiveSeverity(item: AttentionItem): AttentionSeverity {
+  return item.value === null ? "unavailable" : item.severity;
+}
+
+/**
+ * The operational queue.
+ *
+ * A ranked list: severity rail, the count (or an explicit Unavailable), what it
+ * means, and the route that actions it. Scanning top-to-bottom answers "what do
+ * I do next?" in one pass.
  */
 export function AttentionCenter({ items }: { items: AttentionItem[] }) {
   const ranked = [...items].sort((a, b) => {
-    const order: AttentionSeverity[] = ["critical", "warning", "info", "clear"];
-    const bySeverity = order.indexOf(a.severity) - order.indexOf(b.severity);
-    return bySeverity !== 0 ? bySeverity : b.value - a.value;
+    const bySeverity =
+      SEVERITY_ORDER.indexOf(effectiveSeverity(a)) - SEVERITY_ORDER.indexOf(effectiveSeverity(b));
+    if (bySeverity !== 0) return bySeverity;
+    // An unknown value sorts below every proven one inside the same state.
+    return (b.value ?? -1) - (a.value ?? -1);
   });
 
-  const needing = ranked.filter((item) => item.severity === "critical" || item.severity === "warning").length;
+  const needing = ranked.filter((item) => {
+    const severity = effectiveSeverity(item);
+    return severity === "critical" || severity === "warning";
+  }).length;
+
+  const unavailable = ranked.filter((item) => effectiveSeverity(item) === "unavailable").length;
+
+  const summary = (() => {
+    const decisions =
+      needing === 0 ? null : `${needing} ${needing === 1 ? "queue needs" : "queues need"} a decision`;
+    const unread =
+      unavailable === 0
+        ? null
+        : `${unavailable} ${unavailable === 1 ? "source" : "sources"} could not be read`;
+
+    if (decisions && unread) return `${decisions} · ${unread}`;
+    if (decisions) return decisions;
+    // Never claim nothing is waiting while a source is unreadable.
+    if (unread) return `${unread} — health cannot be confirmed`;
+    return "Nothing is waiting on a human decision right now.";
+  })();
 
   return (
     <section aria-labelledby="qf-attention-heading" className="qfa-panel overflow-hidden">
@@ -78,21 +135,22 @@ export function AttentionCenter({ items }: { items: AttentionItem[] }) {
           <h2 id="qf-attention-heading" className="text-[15px] font-semibold tracking-tight text-slate-950">
             Attention center
           </h2>
-          <p className="min-w-0 truncate text-xs text-slate-500">
-            {needing === 0
-              ? "Nothing is waiting on a human decision right now."
-              : `${needing} ${needing === 1 ? "queue needs" : "queues need"} a decision`}
-          </p>
+          <p className="min-w-0 truncate text-xs text-slate-500">{summary}</p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-          Live snapshot
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${unavailable === 0 ? "bg-emerald-500" : "bg-amber-500"}`}
+            aria-hidden="true"
+          />
+          {unavailable === 0 ? "Live snapshot" : "Partial snapshot"}
         </span>
       </div>
 
       <ul className="divide-y divide-[color:var(--qfa-line-soft)]">
         {ranked.map((item) => {
-          const tone = TONE[item.severity];
+          const severity = effectiveSeverity(item);
+          const tone = TONE[severity];
+          const unknown = item.value === null;
           const body = (
             <>
               <span aria-hidden="true" className={`h-9 w-0.5 shrink-0 rounded-full ${tone.rail}`} />
@@ -107,14 +165,25 @@ export function AttentionCenter({ items }: { items: AttentionItem[] }) {
               </span>
 
               <span className="w-14 shrink-0 text-right text-lg font-semibold tabular-nums leading-none text-slate-950 sm:w-16">
-                {item.value}
+                {unknown ? (
+                  <>
+                    <span aria-hidden="true" className="text-slate-400">
+                      —
+                    </span>
+                    <span className="sr-only">Unavailable</span>
+                  </>
+                ) : (
+                  item.value
+                )}
               </span>
 
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold text-slate-900">{item.label}</span>
                 <span className="block truncate text-[11px] text-slate-500">
                   {item.detail}
-                  {item.approximate ? " Counted over the latest loaded rows, not marketplace-wide." : ""}
+                  {item.approximate && !unknown
+                    ? " Counted over the latest loaded rows, not marketplace-wide."
+                    : ""}
                 </span>
               </span>
 

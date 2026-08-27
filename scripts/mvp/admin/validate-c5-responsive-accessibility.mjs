@@ -157,7 +157,10 @@ check("no browser service-role credential", !/SUPABASE_SERVICE_ROLE_KEY|process\
 // the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
 // QF-MVP-75.01 RE-PIN: 99 -> 100. This admin phase still adds no migration of its own;
 // the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql).
-check("migration count remains 100", readdirSync(join(root, "supabase", "migrations")).length === 100);
+// QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
+// the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
+// addition. Exact equality, never loosened.
+check("migration count remains 101", readdirSync(join(root, "supabase", "migrations")).length === 101);
 check("C5 added no accessibility/UI dependency", !Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies }).some((name) => /radix|headlessui|framer|focus-trap|axe/i.test(name)));
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);

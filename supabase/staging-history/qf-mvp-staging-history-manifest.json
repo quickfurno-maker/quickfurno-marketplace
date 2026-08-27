@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 13,
+    "postAnchorMigrationCount": 14,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -815,6 +815,17 @@
       "path": "supabase/migrations/20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql",
       "sha256": "ea65d8803f3d2510357d19a7aa779e74efc112089e787cc8c9802a13a4666707",
       "phase": "QF-MVP-75.01",
+      "operationalStatus": "PENDING",
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "requiresSeparateStagingDeploymentGate": true,
+      "appliedByThisPhase": false
+    },
+    {
+      "version": "20260816000000",
+      "name": "qf_mvp_75_02_geo_postgis_shortlist",
+      "path": "supabase/migrations/20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql",
+      "sha256": "aa24f9d9299528d5bab11e18a7a53fd7f9a7a89833f94f1d18190deda9f2b1cd",
+      "phase": "QF-MVP-75.02",
       "operationalStatus": "PENDING",
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "requiresSeparateStagingDeploymentGate": true,

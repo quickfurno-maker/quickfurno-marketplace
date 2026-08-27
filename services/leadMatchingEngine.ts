@@ -16,6 +16,16 @@ import {
   vendorMatchesParentGroup,
 } from "../lib/vendors/categoryMatching";
 import { haversineKm, isValidCoordinate } from "../lib/geo/distance";
+// QF-MVP-75.02 — the ONE canonical WGS84 coordinate contract. The vendor
+// office-then-legacy priority and the "is this pair usable?" rule live there so
+// this matcher, the PostGIS generated columns (migration 20260816000000) and the
+// offline suite cannot drift apart on which rows hold a coordinate.
+import {
+  resolveLeadCanonicalCoordinate,
+  resolveVendorCanonicalCoordinate,
+} from "../lib/geo/canonicalCoordinate";
+import { buildGeoMatchEvidence } from "../lib/geo/geoShortlistContract";
+import { fetchGeoVendorShortlist } from "./geoVendorShortlistService";
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
 import { MAX_CANONICAL_CANDIDATE_POOL } from "../lib/marketplace/canonicalAssignmentContract";
@@ -53,6 +63,11 @@ export type LeadForMatching = {
   message?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  // QF-MVP-75.02 provenance ONLY. Neither is a distance input and neither is a
+  // matching authority; they are recorded as non-sensitive coordinate
+  // provenance in the matching snapshot.
+  location_source?: string | null;
+  google_place_id?: string | null;
   share_consent?: boolean | null;
   is_duplicate?: boolean | null;
 };
@@ -135,7 +150,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     const db = adminClient();
     const { data: lead, error: leadError } = await db
       .from("leads")
-      .select("id, name, phone, city, area, service_required, category, subcategory, budget, timeline, message, latitude, longitude, share_consent, is_duplicate")
+      .select("id, name, phone, city, area, service_required, category, subcategory, budget, timeline, message, latitude, longitude, location_source, google_place_id, share_consent, is_duplicate")
       .eq("id", leadId)
       .maybeSingle();
     if (leadError) throw leadError;
@@ -187,6 +202,32 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
     const { eligible, skipped, skippedReasonCounts } = evaluation.data;
 
+    // QF-MVP-75.02 — bounded read-only PostGIS geo DISCOVERY, recorded as
+    // evidence and nothing else.
+    //
+    // Read this ordering carefully, because it is the whole safety argument:
+    // the shortlist runs AFTER `eligible` is already final, and its result is
+    // never fed back into `eligible`, into `rankedPool`, into the candidate
+    // pool submitted to the authority, or into the comparator. It therefore
+    // CANNOT exclude a vendor the existing 20-candidate contract could have
+    // selected, cannot narrow supply, cannot debit a credit and cannot assign.
+    //
+    // Every abnormal geo outcome — no lead coordinate, no vendor with a
+    // coordinate, migration not applied, infrastructure error — is a TYPED
+    // outcome that resolves to an explicit city-fallback label. None of them can
+    // make a lead look unsupplied: only `eligible` can say that, and `eligible`
+    // is computed above without any geo input at all.
+    const leadPoint = resolveLeadCanonicalCoordinate(leadRow);
+    const geoOutcome = await fetchGeoVendorShortlist(leadRow);
+    const geoEvidence = buildGeoMatchEvidence({
+      outcome: geoOutcome,
+      leadCoordinateSource: leadPoint.source,
+      leadHasValidCoordinate: leadPoint.source !== "none",
+      leadLocationSource: asText(leadRow.location_source),
+      leadGooglePlaceIdPresent: Boolean(asText(leadRow.google_place_id)),
+      cityEligibleVendorCount: eligible.length,
+    });
+
     // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
     // `assigned ⊆ selected`; the authority caps SUCCESSFUL at 3.
     //
@@ -214,6 +255,10 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       // Eligible and ranked, but beyond the bounded transport pool, so never
       // submitted at all. Distinct from `cap_deferred_vendor_ids` below.
       max_vendor_cap_reached_vendor_ids: rankedPool.beyondPool,
+      // QF-MVP-75.02 geo evidence. Straight-line discovery only — see
+      // lib/geo/geoShortlistContract. Never route distance, never route time,
+      // never an authority.
+      geo: geoEvidence,
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
@@ -590,18 +635,19 @@ function classifyCategoryTier(
 }
 
 // Vendor coordinate priority: office_latitude/longitude → legacy latitude/longitude.
+//
+// QF-MVP-75.02: the rule itself now lives in lib/geo/canonicalCoordinate, which
+// migration 20260816000000 mirrors as the two-branch CASE of
+// public.vendors.geo_point. This wrapper keeps the matcher's local shape and
+// adds no rule of its own, so there is exactly ONE definition of the vendor
+// coordinate source. base_latitude/base_longitude remain deliberately unused.
 function resolveVendorCoordinates(vendor: Record<string, unknown>): {
   lat: number | null;
   lng: number | null;
   source: CoordinateSource;
 } {
-  const oLat = Number(vendor.office_latitude);
-  const oLng = Number(vendor.office_longitude);
-  if (isValidCoordinate(oLat, oLng)) return { lat: oLat, lng: oLng, source: "office_coordinates" };
-  const lLat = Number(vendor.latitude);
-  const lLng = Number(vendor.longitude);
-  if (isValidCoordinate(lLat, lLng)) return { lat: lLat, lng: lLng, source: "legacy_coordinates" };
-  return { lat: null, lng: null, source: "none" };
+  const resolved = resolveVendorCanonicalCoordinate(vendor);
+  return { lat: resolved.latitude, lng: resolved.longitude, source: resolved.source };
 }
 
 // SOFT area affinity (ranking only, never eligibility): exact listed-area match = 1,

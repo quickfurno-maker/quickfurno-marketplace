@@ -38,7 +38,10 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
 // binding-rank-order authority replacement (20260815000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 100;
+// QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
+// PostGIS shortlist foundation (20260816000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality.
+const MIGRATION_COUNT = 101;
 // QF-MVP-50.5 STAGING GATE RE-PIN: this version is no longer pending. It cleared
 // its own staging gate at remote history 30 and is now the newest APPLIED record.
 const RECOVERY_VERSION = "20260812000000";
@@ -52,6 +55,9 @@ const CANARY_AUTHORITY_FILENAME =
 /** QF-MVP-75.01 — SOURCE ONLY, never applied by this or any prior phase. */
 const MATCHCORE_RANK_ORDER_FILENAME =
   "20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql";
+/** QF-MVP-75.02 - SOURCE ONLY, never applied by this or any prior phase. */
+const GEO_POSTGIS_SHORTLIST_FILENAME =
+  "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql";
 
 const EXPECTED_APPLIED = [
   ["20260804000000", 21],
@@ -140,11 +146,12 @@ function validateState(state) {
     ? manifest.pendingPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 100", state.migrationFiles.length === MIGRATION_COUNT);
-  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the three pinned SOURCE-PENDING governed authorities",
-    same(state.migrationFiles.slice(-8),
+  check("migration count is exactly 101", state.migrationFiles.length === MIGRATION_COUNT);
+  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the four pinned SOURCE-PENDING governed authorities",
+    same(state.migrationFiles.slice(-9),
       [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
-       CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME]));
+       CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
+       GEO_POSTGIS_SHORTLIST_FILENAME]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -156,11 +163,12 @@ function validateState(state) {
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
   // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
   // UNCHANGED at ten: neither pending migration has been applied to staging.
-  check("the manifest pending set is exactly the three SOURCE-PENDING governed authorities",
-    pending !== null && pending.length === 3 &&
+  check("the manifest pending set is exactly the four SOURCE-PENDING governed authorities",
+    pending !== null && pending.length === 4 &&
     pending[0].version === "20260813000000" &&
     pending[1].version === "20260814000000" &&
     pending[2].version === "20260815000000" &&
+    pending[3].version === "20260816000000" &&
     pending.every((r) => r.operationalStatus === "PENDING"
       && r.requiresSeparateStagingDeploymentGate === true));
   check("the 50.5 recovery migration is APPLIED at remote history 30 by its own phase",
@@ -175,8 +183,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals the ten applied records plus the three SOURCE-PENDING authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 3);
+  check("the anchor post-anchor count equals the ten applied records plus the four SOURCE-PENDING authorities",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 4);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

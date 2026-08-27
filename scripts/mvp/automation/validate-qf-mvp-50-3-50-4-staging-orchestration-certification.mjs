@@ -123,11 +123,14 @@ function validateState(state) {
   // canary activation authority. Nothing about the applied 21..30 truth changes.
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99 and the pending set gains exactly the
   // SOURCE-PENDING marketing-consent writer RPC. The applied 21..30 truth is unchanged.
-  check("local migration count remains exactly 100", state.migrationFiles.length === 100);
+// QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
+// PostGIS shortlist foundation (20260816000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality.
+  check("local migration count remains exactly 101", state.migrationFiles.length === 101);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
   check("the governed pending set is exactly the three SOURCE-PENDING governed authorities",
-    Array.isArray(pending) && pending.length === 3 &&
+    Array.isArray(pending) && pending.length === 4 &&
     pending[0].version === "20260813000000" &&
     pending[1].version === "20260814000000" &&
     pending[2].version === "20260815000000" &&

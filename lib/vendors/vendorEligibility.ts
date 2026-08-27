@@ -6,6 +6,9 @@ import { isLeadVendorCategoryCompatible } from "@/lib/vendors/categoryMatching";
 export {
   LEAD_CREDIT_COST,
   normalizeAcceptingLeads,
+  // QF-MVP-75.01: the assignment-suspension window gate, mirrored from the
+  // pre-existing SQL hard gate in public.qf_vendor_assignment_eligible.
+  isVendorAssignmentSuspended,
   evaluateVendorAutomaticLeadEligibility,
   type VendorAutomaticLeadEligibility,
   type VendorAutomaticLeadEligibilityReason,

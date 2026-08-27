@@ -311,8 +311,11 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G02 the pending post-anchor set holds exactly two and 50.5 is the newest applied record",
-  manifest.pendingPostAnchorMigrations.length === 2 &&
+// QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
+// binding-rank-order authority replacement (20260815000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+record("G02 the pending post-anchor set holds exactly three and 50.5 is the newest applied record",
+  manifest.pendingPostAnchorMigrations.length === 3 &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.at(-1).operationalStatus === "APPLIED");
 record("G03 the ten applied records read 21 through 30",
@@ -329,8 +332,11 @@ record("G05 the validator is registered and wired into CI after 50.3",
 // changed, renamed, deleted or reordered. Still exact equality.
 // The previous LABEL read "97" while the code compared 98 — a stale label left by the
 // 40.13B re-pin. Label and value are now both 99 and agree.
-record("G06 the local migration set is exactly 99",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
+// binding-rank-order authority replacement (20260815000000). No existing migration was
+// changed, renamed, deleted or reordered. Still exact equality.
+record("G06 the local migration set is exactly 100",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 100);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

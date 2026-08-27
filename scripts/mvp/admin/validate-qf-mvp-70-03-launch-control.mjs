@@ -67,7 +67,9 @@ const launchClients = [readiness, controlState];
 
 // ── 1. No new backend, no fifth control system ─────────────────────────────
 const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
-check("migration count remains 99", migrations.length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100. This phase still adds no migration of its own;
+// the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql). Phase 70 behaviour is unchanged.
+check("migration count remains 100", migrations.length === 100);
 // Narrow to names THIS phase could plausibly introduce: "control" and
 // "readiness" already appear in three pre-existing migration filenames.
 check("no launch-control migration was added", !migrations.some((f) => /qf_mvp_70|mvp70|launch_control|launch_readiness/i.test(f)));

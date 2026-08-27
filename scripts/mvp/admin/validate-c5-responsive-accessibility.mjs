@@ -155,7 +155,9 @@ const browserUi = shell + palette + primitives + dashboard + crm + distribution 
 check("no browser service-role credential", !/SUPABASE_SERVICE_ROLE_KEY|process\.env\.[A-Z_]*SERVICE_ROLE/.test(browserUi));
 // QF-MVP-70.04 RE-PIN: 98 -> 99. This admin phase still adds no migration of its own;
 // the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
-check("migration count remains 99", readdirSync(join(root, "supabase", "migrations")).length === 99);
+// QF-MVP-75.01 RE-PIN: 99 -> 100. This admin phase still adds no migration of its own;
+// the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql).
+check("migration count remains 100", readdirSync(join(root, "supabase", "migrations")).length === 100);
 check("C5 added no accessibility/UI dependency", !Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies }).some((name) => /radix|headlessui|framer|focus-trap|axe/i.test(name)));
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);

@@ -19,15 +19,22 @@ import { redirect } from "next/navigation";
 import { getAdminSession } from "@/app/actions";
 import { OperationsControlCenter } from "@/components/admin/operations/OperationsControlCenter";
 import {
+  describeIncidentClass,
+  findIncidentInPool,
   getOperationsIncidentPage,
   getOperationsOverview,
   listIncidentClassDescriptions,
 } from "@/services/adminOperationsService";
+import type { OperationalIncident } from "@/services/adminOperationsService";
 import type {
+  IncidentSelection,
   OperationsControlCenterPayload,
   OperationsTab,
 } from "@/components/admin/operations/operationsTypes";
-import { OPERATIONS_TABS } from "@/components/admin/operations/operationsTypes";
+import {
+  OPERATIONS_INCIDENT_PARAM,
+  OPERATIONS_TABS,
+} from "@/components/admin/operations/operationsTypes";
 
 export const metadata = { title: "Operations & Launch Control - QuickFurno" };
 export const dynamic = "force-dynamic";
@@ -56,6 +63,39 @@ function parseTab(raw: unknown): OperationsTab {
     : "overview";
 }
 
+/** An incident id is `<class>:<uuid>`. Anything longer is not one, and is
+ *  bounded here so a hostile URL cannot push an arbitrary string into the
+ *  rendered payload. */
+const MAX_INCIDENT_ID_LENGTH = 128;
+
+function parseIncidentId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > MAX_INCIDENT_ID_LENGTH) return null;
+  return trimmed;
+}
+
+/**
+ * Resolve `?incident=` against the payload THIS REQUEST already loaded.
+ *
+ * The pool is whichever bounded set the active tab holds — the ranked attention
+ * queue on Overview, the current page of one class on Incidents. There is no
+ * by-id query anywhere: an id outside that pool resolves to `not_in_view` and
+ * the panel says so, rather than a raw row being fetched by table and id to
+ * satisfy an arbitrary URL.
+ */
+function resolveSelection(
+  requestedId: string | null,
+  pool: readonly OperationalIncident[],
+): IncidentSelection {
+  if (!requestedId) return { state: "none" };
+
+  const incident = findIncidentInPool(pool, requestedId);
+  if (!incident) return { state: "not_in_view", requestedId };
+
+  return { state: "resolved", incident, description: describeIncidentClass(incident.class) };
+}
+
 export default async function AdminOperationsPage({
   searchParams,
 }: {
@@ -67,24 +107,34 @@ export default async function AdminOperationsPage({
 
   const sp = searchParams ?? {};
   const tab = parseTab(first(sp.tab));
+  const requestedIncidentId = parseIncidentId(first(sp[OPERATIONS_INCIDENT_PARAM]));
 
   let payload: OperationsControlCenterPayload = { tab };
   let error: string | null = null;
 
   try {
     if (tab === "overview") {
-      payload = { tab, overview: await getOperationsOverview() };
-    } else {
+      const overview = await getOperationsOverview();
       payload = {
         tab,
-        // The class vocabulary is closed and validated inside the read layer;
-        // an unknown ?class= falls back to the default rather than reaching
-        // PostgREST.
-        incidents: await getOperationsIncidentPage({
-          incidentClass: first(sp.class),
-          page: first(sp.page),
-        }),
+        overview,
+        // Resolved from the ranked queue the overview already computed in
+        // memory — no additional read of any kind.
+        selection: resolveSelection(requestedIncidentId, overview.attentionIncidents),
+      };
+    } else {
+      // The class vocabulary is closed and validated inside the read layer; an
+      // unknown ?class= falls back to the default rather than reaching PostgREST.
+      const incidents = await getOperationsIncidentPage({
+        incidentClass: first(sp.class),
+        page: first(sp.page),
+      });
+      payload = {
+        tab,
+        incidents,
         classOptions: listIncidentClassDescriptions(),
+        // Resolved from the bounded page already loaded above.
+        selection: resolveSelection(requestedIncidentId, incidents.rows),
       };
     }
   } catch (caught) {

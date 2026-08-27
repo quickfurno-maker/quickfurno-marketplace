@@ -16,7 +16,15 @@
 
 import Link from "next/link";
 import type { OperationalIncident, OperationsIncidentPage } from "@/services/adminOperationsService";
-import { DataTable, EmptyState, Muted, SectionCard, SelectFilter, StatusBadge } from "../AdminPrimitives";
+import {
+  DataTable,
+  EmptyState,
+  GhostButton,
+  Muted,
+  SectionCard,
+  SelectFilter,
+  StatusBadge,
+} from "../AdminPrimitives";
 import { formatDateTime, shortId } from "../adminUtils";
 import { Pagination } from "../Pagination";
 import {
@@ -29,13 +37,17 @@ import {
 export function OperationsIncidentsTab({
   incidents,
   classOptions,
+  selectedIncidentId,
   onClassChange,
   onPageChange,
+  onSelectIncident,
 }: {
   incidents?: OperationsIncidentPage;
   classOptions: readonly OperationalIncidentClassDescription[];
+  selectedIncidentId?: string;
   onClassChange: (incidentClass: string) => void;
   onPageChange: (page: number) => void;
+  onSelectIncident: (incidentId: string) => void;
 }) {
   if (!incidents) {
     return (
@@ -110,6 +122,20 @@ export function OperationsIncidentsTab({
           <Muted>None</Muted>
         ),
     },
+    {
+      // A DEDICATED affordance rather than a whole-row link: the Evidence cell is
+      // already a link, and nesting one inside a row-wide link is invalid markup
+      // and ambiguous to a keyboard or screen-reader user.
+      header: "",
+      cell: (row: OperationalIncident) => (
+        <GhostButton
+          onClick={() => onSelectIncident(row.id)}
+          aria-label={`Details for ${row.currentStatus} ${row.entityType}`}
+        >
+          Details
+        </GhostButton>
+      ),
+    },
   ];
 
   return (
@@ -148,6 +174,7 @@ export function OperationsIncidentsTab({
             rows={incidents.rows}
             density="compact"
             getRowKey={(row) => row.id}
+            isRowActive={(row) => row.id === selectedIncidentId}
             emptyTitle="No open incidents in this class"
             emptyMessage="This is a proven zero: the source was read successfully and holds no matching rows."
           />

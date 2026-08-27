@@ -8,8 +8,10 @@
 
 import type {
   OperationalHealth,
+  OperationalIncident,
   OperationalIncidentClass,
   OperationalIncidentClassDescription,
+  OperationalSeverity,
   OperationsIncidentPage,
   OperationsOverview,
   SectionFault,
@@ -34,13 +36,102 @@ export interface OperationsControlCenterPayload {
   /** The closed class vocabulary, supplied by the server so the browser never
    *  holds a loose incident-class literal. */
   readonly classOptions?: readonly OperationalIncidentClassDescription[];
+  /** QF-MVP-70.02 — the resolved detail selection for `?incident=`. */
+  readonly selection?: IncidentSelection;
 }
 
 export type OperationsQuery = {
   readonly tab: OperationsTab;
   readonly incidentClass?: string;
   readonly page?: string;
+  readonly incident?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Detail selection (QF-MVP-70.02)
+// ---------------------------------------------------------------------------
+
+/** The base path, declared once so no component re-spells the route. */
+export const OPERATIONS_BASE_PATH = "/admin/operations";
+
+/** The query parameter that opens the read-only incident detail panel. */
+export const OPERATIONS_INCIDENT_PARAM = "incident";
+
+/**
+ * A closed selection vocabulary.
+ *
+ * `not_in_view` is the fail-closed state: the URL named an incident that is not
+ * in the bounded payload this page already loaded. Nothing is fetched by id to
+ * satisfy it and no detail is fabricated — the panel says so and can be closed.
+ */
+export type IncidentSelection =
+  | { readonly state: "none" }
+  | {
+      readonly state: "resolved";
+      readonly incident: OperationalIncident;
+      readonly description: OperationalIncidentClassDescription;
+    }
+  | { readonly state: "not_in_view"; readonly requestedId: string };
+
+/** Opens the detail panel for one incident, staying on the current view. */
+export function incidentSelectionHref(incidentId: string): string {
+  return `${OPERATIONS_BASE_PATH}?${OPERATIONS_INCIDENT_PARAM}=${encodeURIComponent(incidentId)}`;
+}
+
+/**
+ * Founder-facing entity names.
+ *
+ * The read model's `entityType` mirrors the storage vocabulary; the panel shows
+ * plain words instead, so no table or column name reaches the founder UI.
+ */
+const ENTITY_TYPE_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  automation_job: "Automation job",
+  communication_message: "Message",
+  communication_webhook_receipt: "Webhook receipt",
+  lead: "Lead",
+});
+
+export function entityTypeLabel(entityType: string): string {
+  return ENTITY_TYPE_LABELS[entityType] ?? "Operational record";
+}
+
+/**
+ * Why this incident is listed in Operations at all.
+ *
+ * KEYED BY CLASS, NEVER BY SEVERITY. Severity is a priority ordering; it says
+ * how soon a founder should look, not what is true of the record. Two classes
+ * can share a severity and prove entirely different things — an overdue lead
+ * queue row and a dead-lettered job are both `critical`, but only one of them
+ * has stopped being retried — so severity cannot supply this sentence.
+ *
+ * Each line below states ONLY what that class's canonical predicate proves.
+ * None of them asserts permanent failure, absence of automatic recovery, an
+ * external outage, or fault on the part of a vendor or client: no predicate
+ * here establishes any of those, and this text never reaches beyond its own
+ * evidence. Storage vocabulary stays out of it too — no table or column name.
+ */
+const WHY_LISTED: Readonly<Record<OperationalIncidentClass, string>> = Object.freeze({
+  "automation.dead_letter": "Listed because the automation job reached dead-letter state.",
+  "automation.failed": "Listed because the automation job is recorded as failed.",
+  "automation.uncertain":
+    "Listed because the automation outcome is recorded as uncertain and was never proven either way.",
+  "automation.retry_overdue":
+    "Listed because its scheduled retry time has already passed and the job is still waiting to be picked up.",
+  "automation.processing_stale":
+    "Listed because its processing lock is older than the canonical stale threshold.",
+  "communication.dead_letter": "Listed because the message reached dead-letter state.",
+  "communication.failed": "Listed because the message is recorded as failed.",
+  "webhook.failed": "Listed because the webhook receipt is recorded as failed.",
+  "webhook.rejected": "Listed because the webhook receipt was rejected before it was processed.",
+  "lead_assignment.queue_overdue":
+    "Listed because the queue row is unresolved and its next retry time has passed.",
+  "lead_assignment.queue_unresolved":
+    "Listed because the queue row has not reached resolved state.",
+});
+
+export function whyListed(incidentClass: OperationalIncidentClass): string {
+  return WHY_LISTED[incidentClass];
+}
 
 /** Fixed, non-technical text for a source that could not be read. */
 export function faultCopy(fault: SectionFault): { title: string; message: string } {
@@ -105,7 +196,9 @@ export function formatAge(seconds: number | null): string {
 
 export type {
   OperationalHealth,
+  OperationalIncident,
   OperationalIncidentClass,
   OperationalIncidentClassDescription,
+  OperationalSeverity,
   SectionFault,
 };

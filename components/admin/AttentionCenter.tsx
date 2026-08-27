@@ -32,6 +32,21 @@ export type AttentionItem = {
   /** Only set when an existing admin route can actually action this. */
   href?: string;
   /**
+   * QF-MVP-70.02 — age of the concrete item this row points at, in seconds.
+   *
+   * Optional, and only ever a RANKING and labelling input: within one severity
+   * band the longer-open item is shown first. `null`/absent means the age could
+   * not be proven, and an unprovable age is ranked last rather than treated as
+   * brand new.
+   */
+  ageSeconds?: number | null;
+  /**
+   * Wording for the row's affordance — "Open incident" where a concrete item is
+   * selectable, "Open queue" where the link only reaches supporting evidence.
+   * Purely a label; it grants nothing.
+   */
+  actionLabel?: string;
+  /**
    * True when the number is derived from the latest-N loaded rows rather than a
    * server-side aggregate. Rendered explicitly so a partial figure can never be
    * mistaken for a global total.
@@ -98,12 +113,32 @@ function effectiveSeverity(item: AttentionItem): AttentionSeverity {
  * I do next?" in one pass.
  */
 export function AttentionCenter({ items }: { items: AttentionItem[] }) {
+  /**
+   * Deterministic order, in four keys:
+   *   1. severity      the state bands above
+   *   2. age           within a band the longer-open item first; unknown last
+   *   3. value         a larger proven count first, where neither carries an age
+   *   4. id            a stable lexical tie-break, so the order never flickers
+   */
   const ranked = [...items].sort((a, b) => {
     const bySeverity =
       SEVERITY_ORDER.indexOf(effectiveSeverity(a)) - SEVERITY_ORDER.indexOf(effectiveSeverity(b));
     if (bySeverity !== 0) return bySeverity;
+
+    const leftAge = a.ageSeconds ?? null;
+    const rightAge = b.ageSeconds ?? null;
+    if (leftAge !== rightAge) {
+      // An unprovable age is never promoted above a proven one.
+      if (leftAge === null) return 1;
+      if (rightAge === null) return -1;
+      return rightAge - leftAge;
+    }
+
     // An unknown value sorts below every proven one inside the same state.
-    return (b.value ?? -1) - (a.value ?? -1);
+    const byValue = (b.value ?? -1) - (a.value ?? -1);
+    if (byValue !== 0) return byValue;
+
+    return a.id.localeCompare(b.id);
   });
 
   const needing = ranked.filter((item) => {
@@ -189,7 +224,7 @@ export function AttentionCenter({ items }: { items: AttentionItem[] }) {
 
               {item.href ? (
                 <span className="hidden shrink-0 items-center gap-1 text-xs font-semibold text-slate-500 transition-colors group-hover:text-emerald-700 sm:inline-flex">
-                  Open queue
+                  {item.actionLabel ?? "Open queue"}
                   <span aria-hidden="true">→</span>
                 </span>
               ) : null}

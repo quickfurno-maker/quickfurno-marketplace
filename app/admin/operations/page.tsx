@@ -26,6 +26,7 @@ import {
   listIncidentClassDescriptions,
 } from "@/services/adminOperationsService";
 import type { OperationalIncident } from "@/services/adminOperationsService";
+import { getOperationsLaunchSnapshot } from "@/services/adminLaunchControlService";
 import type {
   IncidentSelection,
   OperationsControlCenterPayload,
@@ -118,6 +119,10 @@ export default async function AdminOperationsPage({
       payload = {
         tab,
         overview,
+        // The overview is handed IN, so launch health and the readiness verdict
+        // re-read nothing. Only the three control sources are read, and they are
+        // read concurrently inside the snapshot.
+        launch: await getOperationsLaunchSnapshot(overview),
         // Resolved from the ranked queue the overview already computed in
         // memory — no additional read of any kind.
         selection: resolveSelection(requestedIncidentId, overview.attentionIncidents),

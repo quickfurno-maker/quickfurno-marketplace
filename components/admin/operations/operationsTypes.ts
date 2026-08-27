@@ -16,6 +16,12 @@ import type {
   OperationsOverview,
   SectionFault,
 } from "@/services/adminOperationsService";
+import type {
+  LaunchControl,
+  LaunchControlState,
+  LaunchReadiness,
+  OperationsLaunchSnapshot,
+} from "@/services/adminLaunchControlService";
 
 export const OPERATIONS_TABS = ["overview", "incidents"] as const;
 export type OperationsTab = (typeof OPERATIONS_TABS)[number];
@@ -32,6 +38,8 @@ export const OPERATIONS_TAB_LABELS: Readonly<Record<OperationsTab, string>> = Ob
 export interface OperationsControlCenterPayload {
   readonly tab: OperationsTab;
   readonly overview?: OperationsOverview;
+  /** QF-MVP-70.03 — launch readiness, control state and launch health. */
+  readonly launch?: OperationsLaunchSnapshot;
   readonly incidents?: OperationsIncidentPage;
   /** The closed class vocabulary, supplied by the server so the browser never
    *  holds a loose incident-class literal. */
@@ -194,6 +202,66 @@ export function formatAge(seconds: number | null): string {
   return restHours > 0 ? `${days}d ${restHours}h` : `${days}d`;
 }
 
+// ---------------------------------------------------------------------------
+// Launch control (QF-MVP-70.03)
+// ---------------------------------------------------------------------------
+
+/**
+ * Verdict labels.
+ *
+ * The vocabulary is unchanged, but READY is labelled with its SCOPE attached.
+ * A bare "Ready" beside a disabled WhatsApp provider reads as full launch
+ * certification, which this verdict does not and cannot give: it covers Core
+ * operational health and the launch-critical controls evaluated here, and
+ * WhatsApp/Meta readiness is deliberately advisory and tracked elsewhere.
+ */
+export const LAUNCH_READINESS_LABELS: Readonly<Record<LaunchReadiness, string>> = Object.freeze({
+  READY: "Core operations ready",
+  ATTENTION: "Needs attention",
+  UNAVAILABLE: "Cannot confirm",
+  BLOCKED: "Blocked",
+});
+
+/**
+ * The scope disclosure, rendered next to the verdict so the two are read
+ * together. Declared once so the panel and the harness cannot drift.
+ */
+export const READINESS_SCOPE_DISCLOSURE =
+  "This covers Core operational health and the launch-critical controls listed below. WhatsApp and Meta readiness are tracked separately and do not gate this verdict.";
+
+/**
+ * Verdict tone. UNAVAILABLE is deliberately NOT emerald: an unconfirmed launch
+ * must never read as a green one, and the word beside it carries the meaning —
+ * severity is never conveyed by colour alone.
+ */
+export function readinessTone(verdict: LaunchReadiness): "emerald" | "amber" | "rose" | "slate" {
+  if (verdict === "READY") return "emerald";
+  if (verdict === "ATTENTION") return "amber";
+  if (verdict === "BLOCKED") return "rose";
+  return "slate";
+}
+
+export const LAUNCH_CONTROL_STATE_LABELS: Readonly<Record<LaunchControlState, string>> =
+  Object.freeze({
+    ACTIVE: "Active",
+    PREVIEW: "Preview only",
+    PAUSED: "Paused",
+    DISABLED: "Off",
+    AVAILABLE: "Available",
+    UNAVAILABLE: "Unavailable",
+  });
+
+export function controlStateTone(
+  state: LaunchControlState,
+): "emerald" | "amber" | "rose" | "slate" {
+  if (state === "ACTIVE") return "emerald";
+  if (state === "PREVIEW" || state === "PAUSED") return "amber";
+  if (state === "DISABLED") return "rose";
+  // AVAILABLE and UNAVAILABLE are both neutral: one is a route, the other is
+  // an absence of fact. Neither is a health signal.
+  return "slate";
+}
+
 export type {
   OperationalHealth,
   OperationalIncident,
@@ -201,4 +269,8 @@ export type {
   OperationalIncidentClassDescription,
   OperationalSeverity,
   SectionFault,
+  LaunchControl,
+  LaunchControlState,
+  LaunchReadiness,
+  OperationsLaunchSnapshot,
 };

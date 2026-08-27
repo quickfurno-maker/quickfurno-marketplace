@@ -219,7 +219,10 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
 // QF-MVP-75.01 RE-PIN: 99 -> 100. This admin phase still adds no migration of its own;
 // the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql).
-check("migration count is unchanged at 100", migrations.length === 100);
+// QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
+// the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
+// addition. Exact equality, never loosened.
+check("migration count is unchanged at 101", migrations.length === 101);
 
 console.log(`\nC6 integrated Admin V2: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

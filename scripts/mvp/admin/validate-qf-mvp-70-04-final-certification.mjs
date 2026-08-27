@@ -643,7 +643,10 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // 21 / 22 — migration containment.
 // QF-MVP-75.01 RE-PIN: 99 -> 100. This phase still adds no migration of its own;
 // the new file belongs to QF-MVP-75.01 (20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql). Phase 70 behaviour is unchanged.
-check("migration count remains 100", migrations.length === 100);
+// QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
+// the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
+// addition. Exact equality, never loosened.
+check("migration count remains 101", migrations.length === 101);
 check(
   "no Phase 70 migration exists",
   !migrations.some((f) => /qf_mvp_70|mvp_?70|operations_control|launch_control|launch_readiness|attention_queue/i.test(f)),

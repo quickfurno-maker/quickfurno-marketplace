@@ -567,14 +567,17 @@ record("G01 the migration matches its pinned canonical hash",
 // QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
 // binding-rank-order authority replacement (20260815000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("G02 the local migration set is exactly 100 and 50.5 is the newest APPLIED migration",
+// QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
+// PostGIS shortlist foundation (20260816000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality.
+record("G02 the local migration set is exactly 101 and 50.5 is the newest APPLIED migration",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 100 &&
+    return files.length === 101 &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
-      files.at(-1) === "20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql" &&
+      files.at(-1) === "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql" &&
       manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000";
   })());
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
@@ -584,10 +587,11 @@ record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence,
   (() => {
     const pending = manifest.pendingPostAnchorMigrations ?? null;
     const pin = (manifest.appliedPostAnchorMigrations ?? []).find((r) => r.version === "20260812000000");
-    return Array.isArray(pending) && pending.length === 3 &&
+    return Array.isArray(pending) && pending.length === 4 &&
       pending[0].version === "20260813000000" &&
       pending[1].version === "20260814000000" &&
       pending[2].version === "20260815000000" &&
+      pending[3].version === "20260816000000" &&
       pin?.sha256 === MIGRATION_SHA &&
       pin.path === MIGRATION_PATH && pin.phase === "QF-MVP-50.5" &&
       pin.operationalStatus === "APPLIED" &&
@@ -608,11 +612,11 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
-  manifest.appliedAnchor.postAnchorMigrationCount === 13);
+  manifest.appliedAnchor.postAnchorMigrationCount === 14);
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 100;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 101;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 3") &&
+  g1Source.includes("pendingPins.length === 4") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
   !/state\.migrations\.length\s*>=/.test(g1Source) &&
@@ -694,7 +698,7 @@ const mutants = [
   ["one lane starving the other is prevented by construction",
     () => workflow.nodes.filter((n) => n.type === "n8n-nodes-base.scheduleTrigger").length === 2],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 100;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 101;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   // QF-MVP-40.13B: the pending set is non-empty again, so this `every()` is no longer
   // vacuous — it now genuinely guards the SOURCE-PENDING canary authority. The other

@@ -150,6 +150,16 @@ jobs:
       - name: QF-MVP-75.01 MatchCore binding rank order
         run: npm run test:mvp:75-01
 
+      # QF-MVP-75.02 — the geo foundation the money path now carries evidence for.
+      # It adds the FIRST QuickFurno migration that installs a database extension
+      # (postgis), two GENERATED geography columns, two GiST indexes and one
+      # read-only service_role-only shortlist RPC, so its offline contract is
+      # proved at the same exact head as the assignment authority it must never
+      # become. Offline file-level harness: no secrets, no Supabase, no Meta,
+      # no n8n.
+      - name: QF-MVP-75.02 geo normalization and PostGIS shortlist
+        run: npm run test:mvp:75-02
+
       - name: Marketplace eligibility and category contract
         run: npm run test:mvp:marketplace
 

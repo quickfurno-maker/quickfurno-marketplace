@@ -9,12 +9,43 @@
 const EARTH_RADIUS_KM = 6371;
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 
-/** A finite lat/lng inside valid earth bounds. */
+/**
+ * Coerce a raw column value to a finite number, or `null`.
+ *
+ * QF-MVP-75.02 correction. The previous implementation coerced with a bare
+ * `Number(value)`, which silently turns ABSENCE into the number zero:
+ * `Number(null)`, `Number("")` and `Number(false)` are all `0`. A vendor row
+ * holding office_latitude = 28.6139 with a MISSING office_longitude therefore
+ * passed `isValidCoordinate` as the point (28.6139, 0) - a spot in the Atlantic
+ * - and `haversineKm` reported a fabricated 7386 km for it. The vendor was
+ * ranked as coordinate-KNOWN on a distance that was never measured.
+ *
+ * A one-sided pair is now what it always meant: NO usable coordinate. Only a
+ * real number, or a string that parses to one, counts as present. `null`,
+ * `undefined`, `""`, whitespace, booleans, objects and arrays do not.
+ *
+ * This is also the rule the SQL half must agree with: the GENERATED geography
+ * columns in migration 20260816000000 guard with `is not null`, so without this
+ * correction TypeScript and PostgreSQL would disagree about which rows hold a
+ * point.
+ */
+function toFiniteCoordinateNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/** A finite lat/lng inside valid earth bounds, with BOTH sides genuinely present. */
 export function isValidCoordinate(lat: unknown, lng: unknown): boolean {
-  const la = typeof lat === "number" ? lat : Number(lat);
-  const lo = typeof lng === "number" ? lng : Number(lng);
+  const la = toFiniteCoordinateNumber(lat);
+  const lo = toFiniteCoordinateNumber(lng);
+  if (la === null || lo === null) return false;
   return (
-    Number.isFinite(la) && Number.isFinite(lo) &&
     la >= -90 && la <= 90 && lo >= -180 && lo <= 180 &&
     // (0,0) is in the ocean off Africa — treat as "no real coordinate" for India data.
     !(la === 0 && lo === 0)

@@ -1,0 +1,208 @@
+"use client";
+
+// ============================================================================
+// QuickFurno Admin — Operations overview (QF-MVP-70.01).
+//
+// Presentational only. Nothing here fetches, mutates, retries, cancels, pauses
+// or authorizes. Every number arrives already proven — or already marked
+// unknown — by services/adminOperationsService.ts.
+// ============================================================================
+
+import Link from "next/link";
+import type {
+  OperationalClassSummary,
+  OperationalSubsystem,
+  OperationalSubsystemSummary,
+  OperationsOverview,
+} from "@/services/adminOperationsService";
+import type { AdminIconName } from "../adminConfig";
+import { AdminIcon } from "../AdminIcon";
+import { EmptyState, NoteBar, SectionCard, StatusBadge } from "../AdminPrimitives";
+import { formatDateTime } from "../adminUtils";
+import { AttentionCenter, type AttentionItem, type AttentionSeverity } from "../AttentionCenter";
+import { HEALTH_LABELS, faultCopy, formatAge, healthTone, severityTone } from "./operationsTypes";
+
+const SUBSYSTEM_ICONS: Readonly<Record<OperationalSubsystem, AdminIconName>> = Object.freeze({
+  automation: "automations",
+  communication: "whatsapp",
+  webhook: "notifications",
+  lead_assignment: "distribution",
+});
+
+/**
+ * Class summary → attention row.
+ *
+ * An unknown count is passed through as `null`. AttentionCenter then forces the
+ * row into its `unavailable` state, so an unreadable source can never be ranked,
+ * labelled or coloured as a healthy zero.
+ */
+function toAttentionItem(entry: OperationalClassSummary, icon: AdminIconName): AttentionItem {
+  // A single decision, made once: either the count is a proven number, or the
+  // whole row is unknown. There is no third branch in which a null becomes 0.
+  const value: number | null = entry.fault !== null ? null : entry.count;
+  const unknown = value === null;
+  const open = !unknown && value > 0;
+
+  const severity: AttentionSeverity = unknown ? "unavailable" : open ? entry.severity : "clear";
+
+  const detail = unknown
+    ? faultCopy(entry.fault ?? "UNAVAILABLE").message
+    : open && entry.oldest
+      ? `${entry.detail} Oldest: ${formatAge(entry.oldest.ageSeconds)}.`
+      : entry.detail;
+
+  return {
+    id: entry.key,
+    label: entry.label,
+    value,
+    detail,
+    severity,
+    icon,
+    href: entry.evidenceHref ?? undefined,
+  };
+}
+
+function ClassRow({ entry }: { entry: OperationalClassSummary }) {
+  const count: number | null = entry.fault !== null ? null : entry.count;
+  const unknown = count === null;
+
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-[color:var(--qfa-line-soft)] py-2 last:border-b-0">
+      <div className="min-w-0">
+        <p className="truncate text-[13px] font-semibold text-slate-900">{entry.label}</p>
+        <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+          {unknown ? faultCopy(entry.fault ?? "UNAVAILABLE").title : entry.detail}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {count === null ? null : (
+          <StatusBadge
+            value={count > 0 ? entry.severity : "clear"}
+            tone={count > 0 ? severityTone(entry.severity) : "emerald"}
+          />
+        )}
+        <span className="text-right text-[15px] font-semibold tabular-nums text-slate-950">
+          {count === null ? (
+            <>
+              <span aria-hidden="true" className="text-slate-400">
+                —
+              </span>
+              <span className="sr-only">Unavailable</span>
+            </>
+          ) : (
+            count.toLocaleString("en-IN")
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SubsystemCard({ summary }: { summary: OperationalSubsystemSummary }) {
+  const unknownTotal = summary.incidentCount === null;
+
+  return (
+    <SectionCard
+      title={summary.label}
+      description={
+        unknownTotal
+          ? "At least one source in this subsystem could not be read, so no total is shown."
+          : `${summary.incidentCount?.toLocaleString("en-IN")} open ${summary.incidentCount === 1 ? "incident" : "incidents"}`
+      }
+      action={<StatusBadge value={HEALTH_LABELS[summary.health]} tone={healthTone(summary.health)} />}
+    >
+      <div className="flex items-center gap-2 pb-2">
+        <AdminIcon name={SUBSYSTEM_ICONS[summary.subsystem]} className="h-4 w-4 shrink-0 text-slate-500" />
+        <p className="min-w-0 flex-1 truncate text-[11px] text-slate-500">
+          {summary.oldest
+            ? `Oldest open item: ${formatAge(summary.oldest.ageSeconds)} (${summary.oldest.class})`
+            : unknownTotal
+              ? "Oldest open item cannot be determined."
+              : "No open items."}
+        </p>
+        {summary.evidenceHref ? (
+          <Link
+            href={summary.evidenceHref}
+            className="qfa-focus shrink-0 text-[11px] font-semibold text-slate-500 hover:text-emerald-700"
+          >
+            Evidence →
+          </Link>
+        ) : null}
+      </div>
+
+      <div>
+        {summary.classes.map((entry) => (
+          <ClassRow key={entry.key} entry={entry} />
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+export function OperationsOverviewTab({ overview }: { overview?: OperationsOverview }) {
+  if (!overview) {
+    return (
+      <EmptyState
+        title="Overview unavailable"
+        message="The operations overview could not be loaded. Nothing is shown rather than a figure that might be wrong."
+      />
+    );
+  }
+
+  const items: AttentionItem[] = overview.subsystems.flatMap((summary) =>
+    summary.classes.map((entry) => toAttentionItem(entry, SUBSYSTEM_ICONS[summary.subsystem])),
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2.5 border-b border-[color:var(--qfa-line)] pb-3.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <StatusBadge
+            value={`System: ${HEALTH_LABELS[overview.overallHealth]}`}
+            tone={healthTone(overview.overallHealth)}
+          />
+          {overview.unavailableSubsystems > 0 ? (
+            <StatusBadge
+              value={`${overview.unavailableSubsystems} of ${overview.subsystems.length} subsystems unreadable`}
+              tone="slate"
+            />
+          ) : null}
+          <StatusBadge value={`Read ${formatDateTime(overview.generatedAt)}`} tone="slate" />
+        </div>
+      </div>
+
+      {overview.overallHealth === "UNAVAILABLE" ? (
+        <div role="alert">
+          <NoteBar tone="warning">
+            One or more operational sources could not be read. Health cannot be confirmed — treat this
+            page as incomplete, not as green.
+          </NoteBar>
+        </div>
+      ) : null}
+
+      {overview.recovery.note ? (
+        <NoteBar tone="warning">
+          {overview.recovery.note}
+          {overview.recovery.oldestOverdueAgeSeconds !== null
+            ? ` Oldest overdue retry: ${formatAge(overview.recovery.oldestOverdueAgeSeconds)}.`
+            : ""}
+        </NoteBar>
+      ) : null}
+
+      <AttentionCenter items={items} />
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        {overview.subsystems.map((summary) => (
+          <SubsystemCard key={summary.subsystem} summary={summary} />
+        ))}
+      </section>
+
+      <p className="text-[11px] leading-4 text-slate-500">
+        Every figure above is an exact server-side count over the canonical table named in each row, or
+        an explicit Unavailable. Nothing on this page is sampled, estimated or projected, and no
+        external system was contacted to produce it — recovery status is inferred from job timestamps
+        alone. This page is read-only: it exposes no retry, cancel, pause or resume control.
+      </p>
+    </div>
+  );
+}

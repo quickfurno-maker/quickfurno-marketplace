@@ -139,6 +139,7 @@
     "test:admin:cwa1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-wa1-whatsapp-control-center.mjs",
     "test:admin:cwa1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-cwa1b-whatsapp-billing.mjs",
     "test:admin:c6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c6-integrated-admin.mjs",
+    "test:mvp:70-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-01-operations.mjs",
     "test:mvp:40-c9a": "node scripts/mvp/communication/validate-meta-marketing-mapping-authority.mjs",
     "test:mvp:40-c9b": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-marketing-consent-writer.mjs",
     "report:mvp:40-c9": "node scripts/mvp/communication/evaluate-criterion-9-readiness.mjs",

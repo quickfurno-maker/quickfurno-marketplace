@@ -22,7 +22,8 @@ export type AdminSectionKey =
   | "vendor-crm"
   | "vendor-segments"
   | "vendor-campaigns"
-  | "whatsapp";
+  | "whatsapp"
+  | "operations";
 
 export type AdminIconName =
   | "dashboard"
@@ -68,6 +69,7 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "vendor-crm", href: "/admin/vendor-crm", label: "Vendor CRM", description: "Vendor relationships, contacts, tags, notes, tasks", icon: "vendors", addLabel: "" },
   { key: "vendor-segments", href: "/admin/vendor-crm/segments", label: "Vendor Segments", description: "Deterministic saved rules — preview only, never send authorization", icon: "vendors", addLabel: "" },
   { key: "vendor-campaigns", href: "/admin/vendor-crm/campaigns", label: "Vendor Campaigns", description: "Freeze an audience, review it, approve it — approval never sends", icon: "vendors", addLabel: "" },
+  { key: "operations", href: "/admin/operations", label: "Operations", description: "Launch control — what is failing, overdue or stuck right now", icon: "automations", addLabel: "" },
   { key: "whatsapp", href: "/admin/whatsapp", label: "WhatsApp", description: "Templates, message delivery, consent and provider readiness", icon: "whatsapp", addLabel: "" },
   { key: "packages", href: "/admin/packages", label: "Packages", description: "Lead packs, pricing, visibility", icon: "packages", addLabel: "Add Package" },
   { key: "categories", href: "/admin/categories", label: "Categories", description: "Services and subcategories", icon: "categories", addLabel: "Add Category" },
@@ -99,7 +101,7 @@ export const adminNavGroups: AdminNavGroup[] = [
   },
   {
     title: "Automation",
-    sections: ["whatsapp", "analytics", "aos", "automations", "reports"],
+    sections: ["operations", "whatsapp", "analytics", "aos", "automations", "reports"],
   },
   {
     title: "System",

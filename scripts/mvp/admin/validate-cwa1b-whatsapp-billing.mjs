@@ -133,9 +133,9 @@ check("no broad WhatsApp snapshot consumer exists", !/adminSnapshot|whatsappSnap
 check("dark admin tokens remain scoped", /\.admin-surface \{[^}]*--qfa-page/.test(css));
 check("Billing & spend reuses scoped qfa surfaces", /qfa-panel/.test(provider) && /qfa-quiet/.test(provider));
 const migrations = readdirSync(join(root, "supabase", "migrations")).filter((name) => name.endsWith(".sql"));
-// QF-MVP-40.13B RE-PIN: 97 -> 98. The point of this guard is unchanged — THIS admin phase
-// added no migration — and the one new file belongs to QF-MVP-50.5.
-check("migration count remains exactly 98", migrations.length === 98);
+// QF-MVP-70.04 RE-PIN: 98 -> 99. The point of this guard is unchanged — THIS admin phase
+// added no migration — and the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
+check("migration count remains exactly 99", migrations.length === 99);
 check("C-WA1B package command is wired", typeof pkg.scripts["test:admin:cwa1b"] === "string");
 
 // 7 — Focused mutation self-tests for the highest-risk claims.

@@ -94,8 +94,9 @@ check("no source calls the Meta Graph API at all", allSources.every((s) => !/gra
 
 // ── 4. No second WhatsApp backend ──────────────────────────────────────────
 const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
-// QF-MVP-40.13B RE-PIN: 97 -> 98. This admin phase still adds no migration of its own.
-check("migration count is unchanged at 98", migrations.length === 98);
+// QF-MVP-70.04 RE-PIN: 98 -> 99. This admin phase still adds no migration of its own;
+// the new file belongs to QF-MVP-40 (20260814000000_qf_mvp_40_marketing_consent_writer.sql).
+check("migration count is unchanged at 99", migrations.length === 99);
 check("C-WA1 added no migration", !migrations.some((f) => /wa1|whatsapp_admin|admin_whatsapp/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("the read layer only reads EXISTING communication relations", (() => {

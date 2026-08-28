@@ -12,6 +12,10 @@ on:
       # Durable QF-MVP-50 feature-branch glob. The previous single-branch filter
       # went stale the moment that branch merged, silently disabling push runs.
       - 'mvp/qf-mvp-50-*'
+      # QF-MVP-75 matching/geography branches change the money path, and this
+      # gate already runs their validators. Without this glob a 75.x branch got
+      # push coverage only once a pull request existed.
+      - 'mvp/qf-mvp-75-*'
 
 permissions:
   contents: read
@@ -159,6 +163,16 @@ jobs:
       # no n8n.
       - name: QF-MVP-75.02 geo normalization and PostGIS shortlist
         run: npm run test:mvp:75-02
+
+      # QF-MVP-75.03 — route travel time becomes the PRIMARY geography measure
+      # and geography becomes lexicographically ahead of the secondary signals,
+      # so this is the first slice where a Tier-1 vendor inside the frontier can
+      # beat a Tier-0 vendor outside it. It also introduces the first OUTBOUND
+      # paid third-party dependency on the money path. Both facts must be proved
+      # at the exact head. Offline file-level harness driven through an injected
+      # fake transport: no secrets, no Google key, no live Routes API call.
+      - name: QF-MVP-75.03 route-time provider and GeoRegret
+        run: npm run test:mvp:75-03
 
       - name: Marketplace eligibility and category contract
         run: npm run test:mvp:marketplace

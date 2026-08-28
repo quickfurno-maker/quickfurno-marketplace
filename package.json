@@ -146,6 +146,7 @@
     "test:mvp:75-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-01.mjs",
     "test:mvp:75-02": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-02.mjs",
     "test:mvp:75-03": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-03.mjs",
+    "test:mvp:75-04": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-04.mjs",
     "test:mvp:40-c9a": "node scripts/mvp/communication/validate-meta-marketing-mapping-authority.mjs",
     "test:mvp:40-c9b": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-marketing-consent-writer.mjs",
     "report:mvp:40-c9": "node scripts/mvp/communication/evaluate-criterion-9-readiness.mjs",

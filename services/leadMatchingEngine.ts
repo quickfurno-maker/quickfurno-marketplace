@@ -33,6 +33,18 @@ import { fetchGeoVendorShortlist } from "./geoVendorShortlistService";
 // non-secret evidence is recorded. Neither can widen or narrow `eligible`.
 import { measureLeadRouteTimes } from "./leadRouteTimeService";
 import { reorderByGeoFrontier } from "../lib/matchcore/geoFrontierDecision";
+// QF-MVP-75.04 — the GeoFair secondary contract and the PRIMARY/RESERVES plan.
+// Both are PURE. Neither can widen or narrow `eligible`, neither writes anything
+// and neither is an assignment authority; what happens here is one more
+// membership-preserving in-place ordering pass plus one sanitized evidence
+// block. Fairness is resolved NEUTRAL — see the call site for the source proof.
+import {
+  buildGeoFairEvidence,
+  neutralGeoFairness,
+  reorderByGeoFairSecondary,
+  resolveGeoFairnessScope,
+} from "../lib/matchcore/geoFairSecondaryDecision";
+import { buildSelectionPlan } from "../lib/matchcore/selectionPlan";
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
 import { MAX_CANONICAL_CANDIDATE_POOL } from "../lib/marketplace/canonicalAssignmentContract";
@@ -296,6 +308,49 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       : eligible.map((vendor) => vendor.id);
     const routeEvidence = { ...routeOutcome.evidence, route_ordered_vendor_ids: routeOrderedVendorIds };
 
+    // QF-MVP-75.04 — GEOFAIR SECONDARY ORDER + PRIMARY/RESERVES SELECTION PLAN.
+    //
+    // Read this the same way as the two blocks above, because the safety
+    // argument is the same shape:
+    //
+    //   The input is `eligible` AFTER the 75.03 frontier has spoken. Membership
+    //   is untouched — this pass sorts the same array and adds nothing and
+    //   removes nothing — so the bounded pool below is still built from exactly
+    //   the same vendors under the same 20-candidate transport ceiling, and the
+    //   authority still decides every outcome under the same active cap of 3.
+    //
+    //   Fairness resolves NEUTRAL, with the explicit reason
+    //   DELIVERY_EXPOSURE_UNAVAILABLE: this database has no canonical DELIVERED
+    //   fact to count. The lifecycle vocabulary has 'delivered' but nothing ever
+    //   writes it; the authority writes 'assigned'; the WhatsApp intent it
+    //   queues is never dispatched or reconciled; and lead_delivery_logs carries
+    //   a hardcoded 'delivered' literal that can never be false. Counting any of
+    //   those would charge fairness on SELECTION, which the locked rule forbids.
+    //   A NEUTRAL decision gives every candidate the same fairness key, so this
+    //   pass is order-preserving by construction and 75.04 changes no assignment
+    //   outcome. See lib/matchcore/geoFairSecondaryDecision.
+    //
+    //   The geography gate is passed through unchanged: on a run where route
+    //   authority did NOT engage, the geography and secondary keys are suppressed
+    //   entirely, so a provider outage still cannot reorder a lead.
+    //
+    //   The selection plan is a PURE naming of the first three ranked positions.
+    //   A role is NOT a delivery fact, consumes no fairness, mutates nothing, and
+    //   is never submitted in place of the ranked pool.
+    const fairness = neutralGeoFairness(resolveGeoFairnessScope(leadRow), "DELIVERY_EXPOSURE_UNAVAILABLE");
+    const geoFairOrderedVendorIds = reorderByGeoFairSecondary(eligible, {
+      geographyEngaged: routeOutcome.decision.engaged,
+      placements: routeOutcome.placements,
+      fairness,
+    });
+    const selectionPlan = buildSelectionPlan(geoFairOrderedVendorIds);
+    const geoFairEvidence = buildGeoFairEvidence({
+      geographyEngaged: routeOutcome.decision.engaged,
+      fairness,
+      orderedVendorIds: geoFairOrderedVendorIds,
+      selectionPlan,
+    });
+
     // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
     // `assigned ⊆ selected`; the authority caps SUCCESSFUL at 3.
     //
@@ -332,6 +387,13 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       // supporting discovery evidence. Carries no API key, no auth header, no
       // raw provider body and no lead coordinate.
       route: routeEvidence,
+      // QF-MVP-75.04 GeoFair evidence: the secondary decision components, the
+      // fairness MODE and REASON (never a per-vendor exposure map), the geo
+      // scope identifier, and the PRIMARY/RESERVES selection plan. Carries no
+      // provider payload, no credential, no coordinate and no PII, and states
+      // its own standing negatives — not an assignment authority, not an
+      // eligibility authority, not package-weighted, and not delivery evidence.
+      geofair: geoFairEvidence,
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);

@@ -296,8 +296,12 @@ export function mapMatcherStatusToRetryStatus(matcherStatus: string): RetryStatu
       return "waiting";
     case "failed":
       return "failed";
-    // "skipped" should not occur post-gate (consent/duplicate already excluded);
-    // surface it honestly as failed rather than pretending it matched.
+    // "skipped" is REACHABLE since QF-MVP-80.01: the consent and duplicate gates
+    // are already excluded upstream, but the automatic-assignment kill switch
+    // (auto_assignment_mode = 'off') halts the matcher and returns "skipped"
+    // with failure_reason "auto_assignment_off". Surfaced honestly as failed
+    // rather than pretending it matched; the truthful reason travels alongside
+    // in the caller's matching.failure_reason.
     default:
       return "failed";
   }

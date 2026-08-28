@@ -238,11 +238,26 @@ const AUTO_ASSIGNMENT_BASE = Object.freeze({
 });
 
 /**
- * The engine branches on `off` alone: an `off` mode queues every new lead with
- * reason `auto_assignment_off` instead of matching it. `preview` and
- * `auto_suggest` both run matching and both record `auto_suggested` — the
- * difference is not an execution difference, so neither is described as
- * finalizing an assignment.
+ * TWO engines read this one setting, and they must be described together or the
+ * console lies about what the switch does.
+ *
+ *   services/leadMatchingEngine.runAutoLeadMatchingForLead — the CANONICAL live
+ *   matcher, run for every new lead. Since QF-MVP-80.01 it halts on `off`
+ *   before any vendor evaluation and records a skipped matching run with reason
+ *   `auto_assignment_off`; no vendor is evaluated, no assignment is created and
+ *   no credit is charged. Before QF-MVP-80.01 it did not read this setting at
+ *   all, which is why the copy below no longer claims a queue placement it
+ *   never made.
+ *
+ *   lib/lead-assignment/autoAssignmentEngine — the preview/suggestion engine
+ *   used by the admin surfaces, which on `off` queues the lead under the same
+ *   `auto_assignment_off` reason.
+ *
+ * `preview` and `auto_suggest` differ only in label. BOTH run the canonical
+ * matcher, and that matcher DOES finalize assignments through the canonical
+ * authority and DOES debit one credit per successful assignment. The copy below
+ * says so: describing `preview` as a dry run would be false, and QF-MVP-80.01
+ * corrects the description without touching the runtime semantics.
  */
 async function readAutoAssignmentControl(): Promise<LaunchControl> {
   const source = await readControlSource("marketplace-runtime-settings", (db) =>
@@ -266,7 +281,7 @@ async function readAutoAssignmentControl(): Promise<LaunchControl> {
       ...AUTO_ASSIGNMENT_BASE,
       state: "DISABLED",
       stateDetail:
-        "Automatic matching is switched off. New leads are placed on the assignment queue instead of being matched to vendors.",
+        "Automatic matching is switched off. New leads are recorded and left unmatched: no vendor is evaluated, no assignment is created and no credit is charged until this is switched back on.",
       sourceStatus: "READ",
       fault: null,
       updatedAt: null,
@@ -276,7 +291,7 @@ async function readAutoAssignmentControl(): Promise<LaunchControl> {
   return {
     ...AUTO_ASSIGNMENT_BASE,
     state: "ACTIVE",
-    stateDetail: `Automatic matching is running in '${mode}' mode. It selects and records suggested vendors for each lead; it does not finalize an assignment on its own.${
+    stateDetail: `Automatic matching is running in '${mode}' mode. New leads are matched and assigned to up to 3 vendors through the canonical assignment authority, and each successful assignment charges that vendor 1 credit. Both non-off modes behave this way — '${mode}' is a label, not a dry run. Switch to 'off' to stop automatic assignment.${
       stored ? "" : " No stored override exists, so the built-in default is in force."
     }`,
     sourceStatus: stored ? "READ" : "DEFAULT",

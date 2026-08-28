@@ -3,6 +3,22 @@ import { fail, ok, type Result } from "@/lib/errors";
 
 export type AutoAssignmentMode = "off" | "preview" | "auto_suggest";
 
+/**
+ * QF-MVP-80.01 — the ONE stable reason code for "automatic assignment is
+ * switched off".
+ *
+ * The preview engine (lib/lead-assignment/autoAssignmentEngine) already queued
+ * leads under exactly this string, and the canonical live matcher
+ * (services/leadMatchingEngine.runAutoLeadMatchingForLead) now records the same
+ * one when the kill switch halts it. Both read it from here so a single code
+ * identifies the switch wherever it fires, and neither engine can rename it
+ * without the other following.
+ *
+ * NOT a mode value: the mode vocabulary is AutoAssignmentMode above. This is the
+ * reason/skip code written to evidence when that mode is `off`.
+ */
+export const AUTO_ASSIGNMENT_OFF_REASON = "auto_assignment_off";
+
 export interface MarketplaceRuntimeSettings {
   show_free_vendors_publicly: boolean;
   allow_free_vendor_interest_capture: boolean;

@@ -45,6 +45,14 @@ import {
   resolveGeoFairnessScope,
 } from "../lib/matchcore/geoFairSecondaryDecision";
 import { buildSelectionPlan } from "../lib/matchcore/selectionPlan";
+// QF-MVP-80.01 — the marketplace kill switch. The canonical settings reader and
+// the canonical reason code both live in lib/lead-assignment/runtimeSettings, so
+// this matcher, the preview engine and the Launch Control console cannot drift
+// apart on what `off` means or on what it is called.
+import {
+  AUTO_ASSIGNMENT_OFF_REASON,
+  loadMarketplaceRuntimeSettings,
+} from "../lib/lead-assignment/runtimeSettings";
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
 import { MAX_CANONICAL_CANDIDATE_POOL } from "../lib/marketplace/canonicalAssignmentContract";
@@ -232,6 +240,83 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
         selectedVendorIds: [],
         assignedVendors: [],
         failureReason: "duplicate_lead",
+      });
+    }
+
+    // ======================================================================
+    // QF-MVP-80.01 — AUTOMATIC ASSIGNMENT KILL SWITCH.
+    //
+    // `marketplace_runtime_settings.auto_assignment_mode = 'off'` is the
+    // marketplace's rollback control, and the Launch Control console reports it
+    // as a BLOCKING control. Before this slice it was read by the preview engine
+    // alone (lib/lead-assignment/autoAssignmentEngine); the CANONICAL live
+    // matcher — this function, the one leadService calls on every new lead —
+    // never looked at it, so switching it off stopped nothing at all.
+    //
+    // THE PLACEMENT IS THE WHOLE SAFETY ARGUMENT:
+    //
+    //   AFTER the two gates above, because `missing_share_consent` and
+    //   `duplicate_lead` are REFUSALS. Neither can evaluate a vendor, call a
+    //   provider, reach the authority or debit a credit, and each is the
+    //   TRUTHFUL reason for the lead it describes. An `off` switch must never
+    //   overwrite "this lead carried no share consent" with "matching was off".
+    //
+    //   BEFORE `evaluateVendorsForLead`, which is the first step here that can
+    //   lead anywhere: every vendor evaluation, the 75.02 geo shortlist, the
+    //   75.03 route provider call, the 75.04 ordering, the ranked pool, the
+    //   canonical assignment authority, the per-assignment credit debit and
+    //   every dashboard / WhatsApp / client preview is downstream of it.
+    //   Halting here means not one of them can run.
+    //
+    // The mode is read ONCE per run through the canonical reader, which
+    // normalizes the stored value to exactly one of off/preview/auto_suggest, so
+    // `=== "off"` is exact and this file holds no second interpretation of the
+    // stored row.
+    //
+    // ONLY `off` is a kill switch. `preview` and `auto_suggest` are NOT
+    // reinterpreted: whatever they do today they keep doing, unchanged. Despite
+    // its name `preview` DOES finalize assignments and DOES debit credits
+    // through this path — redefining that is a product contract change, not a
+    // rollback control, and is deliberately out of scope here.
+    //
+    // KNOWN BOUNDARY, stated rather than hidden: the canonical reader fails
+    // OPEN — an UNREADABLE settings table yields the built-in default
+    // (`preview`), not `off`. That is the pre-existing runtime contract (a lead
+    // must never be blocked by an unreadable settings table) and this slice
+    // deliberately preserves it, because inverting it would change behaviour in
+    // the not-off modes. A MISSING ROW is not a read failure: it is a successful
+    // read that resolves to the default.
+    // ======================================================================
+    const runtimeSettings = await loadMarketplaceRuntimeSettings();
+    if (runtimeSettings.auto_assignment_mode === "off") {
+      await updateMatchingRun(runId, {
+        run_status: "skipped",
+        eligible_vendor_count: 0,
+        selected_vendor_ids: [],
+        assigned_vendor_ids: [],
+        failure_reason: AUTO_ASSIGNMENT_OFF_REASON,
+        // Deterministic evidence, in the run model that already exists. It
+        // states the standing negatives explicitly so a reader can prove after
+        // the fact that the halt happened before anything could act.
+        matching_snapshot: {
+          matching_model_version: MATCHING_MODEL_VERSION,
+          lead: summarizeLead(leadRow),
+          auto_assignment_mode: "off",
+          halted_before: "vendor_evaluation",
+          vendors_evaluated: false,
+          route_provider_called: false,
+          assignment_authority_called: false,
+          credits_debited: false,
+          deliveries_created: false,
+        },
+      });
+      return ok({
+        leadId,
+        status: "skipped",
+        eligibleVendorCount: 0,
+        selectedVendorIds: [],
+        assignedVendors: [],
+        failureReason: AUTO_ASSIGNMENT_OFF_REASON,
       });
     }
 

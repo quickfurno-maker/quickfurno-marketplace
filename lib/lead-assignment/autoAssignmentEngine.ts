@@ -4,6 +4,7 @@ import { adminClient } from "@/lib/supabase";
 import { evaluateVendorLeadAssignmentEligibility } from "@/lib/vendors/vendorEligibility";
 import { queueLeadForAssignment } from "@/lib/lead-assignment/leadQueueService";
 import {
+  AUTO_ASSIGNMENT_OFF_REASON,
   DEFAULT_MARKETPLACE_RUNTIME_SETTINGS,
   loadMarketplaceRuntimeSettings,
   type MarketplaceRuntimeSettings,
@@ -103,7 +104,10 @@ export async function runAutoAssignmentPreviewForLead(
 
     const mode = normalizeMode(settings.auto_assignment_mode);
     if (mode === "off") {
-      const queueReason = "auto_assignment_off";
+      // QF-MVP-80.01: the same shared constant the canonical matcher records, so
+      // one reason code identifies the kill switch in both engines. Value
+      // unchanged — this was already the literal "auto_assignment_off".
+      const queueReason = AUTO_ASSIGNMENT_OFF_REASON;
       const queue = await queueLeadForAssignment({
         leadId: id,
         city: leadSummary.city,

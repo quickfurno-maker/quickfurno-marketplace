@@ -132,7 +132,17 @@ export function runStagingBuild({ env, root, fsApi, spawnChild, log = () => {} }
   // -- 6. post-build scan ------------------------------------------------------
   const clientFiles = readTree(fsApi, root, path.join(outDir, "static"));
   const serverFiles = readTree(fsApi, root, path.join(outDir, "server"));
-  const secrets = [env.SUPABASE_SERVICE_ROLE_KEY, env.SUPABASE_SECRET_KEY].filter(Boolean);
+  // QF-MVP-75.03 adds GOOGLE_ROUTES_API_KEY: a SERVER-ONLY Google credential
+  // that must never be inlined into a client chunk. It is scanned exactly like
+  // the Supabase secrets — by value, so the check also catches the specific
+  // mistake of pasting the PUBLIC browser Places key into the server variable
+  // (the public key legitimately appears in client output, so an identical
+  // value would trip this and be refused).
+  const secrets = [
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    env.SUPABASE_SECRET_KEY,
+    env.GOOGLE_ROUTES_API_KEY,
+  ].filter(Boolean);
   const scan = scanBuildOutput({ clientFiles, serverFiles, secrets });
 
   log("");

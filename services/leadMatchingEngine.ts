@@ -26,6 +26,13 @@ import {
 } from "../lib/geo/canonicalCoordinate";
 import { buildGeoMatchEvidence } from "../lib/geo/geoShortlistContract";
 import { fetchGeoVendorShortlist } from "./geoVendorShortlistService";
+// QF-MVP-75.03 — route travel time is the PRIMARY geography measure. The
+// provider seam, the bounded candidate domain and the Tmin/GeoRegret frontier
+// live outside this file; what happens here is exactly two things: the ranked
+// list is reordered by the frontier when route-time authority engages, and the
+// non-secret evidence is recorded. Neither can widen or narrow `eligible`.
+import { measureLeadRouteTimes } from "./leadRouteTimeService";
+import { reorderByGeoFrontier } from "../lib/matchcore/geoFrontierDecision";
 import { adminClient } from "../lib/supabase";
 import { fail, ok, type Result } from "../lib/errors";
 import { MAX_CANONICAL_CANDIDATE_POOL } from "../lib/marketplace/canonicalAssignmentContract";
@@ -111,10 +118,28 @@ export type SkippedVendorAudit = {
   reasons: AutomaticMatchRejectReason[];
 };
 
+/**
+ * QF-MVP-75.03: the canonical coordinate of each ELIGIBLE vendor, carried
+ * alongside the evaluation so the route-time seam does not have to re-read the
+ * vendor table. It is computed from the rows already in hand by the SAME shared
+ * primitive the matcher and the PostGIS generated columns use.
+ *
+ * DELIBERATELY NOT PART OF `eligible`: only `eligible`, `skipped` and
+ * `skippedReasonCounts` reach `matching_snapshot`, so keeping coordinates in a
+ * sibling field means no vendor office coordinate is added to the persisted
+ * snapshot shape by this phase.
+ */
+export type EligibleVendorCoordinate = {
+  vendor_id: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 export type VendorMatchEvaluation = {
   eligible: EligibleMatchedVendor[];
   skipped: SkippedVendorAudit[];
   skippedReasonCounts: Record<string, number>;
+  eligibleCoordinates: EligibleVendorCoordinate[];
 };
 
 const MAX_VENDOR_MATCHES = 3;
@@ -200,7 +225,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
 
     const evaluation = await evaluateVendorsForLead(leadRow);
     if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
-    const { eligible, skipped, skippedReasonCounts } = evaluation.data;
+    const { eligible, skipped, skippedReasonCounts, eligibleCoordinates } = evaluation.data;
 
     // QF-MVP-75.02 — bounded read-only PostGIS geo DISCOVERY, recorded as
     // evidence and nothing else.
@@ -227,6 +252,49 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       leadGooglePlaceIdPresent: Boolean(asText(leadRow.google_place_id)),
       cityEligibleVendorCount: eligible.length,
     });
+
+    // QF-MVP-75.03 — ROUTE TRAVEL TIME, the primary geography measure.
+    //
+    // Read this ordering as carefully as the QF-MVP-75.02 block above, because
+    // it is the whole safety argument for making geography lexicographically
+    // primary:
+    //
+    //   The routing domain is EXACTLY `eligible` — the hard-eligible set already
+    //   gated by commercial eligibility, the city hard gate and CATEGORY
+    //   COMPATIBILITY. Nothing is filtered by distance, tier, package or PostGIS
+    //   before routing, so the category-blind exclusion QF-MVP-75.02 refused to
+    //   risk cannot occur: the category gate ran upstream and is untouched.
+    //
+    //   What the frontier changes is the ORDER of that set, never its MEMBERSHIP.
+    //   `eligible` is reordered in place; not one candidate is added or removed,
+    //   so the bounded pool below is still built from exactly the same vendors,
+    //   the same 20-candidate transport ceiling applies, and the authority still
+    //   decides every outcome under the same active cap of 3.
+    //
+    //   Every abnormal outcome — provider off, no server credential, no lead
+    //   coordinate, too small a domain, too few results, too little coverage, any
+    //   infrastructure failure, or a bound that leaves the domain unproven —
+    //   leaves `route.route_authority_engaged` false and the pre-75.03 order
+    //   completely untouched. A provider outage can never reorder a lead.
+    const routeOutcome = await measureLeadRouteTimes({
+      leadOrigin:
+        leadPoint.latitude !== null && leadPoint.longitude !== null
+          ? { latitude: leadPoint.latitude, longitude: leadPoint.longitude }
+          : null,
+      candidates: eligible.map((vendor) => {
+        const point = eligibleCoordinates.find((entry) => entry.vendor_id === vendor.id);
+        return {
+          id: vendor.id,
+          latitude: point?.latitude ?? null,
+          longitude: point?.longitude ?? null,
+          distance_km: vendor.distance_km,
+        };
+      }),
+    });
+    const routeOrderedVendorIds = routeOutcome.decision.engaged
+      ? reorderByGeoFrontier(eligible, routeOutcome.placements)
+      : eligible.map((vendor) => vendor.id);
+    const routeEvidence = { ...routeOutcome.evidence, route_ordered_vendor_ids: routeOrderedVendorIds };
 
     // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
     // `assigned ⊆ selected`; the authority caps SUCCESSFUL at 3.
@@ -259,6 +327,11 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       // lib/geo/geoShortlistContract. Never route distance, never route time,
       // never an authority.
       geo: geoEvidence,
+      // QF-MVP-75.03 route evidence. Travel time is the PRIMARY measure and the
+      // one this block records; the straight-line numbers above remain
+      // supporting discovery evidence. Carries no API key, no auth header, no
+      // raw provider body and no lead coordinate.
+      route: routeEvidence,
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
@@ -449,6 +522,9 @@ export function rankVendorsForLead(
   const eligible: RankableCandidate[] = [];
   const skipped: SkippedVendorAudit[] = [];
   const skippedReasonCounts: Record<string, number> = {};
+  // QF-MVP-75.03: captured here because the vendor rows are already in hand.
+  // Ranking never reads it — it is an output for the route-time seam only.
+  const eligibleCoordinates: EligibleVendorCoordinate[] = [];
 
   // Lead-level context computed once. Distance is only computable when the LEAD
   // has coordinates; manual leads rank by tier + soft area affinity + fairness.
@@ -505,6 +581,7 @@ export function rankVendorsForLead(
       ? haversineKm(lead.latitude, lead.longitude, coords.lat, coords.lng)
       : null;
     const areaAffinity = computeAreaAffinity(vendor, lead);
+    eligibleCoordinates.push({ vendor_id: id, latitude: coords.lat, longitude: coords.lng });
 
     eligible.push({
       id,
@@ -559,7 +636,7 @@ export function rankVendorsForLead(
     delete (vendor as Record<string, unknown>).__decision;
   });
 
-  return { eligible, skipped, skippedReasonCounts };
+  return { eligible, skipped, skippedReasonCounts, eligibleCoordinates };
 }
 
 export { assignLeadToMatchedVendors } from "./leadDeliveryService";

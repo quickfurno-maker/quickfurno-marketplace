@@ -51,6 +51,11 @@ export const OUTBOUND_FLAG_VARS = Object.freeze([
   "META_WHATSAPP_ENABLED",
   "SMS_ENABLED",
   "EMAIL_OUTBOUND_ENABLED",
+  // QF-MVP-75.03. The route-time provider is a BILLABLE outbound third-party
+  // call on the matching path, so it belongs on this list exactly like every
+  // other provider switch: a staging evidence build must not be produced while
+  // an outbound provider is armed.
+  "ROUTE_TIME_PROVIDER_ENABLED",
 ]);
 
 const PUBLIC_CREDENTIAL_VARS = Object.freeze([

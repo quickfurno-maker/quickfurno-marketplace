@@ -24,6 +24,7 @@ import * as manualAssign from "../services/manualLeadAssignmentService";
 import * as requirementGroups from "../services/clientRequirementGroupService";
 import * as leadClarifications from "../services/leadClarificationService";
 import * as aos from "../services/aosService";
+import * as vendorLoginActivation from "../services/vendorLoginActivationService";
 import { getParentCategoryGroup } from "../lib/vendors/categoryMatching";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
@@ -634,6 +635,11 @@ export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendor
 export const adminApproveVendor   = async (id: string) => asAdmin(() => admin.approveVendor(id));
 export const adminRejectVendor    = async (id: string) => asAdmin(() => admin.rejectVendor(id));
 export const adminSuspendVendor   = async (id: string) => asAdmin(() => admin.suspendVendor(id));
+// QF-MVP-80.02 GATE-06 — give an EXISTING approved vendor a login without
+// creating a second vendor row. `asAdmin` already requires Superadmin here, and
+// the service independently re-derives superadmin authority from the session.
+export const adminActivateVendorLogin = async (vendorId: string) =>
+  asAdmin(() => vendorLoginActivation.activateVendorLogin({ vendorId }));
 export const adminCreatePackage   = async (input: { name: string; lead_count: number; total_price: number; validity_days: number; is_active?: boolean }) =>
   asAdmin(() => admin.createPackage(input));
 export const adminSetPackageActive = async (id: string, isActive: boolean) =>

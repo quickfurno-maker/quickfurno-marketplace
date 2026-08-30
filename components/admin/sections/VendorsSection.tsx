@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  adminActivateVendorLogin,
   adminApproveVendorProfileChangeRequest,
   adminRejectVendorProfileChangeRequest,
   adminReplyVendorSupportThread,
@@ -58,6 +59,11 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
   const [packageFor, setPackageFor] = useState<Vendor | null>(null);
   const [logFor, setLogFor] = useState<Vendor | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // QF-MVP-80.02 GATE-06. Held in memory for ONE viewing only: the recovery
+  // link is a single-use credential, so it is never persisted or re-fetched.
+  const [loginActivation, setLoginActivation] = useState<
+    { vendorName: string; alreadyActive: boolean; recoveryLink: string | null; mappingLinked: boolean } | null
+  >(null);
 
   const result = data?.result ?? { rows: [], page: 1, pageSize: 20, total: 0 };
   const totals = data?.totals ?? { all: 0, approved: 0, pending: 0, lowBalance: 0 };
@@ -175,6 +181,25 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
     } finally {
       setBusyId(null);
     }
+  }, [notify, router]);
+
+  // QF-MVP-80.02 GATE-06 — give an EXISTING approved vendor a login. Creates no
+  // vendor row, changes no status/package/credit state, sends no message.
+  const activateLogin = useCallback(async (vendor: Vendor) => {
+    setBusyId(vendor.id);
+    const result = await adminActivateVendorLogin(vendor.id);
+    setBusyId(null);
+    if (!result.ok) {
+      notify(result.error ?? "Vendor login activation failed.", "error");
+      return;
+    }
+    setLoginActivation({
+      vendorName: vendor.business_name || "Vendor",
+      alreadyActive: result.data.alreadyActive,
+      recoveryLink: result.data.recoveryLink,
+      mappingLinked: result.data.dashboardMappingLinked,
+    });
+    router.refresh();
   }, [notify, router]);
 
   const approveProfileRequest = useCallback(async (requestId: string) => {
@@ -372,6 +397,7 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
                   { label: "Manage Credits", onClick: () => setCreditsFor(vendor) },
                   { label: "Assign / Update Package", onClick: () => setPackageFor(vendor) },
                   { label: "Mark Package Expired", onClick: () => void mutate(vendor.id, "package", { packageStatus: "expired", packageName: vendor.package_name ?? null }, "Package marked expired.") },
+                  { label: "Activate vendor login", onClick: () => void activateLogin(vendor) },
                   { label: "View Credit Log", onClick: () => setLogFor(vendor) },
                 ]}
               />
@@ -401,8 +427,73 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
       {creditsFor ? <ManageCreditsModal vendor={creditsFor} busy={busyId === creditsFor.id} onClose={() => setCreditsFor(null)} onSave={(body) => mutate(creditsFor.id, "credits", body, "Credits updated.").then((ok) => { if (ok) setCreditsFor(null); })} /> : null}
       {packageFor ? <AssignPackageModal vendor={packageFor} busy={busyId === packageFor.id} onClose={() => setPackageFor(null)} onSave={(body) => mutate(packageFor.id, "package", body, "Package updated.").then((ok) => { if (ok) setPackageFor(null); })} /> : null}
       {logFor ? <CreditLogModal vendor={logFor} notify={notify} onClose={() => setLogFor(null)} /> : null}
+      {loginActivation ? <VendorLoginActivationModal result={loginActivation} onClose={() => setLoginActivation(null)} /> : null}
       {toast ? <Toast message={toast.message} tone={toast.tone} /> : null}
     </div>
+  );
+}
+
+/**
+ * QF-MVP-80.02 GATE-06 — one-time handover panel.
+ *
+ * The recovery link is a single-use credential. It is shown once, never stored,
+ * never re-fetched, and no password is ever created, displayed or emailed by
+ * QuickFurno. The operator delivers it over the channel they already use.
+ */
+function VendorLoginActivationModal({
+  result,
+  onClose,
+}: {
+  result: { vendorName: string; alreadyActive: boolean; recoveryLink: string | null; mappingLinked: boolean };
+  onClose: () => void;
+}) {
+  return (
+    <ModalShell
+      title={result.alreadyActive ? "Vendor login already active" : "Vendor login activated"}
+      subtitle={result.vendorName}
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        {result.alreadyActive ? (
+          <p className="text-sm text-slate-600">
+            This vendor already had a login. Nothing was created or changed.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-600">
+            The existing vendor record now owns a sign-in account. Approval, package and credits are unchanged, and no
+            new vendor record was created.
+          </p>
+        )}
+
+        {result.recoveryLink ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase text-amber-700">Single-use set-password link</p>
+            <p className="mt-1 text-xs text-amber-800">
+              Shown once. Copy it now and send it to the vendor yourself — it is not stored anywhere.
+            </p>
+            <textarea
+              readOnly
+              value={result.recoveryLink}
+              rows={3}
+              onFocus={(event) => event.currentTarget.select()}
+              className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-2 py-1.5 font-mono text-[11px] text-slate-800 outline-none"
+            />
+          </div>
+        ) : result.alreadyActive ? null : (
+          <p className="text-sm text-amber-700">
+            The account was linked, but a set-password link could not be issued. Use the vendor password-reset flow
+            instead.
+          </p>
+        )}
+
+        {result.mappingLinked ? null : (
+          <p className="text-xs text-slate-500">
+            Note: the dashboard membership record was not written. Sign-in works, but check this vendor before relying
+            on the self-service reset flow.
+          </p>
+        )}
+      </div>
+    </ModalShell>
   );
 }
 

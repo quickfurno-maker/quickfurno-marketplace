@@ -18,18 +18,53 @@
 // WHAT THIS DOES
 //   Given an EXISTING approved vendor id, it creates a Supabase Auth principal
 //   for that vendor's stored email, claims the EXISTING vendor row for it with a
-//   compare-and-swap, reuses the canonical vendor_dashboard_users linkage, and
-//   hands back a single-use recovery link for the superadmin to deliver.
+//   compare-and-swap, establishes the vendor profile role, reuses the canonical
+//   vendor_dashboard_users linkage, and hands back a single-use recovery link
+//   pointing at this deployment's own set-password page.
+//
+// ---------------------------------------------------------------------------
+// QF-MVP-80.02 GATE-06 REPAIR — what the first production activation exposed.
+//
+//   The 2026-08-30 activation of one vendor "succeeded" while leaving the
+//   account unusable. Three separate defects, all fixed here:
+//
+//   1. The recovery link carried `redirect_to=http://localhost:3000`.
+//      `generateLink` was called with no `options.redirectTo`, so GoTrue fell
+//      back to the project's dashboard Site URL. The link is now built from
+//      lib/siteUrl and the whole operation FAILS CLOSED before creating
+//      anything if that origin is missing or implausible — an activation with
+//      no usable handover is not a success worth recording.
+//
+//   2. `vendor_dashboard_users` was never written. The vendor's stored phone is
+//      a legacy 10-digit local number; `normalizePhoneE164` correctly rejects it
+//      (PHONE_MISSING_COUNTRY_CODE), and the canonical linker treats an
+//      unparseable phone as fatal because that column is an authentication
+//      identity. The invariant is RIGHT and is not loosened. The caller was
+//      wrong: a non-canonical phone is now simply not offered as a mapping
+//      identity, and the membership is created without one. `vendors.phone` is
+//      never read for anything else here and never modified.
+//
+//   3. `profiles.role` came out NULL, so app/vendor/dashboard/layout.tsx
+//      bounced the vendor back to the login page. See
+//      services/vendorPrincipalProfileService.ts for the trigger-ordering root
+//      cause; the role is now asserted explicitly.
+//
+//   And the replay path is no longer a dead end: a vendor that is already
+//   linked but INCOMPLETE is repaired in place — role, membership and a fresh
+//   link — instead of returning "already active" and doing nothing.
+// ---------------------------------------------------------------------------
 //
 // WHAT IT MUST NEVER DO — each one is enforced below and tested:
 //   • never create a vendor row (it holds no INSERT on `vendors`);
+//   • never create a second auth principal for an already-linked vendor;
 //   • never move an already-linked vendor (CAS requires user_id IS NULL);
-//   • never adopt a pre-existing auth principal (that is a different authority
-//     with different evidence requirements — it fails closed instead);
+//   • never adopt a pre-existing auth principal on a FRESH activation (that is
+//     a different authority with different evidence requirements);
 //   • never activate a vendor whose email is shared with another vendor row,
 //     because auth.users.email is UNIQUE and a shared address cannot say which
 //     business the login owns;
-//   • never set, store, transmit, generate or default a password;
+//   • never set, store, transmit, generate or default a login secret;
+//   • never overwrite a non-null profile role, and never write 'admin';
 //   • never change status, verification, package, credit, activity or
 //     visibility state;
 //   • never touch assignment, matching, WhatsApp, Routes or the automatic
@@ -49,9 +84,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { adminClient, serverClient } from "../lib/supabase";
 import { AppError, appError, fail, ok, type Result } from "../lib/errors";
+import { normalizePhoneE164 } from "../lib/communication/phone";
 import { vendorPrincipalAppMetadata } from "../lib/identity/authPrincipalMarker";
+import { vendorSetPasswordUrl } from "../lib/siteUrl";
 import { normalizeStatus } from "../lib/vendors/vendorEligibility";
 import { linkVendorAuthUser } from "./vendorAccessService";
+import {
+  ensureVendorPrincipalProfile,
+  type VendorPrincipalProfileOutcomeValue,
+} from "./vendorPrincipalProfileService";
 
 /** The admin role this operation requires. Plain `admin` is NOT sufficient. */
 export const SUPERADMIN_ADMIN_ROLE = "Superadmin";
@@ -82,6 +123,12 @@ export const VendorLoginActivationError = {
   AUTH_USER_CREATE_FAILED: "AUTH_USER_CREATE_FAILED",
   /** The vendor row was claimed by someone else between read and write. */
   VENDOR_CLAIM_CONFLICT: "VENDOR_CLAIM_CONFLICT",
+  /** Replay: vendors.user_id names a principal that no longer exists. */
+  LINKED_PRINCIPAL_MISSING: "LINKED_PRINCIPAL_MISSING",
+  /** Replay: the linked principal's email is not this vendor's email. */
+  LINKED_PRINCIPAL_MISMATCH: "LINKED_PRINCIPAL_MISMATCH",
+  /** No canonical public origin is configured, so no usable link can be made. */
+  SITE_URL_UNAVAILABLE: "SITE_URL_UNAVAILABLE",
 } as const;
 
 export type VendorLoginActivationErrorCode =
@@ -98,6 +145,12 @@ const ACTIVATION_MESSAGES: Record<string, string> = {
   AUTH_DIRECTORY_UNREADABLE: "The authentication directory could not be read. Nothing was changed.",
   AUTH_USER_CREATE_FAILED: "The authentication account could not be created.",
   VENDOR_CLAIM_CONFLICT: "This vendor was linked by someone else. Nothing was changed.",
+  LINKED_PRINCIPAL_MISSING:
+    "This vendor points at an authentication account that no longer exists. Nothing was changed.",
+  LINKED_PRINCIPAL_MISMATCH:
+    "This vendor is linked to an account with a different email address. Nothing was changed.",
+  SITE_URL_UNAVAILABLE:
+    "This deployment has no valid public site address configured, so no sign-in link can be issued.",
 };
 
 function activationError(code: VendorLoginActivationErrorCode): AppError {
@@ -121,15 +174,20 @@ export interface ActivateVendorLoginInput {
 }
 
 /**
- * Sanitized outcome. Carries no password, no service credential, no session and
- * no vendor business state — only what the operator must see to hand over.
+ * Sanitized outcome. Carries no login secret, no service credential and no
+ * vendor business state — only what the operator must see to hand over.
  */
 export interface VendorLoginActivation {
   readonly vendorId: string;
   readonly authUserId: string;
-  /** True when the vendor already had a login; nothing was created or changed. */
+  /** True when the vendor already had a principal; none was created. */
   readonly alreadyActive: boolean;
+  /** True when a replay had to complete an incomplete earlier activation. */
+  readonly repaired: boolean;
   readonly dashboardMappingLinked: boolean;
+  /** Whether the mapping carries a phone identity (legacy phones are omitted). */
+  readonly mappingPhoneIdentity: boolean;
+  readonly profileRoleOutcome: VendorPrincipalProfileOutcomeValue | null;
   /** Single-use Supabase recovery link. Show once, never log, never store. */
   readonly recoveryLink: string | null;
   readonly recoveryLinkIssued: boolean;
@@ -172,8 +230,9 @@ async function requireSuperadminSession(): Promise<Result<string>> {
  * Give an EXISTING approved vendor a login, without creating a second vendor.
  *
  * Authorization is established internally; `input.vendorId` names the target and
- * confers no authority. Replay-safe: an already-linked vendor returns
- * `alreadyActive` without creating an auth user or writing anything.
+ * confers no authority. Replay-safe and replay-USEFUL: an already-linked vendor
+ * is verified and, where an earlier attempt left it incomplete, repaired in
+ * place — never duplicated.
  */
 export async function activateVendorLogin(
   input: ActivateVendorLoginInput
@@ -199,6 +258,13 @@ async function performVendorLoginActivation(
     const vendorId = typeof input?.vendorId === "string" ? input.vendorId.trim() : "";
     if (!vendorId) throw appError("VALIDATION");
 
+    // FAIL CLOSED FIRST. Resolved before any read of the vendor and long before
+    // any write: an activation that cannot produce a usable handover link must
+    // not half-happen.
+    const setPasswordUrl = vendorSetPasswordUrl();
+    if (!setPasswordUrl.ok) throw activationError("SITE_URL_UNAVAILABLE");
+    const redirectTo = setPasswordUrl.origin;
+
     const db = adminClient();
 
     const { data: vendorData, error: vendorError } = await db
@@ -214,20 +280,13 @@ async function performVendorLoginActivation(
       throw activationError("VENDOR_NOT_APPROVED");
     }
 
-    // REPLAY. An already-linked vendor is a safe no-op, never a second account.
-    if (vendor.user_id) {
-      return ok({
-        vendorId,
-        authUserId: vendor.user_id,
-        alreadyActive: true,
-        dashboardMappingLinked: await hasDashboardMapping(db, vendorId, vendor.user_id),
-        recoveryLink: null,
-        recoveryLinkIssued: false,
-      });
-    }
-
     const email = vendor.email?.trim().toLowerCase() || "";
     if (!email) throw activationError("VENDOR_EMAIL_MISSING");
+
+    // REPLAY / REPAIR. An already-linked vendor never gets a second principal.
+    if (vendor.user_id) {
+      return await repairExistingActivation(db, { vendorId, vendor, email, redirectTo });
+    }
 
     // auth.users.email is UNIQUE, so a shared business email cannot identify
     // which vendor owns the login. Refuse rather than choose a winner.
@@ -243,10 +302,10 @@ async function performVendorLoginActivation(
     if (!directory.readable) throw activationError("AUTH_DIRECTORY_UNREADABLE");
     if (directory.authUserId) throw activationError("AUTH_EMAIL_COLLISION");
 
-    // No `password` argument: the account is deliberately unusable until the
-    // vendor sets their own through the recovery link below. The trusted vendor
-    // classification travels in app_metadata, which only the service-role Admin
-    // API can set; public.handle_new_user reads that key and nothing else.
+    // No credential argument of any kind: the account is deliberately unusable
+    // until the vendor sets their own through the recovery link below. The
+    // trusted vendor classification travels in app_metadata, which only the
+    // service-role Admin API can set.
     const { data: created, error: createError } = await db.auth.admin.createUser({
       email,
       email_confirm: true,
@@ -268,19 +327,13 @@ async function performVendorLoginActivation(
     if (claimError) throw activationError("VENDOR_CLAIM_CONFLICT");
     if ((claimed ?? []).length !== 1) throw activationError("VENDOR_CLAIM_CONFLICT");
 
-    // The canonical Phase 5C linkage, called through its PUBLIC entry point so
-    // it re-derives its own admin authority. Reported, never silently assumed:
-    // the dashboard already works off vendors.user_id, and rolling the claim
-    // back over a secondary mapping would be the more dangerous failure.
-    const mapping = await linkVendorAuthUser({
-      vendorId,
-      authUserId: uncommittedAuthUserId,
-      email,
-      phone: vendor.phone,
-      role: VENDOR_LOGIN_OWNER_ROLE,
-    });
+    // The vendor role the AFTER INSERT trigger could not see. A conflicting
+    // non-null role fails closed here, before the link is issued.
+    const profile = await ensureVendorPrincipalProfile(uncommittedAuthUserId);
+    if (!profile.ok) throw new AppError(profile.code, profile.error);
 
-    const recoveryLink = await issueRecoveryLink(db, email);
+    const mapping = await linkMembership(vendorId, uncommittedAuthUserId, email, vendor.phone);
+    const recoveryLink = await issueRecoveryLink(db, email, redirectTo);
 
     // Committed. Past this point a failure must NOT delete the linked account.
     const authUserId = uncommittedAuthUserId;
@@ -290,7 +343,10 @@ async function performVendorLoginActivation(
       vendorId,
       authUserId,
       alreadyActive: false,
-      dashboardMappingLinked: mapping.ok,
+      repaired: false,
+      dashboardMappingLinked: mapping.linked,
+      mappingPhoneIdentity: mapping.phoneIdentity,
+      profileRoleOutcome: profile.data.outcome,
       recoveryLink,
       recoveryLinkIssued: recoveryLink !== null,
     });
@@ -298,6 +354,94 @@ async function performVendorLoginActivation(
     if (uncommittedAuthUserId) await rollbackAuthUser(uncommittedAuthUserId);
     return fail(e);
   }
+}
+
+/**
+ * Complete an activation that an earlier attempt left half-finished.
+ *
+ * The linked principal is VERIFIED first — it must still exist, and its email
+ * must be this vendor's email — so a repair can never quietly bless a
+ * mismatched or stale link. It creates no auth user: `createUser` is not
+ * reachable from this path at all.
+ */
+async function repairExistingActivation(
+  db: SupabaseClient,
+  args: { vendorId: string; vendor: VendorActivationRow; email: string; redirectTo: string }
+): Promise<Result<VendorLoginActivation>> {
+  const { vendorId, vendor, email, redirectTo } = args;
+  const authUserId = vendor.user_id as string;
+
+  const { data: existing, error: existingError } = await db.auth.admin.getUserById(authUserId);
+  if (existingError || !existing?.user?.id) throw activationError("LINKED_PRINCIPAL_MISSING");
+  const linkedEmail = String(existing.user.email ?? "").trim().toLowerCase();
+  if (linkedEmail === "" || linkedEmail !== email) throw activationError("LINKED_PRINCIPAL_MISMATCH");
+
+  const profile = await ensureVendorPrincipalProfile(authUserId);
+  if (!profile.ok) throw new AppError(profile.code, profile.error);
+
+  const mapping = await linkMembership(vendorId, authUserId, email, vendor.phone);
+
+  // A fresh recovery token supersedes any earlier one for this principal, so
+  // issuing here is also how a previously-exposed link stops working.
+  const recoveryLink = await issueRecoveryLink(db, email, redirectTo);
+
+  const repaired =
+    profile.data.outcome !== "ALREADY_VENDOR" || mapping.created || recoveryLink !== null;
+
+  return ok({
+    vendorId,
+    authUserId,
+    alreadyActive: true,
+    repaired,
+    dashboardMappingLinked: mapping.linked,
+    mappingPhoneIdentity: mapping.phoneIdentity,
+    profileRoleOutcome: profile.data.outcome,
+    recoveryLink,
+    recoveryLinkIssued: recoveryLink !== null,
+  });
+}
+
+/**
+ * A stored vendor phone is offered to the authentication mapping ONLY when it
+ * is already canonical E.164.
+ *
+ * `vendor_dashboard_users.phone` is an authentication identity, and the
+ * canonical linker rejects anything unparseable — correctly. Many legacy vendor
+ * rows hold a bare 10-digit local number. Guessing a country code for an
+ * identity column would be inventing identity, so the mapping is created
+ * WITHOUT a phone instead. `vendors.phone` itself is never modified.
+ */
+export function canonicalMappingPhone(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  const normalized = normalizePhoneE164(raw);
+  return normalized.ok ? normalized.e164 : null;
+}
+
+/** Create (or confirm) the canonical membership row. Never fatal on its own. */
+async function linkMembership(
+  vendorId: string,
+  authUserId: string,
+  email: string,
+  storedPhone: string | null
+): Promise<{ linked: boolean; created: boolean; phoneIdentity: boolean }> {
+  const phone = canonicalMappingPhone(storedPhone);
+
+  const before = await hasDashboardMapping(adminClient(), vendorId, authUserId);
+  if (before) return { linked: true, created: false, phoneIdentity: phone !== null };
+
+  // The canonical Phase 5C linkage, called through its PUBLIC entry point so it
+  // re-derives its own admin authority. Reported, never silently assumed: the
+  // dashboard already works off vendors.user_id, and rolling the claim back over
+  // a secondary mapping would be the more dangerous failure.
+  const mapping = await linkVendorAuthUser({
+    vendorId,
+    authUserId,
+    email,
+    phone,
+    role: VENDOR_LOGIN_OWNER_ROLE,
+  });
+
+  return { linked: mapping.ok, created: mapping.ok, phoneIdentity: phone !== null };
 }
 
 /**
@@ -349,15 +493,26 @@ async function hasDashboardMapping(
 }
 
 /**
- * Ask Supabase Auth for a single-use recovery link.
+ * Ask Supabase Auth for a single-use recovery link that returns the vendor to
+ * THIS deployment's set-password page.
  *
- * This is a HANDOVER mechanism, not a password: QuickFurno never invents,
- * stores or transmits one. Failure is non-fatal — the account and the link are
+ * `redirectTo` is always explicit — never omitted, so GoTrue's dashboard Site
+ * URL fallback can never decide where a production credential points. This is a
+ * HANDOVER mechanism, not a login secret: QuickFurno never invents, stores or
+ * transmits one. A failure here is non-fatal — the account and its link are
  * already correct, and the operator can re-issue.
  */
-async function issueRecoveryLink(db: SupabaseClient, email: string): Promise<string | null> {
+async function issueRecoveryLink(
+  db: SupabaseClient,
+  email: string,
+  redirectTo: string
+): Promise<string | null> {
   try {
-    const { data, error } = await db.auth.admin.generateLink({ type: "recovery", email });
+    const { data, error } = await db.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
     if (error || !data) return null;
     const link = (data as { properties?: { action_link?: unknown } }).properties?.action_link;
     return typeof link === "string" && link.length > 0 ? link : null;

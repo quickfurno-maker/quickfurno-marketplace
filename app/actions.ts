@@ -25,6 +25,7 @@ import * as requirementGroups from "../services/clientRequirementGroupService";
 import * as leadClarifications from "../services/leadClarificationService";
 import * as aos from "../services/aosService";
 import * as vendorLoginActivation from "../services/vendorLoginActivationService";
+import * as vendorPrincipalProfiles from "../services/vendorPrincipalProfileService";
 import { getParentCategoryGroup } from "../lib/vendors/categoryMatching";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
@@ -331,6 +332,22 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     }
 
     createdUserId = auth.user.id;
+
+    // QF-MVP-80.02 GATE-06 REPAIR. public.handle_new_user classifies from
+    // raw_app_meta_data at INSERT time, but the Auth Admin API applies custom
+    // app_metadata in a separate step — so the trigger does not see the marker
+    // above and files this vendor with a NEUTRAL null role. A null role makes
+    // app/vendor/dashboard/layout.tsx bounce the vendor straight back to the
+    // login page: the account works and the dashboard is still unreachable.
+    // Asserted explicitly here, with the same safe rule the Gate-06 activation
+    // path uses — it writes only 'vendor', never overwrites a non-null role,
+    // and can never produce an admin role.
+    const principalProfile = await vendorPrincipalProfiles.ensureVendorPrincipalProfile(auth.user.id);
+    if (!principalProfile.ok) {
+      await db.auth.admin.deleteUser(auth.user.id);
+      createdUserId = null;
+      return principalProfile;
+    }
 
     const vendor = await vendors.registerVendor({
       ...input,

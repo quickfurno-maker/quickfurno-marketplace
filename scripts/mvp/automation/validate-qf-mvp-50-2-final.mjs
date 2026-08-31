@@ -565,10 +565,15 @@ record("G03a the G1 staging-history gate was re-pinned to the applied truth, not
   // QF-MVP-40.13B RE-PIN: the pending set held exactly one SOURCE-PENDING entry.
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: it now holds exactly TWO SOURCE-PENDING entries,
   // so the post-anchor total is twelve while APPLIED stays exactly ten.
-  g1Source.includes("the explicit PENDING post-anchor set holds exactly five entries") &&
+  // QF-MVP-80.05 RECONCILIATION: the five ex-pending authorities are proved applied to
+  // BOTH environments, so the pending set is pinned EMPTY and a RECONCILED set of exactly
+  // five carries them. The APPLIED ten are untouched. Still exact counts, still no `>=`.
+  g1Source.includes("the explicit PENDING post-anchor set is present and EMPTY") &&
+  g1Source.includes("manifest declares exactly five RECONCILED post-anchor migrations") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 10") &&
-  g1Source.includes("pendingPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("const MIGRATION_COUNT = 102;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
@@ -805,8 +810,10 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 10") &&
-          g1Source.includes("pendingPins.length === 5") &&
+          g1Source.includes("pendingPins.length === 0") &&
+          g1Source.includes("reconciledPins.length === 5") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
+          !/reconciledPins\.length\s*>=/.test(g1Source) &&
           !/postAnchorLocal\.length\s*>=/.test(g1Source)],
 ];
 for (const [name, fn] of mutants) {

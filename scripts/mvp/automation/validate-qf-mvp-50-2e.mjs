@@ -732,13 +732,19 @@ record("G01 the anchor is untouched",
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G02 exactly ten APPLIED and five PENDING post-anchor migrations",
+// QF-MVP-80.05 RECONCILIATION: read-only queries of `supabase_migrations.schema_migrations`
+// proved 20260813000000-20260817000000 are ALREADY APPLIED to BOTH staging and
+// production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
+// reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
+// counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
+record("G02 exactly ten APPLIED, five RECONCILED and ZERO PENDING post-anchor migrations",
   manifest.appliedAnchor?.postAnchorMigrationCount === 15 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 5 &&
-  manifest.pendingPostAnchorMigrations[0].version === "20260813000000" &&
-  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
+  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.reconciledPostAnchorMigrations?.length === 5 &&
+  manifest.reconciledPostAnchorMigrations[0].version === "20260813000000" &&
+  manifest.reconciledPostAnchorMigrations[0].operationalStatus === "APPLIED" &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
   manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply === 30 &&

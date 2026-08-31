@@ -114,6 +114,8 @@ function validateState(state) {
   const check = (name, passed) => results.push({ name, passed: passed === true });
   const applied = state.manifest.appliedPostAnchorMigrations ?? [];
   const pending = state.manifest.pendingPostAnchorMigrations;
+  // QF-MVP-80.05 RECONCILIATION: proved applied to BOTH environments, read-only.
+  const reconciled = state.manifest.reconciledPostAnchorMigrations;
 
   // QF-MVP-50.5 STAGING GATE RE-PIN. Nothing this certification proved about the
   // 50.3/50.4 staging orchestration changes: histories 21..29 are still applied in
@@ -129,13 +131,15 @@ function validateState(state) {
   check("local migration count remains exactly 102", state.migrationFiles.length === 102);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set is exactly the five SOURCE-PENDING governed authorities",
-    Array.isArray(pending) && pending.length === 5 &&
-    pending[0].version === "20260813000000" &&
-    pending[1].version === "20260814000000" &&
-    pending[2].version === "20260815000000" &&
-    pending.every((r) => r.operationalStatus === "PENDING"
-      && r.appliedByThisPhase === false));
+  check("the governed pending set is EMPTY and the five governed authorities are reconciled as APPLIED",
+    Array.isArray(pending) && pending.length === 0 &&
+    Array.isArray(reconciled) && reconciled.length === 5 &&
+    reconciled[0].version === "20260813000000" &&
+    reconciled[1].version === "20260814000000" &&
+    reconciled[2].version === "20260815000000" &&
+    reconciled.every((r) => r.operationalStatus === "APPLIED"
+      && r.appliedByThisPhase === false
+      && r.appliedToStaging === true && r.appliedToProduction === true));
   check("the 50.5 recovery migration is applied by its own phase at history 30",
     (() => {
       const pin = applied.find((record) => record.version === "20260812000000");

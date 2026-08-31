@@ -310,20 +310,29 @@ record("G05a the bridge no longer appears as pending",
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G06 the pending post-anchor set is exactly the five SOURCE-PENDING governed authorities",
-  manifest.pendingPostAnchorMigrations?.length === 5 &&
-  same(manifest.pendingPostAnchorMigrations.map((r) => r.version), PENDING_ORDER));
+// QF-MVP-80.05 RECONCILIATION: read-only queries of `supabase_migrations.schema_migrations`
+// proved 20260813000000-20260817000000 are ALREADY APPLIED to BOTH staging and
+// production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
+// reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
+// counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
+record("G06 the pending post-anchor set is EMPTY and the five governed authorities are reconciled as APPLIED",
+  manifest.pendingPostAnchorMigrations?.length === 0 &&
+  manifest.reconciledPostAnchorMigrations?.length === 5 &&
+  same(manifest.reconciledPostAnchorMigrations.map((r) => r.version), PENDING_ORDER) &&
+  manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
+    r.appliedToStaging === true && r.appliedToProduction === true));
 record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
 record("G08 the anchor post-anchor count agrees at 15",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 was re-pinned to 102 / 10 applied / 5 pending, not loosened",
+record("G09 G1 was re-pinned to 102 / 10 applied / 5 reconciled / 0 pending, not loosened",
   /const MIGRATION_COUNT = 102;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));

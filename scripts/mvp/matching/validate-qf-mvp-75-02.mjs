@@ -797,7 +797,10 @@ section('J. MIGRATION GOVERNANCE [static]');
   check('J03 G1 is re-pinned to 102 by exact equality, never loosened to >=',
     /const MIGRATION_COUNT = 102;/.test(g1)
     && !/MIGRATION_COUNT\s*[><]=/.test(g1));
-  check('J04 G1 pins the geo migration as a PENDING post-anchor entry, by exact hash',
+  // QF-MVP-80.05 RECONCILIATION: 20260816000000 was applied to staging and production,
+  // proved by read-only history queries, so the manifest now carries it as RECONCILED /
+  // APPLIED rather than SOURCE-PENDING. Its hash pin is unchanged and still exact.
+  check('J04 G1 pins the geo migration as a post-anchor entry, by exact hash',
     g1.includes('20260816000000')
     && g1.includes('qf_mvp_75_02_geo_postgis_shortlist')
     && g1.includes(geoSha),
@@ -805,20 +808,27 @@ section('J. MIGRATION GOVERNANCE [static]');
 
   const manifest = JSON.parse(read('supabase/staging-history/qf-mvp-staging-history-manifest.json'));
   const pending = manifest.pendingPostAnchorMigrations ?? [];
-  const geoEntry = pending.find((m) => m.version === '20260816000000');
-  check('J05 the staging-history manifest carries the geo migration as PENDING with the same hash',
+  const reconciled = manifest.reconciledPostAnchorMigrations ?? [];
+  const geoEntry = reconciled.find((m) => m.version === '20260816000000');
+  check('J05 the staging-history manifest carries the geo migration as RECONCILED/APPLIED with the same hash',
     Boolean(geoEntry)
     && geoEntry.sha256 === geoSha
-    && geoEntry.operationalStatus === 'PENDING'
+    && geoEntry.operationalStatus === 'APPLIED'
+    && geoEntry.appliedToStaging === true
+    && geoEntry.appliedToProduction === true
     && geoEntry.appliedByThisPhase === false
-    && geoEntry.requiresSeparateStagingDeploymentGate === true);
-  check('J06 the manifest post-anchor count moved 14 -> 15 and nothing was demoted',
+    && geoEntry.requiresSeparateStagingDeploymentGate === false
+    && !pending.some((m) => m.version === '20260816000000'));
+  check('J06 the manifest post-anchor count is 15: ten applied, five reconciled, none pending',
     manifest.appliedAnchor.postAnchorMigrationCount === 15
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
-    && pending.length === 5);
-  check('J07 the phase applied nothing: the geo migration claims no remote history',
-    geoEntry && geoEntry.remoteVersionStatus === 'NOT_PROVEN_OFFLINE'
-    && !Object.prototype.hasOwnProperty.call(geoEntry, 'remoteHistory'));
+    && reconciled.length === 5
+    && pending.length === 0);
+  check('J07 THIS phase still applied nothing: the geo record carries no observed remote-history count',
+    geoEntry && geoEntry.remoteVersionStatus === 'PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY'
+    && geoEntry.remoteHistoryCountObservedAtApply === false
+    && !Object.prototype.hasOwnProperty.call(geoEntry, 'remoteHistory')
+    && !Object.prototype.hasOwnProperty.call(geoEntry, 'remoteHistoryCountAfterApply'));
 
   check('J08 no earlier migration was renamed, reordered or re-hashed',
     migrations.slice(0, 100).every((f) => /^\d{14}_/.test(f))

@@ -134,6 +134,18 @@ export async function getAdminSession(): Promise<{
   isAdmin: boolean;
   isSuperadmin: boolean;
   adminRole: AdminRoleName | null;
+  /**
+   * QF-MVP-80.03 PR C — the TRUSTED actor id, straight from the
+   * Supabase-validated session via currentUser(). This is the only identity an
+   * audit row may be attributed to.
+   *
+   * `adminRole` is a display label ("Superadmin"), not an identity; the first
+   * production audit rows were written with admin_user_id NULL precisely
+   * because the caller had a label and no principal. A value arriving in a
+   * request body, query string, header or `updatedBy` field is a CLAIM, never
+   * this.
+   */
+  userId: string | null;
 }> {
   const u = await currentUser();
   return {
@@ -141,6 +153,7 @@ export async function getAdminSession(): Promise<{
     isAdmin: u?.role === "admin",
     isSuperadmin: u?.role === "admin" && u.adminRole === "Superadmin",
     adminRole: u?.adminRole ?? null,
+    userId: u?.id ?? null,
   };
 }
 
@@ -571,9 +584,19 @@ export async function adminReplyVendorSupportThread(threadId: string, message: s
 // --------------------------------------------------------------------------
 // ADMIN
 // --------------------------------------------------------------------------
-async function asAdmin<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
-  try { await requireSuperadmin(); } catch (e) { return fail(e); }
-  return fn();
+/**
+ * QF-MVP-80.03 PR C — the guard now HANDS the authenticated principal to the
+ * work it authorizes. `requireSuperadmin()` already resolved a real user; not
+ * passing its id was why every audited admin action landed with
+ * admin_user_id NULL. Callbacks that need no actor simply ignore the argument.
+ */
+async function asAdmin<T>(fn: (actorUserId: string) => Promise<Result<T>>): Promise<Result<T>> {
+  let actor: string;
+  try { actor = (await requireSuperadmin()).id; } catch (e) { return fail(e); }
+  // Fail closed BEFORE any business mutation: an authorized action whose actor
+  // cannot be named is exactly the state this slice exists to end.
+  if (!actor) return fail(appError("UNAUTHORIZED"));
+  return fn(actor);
 }
 
 export const adminStats           = async () => asAdmin(() => admin.getAdminDashboardStats());
@@ -605,7 +628,7 @@ export const adminVendorsForEligibility = async (city: string) => asAdmin(() => 
 // a safe fallback. No AI, WhatsApp, credit, or distribution side effects.
 export const adminLogAosDecision  = async (input: AosDecisionLogInput) => asAdmin(() => aos.logAosAgentDecision(input));
 export const adminAllLeads        = async () => asAdmin(() => admin.getAllLeads());
-export const adminUpdateLeadStatus = async (leadId: string, status: string) => asAdmin(() => admin.updateLeadStatus(leadId, status));
+export const adminUpdateLeadStatus = async (leadId: string, status: string) => asAdmin((actor) => admin.updateLeadStatus(leadId, status, actor));
 export const adminPrepareLeadClarification = async (leadId: string) =>
   asAdmin(async () => {
     const result = await leadClarifications.createClarificationRequestForLead(leadId);
@@ -649,26 +672,26 @@ export const adminSaveLeadClarificationResponses = async (
 export const adminGetLeadClarificationResponses = async (leadId: string, requestId?: string) =>
   asAdmin(() => leadClarifications.getClarificationResponses(leadId, requestId));
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());
-export const adminApproveVendor   = async (id: string) => asAdmin(() => admin.approveVendor(id));
-export const adminRejectVendor    = async (id: string) => asAdmin(() => admin.rejectVendor(id));
-export const adminSuspendVendor   = async (id: string) => asAdmin(() => admin.suspendVendor(id));
+export const adminApproveVendor   = async (id: string) => asAdmin((actor) => admin.approveVendor(id, actor));
+export const adminRejectVendor    = async (id: string) => asAdmin((actor) => admin.rejectVendor(id, actor));
+export const adminSuspendVendor   = async (id: string) => asAdmin((actor) => admin.suspendVendor(id, actor));
 // QF-MVP-80.02 GATE-06 — give an EXISTING approved vendor a login without
 // creating a second vendor row. `asAdmin` already requires Superadmin here, and
 // the service independently re-derives superadmin authority from the session.
 export const adminActivateVendorLogin = async (vendorId: string) =>
   asAdmin(() => vendorLoginActivation.activateVendorLogin({ vendorId }));
 export const adminCreatePackage   = async (input: { name: string; lead_count: number; total_price: number; validity_days: number; is_active?: boolean }) =>
-  asAdmin(() => admin.createPackage(input));
+  asAdmin((actor) => admin.createPackage(input, actor));
 export const adminSetPackageActive = async (id: string, isActive: boolean) =>
-  asAdmin(() => admin.setPackageActive(id, isActive));
+  asAdmin((actor) => admin.setPackageActive(id, isActive, actor));
 export const adminCreateCategory = async (input: { name: string; is_active?: boolean }) =>
-  asAdmin(() => admin.createCategory(input));
+  asAdmin((actor) => admin.createCategory(input, actor));
 export const adminSetCategoryActive = async (id: string, isActive: boolean) =>
-  asAdmin(() => admin.setCategoryActive(id, isActive));
+  asAdmin((actor) => admin.setCategoryActive(id, isActive, actor));
 export const adminCreateCity = async (input: { name: string; is_active?: boolean }) =>
-  asAdmin(() => admin.createCity(input));
+  asAdmin((actor) => admin.createCity(input, actor));
 export const adminSetCityActive = async (id: string, isActive: boolean) =>
-  asAdmin(() => admin.setCityActive(id, isActive));
+  asAdmin((actor) => admin.setCityActive(id, isActive, actor));
 export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin(() => admin.approveBadLeadReport(id, note));
 export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());

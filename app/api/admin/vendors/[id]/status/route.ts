@@ -16,6 +16,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
   }
+  // QF-MVP-80.03 PR C — the audit row must name a real principal. If the session
+  // authorized the call but carries no user id, refuse BEFORE mutating anything
+  // rather than write an unattributable change.
+  if (!session.userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -29,7 +35,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: "Invalid action." }, { status: 400 });
   }
 
-  const result = await setVendorStatusAction(params.id, action as VendorStatusAction, session.adminRole ?? "Superadmin");
+  const result = await setVendorStatusAction(params.id, action as VendorStatusAction, session.adminRole ?? "Superadmin", session.userId);
   if (!result.ok) {
     const status = result.code === "VALIDATION" ? 400 : result.code === "NOT_FOUND" ? 404 : 500;
     return NextResponse.json({ ok: false, error: result.error }, { status });

@@ -207,12 +207,24 @@ export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
   return { stats, paidPaymentRowsAll };
 }
 
-async function recordAuditLog(action: string, entityType: string, entityId?: string, metadata: Record<string, unknown> = {}) {
+/**
+ * QF-MVP-80.03 PR C — `actorUserId` is the authenticated principal resolved by
+ * app/actions.asAdmin from requireSuperadmin(), threaded down after
+ * authorization succeeded. It is never taken from request input.
+ */
+async function recordAuditLog(
+  action: string,
+  entityType: string,
+  entityId: string | undefined,
+  metadata: Record<string, unknown>,
+  actorUserId: string,
+) {
   try {
     const { error } = await adminClient().from("audit_logs").insert({
       action,
       entity_type: entityType,
       entity_id: entityId ?? null,
+      admin_user_id: actorUserId,
       metadata,
     });
     if (error) throw error;
@@ -456,11 +468,12 @@ export async function getAllLeads(): Promise<Result<unknown[]>> {
 }
 
 /** Admin sets a lead's workflow status (New/Verified/Assigned/Contacted/Converted/Bad Lead…). */
-export async function updateLeadStatus(leadId: string, status: string): Promise<Result<null>> {
+export async function updateLeadStatus(leadId: string, status: string, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const { error } = await adminClient().from("leads").update({ status }).eq("id", leadId);
     if (error) throw error;
-    await recordAuditLog("lead.status_updated", "lead", leadId, { status });
+    await recordAuditLog("lead.status_updated", "lead", leadId, { status }, actorUserId);
     return ok(null);
   } catch (e) {
     return fail(e);
@@ -478,25 +491,27 @@ export async function getAllVendors(): Promise<Result<unknown[]>> {
   }
 }
 
-async function setVendorStatus(vendorId: string, status: string): Promise<Result<null>> {
+async function setVendorStatus(vendorId: string, status: string, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const db = adminClient();
     const { error } = await db.from("vendors").update({ status }).eq("id", vendorId);
     if (error) throw error;
     // visibility depends on status — recompute
     await db.rpc("update_vendor_visibility", { p_vendor_id: vendorId });
-    await recordAuditLog("vendor.status_updated", "vendor", vendorId, { status });
+    await recordAuditLog("vendor.status_updated", "vendor", vendorId, { status }, actorUserId);
     return ok(null);
   } catch (e) {
     return fail(e);
   }
 }
 
-export const approveVendor = (id: string) => setVendorStatus(id, "Approved");
-export const rejectVendor = (id: string) => setVendorStatus(id, "Rejected");
-export const suspendVendor = (id: string) => setVendorStatus(id, "Suspended");
+export const approveVendor = (id: string, actorUserId: string) => setVendorStatus(id, "Approved", actorUserId);
+export const rejectVendor = (id: string, actorUserId: string) => setVendorStatus(id, "Rejected", actorUserId);
+export const suspendVendor = (id: string, actorUserId: string) => setVendorStatus(id, "Suspended", actorUserId);
 
-export async function createPackage(input: AdminPackageInput): Promise<Result<{ id: string }>> {
+export async function createPackage(input: AdminPackageInput, actorUserId: string): Promise<Result<{ id: string }>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const name = input.name?.trim();
     const leadCount = Number(input.lead_count);
@@ -521,25 +536,27 @@ export async function createPackage(input: AdminPackageInput): Promise<Result<{ 
       .select("id")
       .single();
     if (error) throw error;
-    await recordAuditLog("package.created", "package", data.id, { name, lead_count: leadCount, total_price: totalPrice });
+    await recordAuditLog("package.created", "package", data.id, { name, lead_count: leadCount, total_price: totalPrice }, actorUserId);
     return ok({ id: data.id });
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function setPackageActive(id: string, isActive: boolean): Promise<Result<null>> {
+export async function setPackageActive(id: string, isActive: boolean, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const { error } = await adminClient().from("packages").update({ is_active: isActive }).eq("id", id);
     if (error) throw error;
-    await recordAuditLog(isActive ? "package.enabled" : "package.disabled", "package", id);
+    await recordAuditLog(isActive ? "package.enabled" : "package.disabled", "package", id, {}, actorUserId);
     return ok(null);
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function createCategory(input: AdminNameInput): Promise<Result<{ id: string }>> {
+export async function createCategory(input: AdminNameInput, actorUserId: string): Promise<Result<{ id: string }>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const name = input.name?.trim();
     if (!name) throw appError("VALIDATION");
@@ -549,25 +566,27 @@ export async function createCategory(input: AdminNameInput): Promise<Result<{ id
       .select("id")
       .single();
     if (error) throw error;
-    await recordAuditLog("category.created", "service_category", data.id, { name });
+    await recordAuditLog("category.created", "service_category", data.id, { name }, actorUserId);
     return ok({ id: data.id });
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function setCategoryActive(id: string, isActive: boolean): Promise<Result<null>> {
+export async function setCategoryActive(id: string, isActive: boolean, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const { error } = await adminClient().from("service_categories").update({ is_active: isActive }).eq("id", id);
     if (error) throw error;
-    await recordAuditLog(isActive ? "category.enabled" : "category.disabled", "service_category", id);
+    await recordAuditLog(isActive ? "category.enabled" : "category.disabled", "service_category", id, {}, actorUserId);
     return ok(null);
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function createCity(input: AdminNameInput): Promise<Result<{ id: string }>> {
+export async function createCity(input: AdminNameInput, actorUserId: string): Promise<Result<{ id: string }>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const name = input.name?.trim();
     if (!name) throw appError("VALIDATION");
@@ -577,18 +596,19 @@ export async function createCity(input: AdminNameInput): Promise<Result<{ id: st
       .select("id")
       .single();
     if (error) throw error;
-    await recordAuditLog("city.created", "city", data.id, { name });
+    await recordAuditLog("city.created", "city", data.id, { name }, actorUserId);
     return ok({ id: data.id });
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function setCityActive(id: string, isActive: boolean): Promise<Result<null>> {
+export async function setCityActive(id: string, isActive: boolean, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const { error } = await adminClient().from("cities").update({ is_active: isActive }).eq("id", id);
     if (error) throw error;
-    await recordAuditLog(isActive ? "city.enabled" : "city.disabled", "city", id);
+    await recordAuditLog(isActive ? "city.enabled" : "city.disabled", "city", id, {}, actorUserId);
     return ok(null);
   } catch (e) {
     return fail(e);

@@ -42,6 +42,17 @@ export interface VendorAdminRow extends Record<string, unknown> {
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; error: string; code: string };
 
+/**
+ * QF-MVP-80.03 PR C — an authorized admin action whose actor cannot be named is
+ * refused BEFORE it mutates anything. Attribution is not decoration: the first
+ * production audit rows carried admin_user_id NULL, which is exactly the state
+ * that made a real incident un-investigable.
+ */
+function requireActor(actorUserId: string): string | null {
+  const id = typeof actorUserId === "string" ? actorUserId.trim() : "";
+  return id === "" ? null : id;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -64,12 +75,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * that could carry business context, and a log line is the wrong place to widen
  * its blast radius.
  */
-async function bestEffortAudit(action: string, vendorId: string, metadata: Record<string, unknown>) {
+async function bestEffortAudit(
+  action: string,
+  vendorId: string,
+  metadata: Record<string, unknown>,
+  actorUserId: string,
+) {
   try {
     const { error } = await adminClient().from("audit_logs").insert({
       action,
       entity_type: "vendor",
       entity_id: vendorId,
+      // QF-MVP-80.03 PR C — the authenticated principal, resolved server-side by
+      // getAdminSession() and passed down after authorization succeeded. NEVER
+      // from the request body, a header, or the `updatedBy` display label.
+      admin_user_id: actorUserId,
       metadata,
     });
     if (error) {
@@ -138,9 +158,12 @@ export async function setVendorStatusAction(
   vendorId: string,
   action: VendorStatusAction,
   updatedBy: string,
+  actorUserId: string,
 ): Promise<ServiceResult<VendorAdminRow>> {
   const id = (vendorId ?? "").trim();
   if (!id) return { ok: false, error: "A vendorId is required.", code: "VALIDATION" };
+  const actor = requireActor(actorUserId);
+  if (!actor) return { ok: false, error: "Unauthorized.", code: "UNAUTHORIZED" };
 
   try {
     const db = adminClient();
@@ -154,7 +177,7 @@ export async function setVendorStatusAction(
     if (error) return { ok: false, error: "Could not update the vendor.", code: "UPDATE_FAILED" };
 
     await recomputeVisibility(id);
-    await bestEffortAudit(`vendor.${action}`, id, { ...update, updatedBy });
+    await bestEffortAudit(`vendor.${action}`, id, { ...update, updatedBy }, actor);
 
     const row = await getVendorRow(id);
     if (!row) return { ok: false, error: "Vendor not found after update.", code: "NOT_FOUND" };
@@ -168,6 +191,8 @@ export async function setVendorStatusAction(
 // CREDITS (manual only — never auto-deducts)
 // ----------------------------------------------------------------------------
 export interface UpdateCreditsInput {
+  /** QF-MVP-80.03 PR C — trusted server-session principal. Not client input. */
+  actorUserId: string;
   mode: "add" | "set";
   amount: number;
   reason?: string | null;
@@ -181,6 +206,8 @@ export async function updateVendorCredits(
   input: UpdateCreditsInput,
 ): Promise<ServiceResult<VendorAdminRow>> {
   const id = (vendorId ?? "").trim();
+  const actor = requireActor(input?.actorUserId);
+  if (!actor) return { ok: false, error: "Unauthorized.", code: "UNAUTHORIZED" };
   if (!id) return { ok: false, error: "A vendorId is required.", code: "VALIDATION" };
 
   const amount = Math.round(Number(input.amount));
@@ -215,7 +242,7 @@ export async function updateVendorCredits(
     }
 
     await recomputeVisibility(id);
-    await bestEffortAudit("vendor.credits_updated", id, { before, delta, mode: input.mode, changeType, updatedBy: input.updatedBy });
+    await bestEffortAudit("vendor.credits_updated", id, { before, delta, mode: input.mode, changeType, updatedBy: input.updatedBy }, actor);
 
     const fresh = (await getVendorRow(id)) ?? row;
     return { ok: true, data: { ...fresh, id, eligibility: evaluateVendorEligibility(fresh) } };
@@ -228,6 +255,8 @@ export async function updateVendorCredits(
 // PACKAGE (denormalized fields used by the preview)
 // ----------------------------------------------------------------------------
 export interface UpdatePackageInput {
+  /** QF-MVP-80.03 PR C — trusted server-session principal. Not client input. */
+  actorUserId: string;
   packageName?: string | null;
   packageStatus: PackageStatus;
   packageExpiresAt?: string | null;
@@ -239,6 +268,8 @@ export async function updateVendorPackage(
   input: UpdatePackageInput,
 ): Promise<ServiceResult<VendorAdminRow>> {
   const id = (vendorId ?? "").trim();
+  const actor = requireActor(input?.actorUserId);
+  if (!actor) return { ok: false, error: "Unauthorized.", code: "UNAUTHORIZED" };
   if (!id) return { ok: false, error: "A vendorId is required.", code: "VALIDATION" };
 
   if (!ALLOWED_PACKAGE_STATUSES.includes(input.packageStatus)) {
@@ -272,7 +303,7 @@ export async function updateVendorPackage(
       package_status: input.packageStatus,
       package_name: input.packageName ?? null,
       updatedBy: input.updatedBy,
-    });
+    }, actor);
 
     const fresh = (await getVendorRow(id)) ?? row;
     return { ok: true, data: { ...fresh, id, eligibility: evaluateVendorEligibility(fresh) } };

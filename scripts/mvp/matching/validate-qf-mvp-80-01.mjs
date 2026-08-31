@@ -138,9 +138,15 @@ section('A. THE STABLE REASON CODE + THE MODE VOCABULARY [static]');
   check('A03 ONLY the exact literal "off" normalizes to off — an unknown value falls back',
     /mode === "off" \|\| mode === "preview" \|\| mode === "auto_suggest" \? mode : fallback/.test(flat(SETTINGS)));
 
-  check('A04 the built-in default is "preview", never "off" — the switch must be set, not assumed',
-    /auto_assignment_mode: "preview",/.test(SETTINGS)
-    && !/auto_assignment_mode: "off",/.test(SETTINGS));
+  // QF-MVP-80.04 RE-PIN. QF-MVP-80.01 deliberately pinned a fail-OPEN default,
+  // reasoning that the switch should be set rather than assumed. The QF-MVP-80.03
+  // staging canary then proved the cost of that choice: with the settings table
+  // empty, staging resolved to `preview`, and `preview` created real assignments
+  // and debited real credits. Silence is not consent to spend, so the default is
+  // now "off". The rule is INVERTED, not deleted.
+  check('A04 the built-in default is "off", never "preview" — silence must not select a mutating mode',
+    /auto_assignment_mode: "off",/.test(SETTINGS)
+    && !/auto_assignment_mode: "preview",/.test(SETTINGS));
 
   check('A05 both engines record the SAME code: neither carries its own literal any more',
     /failure_reason: AUTO_ASSIGNMENT_OFF_REASON,/.test(MATCHER)
@@ -621,10 +627,11 @@ section('I. MUTANTS — every check above is proved to bite [mutant]');
       return t.indexOf(GATE) > t.indexOf('if (!leadRow.share_consent) {');
     });
 
-  mutant('17 turning the DEFAULT mode into "off" is rejected — a fail-open default is deliberate',
+  mutant('17 turning the DEFAULT mode back into "preview" is rejected — QF-MVP-80.04 fails closed',
     SETTINGS_RAW,
-    (s) => s.replace('  auto_assignment_mode: "preview",\n};', '  auto_assignment_mode: "off",\n};'),
-    (s) => !/auto_assignment_mode: "off",/.test(stripTs(s)));
+    (s) => s.replace('  auto_assignment_mode: "off",\n};', '  auto_assignment_mode: "preview",\n};'),
+    (s) => /auto_assignment_mode: "off",/.test(stripTs(s))
+      && !/auto_assignment_mode: "preview",/.test(stripTs(s)));
 
   mutant('18 widening normalization so an unknown value means off is rejected',
     SETTINGS_RAW,

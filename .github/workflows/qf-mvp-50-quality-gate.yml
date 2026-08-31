@@ -177,6 +177,12 @@ jobs:
       - name: QF-MVP-80.02 GATE-06 vendor login activation
         run: npm run test:mvp:80-02-gate06
 
+      - name: QF-MVP-80.03 audit log repair + actor attribution
+        run: npm run test:mvp:80-03-audit
+
+      - name: QF-MVP-80.04 fail-closed runtime default
+        run: npm run test:mvp:80-04
+
       - name: Marketplace eligibility and category contract
         run: npm run test:mvp:marketplace
 

@@ -28,7 +28,11 @@ export const marketplaceSettingDefaults: MarketplaceSettingsView = {
   allow_trial_vendors_for_assignment: true,
   minimum_paid_vendors_required_for_auto_assignment: 1,
   max_vendors_per_lead: 3,
-  auto_assignment_mode: "preview",
+  // QF-MVP-80.04 — mirrors the canonical server default in
+  // lib/lead-assignment/runtimeSettings. If the row is absent the server
+  // resolves "off", so showing "preview" here would tell the operator the
+  // marketplace is in a mutating mode it is not actually in.
+  auto_assignment_mode: "off",
 };
 
 

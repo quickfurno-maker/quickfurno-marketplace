@@ -78,6 +78,8 @@ const OLD_FOUNDATION = "supabase/migrations/20260621000006_superadmin_foundation
 const MIGRATION_FILES = readdirSync(path.join(process.cwd(), "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
 
 /** Credential-shaped keys that must never reach audit metadata or a log line. */
+const ACTOR = "11111111-2222-4333-8444-555555555555";
+
 const BANNED_KEYS = ["password", "passwd", "token", "access_token", "refresh_token", "jwt",
   "secret", "service_role", "serviceRole", "recoveryLink", "recovery_link",
   "authorization", "cookie", "apiKey", "api_key"];
@@ -278,7 +280,7 @@ check("08 [static] it fails closed on an incompatible pre-existing table", () =>
 check("09 [exec] a successful action writes EXACTLY one audit row, silently", async () => {
   resetDb();
   const { value, output } = await captureConsole(() =>
-    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin"));
+    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
   assert(value.ok, `action failed: ${JSON.stringify(value)}`);
   assert(auditInserts.length === 1, `expected 1 audit insert, got ${auditInserts.length}`);
   assert(db.audit_logs.length === 1, "the row must land");
@@ -291,7 +293,7 @@ check("10 [exec] a RETURNED PostgREST error is detected and reported", async () 
   resetDb();
   auditMode = "returns-error";
   const { value, output } = await captureConsole(() =>
-    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin"));
+    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
   assert(value.ok, "the business action must still succeed");
   assert(/\[audit log\] vendor admin action was NOT recorded/.test(output),
     `the failure must be visible, saw: ${output.slice(0, 200)}`);
@@ -303,7 +305,7 @@ check("11 [exec] a THROWN transport failure is caught and reported, not rethrown
   auditMode = "throws";
   let threw = false;
   const { value, output } = await captureConsole(async () => {
-    try { return await VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin"); }
+    try { return await VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR); }
     catch (e) { threw = true; throw e; }
   });
   assert(!threw, "bestEffortAudit must never rethrow");
@@ -315,7 +317,7 @@ check("12 [exec] the business write happens EVEN WHEN the audit fails", async ()
   for (const mode of ["ok", "returns-error", "throws"]) {
     resetDb();
     auditMode = mode;
-    await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin"));
+    await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
     const vendor = db.vendors.find((v) => v.id === "vendor-1");
     assert(vendor.is_active === false, `${mode}: is_active must still have been written`);
     assert(vendorUpdates.some((u) => u.table === "vendors"), `${mode}: the vendor update must have run`);
@@ -326,7 +328,7 @@ check("13 [exec] audit failure never corrupts unrelated business state", async (
   resetDb();
   auditMode = "returns-error";
   const before = JSON.stringify(db.vendors[0]);
-  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin"));
+  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
   const after = db.vendors[0];
   assert(after.remaining_credits === 10 && after.total_credits === 10, "credits untouched");
   assert(after.status === "Approved", "account status untouched by an is_active action");
@@ -341,7 +343,7 @@ check("14 [exec] the log line carries no metadata and no credential", async () =
   resetDb();
   auditMode = "returns-error";
   const { output } = await captureConsole(() =>
-    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin"));
+    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
   for (const banned of BANNED_KEYS) {
     assert(!new RegExp(banned, "i").test(output), `the log must not contain ${banned}`);
   }
@@ -353,8 +355,8 @@ check("14 [exec] the log line carries no metadata and no credential", async () =
 
 check("15 [exec] no credential-shaped key reaches audit metadata", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin"));
-  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 1, updatedBy: "Superadmin" }));
+  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
   assert(auditInserts.length >= 1, "at least one audit payload to inspect");
   for (const payload of auditInserts) {
     const keys = Object.keys(payload.metadata ?? {});
@@ -467,6 +469,170 @@ mutant("27 [mutant] dropping the incompatible-object guard is rejected",
   MIGRATION_SQL,
   (s) => s.replace(/raise exception/i, "return"),
   (s) => /raise exception/i.test(s));
+
+
+// ============================================================================
+// QF-MVP-80.03 PR C — trusted actor attribution
+// ============================================================================
+const ACTIONS_SRC_C = readCode("app/actions.ts");
+const ADMIN_SVC_C = readCode("services/adminService.ts");
+const VENDOR_SVC_C = readCode("services/vendorAdminService.ts");
+const ROUTE_STATUS = readCode("app/api/admin/vendors/[id]/status/route.ts");
+const ROUTE_CREDITS = readCode("app/api/admin/vendors/[id]/credits/route.ts");
+const ROUTE_PACKAGE = readCode("app/api/admin/vendors/[id]/package/route.ts");
+
+check("28 [exec] a vendor status action binds the authenticated actor", async () => {
+  resetDb();
+  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
+  assert(db.audit_logs.length === 1, `expected 1 audit row, got ${db.audit_logs.length}`);
+  assert(db.audit_logs[0].admin_user_id === ACTOR,
+    `admin_user_id must be the authenticated actor, saw ${JSON.stringify(db.audit_logs[0].admin_user_id)}`);
+  assert(auditInserts.length === 1, "exactly one audit attempt");
+});
+
+check("29 [exec] a credit adjustment binds the authenticated actor", async () => {
+  resetDb();
+  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
+    { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  const rows = db.audit_logs.filter((r) => r.action === "vendor.credits_updated");
+  assert(rows.length === 1, `expected 1 credit audit row, got ${rows.length}`);
+  assert(rows[0].admin_user_id === ACTOR, String(rows[0].admin_user_id));
+});
+
+check("30 [exec] a package update binds the authenticated actor", async () => {
+  resetDb();
+  await captureConsole(() => VendorAdmin.updateVendorPackage("vendor-1",
+    { packageStatus: "expired", packageName: null, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  const rows = db.audit_logs.filter((r) => r.action === "vendor.package_updated");
+  assert(rows.length === 1, `expected 1 package audit row, got ${rows.length}`);
+  assert(rows[0].admin_user_id === ACTOR, String(rows[0].admin_user_id));
+});
+
+check("31 [exec] a MISSING actor fails closed BEFORE the business mutation", async () => {
+  for (const bad of ["", "   ", null, undefined]) {
+    resetDb();
+    const before = JSON.stringify(db.vendors[0]);
+    const res = await captureConsole(() =>
+      VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", bad));
+    assert(res.value.ok === false, `actor ${JSON.stringify(bad)} must be refused`);
+    assert(res.value.code === "UNAUTHORIZED", String(res.value.code));
+    assert(JSON.stringify(db.vendors[0]) === before, "the vendor must NOT have been mutated");
+    assert(db.audit_logs.length === 0, "no audit row for a refused action");
+    assert(vendorUpdates.length === 0, "no vendor write attempted at all");
+  }
+});
+
+check("32 [exec] a missing actor also fails closed for credits and package", async () => {
+  resetDb();
+  const c = await VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 5, updatedBy: "x", actorUserId: "" });
+  assert(c.ok === false && c.code === "UNAUTHORIZED", JSON.stringify(c));
+  assert(db.vendors[0].remaining_credits === 10, "credits must be untouched");
+  const p = await VendorAdmin.updateVendorPackage("vendor-1", { packageStatus: "expired", packageName: null, updatedBy: "x", actorUserId: "" });
+  assert(p.ok === false && p.code === "UNAUTHORIZED", JSON.stringify(p));
+  assert(db.audit_logs.length === 0, "no audit rows from refused actions");
+});
+
+check("33 [exec] the actor is NOT taken from updatedBy or any label", async () => {
+  resetDb();
+  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  const row = db.audit_logs[0];
+  assert(row.admin_user_id === ACTOR, "actor is the session id");
+  assert(row.admin_user_id !== "Superadmin", "the display label must never become the identity");
+  assert(row.metadata.updatedBy === "Superadmin", "the label still travels as display context");
+  assert(row.admin_user_id !== db.vendors[0].id, "the vendor id is not the actor");
+});
+
+check("34 [static] getAdminSession exposes a trusted userId from the session", () => {
+  assert(/userId: string \| null;/.test(ACTIONS_SRC_C), "the session type must carry userId");
+  assert(/userId: u\?\.id \?\? null,/.test(ACTIONS_SRC_C), "userId must come from currentUser()");
+  assert(/const \{ data: \{ user \} \} = await sb\.auth\.getUser\(\)/.test(ACTIONS_SRC_C),
+    "currentUser must still resolve from the Supabase-validated session");
+  // roles unchanged
+  for (const f of ["isLoggedIn: Boolean(u)", 'isAdmin: u?.role === "admin"',
+    'isSuperadmin: u?.role === "admin" && u.adminRole === "Superadmin"', "adminRole: u?.adminRole ?? null"]) {
+    assert(ACTIONS_SRC_C.includes(f), `existing session field changed: ${f}`);
+  }
+});
+
+check("35 [static] asAdmin hands the authenticated principal to the work", () => {
+  assert(/async function asAdmin<T>\(fn: \(actorUserId: string\) => Promise<Result<T>>\)/.test(ACTIONS_SRC_C),
+    "asAdmin must pass the actor");
+  assert(/actor = \(await requireSuperadmin\(\)\)\.id/.test(ACTIONS_SRC_C), "actor comes from requireSuperadmin()");
+  assert(/if \(!actor\) return fail\(appError\("UNAUTHORIZED"\)\);/.test(ACTIONS_SRC_C), "fail closed on a missing actor");
+});
+
+check("36 [static] both audit writers set admin_user_id", () => {
+  assert(/admin_user_id: actorUserId,/.test(VENDOR_SVC_C), "vendorAdminService must bind the actor");
+  assert(/admin_user_id: actorUserId,/.test(ADMIN_SVC_C), "adminService must bind the actor");
+  for (const src of [VENDOR_SVC_C, ADMIN_SVC_C]) {
+    const inserts = src.match(/from\("audit_logs"\)\.insert\(\{[\s\S]*?\}\)/g) ?? [];
+    assert(inserts.length >= 1, "an audit insert must exist");
+    for (const i of inserts) assert(/admin_user_id/.test(i), "every audit insert must carry admin_user_id");
+  }
+});
+
+check("37 [static] the actor is never sourced from untrusted input", () => {
+  for (const src of [VENDOR_SVC_C, ADMIN_SVC_C, ROUTE_STATUS, ROUTE_CREDITS, ROUTE_PACKAGE]) {
+    assert(!/admin_user_id:\s*(body|input\.updatedBy|updatedBy|req|request|params|headers)/.test(src),
+      "admin_user_id must never come from request input or a display label");
+    assert(!/actorUserId\s*=\s*(body|req|request|headers)/.test(src), "actor must not be read from the request");
+  }
+  // the routes take it from the SESSION only
+  for (const r of [ROUTE_STATUS, ROUTE_CREDITS, ROUTE_PACKAGE]) {
+    assert(/session\.userId/.test(r), "the route must pass session.userId");
+    assert(/if \(!session\.userId\)/.test(r), "the route must fail closed on a missing session actor");
+  }
+});
+
+check("38 [static] every human-admin audit writer threads an actor", () => {
+  const calls = ADMIN_SVC_C.match(/await recordAuditLog\([^;]*?\);/gs) ?? [];
+  assert(calls.length === 8, `expected 8 recordAuditLog call sites, found ${calls.length}`);
+  for (const c of calls) assert(/actorUserId\)/.test(c), `call site lacks the actor: ${c.slice(0, 80)}`);
+  const vcalls = VENDOR_SVC_C.match(/await bestEffortAudit\([^;]*?\);/gs) ?? [];
+  assert(vcalls.length === 3, `expected 3 bestEffortAudit call sites, found ${vcalls.length}`);
+  for (const c of vcalls) assert(/, actor\)/.test(c), `call site lacks the actor: ${c.slice(0, 80)}`);
+});
+
+check("39 [static] no historical backfill and no new migration", () => {
+  for (const src of [VENDOR_SVC_C, ADMIN_SVC_C]) {
+    assert(!/update\([^)]*admin_user_id/.test(src), "existing audit rows must never be updated");
+    assert(!/from\("audit_logs"\)[\s\S]{0,120}\.(update|delete)\(/.test(src), "no update/delete on audit_logs");
+  }
+  const migrations = readdirSync(path.join(process.cwd(), "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
+  assert(migrations.length === 102, `PR C adds no migration; expected 102, found ${migrations.length}`);
+});
+
+mutant("40 [mutant] dropping admin_user_id from the vendor audit insert is rejected",
+  VENDOR_SVC_C, (s) => s.replace("      admin_user_id: actorUserId,\n", ""),
+  (s) => /admin_user_id: actorUserId,/.test(s));
+
+mutant("41 [mutant] dropping admin_user_id from the adminService insert is rejected",
+  ADMIN_SVC_C, (s) => s.replace("      admin_user_id: actorUserId,\n", ""),
+  (s) => /admin_user_id: actorUserId,/.test(s));
+
+mutant("42 [mutant] sourcing the actor from updatedBy is rejected",
+  VENDOR_SVC_C, (s) => s.replace("admin_user_id: actorUserId,", "admin_user_id: updatedBy,"),
+  (s) => /admin_user_id: actorUserId,/.test(s)
+    && !/admin_user_id:\s*(body|input\.updatedBy|updatedBy|req|request|params|headers)/.test(s));
+
+mutant("43 [mutant] sourcing the actor from the request body is rejected",
+  ROUTE_STATUS,
+  (s) => s.replace('"Superadmin", session.userId)', '"Superadmin", (body as any).adminUserId)'),
+  (s) => /"Superadmin", session\.userId\)/.test(s)
+    && !/adminUserId/.test(s));
+
+mutant("44 [mutant] removing the route's fail-closed actor guard is rejected",
+  ROUTE_STATUS, (s) => s.replace("if (!session.userId) {", "if (false) {"),
+  (s) => /if \(!session\.userId\)/.test(s));
+
+mutant("45 [mutant] removing asAdmin's actor plumbing is rejected",
+  ACTIONS_SRC_C, (s) => s.replace("async function asAdmin<T>(fn: (actorUserId: string) => Promise<Result<T>>)",
+    "async function asAdmin<T>(fn: () => Promise<Result<T>>)"),
+  (s) => /async function asAdmin<T>\(fn: \(actorUserId: string\) => Promise<Result<T>>\)/.test(s));
+
+mutant("46 [mutant] backfilling historical NULL attribution is rejected",
+  VENDOR_SVC_C, (s) => s + '\nasync function backfill() { await adminClient().from("audit_logs").update({ admin_user_id: "x" }); }\n',
+  (s) => !/from\("audit_logs"\)[\s\S]{0,120}\.(update|delete)\(/.test(s));
 
 // ============================================================================
 (async () => {

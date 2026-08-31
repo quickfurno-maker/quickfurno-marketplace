@@ -150,6 +150,7 @@
     "test:mvp:80-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-80-01.mjs",
     "test:mvp:80-02-gate06": "node scripts/qf-mvp-80-02-vendor-login-activation-harness.mjs",
     "test:mvp:80-03-audit": "node scripts/qf-mvp-80-03-audit-log-repair-harness.mjs",
+    "test:mvp:80-04": "node scripts/qf-mvp-80-04-fail-closed-runtime-default-harness.mjs",
     "test:mvp:40-c9a": "node scripts/mvp/communication/validate-meta-marketing-mapping-authority.mjs",
     "test:mvp:40-c9b": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-marketing-consent-writer.mjs",
     "report:mvp:40-c9": "node scripts/mvp/communication/evaluate-criterion-9-readiness.mjs",

@@ -46,7 +46,20 @@ export const DEFAULT_MARKETPLACE_RUNTIME_SETTINGS: MarketplaceRuntimeSettings = 
   allow_trial_vendors_for_assignment: true,
   minimum_paid_vendors_required_for_auto_assignment: 1,
   max_vendors_per_lead: 3,
-  auto_assignment_mode: "preview",
+  // QF-MVP-80.04 — FAIL CLOSED. This was "preview" until the QF-MVP-80.03
+  // staging canary proved what that actually costs: with the settings table
+  // EMPTY, staging silently resolved to `preview`, and `preview` is NOT
+  // read-only — one canary lead produced 3 real lead_assignments, 3 credit
+  // debits, 3 assignment events and 6 delivery rows. A missing row is the one
+  // case where the operator has expressed no intention at all, and inferring a
+  // MUTATING mode from silence is the wrong default in a marketplace that
+  // spends vendor credits.
+  //
+  // This changes only what UNSET resolves to. An explicitly persisted "preview"
+  // or "auto_suggest" still resolves to itself, unchanged, with the same
+  // semantics: `preview` is not redefined as read-only here, and no mode is
+  // renamed. Turning assignment on remains a deliberate, recorded act.
+  auto_assignment_mode: "off",
 };
 
 const SETTING_DESCRIPTIONS: Record<keyof MarketplaceRuntimeSettings, string> = {

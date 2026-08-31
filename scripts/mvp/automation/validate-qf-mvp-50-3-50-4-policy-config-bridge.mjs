@@ -62,7 +62,7 @@ const FROZEN = [
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
 const MIGRATION_COUNT = 102;
-const POST_ANCHOR_COUNT = 14;
+const POST_ANCHOR_COUNT = 15;
 const PENDING_ORDER = ["20260813000000", "20260814000000", "20260815000000", "20260816000000", "20260817000000"];
 const RECOVERY_NAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
@@ -317,7 +317,7 @@ record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
-record("G08 the anchor post-anchor count agrees at 14",
+record("G08 the anchor post-anchor count agrees at 15",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
 record("G09 G1 was re-pinned to 102 / 10 applied / 5 pending, not loosened",
   /const MIGRATION_COUNT = 102;/.test(g1Source) &&

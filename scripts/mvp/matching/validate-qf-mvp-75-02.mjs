@@ -780,16 +780,22 @@ section('J. MIGRATION GOVERNANCE [static]');
 // ===========================================================================
 {
   const migrations = readdirSync(path.join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
-  check('J01 the local migration set is exactly 101', migrations.length === 101,
+  check('J01 the local migration set is exactly 102', migrations.length === 102,
     `found ${migrations.length}`);
-  check('J02 the geo migration is the newest, at the expected version and name',
-    migrations[migrations.length - 1] === '20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql'
-    && migrations[migrations.length - 2] === '20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql');
+  // QF-MVP-80.03: the geo migration is no longer the TAIL of the set — the
+  // audit_logs forward repair (20260817000000) was added after it. What 75.02
+  // actually needs is that its own migration is unmoved and unrenamed and still
+  // sits immediately after 75.01, so the rule is narrowed to exactly that rather
+  // than deleted. Position-from-the-end was never the invariant; adjacency was.
+  const geoIndex = migrations.indexOf('20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql');
+  check('J02 the geo migration is present, at the expected version and name, immediately after 75.01',
+    geoIndex > 0
+    && migrations[geoIndex - 1] === '20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql');
 
   const g1 = read('scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs');
   const geoSha = sha256(MIGRATION_RAW.replace(/\r\n/g, '\n'));
-  check('J03 G1 is re-pinned to 101 by exact equality, never loosened to >=',
-    /const MIGRATION_COUNT = 101;/.test(g1)
+  check('J03 G1 is re-pinned to 102 by exact equality, never loosened to >=',
+    /const MIGRATION_COUNT = 102;/.test(g1)
     && !/MIGRATION_COUNT\s*[><]=/.test(g1));
   check('J04 G1 pins the geo migration as a PENDING post-anchor entry, by exact hash',
     g1.includes('20260816000000')
@@ -806,10 +812,10 @@ section('J. MIGRATION GOVERNANCE [static]');
     && geoEntry.operationalStatus === 'PENDING'
     && geoEntry.appliedByThisPhase === false
     && geoEntry.requiresSeparateStagingDeploymentGate === true);
-  check('J06 the manifest post-anchor count moved 13 -> 14 and nothing was demoted',
-    manifest.appliedAnchor.postAnchorMigrationCount === 14
+  check('J06 the manifest post-anchor count moved 14 -> 15 and nothing was demoted',
+    manifest.appliedAnchor.postAnchorMigrationCount === 15
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
-    && pending.length === 4);
+    && pending.length === 5);
   check('J07 the phase applied nothing: the geo migration claims no remote history',
     geoEntry && geoEntry.remoteVersionStatus === 'NOT_PROVEN_OFFLINE'
     && !Object.prototype.hasOwnProperty.call(geoEntry, 'remoteHistory'));

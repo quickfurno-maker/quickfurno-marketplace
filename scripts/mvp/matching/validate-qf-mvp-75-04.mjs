@@ -1020,8 +1020,8 @@ section('L. GOVERNANCE [static]');
 {
   const migrations = readdirSync(path.join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
 
-  check('L01 QF-MVP-75.04 adds NO migration — the set is still exactly 101',
-    migrations.length === 101, `found ${migrations.length}`);
+  check('L01 QF-MVP-75.04 itself adds NO migration — the set is exactly 102 after the QF-MVP-80.03 audit repair',
+    migrations.length === 102, `found ${migrations.length}`);
 
   check('L02 no 75.04 migration file exists',
     migrations.filter((f) => /qf_mvp_75_04|geofair/i.test(f)).length === 0);

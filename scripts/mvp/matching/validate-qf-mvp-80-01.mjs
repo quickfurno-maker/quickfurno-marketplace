@@ -400,8 +400,8 @@ section('G. MVP INVARIANTS UNCHANGED [pure] [static]');
     && /const MAX_ASSIGNMENT_CANDIDATE_POOL = MAX_CANONICAL_CANDIDATE_POOL;/.test(MATCHER)
     && /const MAX_VENDOR_MATCHES = 3;/.test(MATCHER));
 
-  check('G05 this phase added NO migration — the repo set is still 101',
-    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 101);
+  check('G05 QF-MVP-80.01 itself added NO migration — the repo set is 102 after the QF-MVP-80.03 audit repair',
+    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 102);
 
   check('G06 the three migrations this phase rehearses exist on disk, unrenamed',
     ['20260814000000_qf_mvp_40_marketing_consent_writer.sql',

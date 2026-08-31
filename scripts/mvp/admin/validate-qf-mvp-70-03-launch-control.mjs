@@ -72,7 +72,10 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
 // the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
 // addition. Exact equality, never loosened.
-check("migration count remains 101", migrations.length === 101);
+// QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
+// the audit_logs forward repair (20260817000000) is the only addition. Exact
+// equality, never loosened.
+check("migration count remains 102", migrations.length === 102);
 // Narrow to names THIS phase could plausibly introduce: "control" and
 // "readiness" already appear in three pre-existing migration filenames.
 check("no launch-control migration was added", !migrations.some((f) => /qf_mvp_70|mvp70|launch_control|launch_readiness/i.test(f)));

@@ -584,16 +584,24 @@ record("G02 the local migration set is exactly 102 and 50.5 is the newest APPLIE
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence, and the two QF-MVP-40 authorities are pending",
+// QF-MVP-80.05 RECONCILIATION: read-only queries of `supabase_migrations.schema_migrations`
+// proved 20260813000000-20260817000000 are ALREADY APPLIED to BOTH staging and
+// production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
+// reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
+// counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
+record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence, and the five later authorities are reconciled as applied",
   (() => {
     const pending = manifest.pendingPostAnchorMigrations ?? null;
+    const reconciled = manifest.reconciledPostAnchorMigrations ?? null;
     const pin = (manifest.appliedPostAnchorMigrations ?? []).find((r) => r.version === "20260812000000");
-    return Array.isArray(pending) && pending.length === 5 &&
-      pending[0].version === "20260813000000" &&
-      pending[1].version === "20260814000000" &&
-      pending[2].version === "20260815000000" &&
-      pending[3].version === "20260816000000" &&
-      pending[4].version === "20260817000000" &&
+    return Array.isArray(pending) && pending.length === 0 &&
+      Array.isArray(reconciled) && reconciled.length === 5 &&
+      reconciled[0].version === "20260813000000" &&
+      reconciled[1].version === "20260814000000" &&
+      reconciled[2].version === "20260815000000" &&
+      reconciled[3].version === "20260816000000" &&
+      reconciled[4].version === "20260817000000" &&
+      reconciled.every((r) => r.operationalStatus === "APPLIED") &&
       pin?.sha256 === MIGRATION_SHA &&
       pin.path === MIGRATION_PATH && pin.phase === "QF-MVP-50.5" &&
       pin.operationalStatus === "APPLIED" &&
@@ -618,7 +626,8 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
   /const MIGRATION_COUNT = 102;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
   !/state\.migrations\.length\s*>=/.test(g1Source) &&
@@ -705,11 +714,17 @@ const mutants = [
   // QF-MVP-40.13B: the pending set is non-empty again, so this `every()` is no longer
   // vacuous — it now genuinely guards the SOURCE-PENDING canary authority. The other
   // risk is unchanged: an APPLIED record that misrepresents HOW it was proven.
-  ["a pending record claiming applied evidence is impossible",
-    () => (manifest.pendingPostAnchorMigrations ?? []).length >= 1 &&
-      (manifest.pendingPostAnchorMigrations ?? []).every((r) =>
-        r.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
-        !("remoteHistoryCountAfterApply" in r) && !("appliedEvidenceMarker" in r))],
+  // QF-MVP-80.05: nothing is pending any more, so the guard moves to the reconciled set.
+  // A RECONCILED record must never fabricate a remote-history count nobody observed, and
+  // must never borrow the applied ten's owner-reviewed evidence type.
+  ["a reconciled record fabricating an observed apply record is impossible",
+    () => (manifest.pendingPostAnchorMigrations ?? []).length === 0 &&
+      (manifest.reconciledPostAnchorMigrations ?? []).length === 5 &&
+      (manifest.reconciledPostAnchorMigrations ?? []).every((r) =>
+        r.remoteVersionStatus === "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY" &&
+        r.remoteHistoryCountObservedAtApply === false &&
+        r.appliedEvidenceType === "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION" &&
+        !("remoteHistoryCountAfterApply" in r))],
   ["misrepresenting how 50.5 was proven on staging is detectable",
     () => {
       const pin = manifest.appliedPostAnchorMigrations.find((r) => r.version === "20260812000000");

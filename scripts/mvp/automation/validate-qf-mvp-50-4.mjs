@@ -314,8 +314,15 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
 // binding-rank-order authority replacement (20260815000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("G02 the pending post-anchor set holds exactly five and 50.5 is the newest applied record",
-  manifest.pendingPostAnchorMigrations.length === 5 &&
+// QF-MVP-80.05 RECONCILIATION: read-only queries of `supabase_migrations.schema_migrations`
+// proved 20260813000000-20260817000000 are ALREADY APPLIED to BOTH staging and
+// production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
+// reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
+// counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
+record("G02 the pending post-anchor set is EMPTY, five are reconciled, and 50.5 is the newest applied record",
+  manifest.pendingPostAnchorMigrations.length === 0 &&
+  manifest.reconciledPostAnchorMigrations.length === 5 &&
+  manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED") &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.at(-1).operationalStatus === "APPLIED");
 record("G03 the ten applied records read 21 through 30",

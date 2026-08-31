@@ -715,9 +715,17 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G03 exactly ten APPLIED and five PENDING post-anchor migrations are declared",
+// QF-MVP-80.05 RECONCILIATION: read-only queries of `supabase_migrations.schema_migrations`
+// proved 20260813000000-20260817000000 are ALREADY APPLIED to BOTH staging and
+// production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
+// reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
+// counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
+record("G03 exactly ten APPLIED, five RECONCILED and ZERO PENDING post-anchor migrations are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 10 &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 5 &&
+  Array.isArray(manifest.reconciledPostAnchorMigrations) && manifest.reconciledPostAnchorMigrations.length === 5 &&
+  manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
+    r.appliedToStaging === true && r.appliedToProduction === true) &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
   manifest.appliedAnchor?.postAnchorMigrationCount === 15 &&
@@ -787,8 +795,10 @@ record("G10 G1 still rejects an arbitrary newer or drifted migration",
   // G1's "one past the pinned set" on-disk mutant is now the TWELFTH, and the pending
   // slot has its own dedicated mutant family again.
   /a twelfth post-anchor migration on disk/.test(g1Source) &&
-  /40\.13B pending entry removed/.test(g1Source) &&
-  /40\.13B promoted to APPLIED in place without evidence/.test(g1Source) &&
+  /the whole reconciled set re-marked SOURCE-PENDING/.test(g1Source) &&
+  /20260813-20260816 re-marked SOURCE-PENDING in place/.test(g1Source) &&
+  /one reconciled entry moved back into the pending list/.test(g1Source) &&
+  /40\.13B demoted to PENDING in place/.test(g1Source) &&
   /40\.13B on-disk SHA drift/.test(g1Source) &&
   /50\.5 applied entry removed/.test(g1Source) &&
   /50\.5 demoted back to PENDING in place/.test(g1Source) &&

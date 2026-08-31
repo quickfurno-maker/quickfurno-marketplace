@@ -169,11 +169,29 @@ const POST_ANCHOR_APPLIED = [
 // single push and an INDEPENDENT re-list proved remote history 29 -> 30), so it moved
 // to POST_ANCHOR_APPLIED.
 //
-// QF-MVP-40.13B now occupies the PENDING slot: the canary activation authority is
-// SOURCE ONLY and has NOT been applied. This gate still performs NO database access of
-// its own — the entry is pinned by version, name, path and hash, and carries no applied
-// evidence and no remote history count.
-const POST_ANCHOR_PENDING = [
+// QF-MVP-80.05 — MIGRATION-HISTORY RECONCILIATION.
+//
+// These five were pinned here as SOURCE-PENDING. That claim went stale: read-only
+// queries of `supabase_migrations.schema_migrations` proved all five are ALREADY
+// APPLIED to BOTH staging and production. Production was read first-party by
+// QF-MVP-80.05 (37 history rows, newest 20260817000000); staging is owner-certified
+// and corroborated by SELECT-only object probes (public.audit_logs exists, and
+// vendors.geo_point / leads.geo_point exist — objects that only 20260817000000 and
+// 20260816000000 create).
+//
+// They therefore move to a RECONCILED set, not to POST_ANCHOR_APPLIED. That
+// distinction is deliberate and load-bearing: POST_ANCHOR_APPLIED means "applied with
+// a first-party or owner-reviewed APPLY record and an OBSERVED remote-history count",
+// and no such record exists for these five. Promoting them there would have required
+// either fabricating remote-history counts nobody observed, or loosening the
+// count/marker rules that guard the original ten. Neither is acceptable, so the
+// reconciled set carries its own evidence vocabulary and its own strict rules:
+// applied to BOTH environments, NO fabricated remote-history count, and no waiver of
+// anything the applied ten must prove. G1 itself still performs NO database access.
+//
+// The full applied truth is the UNION of POST_ANCHOR_APPLIED and
+// POST_ANCHOR_RECONCILED. POST_ANCHOR_PENDING is now genuinely empty.
+const POST_ANCHOR_RECONCILED = [
   {
     version: "20260813000000",
     name: "qf_mvp_40_13b_canary_activation_authority",
@@ -229,10 +247,28 @@ const POST_ANCHOR_PENDING = [
   ...m,
   filename: `${m.version}_${m.name}.sql`,
   path: `supabase/migrations/${m.version}_${m.name}.sql`,
+  marker: `QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_${m.version}`,
 }));
 
-const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING].map((m) => m.version);
-const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_PENDING];
+// QF-MVP-80.05 — nothing is pending any more. The key is KEPT and pinned EMPTY rather
+// than deleted, so a future slice cannot quietly reintroduce an unpinned pending entry
+// by recreating the array, and so "deleted the pending list" stays a rejected mutant.
+const POST_ANCHOR_PENDING = [];
+
+const RECONCILED_EVIDENCE_TYPE = "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION";
+const RECONCILED_REMOTE_STATUS = "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY";
+// The certified interval, exactly as both remote histories return it.
+const RECONCILED_HISTORY = [
+  ["20260812000000", "qf_mvp_50_5_automation_recovery_reconciliation"],
+  ["20260813000000", "qf_mvp_40_13b_canary_activation_authority"],
+  ["20260814000000", "qf_mvp_40_marketing_consent_writer"],
+  ["20260815000000", "qf_mvp_75_01_matchcore_binding_rank_order"],
+  ["20260816000000", "qf_mvp_75_02_geo_postgis_shortlist"],
+  ["20260817000000", "qf_mvp_80_03_audit_logs_forward_repair"],
+];
+
+const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING].map((m) => m.version);
+const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING];
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
@@ -246,7 +282,10 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-80.03 RE-PIN: 101 -> 102, adding ONLY the SOURCE-PENDING audit_logs forward
 // repair (20260817000000). No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality.
+// QF-MVP-80.05 does NOT move this number. It adds, removes and renames no migration
+// and edits no migration body — it only reconciles stale application-state claims.
 const MIGRATION_COUNT = 102;
+const RECONCILIATION_DOC_PATH = "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md";
 
 const APPROVED_COMMON = [
   "20260723000100", "20260723000200", "20260723000300", "20260723000400",
@@ -359,7 +398,8 @@ function loadState() {
     packageJson: JSON.parse(read("package.json")),
     workflow: read(WORKFLOW_PATH),
     stagingHistoryFiles: walk("supabase/staging-history"),
-    governanceFiles: [MANIFEST_PATH, S1_PATH, GOVERNANCE_PATH, README_PATH, APPLICATION_REPORT_PATH]
+    reconciliationDoc: read(RECONCILIATION_DOC_PATH),
+    governanceFiles: [MANIFEST_PATH, S1_PATH, GOVERNANCE_PATH, README_PATH, APPLICATION_REPORT_PATH, RECONCILIATION_DOC_PATH]
       .map((file) => ({ file, text: read(file) })),
   };
 }
@@ -440,23 +480,30 @@ function validateState(state) {
   check("anchor is present exactly once under migrations", validMigrations.filter((record) => record.version === TARGET_VERSION).length === 1);
   check("superseded pendingTarget block is gone", manifest.pendingTarget === undefined);
 
-  // Exact post-anchor pin: ten APPLIED (21-30), one PENDING (QF-MVP-40.13B, source only).
+  // Exact post-anchor pin: ten APPLIED (remote history 21-30), five RECONCILED
+  // (QF-MVP-80.05: already applied to BOTH staging and production, proved read-only),
+  // and ZERO pending.
   const postAnchorLocal = validMigrations.filter((record) => record.version > TARGET_VERSION);
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
+  const reconciledPins = Array.isArray(manifest.reconciledPostAnchorMigrations) ? manifest.reconciledPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
+  const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
   check("exactly fifteen local migrations are newer than the anchor", postAnchorLocal.length === 15, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
   check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 15);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
-  check("the explicit PENDING post-anchor set holds exactly five entries", pendingPins !== null && pendingPins.length === 5, `actual=${pendingPins?.length}`);
-  check("the pending records match the exact pinned set", same(pendingPins?.map((r) => r.version), POST_ANCHOR_PENDING.map((m) => m.version)));
+  check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
+  check("the reconciled records appear in exact pinned order", same(reconciledPins?.map((r) => r.version), POST_ANCHOR_RECONCILED.map((m) => m.version)));
+  check("the explicit PENDING post-anchor set is present and EMPTY", pendingPins !== null && pendingPins.length === 0, `actual=${pendingPins?.length}`);
+  check("nothing pinned is claimed pending: every post-anchor migration is accounted for as applied",
+    appliedTruth.length === 15 && same(appliedTruth.map((r) => r.version), POST_ANCHOR_ORDER));
 
-  for (const expected of POST_ANCHOR_PENDING) {
+  for (const expected of POST_ANCHOR_RECONCILED) {
     const label = `${expected.phase} ${expected.version}`;
     const local = postAnchorLocal.find((record) => record.version === expected.version);
-    const pin = pendingPins?.find((record) => record.version === expected.version);
+    const pin = reconciledPins?.find((record) => record.version === expected.version);
     const disk = state.postAnchorOnDisk?.[expected.version];
     check(`${label}: local migration is exactly the pinned version/name/file`,
       local?.version === expected.version && local?.name === expected.name && local?.filename === expected.filename);
@@ -466,12 +513,22 @@ function validateState(state) {
       disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha);
     check(`${label}: manifest SHA equals the on-disk SHA`,
       pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256);
-    check(`${label}: is PENDING, needs its own gate, not applied by this phase`,
-      pin?.operationalStatus === "PENDING" && pin?.requiresSeparateStagingDeploymentGate === true && pin?.appliedByThisPhase === false);
-    check(`${label}: remote status is not fabricated offline`,
-      pin?.remoteVersionStatus === "NOT_PROVEN_OFFLINE");
-    check(`${label}: claims no applied evidence`,
-      !("appliedEvidenceMarker" in (pin ?? {})) && !("remoteHistoryCountAfterApply" in (pin ?? {})));
+    check(`${label}: is APPLIED and can never be re-marked pending`,
+      pin?.operationalStatus === "APPLIED" && !pendingPins?.some((r) => r.version === expected.version));
+    check(`${label}: is recorded applied to BOTH staging and production`,
+      pin?.appliedToStaging === true && pin?.appliedToProduction === true &&
+      pin?.remoteVersionStatus === RECONCILED_REMOTE_STATUS);
+    check(`${label}: carries its own distinct read-only certification evidence`,
+      pin?.appliedEvidenceMarker === expected.marker && pin?.appliedEvidenceType === RECONCILED_EVIDENCE_TYPE &&
+      pin?.evidencePath === RECONCILIATION_DOC_PATH);
+    check(`${label}: names the read-only provenance of each environment`,
+      pin?.stagingHistoryEvidence === "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY" &&
+      pin?.productionHistoryEvidence === "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY");
+    check(`${label}: fabricates NO remote-history count nobody observed`,
+      !("remoteHistoryCountAfterApply" in (pin ?? {})) && pin?.remoteHistoryCountObservedAtApply === false);
+    check(`${label}: applied exactly once, not by this source phase, and needs no further gate`,
+      pin?.appliedExactlyOnce === true && pin?.appliedByThisPhase === false &&
+      pin?.requiresSeparateStagingDeploymentGate === false);
   }
 
   // Per-migration exact identity, hash, evidence and remote-history assertions.
@@ -505,6 +562,43 @@ function validateState(state) {
   check("the ten applied markers are all distinct",
     new Set(POST_ANCHOR_APPLIED.map((m) => m.marker)).size === 10 &&
     new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker)).size === 10);
+  check("all fifteen evidence markers across applied and reconciled are distinct",
+    new Set(appliedTruth.map((record) => record.appliedEvidenceMarker)).size === 15);
+  check("the reconciled five never borrow an applied-ten marker or evidence type",
+    (reconciledPins ?? []).every((record) =>
+      !POST_ANCHOR_APPLIED.some((m) => m.marker === record.appliedEvidenceMarker) &&
+      record.appliedEvidenceType !== APPLIED_EVIDENCE_TYPE));
+  check("every pinned applied-history version maps to a real migration source file",
+    appliedTruth.every((record) => {
+      const local = localByVersion.get(record.version);
+      return local !== undefined && record.path === `supabase/migrations/${local.filename}` &&
+        record.name === local.name && record.sha256 === local.sha256;
+    }));
+  check("the reconciled interval is pinned exactly as both remote histories return it",
+    same(manifest.historyReconciliation?.certifiedHistory?.map((r) => [r.version, r.name]), RECONCILED_HISTORY));
+  check("the reconciliation is documentary only: no migration added, removed, renamed or edited",
+    manifest.historyReconciliation?.migrationFilesChanged === 0 &&
+    manifest.historyReconciliation?.migrationsAdded === 0 &&
+    manifest.historyReconciliation?.migrationsRemoved === 0 &&
+    manifest.historyReconciliation?.migrationsRenamed === 0 &&
+    manifest.historyReconciliation?.migrationCount === MIGRATION_COUNT &&
+    manifest.historyReconciliation?.databaseMutationAuthorized === false);
+  check("the reconciliation authorizes no production apply and names both project refs correctly",
+    manifest.historyReconciliation?.productionApplyAuthorized === false &&
+    manifest.historyReconciliation?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
+    manifest.historyReconciliation?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
+  check("the reconciliation states plainly which environment was read first-party and which is owner-certified",
+    manifest.historyReconciliation?.production?.directReadPerformedByThisPhase === true &&
+    manifest.historyReconciliation?.staging?.directReadPerformedByThisPhase === false &&
+    typeof manifest.historyReconciliation?.staging?.directReadBlockedBy === "string" &&
+    (manifest.historyReconciliation?.staging?.corroboratingReadOnlyObjectProbes ?? []).length === 3);
+  check("20260817000000 (the audit_logs forward repair) is represented as APPLIED, never pending",
+    reconciledPins?.some((r) => r.version === "20260817000000" && r.operationalStatus === "APPLIED") === true &&
+    !pendingPins?.some((r) => r.version === "20260817000000"));
+  check("the reconciliation document exists and states the reconciled truth",
+    state.reconciliationDoc.includes("QF-MVP-80.05") &&
+    RECONCILED_HISTORY.every(([version]) => state.reconciliationDoc.includes(version)) &&
+    state.reconciliationDoc.includes("ZERO migrations applied"));
   check("the ten remote-history counts are exactly 21 through 30 in ascending order",
     same((appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]));
   check("exactly one post-anchor migration is applied by the phase that pinned it",
@@ -601,24 +695,62 @@ function runMutants(pristineState) {
     ["an unpinned new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260818000000", name: "sixteenth", path: "supabase/migrations/20260818000000_sixteenth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.6", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
     ["the pending list key deleted entirely instead of pinned", (state) => { delete state.manifest.pendingPostAnchorMigrations; }],
 
-    // --- QF-MVP-40.13B: the pinned PENDING canary-activation authority --------
-    ["40.13B pending entry removed", (state) => { state.manifest.pendingPostAnchorMigrations = []; }],
-    ["40.13B promoted to APPLIED in place without evidence", (state) => { state.manifest.pendingPostAnchorMigrations[0].operationalStatus = "APPLIED"; }],
-    ["40.13B moved into the applied list", (state) => {
-      const [p] = state.manifest.pendingPostAnchorMigrations.splice(0, 1);
-      state.manifest.appliedPostAnchorMigrations.push({
-        ...p, operationalStatus: "APPLIED",
-        appliedEvidenceMarker: "QF_MVP_40_13B_FAKE_MARKER",
-        appliedEvidenceType: APPLIED_EVIDENCE_TYPE,
-        remoteHistoryCountAfterApply: 31, appliedExactlyOnce: true,
+    // --- QF-MVP-80.05: the five RECONCILED already-applied authorities ---------
+    // Index 0 is 20260813000000 (the canary activation authority); index 4 is
+    // 20260817000000 (the audit_logs forward repair). The whole point of this slice is
+    // that none of them may be described as pending or unproven ever again.
+    ["the whole reconciled set re-marked SOURCE-PENDING", (state) => {
+      state.manifest.pendingPostAnchorMigrations = state.manifest.reconciledPostAnchorMigrations.map((r) => ({
+        ...r, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE",
+        requiresSeparateStagingDeploymentGate: true,
+      }));
+      state.manifest.reconciledPostAnchorMigrations = [];
+    }],
+    ["20260813-20260816 re-marked SOURCE-PENDING in place", (state) => {
+      for (const record of state.manifest.reconciledPostAnchorMigrations.slice(0, 4)) {
+        record.operationalStatus = "PENDING";
+        record.remoteVersionStatus = "NOT_PROVEN_OFFLINE";
+      }
+    }],
+    ["one reconciled entry moved back into the pending list", (state) => {
+      const [p] = state.manifest.reconciledPostAnchorMigrations.splice(0, 1);
+      state.manifest.pendingPostAnchorMigrations.push({
+        ...p, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE",
+        requiresSeparateStagingDeploymentGate: true,
       });
     }],
-    ["40.13B claims an applied-evidence marker while pending", (state) => { state.manifest.pendingPostAnchorMigrations[0].appliedEvidenceMarker = "QF_MVP_40_13B_FAKE_MARKER"; }],
-    ["40.13B claims a remote history count while pending", (state) => { state.manifest.pendingPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31; }],
-    ["40.13B fabricates a remote version status offline", (state) => { state.manifest.pendingPostAnchorMigrations[0].remoteVersionStatus = "PRESENT"; }],
-    ["40.13B waives its own staging deployment gate", (state) => { state.manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = false; }],
-    ["40.13B claimed applied by this source phase", (state) => { state.manifest.pendingPostAnchorMigrations[0].appliedByThisPhase = true; }],
-    ["40.13B manifest SHA drift", (state) => { state.manifest.pendingPostAnchorMigrations[0].sha256 = "4".repeat(64); }],
+    ["reconciled list emptied", (state) => { state.manifest.reconciledPostAnchorMigrations = []; }],
+    ["reconciled list key deleted entirely", (state) => { delete state.manifest.reconciledPostAnchorMigrations; }],
+    ["40.13B demoted to PENDING in place", (state) => { state.manifest.reconciledPostAnchorMigrations[0].operationalStatus = "PENDING"; }],
+    ["40.13B claims staging only, not production", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedToProduction = false; }],
+    ["40.13B claims production only, not staging", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedToStaging = false; }],
+    ["40.13B reverts to the stale unproven remote status", (state) => { state.manifest.reconciledPostAnchorMigrations[0].remoteVersionStatus = "NOT_PROVEN_OFFLINE"; }],
+    ["40.13B fabricates a remote-history count nobody observed", (state) => { state.manifest.reconciledPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31; }],
+    ["40.13B claims a count was observed at apply", (state) => { state.manifest.reconciledPostAnchorMigrations[0].remoteHistoryCountObservedAtApply = true; }],
+    ["40.13B evidence marker forged", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceMarker = "QF_MVP_40_13B_FAKE_MARKER"; }],
+    ["40.13B borrows an owner-reviewed evidence type it does not have", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceType = APPLIED_EVIDENCE_TYPE; }],
+    ["40.13B borrows the 50.2D applied marker", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceMarker = POST_ANCHOR_APPLIED[0].marker; }],
+    ["40.13B claimed applied by this source phase", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedByThisPhase = true; }],
+    ["40.13B re-asserts a separate staging gate it no longer needs", (state) => { state.manifest.reconciledPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = true; }],
+    ["40.13B staging provenance downgraded to nothing", (state) => { delete state.manifest.reconciledPostAnchorMigrations[0].stagingHistoryEvidence; }],
+    ["40.13B production provenance downgraded to nothing", (state) => { delete state.manifest.reconciledPostAnchorMigrations[0].productionHistoryEvidence; }],
+    ["40.13B manifest SHA drift", (state) => { state.manifest.reconciledPostAnchorMigrations[0].sha256 = "4".repeat(64); }],
+    ["80.03 audit repair demoted to PENDING in place", (state) => { state.manifest.reconciledPostAnchorMigrations[4].operationalStatus = "PENDING"; }],
+    ["80.03 audit repair removed from the reconciled set", (state) => { state.manifest.reconciledPostAnchorMigrations.splice(4, 1); }],
+    ["80.03 audit repair SHA drift", (state) => { state.manifest.reconciledPostAnchorMigrations[4].sha256 = "3".repeat(64); }],
+    ["75.01 reconciled entry claims a path that is not its migration", (state) => { state.manifest.reconciledPostAnchorMigrations[2].path = "supabase/migrations/20260815000000_something_else.sql"; }],
+    ["the reconciled set duplicated into the applied ten", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.reconciledPostAnchorMigrations[0])); }],
+    ["reconciled order reversed", (state) => { state.manifest.reconciledPostAnchorMigrations.reverse(); }],
+    ["the certified interval loses a version", (state) => { state.manifest.historyReconciliation.certifiedHistory.pop(); }],
+    ["the certified interval renames a migration", (state) => { state.manifest.historyReconciliation.certifiedHistory[3].name = "qf_mvp_75_01_renamed"; }],
+    ["the reconciliation claims it changed migration files", (state) => { state.manifest.historyReconciliation.migrationFilesChanged = 1; }],
+    ["the reconciliation claims it added a migration", (state) => { state.manifest.historyReconciliation.migrationsAdded = 1; }],
+    ["the reconciliation authorizes database mutation", (state) => { state.manifest.historyReconciliation.databaseMutationAuthorized = true; }],
+    ["the reconciliation authorizes a production apply", (state) => { state.manifest.historyReconciliation.productionApplyAuthorized = true; }],
+    ["the reconciliation overstates staging as first-party read", (state) => { state.manifest.historyReconciliation.staging.directReadPerformedByThisPhase = true; }],
+    ["the reconciliation drops the staging corroboration probes", (state) => { state.manifest.historyReconciliation.staging.corroboratingReadOnlyObjectProbes = []; }],
+    ["the reconciliation block deleted entirely", (state) => { delete state.manifest.historyReconciliation; }],
+    ["the reconciliation document claims migrations were applied", (state) => { state.reconciliationDoc = state.reconciliationDoc.replace(/ZERO migrations applied/g, "migrations applied"); }],
     ["40.13B on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260813000000"].sha = "4".repeat(64); state.postAnchorOnDisk["20260813000000"].canonicalSha = "4".repeat(64); }],
     ["40.13B migration renamed", (state) => {
       const record = state.migrations.find((m) => m.version === "20260813000000");
@@ -629,7 +761,6 @@ function runMutants(pristineState) {
       state.migrations = state.migrations.filter((m) => m.version !== "20260813000000");
       state.postAnchorOnDisk["20260813000000"].exists = false;
     }],
-    ["40.13B also listed as applied", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.pendingPostAnchorMigrations[0])); }],
     ["an eleventh applied post-anchor migration", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
     ["a twelfth post-anchor migration on disk", (state) => { state.migrations.push({ filename: "20260818000000_sixteenth.sql", version: "20260818000000", name: "sixteenth", sha256: "c".repeat(64), malformed: false }); }],
 

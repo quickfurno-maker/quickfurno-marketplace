@@ -148,6 +148,12 @@ function validateState(state) {
   const pending = Array.isArray(manifest.pendingPostAnchorMigrations)
     ? manifest.pendingPostAnchorMigrations
     : null;
+  // QF-MVP-80.05 RECONCILIATION: the five ex-pending governed authorities are proved
+  // applied to BOTH staging and production, so they live in the reconciled set and the
+  // pending set is EMPTY. Nothing this forensic phase established about 21-30 changes.
+  const reconciled = Array.isArray(manifest.reconciledPostAnchorMigrations)
+    ? manifest.reconciledPostAnchorMigrations
+    : null;
 
   check("migration count is exactly 102", state.migrationFiles.length === MIGRATION_COUNT);
   check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the five pinned SOURCE-PENDING governed authorities",
@@ -166,13 +172,16 @@ function validateState(state) {
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
   // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
   // UNCHANGED at ten: neither pending migration has been applied to staging.
-  check("the manifest pending set is exactly the five SOURCE-PENDING governed authorities",
-    pending !== null && pending.length === 5 &&
-    pending[0].version === "20260813000000" &&
-    pending[1].version === "20260814000000" &&
-    pending[2].version === "20260815000000" &&
-    pending[3].version === "20260816000000" &&
-    pending[4].version === "20260817000000" &&
+  check("the manifest pending set is EMPTY and the five governed authorities are reconciled as APPLIED",
+    pending !== null && pending.length === 0 &&
+    reconciled !== null && reconciled.length === 5 &&
+    reconciled[0].version === "20260813000000" &&
+    reconciled[1].version === "20260814000000" &&
+    reconciled[2].version === "20260815000000" &&
+    reconciled[3].version === "20260816000000" &&
+    reconciled[4].version === "20260817000000" &&
+    reconciled.every((record) => record.operationalStatus === "APPLIED"
+      && record.appliedToStaging === true && record.appliedToProduction === true) &&
     pending.every((r) => r.operationalStatus === "PENDING"
       && r.requiresSeparateStagingDeploymentGate === true));
   check("the 50.5 recovery migration is APPLIED at remote history 30 by its own phase",

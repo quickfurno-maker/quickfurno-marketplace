@@ -786,17 +786,26 @@
       "mustApplyAfterVersion": "20260811000000"
     }
   ],
-  "pendingPostAnchorMigrations": [
+  "reconciledPostAnchorMigrations": [
     {
       "version": "20260813000000",
       "name": "qf_mvp_40_13b_canary_activation_authority",
       "path": "supabase/migrations/20260813000000_qf_mvp_40_13b_canary_activation_authority.sql",
       "sha256": "517b6ce01e27df8bb32cc473a1fb3d80775ad96190cff71175725ac3053e3a59",
       "phase": "QF-MVP-40.13B",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_20260813000000",
+      "appliedEvidenceType": "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION",
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": false,
+      "appliedToStaging": true,
+      "appliedToProduction": true,
+      "remoteVersionStatus": "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryCountObservedAtApply": false,
+      "stagingHistoryEvidence": "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "productionHistoryEvidence": "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "requiresSeparateStagingDeploymentGate": false,
+      "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
     },
     {
       "version": "20260814000000",
@@ -804,10 +813,19 @@
       "path": "supabase/migrations/20260814000000_qf_mvp_40_marketing_consent_writer.sql",
       "sha256": "0015de5971be5072f78f1daaa49c49a088d29a16d2aaa0b954e08dc29f5ea4fc",
       "phase": "QF-MVP-40",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_20260814000000",
+      "appliedEvidenceType": "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION",
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": false,
+      "appliedToStaging": true,
+      "appliedToProduction": true,
+      "remoteVersionStatus": "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryCountObservedAtApply": false,
+      "stagingHistoryEvidence": "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "productionHistoryEvidence": "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "requiresSeparateStagingDeploymentGate": false,
+      "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
     },
     {
       "version": "20260815000000",
@@ -815,10 +833,19 @@
       "path": "supabase/migrations/20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql",
       "sha256": "ea65d8803f3d2510357d19a7aa779e74efc112089e787cc8c9802a13a4666707",
       "phase": "QF-MVP-75.01",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_20260815000000",
+      "appliedEvidenceType": "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION",
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": false,
+      "appliedToStaging": true,
+      "appliedToProduction": true,
+      "remoteVersionStatus": "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryCountObservedAtApply": false,
+      "stagingHistoryEvidence": "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "productionHistoryEvidence": "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "requiresSeparateStagingDeploymentGate": false,
+      "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
     },
     {
       "version": "20260816000000",
@@ -826,10 +853,19 @@
       "path": "supabase/migrations/20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql",
       "sha256": "aa24f9d9299528d5bab11e18a7a53fd7f9a7a89833f94f1d18190deda9f2b1cd",
       "phase": "QF-MVP-75.02",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_20260816000000",
+      "appliedEvidenceType": "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION",
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": false,
+      "appliedToStaging": true,
+      "appliedToProduction": true,
+      "remoteVersionStatus": "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryCountObservedAtApply": false,
+      "stagingHistoryEvidence": "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "productionHistoryEvidence": "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "requiresSeparateStagingDeploymentGate": false,
+      "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
     },
     {
       "version": "20260817000000",
@@ -837,12 +873,22 @@
       "path": "supabase/migrations/20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql",
       "sha256": "13a44b111423d9d4b4cfc5dc8cbf24a66b96eb647ef4e0533856984b70273db8",
       "phase": "QF-MVP-80.03",
-      "operationalStatus": "PENDING",
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "requiresSeparateStagingDeploymentGate": true,
-      "appliedByThisPhase": false
+      "operationalStatus": "APPLIED",
+      "appliedEvidenceMarker": "QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_20260817000000",
+      "appliedEvidenceType": "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION",
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": false,
+      "appliedToStaging": true,
+      "appliedToProduction": true,
+      "remoteVersionStatus": "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryCountObservedAtApply": false,
+      "stagingHistoryEvidence": "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "productionHistoryEvidence": "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "requiresSeparateStagingDeploymentGate": false,
+      "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
     }
   ],
+  "pendingPostAnchorMigrations": [],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,
@@ -896,5 +942,66 @@
     "importedS1HistoricalMain": "e511166119703c6044a73d4629a031a6685a3415",
     "importedS1FinalStatus": "QF_MVP_50_2C_S1_STAGING_PREFLIGHT_READY",
     "g1PerformsDatabaseAccess": false
+  },
+  "historyReconciliation": {
+    "phase": "QF-MVP-80.05",
+    "purpose": "Reconcile stale SOURCE-PENDING governance claims to the actual already-applied remote histories. Documentary only.",
+    "reconciledInterval": {
+      "fromVersion": "20260812000000",
+      "toVersion": "20260817000000"
+    },
+    "certifiedHistory": [
+      {
+        "version": "20260812000000",
+        "name": "qf_mvp_50_5_automation_recovery_reconciliation"
+      },
+      {
+        "version": "20260813000000",
+        "name": "qf_mvp_40_13b_canary_activation_authority"
+      },
+      {
+        "version": "20260814000000",
+        "name": "qf_mvp_40_marketing_consent_writer"
+      },
+      {
+        "version": "20260815000000",
+        "name": "qf_mvp_75_01_matchcore_binding_rank_order"
+      },
+      {
+        "version": "20260816000000",
+        "name": "qf_mvp_75_02_geo_postgis_shortlist"
+      },
+      {
+        "version": "20260817000000",
+        "name": "qf_mvp_80_03_audit_logs_forward_repair"
+      }
+    ],
+    "staging": {
+      "projectRef": "uckafzuochmbvtiodmcl",
+      "evidence": "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "directReadPerformedByThisPhase": false,
+      "directReadBlockedBy": "POOLER_PASSWORD_AUTHENTICATION_REJECTED_28P01",
+      "corroboratingReadOnlyObjectProbes": [
+        "public.audit_logs present \u2014 created only by 20260817000000",
+        "public.vendors.geo_point present \u2014 created only by 20260816000000",
+        "public.leads.geo_point present \u2014 created only by 20260816000000"
+      ]
+    },
+    "production": {
+      "projectRef": "yqpgcsduqbxulrlzwzap",
+      "evidence": "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
+      "directReadPerformedByThisPhase": true,
+      "totalHistoryRows": 37,
+      "newestVersion": "20260817000000"
+    },
+    "databaseMutationAuthorized": false,
+    "productionApplyAuthorized": false,
+    "migrationFilesChanged": 0,
+    "migrationsAdded": 0,
+    "migrationsRemoved": 0,
+    "migrationsRenamed": 0,
+    "migrationCount": 102,
+    "appliedTruthIsTheUnion": "appliedPostAnchorMigrations + reconciledPostAnchorMigrations",
+    "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
   }
 }

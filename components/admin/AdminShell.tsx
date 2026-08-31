@@ -351,21 +351,20 @@ function SidebarContent({
         </div>
       </nav>
 
+      {/* QF-MVP-80.03 — a static "Preview-safe mode / Safe" badge used to sit
+          here, claiming "No WhatsApp · No vendor notification · No credit
+          deduction · No auto-assignment" unconditionally.
+          It was FALSE. The claim depends entirely on
+          `marketplace_runtime_settings.auto_assignment_mode`, which this shell
+          never read: `off` is the only true halt, while `preview` — despite its
+          name — finalizes assignments and debits vendor credits through
+          services/leadMatchingEngine. The badge would have rendered "Safe" in
+          exactly the situation an operator most needs warning about.
+          Removed rather than made live, because AdminShell receives only
+          `children` and reading the runtime mode here would mean adding a fetch
+          this slice deliberately does not introduce. The truthful live state
+          belongs in Launch Control, which already reads the canonical setting. */}
       <div className={`border-t border-white/10 ${collapsed ? "p-2.5" : "p-3"}`}>
-        {collapsed ? null : (
-          <div className="mb-2.5 rounded-[var(--qfa-radius)] border border-white/10 bg-white/[0.04] px-2.5 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-slate-300">Preview-safe mode</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-                <span aria-hidden="true" className="h-1 w-1 rounded-full bg-emerald-400" />
-                Safe
-              </span>
-            </div>
-            <p className="mt-1 text-[10px] leading-4 text-slate-400">
-              No WhatsApp · No vendor notification · No credit deduction · No auto-assignment.
-            </p>
-          </div>
-        )}
         <button
           type="button"
           onClick={onSignOut}

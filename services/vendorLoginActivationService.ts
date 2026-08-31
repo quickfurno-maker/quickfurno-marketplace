@@ -185,6 +185,13 @@ export interface VendorLoginActivation {
   /** True when a replay had to complete an incomplete earlier activation. */
   readonly repaired: boolean;
   readonly dashboardMappingLinked: boolean;
+  /**
+   * QF-MVP-80.03 — TRUE only when THIS call wrote the membership row. Distinct
+   * from `dashboardMappingLinked`, which is also true for a mapping that was
+   * already correct. The admin modal cannot report "membership repaired"
+   * truthfully without this distinction.
+   */
+  readonly dashboardMappingCreated: boolean;
   /** Whether the mapping carries a phone identity (legacy phones are omitted). */
   readonly mappingPhoneIdentity: boolean;
   readonly profileRoleOutcome: VendorPrincipalProfileOutcomeValue | null;
@@ -345,6 +352,7 @@ async function performVendorLoginActivation(
       alreadyActive: false,
       repaired: false,
       dashboardMappingLinked: mapping.linked,
+      dashboardMappingCreated: mapping.created,
       mappingPhoneIdentity: mapping.phoneIdentity,
       profileRoleOutcome: profile.data.outcome,
       recoveryLink,
@@ -385,8 +393,11 @@ async function repairExistingActivation(
   // issuing here is also how a previously-exposed link stops working.
   const recoveryLink = await issueRecoveryLink(db, email, redirectTo);
 
-  const repaired =
-    profile.data.outcome !== "ALREADY_VENDOR" || mapping.created || recoveryLink !== null;
+  // QF-MVP-80.03 — `recoveryLink !== null` used to be part of this test, which
+  // made `repaired` true on EVERY replay, because a fresh link is always issued.
+  // Re-issuing a link is not a repair, and treating it as one left the admin UI
+  // unable to distinguish "we fixed something" from "nothing was wrong".
+  const repaired = profile.data.outcome !== "ALREADY_VENDOR" || mapping.created;
 
   return ok({
     vendorId,
@@ -394,6 +405,7 @@ async function repairExistingActivation(
     alreadyActive: true,
     repaired,
     dashboardMappingLinked: mapping.linked,
+    dashboardMappingCreated: mapping.created,
     mappingPhoneIdentity: mapping.phoneIdentity,
     profileRoleOutcome: profile.data.outcome,
     recoveryLink,

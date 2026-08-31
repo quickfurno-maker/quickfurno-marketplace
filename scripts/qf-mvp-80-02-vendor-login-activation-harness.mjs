@@ -73,6 +73,7 @@ const files = [
   "services/vendorAccessService.ts",
   "services/vendorPrincipalProfileService.ts",
   "services/vendorLoginActivationService.ts",
+  "components/admin/sections/vendorLoginActivationCopy.ts",
 ];
 
 const tsconfigPath = resolve(".qf-80-02-gate06-tsconfig.json");
@@ -427,6 +428,9 @@ const Activation = requireFromBuild("./services/vendorLoginActivationService.js"
 const ProfileService = requireFromBuild("./services/vendorPrincipalProfileService.js");
 const SiteUrl = requireFromBuild("./lib/siteUrl.js");
 const MarkerMod = requireFromBuild("./lib/identity/authPrincipalMarker.js");
+const Copy = requireFromBuild("./components/admin/sections/vendorLoginActivationCopy.js");
+const ADMIN_SHELL_SRC = readCode("components/admin/AdminShell.tsx");
+const PREVIEW_ENGINE_SRC = readCode("lib/lead-assignment/autoAssignmentEngine.ts");
 
 // ----------------------------------------------------------------------------
 const checks = [];
@@ -1079,7 +1083,8 @@ check("57 [static] public vendor signup establishes the vendor role, with rollba
 
 check("58 [static] the admin UI never handles a credential it should not", () => {
   assert(/adminActivateVendorLogin/.test(VENDORS_UI_SRC), "the UI calls the guarded action");
-  assert(/Activate vendor login/.test(VENDORS_UI_SRC), "the action is reachable from the vendor menu");
+  assert(VENDORS_UI_SRC.includes("Create / repair vendor login"),
+    "the action is reachable from the vendor menu (QF-MVP-80.03 renamed the label)");
   for (const banned of ["SERVICE_ROLE", "serviceRoleKey", "adminClient(", "auth.admin"]) {
     assert(!VENDORS_UI_SRC.includes(banned), `the client component must not reference ${banned}`);
   }
@@ -1200,6 +1205,147 @@ mutant("77 [mutant] moving the signup assertion after registerVendor is rejected
 mutant("78 [mutant] a set-password page that never sets a password is rejected",
   SETPW_SRC, (s) => s.replace("updateUser({ password })", "updateUser({})"),
   (s) => /updateUser\(\{ password \}\)/.test(s));
+
+
+// ============================================================================
+// QF-MVP-80.03 — operator truthfulness (defects A, B, C)
+// ============================================================================
+/** One activation outcome, carrying only the fields the copy decision reads. */
+function outcome(over) {
+  return {
+    vendorName: "QA Vendor", alreadyActive: false, repaired: false, profileRoleOutcome: null,
+    recoveryLink: "https://link", mappingLinked: true, mappingCreated: false, recoveryLinkIssued: true,
+    ...over,
+  };
+}
+const BANNED_SENTENCE = "Nothing was created or changed";
+const flatUi = VENDORS_UI_SRC.replace(/\s+/g, " ");
+
+check("79 [exec] new activation reports creation, not repair", () => {
+  const c = Copy.vendorLoginActivationCopy(outcome({ alreadyActive: false, mappingCreated: true }));
+  assert(c.title === "Vendor login created", c.title);
+  assert(/now owns a sign-in account/.test(c.body), c.body);
+  assert(/no new vendor record was created/.test(c.body), c.body);
+  assert(!c.body.includes(BANNED_SENTENCE), c.body);
+});
+
+check("80 [exec] already active with NO repair says so honestly", () => {
+  const c = Copy.vendorLoginActivationCopy(outcome({ alreadyActive: true, repaired: false, profileRoleOutcome: "ALREADY_VENDOR" }));
+  assert(c.title === "Vendor login already active", c.title);
+  assert(/Nothing was repaired/.test(c.body), c.body);
+  assert(!c.body.includes(BANNED_SENTENCE), "the false sentence must be gone entirely");
+});
+
+check("81 [exec] role-only repair names the role and nothing else", () => {
+  const c = Copy.vendorLoginActivationCopy(outcome({ alreadyActive: true, repaired: true, profileRoleOutcome: "ROLE_ASSIGNED", mappingCreated: false }));
+  assert(c.title === "Vendor login repaired", c.title);
+  assert(/Repaired: dashboard access role\./.test(c.body), c.body);
+  assert(!/membership/.test(c.body), "must not claim a membership repair that did not happen");
+});
+
+check("82 [exec] mapping-only repair names the membership and nothing else", () => {
+  const c = Copy.vendorLoginActivationCopy(outcome({ alreadyActive: true, repaired: true, profileRoleOutcome: "ALREADY_VENDOR", mappingCreated: true }));
+  assert(c.title === "Vendor login repaired", c.title);
+  assert(/Repaired: dashboard membership record\./.test(c.body), c.body);
+  assert(!/access role/.test(c.body), "must not claim a role repair that did not happen");
+});
+
+check("83 [exec] both-repair names both", () => {
+  const c = Copy.vendorLoginActivationCopy(outcome({ alreadyActive: true, repaired: true, profileRoleOutcome: "ROLE_ASSIGNED", mappingCreated: true }));
+  assert(c.title === "Vendor login repaired", c.title);
+  assert(/dashboard access role and membership record/.test(c.body), c.body);
+});
+
+check("84 [exec] the false sentence can NEVER render for a repair", () => {
+  for (const role of [null, "ALREADY_VENDOR", "ROLE_ASSIGNED"]) {
+    for (const mappingCreated of [true, false]) {
+      const c = Copy.vendorLoginActivationCopy(outcome({ alreadyActive: true, repaired: true, profileRoleOutcome: role, mappingCreated }));
+      assert(!c.body.includes(BANNED_SENTENCE), "repaired=true rendered the banned sentence");
+      assert(c.title === "Vendor login repaired", "repaired=true must not read as already-active");
+    }
+  }
+});
+
+check("85 [exec] link wording follows ACTUAL issuance, never assumed", () => {
+  const issued = Copy.vendorLoginActivationCopy(outcome({ recoveryLinkIssued: true }));
+  assert(/A new single-use sign-in link has been issued/.test(issued.body), issued.body);
+  assert(/Any earlier sign-in link no longer works/.test(issued.body), issued.body);
+  const notIssued = Copy.vendorLoginActivationCopy(outcome({ recoveryLinkIssued: false, recoveryLink: null }));
+  assert(!/has been issued/.test(notIssued.body), "must not claim a link when none was issued");
+  assert(/password-reset flow/.test(notIssued.body), notIssued.body);
+});
+
+check("86 [static] the false sentence is gone from the admin source", () => {
+  assert(!VENDORS_UI_SRC.includes(BANNED_SENTENCE), "the sentence must not survive in VendorsSection");
+  assert(/vendorLoginActivationCopy/.test(VENDORS_UI_SRC), "the modal must use the shared truthful copy");
+});
+
+check("87 [static] the modal state retains the repair truth", () => {
+  for (const field of ["repaired", "profileRoleOutcome", "dashboardMappingCreated", "recoveryLinkIssued"]) {
+    assert(new RegExp(field).test(VENDORS_UI_SRC), field + " must be plumbed into the modal state");
+  }
+  assert(/repaired: result\.data\.repaired/.test(VENDORS_UI_SRC), "repaired must come from the service result");
+  assert(/mappingCreated: result\.data\.dashboardMappingCreated/.test(VENDORS_UI_SRC), "mappingCreated must come from the service result");
+});
+
+check("88 [static] `repaired` means an actual repair, not a re-issued link", () => {
+  assert(/const repaired = profile\.data\.outcome !== "ALREADY_VENDOR" \|\| mapping\.created;/.test(ACTIVATION_SRC),
+    "issuing a fresh link must not count as a repair");
+});
+
+check("89 [static] menu labels are unambiguous and bound to the right handlers", () => {
+  assert(/\{ label: "Enable lead eligibility", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "activate" \}/.test(flatUi),
+    "Enable lead eligibility must call the activate STATUS mutation");
+  assert(/\{ label: "Disable lead eligibility", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "deactivate" \}/.test(flatUi),
+    "Disable lead eligibility must call the deactivate STATUS mutation");
+  assert(/\{ label: "Create \/ repair vendor login", onClick: \(\) => void activateLogin\(vendor\) \}/.test(flatUi),
+    "Create / repair vendor login must call the auth provisioning handler");
+  assert(!/label: "Activate vendor"/.test(flatUi), "the ambiguous status label must be gone");
+  assert(!/label: "Activate vendor login"/.test(flatUi), "the ambiguous login label must be gone");
+  for (const kept of ["Approve vendor", "Reject vendor", "Suspend vendor"]) {
+    assert(new RegExp('label: "' + kept + '"').test(flatUi), kept + " must be unchanged");
+  }
+});
+
+check("90 [static] the false preview-safe banner is gone from AdminShell", () => {
+  assert(!/Preview-safe mode/.test(ADMIN_SHELL_SRC), "the literal banner label must not survive");
+  assert(!/No credit deduction/.test(ADMIN_SHELL_SRC), "the unconditional no-debit claim must not survive");
+  assert(!/No auto-assignment/.test(ADMIN_SHELL_SRC), "the unconditional no-assignment claim must not survive");
+  assert(!/>\s*Safe\s*</.test(ADMIN_SHELL_SRC), "no bare Safe badge may remain");
+});
+
+check("91 [static] the genuinely non-mutating preview engine is untouched", () => {
+  assert(/previewOnly: true/.test(PREVIEW_ENGINE_SRC) && /creditsDeducted: false/.test(PREVIEW_ENGINE_SRC),
+    "the separate preview engine keeps its truthful non-mutating contract");
+  assert(/lead_auto_assignment_logs/.test(PREVIEW_ENGINE_SRC), "and still records only its log row");
+});
+
+mutant("92 [mutant] reverting the modal off the shared truthful copy is rejected",
+  VENDORS_UI_SRC,
+  (s) => s.replace(/vendorLoginActivationCopy/g, "legacyAlreadyActiveCopy"),
+  (s) => /vendorLoginActivationCopy/.test(s));
+
+mutant("93 [mutant] restoring the false sentence is rejected",
+  VENDORS_UI_SRC,
+  (s) => s.replace("{copy.body}", "Nothing was created or changed"),
+  (s) => !s.includes(BANNED_SENTENCE));
+
+mutant("94 [mutant] re-adding the preview-safe banner is rejected",
+  ADMIN_SHELL_SRC,
+  (s) => s.replace("<button", "<span>Preview-safe mode</span>\n        <button"),
+  (s) => !/Preview-safe mode/.test(s));
+
+mutant("95 [mutant] swapping the status handler onto the login label is rejected",
+  VENDORS_UI_SRC,
+  (s) => s.replace('{ label: "Create / repair vendor login", onClick: () => void activateLogin(vendor) }',
+    '{ label: "Create / repair vendor login", onClick: () => void mutate(vendor.id, "status", { action: "activate" }, "x") }'),
+  (s) => /\{ label: "Create \/ repair vendor login", onClick: \(\) => void activateLogin\(vendor\) \}/.test(s.replace(/\s+/g, " ")));
+
+mutant("96 [mutant] letting a re-issued link satisfy `repaired` is rejected",
+  ACTIVATION_SRC,
+  (s) => s.replace('const repaired = profile.data.outcome !== "ALREADY_VENDOR" || mapping.created;',
+    'const repaired = profile.data.outcome !== "ALREADY_VENDOR" || mapping.created || recoveryLink !== null;'),
+  (s) => /const repaired = profile\.data\.outcome !== "ALREADY_VENDOR" \|\| mapping\.created;/.test(s));
 
 // ============================================================================
 (async () => {

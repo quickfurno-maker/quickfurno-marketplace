@@ -101,7 +101,10 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
 // the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
 // addition. Exact equality, never loosened.
-check("migration count is unchanged at 101", migrations.length === 101);
+// QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
+// the audit_logs forward repair (20260817000000) is the only addition. Exact
+// equality, never loosened.
+check("migration count is unchanged at 102", migrations.length === 102);
 check("C-WA1 added no migration", !migrations.some((f) => /wa1|whatsapp_admin|admin_whatsapp/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("the read layer only reads EXISTING communication relations", (() => {

@@ -126,11 +126,11 @@ function validateState(state) {
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-  check("local migration count remains exactly 101", state.migrationFiles.length === 101);
+  check("local migration count remains exactly 102", state.migrationFiles.length === 102);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set is exactly the three SOURCE-PENDING governed authorities",
-    Array.isArray(pending) && pending.length === 4 &&
+  check("the governed pending set is exactly the five SOURCE-PENDING governed authorities",
+    Array.isArray(pending) && pending.length === 5 &&
     pending[0].version === "20260813000000" &&
     pending[1].version === "20260814000000" &&
     pending[2].version === "20260815000000" &&

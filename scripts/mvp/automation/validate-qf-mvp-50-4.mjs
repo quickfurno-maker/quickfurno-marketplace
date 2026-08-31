@@ -314,8 +314,8 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // QF-MVP-75.01 RE-PIN: 99 -> 100, adding ONLY the SOURCE-PENDING MatchCore
 // binding-rank-order authority replacement (20260815000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("G02 the pending post-anchor set holds exactly four and 50.5 is the newest applied record",
-  manifest.pendingPostAnchorMigrations.length === 4 &&
+record("G02 the pending post-anchor set holds exactly five and 50.5 is the newest applied record",
+  manifest.pendingPostAnchorMigrations.length === 5 &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.at(-1).operationalStatus === "APPLIED");
 record("G03 the ten applied records read 21 through 30",
@@ -338,8 +338,8 @@ record("G05 the validator is registered and wired into CI after 50.3",
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("G06 the local migration set is exactly 101",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 101);
+record("G06 the local migration set is exactly 102",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 102);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

@@ -732,11 +732,11 @@ record("G01 the anchor is untouched",
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
 // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
 // UNCHANGED at ten: neither pending migration has been applied to staging.
-record("G02 exactly ten APPLIED and two PENDING post-anchor migrations",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 14 &&
+record("G02 exactly ten APPLIED and five PENDING post-anchor migrations",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 15 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 4 &&
+  manifest.pendingPostAnchorMigrations.length === 5 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260813000000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
@@ -800,7 +800,7 @@ record("G05 no applied record fabricates an offline remote status, and only 50.5
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
 record("G06 G1 pins the exact count 99, not a lower bound",
-  /const MIGRATION_COUNT = 101;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 102;/.test(g1Source) &&
   !/>=\s*9[0-9]|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
@@ -818,21 +818,22 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("G08 the local migration set is exactly 101 and the 50.2 wedge repair is still present in order",
+record("G08 the local migration set is exactly 102 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 101 &&
+    return files.length === 102 &&
       files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
       files.includes("20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql") &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
       files.includes("20260813000000_qf_mvp_40_13b_canary_activation_authority.sql") &&
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql") &&
-      files.at(-1) === "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql";
+      files.at(-2) === "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql" &&
+      files.at(-1) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 101/.test(d2Source) &&
-  /exactly fourteen migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 102/.test(d2Source) &&
+  /exactly fifteen migrations are newer than the anchor/.test(d2Source) &&
   !/lengths*>=|>=s*9[0-9]/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));

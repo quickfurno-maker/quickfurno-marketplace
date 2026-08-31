@@ -46,16 +46,51 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Record one admin vendor action. FAIL-OPEN by design: the audit must never
+ * block or roll back the business action it describes.
+ *
+ * QF-MVP-80.03 — this used to be fail-open AND fail-SILENT. PostgREST returns
+ * its errors in `{ error }` rather than throwing, so the bare `catch` here never
+ * fired and every failure was discarded without a trace. Combined with
+ * `audit_logs` being absent from production entirely (see migration
+ * 20260817000000), that meant no superadmin vendor action had EVER been
+ * recorded, and nothing said so. A silent audit is worse than no audit: it
+ * looks like one.
+ *
+ * The returned error is now inspected and reported. What is logged is
+ * deliberately narrow — action, entity type, an id PREFIX and the database's own
+ * code/message. The caller's `metadata` is NEVER logged: it is the one field
+ * that could carry business context, and a log line is the wrong place to widen
+ * its blast radius.
+ */
 async function bestEffortAudit(action: string, vendorId: string, metadata: Record<string, unknown>) {
   try {
-    await adminClient().from("audit_logs").insert({
+    const { error } = await adminClient().from("audit_logs").insert({
       action,
       entity_type: "vendor",
       entity_id: vendorId,
       metadata,
     });
-  } catch {
-    // audit_logs is optional; never block the admin action.
+    if (error) {
+      console.warn("[audit log] vendor admin action was NOT recorded", {
+        action,
+        entity_type: "vendor",
+        entity_id_prefix: vendorId.slice(0, 8),
+        code: error.code ?? null,
+        message: error.message ?? null,
+      });
+    }
+  } catch (e) {
+    // A transport-level throw (network, client construction) lands here. Still
+    // never rethrown — the admin action has already succeeded and must stand.
+    console.warn("[audit log] vendor admin action was NOT recorded", {
+      action,
+      entity_type: "vendor",
+      entity_id_prefix: vendorId.slice(0, 8),
+      code: null,
+      message: e instanceof Error ? e.message : "Unknown audit transport failure",
+    });
   }
 }
 

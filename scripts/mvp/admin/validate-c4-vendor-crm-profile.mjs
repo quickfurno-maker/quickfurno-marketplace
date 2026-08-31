@@ -112,7 +112,10 @@ const migrationFiles = readdirSync(join(root, "supabase", "migrations"));
 // QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
 // the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
 // addition. Exact equality, never loosened.
-check("migration count remains 101", migrationFiles.length === 101);
+// QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
+// the audit_logs forward repair (20260817000000) is the only addition. Exact
+// equality, never loosened.
+check("migration count remains 102", migrationFiles.length === 102);
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);
 console.log("offline: no database, no network, no provider, no auth bypass");

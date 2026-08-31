@@ -176,7 +176,10 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-75.02 RE-PIN: 100 -> 101. This phase still adds no migration of its own;
 // the geo normalization / PostGIS shortlist foundation (20260816000000) is the only
 // addition. Exact equality, never loosened.
-check("migration count is unchanged at 101", migrations.length === 101);
+// QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
+// the audit_logs forward repair (20260817000000) is the only addition. Exact
+// equality, never loosened.
+check("migration count is unchanged at 102", migrations.length === 102);
 check("QF-MVP-70 added no migration", !migrations.some((f) => /qf_mvp_70|mvp70|operations/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("no source creates a function, index or policy", allSources.every((s) => !/create (or replace )?function|create index|create policy/i.test(s)));

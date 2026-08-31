@@ -42,6 +42,7 @@ import {
   vendorName,
 } from "../adminUtils";
 import { ModalShell, CreditsMeter, Strong } from "./shared";
+import { vendorLoginActivationCopy, type VendorLoginActivationSummary } from "./vendorLoginActivationCopy";
 import { marketplaceSettingsObject } from "./SettingsSection";
 
 const VENDOR_FILTER_KEYS = ["search", "city", "category", "status", "package"] as const;
@@ -61,8 +62,22 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
   const [busyId, setBusyId] = useState<string | null>(null);
   // QF-MVP-80.02 GATE-06. Held in memory for ONE viewing only: the recovery
   // link is a single-use credential, so it is never persisted or re-fetched.
+  //
+  // QF-MVP-80.03 — `repaired` and `profileRoleOutcome` were previously fetched
+  // and then dropped here, so a genuine repair rendered the "already active,
+  // nothing changed" copy. They are retained now: the modal must report what
+  // actually happened, not what the alreadyActive flag alone suggests.
   const [loginActivation, setLoginActivation] = useState<
-    { vendorName: string; alreadyActive: boolean; recoveryLink: string | null; mappingLinked: boolean } | null
+    {
+      vendorName: string;
+      alreadyActive: boolean;
+      repaired: boolean;
+      profileRoleOutcome: string | null;
+      recoveryLink: string | null;
+      mappingLinked: boolean;
+      mappingCreated: boolean;
+      recoveryLinkIssued: boolean;
+    } | null
   >(null);
 
   const result = data?.result ?? { rows: [], page: 1, pageSize: 20, total: 0 };
@@ -196,8 +211,12 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
     setLoginActivation({
       vendorName: vendor.business_name || "Vendor",
       alreadyActive: result.data.alreadyActive,
+      repaired: result.data.repaired,
+      profileRoleOutcome: result.data.profileRoleOutcome ?? null,
       recoveryLink: result.data.recoveryLink,
       mappingLinked: result.data.dashboardMappingLinked,
+      recoveryLinkIssued: result.data.recoveryLinkIssued,
+      mappingCreated: result.data.dashboardMappingCreated,
     });
     router.refresh();
   }, [notify, router]);
@@ -392,12 +411,12 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
                   { label: "Approve vendor", onClick: () => void mutate(vendor.id, "status", { action: "approve" }, "Vendor approved.") },
                   { label: "Reject vendor", onClick: () => void mutate(vendor.id, "status", { action: "reject" }, "Vendor rejected.") },
                   { label: "Suspend vendor", onClick: () => void mutate(vendor.id, "status", { action: "suspend" }, "Vendor suspended.") },
-                  { label: "Activate vendor", onClick: () => void mutate(vendor.id, "status", { action: "activate" }, "Vendor activated.") },
-                  { label: "Deactivate vendor", onClick: () => void mutate(vendor.id, "status", { action: "deactivate" }, "Vendor deactivated.") },
+                  { label: "Enable lead eligibility", onClick: () => void mutate(vendor.id, "status", { action: "activate" }, "Lead eligibility enabled.") },
+                  { label: "Disable lead eligibility", onClick: () => void mutate(vendor.id, "status", { action: "deactivate" }, "Lead eligibility disabled.") },
                   { label: "Manage Credits", onClick: () => setCreditsFor(vendor) },
                   { label: "Assign / Update Package", onClick: () => setPackageFor(vendor) },
                   { label: "Mark Package Expired", onClick: () => void mutate(vendor.id, "package", { packageStatus: "expired", packageName: vendor.package_name ?? null }, "Package marked expired.") },
-                  { label: "Activate vendor login", onClick: () => void activateLogin(vendor) },
+                  { label: "Create / repair vendor login", onClick: () => void activateLogin(vendor) },
                   { label: "View Credit Log", onClick: () => setLogFor(vendor) },
                 ]}
               />
@@ -444,26 +463,14 @@ function VendorLoginActivationModal({
   result,
   onClose,
 }: {
-  result: { vendorName: string; alreadyActive: boolean; recoveryLink: string | null; mappingLinked: boolean };
+  result: VendorLoginActivationSummary;
   onClose: () => void;
 }) {
+  const copy = vendorLoginActivationCopy(result);
   return (
-    <ModalShell
-      title={result.alreadyActive ? "Vendor login already active" : "Vendor login activated"}
-      subtitle={result.vendorName}
-      onClose={onClose}
-    >
+    <ModalShell title={copy.title} subtitle={result.vendorName} onClose={onClose}>
       <div className="space-y-4">
-        {result.alreadyActive ? (
-          <p className="text-sm text-slate-600">
-            This vendor already had a login. Nothing was created or changed.
-          </p>
-        ) : (
-          <p className="text-sm text-slate-600">
-            The existing vendor record now owns a sign-in account. Approval, package and credits are unchanged, and no
-            new vendor record was created.
-          </p>
-        )}
+        <p className="text-sm text-slate-600">{copy.body}</p>
 
         {result.recoveryLink ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -479,12 +486,7 @@ function VendorLoginActivationModal({
               className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-2 py-1.5 font-mono text-[11px] text-slate-800 outline-none"
             />
           </div>
-        ) : result.alreadyActive ? null : (
-          <p className="text-sm text-amber-700">
-            The account was linked, but a set-password link could not be issued. Use the vendor password-reset flow
-            instead.
-          </p>
-        )}
+        ) : null}
 
         {result.mappingLinked ? null : (
           <p className="text-xs text-slate-500">

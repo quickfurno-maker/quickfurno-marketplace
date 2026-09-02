@@ -58,6 +58,7 @@ import { createRuntimeCommunicationService } from "@/services/runtimeCommunicati
 import { RECIPIENT_REFERENCE_DESTINATION } from "@/lib/communication/types";
 import type { CommunicationIntent } from "@/lib/communication/types";
 import type { BusinessVariableResult } from "@/lib/communication/businessTemplateVariables";
+import { deriveLeadReference } from "@/lib/communication/leadReference";
 import type { N8nExecuteClientSuccessBody } from "@/lib/automation/transportTypes";
 
 /** The exact shape `getClientActionVariableBuilder` returns. */
@@ -628,15 +629,21 @@ async function readLeadFacts(leadId: string): Promise<LeadFactsResult> {
 
   if (countError) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
 
+  // A deterministic, non-PII Core reference. The raw internal UUID is never
+  // placed in a customer-visible message. QF-MVP-80.13A moved the formula to the
+  // single shared derivation so the vendor lead-assignment lane cannot hand the
+  // SAME lead a different reference. An underivable reference is a definitive
+  // non-send, never a blank or a substituted identifier.
+  const reference = deriveLeadReference(leadId);
+  if (reference === null) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
   return {
     ok: true,
     lead: {
       name: lead.name,
       status: lead.status,
       matchedVendorCount: count ?? 0,
-      // A deterministic, non-PII Core reference. The raw internal UUID is never
-      // placed in a customer-visible message.
-      reference: `QF-${leadId.replace(/-/g, "").slice(0, 8).toUpperCase()}`,
+      reference,
     },
   };
 }

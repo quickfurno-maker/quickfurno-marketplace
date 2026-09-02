@@ -154,7 +154,8 @@
     "test:mvp:40-c9a": "node scripts/mvp/communication/validate-meta-marketing-mapping-authority.mjs",
     "test:mvp:40-c9b": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-marketing-consent-writer.mjs",
     "report:mvp:40-c9": "node scripts/mvp/communication/evaluate-criterion-9-readiness.mjs",
-    "seed:mvp:40-marketing-mapping": "node scripts/mvp/communication/seed-meta-marketing-mapping-once.mjs"
+    "seed:mvp:40-marketing-mapping": "node scripts/mvp/communication/seed-meta-marketing-mapping-once.mjs",
+    "test:mvp:80-13a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-13a.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

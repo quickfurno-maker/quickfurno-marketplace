@@ -168,7 +168,11 @@ const PROD_MAPPING = Object.freeze({
   language: "en",
   version: "1.0",
   provider_template_name: "quickfurno_vendor_lead_assignment_alert_v1",
-  provider_template_id: "1707945567662723",
+  // QF-MVP-80.14C: corrected. A GET-only re-read of the production WABA
+  // (graph v26.0, HTTP 200, exactly one template with this name) returned
+  // 1770945567662723. The old value here was a transcription that had been
+  // copied forward; production metadata was repaired to match Meta.
+  provider_template_id: "1770945567662723",
   approval_status: "approved",
   is_active: true,
   variables_schema: {

@@ -117,8 +117,16 @@ export function VendorAttentionLeads({
             })}
           </ul>
 
+          {/* QF-UI-V2-01R: phone widths show only the first two rows (the rest
+              are hidden in CSS — see .qf-vendor-v2-leadlist), so this is the
+              route to the ones not shown. The trailing clause is desktop-only
+              because there the whole shortlist is already visible. */}
           <Link href={LEADS_HREF} className="qf-vendor-v2-panel-foot-link">
-            View all leads and update statuses
+            {/* One flex item, so the space before the trailing clause is a real
+                space rather than the row's gap (which reads as a double space). */}
+            <span>
+              View all leads<span className="qf-vendor-v2-foot-link-more"> and update statuses</span>
+            </span>
             <VendorIcon name="arrow-right" size={16} />
           </Link>
         </>

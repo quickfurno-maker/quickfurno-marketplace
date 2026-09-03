@@ -1055,6 +1055,16 @@ a.qf-vendor-v2-metric:hover {
 .qf-vendor-v2-access-banner[data-tone="warn"] .qf-vendor-v2-access-icon { color: var(--v2-warn); }
 .qf-vendor-v2-access-banner[data-tone="blocked"] .qf-vendor-v2-access-icon { color: var(--v2-danger); }
 
+/* Healthy state: one line, centred on its icon, no explanatory paragraph. */
+.qf-vendor-v2-access-banner[data-compact="true"] {
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+}
+
+.qf-vendor-v2-access-banner[data-compact="true"] .qf-vendor-v2-access-icon {
+  padding-top: 0;
+}
+
 .qf-vendor-v2-access-headline {
   margin: 0;
   font-size: 0.891rem;
@@ -1073,6 +1083,15 @@ a.qf-vendor-v2-metric:hover {
   display: grid;
   gap: 0;
   margin: 0.9rem 0 0;
+}
+
+/* Healthy state: same five facts, tighter rows. */
+.qf-vendor-v2-factlist[data-compact="true"] {
+  margin-top: 0.6rem;
+}
+
+.qf-vendor-v2-factlist[data-compact="true"] .qf-vendor-v2-fact {
+  padding: 0.4rem 0;
 }
 
 .qf-vendor-v2-fact {
@@ -1222,13 +1241,17 @@ a.qf-vendor-v2-metric:hover {
   overflow-wrap: anywhere;
 }
 
+/* The four-up treatment belongs to the FULL-WIDTH strip only. In the
+   `column` variant the same panel sits in the ~340px right column, where four
+   tracks would shred each value onto its own line, so it keeps the stacked
+   label/value rows defined above. */
 @media (min-width: 700px) {
-  .qf-vendor-v2-summary {
+  .qf-vendor-v2-panel--strip .qf-vendor-v2-summary {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0 1.5rem;
   }
 
-  .qf-vendor-v2-summary > div {
+  .qf-vendor-v2-panel--strip .qf-vendor-v2-summary > div {
     display: block;
     padding: 0;
     border-bottom: none;
@@ -1236,12 +1259,12 @@ a.qf-vendor-v2-metric:hover {
     padding-left: 1rem;
   }
 
-  .qf-vendor-v2-summary > div:first-child {
+  .qf-vendor-v2-panel--strip .qf-vendor-v2-summary > div:first-child {
     border-left: none;
     padding-left: 0;
   }
 
-  .qf-vendor-v2-summary dt {
+  .qf-vendor-v2-panel--strip .qf-vendor-v2-summary dt {
     font-size: 0.719rem;
     font-weight: 600;
     letter-spacing: 0.055em;
@@ -1249,7 +1272,7 @@ a.qf-vendor-v2-metric:hover {
     color: var(--v2-faint);
   }
 
-  .qf-vendor-v2-summary dd {
+  .qf-vendor-v2-panel--strip .qf-vendor-v2-summary dd {
     margin-top: 0.28rem;
     font-size: 0.891rem;
     font-weight: 600;
@@ -1295,6 +1318,26 @@ a.qf-vendor-v2-metric:hover {
 /* ==========================================================================
    Breakpoints
    ========================================================================== */
+
+/*
+  Phone widths only (below the 700px point where the lead row gains its second
+  column). QF-UI-V2-01R: the Overview is a summary, not the CRM, so a phone
+  shows at most the TWO most urgent open enquiries and routes to the Leads page
+  for the rest. The shortlist and its urgency ordering are unchanged — this
+  trims what is displayed, never what is selected — and tablet/desktop keep the
+  full shortlist.
+*/
+@media (max-width: 699px) {
+  .qf-vendor-v2-leadlist > li:nth-child(n + 3) {
+    display: none;
+  }
+
+  /* "View all leads" is the whole label on a phone; the trailing clause (and
+     the space that precedes it inside the same span) is dropped. */
+  .qf-vendor-v2-foot-link-more {
+    display: none;
+  }
+}
 
 /* Tablet: KPIs go four-across once there is room for a readable number. */
 @media (min-width: 700px) {

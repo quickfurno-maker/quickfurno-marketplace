@@ -89,13 +89,20 @@ export function VendorOverview({
         </div>
         <div className="qf-vendor-v2-col qf-vendor-v2-col--side">
           <VendorAccessStatus vendor={vendor} remainingCredits={credits} />
-          <VendorProfileProgress vendor={vendor} />
+          {/* QF-UI-V2-01R: at 100% the panel would only restate the KPI above
+              it, so it is not rendered at all. Below 100% it is the actionable
+              half of the pair — the KPI gives the number, this gives the list
+              of what is missing. */}
+          {completion.complete ? null : <VendorProfileProgress vendor={vendor} />}
+          {completion.complete ? <VendorBusinessSummary vendor={vendor} variant="column" /> : null}
         </div>
       </div>
 
-      {/* Full-width identity strip. Kept out of the two-column block so the
-          left column does not run short of the taller status column. */}
-      <VendorBusinessSummary vendor={vendor} />
+      {/* Identity summary. Normally a full-width strip below the two columns, so
+          the left column does not run short of the taller status column. When
+          the completion panel is absent the right column would instead run
+          short, so the summary moves into it and keeps both columns balanced. */}
+      {completion.complete ? null : <VendorBusinessSummary vendor={vendor} variant="strip" />}
 
       <p className="qf-vendor-v2-overview-foot">
         Need a hand with a lead or your package?{" "}

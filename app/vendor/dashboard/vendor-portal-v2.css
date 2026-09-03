@@ -1481,19 +1481,46 @@ a.qf-vendor-v2-metric:hover {
   a 1024x768 tablet correctly stays on the mobile shell.
 */
 @media (min-width: 1080px) {
-  /* Compound selector for the same reason as the reset above. */
+  /*
+    QF-UI-V2-04R — the sidebar is FIXED, not sticky, and the shell reserves its
+    width with padding instead of a grid column.
+
+    Why not sticky: app/globals.css sets `overflow-x: hidden` on both html and
+    body. Per spec that computes the other axis to `auto`, so BODY becomes a
+    scroll container — but body never scrolls (html is the scrolling element),
+    measured as body scrollHeight 2226 / clientHeight 2226 / scrollTop
+    permanently 0. A sticky element resolves against its nearest ancestor scroll
+    container, so the sidebar was pinned to a box that never moves and simply
+    rode the document away: its viewport top measured 0 -> -663 -> -1325 at
+    top / mid / bottom scroll on a long page.
+
+    The only way to restore sticky is to stop body being a scroll container,
+    which means editing a global rule that governs the whole public site and
+    admin. That is out of scope here, so the sidebar is taken out of flow
+    instead. Fixed is safe in this tree: every ancestor was measured clean of
+    transform / filter / perspective / contain, and the mobile bottom nav
+    already uses position: fixed here successfully.
+
+    Geometry is unchanged: the old grid gave main 1440 - 248 = 1192px, and
+    padding-left of the same token gives it exactly 1192px, so the content
+    column and its max-width centring are pixel-identical to the approved
+    screenshots.
+  */
   .qf-vd-shell.qf-vendor-v2-shell {
-    display: grid;
-    grid-template-columns: var(--v2-sidebar-w) minmax(0, 1fr);
+    display: block;
+    padding-left: var(--v2-sidebar-w);
   }
 
   .qf-vendor-v2-sidebar {
-    position: sticky;
+    position: fixed;
     top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--v2-sidebar-w);
+    /* Above page content, below the mobile sheet layers (45-47). */
+    z-index: 30;
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
     background: var(--v2-surface);
     border-right: 1px solid var(--v2-line);
   }

@@ -55,6 +55,16 @@
   --v2-sidebar-w: 248px;
   --v2-content-max: 1180px;
   --v2-bottomnav-h: 62px;
+  /*
+    QF-UI-V2-04S — measured border-box height of the rendered topbar: 61.05px
+    at desktop and 60.19px at 390px wide. The topbar's own box is NOT changed;
+    this token only reserves the space it vacates once it is taken out of flow.
+    --v2-topbar-space adds whatever a notch adds on top of the bar's existing
+    `padding-top: max(0.55rem, env(safe-area-inset-top))`, so the reserved
+    height tracks the real one on notched devices too.
+  */
+  --v2-topbar-h: 61px;
+  --v2-topbar-space: calc(var(--v2-topbar-h) + max(0px, env(safe-area-inset-top) - 0.55rem));
 
   /* Restraint: a hairline plus one very soft lift. Nothing floats. */
   --v2-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 26px -22px rgba(15, 23, 42, 0.5);
@@ -281,6 +291,10 @@
   min-width: 0;
   min-height: 100vh;
   min-height: 100dvh;
+  /* Reserves the height the now-fixed topbar no longer occupies in flow, so
+     content starts exactly where it did before and never slides underneath.
+     box-sizing is border-box here, so min-height still totals one viewport. */
+  padding-top: var(--v2-topbar-space);
 }
 
 .qf-vendor-v2-content {
@@ -411,9 +425,24 @@
 /* ==========================================================================
    Topbar
    ========================================================================== */
+/*
+  QF-UI-V2-04S — FIXED, not sticky, for the reason proven in QF-UI-V2-04R:
+  app/globals.css gives html and body `overflow-x: hidden`, which computes the
+  other axis to `auto` and makes BODY a scroll container with no scroll range
+  (clientHeight === scrollHeight) while html is what actually scrolls. Sticky
+  resolves against that never-moving box, so the topbar rode the document away:
+  measured viewport top 0 -> -663 -> -1326 at top / mid / bottom scroll.
+
+  Everything about the bar's own box below this line is unchanged — height,
+  padding, background, border, blur and z-index 20 (above page content, below
+  the sidebar at 30 and the mobile sheet layers at 45-47). Only position and
+  the horizontal anchoring are new; `.qf-vendor-v2-main` reserves the height.
+*/
 .qf-vendor-v2-topbar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -1524,6 +1553,9 @@ a.qf-vendor-v2-metric:hover {
     background: var(--v2-surface);
     border-right: 1px solid var(--v2-line);
   }
+
+  /* Begins exactly where the fixed sidebar ends; right edge is the viewport. */
+  .qf-vendor-v2-topbar { left: var(--v2-sidebar-w); }
 
   .qf-vendor-v2-topbar-brand { display: none; }
   .qf-vendor-v2-bottomnav { display: none; }

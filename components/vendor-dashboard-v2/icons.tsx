@@ -28,7 +28,8 @@ export type VendorIconName =
   | "external"
   | "pin"
   | "inbox"
-  | "lock";
+  | "lock"
+  | "search";
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, "children"> & { size?: number };
 
@@ -163,6 +164,12 @@ const PATHS: Record<VendorIconName, React.ReactNode> = {
     <>
       <rect x="4.8" y="10.4" width="14.4" height="9.4" rx="2" />
       <path d="M8.4 10.4V7.9a3.6 3.6 0 0 1 7.2 0v2.5" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="10.8" cy="10.8" r="6.2" />
+      <path d="m15.4 15.4 4.2 4.2" />
     </>
   ),
 };

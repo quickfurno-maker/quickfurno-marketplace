@@ -1,0 +1,834 @@
+/* ==========================================================================
+   QuickFurno — Vendor Leads V2  (QF-UI-V2-02)
+
+   Scope: imported ONLY by app/vendor/dashboard/leads/page.tsx, so it loads on
+   the Leads route and nowhere else. Every selector is namespaced
+   `qf-vendor-v2-leads-*`; no bare element selector is redefined, so nothing on
+   the public marketplace or the admin surface can be affected.
+
+   Tokens (--v2-*) come from `.qf-vendor-v2-shell` in vendor-portal-v2.css. This
+   file adds no colour of its own beyond those tokens, and the approved shell,
+   buttons, panels, pills and empty states are reused rather than restyled.
+   ========================================================================== */
+
+.qf-vendor-v2-leads {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.qf-vendor-v2-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Page header — compact. The shell topbar already says where we are.
+   ========================================================================== */
+.qf-vendor-v2-leads-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding-top: 0.4rem;
+}
+
+.qf-vendor-v2-leads-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 3.6vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-leads-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+/* ==========================================================================
+   Alerts — access notice, action feedback, load failure.
+   Compact rows, not full-bleed warning boxes.
+   ========================================================================== */
+/*
+  Phone: icon + text on the first row, action full width beneath. Squeezing a
+  button in beside the text left the copy in a ~140px column that broke the
+  title across two lines.
+*/
+.qf-vendor-v2-leads-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+}
+
+.qf-vendor-v2-leads-alert > .qf-vendor-v2-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+@media (min-width: 560px) {
+  .qf-vendor-v2-leads-alert {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .qf-vendor-v2-leads-alert > .qf-vendor-v2-btn {
+    grid-column: auto;
+  }
+}
+
+.qf-vendor-v2-leads-alert[data-tone="ok"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+}
+
+.qf-vendor-v2-leads-alert[data-tone="warn"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+}
+
+.qf-vendor-v2-leads-alert[data-tone="error"] {
+  background: var(--v2-danger-tint);
+  border-color: var(--v2-danger-line);
+}
+
+.qf-vendor-v2-leads-alert-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.qf-vendor-v2-leads-alert[data-tone="ok"] .qf-vendor-v2-leads-alert-icon { color: var(--v2-ok); }
+.qf-vendor-v2-leads-alert[data-tone="warn"] .qf-vendor-v2-leads-alert-icon { color: var(--v2-warn); }
+.qf-vendor-v2-leads-alert[data-tone="error"] .qf-vendor-v2-leads-alert-icon { color: var(--v2-danger); }
+
+.qf-vendor-v2-leads-alert-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qf-vendor-v2-leads-alert-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-leads-alert-text {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-leads-alert-body .qf-vendor-v2-leads-alert-text {
+  margin-top: 0.15rem;
+}
+
+.qf-vendor-v2-leads-alert .qf-vendor-v2-iconbtn {
+  justify-self: end;
+  align-self: start;
+}
+
+/* Header action: "& package" is dropped on phones so the button stays one line. */
+.qf-vendor-v2-leads-head-more {
+  display: none;
+}
+
+@media (min-width: 560px) {
+  .qf-vendor-v2-leads-head-more {
+    display: inline;
+  }
+}
+
+/* ==========================================================================
+   Summary strip — four truthful counts, 2x2 on a phone.
+   Small by design: this is a Leads page, not the Overview.
+   ========================================================================== */
+.qf-vendor-v2-leads-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.qf-vendor-v2-leads-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+}
+
+.qf-vendor-v2-leads-stat-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-blue-tint);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-leads-stat-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.qf-vendor-v2-leads-stat-text strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-leads-stat-text span {
+  font-size: 0.797rem;
+  color: var(--v2-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Controls — status chips + local search
+   ========================================================================== */
+.qf-vendor-v2-leads-controls {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-leads-filters {
+  display: flex;
+  gap: 0.3rem;
+  /* Phone: one scrollable row. Nothing is hidden behind the scroll that is not
+     also reachable by scrolling, and "All" stays first. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 0.2rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qf-vendor-v2-leads-filters::-webkit-scrollbar {
+  height: 4px;
+}
+
+.qf-vendor-v2-leads-filters::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--v2-line-soft);
+}
+
+.qf-vendor-v2-leads-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-family: inherit;
+  font-size: 0.828rem;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.qf-vendor-v2-leads-chip:hover {
+  background: var(--v2-inset);
+  border-color: #cfd6e2;
+}
+
+.qf-vendor-v2-leads-chip[data-active="true"] {
+  background: var(--v2-blue);
+  border-color: var(--v2-blue);
+  color: #ffffff;
+  font-weight: 650;
+}
+
+.qf-vendor-v2-leads-chip-count {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--v2-inset-strong, var(--v2-inset));
+  font-size: 0.719rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-chip[data-active="true"] .qf-vendor-v2-leads-chip-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.qf-vendor-v2-leads-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 40px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-leads-search:focus-within {
+  border-color: var(--v2-blue-line);
+  outline: 2px solid var(--v2-blue);
+  outline-offset: 1px;
+}
+
+.qf-vendor-v2-leads-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-leads-search input::placeholder {
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-leads-count {
+  margin: 0;
+  font-size: 0.781rem;
+  color: var(--v2-muted);
+}
+
+/* ==========================================================================
+   Lead list
+   ========================================================================== */
+.qf-vendor-v2-leads-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-leads-card {
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+  box-shadow: var(--v2-shadow);
+  overflow: hidden;
+  transition: border-color 150ms ease;
+}
+
+.qf-vendor-v2-leads-card[data-expanded="true"] {
+  border-color: var(--v2-blue-line);
+}
+
+.qf-vendor-v2-leads-card-main {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+}
+
+.qf-vendor-v2-leads-card-body {
+  min-width: 0;
+}
+
+.qf-vendor-v2-leads-card-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.qf-vendor-v2-leads-card-title h3 {
+  margin: 0;
+  font-size: 0.969rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--v2-ink);
+  /* Long client names wrap instead of stretching the row. */
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.qf-vendor-v2-leads-card-service {
+  margin: 0.2rem 0 0;
+  font-size: 0.875rem;
+  color: var(--v2-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-leads-card-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.8rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  font-size: 0.781rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-card-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-leads-card-meta svg {
+  flex: 0 0 auto;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-leads-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Status — the loudest thing on the row after the client's name. */
+.qf-vendor-v2-leads-status {
+  flex: 0 0 auto;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-inset);
+  font-size: 0.719rem;
+  font-weight: 650;
+  color: var(--v2-ink-2);
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-leads-status[data-status="New"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-leads-status[data-status="Follow-up Needed"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-leads-status[data-status="Converted"],
+.qf-vendor-v2-leads-status[data-status="Won"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+  color: var(--v2-ok);
+}
+
+.qf-vendor-v2-leads-status[data-status="Lost"] {
+  background: var(--v2-danger-tint);
+  border-color: var(--v2-danger-line);
+  color: var(--v2-danger);
+}
+
+/* Assignment source — deliberately quieter than the CRM status. */
+.qf-vendor-v2-leads-source {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--v2-line-soft);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+  font-size: 0.688rem;
+  font-weight: 550;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-source[data-tone="client"] { color: var(--v2-blue-deep); }
+.qf-vendor-v2-leads-source[data-tone="recovery"] { color: var(--v2-warn); }
+
+.qf-vendor-v2-leads-reported {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--v2-warn-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-warn-tint);
+  font-size: 0.688rem;
+  font-weight: 600;
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-leads-toggle {
+  min-width: 104px;
+}
+
+/* ==========================================================================
+   Detail expansion
+   ========================================================================== */
+.qf-vendor-v2-leads-detail {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.9rem 0.85rem 1rem;
+  border-top: 1px solid var(--v2-line-soft);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-leads-detail-block h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.719rem;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-leads-detail-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.qf-vendor-v2-leads-detail-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-leads-detail-list > div:last-child { border-bottom: none; }
+
+.qf-vendor-v2-leads-detail-list dt {
+  flex: 0 0 auto;
+  font-size: 0.812rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-detail-list dd {
+  margin: 0;
+  font-size: 0.812rem;
+  font-weight: 550;
+  color: var(--v2-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-leads-message {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.7rem;
+  border-left: 2px solid var(--v2-blue-line);
+  border-radius: 0 var(--v2-radius-sm) var(--v2-radius-sm) 0;
+  background: var(--v2-surface);
+  font-size: 0.828rem;
+  line-height: 1.55;
+  color: var(--v2-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-leads-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.qf-vendor-v2-leads-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--v2-ink);
+  text-decoration: none;
+}
+
+.qf-vendor-v2-leads-phone:hover { border-color: var(--v2-blue-line); }
+.qf-vendor-v2-leads-phone svg { color: var(--v2-blue); }
+
+.qf-vendor-v2-leads-locked,
+.qf-vendor-v2-leads-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.812rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-locked svg { flex: 0 0 auto; margin-top: 1px; color: var(--v2-faint); }
+.qf-vendor-v2-leads-note + .qf-vendor-v2-btn { margin-top: 0.6rem; }
+
+/* ==========================================================================
+   Status control
+   ========================================================================== */
+.qf-vendor-v2-leads-status-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.qf-vendor-v2-leads-field {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 190px;
+  min-width: 0;
+}
+
+.qf-vendor-v2-leads-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-leads-status-form .qf-vendor-v2-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qf-vendor-v2-leads-status-help {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.781rem;
+  line-height: 1.5;
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-leads-status-help svg { flex: 0 0 auto; margin-top: 1px; }
+
+/* ==========================================================================
+   Report form — the shared VendorLeadReportForm ships legacy qf-vd-* classes.
+   Restyled here from a scoped wrapper so the component itself, and every other
+   surface that renders it, stay untouched.
+   ========================================================================== */
+.qf-vendor-v2-leads-report { margin-top: 0.55rem; }
+
+.qf-vendor-v2-leads-report .qf-vd-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+  font-family: inherit;
+  font-size: 0.859rem;
+  font-weight: 600;
+  color: var(--v2-ink-2);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.qf-vendor-v2-leads-report .qf-vd-link:hover {
+  background: var(--v2-inset);
+  border-color: #cfd6e2;
+}
+
+.qf-vendor-v2-leads-report .qf-vd-bad-lead-form {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+}
+
+.qf-vendor-v2-leads-report .qf-vd-bad-lead-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-report .qf-vd-bad-lead-form select,
+.qf-vendor-v2-leads-report .qf-vd-bad-lead-form textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--v2-ink);
+  resize: vertical;
+}
+
+.qf-vendor-v2-leads-report .qf-vd-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.qf-vendor-v2-leads-report .qf-vd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--v2-blue);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-blue);
+  font-family: inherit;
+  font-size: 0.859rem;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.qf-vendor-v2-leads-report .qf-vd-btn:hover { background: var(--v2-blue-deep); }
+.qf-vendor-v2-leads-report .qf-vd-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+.qf-vendor-v2-leads-report .qf-vd-pills .qf-vd-link {
+  min-height: 38px;
+  border: none;
+  background: none;
+  color: var(--v2-muted);
+  font-weight: 550;
+  padding: 0 0.3rem;
+}
+
+.qf-vendor-v2-leads-report .qf-vd-note,
+.qf-vendor-v2-leads-report .qf-vd-report-done {
+  margin: 0;
+  font-size: 0.781rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leads-report .qf-vd-error {
+  margin: 0;
+  font-size: 0.781rem;
+  color: var(--v2-danger);
+}
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+
+/* Tablet and up: four summary tiles across, lead row gains an action column. */
+@media (min-width: 700px) {
+  .qf-vendor-v2-leads { gap: 1rem; }
+
+  .qf-vendor-v2-leads-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .qf-vendor-v2-leads-controls {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    align-items: center;
+    gap: 0.7rem;
+  }
+
+  .qf-vendor-v2-leads-filters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .qf-vendor-v2-leads-card-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.95rem 1rem;
+  }
+
+  .qf-vendor-v2-leads-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 148px;
+  }
+
+  .qf-vendor-v2-leads-detail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 1.4rem;
+    padding: 1rem;
+  }
+
+  /* Requirement block spans the full width — it holds the longest content. */
+  .qf-vendor-v2-leads-detail-block:first-child {
+    grid-column: 1 / -1;
+  }
+
+  /*
+    Stacked label-over-value in three columns. The earlier two-column
+    label/value table put a value flush against the next column's label
+    ("Modular kitchen | Area / city"), which read as one row.
+  */
+  .qf-vendor-v2-leads-detail-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem 1.4rem;
+  }
+
+  .qf-vendor-v2-leads-detail-list > div {
+    display: block;
+    padding: 0;
+    border-bottom: none;
+  }
+
+  .qf-vendor-v2-leads-detail-list dd {
+    margin-top: 0.15rem;
+    text-align: left;
+  }
+}
+
+
+
+/* Motion: hover/expand transitions only, so the OS preference just removes them. */
+@media (prefers-reduced-motion: reduce) {
+  .qf-vendor-v2-leads-chip,
+  .qf-vendor-v2-leads-card {
+    transition-duration: 0.01ms !important;
+  }
+}

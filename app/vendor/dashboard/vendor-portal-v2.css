@@ -1,0 +1,1382 @@
+/* ==========================================================================
+   QuickFurno — Vendor Portal V2  (QF-UI-V2-01)
+
+   Scope: imported ONLY by app/vendor/dashboard/layout.tsx, so it never loads on
+   the public marketplace or the admin surface. Every selector is namespaced
+   `qf-vendor-v2-*`; no bare element selector is redefined here.
+
+   The shell root keeps the legacy `qf-vd-shell` class alongside the V2 class on
+   purpose: the Leads / Profile / Package / Notifications / Support pages still
+   render `qf-vd-*` markup, and `.qf-vd-shell` is where their custom properties
+   are declared. Removing it would unstyle those pages before their own slices
+   land (QF-UI-V2-02..04).
+
+   Palette derived from the existing portal, not invented: the primary blue
+   (#2563eb / #1d4ed8) is the blue already used by the vendor dashboard, and the
+   wordmark gold (#C67821) is the public site's `--color-gold`.
+   ========================================================================== */
+
+.qf-vendor-v2-shell {
+  /* Brand */
+  --v2-blue: #2563eb;
+  --v2-blue-deep: #1d4ed8;
+  --v2-blue-tint: #eff4ff;
+  --v2-blue-line: #d7e3fd;
+  --v2-gold: #c67821;
+
+  /* Ink */
+  --v2-ink: #0f172a;
+  --v2-ink-2: #334155;
+  --v2-muted: #5f6b7d;
+  --v2-faint: #8d97a8;
+
+  /* Surfaces + lines */
+  --v2-page: #f5f7fa;
+  --v2-surface: #ffffff;
+  --v2-inset: #f8fafc;
+  --v2-line: #e5e9f0;
+  --v2-line-soft: #eef1f6;
+
+  /* Semantics — calm, never neon */
+  --v2-ok: #0f7a51;
+  --v2-ok-tint: #ecfdf5;
+  --v2-ok-line: #b8e6d2;
+  --v2-warn: #a35a09;
+  --v2-warn-tint: #fff8ec;
+  --v2-warn-line: #f0d9b4;
+  --v2-danger: #b02a25;
+  --v2-danger-tint: #fef3f2;
+  --v2-danger-line: #f2cfcc;
+
+  /* Geometry */
+  --v2-radius-sm: 8px;
+  --v2-radius: 12px;
+  --v2-radius-lg: 16px;
+  --v2-sidebar-w: 248px;
+  --v2-content-max: 1180px;
+  --v2-bottomnav-h: 62px;
+
+  /* Restraint: a hairline plus one very soft lift. Nothing floats. */
+  --v2-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 26px -22px rgba(15, 23, 42, 0.5);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--v2-page);
+  color: var(--v2-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+  The root also carries the legacy `qf-vd-shell` class (see the header note), and
+  qf-redesign.css turns THAT class into `display:grid; grid-template-columns:
+  248px 1fr` from 900px up. Between 900px and this file's own 1080px desktop
+  breakpoint the V2 sidebar is still hidden, so the main column would drop into
+  the legacy 248px track and collapse. V2 owns its own layout at every width, so
+  the legacy shell layout is neutralised here with a compound selector that
+  outranks the single-class rule regardless of stylesheet order.
+*/
+.qf-vd-shell.qf-vendor-v2-shell {
+  display: block;
+  background: var(--v2-page);
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-shell *,
+.qf-vendor-v2-shell *::before,
+.qf-vendor-v2-shell *::after {
+  box-sizing: border-box;
+}
+
+/* Visible keyboard focus on every interactive element in the portal. */
+.qf-vendor-v2-shell a:focus-visible,
+.qf-vendor-v2-shell button:focus-visible,
+.qf-vendor-v2-shell [tabindex]:focus-visible {
+  outline: 2px solid var(--v2-blue);
+  outline-offset: 2px;
+  border-radius: var(--v2-radius-sm);
+}
+
+/* ==========================================================================
+   Brand lockup
+   ========================================================================== */
+.qf-vendor-v2-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.qf-vendor-v2-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  background: linear-gradient(160deg, var(--v2-ink) 0%, #1e293b 100%);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.qf-vendor-v2-brand--sm .qf-vendor-v2-brand-mark {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  font-size: 0.92rem;
+}
+
+.qf-vendor-v2-brand-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.qf-vendor-v2-brand-word {
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.021em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-brand--sm .qf-vendor-v2-brand-word {
+  font-size: 1.02rem;
+}
+
+.qf-vendor-v2-brand-quick { color: var(--v2-ink); }
+.qf-vendor-v2-brand-furno { color: var(--v2-gold); }
+
+.qf-vendor-v2-brand-tag {
+  font-size: 0.688rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+}
+
+/* ==========================================================================
+   Shell layout
+   ========================================================================== */
+.qf-vendor-v2-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.qf-vendor-v2-content {
+  flex: 1;
+  width: 100%;
+  max-width: var(--v2-content-max);
+  margin: 0 auto;
+  padding: 1rem 1rem calc(var(--v2-bottomnav-h) + 1.5rem + env(safe-area-inset-bottom));
+}
+
+/* ==========================================================================
+   Sidebar (desktop only — see the breakpoint block at the end)
+   ========================================================================== */
+.qf-vendor-v2-sidebar {
+  display: none;
+}
+
+.qf-vendor-v2-sidebar-head {
+  padding: 1.25rem 1.1rem 1rem;
+}
+
+.qf-vendor-v2-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.7rem;
+}
+
+.qf-vendor-v2-navlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.qf-vendor-v2-navgroup-label {
+  margin: 1.4rem 0 0.45rem;
+  padding: 0 0.55rem;
+  font-size: 0.688rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-navlink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 40px;
+  padding: 0 0.6rem;
+  border-radius: var(--v2-radius-sm);
+  color: var(--v2-ink-2);
+  font-size: 0.891rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.qf-vendor-v2-navlink svg {
+  flex: 0 0 auto;
+  color: var(--v2-faint);
+  transition: color 150ms ease;
+}
+
+.qf-vendor-v2-navlink:hover {
+  background: var(--v2-inset);
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-navlink:hover svg { color: var(--v2-ink-2); }
+
+/* Active: soft tint + a short accent rule. One treatment, applied once. */
+.qf-vendor-v2-navlink[data-active="true"] {
+  background: var(--v2-blue-tint);
+  color: var(--v2-blue-deep);
+  font-weight: 600;
+}
+
+.qf-vendor-v2-navlink[data-active="true"] svg { color: var(--v2-blue); }
+
+.qf-vendor-v2-navlink[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: -0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--v2-blue);
+}
+
+.qf-vendor-v2-sidebar-foot {
+  padding: 0.9rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--v2-line-soft);
+}
+
+/* The shared <SignOut /> button ships its own legacy classes; restyle it from
+   the wrapper instead of editing a component other surfaces also use. */
+.qf-vendor-v2-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-signout svg { flex: 0 0 auto; }
+
+.qf-vendor-v2-signout button {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.891rem;
+  font-weight: 500;
+  color: inherit;
+  transition: color 150ms ease;
+}
+
+.qf-vendor-v2-signout:hover,
+.qf-vendor-v2-signout:hover button {
+  color: var(--v2-danger);
+}
+
+/* ==========================================================================
+   Topbar
+   ========================================================================== */
+.qf-vendor-v2-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 58px;
+  padding: 0.55rem 1rem;
+  padding-top: max(0.55rem, env(safe-area-inset-top));
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--v2-line);
+  backdrop-filter: blur(8px);
+}
+
+.qf-vendor-v2-topbar-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.qf-vendor-v2-topbar-context {
+  display: none;
+  min-width: 0;
+}
+
+.qf-vendor-v2-topbar-eyebrow {
+  display: block;
+  font-size: 0.688rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-topbar-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  color: var(--v2-ink);
+  line-height: 1.25;
+}
+
+.qf-vendor-v2-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.qf-vendor-v2-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius-sm);
+  background: transparent;
+  color: var(--v2-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.qf-vendor-v2-iconbtn:hover {
+  background: var(--v2-inset);
+  border-color: var(--v2-line);
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-account {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 220px;
+  padding: 0.3rem 0.55rem 0.3rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.qf-vendor-v2-account:hover {
+  background: var(--v2-inset);
+  border-color: var(--v2-line);
+}
+
+.qf-vendor-v2-account-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  background: var(--v2-blue-tint);
+  color: var(--v2-blue-deep);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.qf-vendor-v2-account-text {
+  display: none;
+  min-width: 0;
+}
+
+.qf-vendor-v2-account-name {
+  display: block;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--v2-ink);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-account-meta {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--v2-faint);
+  line-height: 1.3;
+}
+
+/* ==========================================================================
+   Mobile bottom nav + More sheet
+   ========================================================================== */
+/* Sits ABOVE the More sheet (z-index 46) so the nav — including the More button
+   that toggles the sheet — stays visible and tappable while it is open. */
+.qf-vendor-v2-bottomnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 47;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 0.3rem 0.3rem calc(0.3rem + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid var(--v2-line);
+  backdrop-filter: blur(10px);
+}
+
+.qf-vendor-v2-bottomnav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  padding: 0.3rem 0.15rem;
+  border: none;
+  border-radius: var(--v2-radius-sm);
+  background: transparent;
+  color: var(--v2-muted);
+  font-family: inherit;
+  font-size: 0.688rem;
+  font-weight: 550;
+  line-height: 1.1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.qf-vendor-v2-bottomnav-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-bottomnav-item[data-active="true"] {
+  background: var(--v2-blue-tint);
+  color: var(--v2-blue-deep);
+  font-weight: 650;
+}
+
+.qf-vendor-v2-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.qf-vendor-v2-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 46;
+  padding: 0.9rem 1rem calc(var(--v2-bottomnav-h) + 1rem + env(safe-area-inset-bottom));
+  background: var(--v2-surface);
+  border-top: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-lg) var(--v2-radius-lg) 0 0;
+  box-shadow: 0 -18px 40px -26px rgba(15, 23, 42, 0.55);
+  animation: qf-vendor-v2-sheet-in 180ms ease-out;
+}
+
+/* The sheet takes focus programmatically so assistive tech lands inside the
+   dialog; it is a container, not a control, so it must not draw a focus ring.
+   The controls inside it keep theirs. Scoped through .qf-vendor-v2-shell so it
+   outranks the shell-wide [tabindex]:focus-visible outline rule above. */
+.qf-vendor-v2-shell .qf-vendor-v2-sheet:focus,
+.qf-vendor-v2-shell .qf-vendor-v2-sheet:focus-visible {
+  outline: none;
+}
+
+@keyframes qf-vendor-v2-sheet-in {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.qf-vendor-v2-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.qf-vendor-v2-sheet-title {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-sheet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.qf-vendor-v2-sheet-divider {
+  margin-top: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-sheet-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 48px;
+  padding: 0 0.65rem;
+  border-radius: var(--v2-radius-sm);
+  color: var(--v2-ink-2);
+  font-size: 0.938rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.qf-vendor-v2-sheet-link svg { color: var(--v2-faint); flex: 0 0 auto; }
+.qf-vendor-v2-sheet-link:hover { background: var(--v2-inset); }
+
+.qf-vendor-v2-sheet-link[data-active="true"] {
+  background: var(--v2-blue-tint);
+  color: var(--v2-blue-deep);
+  font-weight: 600;
+}
+
+.qf-vendor-v2-sheet-chevron { margin-left: auto; }
+
+/* ==========================================================================
+   Panels + shared primitives
+   ========================================================================== */
+.qf-vendor-v2-panel {
+  padding: 1.1rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+  box-shadow: var(--v2-shadow);
+}
+
+.qf-vendor-v2-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.qf-vendor-v2-panel-title {
+  margin: 0;
+  font-size: 0.984rem;
+  font-weight: 650;
+  letter-spacing: -0.008em;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-panel-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.828rem;
+  color: var(--v2-muted);
+  line-height: 1.45;
+}
+
+.qf-vendor-v2-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex: 0 0 auto;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--v2-blue-deep);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-textlink:hover { text-decoration: underline; }
+
+.qf-vendor-v2-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--v2-radius-sm);
+  font-family: inherit;
+  font-size: 0.859rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.qf-vendor-v2-btn--primary {
+  background: var(--v2-blue);
+  border-color: var(--v2-blue);
+  color: #ffffff;
+}
+
+.qf-vendor-v2-btn--primary:hover {
+  background: var(--v2-blue-deep);
+  border-color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-btn--quiet {
+  background: var(--v2-surface);
+  border-color: var(--v2-line);
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-btn--quiet:hover {
+  background: var(--v2-inset);
+  border-color: #cfd6e2;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-inset);
+  color: var(--v2-ink-2);
+  font-size: 0.766rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-pill[data-tone="ok"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+  color: var(--v2-ok);
+}
+
+.qf-vendor-v2-pill[data-tone="pending"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-pill[data-tone="warn"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-pill[data-tone="blocked"] {
+  background: var(--v2-danger-tint);
+  border-color: var(--v2-danger-line);
+  color: var(--v2-danger);
+}
+
+/* Empty / restricted states */
+.qf-vendor-v2-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 1.9rem 1rem;
+  text-align: center;
+}
+
+.qf-vendor-v2-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 0.35rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 50%;
+  background: var(--v2-inset);
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-empty-title {
+  margin: 0;
+  font-size: 0.938rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-empty-message {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-empty .qf-vendor-v2-btn { margin-top: 0.7rem; }
+
+/* ==========================================================================
+   Overview — header
+   ========================================================================== */
+.qf-vendor-v2-overview {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-vendor-v2-overview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding-top: 0.4rem;
+}
+
+.qf-vendor-v2-greeting {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(1.35rem, 4.4vw, 1.72rem);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-greeting span { color: var(--v2-blue-deep); }
+
+.qf-vendor-v2-greeting-sub {
+  margin: 0.35rem 0 0;
+  max-width: 56ch;
+  font-size: 0.906rem;
+  line-height: 1.55;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-overview-headmeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ==========================================================================
+   Overview — KPI row
+   ========================================================================== */
+.qf-vendor-v2-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.qf-vendor-v2-metric {
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  padding: 0.9rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+  box-shadow: var(--v2-shadow);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+a.qf-vendor-v2-metric:hover {
+  border-color: var(--v2-blue-line);
+  transform: translateY(-1px);
+}
+
+.qf-vendor-v2-metric-top {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.qf-vendor-v2-metric-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-blue-tint);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-metric[data-tone="warn"] .qf-vendor-v2-metric-icon {
+  background: var(--v2-warn-tint);
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-metric[data-tone="ok"] .qf-vendor-v2-metric-icon {
+  background: var(--v2-ok-tint);
+  color: var(--v2-ok);
+}
+
+/* Wraps rather than truncating: "Profile completion" must stay readable in a
+   two-across 360px grid, and a clipped KPI label is worse than a second line. */
+.qf-vendor-v2-metric-label {
+  font-size: 0.797rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-metric-value {
+  font-size: clamp(1.6rem, 5.4vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-metric[data-tone="warn"] .qf-vendor-v2-metric-value { color: var(--v2-warn); }
+
+.qf-vendor-v2-metric-caption {
+  font-size: 0.766rem;
+  line-height: 1.4;
+  color: var(--v2-faint);
+}
+
+/* ==========================================================================
+   Overview — columns
+   ========================================================================== */
+.qf-vendor-v2-columns {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-vendor-v2-col {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.qf-vendor-v2-overview-foot {
+  margin: 0.2rem 0 0;
+  font-size: 0.828rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-overview-foot a {
+  color: var(--v2-blue-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.qf-vendor-v2-overview-foot a:hover { text-decoration: underline; }
+
+/* ==========================================================================
+   Overview — needs your attention
+   ========================================================================== */
+.qf-vendor-v2-leadlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-leadrow {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid var(--v2-line-soft);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-leadrow-main { min-width: 0; }
+
+.qf-vendor-v2-leadrow-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.qf-vendor-v2-leadrow-title strong {
+  font-size: 0.938rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+  letter-spacing: -0.008em;
+}
+
+.qf-vendor-v2-leadrow-service {
+  margin: 0.2rem 0 0;
+  font-size: 0.859rem;
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-leadrow-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.85rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  font-size: 0.781rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-leadrow-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.qf-vendor-v2-leadrow-meta svg { color: var(--v2-faint); flex: 0 0 auto; }
+
+.qf-vendor-v2-leadrow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.qf-vendor-v2-leadstatus {
+  padding: 0.16rem 0.5rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-surface);
+  font-size: 0.719rem;
+  font-weight: 600;
+  color: var(--v2-ink-2);
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-leadstatus[data-status="New"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-leadstatus[data-status="Follow-up Needed"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-leadlink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 38px;
+  padding: 0 0.35rem;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--v2-blue-deep);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-leadlink:hover { text-decoration: underline; }
+
+.qf-vendor-v2-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.781rem;
+  line-height: 1.4;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-locked svg { color: var(--v2-faint); flex: 0 0 auto; }
+
+.qf-vendor-v2-panel-foot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin-top: 0.85rem;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--v2-blue-deep);
+  text-decoration: none;
+}
+
+.qf-vendor-v2-panel-foot-link:hover { text-decoration: underline; }
+
+/* ==========================================================================
+   Overview — lead access panel
+   ========================================================================== */
+.qf-vendor-v2-access-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-access-banner[data-tone="ok"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+}
+
+.qf-vendor-v2-access-banner[data-tone="pending"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+}
+
+.qf-vendor-v2-access-banner[data-tone="warn"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+}
+
+.qf-vendor-v2-access-banner[data-tone="blocked"] {
+  background: var(--v2-danger-tint);
+  border-color: var(--v2-danger-line);
+}
+
+.qf-vendor-v2-access-icon { flex: 0 0 auto; padding-top: 1px; }
+
+.qf-vendor-v2-access-banner[data-tone="ok"] .qf-vendor-v2-access-icon { color: var(--v2-ok); }
+.qf-vendor-v2-access-banner[data-tone="pending"] .qf-vendor-v2-access-icon { color: var(--v2-blue-deep); }
+.qf-vendor-v2-access-banner[data-tone="warn"] .qf-vendor-v2-access-icon { color: var(--v2-warn); }
+.qf-vendor-v2-access-banner[data-tone="blocked"] .qf-vendor-v2-access-icon { color: var(--v2-danger); }
+
+.qf-vendor-v2-access-headline {
+  margin: 0;
+  font-size: 0.891rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-access-detail {
+  margin: 0.22rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-factlist {
+  display: grid;
+  gap: 0;
+  margin: 0.9rem 0 0;
+}
+
+.qf-vendor-v2-fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-fact:last-child { border-bottom: none; }
+
+.qf-vendor-v2-fact dt {
+  font-size: 0.828rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-fact dd {
+  margin: 0;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--v2-ink);
+  text-align: right;
+}
+
+.qf-vendor-v2-fact dd[data-tone="ok"] { color: var(--v2-ok); }
+.qf-vendor-v2-fact dd[data-tone="warn"] { color: var(--v2-warn); }
+.qf-vendor-v2-fact dd[data-tone="blocked"] { color: var(--v2-danger); }
+.qf-vendor-v2-fact dd[data-tone="pending"] { color: var(--v2-ink-2); }
+
+.qf-vendor-v2-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+/* ==========================================================================
+   Overview — profile completion
+   ========================================================================== */
+.qf-vendor-v2-progress-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-progress-value {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-progress-count {
+  font-size: 0.797rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-progress-track {
+  height: 6px;
+  margin-top: 0.55rem;
+  border-radius: 999px;
+  background: var(--v2-line-soft);
+  overflow: hidden;
+}
+
+.qf-vendor-v2-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--v2-blue);
+}
+
+.qf-vendor-v2-progress-label {
+  margin: 0.95rem 0 0.4rem;
+  font-size: 0.719rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-progress-done {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.828rem;
+  color: var(--v2-ok);
+}
+
+.qf-vendor-v2-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qf-vendor-v2-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.828rem;
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-checklist svg { color: var(--v2-warn); flex: 0 0 auto; }
+
+/* ==========================================================================
+   Overview — business summary
+   ========================================================================== */
+/* Full-width identity strip beneath the two columns. Stacked label/value pairs
+   rather than a right-aligned list, so it reads as a summary band and not as a
+   third column of key/value rows. */
+.qf-vendor-v2-summary {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.qf-vendor-v2-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-summary > div:last-child { border-bottom: none; }
+
+.qf-vendor-v2-summary dt {
+  flex: 0 0 auto;
+  font-size: 0.828rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-summary dd {
+  margin: 0;
+  font-size: 0.828rem;
+  font-weight: 550;
+  color: var(--v2-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 700px) {
+  .qf-vendor-v2-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 1.5rem;
+  }
+
+  .qf-vendor-v2-summary > div {
+    display: block;
+    padding: 0;
+    border-bottom: none;
+    border-left: 1px solid var(--v2-line-soft);
+    padding-left: 1rem;
+  }
+
+  .qf-vendor-v2-summary > div:first-child {
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .qf-vendor-v2-summary dt {
+    font-size: 0.719rem;
+    font-weight: 600;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+    color: var(--v2-faint);
+  }
+
+  .qf-vendor-v2-summary dd {
+    margin-top: 0.28rem;
+    font-size: 0.891rem;
+    font-weight: 600;
+    text-align: left;
+    line-height: 1.4;
+  }
+}
+
+/* ==========================================================================
+   Standalone state (no vendor profile linked)
+   ========================================================================== */
+.qf-vendor-v2-standalone {
+  display: grid;
+  place-items: center;
+  padding: 2rem 0;
+}
+
+.qf-vendor-v2-standalone-panel {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  max-width: 34rem;
+  padding: 2rem 1.4rem;
+  text-align: center;
+}
+
+.qf-vendor-v2-standalone-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-standalone-text {
+  margin: 0 0 0.6rem;
+  max-width: 46ch;
+  font-size: 0.891rem;
+  line-height: 1.6;
+  color: var(--v2-muted);
+}
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+
+/* Tablet: KPIs go four-across once there is room for a readable number. */
+@media (min-width: 700px) {
+  .qf-vendor-v2-content { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .qf-vendor-v2-topbar { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .qf-vendor-v2-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .qf-vendor-v2-topbar-context { display: block; }
+  .qf-vendor-v2-account-text { display: block; }
+
+  .qf-vendor-v2-leadrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  /* Content-width, right-aligned: a fixed action column stretched every button
+     to the same width and made the list read as a column of CTAs. */
+  .qf-vendor-v2-leadrow-actions {
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.3rem;
+  }
+}
+
+/*
+  Desktop shell. 1080px is the point at which a 248px sidebar still leaves a
+  comfortable content column — it keeps the sidebar on a 1366x768 laptop while
+  a 1024x768 tablet correctly stays on the mobile shell.
+*/
+@media (min-width: 1080px) {
+  /* Compound selector for the same reason as the reset above. */
+  .qf-vd-shell.qf-vendor-v2-shell {
+    display: grid;
+    grid-template-columns: var(--v2-sidebar-w) minmax(0, 1fr);
+  }
+
+  .qf-vendor-v2-sidebar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--v2-surface);
+    border-right: 1px solid var(--v2-line);
+  }
+
+  .qf-vendor-v2-topbar-brand { display: none; }
+  .qf-vendor-v2-bottomnav { display: none; }
+
+  .qf-vendor-v2-content {
+    padding: 1.5rem 1.75rem 3rem;
+  }
+
+  .qf-vendor-v2-topbar { padding-left: 1.75rem; padding-right: 1.75rem; }
+
+  .qf-vendor-v2-overview { gap: 1.15rem; }
+  .qf-vendor-v2-metric-grid { gap: 0.9rem; }
+  .qf-vendor-v2-panel { padding: 1.25rem; }
+
+  .qf-vendor-v2-columns {
+    grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+    gap: 1.15rem;
+    align-items: start;
+  }
+}
+
+/* Wide desktop: a touch more air, content stays capped by --v2-content-max. */
+@media (min-width: 1400px) {
+  .qf-vendor-v2-content { padding: 1.75rem 2.25rem 3.5rem; }
+  .qf-vendor-v2-topbar { padding-left: 2.25rem; padding-right: 2.25rem; }
+}
+
+/* Motion: everything here is a hover/focus/entrance transition, so honouring
+   the OS preference simply removes it. */
+@media (prefers-reduced-motion: reduce) {
+  .qf-vendor-v2-shell *,
+  .qf-vendor-v2-shell *::before,
+  .qf-vendor-v2-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  a.qf-vendor-v2-metric:hover { transform: none; }
+}

@@ -183,6 +183,16 @@ jobs:
       - name: QF-MVP-80.04 fail-closed runtime default
         run: npm run test:mvp:80-04
 
+      # QF-MVP-80.14A — the ONLY authority in the repository that can assign
+      # activation_status = 'active', i.e. the switch that turns real outbound
+      # WhatsApp on in production. Its narrowness is the whole safety argument:
+      # one hard-coded lane, every switch a constant, durable delivered-canary
+      # proof required, and postconditions that roll the call back on drift. That
+      # must be proved at the exact head of every change, not just its own.
+      # Offline file-level harness: no secrets, no Supabase, no Meta, no n8n.
+      - name: QF-MVP-80.14A Meta production activation authority
+        run: npm run test:mvp:80-14a
+
       - name: Marketplace eligibility and category contract
         run: npm run test:mvp:marketplace
 

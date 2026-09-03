@@ -250,10 +250,31 @@ const POST_ANCHOR_RECONCILED = [
   marker: `QF_MVP_80_05_REMOTE_HISTORY_RECONCILED_${m.version}`,
 }));
 
-// QF-MVP-80.05 — nothing is pending any more. The key is KEPT and pinned EMPTY rather
-// than deleted, so a future slice cannot quietly reintroduce an unpinned pending entry
-// by recreating the array, and so "deleted the pending list" stays a rejected mutant.
-const POST_ANCHOR_PENDING = [];
+// QF-MVP-80.05 emptied this list. QF-MVP-80.14A puts exactly ONE entry back.
+//
+// The key is never deleted and never generic: a pending migration is pinned by exact
+// version, name, path and canonical SHA, so "deleted the pending list" and "added an
+// unpinned pending entry" both stay rejected mutants.
+//
+// 20260903040000 is the Meta production ACTIVATION authority — the only function in the
+// repository that can assign activation_status = 'active'. It is SOURCE ONLY: it has NOT
+// been applied to staging or production, it carries no applied evidence and no remote
+// history count, and it requires its own separate deployment gate. Applying it arms
+// nothing (its §3.10 refuses to commit if any sendable policy, active canary destination
+// or active mapping exists), but it is the migration that makes production sending
+// REACHABLE, so its gate is the most consequential of the set.
+const POST_ANCHOR_PENDING = [
+  {
+    version: "20260903040000",
+    name: "qf_mvp_80_14a_meta_lead_assignment_production_activation",
+    sha: "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
+    phase: "QF-MVP-80.14A",
+  },
+].map((m) => ({
+  ...m,
+  filename: `${m.version}_${m.name}.sql`,
+  path: `supabase/migrations/${m.version}_${m.name}.sql`,
+}));
 
 const RECONCILED_EVIDENCE_TYPE = "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION";
 const RECONCILED_REMOTE_STATUS = "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY";
@@ -284,7 +305,18 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // reordered. Still exact equality.
 // QF-MVP-80.05 does NOT move this number. It adds, removes and renames no migration
 // and edits no migration body — it only reconciles stale application-state claims.
-const MIGRATION_COUNT = 102;
+// QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
+// activation authority (20260903040000). No existing migration was changed, renamed,
+// deleted or reordered. Still exact equality.
+const MIGRATION_COUNT = 103;
+// The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
+// fact about that reconciliation, not a live count, and it must never track
+// MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
+// retroactively change how many migrations 80.05 looked at. Pinned as its own
+// constant for exactly the reason `appliedAnchor.remoteHistoryCountAfterApply` and
+// RECONCILED_HISTORY are pinned — a historical observation stays observed.
+// The LIVE tree size is asserted separately, against MIGRATION_COUNT.
+const RECONCILIATION_MIGRATION_COUNT = 102;
 const RECONCILIATION_DOC_PATH = "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md";
 
 const APPROVED_COMMON = [
@@ -489,16 +521,24 @@ function validateState(state) {
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly fifteen local migrations are newer than the anchor", postAnchorLocal.length === 15, `actual=${postAnchorLocal.length}`);
+  check("exactly sixteen local migrations are newer than the anchor", postAnchorLocal.length === 16, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 15);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 16);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
   check("the reconciled records appear in exact pinned order", same(reconciledPins?.map((r) => r.version), POST_ANCHOR_RECONCILED.map((m) => m.version)));
-  check("the explicit PENDING post-anchor set is present and EMPTY", pendingPins !== null && pendingPins.length === 0, `actual=${pendingPins?.length}`);
-  check("nothing pinned is claimed pending: every post-anchor migration is accounted for as applied",
-    appliedTruth.length === 15 && same(appliedTruth.map((r) => r.version), POST_ANCHOR_ORDER));
+  // QF-MVP-80.14A: the PENDING set is no longer empty, but it is still EXACT. One
+  // entry, pinned by version/name/path/SHA, and it must not also be claimed applied.
+  check("the explicit PENDING post-anchor set holds exactly the one pinned entry",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 1,
+    `actual=${pendingPins?.length}`);
+  check("the pending records appear in exact pinned order",
+    same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
+  check("applied truth and pending truth together account for every post-anchor migration, with no overlap",
+    appliedTruth.length === 15 &&
+    same([...appliedTruth.map((r) => r.version), ...(pendingPins ?? []).map((r) => r.version)], POST_ANCHOR_ORDER) &&
+    !(pendingPins ?? []).some((p) => appliedTruth.some((a) => a.version === p.version)));
 
   for (const expected of POST_ANCHOR_RECONCILED) {
     const label = `${expected.phase} ${expected.version}`;
@@ -529,6 +569,38 @@ function validateState(state) {
     check(`${label}: applied exactly once, not by this source phase, and needs no further gate`,
       pin?.appliedExactlyOnce === true && pin?.appliedByThisPhase === false &&
       pin?.requiresSeparateStagingDeploymentGate === false);
+  }
+
+  // QF-MVP-80.14A — per-migration assertions for the PENDING set. A pending entry
+  // is held to the same identity and hash standard as an applied one, and is
+  // additionally required to claim NO application evidence of any kind: an
+  // unapplied migration that carries an applied marker, a remote-history count or
+  // a "no further gate needed" flag is exactly the drift this manifest exists to
+  // prevent.
+  for (const expected of POST_ANCHOR_PENDING) {
+    const label = `${expected.phase} ${expected.version}`;
+    const local = postAnchorLocal.find((record) => record.version === expected.version);
+    const pin = pendingPins?.find((record) => record.version === expected.version);
+    const disk = state.postAnchorOnDisk?.[expected.version];
+
+    check(`${label}: local migration is exactly the pinned version/name/file`,
+      local?.version === expected.version && local?.name === expected.name && local?.filename === expected.filename);
+    check(`${label}: manifest entry matches the pinned identity`,
+      pin?.version === expected.version && pin?.name === expected.name && pin?.path === expected.path && pin?.phase === expected.phase);
+    check(`${label}: source exists and raw/canonical SHA are exact`,
+      disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha);
+    check(`${label}: manifest SHA equals the on-disk SHA`,
+      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256);
+    check(`${label}: is PENDING and is never also claimed applied`,
+      pin?.operationalStatus === "PENDING" &&
+      !appliedTruth.some((record) => record.version === expected.version));
+    check(`${label}: claims NO application evidence and NO remote history`,
+      pin?.appliedToStaging === false && pin?.appliedToProduction === false &&
+      pin?.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+      !("remoteHistoryCountAfterApply" in (pin ?? {})) &&
+      !("appliedEvidenceMarker" in (pin ?? {})));
+    check(`${label}: still requires its own separate deployment gate`,
+      pin?.requiresSeparateStagingDeploymentGate === true && pin?.appliedByThisPhase === false);
   }
 
   // Per-migration exact identity, hash, evidence and remote-history assertions.
@@ -581,8 +653,13 @@ function validateState(state) {
     manifest.historyReconciliation?.migrationsAdded === 0 &&
     manifest.historyReconciliation?.migrationsRemoved === 0 &&
     manifest.historyReconciliation?.migrationsRenamed === 0 &&
-    manifest.historyReconciliation?.migrationCount === MIGRATION_COUNT &&
+    manifest.historyReconciliation?.migrationCount === RECONCILIATION_MIGRATION_COUNT &&
     manifest.historyReconciliation?.databaseMutationAuthorized === false);
+  // ...and the live tree is exactly the pinned tree, one migration larger, with the
+  // difference accounted for as an explicitly pinned PENDING entry and nothing else.
+  check("every migration added since that reconciliation is explicitly pinned as pending",
+    MIGRATION_COUNT - RECONCILIATION_MIGRATION_COUNT === POST_ANCHOR_PENDING.length &&
+    state.migrations.length === MIGRATION_COUNT);
   check("the reconciliation authorizes no production apply and names both project refs correctly",
     manifest.historyReconciliation?.productionApplyAuthorized === false &&
     manifest.historyReconciliation?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
@@ -694,6 +771,29 @@ function runMutants(pristineState) {
     // 20260813000000 is now a REAL pinned pending migration.
     ["an unpinned new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260818000000", name: "sixteenth", path: "supabase/migrations/20260818000000_sixteenth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.6", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
     ["the pending list key deleted entirely instead of pinned", (state) => { delete state.manifest.pendingPostAnchorMigrations; }],
+
+    // --- QF-MVP-80.14A: the ONE pinned pending activation authority ------------
+    // This migration creates the only function that can turn production sending
+    // on, so every way of quietly promoting it past its own gate is a mutant.
+    ["the pending activation authority is emptied away", (state) => { state.manifest.pendingPostAnchorMigrations = []; }],
+    ["the pending activation authority is claimed APPLIED", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].operationalStatus = "APPLIED";
+    }],
+    ["the pending activation authority is also listed as applied", (state) => {
+      state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.pendingPostAnchorMigrations[0]));
+    }],
+    ["the pending activation authority claims it was applied to production", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].appliedToProduction = true;
+    }],
+    ["the pending activation authority's SHA drifts from disk", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].sha256 = "a".repeat(64);
+    }],
+    ["the pending activation authority waives its own deployment gate", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = false;
+    }],
+    ["the pending activation authority fabricates a remote history count", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31;
+    }],
 
     // --- QF-MVP-80.05: the five RECONCILED already-applied authorities ---------
     // Index 0 is 20260813000000 (the canary activation authority); index 4 is

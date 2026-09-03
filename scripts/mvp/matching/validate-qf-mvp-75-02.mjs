@@ -780,7 +780,10 @@ section('J. MIGRATION GOVERNANCE [static]');
 // ===========================================================================
 {
   const migrations = readdirSync(path.join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
-  check('J01 the local migration set is exactly 102', migrations.length === 102,
+// QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
+// activation authority (20260903040000). No existing migration was changed, renamed,
+// deleted or reordered. Still exact equality.
+  check('J01 the local migration set is exactly 103', migrations.length === 103,
     `found ${migrations.length}`);
   // QF-MVP-80.03: the geo migration is no longer the TAIL of the set — the
   // audit_logs forward repair (20260817000000) was added after it. What 75.02
@@ -794,8 +797,8 @@ section('J. MIGRATION GOVERNANCE [static]');
 
   const g1 = read('scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs');
   const geoSha = sha256(MIGRATION_RAW.replace(/\r\n/g, '\n'));
-  check('J03 G1 is re-pinned to 102 by exact equality, never loosened to >=',
-    /const MIGRATION_COUNT = 102;/.test(g1)
+  check('J03 G1 is re-pinned to 103 by exact equality, never loosened to >=',
+    /const MIGRATION_COUNT = 103;/.test(g1)
     && !/MIGRATION_COUNT\s*[><]=/.test(g1));
   // QF-MVP-80.05 RECONCILIATION: 20260816000000 was applied to staging and production,
   // proved by read-only history queries, so the manifest now carries it as RECONCILED /
@@ -819,11 +822,13 @@ section('J. MIGRATION GOVERNANCE [static]');
     && geoEntry.appliedByThisPhase === false
     && geoEntry.requiresSeparateStagingDeploymentGate === false
     && !pending.some((m) => m.version === '20260816000000'));
-  check('J06 the manifest post-anchor count is 15: ten applied, five reconciled, none pending',
-    manifest.appliedAnchor.postAnchorMigrationCount === 15
+  check('J06 the manifest post-anchor count is 16: ten applied, five reconciled, one pending',
+    manifest.appliedAnchor.postAnchorMigrationCount === 16
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
     && reconciled.length === 5
-    && pending.length === 0);
+    && pending.length === 1
+    && pending[0].version === '20260903040000'
+    && pending[0].operationalStatus === 'PENDING');
   check('J07 THIS phase still applied nothing: the geo record carries no observed remote-history count',
     geoEntry && geoEntry.remoteVersionStatus === 'PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY'
     && geoEntry.remoteHistoryCountObservedAtApply === false

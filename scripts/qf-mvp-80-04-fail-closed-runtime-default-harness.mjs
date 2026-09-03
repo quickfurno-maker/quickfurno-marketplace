@@ -254,7 +254,35 @@ check("21 [static] the admin settings view mirrors the canonical default", () =>
 
 check("22 [static] this slice adds no migration and no seed", () => {
   const migrations = readdirSync(path.join(process.cwd(), "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
-  assert(migrations.length === 102, `expected 102 migrations, found ${migrations.length}`);
+
+  // QF-MVP-80.14A. This guard used to hard-code the GLOBAL migration count (102),
+  // which made it a moving-HEAD assertion: it went red the moment ANY later slice
+  // legitimately added a migration, even though 80.04 still added none. That is a
+  // false failure about someone else's work, and re-bumping the literal every time
+  // just defers it.
+  //
+  // Re-pinned to what this slice can actually claim, without losing coverage:
+  //   (1) NO migration belongs to the 80.04 slice — the real scope statement, and
+  //       true forever;
+  //   (2) the tree size still equals the ONE pinned authority for it, G1's
+  //       MIGRATION_COUNT, read from G1's source rather than duplicated here. An
+  //       unpinned migration therefore still fails this check, and it fails G1's
+  //       153 mutants first.
+  assert(
+    migrations.filter((f) => /80_04/.test(f)).length === 0,
+    `QF-MVP-80.04 must add no migration; found ${migrations.filter((f) => /80_04/.test(f)).join(", ")}`
+  );
+  const g1 = readFileSync(
+    path.join(process.cwd(), "scripts", "mvp", "staging", "validate-qf-mvp-50-2c-s2-g1.mjs"),
+    "utf8"
+  );
+  const pinned = /const MIGRATION_COUNT = (\d+);/.exec(g1);
+  assert(pinned !== null, "G1 no longer pins a migration count");
+  assert(
+    migrations.length === Number(pinned[1]),
+    `tree has ${migrations.length} migrations but G1 pins ${pinned[1]}`
+  );
+
   assert(!/upsert\(|insert\(/.test(SETTINGS_SRC.split("updateMarketplaceRuntimeSetting")[0]),
     "the loader must not write a row to make the default real");
 });

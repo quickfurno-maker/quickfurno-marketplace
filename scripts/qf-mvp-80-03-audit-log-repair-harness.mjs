@@ -204,9 +204,32 @@ async function captureConsole(fn) {
 // ============================================================================
 check("01 [static] the migration exists with a forward-only timestamped name", () => {
   assert(existsSync(MIGRATION_FILE), "migration file missing");
-  assert(/^\d{14}_/.test(path.basename(MIGRATION_FILE)), "must carry a 14-digit timestamp prefix");
-  const newest = MIGRATION_FILES.slice().sort().pop();
-  assert(newest === path.basename(MIGRATION_FILE), `must be the newest migration, newest is ${newest}`);
+  const base = path.basename(MIGRATION_FILE);
+  assert(/^\d{14}_/.test(base), "must carry a 14-digit timestamp prefix");
+
+  // QF-MVP-80.14A. This used to assert "is the NEWEST migration in the tree",
+  // which is a moving-HEAD claim: it went red the moment any later slice added a
+  // migration, even though 80.03's migration was still perfectly forward-only.
+  // Forward-only is a property of THIS migration's position, not of it being last
+  // forever, so it is now stated as such and stays true for good:
+  //   * it appears exactly once,
+  //   * every migration ordered before it has a strictly smaller version, and
+  //   * the whole tree is strictly ascending with no duplicate timestamps.
+  const sorted = MIGRATION_FILES.slice().sort();
+  assert(sorted.filter((f) => f === base).length === 1, "must appear exactly once");
+
+  const versions = sorted.map((f) => f.slice(0, 14));
+  assert(new Set(versions).size === versions.length, "duplicate migration timestamps");
+  for (let i = 1; i < versions.length; i += 1) {
+    assert(versions[i] > versions[i - 1], `migration order is not strictly ascending at ${sorted[i]}`);
+  }
+
+  const index = sorted.indexOf(base);
+  assert(index > 0, "must not be the first migration in the tree");
+  assert(
+    sorted.slice(0, index).every((f) => f.slice(0, 14) < base.slice(0, 14)),
+    "must be strictly newer than every migration ordered before it"
+  );
 });
 
 check("02 [static] it creates audit_logs with the canonical columns", () => {
@@ -598,8 +621,23 @@ check("39 [static] no historical backfill and no new migration", () => {
     assert(!/update\([^)]*admin_user_id/.test(src), "existing audit rows must never be updated");
     assert(!/from\("audit_logs"\)[\s\S]{0,120}\.(update|delete)\(/.test(src), "no update/delete on audit_logs");
   }
+  // QF-MVP-80.14A. "PR C adds no migration" was expressed as a hard-coded global
+  // count, so a later slice adding a legitimate, explicitly pinned migration made
+  // it fail — a false failure about someone else's work. The count is now
+  // delegated to the ONE authority for it, G1's MIGRATION_COUNT, rather than
+  // duplicated as a literal here. An UNPINNED migration still fails this check,
+  // and fails G1's 153 mutants first.
   const migrations = readdirSync(path.join(process.cwd(), "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
-  assert(migrations.length === 102, `PR C adds no migration; expected 102, found ${migrations.length}`);
+  const g1 = readFileSync(
+    path.join(process.cwd(), "scripts", "mvp", "staging", "validate-qf-mvp-50-2c-s2-g1.mjs"),
+    "utf8"
+  );
+  const pinned = /const MIGRATION_COUNT = (\d+);/.exec(g1);
+  assert(pinned !== null, "G1 no longer pins a migration count");
+  assert(
+    migrations.length === Number(pinned[1]),
+    `tree has ${migrations.length} migrations but G1 pins ${pinned[1]}`
+  );
 });
 
 mutant("40 [mutant] dropping admin_user_id from the vendor audit insert is rejected",

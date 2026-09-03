@@ -113,6 +113,105 @@
 }
 
 /* ==========================================================================
+   Utility-page chrome (QF-UI-V2-04)
+
+   Page header, result banner and section primitives shared by Credits &
+   Package, Notifications and Support. They live here rather than being
+   triplicated in three page stylesheets; each of those keeps only its own
+   page-specific rules.
+   ========================================================================== */
+.qf-vendor-v2-utilhead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding-top: 0.4rem;
+}
+
+.qf-vendor-v2-utilhead-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 3.6vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-utilhead-sub {
+  margin: 0.25rem 0 0;
+  max-width: 62ch;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-utilhead-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.qf-vendor-v2-utilalert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+}
+
+.qf-vendor-v2-utilalert[data-tone="ok"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+}
+
+.qf-vendor-v2-utilalert[data-tone="info"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+}
+
+.qf-vendor-v2-utilalert[data-tone="warn"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+}
+
+.qf-vendor-v2-utilalert[data-tone="error"] {
+  background: var(--v2-danger-tint);
+  border-color: var(--v2-danger-line);
+}
+
+.qf-vendor-v2-utilalert-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding-top: 1px;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-utilalert[data-tone="ok"] .qf-vendor-v2-utilalert-icon { color: var(--v2-ok); }
+.qf-vendor-v2-utilalert[data-tone="info"] .qf-vendor-v2-utilalert-icon { color: var(--v2-blue-deep); }
+.qf-vendor-v2-utilalert[data-tone="warn"] .qf-vendor-v2-utilalert-icon { color: var(--v2-warn); }
+.qf-vendor-v2-utilalert[data-tone="error"] .qf-vendor-v2-utilalert-icon { color: var(--v2-danger); }
+
+.qf-vendor-v2-utilalert-text {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-ink-2);
+}
+
+/* Disabled form controls inside the portal read as unavailable, not broken. */
+.qf-vendor-v2-shell button[disabled],
+.qf-vendor-v2-shell .qf-vendor-v2-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
    Brand lockup
    ========================================================================== */
 .qf-vendor-v2-brand {

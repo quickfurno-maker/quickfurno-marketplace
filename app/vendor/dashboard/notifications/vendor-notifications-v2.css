@@ -1,0 +1,217 @@
+/* ==========================================================================
+   QuickFurno — Vendor Notifications V2  (QF-UI-V2-04)
+
+   Scope: imported ONLY by app/vendor/dashboard/notifications/page.tsx. Every
+   selector is namespaced `qf-vendor-v2-notice-*`; no bare element selector is
+   redefined. Tokens, panels, buttons, empty states and the utility page header
+   / banner come from the approved vendor-portal-v2.css.
+   ========================================================================== */
+
+.qf-vendor-v2-notice {
+  display: grid;
+  gap: 0.85rem;
+}
+
+/* ==========================================================================
+   Filter tabs — the two server-driven views.
+   ========================================================================== */
+.qf-vendor-v2-notice-filters {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.qf-vendor-v2-notice-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 38px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-size: 0.859rem;
+  font-weight: 550;
+  text-decoration: none;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.qf-vendor-v2-notice-tab:hover {
+  background: var(--v2-inset);
+  border-color: #cfd6e2;
+}
+
+.qf-vendor-v2-notice-tab[data-active="true"] {
+  background: var(--v2-blue);
+  border-color: var(--v2-blue);
+  color: #ffffff;
+  font-weight: 650;
+}
+
+.qf-vendor-v2-notice-tab-count {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--v2-blue-tint);
+  font-size: 0.719rem;
+  font-weight: 650;
+  color: var(--v2-blue-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-notice-tab[data-active="true"] .qf-vendor-v2-notice-tab-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Inbox rows
+   ========================================================================== */
+.qf-vendor-v2-notice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.qf-vendor-v2-notice-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid var(--v2-line);
+  /* Reserved to the same 3px the unread accent uses, so read and unread rows
+     start their content on the same vertical line. */
+  border-left: 3px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+  box-shadow: var(--v2-shadow);
+}
+
+/*
+  Unread carries THREE independent signals: a tinted ground, a left accent rule
+  and the word "Unread" in the kicker. Colour alone never conveys it.
+*/
+.qf-vendor-v2-notice-item[data-unread="true"] {
+  border-color: var(--v2-blue-line);
+  background: var(--v2-blue-tint);
+  border-left: 3px solid var(--v2-blue);
+}
+
+.qf-vendor-v2-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--v2-radius-sm);
+  border: 1px solid var(--v2-line);
+  background: var(--v2-inset);
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-notice-item[data-unread="true"] .qf-vendor-v2-notice-icon {
+  border-color: var(--v2-blue-line);
+  background: var(--v2-surface);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-notice-body { min-width: 0; }
+
+.qf-vendor-v2-notice-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+  font-size: 0.719rem;
+}
+
+.qf-vendor-v2-notice-type {
+  padding: 0.12rem 0.42rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+  font-weight: 600;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-notice-priority {
+  padding: 0.12rem 0.42rem;
+  border: 1px solid var(--v2-warn-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-warn-tint);
+  font-weight: 650;
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-notice-unread {
+  padding: 0.12rem 0.42rem;
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-blue);
+  font-weight: 650;
+  color: #ffffff;
+}
+
+.qf-vendor-v2-notice-time {
+  color: var(--v2-faint);
+  font-weight: 500;
+}
+
+.qf-vendor-v2-notice-title {
+  margin: 0.35rem 0 0;
+  font-size: 0.938rem;
+  font-weight: 650;
+  letter-spacing: -0.008em;
+  color: var(--v2-ink);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-notice-message {
+  margin: 0.2rem 0 0;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--v2-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.qf-vendor-v2-notice-actions:empty { display: none; }
+
+/* Quiet secondary action, so it never competes with the row's own CTA. */
+.qf-vendor-v2-notice-markread {
+  min-height: 38px;
+  padding: 0 0.6rem;
+  border: none;
+  border-radius: var(--v2-radius-sm);
+  background: none;
+  font-family: inherit;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--v2-blue-deep);
+  cursor: pointer;
+}
+
+.qf-vendor-v2-notice-markread:hover { text-decoration: underline; }
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+@media (min-width: 700px) {
+  .qf-vendor-v2-notice { gap: 1rem; }
+
+  .qf-vendor-v2-notice-item {
+    padding: 1rem 1.1rem;
+    gap: 0.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-vendor-v2-notice-tab { transition-duration: 0.01ms !important; }
+}

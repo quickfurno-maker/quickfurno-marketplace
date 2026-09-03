@@ -406,7 +406,9 @@ record("R18 the execute_v1 repair is present, ordered immediately before the wed
     // ordering proof.
     // QF-MVP-75.02 RE-PIN: 100 -> 101 (20260816000000). Still exact equality,
     // still an ordering proof.
-    return files.length === 102 &&
+    // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta
+    // production activation authority (20260903040000). Still exact equality.
+    return files.length === 103 &&
       files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
@@ -495,11 +497,11 @@ record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surf
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("W19 the wedge repair is present and the set is exactly 102",
+record("W19 the wedge repair is present and the set is exactly 103",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 102 && files.includes(WEDGE_NAME);
+    return files.length === 103 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -554,9 +556,12 @@ record("G02 the ten applied records are 21 through 30 in exact ascending order",
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("G03 post-anchor count and local migration count agree at 15 / 102",
-  manifest.appliedAnchor.postAnchorMigrationCount === 15 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 102);
+// QF-MVP-80.14A RE-PIN: 15 / 102 -> 16 / 103, adding ONLY the SOURCE-PENDING Meta
+// production activation authority (20260903040000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality.
+record("G03 post-anchor count and local migration count agree at 16 / 103",
+  manifest.appliedAnchor.postAnchorMigrationCount === 16 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 103);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
@@ -568,13 +573,15 @@ record("G03a the G1 staging-history gate was re-pinned to the applied truth, not
   // QF-MVP-80.05 RECONCILIATION: the five ex-pending authorities are proved applied to
   // BOTH environments, so the pending set is pinned EMPTY and a RECONCILED set of exactly
   // five carries them. The APPLIED ten are untouched. Still exact counts, still no `>=`.
-  g1Source.includes("the explicit PENDING post-anchor set is present and EMPTY") &&
+  // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
+  // the production activation authority. Still an exact count, still no `>=`.
+  g1Source.includes("the explicit PENDING post-anchor set holds exactly the one pinned entry") &&
   g1Source.includes("manifest declares exactly five RECONCILED post-anchor migrations") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 10") &&
-  g1Source.includes("pendingPins.length === 0") &&
+  g1Source.includes("pendingPins.length === 1") &&
   g1Source.includes("reconciledPins.length === 5") &&
-  g1Source.includes("const MIGRATION_COUNT = 102;"));
+  g1Source.includes("const MIGRATION_COUNT = 103;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -810,7 +817,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 10") &&
-          g1Source.includes("pendingPins.length === 0") &&
+          g1Source.includes("pendingPins.length === 1") &&
           g1Source.includes("reconciledPins.length === 5") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/reconciledPins\.length\s*>=/.test(g1Source) &&

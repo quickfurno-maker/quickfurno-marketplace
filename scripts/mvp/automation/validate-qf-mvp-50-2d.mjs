@@ -650,8 +650,11 @@ record("I02 the 50.2D migration matches its pinned hash",
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("I03 exactly fifteen migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 15);
+// QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
+// activation authority (20260903040000). No existing migration was changed, renamed,
+// deleted or reordered. Still exact equality.
+record("I03 exactly sixteen migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 16);
 record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, the execute_v1 repair, the fresh-claim wedge repair, the policy-config bridge, the 50.3/50.4 set, then the 50.5 recovery transport, then the marketing-consent writer",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
        [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME,
@@ -664,13 +667,14 @@ record("I04 they are exactly the 50.2D completion route, the 50.2E execution rou
         "20260814000000_qf_mvp_40_marketing_consent_writer.sql",
         "20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql",
         "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql",
-        "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql"]));
+        "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql",
+        "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql"]));
 // QF-MVP-40.13B RE-PIN: 97 -> 98, adding only the SOURCE-PENDING canary activation
 // authority. Still exact equality.
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("I05 the local migration count is exactly 102", migrationFiles.length === 102);
+record("I05 the local migration count is exactly 103", migrationFiles.length === 103);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -720,15 +724,19 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
 // reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
-record("G03 exactly ten APPLIED, five RECONCILED and ZERO PENDING post-anchor migrations are declared",
+  // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
+  // the Meta production activation authority. Still an exact count, never `>=`.
+record("G03 exactly ten APPLIED, five RECONCILED and ONE PENDING post-anchor migration are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 10 &&
   Array.isArray(manifest.reconciledPostAnchorMigrations) && manifest.reconciledPostAnchorMigrations.length === 5 &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
     r.appliedToStaging === true && r.appliedToProduction === true) &&
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 0 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
+  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 15 &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 16 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
@@ -767,7 +775,7 @@ record("G07 no generic future-migration allowance was granted",
 // state an EXACT count with no `>=` anywhere — so the literal moves and the shape
 // requirement does not.
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 102;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 103;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",

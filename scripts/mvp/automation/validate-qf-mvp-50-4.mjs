@@ -319,8 +319,12 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // production. They moved out of pendingPostAnchorMigrations (now EMPTY) into the new
 // reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
-record("G02 the pending post-anchor set is EMPTY, five are reconciled, and 50.5 is the newest applied record",
-  manifest.pendingPostAnchorMigrations.length === 0 &&
+// QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
+// the Meta production activation authority. Still an exact count, never `>=`.
+record("G02 the pending post-anchor set holds exactly the one pinned activation authority, five are reconciled, and 50.5 is the newest applied record",
+  manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
+  manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.reconciledPostAnchorMigrations.length === 5 &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED") &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
@@ -345,8 +349,11 @@ record("G05 the validator is registered and wired into CI after 50.3",
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("G06 the local migration set is exactly 102",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 102);
+// QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
+// activation authority (20260903040000). This phase still adds no migration of its
+// own; the count is re-pinned by exact equality, never loosened.
+record("G06 the local migration set is exactly 103",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 103);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

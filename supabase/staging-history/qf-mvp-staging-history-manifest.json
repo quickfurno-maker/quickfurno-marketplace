@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 15,
+    "postAnchorMigrationCount": 16,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -888,7 +888,24 @@
       "evidencePath": "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md"
     }
   ],
-  "pendingPostAnchorMigrations": [],
+  "pendingPostAnchorMigrations": [
+    {
+      "version": "20260903040000",
+      "name": "qf_mvp_80_14a_meta_lead_assignment_production_activation",
+      "path": "supabase/migrations/20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+      "sha256": "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
+      "phase": "QF-MVP-80.14A",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates public.qf_activate_meta_lead_assignment_v1 — the ONLY authority that can assign activation_status=active, scoped to meta_whatsapp_cloud/whatsapp/lead_assignment_alert/en. Applying it arms nothing.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    }
+  ],
   "safety": {
     "baselineMustRemainOutsideMigrations": true,
     "preBaselineReplayForbidden": true,
@@ -982,9 +999,9 @@
       "directReadPerformedByThisPhase": false,
       "directReadBlockedBy": "POOLER_PASSWORD_AUTHENTICATION_REJECTED_28P01",
       "corroboratingReadOnlyObjectProbes": [
-        "public.audit_logs present \u2014 created only by 20260817000000",
-        "public.vendors.geo_point present \u2014 created only by 20260816000000",
-        "public.leads.geo_point present \u2014 created only by 20260816000000"
+        "public.audit_logs present — created only by 20260817000000",
+        "public.vendors.geo_point present — created only by 20260816000000",
+        "public.leads.geo_point present — created only by 20260816000000"
       ]
     },
     "production": {

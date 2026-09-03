@@ -41,7 +41,12 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 102;
+// QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
+// activation authority. Still exact equality.
+const MIGRATION_COUNT = 103;
+const PRODUCTION_ACTIVATION_FILENAME =
+  "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
+
 // QF-MVP-50.5 STAGING GATE RE-PIN: this version is no longer pending. It cleared
 // its own staging gate at remote history 30 and is now the newest APPLIED record.
 const RECOVERY_VERSION = "20260812000000";
@@ -155,12 +160,13 @@ function validateState(state) {
     ? manifest.reconciledPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 102", state.migrationFiles.length === MIGRATION_COUNT);
-  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration and the five pinned SOURCE-PENDING governed authorities",
-    same(state.migrationFiles.slice(-10),
+  check("migration count is exactly 103", state.migrationFiles.length === MIGRATION_COUNT);
+  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration, the five reconciled governed authorities and the one pinned SOURCE-PENDING activation authority",
+    same(state.migrationFiles.slice(-11),
       [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
        CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
-       GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME]));
+       GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,
+       PRODUCTION_ACTIVATION_FILENAME]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -172,8 +178,9 @@ function validateState(state) {
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
   // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
   // UNCHANGED at ten: neither pending migration has been applied to staging.
-  check("the manifest pending set is EMPTY and the five governed authorities are reconciled as APPLIED",
-    pending !== null && pending.length === 0 &&
+  check("the manifest pending set holds exactly the one pinned activation authority and the five governed authorities are reconciled as APPLIED",
+    pending !== null && pending.length === 1 &&
+    pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
     reconciled !== null && reconciled.length === 5 &&
     reconciled[0].version === "20260813000000" &&
     reconciled[1].version === "20260814000000" &&
@@ -196,8 +203,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals the ten applied records plus the five SOURCE-PENDING authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5);
+  check("the anchor post-anchor count equals the ten applied records plus the five reconciled authorities plus the one pinned SOURCE-PENDING activation authority",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 1);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

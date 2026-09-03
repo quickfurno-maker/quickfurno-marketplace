@@ -88,6 +88,21 @@
   box-sizing: border-box;
 }
 
+/* Visually hidden but available to assistive tech. Shared by every portal
+   page — it was Leads-local, which left the Profile page rendering its hidden
+   labels as visible text. */
+.qf-vendor-v2-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Visible keyboard focus on every interactive element in the portal. */
 .qf-vendor-v2-shell a:focus-visible,
 .qf-vendor-v2-shell button:focus-visible,

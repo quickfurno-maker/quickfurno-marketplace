@@ -193,6 +193,14 @@ jobs:
       - name: QF-MVP-80.14A Meta production activation authority
         run: npm run test:mvp:80-14a
 
+      # QF-MVP-80.14C — the production SCHEDULER. It is the only thing that will
+      # routinely invoke the live outbound lane, so its containment must be proved
+      # at the exact head: one endpoint, POST only, fixed batch, no secret in cron
+      # or argv, no Meta/n8n/SQL, no retry, no overlap, sanitized logging.
+      # Offline file-level harness: no secrets, no Supabase, no Meta, no VPS.
+      - name: QF-MVP-80.14C production scheduler containment
+        run: npm run test:mvp:80-14c
+
       - name: Marketplace eligibility and category contract
         run: npm run test:mvp:marketplace
 

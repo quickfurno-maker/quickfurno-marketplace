@@ -1,0 +1,22 @@
+# =============================================================================
+# QuickFurno - QF-MVP-80.14C lead-assignment dispatch scheduler.
+#
+# Deployed to /etc/cron.d/quickfurno-lead-assignment-dispatch (root:root, 0644).
+#
+# It invokes ONLY the approved root-owned wrapper. There is deliberately no
+# curl, no URL, no header and NO SECRET on this line: QF_CRON_SECRET lives only
+# in /etc/quickfurno/quickfurno-runtime.env (root-protected) and is read by the
+# wrapper at execution time. A cron file is world-readable, so a secret here
+# would be a disclosure.
+#
+# Cadence: once per minute. Overlap is impossible - the wrapper takes an
+# exclusive flock and a tick arriving during a slow run exits immediately.
+#
+# The wrapper sends a fixed batch of 3 (QuickFurno assigns at most 3 vendors per
+# lead). Core independently clamps any limit to [1,25].
+# =============================================================================
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+* * * * * root /usr/local/sbin/qf-lead-assignment-dispatch

@@ -1,0 +1,1001 @@
+/* ==========================================================================
+   QuickFurno — Client enquiry & utility modals V2  (QF-UI-V2-08)
+
+   Loaded LAST from app/layout.tsx so these scoped rules win over the legacy
+   cream/copper treatment in qf-redesign.css and vendor-discovery.css WITHOUT
+   deleting selectors that other, not-yet-redesigned surfaces still rely on.
+
+   Covers the three client-facing utilities so they share one visual language:
+     .qf-rf-*            the global Requirement-First enquiry modal
+     .qf-free-interest-* the free-vendor callback modal
+     .qf-cs-enquiry-*    the inline selected-vendor form on a vendor profile
+
+   All colour / spacing / typography comes from the QF-UI-V2-05 public tokens.
+   Orange is demoted to a small accent only: blue is the primary and progress
+   colour, green is success. No new palette.
+   ========================================================================== */
+
+/* ==========================================================================
+   Shared shell
+   ========================================================================== */
+.qf-rf-backdrop.qf-rf-backdrop {
+  /* Above the sticky public header (80) and the public bottom nav (90); the
+     established public-modal band from QF-UI-V2-05/06R is 120+. 140 is kept so
+     the enquiry modal also sits above the compare dialog (120/121) if both ever
+     coexist. */
+  z-index: 140;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(3px);
+  overscroll-behavior: contain;
+  padding: 0;
+  display: grid;
+  place-items: end center;
+}
+
+.qf-rf-modal.qf-rf-modal {
+  width: 100%;
+  max-width: none;
+  max-height: 94vh;
+  max-height: 94dvh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  border: 0;
+  border-radius: var(--qf-radius-lg) var(--qf-radius-lg) 0 0;
+  background: var(--qf-brand-surface);
+  box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.22);
+  color: var(--qf-brand-ink);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.qf-rf-modal:focus { outline: none; }
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.qf-rf-top.qf-rf-top {
+  padding: 0.9rem 1rem 0.7rem;
+  border-bottom: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-surface);
+}
+
+.qf-rf-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qf-rf-flow-name.qf-rf-flow-name {
+  font-size: 0.938rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-rf-close.qf-rf-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-sm);
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+}
+
+.qf-rf-close:hover { color: var(--qf-brand-ink); border-color: #cfd9e8; }
+
+.qf-rf-close:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Phase steps + progress — blue, not orange
+   ========================================================================== */
+.qf-rf-steps.qf-rf-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.qf-rf-step.qf-rf-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.qf-rf-phase-dot.qf-rf-phase-dot {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-inset);
+  color: var(--qf-brand-faint);
+  font-size: 0.688rem;
+  font-weight: 700;
+}
+
+/*
+  The wrapper is .qf-rf-phase (not .qf-rf-step), and qf-redesign.css styles the
+  active dot with `.qf-rf-phase.is-active .qf-rf-phase-dot` at specificity
+  (0,3,0) using the amber #f5a400. The class is repeated below to reach (0,4,0)
+  so blue wins without !important.
+*/
+.qf-rf-phase.is-active .qf-rf-phase-dot.qf-rf-phase-dot {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-rf-phase.is-done .qf-rf-phase-dot.qf-rf-phase-dot {
+  background: var(--qf-brand-success);
+  border-color: var(--qf-brand-success);
+  color: #fff;
+}
+
+.qf-rf-phase.is-active .qf-rf-phase-label { color: var(--qf-brand-ink); }
+.qf-rf-phase.is-done .qf-rf-phase-label { color: var(--qf-brand-ink-2); }
+
+.qf-rf-phase.qf-rf-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+}
+
+.qf-rf-progress.qf-rf-progress {
+  height: 4px;
+  margin-top: 0.6rem;
+  border-radius: 999px;
+  background: var(--qf-brand-line);
+  overflow: hidden;
+}
+
+.qf-rf-progress-fill.qf-rf-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--qf-brand-blue);
+  transition: width 220ms ease;
+}
+
+/* ==========================================================================
+   Body + question
+   ========================================================================== */
+.qf-rf-body.qf-rf-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem;
+  background: var(--qf-brand-bg);
+}
+
+.qf-rf-question { display: grid; gap: 0.15rem; }
+
+.qf-rf-qcount.qf-rf-qcount {
+  font-size: 0.688rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  /* Was a dominant orange; demoted to the muted meta colour. */
+  color: var(--qf-brand-faint);
+}
+
+.qf-rf-title.qf-rf-title,
+.qf-rf-question > h3 {
+  margin: 0.35rem 0 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  line-height: 1.28;
+  color: var(--qf-brand-ink);
+}
+
+.qf-rf-qhint.qf-rf-qhint {
+  margin: 0.3rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Tiles
+   ========================================================================== */
+.qf-rf-tiles.qf-rf-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.qf-rf-tiles--wide { grid-template-columns: minmax(0, 1fr); }
+
+.qf-rf-tile.qf-rf-tile {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+  padding: 0.8rem;
+  text-align: left;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.qf-rf-tile:hover { border-color: #cfd9e8; }
+
+.qf-rf-tile[aria-pressed="true"],
+.qf-rf-tile.is-selected {
+  border-color: var(--qf-brand-blue);
+  background: var(--qf-brand-blue-tint);
+  box-shadow: 0 0 0 1px var(--qf-brand-blue) inset;
+}
+
+.qf-rf-tile:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-rf-tile-icon.qf-rf-tile-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--qf-radius-sm);
+  /* Was an amber gradient with a matching amber glow; both are cleared here —
+     overriding only `background` left the orange box-shadow behind. */
+  background: var(--qf-brand-blue-tint);
+  box-shadow: none;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-rf-tile[aria-pressed="true"] .qf-rf-tile-icon,
+.qf-rf-tile.is-selected .qf-rf-tile-icon {
+  background: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-rf-tile-label.qf-rf-tile-label {
+  font-size: 0.906rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink);
+  overflow-wrap: break-word;
+}
+
+.qf-rf-tile-micro.qf-rf-tile-micro {
+  font-size: 0.781rem;
+  line-height: 1.45;
+  color: var(--qf-brand-muted);
+}
+
+.qf-rf-tile-check.qf-rf-tile-check {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue);
+  color: #fff;
+  font-size: 0.688rem;
+}
+
+/* ==========================================================================
+   Chips (timeline etc.)
+   ========================================================================== */
+.qf-rf-chips.qf-rf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.qf-rf-chip.qf-rf-chip {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+  cursor: pointer;
+}
+
+.qf-rf-chip[aria-pressed="true"],
+.qf-rf-chip.is-selected {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-rf-chip:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Fields
+   ========================================================================== */
+.qf-rf-fields { display: grid; gap: 0.85rem; margin-top: 0.9rem; }
+
+.qf-rf-field.qf-rf-field { display: grid; gap: 0.3rem; min-width: 0; }
+
+.qf-rf-field > span,
+.qf-rf-field > label > span {
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-rf-field input,
+.qf-rf-field select,
+.qf-rf-field textarea,
+.qf-rf-input-wrapper input,
+.qf-rf-money input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.938rem;
+  color: var(--qf-brand-ink);
+}
+
+.qf-rf-field textarea { min-height: 92px; line-height: 1.55; resize: vertical; }
+
+.qf-rf-field input:focus-visible,
+.qf-rf-field select:focus-visible,
+.qf-rf-field textarea:focus-visible,
+.qf-rf-input-wrapper input:focus-visible,
+.qf-rf-money input:focus-visible {
+  outline: none;
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-rf-input-wrapper { position: relative; display: grid; }
+
+.qf-rf-input-icon.qf-rf-input-icon {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.qf-rf-input-icon--valid { color: var(--qf-brand-success); }
+.qf-rf-input-icon--invalid { color: #c0392b; }
+
+.qf-rf-field-err.qf-rf-field-err {
+  font-size: 0.766rem;
+  font-weight: 550;
+  color: #c0392b;
+}
+
+.qf-rf-field-err--block { display: block; margin-top: 0.2rem; }
+
+/* Budget */
+.qf-rf-budget-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.qf-rf-money { position: relative; display: grid; }
+
+.qf-rf-money-prefix.qf-rf-money-prefix {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.938rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+  pointer-events: none;
+}
+
+.qf-rf-money input { padding-left: 1.7rem; }
+
+/* Consent */
+.qf-rf-consent.qf-rf-consent {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-size: 0.781rem;
+  line-height: 1.55;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-rf-consent input[type="checkbox"] { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--qf-brand-blue); }
+
+/* Every checkbox in the flow (including "WhatsApp number same as phone", which
+   kept the legacy amber accent) uses the brand blue. */
+.qf-rf-body input[type="checkbox"],
+.qf-rf-check input[type="checkbox"] { accent-color: var(--qf-brand-blue); }
+
+.qf-rf-check.qf-rf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+  cursor: pointer;
+}
+
+.qf-rf-consent a { color: var(--qf-brand-blue); }
+
+/* Location helpers */
+.qf-rf-loc-btn.qf-rf-loc-btn {
+  justify-self: start;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  font-family: inherit;
+  font-size: 0.797rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+  cursor: pointer;
+}
+
+.qf-rf-loc-btn:hover { border-color: var(--qf-brand-blue); color: var(--qf-brand-blue); }
+
+.qf-rf-loc-note.qf-rf-loc-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.766rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+}
+
+.qf-rf-loc-note--ok { color: var(--qf-brand-success); }
+
+/* Summary + preferred-vendor context */
+.qf-rf-summary.qf-rf-summary,
+.qf-rf-preferred-summary.qf-rf-preferred-summary {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-size: 0.812rem;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-rf-preferred-summary.qf-rf-preferred-summary {
+  border-color: var(--qf-brand-blue);
+  background: var(--qf-brand-blue-tint);
+}
+
+/* Alerts */
+.qf-rf-alert.qf-rf-alert {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #f0c8c1;
+  border-radius: var(--qf-radius-md);
+  background: #fdf1ef;
+  font-size: 0.812rem;
+  line-height: 1.5;
+  color: #8f2c1c;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.qf-rf-footer.qf-rf-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-surface);
+}
+
+.qf-rf-footer-spacer { flex: 1 1 auto; }
+
+.qf-rf-btn.qf-rf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 46px;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--qf-radius-md);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 0.938rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.qf-rf-btn--primary.qf-rf-btn--primary {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-rf-btn--primary:hover { background: var(--qf-brand-blue-deep); border-color: var(--qf-brand-blue-deep); }
+
+.qf-rf-btn--ghost.qf-rf-btn--ghost {
+  background: var(--qf-brand-surface);
+  border-color: var(--qf-brand-line);
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-rf-btn--ghost:hover { border-color: #cfd9e8; color: var(--qf-brand-ink); }
+
+.qf-rf-btn--danger.qf-rf-btn--danger {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+}
+
+.qf-rf-btn--full { width: 100%; }
+
+.qf-rf-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.qf-rf-btn:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Success
+   ========================================================================== */
+.qf-rf-success.qf-rf-success {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background: var(--qf-brand-surface);
+}
+
+.qf-rf-success-mark.qf-rf-success-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-success);
+  font-size: 1.6rem;
+}
+
+.qf-rf-success h3 {
+  margin: 0.35rem 0 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-rf-success p {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 0.859rem;
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Discard confirm — must layer ABOVE the enquiry shell
+   ========================================================================== */
+.qf-rf-confirm.qf-rf-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.qf-rf-confirm-card.qf-rf-confirm-card {
+  width: 100%;
+  max-width: 340px;
+  padding: 1.15rem;
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.28);
+  text-align: left;
+}
+
+.qf-rf-confirm-card h4,
+.qf-rf-confirm-card strong {
+  display: block;
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--qf-brand-ink);
+}
+
+.qf-rf-confirm-card p {
+  margin: 0;
+  font-size: 0.828rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-rf-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.qf-rf-confirm-actions .qf-rf-btn { flex: 1 1 0; }
+
+/* ==========================================================================
+   FREE VENDOR CALLBACK MODAL
+   ========================================================================== */
+.qf-free-interest-backdrop.qf-free-interest-backdrop {
+  z-index: 140;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(3px);
+  overscroll-behavior: contain;
+}
+
+.qf-free-interest-modal.qf-free-interest-modal {
+  width: 100%;
+  max-width: 400px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.28);
+  color: var(--qf-brand-ink);
+}
+
+.qf-free-interest-modal:focus { outline: none; }
+
+.qf-free-interest-head.qf-free-interest-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+  /* vendor-discovery.css painted this header a warm cream band. */
+  background: var(--qf-brand-surface);
+  border-bottom: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg) var(--qf-radius-lg) 0 0;
+}
+
+.qf-free-interest-head > div > span {
+  font-size: 0.719rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qf-brand-blue);
+}
+
+.qf-free-interest-title.qf-free-interest-title,
+.qf-free-interest-head h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.031rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+  overflow-wrap: break-word;
+}
+
+.qf-free-interest-close.qf-free-interest-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-sm);
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+}
+
+.qf-free-interest-close:hover { color: var(--qf-brand-ink); border-color: #cfd9e8; }
+
+.qf-free-interest-close:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-free-interest-body.qf-free-interest-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.qf-free-interest-body > p {
+  margin: 0;
+  font-size: 0.828rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-free-interest-body label { display: grid; gap: 0.3rem; }
+
+.qf-free-interest-body label > span {
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-free-interest-body input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.938rem;
+  color: var(--qf-brand-ink);
+}
+
+.qf-free-interest-body input:focus-visible {
+  outline: none;
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-free-interest-error.qf-free-interest-error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #f0c8c1;
+  border-radius: var(--qf-radius-md);
+  background: #fdf1ef;
+  font-size: 0.797rem;
+  line-height: 1.5;
+  color: #8f2c1c;
+}
+
+.qf-free-interest-actions.qf-free-interest-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.qf-free-interest-actions button {
+  flex: 1 1 0;
+  min-height: 46px;
+  padding: 0.6rem 1rem;
+  border-radius: var(--qf-radius-md);
+  border: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.906rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+  cursor: pointer;
+}
+
+.qf-free-interest-actions button:last-child {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-free-interest-actions button:last-child:hover {
+  background: var(--qf-brand-blue-deep);
+  border-color: var(--qf-brand-blue-deep);
+}
+
+.qf-free-interest-actions button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.qf-free-interest-actions button:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-free-interest-success.qf-free-interest-success {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 1.9rem 1.25rem;
+  text-align: center;
+}
+
+.qf-free-interest-success strong {
+  font-size: 1.031rem;
+  font-weight: 700;
+  color: var(--qf-brand-ink);
+}
+
+.qf-free-interest-success p {
+  margin: 0;
+  max-width: 38ch;
+  font-size: 0.828rem;
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+.qf-free-interest-success button {
+  margin-top: 0.6rem;
+  min-height: 44px;
+  padding: 0.55rem 1.4rem;
+  border: 0;
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-blue);
+  font-family: inherit;
+  font-size: 0.906rem;
+  font-weight: 650;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   PROFILE INLINE SELECTED-VENDOR FORM
+   Same field heights, validation colours and button hierarchy as above.
+   ========================================================================== */
+.qf-cs-enquiry.qf-cs-enquiry { display: grid; gap: 0.55rem; }
+
+.qf-cs-enquiry-hint.qf-cs-enquiry-hint,
+.qf-cs-enquiry-multi.qf-cs-enquiry-multi {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--qf-brand-faint);
+}
+
+.qf-cs-enquiry-locked.qf-cs-enquiry-locked {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--qf-brand-blue);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-blue-tint);
+  font-size: 0.781rem;
+  font-weight: 600;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-cs-enquiry-field.qf-cs-enquiry-field { display: grid; gap: 0.3rem; min-width: 0; }
+
+.qf-cs-enquiry-field > span {
+  font-size: 0.781rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-cs-enquiry-field input,
+.qf-cs-enquiry-field select,
+.qf-cs-enquiry-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.906rem;
+  color: var(--qf-brand-ink);
+}
+
+.qf-cs-enquiry-field textarea { min-height: 84px; line-height: 1.55; resize: vertical; }
+
+.qf-cs-enquiry-field input:focus-visible,
+.qf-cs-enquiry-field select:focus-visible,
+.qf-cs-enquiry-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-cs-enquiry-consent.qf-cs-enquiry-consent {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.65rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  font-size: 0.734rem;
+  line-height: 1.5;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-cs-enquiry-consent input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  accent-color: var(--qf-brand-blue);
+}
+
+.qf-cs-enquiry-error.qf-cs-enquiry-error {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #f0c8c1;
+  border-radius: var(--qf-radius-md);
+  background: #fdf1ef;
+  font-size: 0.781rem;
+  color: #8f2c1c;
+}
+
+.qf-cs-enquiry--done.qf-cs-enquiry--done {
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 1.1rem 0.85rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  text-align: center;
+}
+
+.qf-cs-enquiry-check.qf-cs-enquiry-check {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-success);
+  font-size: 1.2rem;
+}
+
+.qf-cs-enquiry--done p {
+  margin: 0;
+  font-size: 0.828rem;
+  line-height: 1.55;
+  color: var(--qf-brand-ink-2);
+}
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+@media (min-width: 720px) {
+  .qf-rf-backdrop.qf-rf-backdrop { place-items: center; padding: 1.5rem; }
+
+  .qf-rf-modal.qf-rf-modal {
+    max-width: 560px;
+    max-height: 88vh;
+    max-height: 88dvh;
+    border: 1px solid var(--qf-brand-line);
+    border-radius: var(--qf-radius-lg);
+    padding-bottom: 0;
+  }
+
+  .qf-rf-top.qf-rf-top { padding: 1rem 1.25rem 0.8rem; }
+  .qf-rf-body.qf-rf-body { padding: 1.25rem; }
+  .qf-rf-footer.qf-rf-footer { padding: 0.85rem 1.25rem; }
+  .qf-rf-tiles.qf-rf-tiles { gap: 0.65rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-rf-tile,
+  .qf-rf-btn,
+  .qf-rf-progress-fill { transition-duration: 0.01ms !important; }
+}

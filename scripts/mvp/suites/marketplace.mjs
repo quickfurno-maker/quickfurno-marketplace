@@ -19,6 +19,7 @@
 // ============================================================================
 
 import { assert, assertEqual, assertTrue, assertFalse } from '../lib/harness.mjs';
+import { readFileSync } from 'node:fs';
 
 import { assignmentRules, isAssignmentPreviewWithinLimit } from '../../../lib/aos/rules/assignmentRules.ts';
 import {
@@ -474,6 +475,80 @@ export const suite = {
         });
         assertEqual(profile.profileImage, 'https://cdn.example.com/logo.png',
           'profile renders the approved external url');
+      },
+    },
+
+    // --- QF-UI-V2-08: client enquiry truthfulness + layering -------------
+    {
+      name: 'enquiry modal shows no ungoverned subcategory rates',
+      run: () => {
+        const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+        assertFalse(src.includes('SUBCATEGORY_RATES ='), 'rate table must not be redefined');
+        assertFalse(src.includes('qf-rf-tile-rate'), 'rate element must not be rendered');
+        for (const rate of ['1,000/sqft', '200/sqft', '1,200/sqft']) {
+          assertFalse(src.includes(rate), 'no hardcoded rate ' + rate);
+        }
+      },
+    },
+    {
+      name: 'enquiry success copy claims relevance, not unsupported proximity',
+      run: () => {
+        const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+        assertTrue(src.includes('up to 3 relevant verified vendors'), 'relevance wording present');
+        assertFalse(src.includes('verified vendors near you'), 'no "near you" match claim');
+        assertFalse(src.includes('Verified Teams near your area'), 'no near-area claim');
+        // The governed consent + cap wording must survive untouched.
+        assertTrue(src.includes('up to 3 verified vendors initially'), 'consent cap wording intact');
+      },
+    },
+    {
+      name: 'client modals lock the real scroll owner and restore it',
+      run: () => {
+        for (const file of ['components/ClientEnquiryModal.tsx', 'components/FreeVendorInterestButton.tsx']) {
+          const src = readFileSync(file, 'utf8');
+          assertTrue(src.includes('document.documentElement'), file + ' locks documentElement');
+          assertFalse(src.includes('document.body.style.overflow'), file + ' must not lock body');
+          assertTrue(src.includes('previousOverflow'), file + ' captures the previous value');
+          assertTrue(src.includes('root.style.overflow = previousOverflow'), file + ' restores it');
+          assertTrue(src.includes('previousPaddingRight'), file + ' compensates the scrollbar');
+        }
+      },
+    },
+    {
+      name: 'client modal stack sits above the public bottom nav',
+      run: () => {
+        const css = readFileSync('app/client-enquiry-v2.css', 'utf8');
+        const publicCss = readFileSync('app/qf-public-v2.css', 'utf8');
+        const navZ = Number(/\.qf-bottom-nav\.qf-bottom-nav\s*\{[^}]*z-index:\s*(\d+)/.exec(publicCss)?.[1]);
+        const enquiryZ = Number(/\.qf-rf-backdrop\.qf-rf-backdrop\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
+        const freeZ = Number(/\.qf-free-interest-backdrop\.qf-free-interest-backdrop\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
+        const confirmZ = Number(/\.qf-rf-confirm\.qf-rf-confirm\s*\{[^}]*z-index:\s*(\d+)/.exec(css)?.[1]);
+        assertEqual(navZ, 90, 'public bottom nav level');
+        assertTrue(enquiryZ > navZ, 'enquiry backdrop above the nav');
+        assertTrue(freeZ > navZ, 'free callback backdrop above the nav');
+        assertTrue(confirmZ > enquiryZ, 'discard confirm above the enquiry shell');
+      },
+    },
+    {
+      name: 'client enquiry authority is unchanged by the V2-08 redesign',
+      run: () => {
+        const modal = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+        const free = readFileSync('components/FreeVendorInterestButton.tsx', 'utf8');
+        const inline = readFileSync('components/vendors/ClientSelectedVendorEnquiry.tsx', 'utf8');
+        // General + preferred stay on submitLead with preferred_vendor intent.
+        assertTrue(modal.includes('submitLead'), 'general enquiry still calls submitLead');
+        assertTrue(modal.includes("lead_intent: \"preferred_vendor\""), 'preferred intent preserved');
+        assertTrue(modal.includes('targetVendorId'), 'preferred target preserved');
+        // The profile form keeps its own certified backend.
+        assertTrue(inline.includes('sendClientSelectedVendorEnquiry'), 'profile form authority preserved');
+        // Free vendors stay on the gated interest capture only.
+        assertTrue(free.includes('submitFreeVendorProfileInterest'), 'free interest authority preserved');
+        assertFalse(free.includes('preferred_vendor'), 'free flow never sends a preferred-vendor enquiry');
+        assertFalse(free.includes('submitLead'), 'free flow never submits a lead directly');
+        // 10-digit Indian mobile validation survives in every client form.
+        for (const [name, src] of [['free', free], ['inline', inline]]) {
+          assertTrue(/\[6-9\]\\d\{9\}/.test(src), name + ' keeps 10-digit 6-9 phone validation');
+        }
       },
     },
 

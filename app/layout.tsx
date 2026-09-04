@@ -11,6 +11,11 @@ import "./qf-redesign.css";
 // win over the legacy styling for those surfaces without deleting legacy
 // selectors that the not-yet-redesigned pages still rely on.
 import "./qf-public-v2.css";
+// QF-UI-V2-08 — client enquiry / callback / inline-enquiry utilities. Loaded
+// after the public system so its scoped .qf-rf-* / .qf-free-interest-* /
+// .qf-cs-enquiry-* rules win over the legacy cream-copper modal styling without
+// deleting selectors other surfaces still use.
+import "./client-enquiry-v2.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

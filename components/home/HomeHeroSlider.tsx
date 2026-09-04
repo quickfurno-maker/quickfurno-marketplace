@@ -14,8 +14,16 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
  * sized by the slider's own fixed track height, so no slide is coupled to a
  * particular asset's intrinsic dimensions.
  *
- * Media are existing LOCAL repository assets. No remote image, no video, no
- * carousel dependency — this is a small focused client component.
+ * Media are LOCAL repository assets. No remote image, no video, no carousel
+ * dependency — this is a small focused client component.
+ *
+ * QF-UI-V2-15: the three slides now use purpose-drawn architectural artwork
+ * (hero-01/02/03) instead of the previous set, which was two copies of one
+ * thumbnail template — captions baked into the artwork — plus a cartoon
+ * diorama, all still on the retired copper palette. The new files are original
+ * abstract vector art on the approved V2 tokens. They remain decorative
+ * (alt="" behind aria-hidden), so swapping in final photography later is a
+ * one-line change per slide with no layout or a11y consequence.
  */
 type HeroSlide = {
   id: string;
@@ -36,27 +44,27 @@ const SLIDES: HeroSlide[] = [
       "Get matched with up to 3 relevant verified local teams in Pune & Mumbai — free for homeowners.",
     primary: "Get Free Team Matches",
     secondary: { label: "Explore Services", href: "#services" },
-    media: "/assets/quickfurno/images/hero/hero-interior-diorama.svg",
+    media: "/assets/quickfurno/images/hero/hero-01-matching.svg",
     alt: "",
   },
   {
     id: "interiors",
-    headline: "Planning a new kitchen or complete home interior?",
+    headline: "From custom carpentry to modular work, find the right team.",
     support:
-      "Compare verified interior designers, carpenters and modular teams for your project.",
+      "Compare verified carpenters and modular specialists across Pune & Mumbai.",
     primary: "Find Interior Experts",
     secondary: { label: "Browse interiors", href: "/category/interior-designers" },
-    media: "/assets/quickfurno/images/vendors/modular-kitchen.svg",
+    media: "/assets/quickfurno/images/hero/hero-02-carpentry.svg",
     alt: "",
   },
   {
     id: "improvement",
-    headline: "Painting, sofa, carpentry or civil work?",
+    headline: "Tell us what you need and we will find relevant verified vendors.",
     support:
-      "Find verified local professionals for home improvement work in Pune & Mumbai.",
+      "One enquiry covers interiors, carpentry, painting and civil work — your details stay private.",
     primary: "Get Free Team Matches",
     secondary: { label: "Explore Services", href: "#services" },
-    media: "/assets/quickfurno/images/vendors/premium-living-room.svg",
+    media: "/assets/quickfurno/images/hero/hero-03-multiservice.svg",
     alt: "",
   },
 ];

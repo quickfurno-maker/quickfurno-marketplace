@@ -1280,6 +1280,93 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-15: premium homepage hero artwork -----------------------
+    {
+      name: 'homepage hero declares exactly three slides with local artwork',
+      run: () => {
+        const src = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8');
+        const media = src.match(/media: "([^"]+)"/g) || [];
+        assertEqual(media.length, 3, 'exactly three slides');
+        for (const entry of media) {
+          const url = entry.replace(/^media: "|"$/g, '');
+          // Local-only: no remote host, no protocol-relative, no data URI.
+          assertTrue(url.startsWith('/assets/'), 'local asset: ' + url);
+          assertFalse(/^https?:|^\/\/|^data:/.test(url), 'no remote/data image: ' + url);
+          assertTrue(existsSync('public' + url), 'asset exists on disk: ' + url);
+        }
+        // Each slide gets its own artwork - the previous set reused one
+        // thumbnail template for two slides.
+        assertEqual(new Set(media).size, 3, 'three distinct artworks');
+        // Artwork is decorative; the copy carries the meaning.
+        assertEqual((src.match(/alt: ""/g) || []).length, 3, 'all slide media is decorative');
+      },
+    },
+    {
+      name: 'hero keeps one H1, distinct headlines and the enquiry CTA authority',
+      run: () => {
+        const src = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8');
+        // Slide 1 is the page H1; the rest are H2 so the outline stays valid.
+        assertTrue(src.includes('const Heading = i === 0 ? "h1" : "h2"'), 'single H1 rule intact');
+        const headlines = (src.match(/headline:\s*\n?\s*"([^"]+)"/g) || []);
+        assertEqual(headlines.length, 3, 'three headlines');
+        assertEqual(new Set(headlines).size, 3, 'no duplicated headline');
+        // Every slide keeps the governed enquiry trigger - not a raw link.
+        assertEqual((src.match(/<EnquiryModalTrigger/g) || []).length, 1, 'one shared CTA component');
+        assertTrue(src.includes('source={`Homepage hero'), 'CTA still reports its source');
+      },
+    },
+    {
+      name: 'hero slide copy makes no unsupported marketing claim',
+      run: () => {
+        const src = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8');
+        // Only the declared copy fields, so code identifiers cannot trip this.
+        const copy = [...src.matchAll(/(?:headline|support|primary):\s*\n?\s*"([^"]+)"/g)]
+          .map((m) => m[1]).join(' ').toLowerCase();
+        assertTrue(copy.length > 0, 'copy extracted');
+        for (const banned of ['guarantee', 'guaranteed', 'instant', 'lowest price', 'best ',
+                              'top rated', '100%', 'same-day', 'trusted by thousands',
+                              'award', 'no.1', 'cheapest']) {
+          assertFalse(copy.includes(banned), 'no unsupported claim: ' + banned);
+        }
+        // No invented counts (a bare number followed by customers/projects/reviews).
+        assertFalse(/\d[\d,+]*\s*(customers|projects|reviews|clients|vendors served)/.test(copy),
+          'no fabricated counts');
+        // The approved promise is still stated.
+        assertTrue(copy.includes('up to 3 relevant'), 'keeps the approved match claim');
+        assertTrue(copy.includes('free for homeowners'), 'keeps the free-for-homeowners claim');
+      },
+    },
+    {
+      name: 'hero slider keeps its accessible carousel semantics',
+      run: () => {
+        const src = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8');
+        assertTrue(src.includes('aria-roledescription="carousel"'), 'carousel role description');
+        assertTrue(src.includes('aria-roledescription="slide"'), 'slide role description');
+        assertTrue(src.includes('aria-label="Previous slide"'), 'previous control is named');
+        assertTrue(src.includes('aria-label="Next slide"'), 'next control is named');
+        assertTrue(src.includes('aria-selected={i === index}'), 'dots expose selection');
+        // Inactive slides must leave the tab order.
+        assertTrue(src.includes('inert'), 'inactive slides are inert');
+        // Autoplay must yield to reduced-motion and to hover/focus.
+        assertTrue(src.includes('prefers-reduced-motion: reduce'), 'reduced motion respected');
+        assertTrue(src.includes('if (paused) return;'), 'autoplay pauses');
+        const interval = Number((src.match(/INTERVAL_MS = (\d+)/) || [])[1]);
+        assertTrue(interval >= 5000 && interval <= 7000, 'interval within 5-7s, got ' + interval);
+      },
+    },
+    {
+      name: 'homepage service finder keeps its locked categories',
+      run: () => {
+        const src = readFileSync('components/home/HomeServiceLauncher.tsx', 'utf8');
+        for (const label of ['Interior', 'Carpentry', 'Modular', 'Premium Interiors',
+                             'Sofa', 'Painting', 'Civil Work']) {
+          assertTrue(src.includes(label), 'finder keeps: ' + label);
+        }
+        // The hero pass must not have taken over the launcher's subsheet.
+        assertTrue(src.includes('aria-modal="true"'), 'subsheet dialog semantics intact');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

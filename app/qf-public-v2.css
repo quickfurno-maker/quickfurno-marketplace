@@ -1111,9 +1111,11 @@
   .qf-hero-v2-trust { grid-column: 1 / -1; }
   .qf-hero-arrows { display: flex; }
 
-  /* Copy left, visual right — copy keeps priority at ~1.5fr. */
+  /* Copy left, visual right — copy keeps priority. QF-UI-V2-15: measured at
+     1.85fr the artwork was only 29-30% of the hero card once padding and the
+     column gap were taken out; 1.4fr puts it back inside the intended band. */
   .qf-hero-slide {
-    grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-content: center;
     column-gap: 1.6rem;

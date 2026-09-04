@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="presentation" aria-hidden="true">
+  <!-- QuickFurno hero artwork 02 — modular / carpentry elevation.
+       Original abstract vector art on the approved V2 public palette. -->
+  <defs>
+    <linearGradient id="b-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8edf5"/><stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="b-timber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcb083"/><stop offset="1" stop-color="#c2915c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="800" fill="url(#b-bg)"/>
+  <rect x="70" y="60" width="500" height="600" rx="10" fill="#dbe3ee"/>
+
+  <!-- Tall modular bank: alternating light fronts on a dark carcass. -->
+  <rect x="96" y="88" width="212" height="544" rx="6" fill="#33465f"/>
+  <rect x="108" y="100" width="88" height="256" rx="4" fill="#f4f7fb"/>
+  <rect x="208" y="100" width="88" height="256" rx="4" fill="#dde5f0"/>
+  <rect x="108" y="368" width="88" height="252" rx="4" fill="#dde5f0"/>
+  <rect x="208" y="368" width="88" height="252" rx="4" fill="#f4f7fb"/>
+  <!-- Handle lines: the precision-joinery detail. -->
+  <path d="M166 210h18M266 210h18M166 478h18M266 478h18" stroke="#33465f" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Warm timber run: the craft surface, one material only. -->
+  <rect x="340" y="88" width="212" height="228" rx="6" fill="url(#b-timber)"/>
+  <path d="M340 148h212M340 208h212M340 268h212" stroke="#a3743f" stroke-width="3" opacity="0.55"/>
+
+  <!-- Worktop slab: strongest horizontal, reads as stone. -->
+  <rect x="340" y="352" width="212" height="26" rx="6" fill="#22303f"/>
+  <rect x="340" y="352" width="212" height="8" rx="4" fill="#2563eb"/>
+
+  <!-- Base units below the worktop. -->
+  <rect x="340" y="398" width="212" height="234" rx="6" fill="#ffffff"/>
+  <rect x="340" y="398" width="212" height="234" rx="6" fill="none" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M446 398v234" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M382 512h28M482 512h28" stroke="#5f6b7d" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Plinth + grounded shadow. -->
+  <rect x="96" y="632" width="456" height="18" rx="6" fill="#c3cddc"/>
+  <ellipse cx="320" cy="668" rx="230" ry="16" fill="#8fa0b8" opacity="0.32"/>
+</svg>

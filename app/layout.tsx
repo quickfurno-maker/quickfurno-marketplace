@@ -6,6 +6,11 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
 import "./vendor-discovery.css";
 import "./qf-redesign.css";
+// QF-UI-V2-05 — public design system. Loaded LAST so its scoped public rules
+// (.qf-site-header / .qf-home-page / .qf-foot / .qf-bottom-nav / .qf-pub-*)
+// win over the legacy styling for those surfaces without deleting legacy
+// selectors that the not-yet-redesigned pages still rely on.
+import "./qf-public-v2.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

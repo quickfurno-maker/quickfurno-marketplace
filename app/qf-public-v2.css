@@ -1,0 +1,1177 @@
+/* ==========================================================================
+   QuickFurno — PUBLIC SITE V2  (QF-UI-V2-05)
+
+   Canonical public-facing token layer + primitives + homepage / header /
+   footer / public mobile nav styling.
+
+   SCOPE RULES
+   - Loaded globally (root layout) but every rule is scoped to a public class:
+     .qf-site-header, .qf-home-page, .qf-foot, .qf-bottom-nav, .qf-pub-*.
+   - No bare element selector (h1/button/input/card) is redefined here, so the
+     vendor portal, admin and auth surfaces are untouched.
+   - The vendor portal's own --v2-* namespace is separate and is never read or
+     written by this file.
+
+   This layer is loaded AFTER qf-redesign.css so these scoped rules win over the
+   legacy "Copper & Charcoal" styling for the surfaces listed above, without
+   deleting legacy selectors that other (not yet redesigned) pages still use.
+   ========================================================================== */
+
+:root {
+  /* Ink */
+  --qf-brand-ink: #0f172a;
+  --qf-brand-ink-2: #334155;
+  --qf-brand-muted: #5f6b7d;
+  --qf-brand-faint: #8d97a8;
+
+  /* Primary action — the same blue the approved vendor portal uses */
+  --qf-brand-blue: #2563eb;
+  --qf-brand-blue-deep: #1d4ed8;
+  --qf-brand-blue-tint: #eff4ff;
+  --qf-brand-blue-line: #d7e3fd;
+
+  /* Brand warmth — wordmark and small accents only, never a button colour */
+  --qf-brand-orange: #c67821;
+  --qf-brand-orange-deep: #9a5e16;
+
+  /* Surfaces */
+  --qf-brand-bg: #f6f8fb;
+  --qf-brand-surface: #ffffff;
+  --qf-brand-inset: #f8fafc;
+  --qf-brand-line: #e5e9f0;
+  --qf-brand-line-soft: #eef1f6;
+
+  /* Semantics */
+  --qf-brand-success: #0f7a51;
+  --qf-brand-success-tint: #ecfdf5;
+  --qf-brand-success-line: #b8e6d2;
+  --qf-brand-warning: #a35a09;
+  --qf-brand-danger: #b02a25;
+
+  /* Geometry */
+  --qf-brand-radius-sm: 8px;
+  --qf-brand-radius-md: 12px;
+  --qf-brand-radius-lg: 18px;
+  --qf-brand-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 22px -18px rgba(15, 23, 42, 0.45);
+  --qf-brand-shadow-md: 0 2px 6px rgba(15, 23, 42, 0.05), 0 20px 44px -28px rgba(15, 23, 42, 0.5);
+
+  /* Rhythm */
+  --qf-public-container: 1180px;
+  --qf-public-section-space: clamp(2.75rem, 6vw, 4.5rem);
+  --qf-public-header-h: 68px;
+}
+
+/* ==========================================================================
+   PRIMITIVES — reusable by V2-06/07/08/09. Scoped by their own qf-pub- prefix.
+   ========================================================================== */
+.qf-pub-container {
+  width: 100%;
+  max-width: var(--qf-public-container);
+  margin: 0 auto;
+  padding-inline: clamp(1rem, 4vw, 1.75rem);
+}
+
+.qf-pub-section { padding-block: var(--qf-public-section-space); }
+.qf-pub-section--tight { padding-block: clamp(2rem, 4.5vw, 3rem); }
+.qf-pub-section--surface { background: var(--qf-brand-surface); }
+.qf-pub-section--inset { background: var(--qf-brand-bg); }
+
+.qf-pub-eyebrow {
+  display: inline-block;
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-pub-sectionhead { max-width: 62ch; margin-bottom: clamp(1.4rem, 3vw, 2.1rem); }
+.qf-pub-sectionhead--center { margin-inline: auto; text-align: center; }
+
+.qf-pub-sectionhead h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--qf-brand-ink);
+}
+
+.qf-pub-sectionhead p {
+  margin: 0.6rem 0 0;
+  font-size: clamp(0.938rem, 1.6vw, 1.02rem);
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+/* Buttons */
+.qf-pub-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0 1.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--qf-brand-radius-sm);
+  font-family: inherit;
+  font-size: 0.969rem;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease,
+    transform 160ms ease, box-shadow 160ms ease;
+}
+
+.qf-pub-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+
+.qf-pub-btn--primary {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #ffffff;
+  box-shadow: 0 10px 24px -14px rgba(37, 99, 235, 0.8);
+}
+
+.qf-pub-btn--primary:hover {
+  background: var(--qf-brand-blue-deep);
+  border-color: var(--qf-brand-blue-deep);
+  transform: translateY(-1px);
+}
+
+.qf-pub-btn--secondary {
+  background: var(--qf-brand-surface);
+  border-color: var(--qf-brand-line);
+  color: var(--qf-brand-ink);
+}
+
+.qf-pub-btn--secondary:hover {
+  background: var(--qf-brand-inset);
+  border-color: #cfd6e2;
+}
+
+.qf-pub-btn--sm { min-height: 42px; padding: 0 1rem; font-size: 0.906rem; }
+.qf-pub-btn--block { width: 100%; }
+
+.qf-pub-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 650;
+  color: var(--qf-brand-blue-deep);
+  text-decoration: none;
+}
+
+.qf-pub-link:hover { text-decoration: underline; }
+.qf-pub-link svg { width: 16px; height: 16px; }
+
+/* Pills, cards, icon tiles */
+.qf-pub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid var(--qf-brand-success-line);
+  border-radius: 999px;
+  background: var(--qf-brand-success-tint);
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-success);
+}
+
+.qf-pub-pill svg { width: 15px; height: 15px; }
+
+.qf-pub-card {
+  padding: 1.15rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-md);
+  background: var(--qf-brand-surface);
+  box-shadow: var(--qf-brand-shadow-sm);
+}
+
+.qf-pub-icontile {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: var(--qf-brand-radius-sm);
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-pub-icontile svg { width: 21px; height: 21px; }
+
+.qf-pub-sronly {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus — one visible treatment across every public surface. */
+.qf-site-header a:focus-visible,
+.qf-site-header button:focus-visible,
+.qf-home-page a:focus-visible,
+.qf-home-page button:focus-visible,
+.qf-foot a:focus-visible,
+.qf-foot button:focus-visible,
+.qf-bottom-nav a:focus-visible,
+.qf-bottom-nav button:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: var(--qf-brand-radius-sm);
+}
+
+/* ==========================================================================
+   PUBLIC HEADER — light, premium. Replaces the charcoal bar.
+   ========================================================================== */
+.qf-site-header.qf-site-header {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid var(--qf-brand-line);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+  transition: background 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.qf-site-header.qf-site-header--scrolled {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom-color: var(--qf-brand-line);
+  box-shadow: 0 10px 26px -22px rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(16px);
+}
+
+.qf-site-header .qf-header-shell {
+  width: 100%;
+  max-width: var(--qf-public-container);
+  margin: 0 auto;
+  min-height: var(--qf-public-header-h);
+  padding-inline: clamp(1rem, 4vw, 1.75rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.qf-site-header .qf-brand { text-decoration: none; flex: 0 0 auto; }
+
+.qf-site-header .qf-brand-lockup { display: grid; gap: 1px; }
+
+.qf-site-header .qf-brand-text {
+  font-size: 1.28rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.qf-site-header .qf-bw-quick { color: var(--qf-brand-ink); }
+.qf-site-header .qf-bw-furno { color: var(--qf-brand-orange); }
+
+.qf-site-header .qf-brand-tagline {
+  font-size: 0.688rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--qf-brand-faint);
+}
+
+.qf-site-header .qf-nav {
+  display: none;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.qf-site-header .qf-nav-link {
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--qf-brand-radius-sm);
+  font-size: 0.906rem;
+  font-weight: 550;
+  color: var(--qf-brand-ink-2);
+  text-decoration: none;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.qf-site-header .qf-nav-link:hover {
+  background: var(--qf-brand-inset);
+  color: var(--qf-brand-ink);
+}
+
+.qf-site-header .qf-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.qf-site-header .qf-header-cta {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 1.05rem;
+  border: 1px solid var(--qf-brand-blue);
+  border-radius: var(--qf-brand-radius-sm);
+  background: var(--qf-brand-blue);
+  font-family: inherit;
+  font-size: 0.906rem;
+  font-weight: 650;
+  color: #ffffff;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.qf-site-header .qf-header-cta:hover { background: var(--qf-brand-blue-deep); }
+
+.qf-site-header .qf-header-cta--block {
+  display: inline-flex;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.35rem;
+}
+
+.qf-site-header .qf-nav-toggle {
+  display: inline-grid;
+  place-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-sm);
+  background: var(--qf-brand-surface);
+  cursor: pointer;
+}
+
+.qf-site-header .qf-nav-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--qf-brand-ink);
+}
+
+.qf-site-header .qf-mobile-nav {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem clamp(1rem, 4vw, 1.75rem) 1rem;
+  border-top: 1px solid var(--qf-brand-line-soft);
+  background: var(--qf-brand-surface);
+}
+
+.qf-site-header .qf-mobile-nav-link {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 0.7rem;
+  border-radius: var(--qf-brand-radius-sm);
+  font-size: 0.969rem;
+  font-weight: 550;
+  color: var(--qf-brand-ink-2);
+  text-decoration: none;
+}
+
+.qf-site-header .qf-mobile-nav-link:hover { background: var(--qf-brand-inset); }
+
+@media (min-width: 880px) {
+  .qf-site-header .qf-nav { display: flex; }
+  .qf-site-header .qf-header-cta { display: inline-flex; }
+  .qf-site-header .qf-nav-toggle { display: none; }
+  .qf-site-header .qf-mobile-nav { display: none; }
+}
+
+/* ==========================================================================
+   HOMEPAGE SHELL
+   ========================================================================== */
+.qf-home-page {
+  background: var(--qf-brand-bg);
+  color: var(--qf-brand-ink);
+}
+
+/* The legacy decorative body wash is suppressed on the public home surface
+   only; body itself is left alone so vendor/admin/auth are unaffected. */
+.qf-home-page::before,
+.qf-home-page::after { content: none; }
+
+/* ==========================================================================
+   HERO + SERVICE LAUNCHER — one entry module
+   ========================================================================== */
+.qf-hero-v2 {
+  padding-block: clamp(1.25rem, 3vw, 2.25rem) clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.qf-hero-v2-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+/* --- Slider --- */
+.qf-hero-slider {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: var(--qf-brand-shadow-md);
+  /* Fixed track height keeps dots and CTAs from moving between slides, and is
+     matched to the launcher beside it so neither panel ends in dead space. */
+  min-height: 372px;
+}
+
+.qf-hero-slide {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: center;
+  gap: 1rem;
+  padding: clamp(1.35rem, 3.5vw, 2.4rem);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 420ms ease;
+}
+
+.qf-hero-slide[data-active="true"] { opacity: 1; visibility: visible; }
+
+.qf-hero-slide-copy { max-width: 40ch; }
+
+.qf-hero-slide h1,
+.qf-hero-slide h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.1vw, 2.05rem);
+  font-weight: 800;
+  letter-spacing: -0.028em;
+  line-height: 1.14;
+  color: var(--qf-brand-ink);
+}
+
+.qf-hero-slide p {
+  margin: 0.7rem 0 0;
+  max-width: 46ch;
+  font-size: clamp(0.938rem, 1.7vw, 1.05rem);
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+.qf-hero-slide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1.1rem;
+}
+
+/* Slightly tighter than the default public button so the primary and secondary
+   hero actions sit on one row inside the slide's copy column. */
+.qf-hero-slide-actions .qf-pub-btn { padding-inline: 1.05rem; }
+
+/*
+  Mobile: a very light wash behind the copy, so the card is not flat white.
+  Desktop: promoted to a real image panel in the slide's second column (see the
+  1024px block). The container is sized by the slide, never by the asset's own
+  dimensions, so future artwork drops in without touching layout.
+*/
+.qf-hero-slide-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.qf-hero-slide-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: right center;
+  /* Barely-there on phones: enough to lift the card off flat white, light
+     enough that the supporting copy never reads as sitting on texture. */
+  opacity: 0.07;
+}
+
+.qf-hero-slide-copy,
+.qf-hero-slide-actions { position: relative; z-index: 1; }
+
+/* Controls */
+.qf-hero-dots {
+  position: absolute;
+  left: clamp(1.35rem, 3.5vw, 2.4rem);
+  bottom: 1rem;
+  display: flex;
+  gap: 0.4rem;
+  z-index: 2;
+}
+
+.qf-hero-dot {
+  width: 26px;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--qf-brand-line);
+  cursor: pointer;
+  transition: background 180ms ease, width 180ms ease;
+}
+
+.qf-hero-dot[aria-selected="true"] { background: var(--qf-brand-blue); width: 34px; }
+
+.qf-hero-arrows {
+  display: none;
+  position: absolute;
+  right: 1rem;
+  bottom: 0.85rem;
+  gap: 0.4rem;
+  z-index: 2;
+}
+
+.qf-hero-arrow {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 50%;
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-ink-2);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.qf-hero-arrow:hover { background: var(--qf-brand-inset); border-color: #cfd6e2; }
+.qf-hero-arrow svg { width: 17px; height: 17px; }
+.qf-hero-arrow--prev svg { transform: rotate(180deg); }
+
+/* --- Service launcher --- */
+.qf-launcher {
+  display: grid;
+  /* auto head + growing grid, so the tiles absorb whatever height the hero
+     sets and the panel never ends in a block of dead space. */
+  grid-template-rows: auto 1fr;
+  gap: 0.75rem;
+  padding: 1.1rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: var(--qf-brand-shadow-sm);
+}
+
+.qf-launcher-head h2 {
+  margin: 0;
+  font-size: 1.075rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-launcher-head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+}
+
+.qf-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .qf-launcher-grid { align-content: stretch; grid-auto-rows: minmax(56px, 1fr); }
+}
+
+.qf-launcher-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 56px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.891rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.qf-launcher-item:hover {
+  border-color: var(--qf-brand-blue-line);
+  background: var(--qf-brand-blue-tint);
+  transform: translateY(-1px);
+}
+
+.qf-launcher-item-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--qf-brand-radius-sm);
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-launcher-item-icon svg { width: 17px; height: 17px; }
+.qf-launcher-item span { min-width: 0; overflow-wrap: anywhere; }
+.qf-launcher-item--wide { grid-column: 1 / -1; }
+
+/* --- Trust strip --- */
+.qf-trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.35rem;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-md);
+  background: var(--qf-brand-surface);
+}
+
+.qf-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.859rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-trust-item svg { width: 17px; height: 17px; color: var(--qf-brand-success); flex: 0 0 auto; }
+
+/* ==========================================================================
+   HOW IT WORKS / WHY / COVERAGE / CTA
+   ========================================================================== */
+.qf-steps {
+  display: grid;
+  gap: 0.7rem;
+  counter-reset: qfstep;
+}
+
+.qf-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-md);
+  background: var(--qf-brand-surface);
+}
+
+.qf-step-num {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue-tint);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-step h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-step p {
+  margin: 0.25rem 0 0;
+  font-size: 0.891rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-usp {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.qf-usp-item {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.15rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-md);
+  background: var(--qf-brand-surface);
+}
+
+.qf-usp-item h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-usp-item p {
+  margin: 0;
+  font-size: 0.891rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-coverage {
+  display: grid;
+  gap: 1.2rem;
+  padding: clamp(1.3rem, 3.5vw, 2.1rem);
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-lg);
+  background: var(--qf-brand-surface);
+}
+
+.qf-coverage-cities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.qf-coverage-city {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-inset);
+  font-size: 0.938rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink);
+}
+
+.qf-coverage-city svg { width: 17px; height: 17px; color: var(--qf-brand-blue); }
+
+.qf-coverage-note {
+  margin: 0;
+  font-size: 0.828rem;
+  color: var(--qf-brand-faint);
+}
+
+.qf-final-cta {
+  display: grid;
+  gap: 1.1rem;
+  padding: clamp(1.6rem, 4.5vw, 2.75rem);
+  border-radius: var(--qf-brand-radius-lg);
+  background: linear-gradient(140deg, #101c34 0%, #16264a 60%, #1d3566 100%);
+  color: #ffffff;
+  text-align: center;
+  justify-items: center;
+}
+
+.qf-final-cta h2 {
+  margin: 0;
+  max-width: 22ch;
+  font-size: clamp(1.5rem, 3.6vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: -0.028em;
+  line-height: 1.15;
+  color: #ffffff;
+}
+
+.qf-final-cta p {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.qf-final-cta .qf-pub-btn--primary {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--qf-brand-ink);
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.8);
+}
+
+.qf-final-cta .qf-pub-btn--primary:hover { background: #eef2f8; border-color: #eef2f8; }
+
+.qf-final-cta-points {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1.2rem;
+  font-size: 0.859rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.qf-final-cta-points span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.qf-final-cta-points svg { width: 16px; height: 16px; color: #7dd3a8; }
+
+/* ==========================================================================
+   SUBCATEGORY SHEET / DIALOG — premium treatment
+   ========================================================================== */
+.qf-subsheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.qf-subsheet {
+  position: fixed;
+  z-index: 121;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 0.9rem 1rem calc(1.2rem + env(safe-area-inset-bottom));
+  border-radius: var(--qf-brand-radius-lg) var(--qf-brand-radius-lg) 0 0;
+  background: var(--qf-brand-surface);
+  box-shadow: 0 -20px 46px -28px rgba(15, 23, 42, 0.6);
+  animation: qf-subsheet-in 200ms ease-out;
+}
+
+@keyframes qf-subsheet-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.qf-subsheet:focus { outline: none; }
+
+.qf-subsheet-grip {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 0.75rem;
+  border-radius: 999px;
+  background: var(--qf-brand-line);
+}
+
+.qf-subsheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.85rem;
+}
+
+.qf-subsheet-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-subsheet-head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.859rem;
+  color: var(--qf-brand-muted);
+}
+
+.qf-subsheet-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-sm);
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+}
+
+.qf-subsheet-close:hover { background: var(--qf-brand-inset); color: var(--qf-brand-ink); }
+.qf-subsheet-close svg { width: 17px; height: 17px; }
+
+.qf-subsheet-list { display: grid; gap: 0.4rem; }
+
+.qf-subsheet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  min-height: 54px;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-brand-radius-md);
+  background: var(--qf-brand-surface);
+  font-size: 0.938rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink);
+  text-decoration: none;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.qf-subsheet-item:hover {
+  border-color: var(--qf-brand-blue-line);
+  background: var(--qf-brand-blue-tint);
+}
+
+.qf-subsheet-item svg { width: 17px; height: 17px; color: var(--qf-brand-faint); flex: 0 0 auto; }
+
+.qf-subsheet-all { margin-top: 0.75rem; }
+
+/* ==========================================================================
+   FOOTER — light premium.
+
+   Targets the Footer component's EXISTING class names, so its markup, links
+   and the 0fr/1fr accordion mechanism in qf-redesign.css all keep working;
+   only colour, weight and spacing are restated here.
+   ========================================================================== */
+.qf-foot.qf-foot {
+  margin-top: 0;
+  background: var(--qf-brand-surface);
+  border-top: 1px solid var(--qf-brand-line);
+  color: var(--qf-brand-ink);
+}
+
+.qf-foot .qf-foot-inner {
+  width: 100%;
+  max-width: var(--qf-public-container);
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 3rem) clamp(1rem, 4vw, 1.75rem) 1.4rem;
+  gap: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.qf-foot .qf-foot-brand { display: grid; gap: 0.6rem; align-content: start; }
+
+.qf-foot .qf-foot-logo {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  text-decoration: none;
+}
+
+.qf-foot .qf-foot-logo-q { color: var(--qf-brand-ink); }
+.qf-foot .qf-foot-logo-f { color: var(--qf-brand-orange); }
+
+.qf-foot .qf-foot-tagline {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 0.891rem;
+  line-height: 1.65;
+  color: var(--qf-brand-muted);
+}
+
+.qf-foot .qf-foot-acc { border-bottom: 1px solid var(--qf-brand-line-soft); }
+
+.qf-foot .qf-foot-acc-head { margin: 0; }
+
+.qf-foot .qf-foot-acc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.938rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qf-foot .qf-foot-acc-chev {
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--qf-brand-faint);
+  border-bottom: 2px solid var(--qf-brand-faint);
+  transform: rotate(45deg);
+  transition: transform 200ms ease;
+}
+
+.qf-foot .qf-foot-acc.is-open .qf-foot-acc-chev { transform: rotate(-135deg); }
+
+.qf-foot .qf-foot-links {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.qf-foot .qf-foot-links a,
+.qf-foot .qf-foot-links span {
+  font-size: 0.891rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+}
+
+.qf-foot .qf-foot-links a:hover { color: var(--qf-brand-blue-deep); }
+
+.qf-foot .qf-foot-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: var(--qf-public-container);
+  margin: 0 auto;
+  padding: 1.1rem clamp(1rem, 4vw, 1.75rem) 1.4rem;
+  border-top: 1px solid var(--qf-brand-line-soft);
+  background: transparent;
+  font-size: 0.812rem;
+  color: var(--qf-brand-faint);
+}
+
+@media (min-width: 900px) {
+  .qf-foot .qf-foot-acc { border-bottom: none; }
+  .qf-foot .qf-foot-acc-btn { min-height: auto; margin-bottom: 0.6rem; cursor: default; }
+}
+
+/* ==========================================================================
+   PUBLIC MOBILE BOTTOM NAV
+   ========================================================================== */
+.qf-bottom-nav.qf-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  padding: 0.3rem 0.3rem calc(0.3rem + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid var(--qf-brand-line);
+  backdrop-filter: blur(10px);
+}
+
+.qf-bottom-nav .qf-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  padding: 0.3rem 0.15rem;
+  border: none;
+  border-radius: var(--qf-brand-radius-sm);
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.688rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.qf-bottom-nav .qf-bottom-nav-item svg { width: 20px; height: 20px; }
+
+.qf-bottom-nav .qf-bottom-nav-item--active {
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-blue-deep);
+  font-weight: 700;
+}
+
+.qf-bottom-nav .qf-bottom-nav-item--whatsapp { color: var(--qf-brand-success); }
+
+/* Content clears the fixed nav on the surfaces that show it. */
+.qf-home-page { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+
+@media (min-width: 880px) {
+  .qf-bottom-nav.qf-bottom-nav { display: none; }
+  .qf-home-page { padding-bottom: 0; }
+}
+
+/* ==========================================================================
+   BREAKPOINTS
+   ========================================================================== */
+@media (min-width: 700px) {
+  .qf-launcher-grid { gap: 0.55rem; }
+  .qf-hero-slider { min-height: 460px; }
+  .qf-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qf-usp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qf-foot .qf-foot-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+}
+
+@media (min-width: 1024px) {
+  /* The locked ~65 / ~35 entry module. */
+  .qf-hero-v2-grid {
+    grid-template-columns: minmax(0, 65fr) minmax(300px, 35fr);
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .qf-hero-v2-trust { grid-column: 1 / -1; }
+  .qf-hero-arrows { display: flex; }
+
+  /* Copy left, visual right — copy keeps priority at ~1.5fr. */
+  .qf-hero-slide {
+    grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: 1.6rem;
+  }
+
+  .qf-hero-slide-copy { grid-column: 1; grid-row: 1; max-width: 30ch; }
+  .qf-hero-slide-actions { grid-column: 1; grid-row: 2; }
+
+  .qf-hero-slide-media {
+    position: relative;
+    inset: auto;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    min-height: 232px;
+    border-radius: var(--qf-brand-radius-md);
+    background: var(--qf-brand-inset);
+  }
+
+  .qf-hero-slide-media img {
+    opacity: 1;
+    object-position: center;
+  }
+  .qf-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .qf-usp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  .qf-coverage { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+
+  .qf-foot .qf-foot-shell { grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr); gap: 2.5rem; }
+  .qf-foot .qf-foot-cols { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .qf-foot .qf-foot-col { border-bottom: none; }
+  .qf-foot .qf-foot-base { grid-column: 1 / -1; }
+
+  /* Desktop dialog rather than a bottom sheet. */
+  .qf-subsheet {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    width: min(520px, calc(100vw - 3rem));
+    transform: translate(-50%, -50%);
+    border-radius: var(--qf-brand-radius-lg);
+    animation: none;
+  }
+
+  .qf-subsheet-grip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-hero-slide,
+  .qf-launcher-item,
+  .qf-pub-btn,
+  .qf-subsheet,
+  .qf-site-header.qf-site-header {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  .qf-pub-btn--primary:hover,
+  .qf-launcher-item:hover { transform: none; }
+}

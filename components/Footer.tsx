@@ -118,7 +118,7 @@ export function Footer() {
 
       <div className="qf-foot-bottom">
         <span>© 2026 QuickFurno · Pune &amp; Mumbai</span>
-        <span>Verified Teams · Transparent process · Fast response</span>
+        <span>Verified vendors · Up to 3 matches · Free for homeowners</span>
       </div>
     </footer>
   );

@@ -310,7 +310,7 @@
 
   .qf-vendor-v2-support-layout[data-has-threads="true"] .qf-vendor-v2-support-new {
     position: sticky;
-    top: calc(58px + 1.15rem);
+    top: calc(var(--v2-topbar-h) + 1.15rem);
   }
 }
 

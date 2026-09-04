@@ -722,7 +722,7 @@
     grid-row: 1;
     /* Follows the form down the page instead of leaving dead space beside it. */
     position: sticky;
-    top: calc(58px + 1.15rem);
+    top: calc(var(--v2-topbar-h) + 1.15rem);
   }
 
   .qf-vendor-v2-profile-portfolio-grid {

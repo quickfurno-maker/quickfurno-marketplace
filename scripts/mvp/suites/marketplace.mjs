@@ -1146,6 +1146,91 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-14: global public navigation ---------------------------
+    {
+      name: 'mobile bottom nav derives active state from the pathname',
+      run: () => {
+        const src = readFileSync('components/MobileBottomNav.tsx', 'utf8');
+        const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+        // Home used to be hardcoded active, so it stayed lit on every route.
+        assertFalse(/className="qf-bottom-nav-item qf-bottom-nav-item--active"/.test(code),
+          'no hardcoded active item');
+        assertTrue(code.includes('usePathname()'), 'active state reads the real pathname');
+        assertTrue(/isHome\s*=\s*pathname === "\/"/.test(code), 'Home is active only on /');
+        assertTrue(/isCategory\s*=\s*pathname.startsWith\("\/category"\)/.test(code),
+          'Categories owns the active state on category routes');
+        // Screen readers must get the same fact the highlight conveys.
+        assertTrue((code.match(/aria-current=\{/g) || []).length >= 2, 'aria-current is exposed');
+        // A modal trigger and an outbound link are not pages: never "current".
+        const tail = code.slice(code.indexOf('Fill Form') - 400);
+        assertFalse(/aria-current=\{true\}|aria-current="page"/.test(tail),
+          'Fill Form / WhatsApp are never marked as the current page');
+      },
+    },
+    {
+      name: 'public header mobile menu is dismissible and unambiguous',
+      run: () => {
+        const src = readFileSync('components/Header.tsx', 'utf8');
+        // Escape must close the disclosure menu.
+        assertTrue(/event.key === "Escape"/.test(src), 'Escape handler present');
+        assertTrue(/if \(!open\) return;/.test(src), 'the key listener is bound only while open');
+        // The toggle must point at what it controls.
+        assertTrue(src.includes('aria-controls="qf-mobile-menu"'), 'toggle declares aria-controls');
+        assertTrue(src.includes('id="qf-mobile-menu"'), 'the menu carries that id');
+        // Two <nav> landmarks must not share one accessible name.
+        assertTrue(src.includes('aria-label="Mobile menu"'), 'header menu has its own landmark name');
+        const bottom = readFileSync('components/MobileBottomNav.tsx', 'utf8');
+        assertTrue(bottom.includes('aria-label="Mobile navigation"'), 'bottom nav keeps its name');
+        assertFalse(src.includes('aria-label="Mobile navigation"'), 'names no longer collide');
+      },
+    },
+    {
+      name: 'public nav has one link source and no duplicate contact id',
+      run: () => {
+        const header = readFileSync('components/Header.tsx', 'utf8');
+        // Desktop and mobile must render the SAME list, not two copies.
+        assertTrue((header.match(/NAV_LINKS.map/g) || []).length === 2, 'both menus map one list');
+        assertEqual((header.match(/const NAV_LINKS/g) || []).length, 1, 'exactly one link source');
+        // The homepage shipped id="contact" twice (footer + final CTA).
+        const footer = readFileSync('components/Footer.tsx', 'utf8');
+        const footerCode = footer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+        assertFalse(footerCode.includes('id="contact"'), 'footer no longer duplicates the id');
+        assertTrue(readFileSync('components/home/HomeSectionsV2.tsx', 'utf8').includes('id="contact"'),
+          'the homepage anchor target is kept');
+        // Every header anchor must exist in the homepage composition.
+        for (const [href, id] of [['/#categories', 'categories'], ['/#how-it-works', 'how-it-works'],
+                                  ['/#why-quickfurno', 'why-quickfurno']]) {
+          assertTrue(header.includes(href), 'header links ' + href);
+        }
+        const home = readFileSync('app/page.tsx', 'utf8')
+          + readFileSync('components/home/HomeSectionsV2.tsx', 'utf8');
+        for (const id of ['categories', 'how-it-works', 'why-quickfurno']) {
+          assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');
+        }
+      },
+    },
+    {
+      name: 'public nav never leaks into vendor or admin chrome',
+      run: () => {
+        for (const file of ['components/vendor/VendorPortalHeader.tsx',
+                            'components/vendor/VendorPortalFooter.tsx']) {
+          // Strip comments: these files document WHY they exclude the homeowner
+          // CTA, so the raw text names it on purpose.
+          const src = readFileSync(file, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+          assertFalse(src.includes('MobileBottomNav'), file + ' has no public bottom nav');
+          assertFalse(src.includes('StickyMobileCTA'), file + ' has no public sticky CTA');
+          assertFalse(src.includes('Get Free Team Matches'), file + ' has no homeowner CTA');
+        }
+        const vendorPage = readFileSync('app/vendor/page.tsx', 'utf8');
+        assertFalse(vendorPage.includes('<StickyMobileCTA />'), '/vendor renders no public bottom nav');
+        // WhatsApp destination authority stays in lib/config, not inlined here.
+        const bottom = readFileSync('components/MobileBottomNav.tsx', 'utf8');
+        assertTrue(bottom.includes('whatsappLink()'), 'WhatsApp uses the existing helper');
+        assertFalse(/wa\.me\/\d/.test(bottom), 'no hardcoded second contact authority');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

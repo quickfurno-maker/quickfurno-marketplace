@@ -74,8 +74,12 @@ function FooterLinks({ links }: { links: FooterLink[] }) {
 export function Footer() {
   const [open, setOpen] = useState<string | null>(null);
 
+  // QF-UI-V2-14: id="contact" removed - FinalCTAV2 also carried it, so the
+  // homepage shipped a duplicate element id. That section comes first in the
+  // document, so "/#contact" already resolved there and this copy was
+  // unreachable: dropping it changes no navigation behaviour.
   return (
-    <footer className="qf-foot" id="contact">
+    <footer className="qf-foot">
       <div className="qf-foot-inner">
         <div className="qf-foot-brand">
           <Link href="/" className="qf-foot-logo" aria-label="QuickFurno home">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { whatsappLink } from "@/lib/config";
@@ -17,13 +18,35 @@ function WhatsAppGlyph() {
 }
 
 export function MobileBottomNav() {
+  /**
+   * QF-UI-V2-14: "Home" was hardcoded active, so it stayed highlighted on
+   * /category/*, /enquiry, /privacy, /terms and /vendors - a false active
+   * state on every page except the homepage. Active state is now derived from
+   * the real pathname, and exposed to assistive tech with aria-current.
+   * Categories is a homepage anchor, but a category listing page IS that
+   * section's destination, so it owns the active state there.
+   * Fill Form opens a modal and WhatsApp leaves the site: neither is a page,
+   * so neither is ever marked current.
+   */
+  const pathname = usePathname();
+  const isHome = pathname === "/";
+  const isCategory = pathname.startsWith("/category");
+
   return (
     <nav className="qf-bottom-nav" aria-label="Mobile navigation">
-      <Link href="/" className="qf-bottom-nav-item qf-bottom-nav-item--active">
+      <Link
+        href="/"
+        className={`qf-bottom-nav-item${isHome ? " qf-bottom-nav-item--active" : ""}`}
+        aria-current={isHome ? "page" : undefined}
+      >
         <QFIcon name="home" />
         <span>Home</span>
       </Link>
-      <Link href="/#categories" className="qf-bottom-nav-item">
+      <Link
+        href="/#categories"
+        className={`qf-bottom-nav-item${isCategory ? " qf-bottom-nav-item--active" : ""}`}
+        aria-current={isCategory ? "page" : undefined}
+      >
         <QFIcon name="grid" />
         <span>Categories</span>
       </Link>

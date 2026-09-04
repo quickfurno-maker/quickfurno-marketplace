@@ -19,7 +19,7 @@
 // ============================================================================
 
 import { assert, assertEqual, assertTrue, assertFalse } from '../lib/harness.mjs';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import {
   formatServiceLabels,
@@ -1033,6 +1033,98 @@ export const suite = {
         // The intro heading itself is untouched.
         assertTrue(portal.includes('qf-vendor-intro-title'), 'intro title still rendered');
         assertTrue(portal.includes('Login to your vendor dashboard'), 'login title copy unchanged');
+      },
+    },
+
+    // --- QF-UI-V2-13: superadmin shell + dashboard certification ----------
+    {
+      name: 'admin login keeps its full fail-closed Superadmin authority',
+      run: () => {
+        const src = readFileSync('components/AdminLoginForm.tsx', 'utf8');
+        // Presentation-only phase: every authority step must survive verbatim.
+        assertTrue(src.includes('signInWithPassword'), 'password sign-in intact');
+        assertTrue(src.includes('.from("profiles")'), 'profile lookup intact');
+        assertTrue(
+          src.includes('profile?.role === "admin" && data.user.app_metadata?.admin_role === "Superadmin"'),
+          'both role checks intact and ANDed',
+        );
+        assertTrue(src.includes('if (profileError || !isSuperadmin) {'), 'fail-closed branch intact');
+        assertTrue(src.includes('await sb.auth.signOut();'), 'non-superadmin is signed out');
+        // No bypass may ever be committed.
+        assertFalse(/DEV_BYPASS|SKIP_AUTH|NEXT_PUBLIC_ADMIN_BYPASS|bypassAuth/i.test(src), 'no auth bypass');
+      },
+    },
+    {
+      name: 'admin login renders in the admin design system, not the public palette',
+      run: () => {
+        const src = readFileSync('components/AdminLoginForm.tsx', 'utf8');
+        // It is the entry point to the admin; it must speak the qfa language.
+        assertTrue(src.includes('var(--qfa-page)'), 'admin page token used');
+        assertTrue(src.includes('var(--qfa-surface)'), 'admin surface token used');
+        assertTrue(src.includes('qfa-control'), 'shared admin control height/border');
+        assertTrue(src.includes('qfa-focus'), 'shared admin focus ring');
+        // The legacy public marketing palette must not reappear here. Scan the
+        // CODE only: the file's header comment names the old hexes on purpose,
+        // to record what was replaced.
+        const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+        for (const legacy of ['#f3eadf', '#b8874a', '#1f1a14', 'qf-btn', 'qf-eyebrow']) {
+          assertFalse(code.toLowerCase().includes(legacy.toLowerCase()),
+            'no legacy public token: ' + legacy);
+        }
+      },
+    },
+    {
+      name: 'admin shell returns focus to the trigger when the drawer is dismissed',
+      run: () => {
+        const src = readFileSync('components/admin/AdminShell.tsx', 'utf8');
+        assertTrue(src.includes('menuButtonRef'), 'trigger ref exists');
+        assertTrue(src.includes('ref={menuButtonRef}'), 'ref is attached to the trigger');
+        assertTrue(src.includes('menuButtonRef.current?.focus()'), 'focus is restored');
+        assertTrue(src.includes('onClose={closeMobileNav}'), 'the drawer control restores focus too');
+        assertTrue(/event.key === "Escape" && mobileOpen/.test(src), 'Escape only acts while open');
+        // A route change must NOT steal focus back to the hamburger.
+        assertTrue(/useEffect\(\(\) => \{\s*setMobileOpen\(false\);\s*\}, \[pathname\]\);/.test(src),
+          'route-change close stays a plain state reset');
+      },
+    },
+    {
+      name: 'admin surfaces make no unverifiable runtime-safety or metric claims',
+      run: () => {
+        // QF-MVP-80.03 removed a static "Preview-safe mode" banner that claimed
+        // no assignment/credit effect while preview DID assign and debit.
+        const shell = readFileSync('components/admin/AdminShell.tsx', 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+        assertFalse(/Preview-safe mode/i.test(shell), 'no static preview-safe claim in the shell');
+        // The dashboard must not hardcode metric numbers.
+        const dash = readFileSync('components/AdminDashboard.tsx', 'utf8');
+        assertTrue(dash.includes('emptyCommandCenterData'), 'zero state comes from a real empty model');
+        // Sample-scoped figures must be labelled approximate, never absolute.
+        assertTrue(dash.includes('approximate'), 'sample-scoped figures are flagged');
+      },
+    },
+    {
+      name: 'V2-13 touched no public or vendor chrome',
+      run: () => {
+        // The phase is admin-only; these approved surfaces must be unchanged.
+        const header = readFileSync('components/Header.tsx', 'utf8');
+        assertTrue(header.includes('Get Free Team Matches'), 'public header CTA intact');
+        const vHeader = readFileSync('components/vendor/VendorPortalHeader.tsx', 'utf8');
+        assertTrue(vHeader.includes('Vendor Portal'), 'vendor chrome intact');
+        assertFalse(vHeader.includes('qfa-'), 'admin tokens did not leak into vendor chrome');
+        const vFooter = readFileSync('components/vendor/VendorPortalFooter.tsx', 'utf8');
+        assertFalse(vFooter.includes('qfa-'), 'admin tokens did not leak into vendor footer');
+      },
+    },
+    {
+      name: 'no visual-QA harness route is committed',
+      run: () => {
+        // The V2-13 harness lived at app/qf-visual-qa and must be gone.
+        assertFalse(existsSync('app/qf-visual-qa'), 'qf-visual-qa harness removed');
+        // And the real admin routes must still be the only way in.
+        const section = readFileSync('app/admin/[section]/page.tsx', 'utf8');
+        assertTrue(section.includes('if (!session.isLoggedIn) redirect("/admin/login");'), 'login gate intact');
+        assertTrue(section.includes('if (!session.isSuperadmin) redirect("/admin/login?error=unauthorized");'),
+          'superadmin gate intact');
       },
     },
 

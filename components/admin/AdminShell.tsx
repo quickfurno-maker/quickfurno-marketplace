@@ -23,6 +23,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const current = useMemo(() => getAdminSectionByPath(pathname), [pathname]);
 
   const group = useMemo(
@@ -52,6 +53,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /**
+   * QF-UI-V2-13: dismissing the drawer returned focus to <body>, so keyboard
+   * users landed at the top of the document instead of back on the control they
+   * had just used. Only USER-initiated dismissal restores focus; a route change
+   * closes the drawer too, and there focus belongs to the new page.
+   */
+  const closeMobileNav = useCallback(() => {
+    setMobileOpen(false);
+    // The trigger is aria-hidden/tabIndex=-1 while open, so wait for the
+    // re-render that makes it focusable again.
+    requestAnimationFrame(() => menuButtonRef.current?.focus());
+  }, []);
+
   // Cmd/Ctrl+K opens the navigation palette; Escape closes the mobile drawer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -60,13 +74,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
         event.preventDefault();
         setPaletteOpen(true);
-      } else if (event.key === "Escape") {
-        setMobileOpen(false);
+      } else if (event.key === "Escape" && mobileOpen) {
+        closeMobileNav();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [mobileOpen, closeMobileNav]);
 
   // Close the drawer on navigation so the overlay can never strand the page.
   useEffect(() => {
@@ -92,6 +106,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         Skip to admin content
       </a>
       <button
+        ref={menuButtonRef}
         type="button"
         onClick={() => setMobileOpen(true)}
         className="qfa-focus fixed left-3 top-3 z-40 inline-flex h-10 w-10 items-center justify-center rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white text-slate-700 shadow-[var(--qfa-shadow-1)] lg:hidden"
@@ -108,7 +123,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         open={mobileOpen}
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
-        onClose={() => setMobileOpen(false)}
+        onClose={closeMobileNav}
         onSignOut={signOut}
         backgroundInert={paletteOpen}
       />

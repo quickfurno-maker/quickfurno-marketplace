@@ -898,6 +898,40 @@ export const suite = {
       },
     },
 
+    {
+      name: 'vendor portal page states eligibility without promising leads',
+      run: () => {
+        // Assert on shipped code only — the file header comment records what the
+        // old copy said.
+        const src = readFileSync('app/vendor/page.tsx', 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/^\s*\/\/.*$/gm, '')
+          .replace(/\s+/g, ' ');
+
+        // Unsupported claims must be gone.
+        assertFalse(/verified home-service client leads/i.test(src),
+          'no "verified ... client leads" — QuickFurno verifies vendors, not clients');
+        assertFalse(/verified client/i.test(src), 'no verified-client claim');
+        assertFalse(/start receiving/i.test(src), 'signup does not promise leads will start');
+        for (const claim of [/guaranteed/i, /instant activation/i, /start earning/i,
+                             /grow faster/i, /priority leads/i]) {
+          assertFalse(claim.test(src), 'unsupported claim absent: ' + claim.source);
+        }
+
+        // The eligibility reality must be stated in full.
+        assertTrue(/approved and active/i.test(src), 'states approved and active');
+        assertTrue(/package and credits in place/i.test(src), 'states package and credits');
+        assertTrue(/matched enquiries/i.test(src), 'uses matched-enquiry wording');
+        assertTrue(src.includes('Lead access depends on your account being approved and active'),
+          'process step states the eligibility dependency');
+
+        // Title intent is unchanged; the description is the truthful one.
+        assertTrue(src.includes('Vendor Portal | QuickFurno'), 'title kept');
+        assertTrue(src.includes('manage matched home-service enquiries when eligible'),
+          'truthful metadata description');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

@@ -21,6 +21,14 @@
 import { assert, assertEqual, assertTrue, assertFalse } from '../lib/harness.mjs';
 import { readFileSync } from 'node:fs';
 
+import {
+  formatServiceLabels,
+  BUDGET_MIN_PLACEHOLDER,
+  BUDGET_MAX_PLACEHOLDER,
+  DISCARD_CONFIRM_TITLE,
+  DISCARD_CONFIRM_BODY,
+} from '../../../components/client-enquiry/enquiryDisplay.ts';
+
 import { assignmentRules, isAssignmentPreviewWithinLimit } from '../../../lib/aos/rules/assignmentRules.ts';
 import {
   MAX_DISTRIBUTION_VENDORS,
@@ -549,6 +557,70 @@ export const suite = {
         for (const [name, src] of [['free', free], ['inline', inline]]) {
           assertTrue(/\[6-9\]\\d\{9\}/.test(src), name + ' keeps 10-digit 6-9 phone validation');
         }
+      },
+    },
+
+    // --- QF-UI-V2-08R: client enquiry copy corrections -------------------
+    {
+      name: 'preferred-vendor service label collapses only genuine duplicates',
+      run: () => {
+        // The reported defect: category and subcategory resolve to the same label.
+        assertEqual(formatServiceLabels('Carpenters', 'Carpenters'), 'Carpenters',
+          'identical labels render once');
+        assertEqual(formatServiceLabels('Carpenters', ' carpenters '), 'Carpenters',
+          'trim + case-insensitive match still collapses, keeping the first casing');
+        // Genuinely different labels must NOT be collapsed.
+        assertEqual(formatServiceLabels('Interior Designers', 'Modular Factory'),
+          'Interior Designers / Modular Factory', 'distinct labels are both kept');
+        assertEqual(formatServiceLabels('Carpenters', 'Carpentry'),
+          'Carpenters / Carpentry', 'similar but distinct labels are both kept');
+        // Missing halves degrade cleanly.
+        assertEqual(formatServiceLabels('Carpenters', ''), 'Carpenters', 'empty second');
+        assertEqual(formatServiceLabels('', 'Carpenters'), 'Carpenters', 'empty first');
+        assertEqual(formatServiceLabels(null, undefined), '', 'both absent');
+        // The inline profile form uses the same helper with its own separator.
+        assertEqual(formatServiceLabels('Carpentry', 'Carpentry', ' · '), 'Carpentry',
+          'inline separator variant also dedupes');
+        assertEqual(formatServiceLabels('Carpentry', 'Carpenters', ' · '),
+          'Carpentry · Carpenters', 'inline separator variant keeps distinct labels');
+      },
+    },
+    {
+      name: 'budget placeholders are examples, never prefilled values',
+      run: () => {
+        assertEqual(BUDGET_MIN_PLACEHOLDER, 'e.g. 50,000', 'minimum placeholder copy');
+        assertEqual(BUDGET_MAX_PLACEHOLDER, 'e.g. 3,00,000', 'maximum placeholder copy');
+        for (const text of [BUDGET_MIN_PLACEHOLDER, BUDGET_MAX_PLACEHOLDER]) {
+          assertTrue(text.startsWith('e.g. '), 'reads as an example: ' + text);
+        }
+        const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+        // Placeholders only — never a value/defaultValue, and no bare numerics.
+        assertFalse(src.includes('placeholder="50000"'), 'old bare minimum placeholder gone');
+        assertFalse(src.includes('placeholder="300000"'), 'old bare maximum placeholder gone');
+        assertTrue(src.includes('placeholder={BUDGET_MIN_PLACEHOLDER}'), 'min bound to the constant');
+        assertTrue(src.includes('placeholder={BUDGET_MAX_PLACEHOLDER}'), 'max bound to the constant');
+        assertFalse(src.includes('defaultValue={BUDGET_MIN_PLACEHOLDER}'), 'never a default value');
+        assertFalse(src.includes('value={BUDGET_MIN_PLACEHOLDER}'), 'never a bound value');
+        assertFalse(src.includes('value={BUDGET_MAX_PLACEHOLDER}'), 'never a bound value');
+        // The budget fields stay bound to form state, so nothing can leak to the payload.
+        assertTrue(src.includes('value={form.budgetMin}'), 'min stays bound to form state');
+        assertTrue(src.includes('value={form.budgetMax}'), 'max stays bound to form state');
+      },
+    },
+    {
+      name: 'discard confirmation uses the approved specific copy',
+      run: () => {
+        assertEqual(DISCARD_CONFIRM_TITLE, 'Discard this enquiry?', 'heading copy');
+        assertEqual(DISCARD_CONFIRM_BODY, 'Your entered details will be lost.', 'body copy');
+        const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+        assertFalse(src.includes('Are you sure?'), 'vague heading removed');
+        assertFalse(src.includes('Your requirement details will be lost.'), 'old body removed');
+        assertTrue(src.includes('{DISCARD_CONFIRM_TITLE}'), 'heading bound to the constant');
+        assertTrue(src.includes('{DISCARD_CONFIRM_BODY}'), 'body bound to the constant');
+        // The two actions and the gating behaviour are untouched.
+        assertTrue(src.includes('Keep editing'), 'keep-editing action preserved');
+        assertTrue(src.includes('>\n                      Discard\n'), 'discard action preserved');
+        assertTrue(src.includes('if (success || !hasData())'), 'confirm gating unchanged');
       },
     },
 

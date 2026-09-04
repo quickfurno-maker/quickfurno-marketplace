@@ -12,6 +12,13 @@ import {
   useState,
 } from "react";
 import { submitLead } from "@/app/actions";
+import {
+  BUDGET_MAX_PLACEHOLDER,
+  BUDGET_MIN_PLACEHOLDER,
+  DISCARD_CONFIRM_BODY,
+  DISCARD_CONFIRM_TITLE,
+  formatServiceLabels,
+} from "@/components/client-enquiry/enquiryDisplay";
 import { trackEvent } from "@/lib/config";
 import { enquiryServiceForCategory } from "@/lib/quickfurno-data";
 import { mainCategories } from "@/lib/categories";
@@ -1200,7 +1207,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                           value={form.budgetMin}
                           onChange={(e) => setBudgetValue("budgetMin", e.target.value)}
                           onBlur={() => markTouched("budgetMin")}
-                          placeholder="50000"
+                          placeholder={BUDGET_MIN_PLACEHOLDER}
                           inputMode="numeric"
                           disabled={form.budgetNotSure}
                           aria-label="Minimum budget in rupees"
@@ -1219,7 +1226,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                           value={form.budgetMax}
                           onChange={(e) => setBudgetValue("budgetMax", e.target.value)}
                           onBlur={() => markTouched("budgetMax")}
-                          placeholder="300000"
+                          placeholder={BUDGET_MAX_PLACEHOLDER}
                           inputMode="numeric"
                           disabled={form.budgetNotSure}
                           aria-label="Maximum budget in rupees"
@@ -1518,8 +1525,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                         You are requesting a quote from {modalOptions.targetVendorName || "this vendor"}
                       </strong>
                       <div style={{ color: "#4b5563" }}>
-                        Service: {modalOptions.targetVendorCategory || form.serviceRequired || "—"}
-                        {modalOptions.targetVendorSubcategory ? ` / ${modalOptions.targetVendorSubcategory}` : ""}
+                        {/* DISPLAY ONLY: the vendor's category and subcategory often
+                            resolve to the same label ("Carpenters / Carpenters"), so
+                            equal labels collapse to one. The stored
+                            targetVendorCategory / targetVendorSubcategory values are
+                            unchanged and still submitted separately. */}
+                        Service:{" "}
+                        {formatServiceLabels(
+                          modalOptions.targetVendorCategory || form.serviceRequired,
+                          modalOptions.targetVendorSubcategory,
+                        ) || "—"}
                       </div>
                       {form.area || form.city ? (
                         <div style={{ color: "#4b5563" }}>
@@ -1570,8 +1585,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             {showConfirm ? (
               <div className="qf-rf-confirm" role="alertdialog" aria-label="Confirm close">
                 <div className="qf-rf-confirm-card">
-                  <h4>Are you sure?</h4>
-                  <p>Your requirement details will be lost.</p>
+                  <h4>{DISCARD_CONFIRM_TITLE}</h4>
+                  <p>{DISCARD_CONFIRM_BODY}</p>
                   <div className="qf-rf-confirm-actions">
                     <button type="button" className="qf-rf-btn qf-rf-btn--ghost" onClick={() => setShowConfirm(false)}>
                       Keep editing

@@ -729,6 +729,89 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-10: vendor acquisition page ---------------------------
+    {
+      name: 'vendor acquisition CTAs route to the real portal tabs',
+      run: () => {
+        const src = readFileSync('app/vendors/page.tsx', 'utf8');
+        assertTrue(src.includes('const SIGNUP_HREF = "/vendor?mode=signup"'), 'signup target');
+        assertTrue(src.includes('const LOGIN_HREF = "/vendor?mode=login"'), 'login target');
+        // Both a signup AND a login CTA must exist (the old page had no login CTA).
+        assertTrue((src.match(/SIGNUP_HREF/g) || []).length >= 2, 'signup CTA used');
+        assertTrue((src.match(/LOGIN_HREF/g) || []).length >= 2, 'login CTA used');
+        // No second auth surface on this page.
+        assertFalse(/VendorRegisterForm|LoginForm|<form/.test(src), 'no duplicate auth form');
+        // The portal itself still honours both modes.
+        const portal = readFileSync('app/vendor/page.tsx', 'utf8');
+        assertTrue(portal.includes('searchParams?.mode === "signup" ? "signup" : "login"'),
+          'portal still resolves both modes');
+      },
+    },
+    {
+      name: 'vendor acquisition page carries no fabricated or unsupported claims',
+      run: () => {
+        // Assert on shipped JSX only — the file's header comment deliberately
+        // records what was removed.
+        const src = readFileSync('app/vendors/page.tsx', 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+
+        // Invented testimonials and businesses.
+        for (const name of ['Rohit Deshmukh', 'Sanket Patil', 'Arjun Mehta',
+                            'UrbanCraft', 'Patil Modular', 'Mehta Construction']) {
+          assertFalse(src.includes(name), 'fabricated name removed: ' + name);
+        }
+        // Invented dashboard metrics and live-lead theatre.
+        for (const token of ['92%', 'New Today', 'Active Client Matches', 'waiting for you',
+                             'Accept Match', 'sampleLeads', 'miniLeads', 'testimonials',
+                             'VendorHeroStats']) {
+          assertFalse(src.includes(token), 'fabricated element removed: ' + token);
+        }
+        assertFalse(/\dm ago|\dh ago/.test(src), 'no fake relative timestamps');
+        assertFalse(/₹\s?\d/.test(src), 'no invented rupee figures');
+        // Unsupported marketing promises.
+        for (const claim of [/verified client/i, /high-intent/i, /genuine/i, /faster growth/i,
+                             /win more/i, /fair distribut/i, /no hidden/i, /24.7 support/i,
+                             /pre-qualified/i, /premium visibility/i, /higher conversions/i,
+                             /guarantee/i, /unlimited/i, /cancel anytime/i,
+                             /future vendor dashboard/i]) {
+          assertFalse(claim.test(src), 'unsupported claim removed: ' + claim.source);
+        }
+        // Public package pricing stays unpublished.
+        assertFalse(/Starter|Growth plan|per month|\/month|credits for ₹/i.test(src),
+          'no public package pricing');
+      },
+    },
+    {
+      name: 'vendor page preview is labelled illustrative and the journey states eligibility',
+      run: () => {
+        const src = readFileSync('app/vendors/page.tsx', 'utf8');
+        // The dashboard preview must announce itself as an example, not live data.
+        assertTrue(src.includes('Example view'), 'visible example label');
+        assertTrue(/aria-label="Illustrative example[^"]*Not live data\./.test(src),
+          'accessible name says illustrative and not live');
+        assertTrue(src.includes('Example enquiry'), 'example enquiry labelled');
+        // The journey must not imply enquiries start immediately after signup.
+        assertTrue(/reviews your profile/i.test(src), 'states QuickFurno review');
+        assertTrue(/approved, active and credited/i.test(src), 'states eligibility reality');
+        assertTrue(/package and credits/i.test(src), 'states package/credit reality');
+        // Metadata is truthful.
+        assertFalse(/verified client matches/i.test(src), 'metadata claim removed');
+        assertTrue(src.includes('manage matched home-service enquiries'), 'truthful metadata');
+      },
+    },
+    {
+      name: 'vendor auth implementation is untouched by the acquisition redesign',
+      run: () => {
+        // These are the signup/login authority files; V2-10 is presentation only.
+        for (const file of ['components/vendor/VendorPortal.tsx']) {
+          const src = readFileSync(file, 'utf8');
+          assertTrue(src.includes('initialMode'), file + ' still takes initialMode');
+          assertTrue(src.includes('/vendor?mode='), file + ' still drives both tabs');
+        }
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

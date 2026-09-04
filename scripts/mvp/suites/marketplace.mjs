@@ -37,6 +37,13 @@ import { replacementRules, buildReplacementReason } from '../../../lib/aos/rules
 import { pricingRules } from '../../../lib/aos/rules/pricingRules.ts';
 import { securityRules, isBlockedSideEffect } from '../../../lib/aos/rules/securityRules.ts';
 import {
+  toProfileView,
+  safePublicImageUrl,
+  profileSections,
+  profileQuickFacts,
+} from '../../../components/public-vendor/profileModel.ts';
+
+import {
   toListingView,
   hasRealStartingPrice,
   formatStartingPrice,
@@ -318,6 +325,155 @@ export const suite = {
           matchesListingFilters(all[0], { ...emptyListingFilters, query: 'zzz-no-match' }),
           'non-matching query excludes the row',
         );
+      },
+    },
+
+    // --- QF-UI-V2-07: public vendor profile truth model --------------------
+    {
+      name: 'profile view drops defaulted rating / reviews / experience / response',
+      run: () => {
+        const view = toProfileView({
+          slug: 'v-1', businessName: 'Shree Balaji Interiors', city: 'Pune',
+          category: 'Interior Designers', subCategory: 'Interior Designers',
+          rate: 'Price on request', description: 'Local interior team.',
+          verified: true, activePaidPlan: true, source: 'supabase',
+        });
+        const keys = Object.keys(view);
+        const banned = ['rating', 'reviews', 'responseTime', 'experience',
+                        'distance', 'openStatus', 'premium', 'warranty'];
+        for (const key of banned) {
+          assertFalse(keys.includes(key), 'profile view must not expose ' + key);
+        }
+        const blob = JSON.stringify(view);
+        assertFalse(blob.includes('4.2'), 'no defaulted rating');
+        assertFalse(blob.includes('Quick response expected'), 'no invented response text');
+        assertFalse(blob.includes('Verified Team'), 'no defaulted experience string');
+        assertFalse(blob.includes('Mon - Sun'), 'no invented business hours');
+        for (const locality of ['Baner', 'Wakad', 'Andheri', 'Thane']) {
+          assertFalse(blob.includes(locality), 'no invented service area ' + locality);
+        }
+        assertEqual(view.hasBusinessHours, false, 'absent hours stay absent');
+        assertEqual(view.hasServiceArea, false, 'absent service area stays absent');
+        assertEqual(view.startingPrice, null, 'price on request is not a price');
+        assertEqual(view.hasPortfolio, false, 'no portfolio');
+      },
+    },
+    {
+      name: 'profile view exposes only published facts and no private contact fields',
+      run: () => {
+        const view = toProfileView({
+          slug: 'v-2', businessName: 'Aarav Furniture Works', city: 'Mumbai',
+          category: 'Carpenters', rate: '1250', description: 'Custom furniture.',
+          verified: true, activePaidPlan: false, source: 'supabase',
+          serviceCategories: ['Carpenters', 'Modular Factory'],
+          serviceAreaSummary: 'Andheri, Powai', businessHours: 'Mon-Sat, 10am-7pm',
+          portfolioImages: ['/a.png', 'https://cdn.example.com/b.jpg'],
+        });
+        const blob = JSON.stringify(view).toLowerCase();
+        for (const key of ['phone', 'whatsapp', 'email', 'user_id', 'gst', 'address']) {
+          assertFalse(blob.includes(key), 'must not serialize ' + key);
+        }
+        assertEqual(view.startingPrice, '₹1250', 'real price kept');
+        assertEqual(view.serviceAreas.length, 2, 'service areas split faithfully');
+        assertEqual(view.serviceAreas[0], 'Andheri', 'first area');
+        assertEqual(view.portfolio.length, 2, 'local and approved external photos kept');
+        assertEqual(view.activePaidPlan, false, 'action-authority flag carried through');
+        assertEqual(view.initials, 'AF', 'initials fallback');
+      },
+    },
+    {
+      name: 'profile media accepts approved local and http(s) urls, rejects unsafe schemes',
+      run: () => {
+        assertEqual(safePublicImageUrl('/uploads/a.png'), '/uploads/a.png', 'local path kept');
+        assertEqual(safePublicImageUrl('https://cdn.example.com/a.jpg'), 'https://cdn.example.com/a.jpg', 'https kept');
+        assertEqual(safePublicImageUrl('http://cdn.example.com/a.jpg'), 'http://cdn.example.com/a.jpg', 'http kept');
+        assertEqual(safePublicImageUrl('javascript:alert(1)'), null, 'javascript scheme rejected');
+        assertEqual(safePublicImageUrl('JavaScript:alert(1)'), null, 'mixed-case javascript rejected');
+        assertEqual(safePublicImageUrl('data:text/html;base64,xxx'), null, 'data scheme rejected');
+        assertEqual(safePublicImageUrl('//evil.example.com/a.jpg'), null, 'protocol-relative rejected');
+        assertEqual(safePublicImageUrl(''), null, 'empty rejected');
+        assertEqual(safePublicImageUrl(null), null, 'null rejected');
+        const view = toProfileView({
+          slug: 'v-3', businessName: 'X Y', city: 'Pune', category: 'Painter',
+          description: 'd', portfolioImages: ['javascript:alert(1)', '/ok.png', '//evil.com/x.png'],
+          imageUrl: 'javascript:alert(1)', coverImageUrl: 'https://cdn.example.com/c.jpg',
+        });
+        assertEqual(view.portfolio.length, 1, 'only the safe portfolio url survives');
+        assertEqual(view.portfolio[0], '/ok.png', 'safe url kept');
+        assertEqual(view.profileImage, null, 'unsafe profile image dropped');
+        assertEqual(view.coverImage, 'https://cdn.example.com/c.jpg', 'approved external cover kept');
+      },
+    },
+    {
+      name: 'profile sections and quick facts hide what is not published',
+      run: () => {
+        const sparse = toProfileView({
+          slug: 'v-4', businessName: 'Nova Interiors', city: 'Pune',
+          category: 'Carpenters', rate: 'Price on request', description: 'd',
+        });
+        assertEqual(profileSections(sparse).map((x) => x.id).join(','), 'overview',
+          'sparse profile shows only Overview');
+        assertEqual(profileQuickFacts(sparse).length, 0, 'no invented quick facts');
+
+        const rich = toProfileView({
+          slug: 'v-5', businessName: 'Balaji', city: 'Pune', category: 'Carpenters',
+          rate: '900', description: 'd', serviceCategories: ['Carpenters'],
+          serviceAreaSummary: 'Kharadi', businessHours: 'Mon-Sat',
+          portfolioImages: ['/a.png', '/b.png'],
+        });
+        assertEqual(profileSections(rich).map((x) => x.id).join(','),
+          'overview,services,portfolio,details', 'rich profile shows all four');
+        const facts = profileQuickFacts(rich);
+        assertTrue(facts.length > 0 && facts.length <= 4, 'between 1 and 4 quick facts');
+        assertFalse(JSON.stringify(facts).includes('rating'), 'no rating fact');
+      },
+    },
+    {
+      name: 'profile falls back to a neutral description, never invented marketing',
+      run: () => {
+        const view = toProfileView({
+          slug: 'v-6', businessName: 'Nova Interiors', city: 'Pune',
+          category: 'Carpenters', description: '',
+        });
+        assertEqual(view.description,
+          'Nova Interiors is a verified QuickFurno vendor for carpenters services in Pune.',
+          'neutral factual fallback');
+        for (const claim of ['best', 'fast response', 'transparent', 'premium', 'years']) {
+          assertFalse(view.description.toLowerCase().includes(claim), 'no claim: ' + claim);
+        }
+      },
+    },
+
+    {
+      name: 'listing card keeps its local-only image guard after V2-07 widened the mapper',
+      run: () => {
+        // QF-UI-V2-07 lets publicVendorService expose an APPROVED external
+        // profile/cover URL so the profile can render it with a plain <img>.
+        // The listing card renders with next/image, which has no host allowlist,
+        // so toListingView must still drop anything that is not a local path.
+        const external = toListingView({
+          slug: 'v-x', businessName: 'External Logo Vendor', city: 'Pune',
+          category: 'Carpenters', rate: '900', description: 'd',
+          imageUrl: 'https://cdn.example.com/logo.png',
+        });
+        assertEqual(external.imageUrl, null, 'external url must not reach next/image');
+        assertEqual(external.initials, 'EL', 'card falls back to initials');
+
+        const local = toListingView({
+          slug: 'v-y', businessName: 'Local Logo Vendor', city: 'Pune',
+          category: 'Carpenters', rate: '900', description: 'd',
+          imageUrl: '/uploads/logo.png',
+        });
+        assertEqual(local.imageUrl, '/uploads/logo.png', 'local path still renders');
+
+        // The same row on the PROFILE does render the approved external URL.
+        const profile = toProfileView({
+          slug: 'v-x', businessName: 'External Logo Vendor', city: 'Pune',
+          category: 'Carpenters', rate: '900', description: 'd',
+          imageUrl: 'https://cdn.example.com/logo.png',
+        });
+        assertEqual(profile.profileImage, 'https://cdn.example.com/logo.png',
+          'profile renders the approved external url');
       },
     },
 

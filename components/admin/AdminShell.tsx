@@ -139,7 +139,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 pl-12 lg:pl-0">
               <nav aria-label="Breadcrumb">
-                <ol className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                {/* list-none/p-0: globals.css loads @tailwind utilities WITHOUT
+                    @tailwind base, so Preflight never resets lists and the UA default
+                    painted a "1." marker and a 40px indent here. Scoped to this list
+                    on purpose - no global ol/ul reset. Vertical margin is left alone
+                    so the topbar height is unchanged. */}
+                <ol className="flex list-none flex-wrap items-center gap-1.5 p-0 text-[11px] font-medium text-slate-500">
                   <li>
                     <Link href="/admin/dashboard" className="qfa-focus rounded transition-colors hover:text-slate-900">
                       Admin

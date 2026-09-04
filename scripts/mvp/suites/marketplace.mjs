@@ -1128,6 +1128,24 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-13R: breadcrumb list marker ----------------------------
+    {
+      name: 'admin breadcrumb list cannot render a browser list marker',
+      run: () => {
+        const src = readFileSync('components/admin/AdminShell.tsx', 'utf8');
+        const ol = src.match(/<ol className="([^"]*)"/);
+        assertTrue(!!ol, 'breadcrumb ol found');
+        // globals.css loads @tailwind utilities WITHOUT @tailwind base, so
+        // Preflight never resets lists: without these the UA paints "1." and a
+        // 40px indent.
+        assertTrue(ol[1].includes('list-none'), 'breadcrumb ol disables the marker');
+        assertTrue(/\bp-0\b/.test(ol[1]), 'breadcrumb ol drops the UA list indent');
+        // The semantic breadcrumb must be preserved, not swapped out to hide it.
+        assertTrue(src.includes('<nav aria-label="Breadcrumb">'), 'breadcrumb landmark kept');
+        assertTrue(src.includes('aria-current="page"'), 'current crumb still marked');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

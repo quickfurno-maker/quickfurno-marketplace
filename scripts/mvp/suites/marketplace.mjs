@@ -624,6 +624,111 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-09: public utility routes -----------------------------
+    {
+      name: 'legacy nested carpenter route only redirects to the canonical category',
+      run: () => {
+        const src = readFileSync('app/category/interiors/carpenters/page.tsx', 'utf8');
+        assertTrue(src.includes('permanentRedirect("/category/carpenters")'),
+          'permanent 308 redirect to the canonical route');
+        // The fabricated listing must be gone from the user path entirely.
+        for (const name of ['ModuCraft Interiors', 'WoodNest Interiors', 'Urban Wood Studio',
+                            'FineLine Carpentry', 'Prism Interiors', 'CraftEdge Solutions']) {
+          assertFalse(src.includes(name), 'invented vendor removed: ' + name);
+        }
+        for (const token of ['rating:', 'reviews:', 'priorityRank', 'isSubscribed',
+                             'Top Rated', 'Budget Friendly', 'Subscription Active',
+                             '/ sq ft', 'vendor-listing.module.css']) {
+          assertFalse(src.includes(token), 'fabricated listing token removed: ' + token);
+        }
+        // Its stylesheet is deleted, not merely unreferenced.
+        let cssExists = true;
+        try { readFileSync('app/category/interiors/carpenters/vendor-listing.module.css', 'utf8'); }
+        catch { cssExists = false; }
+        assertFalse(cssExists, 'legacy listing stylesheet deleted');
+        // The canonical page is untouched and still reads real vendors.
+        const canonical = readFileSync('app/category/[slug]/page.tsx', 'utf8');
+        assertTrue(canonical.includes('getPublicVendorsForCategory'), 'canonical still reads Supabase');
+        assertTrue(canonical.includes('VendorDiscovery'), 'canonical still renders the V2 listing');
+      },
+    },
+    {
+      name: 'public utility redirect routes stay intact',
+      run: () => {
+        const expected = [
+          ['app/login/page.tsx', '/vendor?mode=login'],
+          ['app/pricing/page.tsx', '/vendors'],
+          ['app/vendors/register/page.tsx', '/vendor?mode=signup'],
+          ['app/vendors/dashboard/page.tsx', '/vendor/dashboard'],
+        ];
+        for (const [file, target] of expected) {
+          const src = readFileSync(file, 'utf8');
+          assertTrue(src.includes('redirect("' + target + '")'), file + ' -> ' + target);
+          // Redirect-only: no interstitial UI was added.
+          assertFalse(src.includes('<Header'), file + ' stays redirect-only');
+        }
+      },
+    },
+    {
+      name: 'standalone enquiry keeps its submission authority and validation',
+      run: () => {
+        const src = readFileSync('components/LeadFunnel.tsx', 'utf8');
+        assertTrue(src.includes('submitLead('), 'same submitLead authority');
+        assertTrue(src.includes('source: "Enquiry funnel"'), 'source tag unchanged');
+        assertTrue(src.includes('share_consent: consent'), 'consent flag unchanged');
+        assertTrue(src.includes('readTracking()'), 'UTM capture unchanged');
+        assertTrue(src.includes('useActiveCities'), 'active-city authority unchanged');
+        assertTrue(src.includes('useActiveCategories'), 'active-category authority unchanged');
+        assertTrue(src.includes('defaultService'), '?service= prefill preserved');
+        // Every submitted field name survives the restyle.
+        for (const field of ['name', 'phone', 'city', 'service_required', 'area',
+                             'budget', 'property_type', 'timeline', 'message']) {
+          assertTrue(src.includes(field), 'field preserved: ' + field);
+        }
+        // Validation rules unchanged.
+        assertTrue(src.includes('replace(/\\D/g, "").length < 10'), '10-digit phone rule unchanged');
+        assertTrue(src.includes('Please accept sharing your details with up to 3 verified vendors to continue.'),
+          'consent gate message unchanged');
+        // The governed consent paragraph is preserved verbatim.
+        assertTrue(src.includes('up to 3 verified vendors initially'), 'consent: initial cap');
+        assertTrue(src.includes('may manually connect me with additional verified vendors'),
+          'consent: limited manual additional matching');
+      },
+    },
+    {
+      name: 'legal pages match the governed consent and drop proximity claims',
+      run: () => {
+        // JSX wraps long sentences across lines, so collapse whitespace before
+        // matching copy, and drop comments so only shipped text is asserted.
+        const stripComments = (text) => text
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/^\s*\/\/.*$/gm, '')
+          .replace(/\s+/g, ' ');
+        for (const file of ['app/privacy/page.tsx', 'app/terms/page.tsx']) {
+          const body = stripComments(readFileSync(file, 'utf8'));
+          // No unsupported proximity wording in shipped copy.
+          assertFalse(/vendors near you/i.test(body), file + ': no "vendors near you"');
+          assertFalse(/nearby leads/i.test(body), file + ': no "nearby leads"');
+          // Matching semantics mirror the consent checkbox.
+          assertTrue(body.includes('up to 3 verified vendors initially'),
+            file + ': states the initial cap');
+          assertTrue(/manually connect/i.test(body),
+            file + ': states the limited manual additional matching');
+          assertTrue(/city and area/i.test(body), file + ': matching is service + city/area');
+          // Legacy dark/gold utilities are gone.
+          for (const cls of ['text-ivory', 'text-muted', 'text-gold']) {
+            assertFalse(body.includes(cls), file + ': legacy class removed ' + cls);
+          }
+          assertTrue(body.includes('Last updated: 4 September 2026'), file + ': last-updated refreshed');
+        }
+        // Terms keeps the commercial model intact.
+        const terms = readFileSync('app/terms/page.tsx', 'utf8').replace(/\s+/g, ' ');
+        assertTrue(terms.includes('we do not carry out the work ourselves'), 'marketplace model kept');
+        assertTrue(terms.includes('Client enquiries are free'), 'free enquiries kept');
+        assertTrue(terms.includes('is between you and the vendor'), 'contract boundary kept');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

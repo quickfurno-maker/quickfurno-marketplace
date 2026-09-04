@@ -1,0 +1,390 @@
+/* ==========================================================================
+   QuickFurno — public utility pages V2  (QF-UI-V2-09)
+
+   Scope: the standalone enquiry route and the legal pages (/enquiry, /privacy,
+   /terms). Every selector is namespaced `qf-legal-*` or `qf-enqpage-*`; no bare
+   element selector is redefined and no generic form control is styled globally,
+   so nothing here can reach the vendor portal, the admin surface or the already
+   approved public pages.
+
+   Loaded after app/client-enquiry-v2.css from app/layout.tsx. All colour,
+   spacing and typography come from the QF-UI-V2-05 public tokens, so these pages
+   read as part of the same system as the homepage, listing and profile.
+
+   `.qf-legal-page` / `.qf-legal-body` already existed as class hooks with NO
+   rules anywhere — the pages were relying entirely on the legacy dark/gold
+   Tailwind utilities. They are given real styles here.
+   ========================================================================== */
+
+/* ==========================================================================
+   Shared page shell
+   ========================================================================== */
+.qf-legal-page,
+.qf-enqpage {
+  background: var(--qf-brand-bg);
+  color: var(--qf-brand-ink);
+  /* Clears the fixed public bottom nav on phones. */
+  padding-bottom: calc(var(--qf-bottom-nav-h, 62px) + 1.4rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 900px) {
+  .qf-legal-page,
+  .qf-enqpage { padding-bottom: 2.4rem; }
+}
+
+.qf-legal-shell,
+.qf-enqpage-shell {
+  width: min(100% - 2rem, 760px);
+  margin-inline: auto;
+  padding: 1.4rem 0 2rem;
+}
+
+@media (min-width: 1024px) {
+  .qf-legal-shell,
+  .qf-enqpage-shell { padding: 2rem 0 2.6rem; }
+}
+
+/* ==========================================================================
+   Page head (shared by legal + enquiry)
+   ========================================================================== */
+.qf-legal-eyebrow,
+.qf-enqpage-eyebrow {
+  display: block;
+  margin: 0 0 0.5rem;
+  font-size: 0.719rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--qf-brand-blue);
+}
+
+.qf-legal-title,
+.qf-enqpage-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 5vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.026em;
+  line-height: 1.18;
+  color: var(--qf-brand-ink);
+}
+
+.qf-legal-updated {
+  margin: 0.5rem 0 0;
+  font-size: 0.797rem;
+  color: var(--qf-brand-faint);
+}
+
+.qf-enqpage-lede {
+  margin: 0.5rem 0 0;
+  max-width: 56ch;
+  font-size: 0.938rem;
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Legal body — long-form reading
+   ========================================================================== */
+.qf-legal-body {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.qf-legal-section {
+  padding: 1.05rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+}
+
+.qf-legal-section h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-legal-section p {
+  margin: 0;
+  /* Comfortable measure and line height for long-form reading, and it survives
+     a 200% zoom without the column collapsing. */
+  font-size: 0.906rem;
+  line-height: 1.75;
+  color: var(--qf-brand-ink-2);
+  overflow-wrap: break-word;
+}
+
+.qf-legal-section p + p { margin-top: 0.65rem; }
+
+.qf-legal-section a {
+  color: var(--qf-brand-blue);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.qf-legal-section a:hover { color: var(--qf-brand-blue-deep); }
+
+.qf-legal-section a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* A restrained summary card for the matching mechanics. */
+.qf-legal-note {
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--qf-brand-blue);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-blue-tint);
+}
+
+.qf-legal-note h2 {
+  margin: 0 0 0.4rem;
+  font-size: 0.938rem;
+  font-weight: 700;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-legal-note ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qf-legal-note li {
+  position: relative;
+  padding-left: 1.05rem;
+  font-size: 0.859rem;
+  line-height: 1.6;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-legal-note li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue);
+}
+
+/* ==========================================================================
+   Standalone enquiry page
+   ========================================================================== */
+.qf-enqpage-head { margin-bottom: 1rem; }
+
+.qf-enqpage-panel {
+  padding: 1.05rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+@media (min-width: 720px) {
+  .qf-enqpage-panel { padding: 1.4rem; }
+}
+
+.qf-enqpage-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .qf-enqpage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qf-enqpage-grid > .qf-enqpage-field--wide { grid-column: 1 / -1; }
+}
+
+.qf-enqpage-field { display: grid; gap: 0.3rem; min-width: 0; }
+
+.qf-enqpage-field > span {
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+}
+
+/* Scoped to this page's own field wrapper — never a global input/select rule. */
+.qf-enqpage-field input,
+.qf-enqpage-field select,
+.qf-enqpage-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.938rem;
+  color: var(--qf-brand-ink);
+}
+
+.qf-enqpage-field textarea { min-height: 96px; line-height: 1.55; resize: vertical; }
+
+.qf-enqpage-field input:focus-visible,
+.qf-enqpage-field select:focus-visible,
+.qf-enqpage-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-enqpage-field input::placeholder,
+.qf-enqpage-field textarea::placeholder { color: var(--qf-brand-faint); }
+
+.qf-enqpage-consent {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: start;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  font-size: 0.781rem;
+  line-height: 1.6;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-enqpage-consent input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: var(--qf-brand-blue);
+}
+
+.qf-enqpage-consent a {
+  color: var(--qf-brand-blue);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.qf-enqpage-submit {
+  margin-top: 1rem;
+  min-height: 48px;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .qf-enqpage-submit { width: auto; min-width: 220px; }
+}
+
+.qf-enqpage-fineprint {
+  margin: 0.7rem 0 0;
+  font-size: 0.766rem;
+  line-height: 1.5;
+  color: var(--qf-brand-faint);
+}
+
+.qf-enqpage-alert {
+  margin: 0 0 0.9rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #f0c8c1;
+  border-radius: var(--qf-radius-md);
+  background: #fdf1ef;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: #8f2c1c;
+}
+
+/* Progress */
+.qf-enqpage-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.qf-enqpage-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+}
+
+.qf-enqpage-step-dot {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-inset);
+  font-size: 0.688rem;
+  font-weight: 700;
+  color: var(--qf-brand-faint);
+}
+
+.qf-enqpage-step[data-state="current"] { color: var(--qf-brand-ink); }
+
+.qf-enqpage-step[data-state="current"] .qf-enqpage-step-dot {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-enqpage-step[data-state="done"] .qf-enqpage-step-dot {
+  background: var(--qf-brand-success);
+  border-color: var(--qf-brand-success);
+  color: #fff;
+}
+
+.qf-enqpage-step-rule {
+  width: 22px;
+  height: 1px;
+  background: var(--qf-brand-line);
+}
+
+/* Success */
+.qf-enqpage-success {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2.2rem 1.25rem;
+  text-align: center;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+}
+
+.qf-enqpage-success-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-success);
+}
+
+.qf-enqpage-success h2 {
+  margin: 0.35rem 0 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-enqpage-success p {
+  margin: 0;
+  max-width: 44ch;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--qf-brand-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-enqpage-panel,
+  .qf-legal-section { transition-duration: 0.01ms !important; }
+}

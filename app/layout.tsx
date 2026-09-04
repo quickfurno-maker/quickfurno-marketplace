@@ -16,6 +16,9 @@ import "./qf-public-v2.css";
 // .qf-cs-enquiry-* rules win over the legacy cream-copper modal styling without
 // deleting selectors other surfaces still use.
 import "./client-enquiry-v2.css";
+// QF-UI-V2-09 — standalone enquiry route + legal pages. Scoped qf-legal-* /
+// qf-enqpage-* only; no global form-control or element rules.
+import "./public-utility-v2.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

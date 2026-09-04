@@ -25,12 +25,18 @@ export function MobileBottomNav() {
    * the real pathname, and exposed to assistive tech with aria-current.
    * Categories is a homepage anchor, but a category listing page IS that
    * section's destination, so it owns the active state there.
-   * Fill Form opens a modal and WhatsApp leaves the site: neither is a page,
-   * so neither is ever marked current.
+   *
+   * QF-UI-V2-14R: /enquiry IS the Fill Form destination as a full page, so the
+   * nav must say so - it previously showed no active item there at all. The
+   * trigger stays a <button> and keeps its existing modal behaviour; only the
+   * active class and aria-current are added.
+   * WhatsApp leaves the site, so it is never current; its green is brand
+   * support colour, not active state.
    */
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isCategory = pathname.startsWith("/category");
+  const isEnquiry = pathname === "/enquiry";
 
   return (
     <nav className="qf-bottom-nav" aria-label="Mobile navigation">
@@ -50,7 +56,10 @@ export function MobileBottomNav() {
         <QFIcon name="grid" />
         <span>Categories</span>
       </Link>
-      <EnquiryModalTrigger className="qf-bottom-nav-item">
+      <EnquiryModalTrigger
+        className={`qf-bottom-nav-item${isEnquiry ? " qf-bottom-nav-item--active" : ""}`}
+        aria-current={isEnquiry ? "page" : undefined}
+      >
         <QFIcon name="request" />
         <span>Fill Form</span>
       </EnquiryModalTrigger>

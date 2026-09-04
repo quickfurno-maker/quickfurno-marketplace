@@ -1161,10 +1161,12 @@ export const suite = {
           'Categories owns the active state on category routes');
         // Screen readers must get the same fact the highlight conveys.
         assertTrue((code.match(/aria-current=\{/g) || []).length >= 2, 'aria-current is exposed');
-        // A modal trigger and an outbound link are not pages: never "current".
-        const tail = code.slice(code.indexOf('Fill Form') - 400);
-        assertFalse(/aria-current=\{true\}|aria-current="page"/.test(tail),
-          'Fill Form / WhatsApp are never marked as the current page');
+        // WhatsApp leaves the site, so it is never a page and never "current".
+        // (Fill Form IS current on /enquiry - see the V2-14R case below.)
+        const waIndex = code.indexOf('WhatsAppGlyph />');
+        assertTrue(waIndex > 0, 'WhatsApp item found');
+        assertFalse(/aria-current/.test(code.slice(waIndex - 300, waIndex + 200)),
+          'WhatsApp is never marked as the current page');
       },
     },
     {
@@ -1228,6 +1230,53 @@ export const suite = {
         const bottom = readFileSync('components/MobileBottomNav.tsx', 'utf8');
         assertTrue(bottom.includes('whatsappLink()'), 'WhatsApp uses the existing helper');
         assertFalse(/wa\.me\/\d/.test(bottom), 'no hardcoded second contact authority');
+      },
+    },
+
+    // --- QF-UI-V2-14R: /enquiry is the Fill Form destination --------------
+    {
+      name: 'bottom nav marks exactly the right item current on every public route',
+      run: () => {
+        const src = readFileSync('components/MobileBottomNav.tsx', 'utf8');
+        const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+        // The three predicates that drive the whole table.
+        assertTrue(/isHome\s*=\s*pathname === "\/"/.test(code), 'Home: exact "/"');
+        assertTrue(/isCategory\s*=\s*pathname.startsWith\("\/category"\)/.test(code),
+          'Categories: /category prefix');
+        assertTrue(/isEnquiry\s*=\s*pathname === "\/enquiry"/.test(code),
+          'Fill Form: exact "/enquiry"');
+
+        // Reproduce the table the predicates imply, for every certified route.
+        const activeFor = (pathname) => {
+          const hits = [];
+          if (pathname === '/') hits.push('Home');
+          if (pathname.startsWith('/category')) hits.push('Categories');
+          if (pathname === '/enquiry') hits.push('Fill Form');
+          return hits;
+        };
+        const expected = {
+          '/': ['Home'],
+          '/category/carpenters': ['Categories'],
+          '/enquiry': ['Fill Form'],
+          '/privacy': [],
+          '/terms': [],
+          '/vendors': [],
+        };
+        for (const [route, want] of Object.entries(expected)) {
+          const got = activeFor(route);
+          assertEqual(got.join(','), want.join(','), route + ' active item');
+          // Never more than one current item anywhere.
+          assertTrue(got.length <= 1, route + ' has at most one current item');
+        }
+
+        // Fill Form stays a modal-opening button; it was NOT turned into a link
+        // just to get active styling.
+        assertTrue(code.includes('<EnquiryModalTrigger'), 'Fill Form is still the modal trigger');
+        assertFalse(/<Link[^>]*Fill Form/s.test(code), 'Fill Form was not converted to a link');
+        // Active styling reuses the established class, not a new one.
+        assertEqual((code.match(/qf-bottom-nav-item--active/g) || []).length, 3,
+          'all three active items share one class');
       },
     },
 

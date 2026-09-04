@@ -37,6 +37,16 @@ import { replacementRules, buildReplacementReason } from '../../../lib/aos/rules
 import { pricingRules } from '../../../lib/aos/rules/pricingRules.ts';
 import { securityRules, isBlockedSideEffect } from '../../../lib/aos/rules/securityRules.ts';
 import {
+  toListingView,
+  hasRealStartingPrice,
+  formatStartingPrice,
+  matchesListingFilters,
+  selectListingVendors,
+  resultCountLabel,
+  emptyListingFilters,
+} from '../../../components/public-listing/listingModel.ts';
+
+import {
   normalizeCategory,
   isLeadVendorCategoryCompatible,
   verifyCategoryMatchingSmokeCases,
@@ -209,6 +219,105 @@ export const suite = {
         assertEqual(normalizeCategory('Kitchen & Bath'), 'kitchen and bath', 'ampersand + case fold');
         assertEqual(normalizeCategory('  Modular   Kitchen '), 'modular kitchen', 'trim + collapse whitespace');
         assertEqual(normalizeCategory(42), '', 'non-string => empty');
+      },
+    },
+
+    // --- QF-UI-V2-06: public listing display model (truthfulness) ---------
+    {
+      name: 'listing view drops defaulted rating / reviews / response / experience',
+      run: () => {
+        // Shape a real Supabase-mapped vendor: mapToPublicVendor() defaults
+        // rating to 4.2, reviews to 0, responseTime to "Quick response expected"
+        // and experience to "Verified Team" when the columns are null.
+        const view = toListingView({
+          slug: 'v-1', businessName: 'Shree Balaji Interiors', city: 'Pune',
+          category: 'Interior Designers', subCategory: 'Interior Designers',
+          rating: 4.2, reviews: 0, rate: 'Price on request',
+          experience: 'Verified Team', responseTime: 'Quick response expected',
+          activePaidPlan: true, verified: true, description: 'Local team.',
+          imageTone: 'warm-suite', source: 'supabase',
+        });
+        const keys = Object.keys(view);
+        for (const banned of ['rating', 'reviews', 'responseTime', 'experience',
+                              'warranty', 'distance', 'openStatus', 'ratingLabel']) {
+          assertFalse(keys.includes(banned), `view must not expose ${banned}`);
+        }
+        assertEqual(JSON.stringify(view).includes('4.2'), false, 'no defaulted 4.2 rating anywhere');
+        assertEqual(JSON.stringify(view).includes('Quick response expected'), false, 'no invented response text');
+        assertEqual(view.startingPrice, null, '"Price on request" is not a real price');
+        assertEqual(view.portfolioCount, 0, 'no stock imagery counted as vendor photos');
+      },
+    },
+    {
+      name: 'listing view never exposes private vendor contact fields',
+      run: () => {
+        const view = toListingView({
+          slug: 'v-2', businessName: 'Test Vendor', city: 'Mumbai',
+          category: 'Carpenters', subCategory: 'Carpenters', rating: 0, reviews: 0,
+          rate: '1200', experience: '', responseTime: '', activePaidPlan: false,
+          verified: true, description: 'd', imageTone: 't',
+          portfolioImages: ['/a.png', '/b.png'], serviceAreaSummary: 'Andheri, Bandra',
+          businessHours: 'Mon-Sat 10am-7pm', serviceCategories: ['Carpenters'],
+        });
+        const serialized = JSON.stringify(view).toLowerCase();
+        for (const banned of ['phone', 'whatsapp', 'email', 'user_id', 'gst', 'address']) {
+          assertFalse(serialized.includes(banned), `must not serialize ${banned}`);
+        }
+        assertEqual(view.startingPrice, '₹1200', 'real numeric price is kept and prefixed');
+        assertEqual(view.portfolioCount, 2, 'counts the vendor own uploads');
+        assertEqual(view.serviceArea, 'Andheri, Bandra', 'real service area kept');
+        assertEqual(view.activePaidPlan, false, 'contact authority flag carried through untouched');
+        assertEqual(view.initials, 'TV', 'initials avatar fallback');
+      },
+    },
+    {
+      name: 'only real listed prices count as a price',
+      run: () => {
+        assertTrue(hasRealStartingPrice('1200'), 'numeric is real');
+        assertTrue(hasRealStartingPrice('₹ 1,200 per sq ft'), 'formatted numeric is real');
+        assertFalse(hasRealStartingPrice('Price on request'), 'placeholder is not a price');
+        assertFalse(hasRealStartingPrice(''), 'empty is not a price');
+        assertFalse(hasRealStartingPrice(null), 'null is not a price');
+        assertEqual(formatStartingPrice('Price on request'), null, 'placeholder formats to null');
+      },
+    },
+    {
+      name: 'listing filters use only real facts and the count matches the rows',
+      run: () => {
+        const base = {
+          rating: 0, reviews: 0, experience: '', responseTime: '', verified: true,
+          description: 'd', imageTone: 't', subCategory: 'Carpenters', activePaidPlan: true,
+        };
+        const vendors = [
+          { ...base, slug: 'a', businessName: 'Alpha Woodworks', city: 'Pune',
+            category: 'Carpenters', rate: '900', portfolioImages: ['/x.png'] },
+          { ...base, slug: 'b', businessName: 'Beta Interiors', city: 'Mumbai',
+            category: 'Carpenters', rate: 'Price on request', portfolioImages: [] },
+        ];
+        const all = selectListingVendors(vendors, emptyListingFilters, 'recommended');
+        assertEqual(all.length, 2, 'no filter => both');
+        assertEqual(resultCountLabel(all.length), '2 vendors', 'plural count label');
+        assertEqual(resultCountLabel(1), '1 vendor', 'singular count label');
+
+        const pune = selectListingVendors(vendors, { ...emptyListingFilters, city: 'Pune' }, 'recommended');
+        assertEqual(pune.length, 1, 'city filter uses the real city column');
+        assertEqual(pune[0].businessName, 'Alpha Woodworks', 'correct vendor kept');
+
+        const priced = selectListingVendors(vendors, { ...emptyListingFilters, hasPrice: true }, 'recommended');
+        assertEqual(priced.length, 1, 'price filter keeps only a real listed price');
+
+        const photos = selectListingVendors(vendors, { ...emptyListingFilters, hasPhotos: true }, 'recommended');
+        assertEqual(photos.length, 1, 'photo filter uses the vendor own uploads');
+
+        const named = selectListingVendors(vendors, emptyListingFilters, 'name');
+        assertEqual(named[0].businessName, 'Alpha Woodworks', 'A-Z sort');
+
+        const searched = selectListingVendors(vendors, { ...emptyListingFilters, query: 'beta' }, 'recommended');
+        assertEqual(searched.length, 1, 'search matches the business name');
+        assertFalse(
+          matchesListingFilters(all[0], { ...emptyListingFilters, query: 'zzz-no-match' }),
+          'non-matching query excludes the row',
+        );
       },
     },
 

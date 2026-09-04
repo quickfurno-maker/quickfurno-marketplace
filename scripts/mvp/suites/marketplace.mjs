@@ -812,6 +812,92 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-11: vendor auth + onboarding ---------------------------
+    {
+      name: 'vendor portal keeps its mode deep-links and tab semantics',
+      run: () => {
+        const page = readFileSync('app/vendor/page.tsx', 'utf8');
+        assertTrue(page.includes('searchParams?.mode === "signup" ? "signup" : "login"'),
+          '?mode=signup maps signup, everything else maps login');
+        const portal = readFileSync('components/vendor/VendorPortal.tsx', 'utf8');
+        assertTrue(portal.includes('router.replace(`/vendor?mode=${next}`, { scroll: false })'),
+          'switchMode keeps the exact router.replace target');
+        assertTrue(portal.includes('role="tablist"'), 'tablist preserved');
+        assertTrue(portal.includes('role="tab"'), 'tab role preserved');
+        assertTrue(portal.includes('aria-selected={active}'), 'aria-selected preserved');
+        // The copper pill is gone and no inline colour remains.
+        assertFalse(portal.includes('#c8892b'), 'copper active tab removed');
+        assertFalse(portal.includes('#4b3f33'), 'brown inactive text removed');
+        assertFalse(/background: active \?/.test(portal), 'inline tab colouring removed');
+      },
+    },
+    {
+      name: 'vendor login authority and role routing are unchanged',
+      run: () => {
+        const src = readFileSync('components/LoginForm.tsx', 'utf8');
+        assertTrue(src.includes('browserClient()'), 'same supabase browser client');
+        assertTrue(src.includes('sb.auth.signInWithPassword({ email, password })'), 'same sign-in call');
+        assertTrue(src.includes('.from("profiles").select("role").eq("id", data.user.id).single()'),
+          'same profiles.role read');
+        assertTrue(src.includes('profile?.role === "admin"'), 'same admin test');
+        assertTrue(src.includes('router.refresh()'), 'refresh before redirect');
+        assertTrue(src.includes('router.push(isAdmin ? "/admin/dashboard" : "/vendor/dashboard")'),
+          'same role-based redirect');
+        // Enter-to-submit survives on BOTH fields.
+        assertEqual((src.match(/e\.key === "Enter" && onSubmit\(\)/g) || []).length, 2,
+          'Enter submits from email and password');
+        // No second auth implementation and no legacy copper styling.
+        assertFalse(/signInWithOtp|signInWithOAuth|magic|resetPasswordForEmail/i.test(src),
+          'no new auth method introduced');
+        for (const cls of ['btn-gold', 'text-gold', 'className="panel', 'className="field']) {
+          assertFalse(src.includes(cls), 'legacy class removed: ' + cls);
+        }
+      },
+    },
+    {
+      name: 'vendor registration authority and rules are unchanged',
+      run: () => {
+        const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
+        assertTrue(src.includes('submitVendorAccountRegistration'), 'sole submit authority');
+        assertEqual((src.match(/submitVendorAccountRegistration\(/g) || []).length, 1,
+          'submitted through exactly one call');
+        // Shared sources of truth are not forked.
+        for (const dep of ['mainCategories', 'useActiveCities', 'GooglePlaceAutocomplete',
+                           'isPlaceCompatibleWithSelectedCity', 'readTracking', 'CATEGORY_MIN_RATE']) {
+          assertTrue(src.includes(dep), 'preserved: ' + dep);
+        }
+        // Six steps, in order.
+        assertTrue(src.includes('const LAST_STEP = 5'), 'six steps (0..5) preserved');
+        for (const name of ['Business Identity', 'Service Category', 'City & Base Area',
+                            'Location', 'Business Strength', 'Review']) {
+          assertTrue(src.includes(name), 'step preserved: ' + name);
+        }
+        // Validation rules untouched.
+        assertTrue(src.includes('key: "confirmPassword"'), 'confirm-password rule kept');
+        assertTrue(/10-digit/.test(src), '10-digit phone rule kept');
+        // No invented brand remains as a placeholder.
+        assertFalse(src.includes('UrbanCraft'), 'fictional business placeholder removed');
+      },
+    },
+    {
+      name: 'set-password recovery flow is untouched by the restyle',
+      run: () => {
+        const src = readFileSync('app/vendor/set-password/page.tsx', 'utf8');
+        assertTrue(src.includes('supabase.auth.setSession({'), 'setSession retained');
+        assertTrue(src.includes('window.history.replaceState(null, "", window.location.pathname)'),
+          'fragment stripped immediately');
+        assertTrue(src.includes('supabase.auth.getUser()'), 'getUser retained');
+        assertTrue(src.includes('supabase.auth.updateUser({ password })'), 'updateUser retained');
+        assertTrue(src.includes('await supabase.auth.signOut()'), 'recovery session signed out');
+        assertTrue(src.includes('router.push("/vendor?mode=login")'), 'login redirect retained');
+        assertTrue(src.includes('VENDOR_PASSWORD_MIN_LENGTH'), 'minimum length rule retained');
+        assertTrue(src.includes('password !== confirm'), 'confirm match retained');
+        // Nothing logs or persists a token or password.
+        assertFalse(/console\.(log|info|warn|error)\(/.test(src), 'no logging on this page');
+        assertFalse(/localStorage|sessionStorage/.test(src), 'no client storage of secrets');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

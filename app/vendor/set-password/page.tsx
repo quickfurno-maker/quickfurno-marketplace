@@ -124,64 +124,80 @@ export default function VendorSetPasswordPage() {
     [confirm, password, router],
   );
 
+  /*
+    QF-UI-V2-11 — presentation only. Everything above this return (fragment
+    error handling, setSession, the immediate history.replaceState that strips
+    the tokens, getUser, VENDOR_PASSWORD_MIN_LENGTH, the confirm match,
+    updateUser, the signOut and the login redirect) is untouched.
+
+    The shared <Header /> is deliberately NOT used here: this is a client page
+    holding a recovery session, and mounting the public header would pull the
+    whole public nav tree into that render. A plain brand lockup keeps the page
+    on-brand without changing what runs while a recovery token is live.
+  */
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-4 py-12">
-      <h1 className="text-2xl font-semibold text-slate-950">Set your QuickFurno password</h1>
+    <main className="qf-vauth-page">
+      <Link href="/" className="qf-vauth-brand">
+        Quick<span>Furno</span>
+      </Link>
 
-      {phase === "checking" ? (
-        <p className="mt-4 text-sm text-slate-500">Checking your link…</p>
-      ) : null}
+      <div className="qf-vauth-card">
+        <h1 className="qf-vauth-card-title">Set your QuickFurno password</h1>
 
-      {phase === "no-session" ? (
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-slate-600">{error}</p>
-          <Link href="/vendor?mode=login" className="text-sm font-semibold text-emerald-700 underline">
-            Go to vendor login
-          </Link>
-        </div>
-      ) : null}
+        {phase === "checking" ? (
+          <p className="qf-vauth-card-sub" role="status">Checking your link…</p>
+        ) : null}
 
-      {phase === "done" ? (
-        <p className="mt-4 text-sm text-emerald-700">
-          Password saved. Taking you to the login page…
-        </p>
-      ) : null}
+        {phase === "no-session" ? (
+          <>
+            <p className="qf-vauth-alert" role="alert">{error}</p>
+            <p className="qf-vauth-alt">
+              <Link href="/vendor?mode=login">Go to vendor login</Link>
+            </p>
+          </>
+        ) : null}
 
-      {phase === "ready" || phase === "saving" ? (
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <p className="text-sm text-slate-600">
-            Choose a password for your vendor dashboard. Your business details, package and credits are unchanged.
+        {phase === "done" ? (
+          <p className="qf-vauth-ok" role="status">
+            Password saved. Taking you to the login page…
           </p>
-          <label className="block">
-            <span className="text-xs font-semibold uppercase text-slate-500">New password</span>
-            <input
-              type="password"
-              value={password}
-              autoComplete="new-password"
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold uppercase text-slate-500">Confirm password</span>
-            <input
-              type="password"
-              value={confirm}
-              autoComplete="new-password"
-              onChange={(event) => setConfirm(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-          </label>
-          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-          <button
-            type="submit"
-            disabled={phase === "saving"}
-            className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {phase === "saving" ? "Saving…" : "Save password"}
-          </button>
-        </form>
-      ) : null}
+        ) : null}
+
+        {phase === "ready" || phase === "saving" ? (
+          <form onSubmit={submit}>
+            <p className="qf-vauth-card-sub">
+              Choose a password for your vendor dashboard. Your business details, package and credits are unchanged.
+            </p>
+
+            {error ? <p className="qf-vauth-alert" role="alert">{error}</p> : null}
+
+            <div className="qf-vauth-fields">
+              <label className="qf-vauth-field">
+                <span>New password</span>
+                <input
+                  type="password"
+                  value={password}
+                  autoComplete="new-password"
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </label>
+              <label className="qf-vauth-field">
+                <span>Confirm password</span>
+                <input
+                  type="password"
+                  value={confirm}
+                  autoComplete="new-password"
+                  onChange={(event) => setConfirm(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <button type="submit" disabled={phase === "saving"} className="qf-vauth-btn">
+              {phase === "saving" ? "Saving…" : "Save password"}
+            </button>
+          </form>
+        ) : null}
+      </div>
     </main>
   );
 }

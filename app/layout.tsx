@@ -19,6 +19,9 @@ import "./client-enquiry-v2.css";
 // QF-UI-V2-09 — standalone enquiry route + legal pages. Scoped qf-legal-* /
 // qf-enqpage-* only; no global form-control or element rules.
 import "./public-utility-v2.css";
+// QF-UI-V2-11 — vendor auth + onboarding (/vendor login & signup,
+// /vendor/set-password). Scoped qf-vauth-* / qf-vrf-* / qf-vendor-* only.
+import "./vendor-auth-v2.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

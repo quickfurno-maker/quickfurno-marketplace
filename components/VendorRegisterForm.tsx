@@ -786,7 +786,10 @@ export function VendorRegisterForm() {
               {renderInputField({
                 label: "Business name",
                 fieldKey: "businessName",
-                placeholder: "e.g. UrbanCraft Interiors",
+                // QF-UI-V2-11: the example here named a fictional business.
+                // A generic placeholder is used instead, so no invented brand
+                // appears anywhere in the product.
+                placeholder: "Your business name",
                 autoComplete: "organization",
                 ref: firstFieldRef,
               })}

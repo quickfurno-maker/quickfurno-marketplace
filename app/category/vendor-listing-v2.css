@@ -590,19 +590,41 @@
   border-radius: 4px;
 }
 
+/*
+  QF-UI-V2-06R — the backdrop must own the whole viewport.
+
+  It previously sat at z-index 80, BELOW the public mobile bottom nav
+  (.qf-bottom-nav, z-index 90 in app/qf-public-v2.css), so on phones the nav
+  painted on top of the sheet and stayed hit-testable while
+  role="dialog" aria-modal="true" was open — document.elementFromPoint() at the
+  nav centre returned .qf-bottom-nav, not the backdrop.
+
+  120 is the established public-modal level in this design system: it matches
+  .qf-subsheet-backdrop / .qf-subsheet (120 / 121) from QF-UI-V2-05, sits above
+  the sticky header (80) and the bottom nav (90), and stays below the enquiry
+  modal (130+) which is never open at the same time. The backdrop is in the ROOT
+  stacking context (no ancestor creates one), so this z-index alone is enough —
+  no portal and no cross-component state.
+*/
 .qf-vl-compare-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 120;
   display: grid;
   place-items: end center;
   padding: 0;
   background: rgba(15, 23, 42, 0.45);
+  /* Scrolling the backdrop must never chain to the page behind it. */
+  overscroll-behavior: contain;
 }
 
 .qf-vl-compare {
   width: 100%;
   max-height: 86vh;
+  /* dvh tracks the real visible viewport when mobile browser chrome shows or
+     hides, so the sheet never extends under it. vh above is the fallback. */
+  max-height: 86dvh;
+  z-index: 121;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   border-radius: var(--qf-radius-lg) var(--qf-radius-lg) 0 0;
@@ -655,10 +677,23 @@
   outline-offset: 2px;
 }
 
-.qf-vl-compare-scroll { overflow: auto; padding: 0.5rem 1rem 1.1rem; }
+/* Taller-than-viewport comparisons scroll INSIDE the sheet, never behind it. */
+.qf-vl-compare-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.5rem 1rem 1.1rem;
+}
 
 .qf-vl-compare-table {
   width: 100%;
+  /*
+    QF-UI-V2-06R — no forced min-width. With overflow-wrap: break-word below,
+    the browser sizes columns to whole words and only overflows (scrolling
+    horizontally INSIDE .qf-vl-compare-scroll) when the content genuinely cannot
+    fit. Two vendors therefore fit a 390px phone with no sideways scroll at all,
+    and the page itself never scrolls sideways either way.
+  */
   border-collapse: collapse;
   font-size: 0.812rem;
 }
@@ -670,7 +705,8 @@
   vertical-align: top;
   border-bottom: 1px solid var(--qf-brand-line);
   color: var(--qf-brand-ink-2);
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: only split a word that cannot fit at all. */
+  overflow-wrap: break-word;
 }
 
 .qf-vl-compare-table thead th {
@@ -782,6 +818,7 @@
     max-width: 760px;
     border-radius: var(--qf-radius-lg);
     max-height: 78vh;
+    max-height: 78dvh;
   }
 }
 

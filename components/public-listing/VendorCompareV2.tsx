@@ -45,6 +45,35 @@ export function VendorCompareV2({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /*
+    QF-UI-V2-06R — scroll lock while the dialog is open.
+
+    `html` is the scrolling element on this site (QF-UI-V2-05 gave `body`
+    `overflow-x: clip` precisely so it is NOT a scroll container), so the lock
+    goes on documentElement. Both the previous INLINE values are captured and
+    restored on unmount, which means the stylesheet's own `overflow-x: hidden`
+    comes back untouched and no permanent gap or overflow change is left behind.
+
+    Removing the scrollbar would otherwise reflow the page, so its width is
+    compensated with padding for exactly as long as the dialog is mounted. This
+    component only mounts while compare is open, so the effect needs no state
+    shared with the listing.
+  */
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousOverflow = root.style.overflow;
+    const previousPaddingRight = root.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - root.clientWidth;
+
+    root.style.overflow = "hidden";
+    if (scrollbarWidth > 0) root.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      root.style.overflow = previousOverflow;
+      root.style.paddingRight = previousPaddingRight;
+    };
+  }, []);
+
   const rows: { label: string; value: (v: VendorListingView) => string }[] = [
     { label: "Verified", value: (v) => (v.verified ? "Yes" : "—") },
     { label: "Service area", value: (v) => v.serviceArea ?? v.city },

@@ -30,7 +30,11 @@ export function VendorPortal({ initialMode = "login" }: { initialMode?: Mode }) 
 
   return (
     <section className="qf-vendor-intro">
-      <span className="qf-vendor-badge">Vendor Portal</span>
+      {/*
+        QF-UI-V2-12R: the page-level "Vendor Portal" eyebrow was removed. The
+        persistent badge in VendorPortalHeader is the contextual indicator, and
+        showing both put the same label twice in the first viewport.
+      */}
       <h1 className="qf-vendor-intro-title">
         {mode === "login" ? "Login to your vendor dashboard" : "Create vendor account / Apply as vendor"}
       </h1>

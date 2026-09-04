@@ -1018,6 +1018,24 @@ export const suite = {
       },
     },
 
+    {
+      name: 'vendor portal label appears once, in the header only',
+      run: () => {
+        const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+        // The persistent contextual badge lives in the header and must stay.
+        const header = strip(readFileSync('components/vendor/VendorPortalHeader.tsx', 'utf8'));
+        assertTrue(header.includes('qf-vauth-context'), 'header keeps the context badge');
+        assertTrue(header.includes('Vendor Portal'), 'header badge still reads Vendor Portal');
+        // The page-level eyebrow was the duplicate and must not come back.
+        const portal = strip(readFileSync('components/vendor/VendorPortal.tsx', 'utf8'));
+        assertFalse(portal.includes('qf-vendor-badge'), 'page-level badge element removed');
+        assertFalse(portal.includes('Vendor Portal'), 'no second Vendor Portal label on the page');
+        // The intro heading itself is untouched.
+        assertTrue(portal.includes('qf-vendor-intro-title'), 'intro title still rendered');
+        assertTrue(portal.includes('Login to your vendor dashboard'), 'login title copy unchanged');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

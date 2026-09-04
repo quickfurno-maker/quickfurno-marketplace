@@ -200,21 +200,11 @@
   .qf-vendor-public-page .qf-vendor-intro { padding: 1.9rem 0 1.6rem; }
 }
 
-.qf-vendor-public-page .qf-vendor-badge {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--qf-brand-blue);
-  background: var(--qf-brand-blue-tint);
-  font-size: 0.688rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--qf-brand-blue-deep);
-}
-
+/* QF-UI-V2-12R: the .qf-vendor-badge rule that sat here is gone with the
+   duplicate eyebrow, and the title's 0.75rem top margin — which existed only to
+   clear that badge — is now 0 so the section opens flush. */
 .qf-vendor-public-page .qf-vendor-intro-title {
-  margin: 0.75rem 0 0;
+  margin: 0;
   font-size: clamp(1.4rem, 4.8vw, 1.95rem);
   font-weight: 700;
   letter-spacing: -0.026em;

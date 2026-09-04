@@ -17,16 +17,174 @@
    ========================================================================== */
 
 /* ==========================================================================
-   Page shell
+   QF-UI-V2-12 — dedicated vendor portal chrome
+   Replaces the shared public Header/Footer on /vendor only. No homeowner nav,
+   no client-enquiry CTA, no hamburger, no fixed bottom bar.
    ========================================================================== */
-.qf-vendor-public-page {
-  background: var(--qf-brand-bg);
-  /* Clears the fixed public bottom nav on phones. */
-  padding-bottom: calc(var(--qf-bottom-nav-h, 62px) + 1.2rem + env(safe-area-inset-bottom));
+.qf-vauth-header {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--qf-brand-line);
 }
 
-@media (min-width: 900px) {
-  .qf-vendor-public-page { padding-bottom: 0; }
+.qf-vauth-header-inner {
+  width: min(100% - 2rem, var(--qf-public-container, 1180px));
+  margin-inline: auto;
+  min-height: var(--qf-public-header-h, 68px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.qf-vauth-brand-link {
+  display: grid;
+  gap: 0.05rem;
+  text-decoration: none;
+  line-height: 1.15;
+}
+
+.qf-vauth-brand-link:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.qf-vauth-brand-text {
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.qf-vauth-bw-quick { color: var(--qf-brand-ink); }
+.qf-vauth-bw-furno { color: var(--qf-brand-orange); }
+
+.qf-vauth-brand-tagline {
+  font-size: 0.688rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vauth-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.qf-vauth-context {
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--qf-brand-blue);
+  border-radius: 999px;
+  background: var(--qf-brand-blue-tint);
+  font-size: 0.688rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--qf-brand-blue-deep);
+  white-space: nowrap;
+}
+
+/* The brand lockup already routes home on phones, so this stays desktop-only
+   rather than being squeezed into the compact bar. */
+.qf-vauth-back { display: none; }
+
+@media (min-width: 720px) {
+  .qf-vauth-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.5rem 0.2rem;
+    font-size: 0.859rem;
+    font-weight: 600;
+    color: var(--qf-brand-muted);
+    text-decoration: none;
+  }
+
+  .qf-vauth-back:hover { color: var(--qf-brand-blue); }
+
+  .qf-vauth-back:focus-visible {
+    outline: 2px solid var(--qf-brand-blue);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.qf-vauth-footer {
+  margin-top: 1.5rem;
+  padding: 1.1rem 0 calc(1.1rem + env(safe-area-inset-bottom));
+  background: var(--qf-brand-surface);
+  border-top: 1px solid var(--qf-brand-line);
+}
+
+.qf-vauth-footer-inner {
+  width: min(100% - 2rem, var(--qf-public-container, 1180px));
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+}
+
+.qf-vauth-footer-copy {
+  font-size: 0.797rem;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vauth-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.05rem;
+}
+
+.qf-vauth-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+}
+
+.qf-vauth-footer-links a:hover { color: var(--qf-brand-blue); }
+
+.qf-vauth-footer-links a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Page shell
+   ========================================================================== */
+/*
+  app/globals.css reserves space for the public fixed bottom bar with a GLOBAL
+  `@media (max-width: 979px) { body { padding-bottom: 78px } }`. /vendor never
+  renders that bar, so on phones the rule left 78px of dead space below the
+  vendor footer (measured: gapAfterFooter = 78, bodyPadB = 78px).
+
+  Neutralised here for this page only, rather than editing the global rule that
+  every homeowner page depends on. If a browser does not support :has(), the
+  fallback is simply today's behaviour — the harmless gap returns.
+*/
+@media (max-width: 979px) {
+  body:has(.qf-vendor-public-page) { padding-bottom: 0; }
+}
+
+.qf-vendor-public-page {
+  background: var(--qf-brand-bg);
+  /*
+    QF-UI-V2-12: this used to reserve ~62px for the public fixed bottom nav.
+    That nav is rendered by StickyMobileCTA, which /vendor never imported — so
+    the reservation only produced a dead gap under the content on phones. The
+    page now ends where its content ends.
+  */
+  padding-bottom: 1.2rem;
 }
 
 /* The portal block sits directly under the header — no tall empty hero, so the

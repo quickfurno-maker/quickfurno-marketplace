@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { FAQ } from "@/components/FAQ";
-import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
 import { VendorPortal } from "@/components/vendor/VendorPortal";
+import { VendorPortalFooter } from "@/components/vendor/VendorPortalFooter";
+import { VendorPortalHeader } from "@/components/vendor/VendorPortalHeader";
 
 const steps = [
   {
@@ -65,7 +65,14 @@ export default function VendorPortalPage({
 
   return (
     <>
-      <Header />
+      {/*
+        QF-UI-V2-12: the shared public Header/Footer used to wrap this page, so a
+        vendor creating an account saw homeowner navigation, a
+        "Get Free Team Matches" client-enquiry CTA and a hamburger opening the
+        homeowner menu. Dedicated vendor chrome replaces them here; the shared
+        public components are untouched and still serve every homeowner page.
+      */}
+      <VendorPortalHeader />
       <main className="qf-home-page qf-vendor-public-page">
         <div className="qf-home-app-shell">
           <VendorPortal initialMode={initialMode} />
@@ -95,7 +102,7 @@ export default function VendorPortalPage({
           </section>
         </div>
       </main>
-      <Footer />
+      <VendorPortalFooter />
     </>
   );
 }

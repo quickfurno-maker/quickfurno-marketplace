@@ -932,6 +932,92 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-12: vendor portal contextual chrome --------------------
+    {
+      name: 'vendor portal page uses dedicated chrome, not the homeowner Header/Footer',
+      run: () => {
+        const page = readFileSync('app/vendor/page.tsx', 'utf8');
+        // The generic public chrome must not be composed here any more.
+        assertFalse(/from "@\/components\/Header"/.test(page), 'generic Header not imported');
+        assertFalse(/from "@\/components\/Footer"/.test(page), 'generic Footer not imported');
+        assertFalse(/<Header\s*\/>/.test(page), 'generic Header not rendered');
+        assertFalse(/<Footer\s*\/>/.test(page), 'generic Footer not rendered');
+        // The public fixed bottom nav was never composed here and must stay out.
+        assertFalse(/StickyMobileCTA|MobileBottomNav/.test(page), 'no public bottom nav');
+        // Dedicated vendor chrome is used instead.
+        assertTrue(page.includes('<VendorPortalHeader />'), 'vendor header rendered');
+        assertTrue(page.includes('<VendorPortalFooter />'), 'vendor footer rendered');
+      },
+    },
+    {
+      name: 'vendor chrome carries no homeowner navigation or client-enquiry CTA',
+      run: () => {
+        const header = readFileSync('components/vendor/VendorPortalHeader.tsx', 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '');
+        for (const banned of ['Get Free Team Matches', 'EnquiryModalTrigger', 'Fill Form',
+                              'Categories', 'How It Works', 'For Professionals', 'Resources',
+                              'Toggle navigation menu']) {
+          assertFalse(header.includes(banned), 'header must not contain: ' + banned);
+        }
+        assertTrue(header.includes('<header'), 'semantic header element');
+        assertTrue(header.includes('aria-label="QuickFurno home"'), 'brand link is labelled');
+        assertTrue(header.includes('Vendor Portal'), 'context is readable text');
+
+        const footer = readFileSync('components/vendor/VendorPortalFooter.tsx', 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '');
+        for (const banned of ['Free for homeowners', 'Up to 3 matches', 'Get Free Team Matches',
+                              'EnquiryModalTrigger', 'Verified vendors ·']) {
+          assertFalse(footer.includes(banned), 'footer must not contain: ' + banned);
+        }
+        assertTrue(footer.includes('<footer'), 'semantic footer element');
+        assertTrue(footer.includes('/privacy'), 'privacy link kept');
+        assertTrue(footer.includes('/terms'), 'terms link kept');
+        // Support reuses the existing destination helper, not a new one.
+        assertTrue(footer.includes('whatsappLink('), 'support uses the existing helper');
+      },
+    },
+    {
+      name: 'public chrome primitives and homeowner surfaces are untouched by V2-12',
+      run: () => {
+        // The shared components must still carry their homeowner behaviour.
+        const header = readFileSync('components/Header.tsx', 'utf8');
+        assertTrue(header.includes('Get Free Team Matches'), 'public header keeps its CTA');
+        assertTrue(header.includes('Toggle navigation menu'), 'public header keeps its menu toggle');
+        const footer = readFileSync('components/Footer.tsx', 'utf8');
+        assertTrue(footer.includes('Free for homeowners'), 'public footer keeps its summary');
+        const sticky = readFileSync('components/StickyMobileCTA.tsx', 'utf8');
+        assertTrue(sticky.includes('MobileBottomNav'), 'public bottom nav wrapper intact');
+        // Homeowner pages still compose the public bottom nav.
+        for (const file of ['app/page.tsx', 'app/vendors/page.tsx', 'app/category/[slug]/page.tsx']) {
+          assertTrue(readFileSync(file, 'utf8').includes('<StickyMobileCTA />'),
+            file + ' still renders the public bottom nav');
+        }
+        // /vendors stays a public marketing page, not the auth shell.
+        const vendors = readFileSync('app/vendors/page.tsx', 'utf8');
+        assertTrue(vendors.includes('<Header />'), '/vendors keeps the public header');
+        assertFalse(vendors.includes('VendorPortalHeader'), '/vendors is not the auth shell');
+      },
+    },
+    {
+      name: 'V2-11R vendor copy survives the chrome change',
+      run: () => {
+        const raw = readFileSync('app/vendor/page.tsx', 'utf8');
+        const src = raw.replace(/\s+/g, ' ');
+        // The file's header comment deliberately records the old wording, so the
+        // regression check runs against shipped code only.
+        const shipped = raw.replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+          .replace(/\s+/g, ' ');
+        assertTrue(src.includes('manage matched home-service enquiries when eligible'),
+          'V2-11R metadata description unchanged');
+        assertTrue(src.includes('Lead access depends on your account being approved and active, with a package and credits in place.'),
+          'V2-11R eligibility step copy unchanged');
+        assertTrue(src.includes('When can matched enquiries appear?'), 'V2-11R FAQ question unchanged');
+        assertFalse(/verified home-service client leads/i.test(shipped),
+          'no regression to the old claim in shipped code');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

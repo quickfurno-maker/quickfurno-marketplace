@@ -1538,6 +1538,73 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-17R: vendor signup heading hierarchy ---------------------
+    {
+      name: 'inline vendor registration step titles are h2, not h3',
+      run: () => {
+        const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
+        // This form renders INLINE beneath the page h1 on /vendor?mode=signup,
+        // so an h3 step title skipped a level (measured jump "1->3").
+        for (const title of ['Tell us about your business', 'What do you specialise in?',
+                             'Where do you serve clients?', 'Improve your client matching',
+                             'Tell us your business strength', 'Review your application',
+                             'Vendor account created']) {
+          assertTrue(src.includes('<h2>' + title + '</h2>'), title + ' is an h2');
+          assertFalse(src.includes('<h3>' + title + '</h3>'), title + ' is not an h3');
+        }
+        // No h3 may reappear as a direct step title in this inline form.
+        assertEqual((src.match(/<h3>/g) || []).length, 0, 'no bare h3 left in the inline form');
+      },
+    },
+    {
+      name: 'the enquiry modal keeps its h3 dialog-title contract',
+      run: () => {
+        const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+        // Inside a dialog an h3 is correct: it is the accessible NAME, and a
+        // dialog starts its own context. This must not be "fixed" too.
+        assertTrue(src.includes('aria-labelledby="qf-rf-title"')
+          || src.includes('aria-labelledby={"qf-rf-title"}'), 'dialog is labelled by its title');
+        assertTrue(src.includes('role="dialog"'), 'dialog role kept');
+        assertTrue(src.includes('aria-modal="true"'), 'aria-modal kept');
+        const titles = src.match(/<h3 id="qf-rf-title">/g) || [];
+        assertTrue(titles.length >= 7, 'every modal step still titles with h3, got ' + titles.length);
+        assertFalse(/<h2 id="qf-rf-title">/.test(src), 'modal title was not changed to h2');
+      },
+    },
+    {
+      name: 'h2 and h3 step titles render identically in the shared qf-rf styling',
+      run: () => {
+        // The two surfaces share .qf-rf-question / .qf-rf-success, so the rules
+        // must match BOTH tags or the vendor form would restyle itself.
+        const css = readFileSync('app/client-enquiry-v2.css', 'utf8');
+        assertTrue(css.includes('.qf-rf-question > h2,'), 'question rule covers h2');
+        assertTrue(css.includes('.qf-rf-question > h3 {'), 'question rule still covers h3');
+        assertTrue(css.includes('.qf-rf-success h2,'), 'success rule covers h2');
+        assertTrue(css.includes('.qf-rf-success h3 {'), 'success rule still covers h3');
+        // No global heading reset may be introduced to achieve this.
+        assertFalse(/^\s*h2\s*\{/m.test(css), 'no global h2 rule');
+        assertFalse(/^\s*h3\s*\{/m.test(css), 'no global h3 rule');
+      },
+    },
+    {
+      name: 'V2-17R changed no vendor registration or auth authority',
+      run: () => {
+        const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
+        // The submit path and its single authority call are untouched.
+        assertTrue(src.includes('import { submitVendorAccountRegistration } from "@/app/actions";'),
+          'registration action import unchanged');
+        assertTrue(src.includes('await submitVendorAccountRegistration({'), 'submit call unchanged');
+        // A presentation pass must never introduce a bypass or a second path.
+        assertFalse(/signInWithPassword|signOut\(|service_role|admin_role/.test(src),
+          'no auth authority in the registration form');
+        assertFalse(/DEV_BYPASS|SKIP_AUTH|bypassAuth/i.test(src), 'no bypass');
+        // The page h1 is still owned by the portal, not the form.
+        const portal = readFileSync('components/vendor/VendorPortal.tsx', 'utf8');
+        assertTrue(portal.includes('<h1 className="qf-vendor-intro-title">'), 'portal keeps the page h1');
+        assertEqual((src.match(/<h1/g) || []).length, 0, 'the form declares no h1');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

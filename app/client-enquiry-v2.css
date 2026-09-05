@@ -194,7 +194,10 @@
   color: var(--qf-brand-faint);
 }
 
+/* h2 = the inline vendor registration step title (QF-UI-V2-17R);
+   h3 = the enquiry modal's dialog title. Both must look identical. */
 .qf-rf-title.qf-rf-title,
+.qf-rf-question > h2,
 .qf-rf-question > h3 {
   margin: 0.35rem 0 0;
   font-size: 1.125rem;
@@ -592,6 +595,7 @@
   font-size: 1.6rem;
 }
 
+.qf-rf-success h2,
 .qf-rf-success h3 {
   margin: 0.35rem 0 0;
   font-size: 1.125rem;

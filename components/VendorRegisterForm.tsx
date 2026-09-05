@@ -669,7 +669,7 @@ export function VendorRegisterForm() {
       <div className="qf-vrf qf-vrf--done">
         <div className="qf-rf-success">
           <span className="qf-rf-success-mark" aria-hidden="true">✓</span>
-          <h3>Vendor account created</h3>
+          <h2>Vendor account created</h2>
           <p>
             Your vendor account and application have been submitted. QuickFurno will review your
             profile. Once approved and credited, leads will appear in your dashboard. You can log
@@ -778,9 +778,14 @@ export function VendorRegisterForm() {
     switch (step) {
       case 0:
         return (
+          /* QF-UI-V2-17R: these step titles are h2, not h3. This form renders
+             INLINE under the page h1 on /vendor?mode=signup, so an h3 here
+             skipped a level. The identical qf-rf-question markup inside the
+             client enquiry MODAL keeps its h3#qf-rf-title, because there it is
+             the dialog's accessible name and a dialog starts its own context. */
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 1 of 6</span>
-            <h3>Tell us about your business</h3>
+            <h2>Tell us about your business</h2>
             <p className="qf-rf-qhint">These details help us create your vendor profile and dashboard access.</p>
             <div className="qf-rf-fields">
               {renderInputField({
@@ -859,7 +864,7 @@ export function VendorRegisterForm() {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 2 of 6</span>
-            <h3>What do you specialise in?</h3>
+            <h2>What do you specialise in?</h2>
             <p className="qf-rf-qhint">Choose the same category clients use to find vendors on QuickFurno.</p>
             <div className={`qf-rf-tiles${fieldError("category") ? " has-error" : ""}`} ref={bindField("category")}>
               {mainCategories.map((category) => {
@@ -923,7 +928,7 @@ export function VendorRegisterForm() {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 3 of 6</span>
-            <h3>Where do you serve clients?</h3>
+            <h2>Where do you serve clients?</h2>
             <p className="qf-rf-qhint">Pick your city and your business base area. You can update this later from your dashboard.</p>
 
             {/* 1. City selection */}
@@ -1082,7 +1087,7 @@ export function VendorRegisterForm() {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 4 of 6</span>
-            <h3>Improve your client matching</h3>
+            <h2>Improve your client matching</h2>
             <p className="qf-rf-qhint">
               Sharing location helps QuickFurno match you with nearby client enquiries.
             </p>
@@ -1125,7 +1130,7 @@ export function VendorRegisterForm() {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 5 of 6</span>
-            <h3>Tell us your business strength</h3>
+            <h2>Tell us your business strength</h2>
             <p className="qf-rf-qhint">This helps us understand your capacity, experience, and project fit.</p>
 
             <ChipGroup label="Years of experience" options={EXPERIENCE_OPTIONS} value={f.yearsExperience} onPick={(v) => set("yearsExperience", v)} />
@@ -1189,7 +1194,7 @@ export function VendorRegisterForm() {
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 6 of 6</span>
-            <h3>Review your application</h3>
+            <h2>Review your application</h2>
             <p className="qf-rf-qhint">
               Please check your details before submitting. Our team will verify your profile and
               contact you on WhatsApp.

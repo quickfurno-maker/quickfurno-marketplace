@@ -210,6 +210,9 @@ jobs:
       - name: Phase 4 credit wallet and candidate-pool invariants
         run: npm run test:phase4
 
+      - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
+        run: npm run test:ui:mobile-form-focus
+
       - name: Typecheck
         run: npm run typecheck
 

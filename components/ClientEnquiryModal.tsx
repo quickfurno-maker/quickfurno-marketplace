@@ -367,6 +367,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [minStep, setMinStep] = useState(0);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // QF-UI-HOTFIX-01: the Escape handler needs the LATEST requestClose (which
+  // reads `success` and the form) without those values becoming effect
+  // dependencies. A ref keeps the listener stable, so typing can never tear the
+  // listener — or the focus/scroll lifecycle — down and back up.
+  const requestCloseRef = useRef<() => void>(() => {});
 
   const openModal = useCallback((options: EnquiryModalOptions = {}) => {
     // Preferred-vendor flow: the vendor's category/subcategory are the source of
@@ -668,6 +673,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setShowConfirm(true);
   }
 
+  // Keep the Escape listener pointed at the current closure without making it a
+  // dependency of any effect. Assigned on every render; read only on Escape.
+  requestCloseRef.current = requestClose;
+
   // ── Phase 2: Area / Locality — Google area enhancement (manual fallback) ────
   // Manual typing keeps the exact old behaviour (free-text area) and never
   // leaves stale structured metadata that disagrees with the typed text.
@@ -797,16 +806,29 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(OPEN_EVENT, onOpenEvent);
   }, [openModal]);
 
-  // Page scroll lock + Escape handling while open.
+  // Page scroll lock + initial focus + return focus. OPEN/CLOSE LIFECYCLE ONLY.
   //
   // QF-UI-V2-08: this locked document.body, which does NOTHING here. QF-UI-V2-05
   // gave body `overflow-x: clip` precisely so it is not a scroll container, and
   // `html` is the scrolling element — measured: with the modal open and
   // body.style.overflow = "hidden", a dispatched wheel still scrolled the page
-  // from 0 to 960. The lock now targets documentElement, restores the previous
-  // INLINE values on close (so the stylesheet's own overflow-x returns), and
-  // compensates the scrollbar width only while the modal is mounted, so nothing
-  // shifts on open and no padding is left behind on close.
+  // from 0 to 960. The lock therefore targets documentElement, restores the
+  // previous INLINE values on close (so the stylesheet's own overflow-x
+  // returns), and compensates the scrollbar width only while the modal is
+  // mounted, so nothing shifts on open and no padding is left behind on close.
+  //
+  // QF-UI-HOTFIX-01 — THE MOBILE KEYBOARD BUG. This effect used to depend on
+  // [open, showConfirm, success, form]. `form` changes on EVERY keystroke, so
+  // React tore the effect down and rebuilt it after every character: cleanup
+  // called opener.focus(), which blurred the field being typed into and closed
+  // the mobile keyboard, then the re-run refocused the dialog and the keyboard
+  // reopened. The scroll lock was also released and re-applied each time.
+  //
+  // The dependency list is now [open] alone, so the opener is captured once, the
+  // dialog is focused once, and focus is handed back ONLY when the modal really
+  // closes. Nothing in here may ever depend on form/step/touched/submitting/
+  // success/showConfirm again — the guard in
+  // scripts/ui/validate-mobile-form-focus.mjs fails CI if it does.
   useEffect(() => {
     if (!open) return;
     const root = document.documentElement;
@@ -821,25 +843,39 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     const opener = document.activeElement as HTMLElement | null;
     const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 60);
 
+    return () => {
+      root.style.overflow = previousOverflow;
+      root.style.paddingRight = previousPaddingRight;
+      window.clearTimeout(focusTimer);
+      // `isConnected` guards the case where the trigger unmounted while the
+      // modal was open — focusing a detached node silently sends focus to body.
+      if (opener && opener.isConnected && typeof opener.focus === "function") {
+        opener.focus();
+      }
+    };
+  }, [open]);
+
+  // Escape handling, deliberately SEPARATE from the focus/scroll lifecycle.
+  //
+  // This effect may re-run (it reads `showConfirm`), and that is safe precisely
+  // because its cleanup does one thing: remove the listener. It must never
+  // restore opener focus, refocus the dialog, or touch the scroll lock — doing
+  // any of those here would reintroduce the keyboard bug through the back door.
+  // `requestCloseRef` keeps the handler current without pulling `form` or
+  // `success` into these dependencies.
+  useEffect(() => {
+    if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (showConfirm) {
         setShowConfirm(false);
         return;
       }
-      requestClose();
+      requestCloseRef.current();
     };
-
     document.addEventListener("keydown", onKeyDown);
-    return () => {
-      root.style.overflow = previousOverflow;
-      root.style.paddingRight = previousPaddingRight;
-      document.removeEventListener("keydown", onKeyDown);
-      window.clearTimeout(focusTimer);
-      if (opener && typeof opener.focus === "function") opener.focus();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, showConfirm, success, form]);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, showConfirm]);
 
   // Focus the name field when the contact step appears; reset scroll on step change.
   useEffect(() => {

@@ -18,6 +18,27 @@ import { useActiveCategories, NO_ACTIVE_CATEGORIES_MESSAGE } from "@/lib/categor
 
 type Step = "form" | "done";
 
+/**
+ * QF-UI-HOTFIX-01 — the SAME Indian mobile contract the canonical homepage
+ * enquiry modal already enforces (components/ClientEnquiryModal.tsx).
+ *
+ * This surface previously accepted any characters, any length, and only
+ * rejected fewer than 10 DIGITS after stripping non-digits — so
+ * "1234567890", "00000000000" and a 15-digit string all passed here while the
+ * homepage modal rejected them. UI-only correction: the field sanitizes to
+ * digits, caps at 10, and the submit gate uses the exact same regexp. No
+ * backend, schema or business rule is touched.
+ */
+const PHONE_RE = /^[6-9]\d{9}$/;
+
+function sanitizePhone(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function isPhoneValid(digits: string): boolean {
+  return PHONE_RE.test(digits);
+}
+
 export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
@@ -75,8 +96,8 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       setError("Please add your name, phone, city and the service you need.");
       return;
     }
-    if (form.phone.replace(/\D/g, "").length < 10) {
-      setError("Please enter a valid phone number.");
+    if (!isPhoneValid(form.phone)) {
+      setError("Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9.");
       return;
     }
     if (!consent) {
@@ -152,7 +173,14 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
           <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Asha Kulkarni" autoComplete="name" />
         </Field>
         <Field label="Phone (WhatsApp)">
-          <input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit mobile number" inputMode="tel" autoComplete="tel" />
+          <input
+            value={form.phone}
+            onChange={(e) => set("phone", sanitizePhone(e.target.value))}
+            placeholder="10-digit mobile number"
+            inputMode="numeric"
+            maxLength={10}
+            autoComplete="tel"
+          />
         </Field>
         <Field label="City">
           <select value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>

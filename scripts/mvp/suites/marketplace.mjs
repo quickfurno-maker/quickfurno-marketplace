@@ -686,8 +686,19 @@ export const suite = {
                              'budget', 'property_type', 'timeline', 'message']) {
           assertTrue(src.includes(field), 'field preserved: ' + field);
         }
-        // Validation rules unchanged.
-        assertTrue(src.includes('replace(/\\D/g, "").length < 10'), '10-digit phone rule unchanged');
+        // Phone validation. QF-UI-HOTFIX-01 TIGHTENED this rule and the pin moved
+        // with it. It previously asserted `replace(/\D/g, "").length < 10`, which
+        // was a QF-UI-V2-09 snapshot proving that restyle changed no behaviour —
+        // not a business rule. That check only rejected FEWER than 10 digits, so
+        // this surface accepted 11+ digits and any leading digit ("1234567890",
+        // "00000000000") while the canonical homepage modal already required
+        // ^[6-9]\d{9}$. The two live lead-entry surfaces now enforce the SAME
+        // contract; this is a stricter pin, not a relaxed one.
+        assertTrue(src.includes('/^[6-9]\\d{9}$/'), 'Indian mobile rule matches the canonical modal');
+        assertTrue(src.includes('maxLength={10}'), 'phone field is capped at 10 characters');
+        assertTrue(src.includes('sanitizePhone('), 'phone input is sanitized to digits');
+        assertFalse(src.includes('replace(/\\D/g, "").length < 10'),
+          'the old length-only rule (which accepted 11+ digits) must not return');
         assertTrue(src.includes('Please accept sharing your details with up to 3 verified vendors to continue.'),
           'consent gate message unchanged');
         // The governed consent paragraph is preserved verbatim.

@@ -35,11 +35,24 @@ export default function HomePage() {
 
       <main className="qf-home-page">
         {/*
-          The locked entry module: hero slider ~65% and the service launcher
-          ~35% side by side from 1024px, stacked hero -> launcher -> trust on
-          smaller screens. `id="categories"` stays on this block so the existing
-          /#categories links from the header, footer and mobile nav still land
-          on the service surface.
+          The entry module, STACKED AT EVERY WIDTH:
+            hero slider -> service launcher -> trust strip,
+          each spanning the full public-container width.
+
+          QF-UI-HOTFIX-01 removed the old desktop "hero ~65% / launcher ~35%
+          side by side from 1024px" split. The launcher is no longer a narrow
+          column pinned beside the hero; it is a full-width category surface
+          below it, so the hero gets the whole width and the categories get a
+          balanced multi-column grid instead of a stretched sidebar.
+
+          The DOM order below already IS the visual order — the layout is
+          governed purely by CSS in app/qf-public-v2.css, and
+          scripts/ui/validate-mobile-form-focus.mjs fails CI if the
+          side-by-side split or a different ordering returns.
+
+          `id="categories"` stays on this block so the existing /#categories
+          links from the header, footer and mobile nav still land on the
+          service surface.
         */}
         <section className="qf-hero-v2" id="categories" aria-label="Find a home service">
           <div className="qf-pub-container">

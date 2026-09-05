@@ -1,180 +1,121 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { QFIcon } from "@/components/QuickFurnoIcons";
-import { VendorHeroStats } from "@/components/vendors/VendorHeroStats";
+import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import styles from "./vendors.module.css";
 
-const registerHref = "/vendor?mode=signup";
+/*
+  QF-UI-V2-10 — public vendor acquisition page.
+
+  Rebuilt on the V2 public design system, and stripped of content that presented
+  invented data or unprovable promises as fact. Removed outright:
+
+    • the hero "dashboard" mock: a fake business ("UrbanCraft Interiors ·
+      Premium plan"), a "Live" badge and the metrics 12 Active Client Matches /
+      5 New Today / 92% Response, plus three invented lead rows with budgets;
+    • sampleLeads + miniLeads — "Client requests waiting for you" with
+      ₹8–12L / "2m ago" / Accept Match / WhatsApp actions;
+    • three named testimonials (Rohit Deshmukh, Sanket Patil, Arjun Mehta) with
+      growth quotes — no evidence in the repository that they are real or
+      approved for public use;
+    • the five floating hero badges (Pre-qualified enquiries, Real-time
+      notifications, High-demand enquiries, Higher Conversions, Premium
+      Visibility) and the VendorHeroStats strip.
+
+  What replaces them is grounded in the certified vendor dashboard and in the
+  journey already published on /vendor: create an account, QuickFurno reviews
+  the profile, and once the account is approved, active and credited, matched
+  enquiries appear in the dashboard.
+*/
+
+const SIGNUP_HREF = "/vendor?mode=signup";
+const LOGIN_HREF = "/vendor?mode=login";
 
 export const metadata: Metadata = {
   title: "For Vendors | QuickFurno",
   description:
-    "Join QuickFurno to receive verified client matches, manage enquiries, build trust and grow faster in Pune and Mumbai.",
+    "Create a QuickFurno vendor account, build your public business profile, and manage matched home-service enquiries in Pune and Mumbai.",
   openGraph: {
-    title: "Grow your business with verified client matches from QuickFurno",
+    title: "For Vendors | QuickFurno",
     description:
-      "QuickFurno helps vendors receive genuine home-service enquiries in Pune and Mumbai.",
+      "Create a QuickFurno vendor account, build your public business profile, and manage matched home-service enquiries in Pune and Mumbai.",
     url: "https://quickfurno.in/vendors",
     siteName: "QuickFurno",
     type: "website",
   },
 };
 
-const benefits = [
-  {
-    title: "Verified Client Matches",
-    body: "High-intent enquiries from real homeowners.",
-    icon: "/assets/quickfurno/icons/trust/verified-vendors.svg",
-  },
-  {
-    title: "Faster Growth",
-    body: "Win more projects and scale your business.",
-    icon: "/assets/quickfurno/icons/process/start-project.svg",
-  },
-  {
-    title: "Transparent Client Allocation",
-    body: "Fair distribution with no hidden preference.",
-    icon: "/assets/quickfurno/icons/process/matched-vendors.svg",
-  },
-  {
-    title: "24×7 Support Channel",
-    body: "Get help whenever you need it.",
-    icon: "/assets/quickfurno/icons/trust/fast-response.svg",
-  },
+/** Capabilities that exist in the certified vendor dashboard today. */
+const CAPABILITIES: [string, string][] = [
+  ["Assigned enquiries", "See the client requirements matched to your business in one inbox."],
+  ["Status & follow-up", "Move each enquiry through your own follow-up stages."],
+  ["Public business profile", "Publish services, service areas, photos and hours once approved."],
+  ["Lead credits & package", "See your remaining credits and current package state."],
+  ["Notifications", "Account and enquiry updates in the dashboard."],
+  ["Support thread", "Raise a question with the QuickFurno team and track the reply."],
 ];
 
-const vendorSteps = [
-  ["Create profile", "Complete your business profile and get verified by our team."],
-  ["Choose plan", "Select the growth option that fits your business goals."],
-  ["Get matched with clients", "Receive verified enquiries from your selected service areas."],
-  ["Win more projects", "Connect with clients, share quotes, and grow your business."],
+/**
+ * Mirrors the journey already published on /vendor, including the approval and
+ * "active and credited" eligibility steps — so the page never implies enquiries
+ * begin arriving the moment someone signs up.
+ */
+const STEPS: [string, string][] = [
+  ["Create your vendor account", "Sign up and submit your business details. This creates your login and sends your profile for review."],
+  ["QuickFurno reviews your profile", "Our team checks your business details and service fit before enabling marketplace access."],
+  ["Account becomes eligible", "Lead access depends on your account being approved and active, with a package and credits in place."],
+  ["Manage matched enquiries", "Once eligible, matched client requirements appear in your dashboard for follow-up."],
 ];
 
-const sampleLeads = [
-  {
-    title: "Premium Interior Design",
-    location: "Baner, Pune",
-    budget: "₹8–12L",
-    status: "New",
-    requested: "2m ago",
-    image: "/assets/quickfurno/images/vendors/premium-living-room.svg",
-  },
-  {
-    title: "Modular Kitchen",
-    location: "Wakad, Pune",
-    budget: "₹3–5L",
-    status: "New",
-    requested: "15m ago",
-    image: "/assets/quickfurno/images/vendors/modular-kitchen.svg",
-  },
-  {
-    title: "Civil Work",
-    location: "Kothrud, Pune",
-    budget: "₹5–8L",
-    status: "Contacted",
-    requested: "1h ago",
-    image: "/assets/quickfurno/images/vendors/civil-work-site.svg",
-  },
+/** The categories QuickFurno actually supports today (same list as /vendor FAQ). */
+const CATEGORIES = [
+  "Interior Designers",
+  "Carpenters",
+  "Modular Factory",
+  "Premium Interiors",
+  "Sofa",
+  "Painter",
+  "Civil Work",
 ];
 
-// NOTE: Public lead-pack pricing (Starter/Growth/Premium, credits, monthly
-// pricing) is intentionally NOT shown on the public vendor page — package
-// details are shared privately after business verification. Plan/credit logic
-// still lives in admin + the future vendor dashboard.
-// TODO: Later add OTP authentication for client enquiry and vendor registration/login.
-
-const uspCards = [
-  ["Better client quality", "High-intent clients ready to hire."],
-  ["City-based matching", "Get client enquiries from your service areas."],
-  ["Priority matching for verified professionals", "Verified profiles get priority matching."],
-  ["Simple dashboard", "Manage enquiries and clients in one place."],
-  ["Build trust with verified badges", "Verified badge boosts your credibility."],
-  ["No hidden charges", "Transparent pricing you can trust."],
-];
-
-const testimonials = [
-  {
-    name: "Rohit Deshmukh",
-    company: "UrbanCraft Interiors, Pune",
-    quote: "QuickFurno brings us genuine, high-intent client matches from real homeowners in our service areas.",
-  },
-  {
-    name: "Sanket Patil",
-    company: "Patil Modular Solutions, Pune",
-    quote: "The platform is easy to use and the client enquiries are genuine. Highly recommended.",
-  },
-  {
-    name: "Arjun Mehta",
-    company: "Mehta Construction, Mumbai",
-    quote: "Transparent process and great support. We have grown our business significantly.",
-  },
-];
-
-const miniLeads = [
-  { title: "Premium Interior Design", place: "Baner, Pune", budget: "₹8–12L", status: "New" },
-  { title: "Modular Kitchen", place: "Wakad, Pune", budget: "₹3–5L", status: "New" },
-  { title: "Civil Work", place: "Kothrud, Pune", budget: "₹5–8L", status: "Contacted" },
-];
-
-// Floating benefit badges around the hero visual.
-const heroFloatBadges = [
-  { icon: "shield" as const, title: "Verified Client Matches", sub: "Pre-qualified enquiries" },
-  { icon: "bolt" as const, title: "Fast Client Alerts", sub: "Real-time notifications" },
-  { icon: "map" as const, title: "Pune & Mumbai", sub: "High-demand enquiries" },
-  { icon: "compare" as const, title: "Higher Conversions", sub: "Convert more matches" },
-  { icon: "star" as const, title: "Premium Visibility", sub: "Stand out & grow" },
-];
-
-function VendorLeadCard() {
+/**
+ * Illustrative only. Every value is generic, no business is named, nothing is
+ * time-stamped or counted, and the block is labelled "Example view" in the UI
+ * and in its accessible name so it can never read as live production data.
+ */
+function DashboardPreview() {
   return (
-    <div className={styles.leadCardMock} aria-label="QuickFurno vendor client match dashboard preview">
-      <div className={styles.leadCardTop}>
-        <span className={styles.leadCardAvatar}>UI</span>
-        <div className={styles.leadCardWho}>
-          <strong>QuickFurno Vendor</strong>
-          <small>UrbanCraft Interiors · Premium plan</small>
-        </div>
-        <span className={styles.leadCardLive}>Live</span>
-      </div>
+    <figure className={styles.preview} role="img" aria-label="Illustrative example of the QuickFurno vendor dashboard layout. Not live data.">
+      <figcaption className={styles.previewLabel}>Example view</figcaption>
 
-      <div className={styles.leadCardKpis}>
-        <div>
-          <strong>12</strong>
-          <small>Active Client Matches</small>
+      <div className={styles.previewCard} aria-hidden="true">
+        <div className={styles.previewTop}>
+          <span className={styles.previewAvatar} />
+          <span className={styles.previewLines}>
+            <i style={{ width: "62%" }} />
+            <i style={{ width: "38%" }} />
+          </span>
         </div>
-        <div>
-          <strong>5</strong>
-          <small>New Today</small>
-        </div>
-        <div>
-          <strong>92%</strong>
-          <small>Response</small>
-        </div>
-      </div>
 
-      <div className={styles.leadCardListHead}>
-        <strong>Recent Client Requests</strong>
-        <span>This week</span>
+        <div className={styles.previewTiles}>
+          <span><small>Assigned leads</small><i /></span>
+          <span><small>Lead credits</small><i /></span>
+          <span><small>Profile completion</small><i /></span>
+        </div>
+
+        <div className={styles.previewList}>
+          <strong>Assigned enquiries</strong>
+          {[0, 1, 2].map((row) => (
+            <span className={styles.previewRow} key={row}>
+              <i style={{ width: "44%" }} />
+              <i style={{ width: "26%" }} />
+              <em />
+            </span>
+          ))}
+        </div>
       </div>
-      <div className={styles.leadCardList}>
-        {miniLeads.map((lead) => (
-          <div className={styles.leadCardRow} key={lead.title}>
-            <span className={styles.leadCardRowAvatar}>{lead.title.slice(0, 1)}</span>
-            <div className={styles.leadCardRowMeta}>
-              <strong>{lead.title}</strong>
-              <small>{lead.place}</small>
-            </div>
-            <b className={styles.leadCardRowBudget}>{lead.budget}</b>
-            <em className={styles.leadCardRowStatus} data-status={lead.status}>
-              {lead.status}
-            </em>
-          </div>
-        ))}
-      </div>
-    </div>
+    </figure>
   );
 }
 
@@ -182,213 +123,144 @@ export default function VendorsPage() {
   return (
     <>
       <Header />
+
       <main className={styles.page}>
+        {/* ── Hero ─────────────────────────────────────────────────────── */}
         <section className={styles.hero}>
           <div className={styles.shell}>
-            <div className={styles.heroCopy} data-reveal>
-              <span className={styles.eyebrow}>For Service Professionals</span>
-              <h1>
-                Grow your business with verified client matches
-                <span className={styles.heroHighlight}> from QuickFurno.</span>
+            <div className={styles.heroCopy}>
+              <span className={styles.eyebrow}>For service professionals</span>
+              <h1 className={styles.heroTitle}>
+                Get relevant home-service enquiries in your service areas
               </h1>
-              <p>
-                Receive genuine home-service enquiries, manage client requests with ease, and grow
-                faster across Pune &amp; Mumbai.
+              <p className={styles.heroLede}>
+                Create a QuickFurno vendor account, publish your business profile, and manage the
+                client enquiries matched to your services across Pune &amp; Mumbai.
               </p>
+
               <div className={styles.heroActions}>
-                <Link className={styles.primaryCta} href={registerHref}>
-                  Become a Vendor
+                <Link className={styles.primaryCta} href={SIGNUP_HREF}>
+                  Create vendor account
                 </Link>
-                <Link className={styles.secondaryCta} href="#lead-demo">
-                  View Demo
+                <Link className={styles.secondaryCta} href={LOGIN_HREF}>
+                  Vendor login
                 </Link>
               </div>
-              <div className={styles.trustLine}>
-                <span>Join verified service professionals across Pune &amp; Mumbai</span>
-                <strong>Verified professional network</strong>
-              </div>
+
+              <p className={styles.heroNote}>
+                Profiles are reviewed by QuickFurno before they go live. Enquiry access depends on
+                your account being approved, active and credited.
+              </p>
             </div>
 
             <div className={styles.heroVisual}>
-              <div className={styles.heroVisualStage}>
-                <VendorLeadCard />
-                <div className={styles.floatBadges} aria-hidden="true">
-                  {heroFloatBadges.map((badge) => (
-                    <span className={styles.floatBadge} key={badge.title}>
-                      <span className={styles.floatBadgeIcon}>
-                        <QFIcon name={badge.icon} />
-                      </span>
-                      <span className={styles.floatBadgeText}>
-                        <strong>{badge.title}</strong>
-                        <small>{badge.sub}</small>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <VendorHeroStats />
+              <DashboardPreview />
             </div>
           </div>
         </section>
 
-        <section className={styles.benefitStrip} aria-label="Vendor benefits">
-          <div className={styles.stripShell}>
-            {benefits.map((benefit) => (
-              <article className={styles.benefitCard} key={benefit.title}>
-                <Image src={benefit.icon} width={40} height={40} alt="" aria-hidden="true" />
-                <div>
-                  <h2>{benefit.title}</h2>
-                  <p>{benefit.body}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeading}>
-            <h2>How it works for vendors</h2>
-          </div>
-          <div className={styles.stepGrid}>
-            {vendorSteps.map(([title, body], index) => (
-              <article className={styles.stepCard} key={title}>
-                <span>{index + 1}</span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.leadSection} id="lead-demo">
-          <div className={styles.sectionHeading}>
-            <h2>Client requests waiting for you</h2>
-          </div>
-          <div className={styles.leadLayout}>
-            <div className={styles.leadGrid}>
-              {sampleLeads.map((lead) => (
-                <article className={styles.leadCard} key={lead.title}>
-                  <Image src={lead.image} width={160} height={120} alt={`${lead.title} preview`} />
-                  <div className={styles.leadInfo}>
-                    <h3>{lead.title}</h3>
-                    <span>{lead.location}</span>
-                    <dl>
-                      <div>
-                        <dt>Budget</dt>
-                        <dd>{lead.budget}</dd>
-                      </div>
-                      <div>
-                        <dt>Client Status</dt>
-                        <dd>{lead.status}</dd>
-                      </div>
-                      <div>
-                        <dt>Requested</dt>
-                        <dd>{lead.requested}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                  <div className={styles.leadActions}>
-                    <Link href={registerHref}>Accept Match</Link>
-                    <Link href={registerHref}>View Details</Link>
-                    <Link href={registerHref}>WhatsApp</Link>
-                  </div>
-                </article>
-              ))}
+        {/* ── Capabilities ─────────────────────────────────────────────── */}
+        <section className={styles.section} aria-labelledby="qf-vend-manage">
+          <div className={styles.shell}>
+            <div className={styles.sectionHead}>
+              <span className={styles.eyebrow}>The vendor dashboard</span>
+              <h2 id="qf-vend-manage">What you can manage in QuickFurno</h2>
             </div>
-
-            <aside className={styles.leadBenefits}>
-              {[
-                ["Real-time client notifications", "Never miss a new opportunity."],
-                ["Direct client communication", "Chat or call directly through the platform."],
-                ["Secure & transparent process", "No hidden charges, no compromises."],
-                ["Performance insights", "Track response rate and conversions."],
-              ].map(([title, body]) => (
-                <div key={title}>
-                  <strong>{title}</strong>
-                  <span>{body}</span>
-                </div>
-              ))}
-            </aside>
-          </div>
-        </section>
-
-        <section className={styles.splitSection}>
-          <div>
-            <div className={styles.sectionHeading}>
-              <h2>Become a QuickFurno Verified Vendor</h2>
-            </div>
-            <div className={styles.vendorJoinCard}>
-              <p className={styles.vendorJoinLead}>
-                Submit your business details and our team will share the right growth package after verification.
-              </p>
-              <ul className={styles.vendorJoinPoints}>
-                <li>Verified vendor onboarding</li>
-                <li>Area-wise client matching</li>
-                <li>Premium visibility for trusted professionals</li>
-                <li>Package details shared after business verification</li>
-                <li>Future vendor dashboard access</li>
-              </ul>
-              <div className={styles.vendorJoinActions}>
-                <Link className={styles.primaryCta} href={registerHref}>Fill Vendor Form</Link>
-                <Link className={styles.secondaryCta} href={registerHref}>Get Package Details</Link>
-              </div>
-              <p className={styles.vendorJoinNote}>Our team will contact you with package details.</p>
-              <p className={styles.vendorJoinNote}>
-                Package details and matching options will be available inside the vendor dashboard after verification.
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <div className={styles.sectionHeading}>
-              <h2>Why vendors love QuickFurno</h2>
-            </div>
-            <div className={styles.uspGrid}>
-              {uspCards.map(([title, body]) => (
-                <article className={styles.uspCard} key={title}>
+            <ul className={styles.cardGrid}>
+              {CAPABILITIES.map(([title, body]) => (
+                <li className={styles.card} key={title}>
                   <h3>{title}</h3>
                   <p>{body}</p>
-                </article>
+                </li>
               ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* ── Process ──────────────────────────────────────────────────── */}
+        <section className={styles.sectionAlt} aria-labelledby="qf-vend-steps">
+          <div className={styles.shell}>
+            <div className={styles.sectionHead}>
+              <span className={styles.eyebrow}>How it works</span>
+              <h2 id="qf-vend-steps">From signup to matched enquiries</h2>
+            </div>
+            <ol className={styles.steps}>
+              {STEPS.map(([title, body], index) => (
+                <li className={styles.step} key={title}>
+                  <span className={styles.stepNum} aria-hidden="true">{index + 1}</span>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* ── Example enquiry ──────────────────────────────────────────── */}
+        <section className={styles.section} aria-labelledby="qf-vend-example">
+          <div className={styles.shell}>
+            <div className={styles.sectionHead}>
+              <span className={styles.eyebrow}>Example</span>
+              <h2 id="qf-vend-example">How an assigned enquiry appears</h2>
+              <p className={styles.sectionLede}>
+                A single illustrative card. QuickFurno shows the client&apos;s requirement, service
+                and area; contact details are released through the dashboard according to your
+                account&apos;s lead access.
+              </p>
+            </div>
+
+            <div className={styles.example}>
+              <span className={styles.exampleLabel}>Example enquiry</span>
+              <dl className={styles.exampleRows}>
+                <div><dt>Service</dt><dd>Modular kitchen</dd></div>
+                <div><dt>Area</dt><dd>Baner, Pune</dd></div>
+                <div><dt>Budget</dt><dd>Shown when the client provides one</dd></div>
+                <div><dt>Status</dt><dd>New</dd></div>
+              </dl>
             </div>
           </div>
         </section>
 
-        <section className={styles.testimonials}>
-          <div className={styles.sectionHeading}>
-            <h2>What our vendors say</h2>
-          </div>
-          <div className={styles.testimonialGrid}>
-            {testimonials.map((item) => (
-              <article className={styles.testimonialCard} key={item.name}>
-                <div>
-                  <span>{item.name.slice(0, 1)}</span>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <small>{item.company}</small>
-                  </div>
-                </div>
-                <p>&quot;{item.quote}&quot;</p>
-                <em>*****</em>
-              </article>
-            ))}
+        {/* ── Categories ───────────────────────────────────────────────── */}
+        <section className={styles.sectionAlt} aria-labelledby="qf-vend-cats">
+          <div className={styles.shell}>
+            <div className={styles.sectionHead}>
+              <span className={styles.eyebrow}>Who it is for</span>
+              <h2 id="qf-vend-cats">Built for local service professionals</h2>
+              <p className={styles.sectionLede}>
+                QuickFurno currently supports these categories in Pune &amp; Mumbai.
+              </p>
+            </div>
+            <ul className={styles.chips}>
+              {CATEGORIES.map((category) => (
+                <li key={category}>{category}</li>
+              ))}
+            </ul>
           </div>
         </section>
 
+        {/* ── Final CTA ────────────────────────────────────────────────── */}
         <section className={styles.finalCta}>
-          <div>
-            <h2>Ready to receive more client enquiries?</h2>
-            <p>Join the verified service professionals growing faster with QuickFurno.</p>
+          <div className={styles.shell}>
+            <h2>Join QuickFurno as a vendor</h2>
+            <p>
+              Create your account and submit your business details. Our team will review your
+              profile and share package details with you directly.
+            </p>
+            <div className={styles.finalActions}>
+              <Link className={styles.primaryCta} href={SIGNUP_HREF}>
+                Create vendor account
+              </Link>
+              <Link className={styles.finalLogin} href={LOGIN_HREF}>
+                Already a vendor? Log in
+              </Link>
+            </div>
           </div>
-          <Link href={registerHref}>Join QuickFurno Today</Link>
-          <ul>
-            <li>No hidden charges</li>
-            <li>Cancel anytime</li>
-            <li>24×7 support</li>
-          </ul>
         </section>
       </main>
+
       <Footer />
+      <StickyMobileCTA />
     </>
   );
 }

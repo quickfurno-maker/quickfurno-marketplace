@@ -63,30 +63,48 @@ export function AdminLoginForm({ initialError }: AdminLoginFormProps) {
     router.replace("/admin/dashboard");
   }
 
+  /*
+    QF-UI-V2-13 — presentation only. Everything above (signInWithPassword, the
+    sanitized error mapping, the profiles.role + app_metadata.admin_role
+    Superadmin check, the fail-closed signOut, and the refresh/replace redirect)
+    is untouched.
+
+    This screen was the one admin surface still on the pre-V2 marketing palette:
+    a cream #F3EADF page, a copper #B8874A eyebrow AND focus ring, and a
+    near-black #1F1A14 button — none of it using the --qfa-* tokens that the
+    whole rest of the admin is built on. It now uses that system: the --qfa-page
+    ground, a --qfa-surface card, the shared .qfa-control inputs and .qfa-focus
+    ring, and the emerald-600 primary that AdminPrimitives' Button already
+    defines as the admin's primary action. Emerald, not the public blue, because
+    the admin keeps ONE design language and blue appears nowhere in it.
+  */
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F3EADF] px-5 py-10 text-[#181512]">
-      <section className="w-full max-w-md rounded-[28px] border border-white/80 bg-white p-7 shadow-[0_30px_90px_rgba(15,23,42,0.14)]">
-        <div className="mb-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#B8874A]">
-            QuickFurno Admin
+    <main className="flex min-h-screen items-center justify-center bg-[var(--qfa-page)] px-5 py-10 text-[var(--qfa-ink)]">
+      <section className="w-full max-w-[420px] rounded-[var(--qfa-radius-lg)] border border-[var(--qfa-line)] bg-[var(--qfa-surface)] p-6 shadow-[var(--qfa-shadow-2)] sm:p-7">
+        <div className="mb-6">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--qfa-muted)]">
+            QuickFurno Superadmin
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#1F1A14]">
-            Superadmin login
+          <h1 className="mt-2 text-[26px] font-semibold leading-tight tracking-tight text-[var(--qfa-ink)]">
+            Sign in to the command center
           </h1>
-          <p className="mt-2 text-sm leading-6 text-[#667085]">
-            Sign in to manage leads, vendors, packages, cities, payments, and marketplace settings.
+          <p className="mt-2 text-[13px] leading-6 text-[var(--qfa-muted)]">
+            Manage leads, vendors, packages, cities, payments and marketplace settings.
           </p>
         </div>
 
         {error && (
-          <p className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p
+            role="alert"
+            className="mb-4 rounded-[var(--qfa-radius)] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] leading-5 text-red-700"
+          >
             {error}
           </p>
         )}
 
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-3.5" onSubmit={onSubmit}>
           <label className="block">
-            <span className="text-sm font-medium text-[#344054]">Email</span>
+            <span className="text-[13px] font-medium text-[var(--qfa-ink-soft)]">Email</span>
             <input
               autoFocus
               required
@@ -94,28 +112,28 @@ export function AdminLoginForm({ initialError }: AdminLoginFormProps) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
-              className="mt-2 w-full rounded-2xl border border-[#d0d5dd] bg-white px-4 py-3 text-sm text-[#181512] outline-none transition focus:border-[#B8874A] focus:ring-4 focus:ring-[#B8874A]/15"
+              className="qfa-control mt-1.5 w-full px-3.5 outline-none"
             />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-[#344054]">Password</span>
+            <span className="text-[13px] font-medium text-[var(--qfa-ink-soft)]">Password</span>
             <input
               required
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
-              className="mt-2 w-full rounded-2xl border border-[#d0d5dd] bg-white px-4 py-3 text-sm text-[#181512] outline-none transition focus:border-[#B8874A] focus:ring-4 focus:ring-[#B8874A]/15"
+              className="qfa-control mt-1.5 w-full px-3.5 outline-none"
             />
           </label>
 
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-2xl bg-[#1F1A14] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+            className="qfa-focus mt-1 inline-flex h-[var(--qfa-control-h)] w-full items-center justify-center rounded-[var(--qfa-radius)] bg-emerald-600 px-5 text-[13px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy ? "Signing in..." : "Sign in"}
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
       </section>

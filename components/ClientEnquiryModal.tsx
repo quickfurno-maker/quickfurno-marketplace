@@ -12,6 +12,13 @@ import {
   useState,
 } from "react";
 import { submitLead } from "@/app/actions";
+import {
+  BUDGET_MAX_PLACEHOLDER,
+  BUDGET_MIN_PLACEHOLDER,
+  DISCARD_CONFIRM_BODY,
+  DISCARD_CONFIRM_TITLE,
+  formatServiceLabels,
+} from "@/components/client-enquiry/enquiryDisplay";
 import { trackEvent } from "@/lib/config";
 import { enquiryServiceForCategory } from "@/lib/quickfurno-data";
 import { mainCategories } from "@/lib/categories";
@@ -54,15 +61,10 @@ const SUBCATEGORY_ICONS: Record<string, IconName> = {
 };
 
 // Minimum starting rate shown on each Interior subcategory card. Display-only
-// guidance for the client form — kept local here so it never touches the shared
-// category source, vendor registration or vendor card logic.
-const SUBCATEGORY_RATES: Record<string, string> = {
-  "Interior Designers": "Starting from ₹1,000/sqft",
-  Carpenters: "Starting from ₹200/sqft",
-  "Modular Factory": "Starting from ₹1,000/sqft",
-  "Premium Interiors": "Starting from ₹1,200/sqft",
-};
-
+// QF-UI-V2-08: the SUBCATEGORY_RATES table that used to live here was removed.
+// It hardcoded ₹1,000 / ₹200 / ₹1,200 per sqft "Starting from" figures that no
+// maintained business source backs, and presented them to homeowners as if they
+// were QuickFurno market rates. No pricing guidance is shown in this flow.
 const RF_TIMELINES: { label: string; icon: IconName }[] = [
   { label: "Within One Month", icon: "bolt" },
   { label: "One–Two Months", icon: "clock" },
@@ -356,6 +358,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [locStatus, setLocStatus] = useState<"" | "locating" | "captured" | "denied" | "unsupported">("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   // First step the client may navigate back to. 0 for the normal flow; for a
@@ -794,11 +797,29 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(OPEN_EVENT, onOpenEvent);
   }, [openModal]);
 
-  // Body scroll lock + Escape handling while open.
+  // Page scroll lock + Escape handling while open.
+  //
+  // QF-UI-V2-08: this locked document.body, which does NOTHING here. QF-UI-V2-05
+  // gave body `overflow-x: clip` precisely so it is not a scroll container, and
+  // `html` is the scrolling element — measured: with the modal open and
+  // body.style.overflow = "hidden", a dispatched wheel still scrolled the page
+  // from 0 to 960. The lock now targets documentElement, restores the previous
+  // INLINE values on close (so the stylesheet's own overflow-x returns), and
+  // compensates the scrollbar width only while the modal is mounted, so nothing
+  // shifts on open and no padding is left behind on close.
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const root = document.documentElement;
+    const previousOverflow = root.style.overflow;
+    const previousPaddingRight = root.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - root.clientWidth;
+    root.style.overflow = "hidden";
+    if (scrollbarWidth > 0) root.style.paddingRight = `${scrollbarWidth}px`;
+
+    // Remember whatever opened the modal so focus can be handed back on close,
+    // and move focus into the dialog so keyboard users are not left on <body>.
+    const opener = document.activeElement as HTMLElement | null;
+    const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 60);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -811,8 +832,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      root.style.overflow = previousOverflow;
+      root.style.paddingRight = previousPaddingRight;
       document.removeEventListener("keydown", onKeyDown);
+      window.clearTimeout(focusTimer);
+      if (opener && typeof opener.focus === "function") opener.focus();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, showConfirm, success, form]);
@@ -932,7 +956,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we will connect you with better matching verified vendors.`,
         );
       } else {
-        setSuccessMessage("Your requirement has been submitted. QuickFurno will connect you with up to 3 verified vendors near you.");
+        setSuccessMessage("Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors.");
       }
       setSuccess(true);
     } catch (err) {
@@ -1054,9 +1078,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       <QFIcon name={SUBCATEGORY_ICONS[sub.label] ?? "home"} />
                     </span>
                     <span className="qf-rf-tile-label">{sub.label}</span>
-                    {SUBCATEGORY_RATES[sub.label] ? (
-                      <span className="qf-rf-tile-rate">{SUBCATEGORY_RATES[sub.label]}</span>
-                    ) : null}
                     {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
                   </button>
                 );
@@ -1142,7 +1163,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 {locStatus === "locating" ? "Getting location…" : "Use my current location"}
               </button>
               {locStatus === "captured" ? (
-                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll match you with Verified Teams near you.</p>
+                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll use this to match relevant verified vendors.</p>
               ) : null}
               {locStatus === "denied" ? (
                 <p className="qf-rf-loc-note">No problem — your city and area above are enough.</p>
@@ -1186,7 +1207,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                           value={form.budgetMin}
                           onChange={(e) => setBudgetValue("budgetMin", e.target.value)}
                           onBlur={() => markTouched("budgetMin")}
-                          placeholder="50000"
+                          placeholder={BUDGET_MIN_PLACEHOLDER}
                           inputMode="numeric"
                           disabled={form.budgetNotSure}
                           aria-label="Minimum budget in rupees"
@@ -1205,7 +1226,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                           value={form.budgetMax}
                           onChange={(e) => setBudgetValue("budgetMax", e.target.value)}
                           onBlur={() => markTouched("budgetMax")}
-                          placeholder="300000"
+                          placeholder={BUDGET_MAX_PLACEHOLDER}
                           inputMode="numeric"
                           disabled={form.budgetNotSure}
                           aria-label="Maximum budget in rupees"
@@ -1383,7 +1404,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Review &amp; confirm</span>
             <h3 id="qf-rf-title">Get matched with Verified Teams</h3>
-            <p className="qf-rf-qhint">We&apos;ll connect you with Verified Teams near your area.</p>
+            <p className="qf-rf-qhint">We&apos;ll connect you with relevant verified vendors.</p>
             <dl className="qf-rf-summary">
               <div>
                 <dt>Service</dt>
@@ -1425,6 +1446,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           }}
         >
           <section
+            ref={dialogRef}
+            tabIndex={-1}
             className="qf-rf-modal"
             role="dialog"
             aria-modal="true"
@@ -1481,7 +1504,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     ✓
                   </span>
                   <h3 id="qf-rf-title">Requirement submitted</h3>
-                  <p>{successMessage || "Your requirement has been submitted. QuickFurno will connect you with up to 3 verified vendors near you."}</p>
+                  <p>{successMessage || "Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors."}</p>
                 </div>
               ) : (
                 <>
@@ -1502,8 +1525,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                         You are requesting a quote from {modalOptions.targetVendorName || "this vendor"}
                       </strong>
                       <div style={{ color: "#4b5563" }}>
-                        Service: {modalOptions.targetVendorCategory || form.serviceRequired || "—"}
-                        {modalOptions.targetVendorSubcategory ? ` / ${modalOptions.targetVendorSubcategory}` : ""}
+                        {/* DISPLAY ONLY: the vendor's category and subcategory often
+                            resolve to the same label ("Carpenters / Carpenters"), so
+                            equal labels collapse to one. The stored
+                            targetVendorCategory / targetVendorSubcategory values are
+                            unchanged and still submitted separately. */}
+                        Service:{" "}
+                        {formatServiceLabels(
+                          modalOptions.targetVendorCategory || form.serviceRequired,
+                          modalOptions.targetVendorSubcategory,
+                        ) || "—"}
                       </div>
                       {form.area || form.city ? (
                         <div style={{ color: "#4b5563" }}>
@@ -1554,8 +1585,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             {showConfirm ? (
               <div className="qf-rf-confirm" role="alertdialog" aria-label="Confirm close">
                 <div className="qf-rf-confirm-card">
-                  <h4>Are you sure?</h4>
-                  <p>Your requirement details will be lost.</p>
+                  <h4>{DISCARD_CONFIRM_TITLE}</h4>
+                  <p>{DISCARD_CONFIRM_BODY}</p>
                   <div className="qf-rf-confirm-actions">
                     <button type="button" className="qf-rf-btn qf-rf-btn--ghost" onClick={() => setShowConfirm(false)}>
                       Keep editing

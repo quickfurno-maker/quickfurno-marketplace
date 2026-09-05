@@ -34,7 +34,7 @@ import {
 } from "@/lib/lead-assignment/runtimeSettings";
 import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
-import { getVendorBySlug, type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
+import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
 
 type VendorRow = Record<string, unknown>;
 
@@ -181,14 +181,21 @@ export async function getPublicVendorsForCategory(
 }
 
 /**
- * Public vendor profile for `/vendors/[id]`, resolved from Supabase first and the
- * static demo catalog second. Returns `null` when the vendor should not be shown
- * so the caller can `notFound()`:
+ * Public vendor profile for `/vendors/[id]`. Resolved from Supabase ONLY.
+ * Returns `null` whenever the vendor must not be shown, so the caller 404s:
  *   - Supabase row found + publicly visible → mapped safe Vendor.
  *   - Supabase row found but hidden (pending/rejected/suspended/inactive, or a
  *     free vendor while `show_free_vendors_publicly` is off) → null (404).
- *   - No Supabase row / read error → fall back to static `getVendorBySlug`
- *     (which applies the same free-visibility rule), else null.
+ *   - No Supabase row → null (404).
+ *   - Read failure → null (404), i.e. FAIL CLOSED.
+ *
+ * QF-UI-V2-07: the static demo fallback was REMOVED. It previously resolved an
+ * unknown id, or any read failure, against the demo catalog and returned it
+ * tagged `source: "static"`, so a direct URL could publish a fictional business
+ * as a live "QuickFurno Verified Vendor" complete with invented rating, rates
+ * and portfolio. A lookup miss and a read failure are not distinguishable here
+ * (fetchVendorRowByColumn returns null for both), so this fails closed rather
+ * than guessing — publishing fiction is strictly worse than a 404.
  */
 export async function getPublicVendorProfileBySlugOrId(
   slugOrId: string,
@@ -213,17 +220,15 @@ export async function getPublicVendorProfileBySlugOrId(
       return mapToPublicVendor(row, resolveVendorCategory(row), visibility.visibilityType);
     }
   } catch (error) {
-    console.warn("[public vendor profile] unexpected error; falling back to static", {
+    console.warn("[public vendor profile] unexpected error; failing closed (404)", {
       message: error instanceof Error ? error.message : "Unknown error",
     });
   }
 
-  // Static demo fallback (applies its own free-visibility rule). Tag it so the
-  // profile page knows it may show the demo services/portfolio/reviews.
-  const staticVendor = getVendorBySlug(key, {
-    showFreeVendorsPublicly: runtimeSettings.show_free_vendors_publicly,
-  });
-  return staticVendor ? { ...staticVendor, source: "static" } : null;
+  // No static demo fallback. See the doc comment above: an unresolved lookup
+  // fails closed to null (404) so demo data can never masquerade as a real
+  // public vendor profile.
+  return null;
 }
 
 /** Fetch a single vendor row by an exact column match. Returns null on "not found"
@@ -291,11 +296,16 @@ function mapToPublicVendor(
     status: "active",
     description: publicDescription ?? `Verified local QuickFurno ${category.toLowerCase()} for home-service requirements in ${city}.`,
     imageTone: IMAGE_TONE_BY_CATEGORY[category] ?? "warm-suite",
-    // Only expose LOCAL image paths. External/storage URLs are dropped so
-    // next/image never renders a host that isn't whitelisted (would crash the
-    // profile header); the card/header fall back to category imagery instead.
-    imageUrl: localImageUrl(row.profile_image_url),
-    coverImageUrl: localImageUrl(row.cover_image_url),
+    // QF-UI-V2-07: expose the APPROVED profile/cover URL as stored — a local
+    // `/path` or an approved http(s) URL. These were previously dropped unless
+    // local, so an approved external link the vendor profile editor accepts
+    // never appeared publicly. Consumers decide how to render: the profile uses
+    // a plain <img> for external URLs (never next/image, which would need a host
+    // allowlist, and never a server-side fetch), while the listing card keeps
+    // its own local-only guard so next/image there is unaffected.
+    // publicImageUrl still rejects javascript:/data:/protocol-relative URLs.
+    imageUrl: publicImageUrl(row.profile_image_url),
+    coverImageUrl: publicImageUrl(row.cover_image_url),
     businessHours,
     serviceAreaSummary,
     source: "supabase",
@@ -421,10 +431,19 @@ function asText(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-/** Accept only local `/…` image paths; drop external URLs (unconfigured next/image hosts crash). */
-function localImageUrl(value: unknown): string | undefined {
+/**
+ * Accept a local `/…` path or an approved http(s) URL; reject everything else.
+ * Protocol-relative `//host` is rejected because it silently inherits the page
+ * scheme, and javascript:/data:/file: are rejected outright. This does not widen
+ * what an admin has approved — it only stops approved external URLs being
+ * discarded on the way out.
+ */
+function publicImageUrl(value: unknown): string | undefined {
   const text = asText(value);
-  return text && text.startsWith("/") ? text : undefined;
+  if (!text) return undefined;
+  if (text.startsWith("//")) return undefined;
+  if (text.startsWith("/")) return text;
+  return /^https?:\/\//i.test(text) ? text : undefined;
 }
 
 function isUuid(value: string): boolean {

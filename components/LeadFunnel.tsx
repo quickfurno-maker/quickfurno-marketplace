@@ -6,6 +6,16 @@ import { BUDGETS } from "@/lib/config";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 import { useActiveCategories, NO_ACTIVE_CATEGORIES_MESSAGE } from "@/lib/categories/useActiveCategories";
 
+/**
+ * Standalone enquiry funnel for /enquiry.
+ *
+ * QF-UI-V2-09 restyled this onto the V2 public system. The SUBMISSION AUTHORITY
+ * IS UNCHANGED: the same submitLead() call, the same field names, the same
+ * `source: "Enquiry funnel"`, the same share_consent flag, the same UTM capture,
+ * the same admin-managed active cities/categories, the same ?service= default
+ * and the same validation rules. Only presentation and a few copy lines moved.
+ */
+
 type Step = "form" | "done";
 
 export function LeadFunnel({ defaultService }: { defaultService?: string }) {
@@ -107,89 +117,97 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
     }
   }
 
+  if (step === "done") {
+    return (
+      <div className="qf-enqpage-success" role="status">
+        <span className="qf-enqpage-success-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" focusable="false">
+            <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <h2>Your enquiry is submitted</h2>
+        <p>
+          QuickFurno will share your requirement with up to 3 relevant verified vendors that match
+          your service and area.
+        </p>
+        <a href="/" className="qf-pub-btn qf-pub-btn--secondary">
+          Back to home
+        </a>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="qf-enqpage-panel">
       <Steps step={step} />
 
-      {error && (
-        <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 font-sans text-sm text-red-200">
+      {error ? (
+        <p className="qf-enqpage-alert" role="alert">
           {error}
         </p>
-      )}
+      ) : null}
 
-      {step === "form" && (
-        <div className="mt-6 panel p-6 md:p-8">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Your name">
-              <input className="field" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Asha Kulkarni" />
-            </Field>
-            <Field label="Phone (WhatsApp)">
-              <input className="field" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+91..." inputMode="tel" />
-            </Field>
-            <Field label="City">
-              <select className="field" value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>
-                {activeCities.length === 0
-                  ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities..." : NO_ACTIVE_CITIES_MESSAGE}</option>
-                  : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Area / locality">
-              <input className="field" value={form.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" />
-            </Field>
-            <Field label="Service needed">
-              <select className="field" value={form.service_required} onChange={(e) => set("service_required", e.target.value)} disabled={activeCategories.length === 0}>
-                {activeCategories.length === 0
-                  ? <option value="" className="bg-navy-deep">{categoriesLoading ? "Loading services..." : NO_ACTIVE_CATEGORIES_MESSAGE}</option>
-                  : activeCategories.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}
-              </select>
-            </Field>
-            <Field label="Budget (optional)">
-              <select className="field" value={form.budget} onChange={(e) => set("budget", e.target.value)}>
-                <option value="" className="bg-navy-deep">Not sure yet</option>
-                {BUDGETS.map((b) => <option key={b} className="bg-navy-deep">{b}</option>)}
-              </select>
-            </Field>
-            <Field label="Property type (optional)">
-              <input className="field" value={form.property_type} onChange={(e) => set("property_type", e.target.value)} placeholder="2BHK, villa..." />
-            </Field>
-            <Field label="Timeline (optional)">
-              <input className="field" value={form.timeline} onChange={(e) => set("timeline", e.target.value)} placeholder="Within 2 months" />
-            </Field>
-          </div>
-          <Field label="Anything else (optional)">
-            <textarea className="field min-h-[90px]" value={form.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell the studios about your space..." />
-          </Field>
-          <label className="mt-5 flex items-start gap-3 font-sans text-xs leading-5 text-muted">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-gold"
-            />
-            <span>
-              I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request. See our{" "}
-              <a href="/privacy" className="text-gold underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
-              and{" "}
-              <a href="/terms" className="text-gold underline" target="_blank" rel="noopener noreferrer">Terms</a>.
-            </span>
-          </label>
-          <button onClick={onSubmitForm} disabled={busy} className="btn-gold mt-6 w-full sm:w-auto">
-            {busy ? "Finding studios..." : "Find matching studios"}
-          </button>
-          <p className="mt-3 font-sans text-xs text-muted/70">Your number is shared only with the studios you&apos;re matched to. Never sold.</p>
-        </div>
-      )}
+      <div className="qf-enqpage-grid">
+        <Field label="Your name">
+          <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Asha Kulkarni" autoComplete="name" />
+        </Field>
+        <Field label="Phone (WhatsApp)">
+          <input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit mobile number" inputMode="tel" autoComplete="tel" />
+        </Field>
+        <Field label="City">
+          <select value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>
+            {activeCities.length === 0
+              ? <option value="">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option>
+              : activeCities.map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </Field>
+        <Field label="Area / locality">
+          <input value={form.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" />
+        </Field>
+        <Field label="Service needed">
+          <select value={form.service_required} onChange={(e) => set("service_required", e.target.value)} disabled={activeCategories.length === 0}>
+            {activeCategories.length === 0
+              ? <option value="">{categoriesLoading ? "Loading services…" : NO_ACTIVE_CATEGORIES_MESSAGE}</option>
+              : activeCategories.map((s) => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Budget (optional)">
+          <select value={form.budget} onChange={(e) => set("budget", e.target.value)}>
+            <option value="">Not sure yet</option>
+            {BUDGETS.map((b) => <option key={b}>{b}</option>)}
+          </select>
+        </Field>
+        <Field label="Property type (optional)">
+          <input value={form.property_type} onChange={(e) => set("property_type", e.target.value)} placeholder="2BHK, villa…" />
+        </Field>
+        <Field label="Timeline (optional)">
+          <input value={form.timeline} onChange={(e) => set("timeline", e.target.value)} placeholder="Within 2 months" />
+        </Field>
+        <Field label="Anything else (optional)" wide>
+          <textarea value={form.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell the vendors about your space…" />
+        </Field>
+      </div>
 
-      {step === "done" && (
-        <div className="mt-6 panel p-8 text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-gold/50 bg-gold/[0.15] text-gold">OK</div>
-          <h2 className="mt-5 text-2xl text-ivory">Your enquiry is submitted</h2>
-          <p className="mx-auto mt-3 max-w-md font-sans text-sm text-muted">
-            QuickFurno will share your requirement with up to 3 eligible verified vendors. WhatsApp remains preview-only in this phase.
-          </p>
-          <a href="/" className="btn-ghost mt-6">Back to home</a>
-        </div>
-      )}
+      <label className="qf-enqpage-consent">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <span>
+          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request. See our{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
+          and{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.
+        </span>
+      </label>
+
+      <button
+        onClick={onSubmitForm}
+        disabled={busy}
+        className="qf-pub-btn qf-pub-btn--primary qf-enqpage-submit"
+      >
+        {busy ? "Submitting…" : "Get matched with vendors"}
+      </button>
+      <p className="qf-enqpage-fineprint">
+        Your number is shared only with the vendors you are matched to. We never sell your details.
+      </p>
     </div>
   );
 }
@@ -198,24 +216,27 @@ function Steps({ step }: { step: Step }) {
   const items: [Step, string][] = [["form", "Your project"], ["done", "Submitted"]];
   const idx = items.findIndex(([s]) => s === step);
   return (
-    <div className="flex items-center gap-3">
+    <div className="qf-enqpage-steps">
       {items.map(([s, label], i) => (
-        <div key={s} className="flex items-center gap-3">
-          <span className={`flex items-center gap-2 font-sans text-xs uppercase tracking-wider ${i <= idx ? "text-gold" : "text-muted/50"}`}>
-            <span className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] ${i <= idx ? "border-gold bg-gold/[0.15] text-gold" : "border-white/[0.15] text-muted/50"}`}>{i + 1}</span>
-            <span className="hidden sm:inline">{label}</span>
+        <div key={s} className="qf-enqpage-steps" style={{ margin: 0 }}>
+          <span
+            className="qf-enqpage-step"
+            data-state={i < idx ? "done" : i === idx ? "current" : "upcoming"}
+          >
+            <span className="qf-enqpage-step-dot">{i < idx ? "✓" : i + 1}</span>
+            {label}
           </span>
-          {i < items.length - 1 && <span className={`h-px w-6 ${i < idx ? "bg-gold/50" : "bg-white/10"}`} />}
+          {i < items.length - 1 ? <span className="qf-enqpage-step-rule" aria-hidden="true" /> : null}
         </div>
       ))}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
-    <label className="block">
-      <span className="label">{label}</span>
+    <label className={`qf-enqpage-field${wide ? " qf-enqpage-field--wide" : ""}`}>
+      <span>{label}</span>
       {children}
     </label>
   );

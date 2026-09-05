@@ -1,0 +1,738 @@
+/* ==========================================================================
+   QuickFurno — Vendor My Profile V2  (QF-UI-V2-03)
+
+   Scope: imported ONLY by app/vendor/dashboard/profile/page.tsx. Every selector
+   is namespaced `qf-vendor-v2-profile-*`; no bare element selector is
+   redefined, so nothing on the public marketplace or the admin surface can be
+   affected. Tokens (--v2-*) and the panel/button/empty primitives come from the
+   approved vendor-portal-v2.css.
+   ========================================================================== */
+
+.qf-vendor-v2-profile {
+  display: grid;
+  gap: 0.85rem;
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.qf-vendor-v2-profile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding-top: 0.4rem;
+}
+
+.qf-vendor-v2-profile-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 3.6vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-profile-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-headactions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.qf-vendor-v2-profile-hiddenchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-inset);
+  font-size: 0.766rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+}
+
+/* ==========================================================================
+   Alerts
+   ========================================================================== */
+.qf-vendor-v2-profile-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+}
+
+.qf-vendor-v2-profile-alert[data-tone="ok"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+}
+
+.qf-vendor-v2-profile-alert[data-tone="error"] {
+  background: var(--v2-danger-tint);
+  border-color: var(--v2-danger-line);
+}
+
+.qf-vendor-v2-profile-alert-icon { display: grid; place-items: center; }
+.qf-vendor-v2-profile-alert[data-tone="ok"] .qf-vendor-v2-profile-alert-icon { color: var(--v2-ok); }
+.qf-vendor-v2-profile-alert[data-tone="error"] .qf-vendor-v2-profile-alert-icon { color: var(--v2-danger); }
+
+.qf-vendor-v2-profile-alert-text {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-ink-2);
+}
+
+/* ==========================================================================
+   Layout — editor left, status rail right on desktop; stacked on mobile with
+   the approval state and completion read first.
+   ========================================================================== */
+.qf-vendor-v2-profile-layout {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.qf-vendor-v2-profile-rail,
+.qf-vendor-v2-profile-main {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   Approval status
+   ========================================================================== */
+.qf-vendor-v2-profile-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-profile-status[data-tone="live"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+}
+
+.qf-vendor-v2-profile-status[data-tone="pending"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+}
+
+.qf-vendor-v2-profile-status[data-tone="rejected"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+}
+
+.qf-vendor-v2-profile-status-icon { flex: 0 0 auto; padding-top: 1px; }
+.qf-vendor-v2-profile-status[data-tone="live"] .qf-vendor-v2-profile-status-icon { color: var(--v2-ok); }
+.qf-vendor-v2-profile-status[data-tone="pending"] .qf-vendor-v2-profile-status-icon { color: var(--v2-blue-deep); }
+.qf-vendor-v2-profile-status[data-tone="rejected"] .qf-vendor-v2-profile-status-icon { color: var(--v2-warn); }
+
+.qf-vendor-v2-profile-status-title {
+  margin: 0;
+  font-size: 0.891rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-profile-status-detail {
+  margin: 0.22rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-profile-status-note { margin-top: 0.6rem; }
+
+.qf-vendor-v2-profile-sublabel {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.719rem;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-profile-proposed {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.qf-vendor-v2-profile-proposed > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-profile-proposed > div:last-child { border-bottom: none; }
+
+.qf-vendor-v2-profile-proposed dt {
+  flex: 0 0 auto;
+  font-size: 0.797rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-proposed dd {
+  margin: 0;
+  font-size: 0.797rem;
+  font-weight: 550;
+  color: var(--v2-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================================================
+   Completion
+   ========================================================================== */
+.qf-vendor-v2-profile-progress-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.qf-vendor-v2-profile-progress-head strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-profile-progress-head span {
+  font-size: 0.797rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-complete {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.828rem;
+  color: var(--v2-ok);
+}
+
+.qf-vendor-v2-profile-missing {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qf-vendor-v2-profile-missing li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.828rem;
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-profile-missing svg { color: var(--v2-warn); flex: 0 0 auto; }
+
+/* ==========================================================================
+   Editor sections + fields
+   ========================================================================== */
+.qf-vendor-v2-profile-editor {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.qf-vendor-v2-profile-section-head { margin-bottom: 0.9rem; }
+
+.qf-vendor-v2-profile-section-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-section-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-vendor-v2-profile-field {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.qf-vendor-v2-profile-labelrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.qf-vendor-v2-profile-label {
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--v2-ink-2);
+}
+
+.qf-vendor-v2-profile-hint {
+  margin: 0;
+  font-size: 0.766rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-hint a {
+  color: var(--v2-blue-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.qf-vendor-v2-profile-hint a:hover { text-decoration: underline; }
+
+.qf-vendor-v2-profile-fieldfoot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.qf-vendor-v2-profile-count {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--v2-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-profile-count[data-low="true"] { color: var(--v2-warn); }
+
+/* Inputs — full width everywhere. No cramped two-column form on a phone. */
+.qf-vendor-v2-profile-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+  font-family: inherit;
+  font-size: 0.891rem;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-profile-input:focus-visible {
+  outline: 2px solid var(--v2-blue);
+  outline-offset: 1px;
+  border-color: var(--v2-blue-line);
+}
+
+.qf-vendor-v2-profile-input[aria-invalid="true"] { border-color: var(--v2-danger-line); }
+
+.qf-vendor-v2-profile-textarea {
+  min-height: 132px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+/* ==========================================================================
+   Services chips
+   ========================================================================== */
+.qf-vendor-v2-profile-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.qf-vendor-v2-profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.3rem 0.28rem 0.6rem;
+  border: 1px solid var(--v2-blue-line);
+  border-radius: 999px;
+  background: var(--v2-blue-tint);
+  font-size: 0.797rem;
+  font-weight: 600;
+  color: var(--v2-blue-deep);
+  max-width: 100%;
+}
+
+.qf-vendor-v2-profile-chip > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-profile-chip button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.12);
+  color: inherit;
+  cursor: pointer;
+}
+
+.qf-vendor-v2-profile-chip button:hover { background: rgba(37, 99, 235, 0.24); }
+
+.qf-vendor-v2-profile-chipadd,
+.qf-vendor-v2-profile-portfolio-add {
+  display: flex;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.qf-vendor-v2-profile-chipadd input,
+.qf-vendor-v2-profile-portfolio-add .qf-vendor-v2-profile-field { flex: 1 1 auto; min-width: 0; }
+.qf-vendor-v2-profile-chipadd .qf-vendor-v2-btn,
+.qf-vendor-v2-profile-portfolio-add .qf-vendor-v2-btn { flex: 0 0 auto; min-height: 40px; }
+
+/* ==========================================================================
+   Media previews
+   ========================================================================== */
+.qf-vendor-v2-profile-media-pair {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-vendor-v2-profile-media {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.qf-vendor-v2-profile-media-controls {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  min-width: 0;
+}
+
+.qf-vendor-v2-profile-media-controls .qf-vendor-v2-profile-field { width: 100%; }
+
+.qf-vendor-v2-profile-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-profile-preview[data-shape="avatar"] {
+  width: 108px;
+  height: 108px;
+  border-radius: var(--v2-radius);
+}
+
+.qf-vendor-v2-profile-preview[data-shape="cover"] {
+  width: 100%;
+  aspect-ratio: 16 / 6;
+}
+
+.qf-vendor-v2-profile-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.qf-vendor-v2-profile-preview-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.719rem;
+  color: var(--v2-faint);
+}
+
+.qf-vendor-v2-profile-preview-empty[data-tone="error"] { color: var(--v2-warn); }
+
+/* ==========================================================================
+   Portfolio
+   ========================================================================== */
+.qf-vendor-v2-profile-portfolio {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-profile-portfolio-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.qf-vendor-v2-profile-portfolio-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 1.3rem 1rem;
+  border: 1px dashed var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+  color: var(--v2-faint);
+  text-align: center;
+}
+
+.qf-vendor-v2-profile-portfolio-empty p {
+  margin: 0;
+  font-size: 0.828rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-portfolio-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-profile-portfolio-item {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qf-vendor-v2-profile-portfolio-item .qf-vendor-v2-profile-preview[data-shape="cover"] {
+  aspect-ratio: 4 / 3;
+}
+
+.qf-vendor-v2-profile-portfolio-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.qf-vendor-v2-profile-portfolio-actions .qf-vendor-v2-iconbtn {
+  width: 34px;
+  height: 34px;
+  border-color: var(--v2-line);
+}
+
+.qf-vendor-v2-profile-portfolio-actions .qf-vendor-v2-iconbtn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qf-vendor-v2-profile-remove:hover { color: var(--v2-danger); }
+.qf-vendor-v2-profile-rot-left { transform: rotate(180deg); }
+
+/* ==========================================================================
+   Submit
+   ========================================================================== */
+.qf-vendor-v2-profile-submit {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+  padding: 1rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-surface);
+  box-shadow: var(--v2-shadow);
+}
+
+.qf-vendor-v2-profile-submit .qf-vendor-v2-btn { min-height: 42px; }
+
+/* ==========================================================================
+   Account details + history
+   ========================================================================== */
+.qf-vendor-v2-profile-account {
+  display: grid;
+  gap: 0;
+  margin: 0 0 0.75rem;
+}
+
+.qf-vendor-v2-profile-account > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-profile-account > div:last-child { border-bottom: none; }
+
+.qf-vendor-v2-profile-account dt {
+  flex: 0 0 auto;
+  font-size: 0.812rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-account dd {
+  margin: 0;
+  font-size: 0.812rem;
+  font-weight: 550;
+  color: var(--v2-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-profile-history {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.qf-vendor-v2-profile-history li {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--v2-line-soft);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-profile-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.qf-vendor-v2-profile-history-date {
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-profile-history-status {
+  flex: 0 0 auto;
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 999px;
+  background: var(--v2-surface);
+  font-size: 0.688rem;
+  font-weight: 650;
+  color: var(--v2-ink-2);
+  white-space: nowrap;
+}
+
+.qf-vendor-v2-profile-history-status[data-status="pending"] {
+  background: var(--v2-blue-tint);
+  border-color: var(--v2-blue-line);
+  color: var(--v2-blue-deep);
+}
+
+.qf-vendor-v2-profile-history-status[data-status="approved"] {
+  background: var(--v2-ok-tint);
+  border-color: var(--v2-ok-line);
+  color: var(--v2-ok);
+}
+
+.qf-vendor-v2-profile-history-status[data-status="rejected"] {
+  background: var(--v2-warn-tint);
+  border-color: var(--v2-warn-line);
+  color: var(--v2-warn);
+}
+
+.qf-vendor-v2-profile-history-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-history-reason {
+  margin: 0.35rem 0 0;
+  font-size: 0.797rem;
+  line-height: 1.5;
+  color: var(--v2-ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+@media (min-width: 700px) {
+  .qf-vendor-v2-profile { gap: 1rem; }
+  .qf-vendor-v2-profile-layout { gap: 1rem; }
+  .qf-vendor-v2-profile-editor { gap: 1rem; }
+
+  /* Stacked, not side by side: a 200px column squeezed the profile photo's
+     URL field so hard that the link was unreadable. The avatar row instead
+     puts its preview beside a full-width field. */
+  .qf-vendor-v2-profile-media[data-shape="avatar"] {
+    grid-template-columns: 108px minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .qf-vendor-v2-profile-portfolio-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .qf-vendor-v2-profile-submit {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    gap: 0.9rem;
+  }
+}
+
+/*
+  Desktop: editor on the left, status rail on the right. The DOM order stays
+  status -> editor -> aside (so a phone reads the approval state first), and the
+  columns are assigned explicitly here rather than reordering the markup.
+*/
+@media (min-width: 1080px) {
+  .qf-vendor-v2-profile-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 1.15rem;
+  }
+
+  /* Explicit placement, so the rail can lead in the DOM (for phones) and still
+     sit on the right here. One row only — a spanned main column would have
+     stretched the rail's rows and dropped its content far down the page. */
+  .qf-vendor-v2-profile-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .qf-vendor-v2-profile-rail {
+    grid-column: 2;
+    grid-row: 1;
+    /* Follows the form down the page instead of leaving dead space beside it. */
+    position: sticky;
+    top: calc(var(--v2-topbar-h) + 1.15rem);
+  }
+
+  .qf-vendor-v2-profile-portfolio-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-vendor-v2-profile-chip button,
+  .qf-vendor-v2-profile-input {
+    transition-duration: 0.01ms !important;
+  }
+}

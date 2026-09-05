@@ -1,0 +1,745 @@
+/* ==========================================================================
+   QuickFurno — vendor auth & onboarding V2  (QF-UI-V2-11)
+
+   Scope: the pre-dashboard vendor account surfaces only —
+     /vendor?mode=login, /vendor?mode=signup, /vendor/set-password.
+
+   Every selector is namespaced `qf-vauth-*` or targets an existing
+   `qf-vendor-*` / `qf-vrf-*` class that ONLY these surfaces use. No bare
+   element selector is redefined, no global button/input/heading rule exists, and
+   nothing here touches the vendor dashboard, the admin surface or any approved
+   public page.
+
+   Loaded last from app/layout.tsx so it wins over the legacy copper rules in
+   qf-redesign.css without deleting selectors other surfaces may still use.
+   Colour/spacing/typography come from the QF-UI-V2-05 public tokens, which is
+   what bridges these screens between the public site and the V2 dashboard.
+   ========================================================================== */
+
+/* ==========================================================================
+   QF-UI-V2-12 — dedicated vendor portal chrome
+   Replaces the shared public Header/Footer on /vendor only. No homeowner nav,
+   no client-enquiry CTA, no hamburger, no fixed bottom bar.
+   ========================================================================== */
+.qf-vauth-header {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--qf-brand-line);
+}
+
+.qf-vauth-header-inner {
+  width: min(100% - 2rem, var(--qf-public-container, 1180px));
+  margin-inline: auto;
+  min-height: var(--qf-public-header-h, 68px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.qf-vauth-brand-link {
+  display: grid;
+  gap: 0.05rem;
+  text-decoration: none;
+  line-height: 1.15;
+}
+
+.qf-vauth-brand-link:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.qf-vauth-brand-text {
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.qf-vauth-bw-quick { color: var(--qf-brand-ink); }
+.qf-vauth-bw-furno { color: var(--qf-brand-orange); }
+
+.qf-vauth-brand-tagline {
+  font-size: 0.688rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vauth-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.qf-vauth-context {
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--qf-brand-blue);
+  border-radius: 999px;
+  background: var(--qf-brand-blue-tint);
+  font-size: 0.688rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--qf-brand-blue-deep);
+  white-space: nowrap;
+}
+
+/* The brand lockup already routes home on phones, so this stays desktop-only
+   rather than being squeezed into the compact bar. */
+.qf-vauth-back { display: none; }
+
+@media (min-width: 720px) {
+  .qf-vauth-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.5rem 0.2rem;
+    font-size: 0.859rem;
+    font-weight: 600;
+    color: var(--qf-brand-muted);
+    text-decoration: none;
+  }
+
+  .qf-vauth-back:hover { color: var(--qf-brand-blue); }
+
+  .qf-vauth-back:focus-visible {
+    outline: 2px solid var(--qf-brand-blue);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.qf-vauth-footer {
+  margin-top: 1.5rem;
+  padding: 1.1rem 0 calc(1.1rem + env(safe-area-inset-bottom));
+  background: var(--qf-brand-surface);
+  border-top: 1px solid var(--qf-brand-line);
+}
+
+.qf-vauth-footer-inner {
+  width: min(100% - 2rem, var(--qf-public-container, 1180px));
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+}
+
+.qf-vauth-footer-copy {
+  font-size: 0.797rem;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vauth-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.05rem;
+}
+
+.qf-vauth-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+}
+
+.qf-vauth-footer-links a:hover { color: var(--qf-brand-blue); }
+
+.qf-vauth-footer-links a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Page shell
+   ========================================================================== */
+/*
+  app/globals.css reserves space for the public fixed bottom bar with a GLOBAL
+  `@media (max-width: 979px) { body { padding-bottom: 78px } }`. /vendor never
+  renders that bar, so on phones the rule left 78px of dead space below the
+  vendor footer (measured: gapAfterFooter = 78, bodyPadB = 78px).
+
+  Neutralised here for this page only, rather than editing the global rule that
+  every homeowner page depends on. If a browser does not support :has(), the
+  fallback is simply today's behaviour — the harmless gap returns.
+*/
+@media (max-width: 979px) {
+  body:has(.qf-vendor-public-page) { padding-bottom: 0; }
+}
+
+.qf-vendor-public-page {
+  background: var(--qf-brand-bg);
+  /*
+    QF-UI-V2-12: this used to reserve ~62px for the public fixed bottom nav.
+    That nav is rendered by StickyMobileCTA, which /vendor never imported — so
+    the reservation only produced a dead gap under the content on phones. The
+    page now ends where its content ends.
+  */
+  padding-bottom: 1.2rem;
+}
+
+/* The portal block sits directly under the header — no tall empty hero, so the
+   form starts inside the first viewport on a common laptop. */
+.qf-vendor-public-page .qf-vendor-intro {
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 1.4rem 0 1.4rem;
+  text-align: center;
+}
+
+@media (min-width: 1024px) {
+  .qf-vendor-public-page .qf-vendor-intro { padding: 1.9rem 0 1.6rem; }
+}
+
+/* QF-UI-V2-12R: the .qf-vendor-badge rule that sat here is gone with the
+   duplicate eyebrow, and the title's 0.75rem top margin — which existed only to
+   clear that badge — is now 0 so the section opens flush. */
+.qf-vendor-public-page .qf-vendor-intro-title {
+  margin: 0;
+  font-size: clamp(1.4rem, 4.8vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.026em;
+  line-height: 1.2;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vendor-public-page .qf-vendor-intro-sub {
+  margin: 0.5rem auto 0;
+  max-width: 46ch;
+  font-size: 0.906rem;
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Segmented mode switcher — replaces the inline copper pill
+   ========================================================================== */
+.qf-vauth-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin: 1.1rem auto 0;
+  padding: 0.28rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-inset);
+}
+
+.qf-vauth-tab {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  /* 44px tap target. */
+  min-height: 44px;
+  padding: 0.6rem 1.15rem;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.891rem;
+  font-weight: 650;
+  color: var(--qf-brand-muted);
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.qf-vauth-tab:hover { color: var(--qf-brand-ink); }
+
+.qf-vauth-tab[aria-selected="true"] {
+  background: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-vauth-tab:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-vauth-panel { margin-top: 1.4rem; text-align: left; }
+
+/* ==========================================================================
+   Auth card (login + set-password share it)
+   ========================================================================== */
+.qf-vauth-card {
+  width: 100%;
+  max-width: 440px;
+  margin-inline: auto;
+  padding: 1.25rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  text-align: left;
+}
+
+@media (min-width: 640px) {
+  .qf-vauth-card { padding: 1.6rem; }
+}
+
+.qf-vauth-card-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vauth-card-sub {
+  margin: 0.35rem 0 1.1rem;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vauth-fields { display: grid; gap: 0.85rem; }
+
+.qf-vauth-field { display: grid; gap: 0.3rem; min-width: 0; }
+
+.qf-vauth-field > span {
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+}
+
+/* Scoped to this card's own field wrapper — never a global input rule. */
+.qf-vauth-field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.938rem;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vauth-field input:focus-visible {
+  outline: none;
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-vauth-field input::placeholder { color: var(--qf-brand-faint); }
+
+.qf-vauth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 1.1rem;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid var(--qf-brand-blue);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-blue);
+  font-family: inherit;
+  font-size: 0.938rem;
+  font-weight: 650;
+  color: #fff;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.qf-vauth-btn:hover:not(:disabled) {
+  background: var(--qf-brand-blue-deep);
+  border-color: var(--qf-brand-blue-deep);
+}
+
+.qf-vauth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.qf-vauth-btn:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-vauth-alt {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  font-size: 0.812rem;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vauth-alt a {
+  color: var(--qf-brand-blue);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.qf-vauth-alt a:hover { color: var(--qf-brand-blue-deep); }
+
+.qf-vauth-alt a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.qf-vauth-note {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--qf-brand-faint);
+}
+
+/* Error / status surfaces */
+.qf-vauth-alert {
+  margin: 0 0 0.9rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #f0c8c1;
+  border-radius: var(--qf-radius-md);
+  background: #fdf1ef;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: #8f2c1c;
+}
+
+.qf-vauth-ok {
+  margin: 0 0 0.9rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--qf-brand-success);
+  border-radius: var(--qf-radius-md);
+  background: #ecfdf3;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: #0b6b47;
+}
+
+.qf-vauth-muted {
+  margin: 0;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Set-password page (its own standalone shell — no portal tabs)
+   ========================================================================== */
+.qf-vauth-page {
+  display: grid;
+  align-content: start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 1.5rem 1rem 2.5rem;
+  background: var(--qf-brand-bg);
+  color: var(--qf-brand-ink);
+}
+
+.qf-vauth-brand {
+  display: block;
+  margin: 0 auto 1.25rem;
+  text-align: center;
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--qf-brand-ink);
+  text-decoration: none;
+}
+
+.qf-vauth-brand span { color: var(--qf-brand-orange); }
+
+@media (min-width: 640px) {
+  .qf-vauth-page { padding-top: 3rem; }
+}
+
+/* ==========================================================================
+   Onboarding wizard — the .qf-rf-* internals are already V2 via
+   app/client-enquiry-v2.css; these are the wizard-only wrappers that were
+   still on the legacy copper sheet.
+   ========================================================================== */
+.qf-vrf.qf-vrf {
+  max-width: 640px;
+  margin-inline: auto;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+  text-align: left;
+}
+
+.qf-vrf-head.qf-vrf-head {
+  padding: 0.9rem 1rem 0.85rem;
+  border-bottom: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-surface);
+}
+
+.qf-vrf-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Was a dominant orange; the step count is meta, the step name is the label. */
+.qf-vrf-stepcount.qf-vrf-stepcount {
+  font-size: 0.688rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vrf-stepname.qf-vrf-stepname {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vrf-dots.qf-vrf-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.7rem;
+}
+
+.qf-vrf-dot.qf-vrf-dot {
+  display: grid;
+  place-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 26px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-inset);
+  font-size: 0.719rem;
+  font-weight: 700;
+  color: var(--qf-brand-faint);
+}
+
+/* The component marks state with .is-active / .is-done — matched here rather
+   than changing the component's markup. */
+.qf-vrf-dot.is-active {
+  border-color: var(--qf-brand-blue);
+  background: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-vrf-dot.is-done {
+  border-color: var(--qf-brand-success);
+  background: var(--qf-brand-success);
+  color: #fff;
+}
+
+.qf-vrf-body.qf-vrf-body {
+  padding: 1rem;
+  background: var(--qf-brand-bg);
+}
+
+@media (min-width: 640px) {
+  .qf-vrf-body.qf-vrf-body { padding: 1.25rem; }
+}
+
+.qf-vrf-subhead.qf-vrf-subhead {
+  margin: 0.3rem 0 0;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vrf-footer.qf-vrf-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--qf-brand-line);
+  background: var(--qf-brand-surface);
+}
+
+.qf-vrf-group { display: grid; gap: 0.4rem; margin-top: 1rem; }
+
+.qf-vrf-group-label {
+  font-size: 0.719rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qf-brand-faint);
+}
+
+/* Location capture card */
+.qf-vrf-loc-card.qf-vrf-loc-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+}
+
+.qf-vrf-loc-icon.qf-vrf-loc-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--qf-radius-sm);
+  background: var(--qf-brand-blue-tint);
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-vrf-loc-text { min-width: 0; font-size: 0.828rem; line-height: 1.55; color: var(--qf-brand-ink-2); }
+
+/* Rate input */
+.qf-vrf-rate-input.qf-vrf-rate-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  min-height: 48px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+}
+
+.qf-vrf-rate-input:focus-within {
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-vrf-rate-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.938rem;
+  color: var(--qf-brand-ink);
+  outline: none;
+}
+
+.qf-vrf-rate-prefix,
+.qf-vrf-rate-suffix {
+  flex: 0 0 auto;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vrf-rate-min {
+  margin: 0.3rem 0 0;
+  font-size: 0.766rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vrf-rate-error {
+  margin: 0.3rem 0 0;
+  font-size: 0.766rem;
+  font-weight: 550;
+  color: #c0392b;
+}
+
+/* Wizard-only blocks the client-enquiry sheet does not cover */
+.qf-rf-subcategory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.qf-rf-subcategory-card {
+  position: relative;
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+  padding: 0.75rem;
+  text-align: left;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  cursor: pointer;
+}
+
+.qf-rf-subcategory-card:hover { border-color: #cfd9e8; }
+
+.qf-rf-subcategory-card[aria-pressed="true"],
+.qf-rf-subcategory-card.is-selected {
+  border-color: var(--qf-brand-blue);
+  background: var(--qf-brand-blue-tint);
+  box-shadow: 0 0 0 1px var(--qf-brand-blue) inset;
+}
+
+.qf-rf-subcategory-card:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-rf-subcategory-card-title {
+  font-size: 0.891rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink);
+}
+
+.qf-rf-subcategory-card-rate {
+  font-size: 0.75rem;
+  color: var(--qf-brand-muted);
+}
+
+.qf-rf-subcategory-card-check {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue);
+  color: #fff;
+  font-size: 0.625rem;
+}
+
+.qf-rf-coverage-wrap { margin-top: 1rem; }
+
+.qf-rf-coverage-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.8rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+}
+
+.qf-rf-coverage-checkbox { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--qf-brand-blue); }
+
+.qf-rf-coverage-title { font-size: 0.875rem; font-weight: 650; color: var(--qf-brand-ink); }
+
+.qf-rf-coverage-desc,
+.qf-rf-coverage-helper,
+.qf-rf-coverage-info {
+  margin: 0.25rem 0 0;
+  font-size: 0.797rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-rf-warnbox {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #f6dfb8;
+  border-radius: var(--qf-radius-md);
+  background: #fdf6e9;
+  font-size: 0.812rem;
+  line-height: 1.55;
+  color: #7a5410;
+}
+
+@media (min-width: 640px) {
+  .qf-rf-subcategory-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-vauth-tab,
+  .qf-vauth-btn { transition-duration: 0.01ms !important; }
+}

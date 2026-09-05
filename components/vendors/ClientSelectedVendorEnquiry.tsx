@@ -11,6 +11,7 @@
 // ============================================================================
 import { useState } from "react";
 import { sendClientSelectedVendorEnquiry } from "@/app/actions";
+import { formatServiceLabels } from "@/components/client-enquiry/enquiryDisplay";
 
 type Props = {
   vendorId: string;
@@ -126,7 +127,9 @@ export function ClientSelectedVendorEnquiry({
 
       {/* Auto-prefilled from the vendor profile — shown read-only, not editable. */}
       <div className="qf-cs-enquiry-locked">
-        <span>{[serviceCategory, subcategory].filter(Boolean).join(" · ")}</span>
+        {/* DISPLAY ONLY dedupe — the submitted serviceCategory / subcategory
+            values are unchanged. */}
+        <span>{formatServiceLabels(serviceCategory, subcategory, " · ")}</span>
         <span>{[city, parentCategoryGroup].filter(Boolean).join(" · ")}</span>
       </div>
 

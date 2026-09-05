@@ -74,8 +74,12 @@ function FooterLinks({ links }: { links: FooterLink[] }) {
 export function Footer() {
   const [open, setOpen] = useState<string | null>(null);
 
+  // QF-UI-V2-14: id="contact" removed - FinalCTAV2 also carried it, so the
+  // homepage shipped a duplicate element id. That section comes first in the
+  // document, so "/#contact" already resolved there and this copy was
+  // unreachable: dropping it changes no navigation behaviour.
   return (
-    <footer className="qf-foot" id="contact">
+    <footer className="qf-foot">
       <div className="qf-foot-inner">
         <div className="qf-foot-brand">
           <Link href="/" className="qf-foot-logo" aria-label="QuickFurno home">
@@ -93,7 +97,12 @@ export function Footer() {
             const isOpen = open === section.id;
             return (
               <div className={`qf-foot-acc${isOpen ? " is-open" : ""}`} key={section.id}>
-                <h3 className="qf-foot-acc-head">
+                {/* QF-UI-V2-17: h2, not h3. These are the footer landmark's own
+                    top-level groups, and on pages whose main content has no
+                    visible h2 (/enquiry) an h3 here produced an h1 -> h3 jump.
+                    All visual styling sits on .qf-foot-acc-btn, so the level
+                    change is purely semantic. */}
+                <h2 className="qf-foot-acc-head">
                   <button
                     type="button"
                     className="qf-foot-acc-btn"
@@ -104,7 +113,7 @@ export function Footer() {
                     {section.title}
                     <span className="qf-foot-acc-chev" aria-hidden="true" />
                   </button>
-                </h3>
+                </h2>
                 <div className="qf-foot-acc-panel" id={`qf-foot-panel-${section.id}`}>
                   <div className="qf-foot-acc-inner">
                     <FooterLinks links={section.links} />
@@ -118,7 +127,7 @@ export function Footer() {
 
       <div className="qf-foot-bottom">
         <span>© 2026 QuickFurno · Pune &amp; Mumbai</span>
-        <span>Verified Teams · Transparent process · Fast response</span>
+        <span>Verified vendors · Up to 3 matches · Free for homeowners</span>
       </div>
     </footer>
   );

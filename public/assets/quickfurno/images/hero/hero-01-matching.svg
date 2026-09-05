@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="presentation" aria-hidden="true">
+  <!-- QuickFurno hero artwork 01 — architectural interior depth.
+       Original abstract vector art on the approved V2 public palette.
+       Key content stays inside x 70-570 so object-fit:cover never crops it. -->
+  <defs>
+    <linearGradient id="a-room" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8edf5"/><stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="a-glass" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#c8dcff"/><stop offset="1" stop-color="#eef4ff"/>
+    </linearGradient>
+    <linearGradient id="a-floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cdd6e4"/><stop offset="1" stop-color="#eef1f6"/>
+    </linearGradient>
+    <linearGradient id="a-warm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c67821" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c67821" stop-opacity="0.28"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="800" fill="url(#a-room)"/>
+
+  <!-- Deep wall recess gives the composition real value contrast. -->
+  <rect x="70" y="60" width="500" height="520" rx="10" fill="#dbe3ee"/>
+  <rect x="98" y="88" width="444" height="464" rx="6" fill="#f4f7fb"/>
+
+  <!-- Window: the brightest plane, anchoring the eye. -->
+  <rect x="150" y="130" width="250" height="300" rx="4" fill="url(#a-glass)"/>
+  <path d="M275 130v300M150 280h250" stroke="#ffffff" stroke-width="8"/>
+  <rect x="150" y="130" width="250" height="300" rx="4" fill="none" stroke="#94a9c9" stroke-width="6"/>
+
+  <!-- Tall storage column: the darkest mass, right of the window. -->
+  <rect x="432" y="130" width="98" height="422" rx="6" fill="#33465f"/>
+  <path d="M432 244h98M432 358h98" stroke="#22303f" stroke-width="4"/>
+  <path d="M470 196h22M470 310h22M470 424h22" stroke="#c9d6e8" stroke-width="6" stroke-linecap="round"/>
+  <!-- Single brand accent, deliberate and small. -->
+  <rect x="432" y="130" width="98" height="12" rx="6" fill="#2563eb"/>
+
+  <!-- Warm light pooling on the sill — the only amber, kept restrained. -->
+  <rect x="150" y="430" width="250" height="26" rx="6" fill="url(#a-warm)"/>
+
+  <!-- Low console: carpentry cue as crisp planes with real shadow. -->
+  <rect x="112" y="470" width="290" height="82" rx="8" fill="#ffffff"/>
+  <rect x="112" y="470" width="290" height="82" rx="8" fill="none" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M209 470v82M306 470v82" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M146 514h30M243 514h30M340 514h30" stroke="#5f6b7d" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Floor plane + grounded shadow. -->
+  <rect x="0" y="580" width="640" height="220" fill="url(#a-floor)"/>
+  <ellipse cx="320" cy="600" rx="240" ry="18" fill="#8fa0b8" opacity="0.35"/>
+  <path d="M120 660h180" stroke="#aebbcd" stroke-width="8" stroke-linecap="round"/>
+  <path d="M120 700h96" stroke="#c3cddc" stroke-width="8" stroke-linecap="round"/>
+</svg>

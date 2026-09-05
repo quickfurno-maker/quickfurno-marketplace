@@ -19,6 +19,21 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  /**
+   * QF-UI-V2-14: Escape did not dismiss the mobile menu. This is a disclosure
+   * menu, not a modal - it deliberately does not trap focus or lock scroll, and
+   * that architecture is kept - but Escape must still close it. Bound only
+   * while open, so the closed header adds no global key listener.
+   */
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   // Lightweight, rAF-throttled scroll listener that elevates the header once
   // the page is scrolled. Transform/opacity/shadow only — no layout work.
   useEffect(() => {
@@ -68,6 +83,7 @@ export function Header() {
             className="qf-nav-toggle"
             aria-label="Toggle navigation menu"
             aria-expanded={open}
+            aria-controls="qf-mobile-menu"
             onClick={() => setOpen((value) => !value)}
           >
             <span />
@@ -78,7 +94,7 @@ export function Header() {
       </div>
 
       {open ? (
-        <nav className="qf-mobile-nav" aria-label="Mobile navigation">
+        <nav className="qf-mobile-nav" id="qf-mobile-menu" aria-label="Mobile menu">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.label}

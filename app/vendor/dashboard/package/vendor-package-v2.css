@@ -1,0 +1,337 @@
+/* ==========================================================================
+   QuickFurno — Vendor Credits & Package V2  (QF-UI-V2-04)
+
+   Scope: imported ONLY by app/vendor/dashboard/package/page.tsx. Every selector
+   is namespaced `qf-vendor-v2-package-*`; no bare element selector is
+   redefined. Tokens, panels, buttons, empty states and the utility page header
+   / banner come from the approved vendor-portal-v2.css.
+   ========================================================================== */
+
+.qf-vendor-v2-package {
+  display: grid;
+  gap: 0.85rem;
+}
+
+/* ==========================================================================
+   Balance — the number the vendor opens this page for.
+   Deliberately NOT styled like a checkout total: no card chrome, no currency
+   emphasis, no basket.
+   ========================================================================== */
+.qf-vendor-v2-package-balance {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-vendor-v2-package-balance-main { min-width: 0; }
+
+.qf-vendor-v2-package-balance-label {
+  margin: 0;
+  font-size: 0.797rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-package-balance-value {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: clamp(2.1rem, 8vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-package-balance-value[data-tone="low"] { color: var(--v2-warn); }
+.qf-vendor-v2-package-balance-value[data-tone="empty"] { color: var(--v2-danger); }
+
+.qf-vendor-v2-package-balance-of {
+  margin: 0.35rem 0 0;
+  font-size: 0.828rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-package-bar { margin-top: 0.7rem; }
+
+.qf-vendor-v2-progress-fill[data-tone="low"] { background: var(--v2-warn); }
+.qf-vendor-v2-progress-fill[data-tone="empty"] { background: var(--v2-danger); }
+
+.qf-vendor-v2-package-balance-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-ok);
+}
+
+.qf-vendor-v2-package-balance-state svg { flex: 0 0 auto; margin-top: 2px; }
+.qf-vendor-v2-package-balance-state[data-tone="low"] { color: var(--v2-warn); }
+.qf-vendor-v2-package-balance-state[data-tone="empty"] { color: var(--v2-danger); }
+
+.qf-vendor-v2-package-facts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-package-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--v2-line-soft);
+}
+
+.qf-vendor-v2-package-facts > div:last-child { border-bottom: none; }
+
+.qf-vendor-v2-package-facts dt {
+  flex: 0 0 auto;
+  font-size: 0.812rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-package-facts dd {
+  margin: 0;
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--v2-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-package-facts dd[data-tone="ok"] { color: var(--v2-ok); }
+.qf-vendor-v2-package-facts dd[data-tone="pending"] { color: var(--v2-ink-2); }
+
+/* ==========================================================================
+   Section heads
+   ========================================================================== */
+.qf-vendor-v2-package-sectionhead { margin-bottom: 0.85rem; }
+
+.qf-vendor-v2-package-sectionhint {
+  margin: 0.2rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--v2-muted);
+}
+
+/* The payment notice sits directly above the order actions. */
+.qf-vendor-v2-package .qf-vendor-v2-utilalert { margin-bottom: 0.85rem; }
+
+/* ==========================================================================
+   Package options
+   ========================================================================== */
+.qf-vendor-v2-package-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.qf-vendor-v2-package-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-package-card-body { min-width: 0; }
+
+.qf-vendor-v2-package-card h3 {
+  margin: 0;
+  font-size: 0.938rem;
+  font-weight: 650;
+  letter-spacing: -0.008em;
+  color: var(--v2-ink);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-package-price {
+  margin: 0.3rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.qf-vendor-v2-package-card-facts {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.797rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-package-card-facts li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.qf-vendor-v2-package-card-facts svg { flex: 0 0 auto; color: var(--v2-faint); }
+
+.qf-vendor-v2-package-card form { display: grid; }
+.qf-vendor-v2-package-card .qf-vendor-v2-btn { width: 100%; }
+
+/* ==========================================================================
+   Order history — stacked rows, never a wide table.
+   ========================================================================== */
+.qf-vendor-v2-package-orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.qf-vendor-v2-package-order {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border: 1px solid var(--v2-line-soft);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-package-order-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.qf-vendor-v2-package-order-head strong {
+  display: block;
+  font-size: 0.891rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-package-order-meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.766rem;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-package-order-price {
+  flex: 0 0 auto;
+  font-size: 0.891rem;
+  font-weight: 650;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Three across wherever they fit. Below ~420px a third of the row leaves under
+  90px of usable width, which clipped the longest label ("Activation") — it is
+  one uppercase word with no break opportunity — so the chips drop to two
+  columns there instead of truncating.
+*/
+.qf-vendor-v2-package-order-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+}
+
+@media (max-width: 419px) {
+  .qf-vendor-v2-package-order-chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.qf-vendor-v2-package-order-chips > div {
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-surface);
+}
+
+.qf-vendor-v2-package-order-chips dt {
+  font-size: 0.688rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--v2-faint);
+  /* Guard: a long single-word label breaks rather than overflowing its chip. */
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-package-order-chips dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.781rem;
+  font-weight: 600;
+  color: var(--v2-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-package-order-chips dd[data-tone="ok"] { color: var(--v2-ok); }
+.qf-vendor-v2-package-order-chips dd[data-tone="warn"] { color: var(--v2-danger); }
+.qf-vendor-v2-package-order-chips dd[data-tone="pending"] { color: var(--v2-warn); }
+
+.qf-vendor-v2-package-order-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.781rem;
+  line-height: 1.5;
+  color: var(--v2-warn);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-package-order-reason svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+@media (min-width: 700px) {
+  .qf-vendor-v2-package { gap: 1rem; }
+
+  .qf-vendor-v2-package-balance {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 280px);
+    align-items: start;
+    gap: 1.6rem;
+  }
+
+  .qf-vendor-v2-package-facts {
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .qf-vendor-v2-package-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .qf-vendor-v2-package-card {
+    grid-template-rows: 1fr auto;
+  }
+
+  .qf-vendor-v2-package-order {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .qf-vendor-v2-package-order-reason { grid-column: 1 / -1; }
+}
+
+@media (min-width: 1080px) {
+  .qf-vendor-v2-package-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -54,7 +54,21 @@ body {
   font-family: var(--font-sans);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /*
+    QF-UI-V2-05 — `clip`, not `hidden`.
+
+    `overflow-x: hidden` on BODY makes body a scroll container. Body never
+    scrolls (html is the scrolling element), so every `position: sticky`
+    descendant on the site resolved against a box with no scroll range and
+    silently rode the document away — proven for the public header
+    (top 0 -> -1272 -> -2572) and previously for the vendor shell.
+
+    `clip` clips the same horizontal overflow WITHOUT establishing a scroll
+    container, so sticky works again. `html` keeps `overflow-x: hidden` above,
+    which propagates to the viewport and remains the horizontal-overflow
+    backstop on engines too old for `clip`.
+  */
+  overflow-x: clip;
 }
 
 body::before {

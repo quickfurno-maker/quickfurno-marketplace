@@ -8,6 +8,12 @@ import { browserClient } from "@/lib/supabaseBrowser";
 // role-based: admins go to /admin/dashboard even if they sign in here, everyone
 // else goes to /vendor/dashboard. The signup link is configurable so the same
 // form can point vendors at the portal's signup tab.
+//
+// QF-UI-V2-11 restyled this card onto the V2 vendor-auth system. The auth path
+// below is UNCHANGED: same browserClient(), same signInWithPassword, same
+// profiles.role read, same refresh-then-push redirect, same error surface, same
+// Enter-to-submit on both fields. Only markup, classes and the accessibility
+// wiring (labels, alert role, autocomplete hints) moved.
 export function LoginForm({
   signupHref = "/vendor?mode=signup",
   signupLabel = "Create a vendor account",
@@ -39,20 +45,52 @@ export function LoginForm({
   }
 
   return (
-    <div className="panel mx-auto max-w-md p-8">
-      {error && <p className="mb-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 font-sans text-sm text-red-200">{error}</p>}
-      <label className="block"><span className="label">Email</span>
-        <input className="field" value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" onKeyDown={(e) => e.key === "Enter" && onSubmit()} />
-      </label>
-      <label className="mt-4 block"><span className="label">Password</span>
-        <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onSubmit()} />
-      </label>
-      <button onClick={onSubmit} disabled={busy} className="btn-gold mt-6 w-full">{busy ? "Signing in…" : "Sign in"}</button>
-      {showSignupLink ? (
-        <p className="mt-4 text-center font-sans text-xs text-muted">
-          New to QuickFurno? <a href={signupHref} className="text-gold hover:underline">{signupLabel}</a>
+    <div className="qf-vauth-card">
+      <h2 className="qf-vauth-card-title">Welcome back</h2>
+      <p className="qf-vauth-card-sub">
+        Sign in to manage assigned leads, credits and your business profile.
+      </p>
+
+      {error ? (
+        <p className="qf-vauth-alert" role="alert">
+          {error}
         </p>
       ) : null}
+
+      <div className="qf-vauth-fields">
+        <label className="qf-vauth-field">
+          <span>Email</span>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            inputMode="email"
+            autoComplete="email"
+            onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+          />
+        </label>
+        <label className="qf-vauth-field">
+          <span>Password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+          />
+        </label>
+      </div>
+
+      <button onClick={onSubmit} disabled={busy} className="qf-vauth-btn">
+        {busy ? "Signing in…" : "Sign in"}
+      </button>
+
+      {showSignupLink ? (
+        <p className="qf-vauth-alt">
+          New to QuickFurno? <a href={signupHref}>{signupLabel}</a>
+        </p>
+      ) : null}
+
+      <p className="qf-vauth-note">Vendor access is for registered QuickFurno vendors.</p>
     </div>
   );
 }

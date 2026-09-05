@@ -1,0 +1,885 @@
+/* ==========================================================================
+   QuickFurno — Public category listing V2  (QF-UI-V2-06)
+
+   Scope: imported ONLY by app/category/[slug]/page.tsx. Every selector is
+   namespaced `qf-cat-*` or `qf-vl-*`; no bare element selector is redefined and
+   nothing here can reach the vendor portal, the admin surface or the public
+   vendor profile (which still uses vendor-discovery.css — untouched, V2-07).
+
+   All colour/spacing/typography comes from the QF-UI-V2-05 public tokens in
+   app/qf-public-v2.css. No new palette; the old cream/copper listing treatment
+   is simply not referenced by any of these classes.
+   ========================================================================== */
+
+.qf-category-page {
+  background: var(--qf-brand-bg);
+  color: var(--qf-brand-ink);
+  /* The public bottom nav is fixed on phones; keep the last section clear of it. */
+  padding-bottom: calc(var(--qf-bottom-nav-h, 62px) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 900px) {
+  .qf-category-page { padding-bottom: 0; }
+}
+
+/* ==========================================================================
+   Category intro — compact, so results start high on the page
+   ========================================================================== */
+.qf-cat-intro {
+  padding: 1.05rem 0 0.9rem;
+  background: var(--qf-brand-surface);
+  border-bottom: 1px solid var(--qf-brand-line);
+}
+
+.qf-cat-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+}
+
+.qf-cat-back:hover { color: var(--qf-brand-blue); }
+
+.qf-cat-title {
+  margin: 0;
+  font-size: clamp(1.4rem, 4.4vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.026em;
+  line-height: 1.18;
+  color: var(--qf-brand-ink);
+}
+
+.qf-cat-copy {
+  margin: 0.4rem 0 0;
+  max-width: 62ch;
+  font-size: 0.891rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+  /* Keeps the intro short on phones so results start high in the viewport. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.qf-cat-truths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qf-cat-truths li {
+  position: relative;
+  padding-left: 0.85rem;
+  font-size: 0.766rem;
+  font-weight: 550;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-cat-truths li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--qf-brand-success);
+}
+
+/* ==========================================================================
+   Layout
+   ========================================================================== */
+.qf-cat-listing { padding: 0.9rem 0 1.6rem; }
+
+.qf-cat-layout {
+  display: grid;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.qf-cat-results { min-width: 0; }
+
+/* ==========================================================================
+   Assistance — ONE surface per page
+   ========================================================================== */
+.qf-cat-assist-card {
+  padding: 1.05rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.qf-cat-assist-card h2 {
+  margin: 0.3rem 0 0;
+  font-size: 1.062rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-cat-assist-card p {
+  margin: 0.4rem 0 0.85rem;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-cat-assist-card ul {
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qf-cat-assist-card li {
+  position: relative;
+  padding-left: 1.05rem;
+  font-size: 0.797rem;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-cat-assist-card li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.44em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qf-brand-blue);
+}
+
+/* ==========================================================================
+   Discovery controls
+   ========================================================================== */
+.qf-vl { display: grid; gap: 0.85rem; }
+
+.qf-vl-controls {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+}
+
+.qf-vl-controls-row {
+  display: grid;
+  gap: 0.5rem;
+  /* Search spans the row; City and Sort sit side by side beneath it so the
+     control block stays well under a quarter of a phone viewport. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.qf-vl-search { grid-column: 1 / -1; }
+
+.qf-vl-controls-row--chips {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.qf-vl-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.7rem;
+  min-height: 42px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  color: var(--qf-brand-faint);
+}
+
+.qf-vl-search:focus-within {
+  border-color: var(--qf-brand-blue);
+  box-shadow: 0 0 0 3px var(--qf-brand-blue-tint);
+}
+
+.qf-vl-search svg { flex: 0 0 auto; }
+
+.qf-vl-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.891rem;
+  color: var(--qf-brand-ink);
+  outline: none;
+}
+
+.qf-vl-search input::placeholder { color: var(--qf-brand-faint); }
+
+.qf-vl-select {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.55rem 0 0.7rem;
+  min-height: 42px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+}
+
+.qf-vl-select label {
+  font-size: 0.734rem;
+  font-weight: 650;
+  color: var(--qf-brand-faint);
+  white-space: nowrap;
+}
+
+/*
+  On narrow phones the two selects share a row, and the visible label text
+  squeezes the value until it truncates. Below 480px the label is visually
+  hidden but remains a real <label for="..."> in the DOM, so the select keeps
+  its accessible name. The visible values ("All cities" / "Recommended") are
+  self-describing.
+*/
+@media (max-width: 479px) {
+  .qf-vl-select label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .qf-vl-select { padding-left: 0.6rem; }
+}
+
+.qf-vl-select select {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.828rem;
+  font-weight: 550;
+  color: var(--qf-brand-ink);
+  cursor: pointer;
+}
+
+.qf-vl-select select:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.qf-vl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.qf-vl-chip {
+  padding: 0.34rem 0.7rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.781rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.qf-vl-chip:hover { border-color: var(--qf-brand-blue); color: var(--qf-brand-blue); }
+
+.qf-vl-chip[aria-pressed="true"] {
+  background: var(--qf-brand-blue);
+  border-color: var(--qf-brand-blue);
+  color: #fff;
+}
+
+.qf-vl-chip--clear {
+  border-style: dashed;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vl-chip:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-vl-count {
+  margin: 0;
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ==========================================================================
+   Result cards
+   ========================================================================== */
+.qf-vl-results { display: grid; gap: 0.65rem; }
+
+.qf-vl-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.qf-vl-card:hover {
+  border-color: #cfd9e8;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+}
+
+.qf-vl-card-body {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.qf-vl-card-media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-blue-tint);
+  text-decoration: none;
+}
+
+.qf-vl-card-img { object-fit: cover; }
+
+.qf-vl-card-initials {
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-vl-card-info { min-width: 0; }
+
+.qf-vl-card-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+  /* Long business names wrap instead of being clipped. */
+  overflow-wrap: anywhere;
+}
+
+.qf-vl-card-name a {
+  color: var(--qf-brand-ink);
+  text-decoration: none;
+}
+
+.qf-vl-card-name a:hover { color: var(--qf-brand-blue); }
+
+.qf-vl-card-name a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.qf-vl-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.797rem;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vl-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 650;
+  color: var(--qf-brand-success);
+}
+
+.qf-vl-card-location { overflow-wrap: anywhere; }
+
+.qf-vl-card-services {
+  margin: 0.3rem 0 0;
+  font-size: 0.797rem;
+  font-weight: 550;
+  color: var(--qf-brand-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.qf-vl-card-desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.qf-vl-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qf-vl-card-facts li {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-sm);
+  background: var(--qf-brand-inset);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+}
+
+/* ==========================================================================
+   Card actions — one primary, one secondary, quiet extras
+   ========================================================================== */
+.qf-vl-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--qf-brand-line);
+}
+
+.qf-vl-card-tel,
+.qf-vl-card-compare {
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 0.797rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--qf-radius-sm);
+}
+
+.qf-vl-card-tel:hover,
+.qf-vl-card-compare:hover { color: var(--qf-brand-blue); }
+
+.qf-vl-card-compare[aria-pressed="true"] { color: var(--qf-brand-blue); font-weight: 650; }
+
+.qf-vl-card-compare:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.qf-vl-card-tel:focus-visible,
+.qf-vl-card-compare:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+/* Compare is a secondary affordance — push it to the end of the row. */
+.qf-vl-card-compare { margin-left: auto; }
+
+/* ==========================================================================
+   Empty / unavailable
+   ========================================================================== */
+.qf-vl-empty {
+  padding: 1.6rem 1.1rem;
+  border: 1px dashed var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  text-align: center;
+}
+
+.qf-vl-empty h2,
+.qf-vl-empty h3 {
+  margin: 0;
+  font-size: 1.031rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vl-empty p {
+  margin: 0.45rem auto 0;
+  max-width: 46ch;
+  font-size: 0.859rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vl-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.95rem;
+}
+
+/* ==========================================================================
+   Compare bar + dialog
+   ========================================================================== */
+.qf-vl-comparebar {
+  position: sticky;
+  /* Sits above the mobile public nav so it never covers card actions. */
+  bottom: calc(var(--qf-bottom-nav-h, 62px) + 0.5rem);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-surface);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+}
+
+.qf-vl-comparebar p {
+  margin: 0;
+  font-size: 0.812rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-vl-comparebar > div {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.qf-vl-comparebar-clear {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 0.797rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+  padding: 0.35rem 0.4rem;
+}
+
+.qf-vl-comparebar-clear:hover { color: var(--qf-brand-blue); }
+
+.qf-vl-comparebar-clear:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+  QF-UI-V2-06R — the backdrop must own the whole viewport.
+
+  It previously sat at z-index 80, BELOW the public mobile bottom nav
+  (.qf-bottom-nav, z-index 90 in app/qf-public-v2.css), so on phones the nav
+  painted on top of the sheet and stayed hit-testable while
+  role="dialog" aria-modal="true" was open — document.elementFromPoint() at the
+  nav centre returned .qf-bottom-nav, not the backdrop.
+
+  120 is the established public-modal level in this design system: it matches
+  .qf-subsheet-backdrop / .qf-subsheet (120 / 121) from QF-UI-V2-05, sits above
+  the sticky header (80) and the bottom nav (90), and stays below the enquiry
+  modal (130+) which is never open at the same time. The backdrop is in the ROOT
+  stacking context (no ancestor creates one), so this z-index alone is enough —
+  no portal and no cross-component state.
+*/
+.qf-vl-compare-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: end center;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.45);
+  /* Scrolling the backdrop must never chain to the page behind it. */
+  overscroll-behavior: contain;
+}
+
+.qf-vl-compare {
+  width: 100%;
+  max-height: 86vh;
+  /* dvh tracks the real visible viewport when mobile browser chrome shows or
+     hides, so the sheet never extends under it. vh above is the fallback. */
+  max-height: 86dvh;
+  z-index: 121;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-radius: var(--qf-radius-lg) var(--qf-radius-lg) 0 0;
+  background: var(--qf-brand-surface);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.qf-vl-compare:focus { outline: none; }
+
+.qf-vl-compare-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--qf-brand-line);
+}
+
+.qf-vl-compare-head h2 {
+  margin: 0;
+  font-size: 1.031rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vl-compare-head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.797rem;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vl-compare-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-sm);
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+}
+
+.qf-vl-compare-close:hover { color: var(--qf-brand-ink); border-color: #cfd9e8; }
+
+.qf-vl-compare-close:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+/* Taller-than-viewport comparisons scroll INSIDE the sheet, never behind it. */
+.qf-vl-compare-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.5rem 1rem 1.1rem;
+}
+
+.qf-vl-compare-table {
+  width: 100%;
+  /*
+    QF-UI-V2-06R — no forced min-width. With overflow-wrap: break-word below,
+    the browser sizes columns to whole words and only overflows (scrolling
+    horizontally INSIDE .qf-vl-compare-scroll) when the content genuinely cannot
+    fit. Two vendors therefore fit a 390px phone with no sideways scroll at all,
+    and the page itself never scrolls sideways either way.
+  */
+  border-collapse: collapse;
+  font-size: 0.812rem;
+}
+
+.qf-vl-compare-table th,
+.qf-vl-compare-table td {
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--qf-brand-line);
+  color: var(--qf-brand-ink-2);
+  /* break-word, not anywhere: only split a word that cannot fit at all. */
+  overflow-wrap: break-word;
+}
+
+.qf-vl-compare-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-ink);
+  font-weight: 700;
+}
+
+.qf-vl-compare-table thead th a {
+  color: var(--qf-brand-ink);
+  text-decoration: none;
+}
+
+.qf-vl-compare-table thead th a:hover { color: var(--qf-brand-blue); }
+
+.qf-vl-compare-table thead th button {
+  display: block;
+  margin-top: 0.2rem;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.734rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+}
+
+.qf-vl-compare-table thead th button:hover { color: var(--qf-brand-blue); }
+
+.qf-vl-compare-table tbody th {
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Final CTA spacing on this page
+   ========================================================================== */
+.qf-category-page .qf-final-cta { margin-top: 0; }
+
+.qf-final-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 1.05rem;
+}
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+@media (min-width: 620px) {
+  .qf-vl-controls-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 200px) minmax(0, 196px);
+    align-items: center;
+  }
+
+  .qf-vl-search { grid-column: auto; }
+
+  .qf-vl-controls-row--chips { grid-template-columns: minmax(0, 1fr) auto; }
+
+  .qf-vl-card-body { grid-template-columns: 92px minmax(0, 1fr); }
+  .qf-vl-card-media { width: 92px; height: 92px; }
+}
+
+@media (min-width: 1024px) {
+  .qf-cat-intro { padding: 1.9rem 0 1.5rem; }
+  .qf-cat-listing { padding: 1.5rem 0 2.6rem; }
+
+  /* Results are the focus; assistance is a compact rail, not a half-empty column. */
+  .qf-cat-layout {
+    grid-template-columns: minmax(0, 1fr) 288px;
+    gap: 1.4rem;
+  }
+
+  .qf-cat-assist {
+    position: sticky;
+    /* Clears the fixed public header (V2-05 repaired sticky globally). */
+    top: calc(var(--qf-public-header-h) + 1rem);
+  }
+
+  .qf-vl-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .qf-vl-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 194px;
+    padding-top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--qf-brand-line);
+    padding-left: 1rem;
+  }
+
+  .qf-vl-card-compare { margin-left: 0; }
+
+  .qf-vl-comparebar { bottom: 1rem; }
+
+  .qf-vl-compare-backdrop { place-items: center; padding: 1.5rem; }
+
+  .qf-vl-compare {
+    max-width: 760px;
+    border-radius: var(--qf-radius-lg);
+    max-height: 78vh;
+    max-height: 78dvh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-vl-card,
+  .qf-vl-chip { transition-duration: 0.01ms !important; }
+}
+
+/* ==========================================================================
+   QF-UI-V2-16 — neutral category artwork slots
+
+   Two category-level surfaces only: the page header and the empty/unavailable
+   state. Never a vendor thumbnail or a profile/gallery image, so generic art
+   can never be read as a vendor's own project. Both slots reserve their box
+   with aspect-ratio so the lazy-loaded SVG cannot shift layout (no CLS).
+   ========================================================================== */
+.qf-cat-intro-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-cat-intro-copy { min-width: 0; }
+
+/* Phones lead with the headline; the artwork supports it underneath and stays
+   small enough that the listing is still reachable in the first scroll. */
+.qf-cat-art {
+  align-self: center;
+  overflow: hidden;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-inset);
+}
+
+/* Phones: the COMPLETE 4:3 composition at a modest width, centred. A wide
+   banner crop was tried first and cut the cabinets off mid-panel; a full-width
+   4:3 block pushed the listing off the first screen. This keeps the artwork
+   honest (no crop, no distortion) and still leaves the listing reachable. */
+.qf-cat-art {
+  width: min(240px, 68%);
+  margin-inline: auto;
+}
+
+.qf-cat-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+@media (min-width: 768px) {
+  /* Copy keeps priority; the artwork is a supporting column, not a hero. */
+  .qf-cat-intro-shell {
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 1.6rem;
+  }
+
+  /* Full supporting column from tablet up. */
+  .qf-cat-art {
+    width: auto;
+    margin-inline: 0;
+  }
+}

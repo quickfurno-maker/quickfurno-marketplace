@@ -1,0 +1,570 @@
+/* ==========================================================================
+   QuickFurno — Public vendor profile V2  (QF-UI-V2-07)
+
+   Scope: imported ONLY by app/vendors/[id]/page.tsx. Every selector is
+   namespaced `qf-vprofile-*`; no bare element selector is redefined. The legacy
+   `vendor-detail-*` / cream-copper rules in app/vendor-discovery.css are simply
+   no longer referenced by this page and are left untouched for any remaining
+   legacy consumer.
+
+   All colour, spacing and typography come from the QF-UI-V2-05 public tokens in
+   app/qf-public-v2.css, so the profile reads as a continuation of the V2-06
+   category listing.
+   ========================================================================== */
+
+.qf-vprofile-page {
+  background: var(--qf-brand-bg);
+  color: var(--qf-brand-ink);
+  padding: 0.9rem 0 1.8rem;
+  /* Clears the fixed public bottom nav on phones. */
+  padding-bottom: calc(var(--qf-bottom-nav-h, 62px) + 1.4rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 900px) {
+  .qf-vprofile-page { padding-bottom: 2.4rem; }
+}
+
+/* ==========================================================================
+   Breadcrumb
+   ========================================================================== */
+.qf-vprofile-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+}
+
+.qf-vprofile-breadcrumb a:hover { color: var(--qf-brand-blue); }
+
+.qf-vprofile-breadcrumb a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Hero
+   ========================================================================== */
+.qf-vprofile-hero {
+  overflow: hidden;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.qf-vprofile-cover {
+  position: relative;
+  height: 116px;
+  background: var(--qf-brand-blue-tint);
+}
+
+/*
+  Descendant-scoped on purpose. app/globals.css carries
+  `img:not([width]) { height: auto }` at specificity (0,1,1), which outranks a
+  single class (0,1,0) — so a bare `.qf-vprofile-cover-img { height: 100% }` lost
+  and the cover rendered at the image's full intrinsic height (measured 712px
+  inside a 196px box, painting over the name and facts below it). Scoping under
+  the parent lifts these to (0,2,0) and wins without !important.
+*/
+.qf-vprofile-cover > .qf-vprofile-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Neutral branded surface when no cover was published — deliberately not a
+   stock interior photo, which would read as this vendor's own project. */
+.qf-vprofile-cover-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(135deg, var(--qf-brand-blue-tint) 0%, #e9eef8 55%, #f3f6fb 100%);
+}
+
+.qf-vprofile-media-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--qf-brand-blue-tint) 0%, #e9eef8 100%);
+  color: var(--qf-brand-blue-deep);
+  font-size: 0.766rem;
+  font-weight: 650;
+  text-align: center;
+  padding: 0.4rem;
+}
+
+/*
+  `.qf-vprofile-cover` is position:relative, so it paints above later STATIC
+  in-flow content that overlaps it — and this block deliberately overlaps by
+  -30px so the avatar sits on the cover edge. Without its own positioning the
+  name, verified badge and facts were painted over by the cover image
+  (elementFromPoint at their centres returned .qf-vprofile-cover-img).
+*/
+.qf-vprofile-identity {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 0.75rem;
+  padding: 0 1rem;
+}
+
+/*
+  Only the AVATAR overlaps the cover. Pulling the whole identity row up instead
+  put the verified line and its helper text on top of the cover image, where
+  muted grey on a photo failed contrast — and how far it straddled changed with
+  the avatar size at each breakpoint. Lifting just the avatar keeps every piece
+  of text on the white surface at every width.
+*/
+.qf-vprofile-avatar {
+  position: relative;
+  margin-top: -30px;
+  width: 68px;
+  height: 68px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--qf-brand-surface);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-blue-tint);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+}
+
+.qf-vprofile-avatar > .qf-vprofile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.qf-vprofile-avatar-initials {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--qf-brand-blue-deep);
+}
+
+.qf-vprofile-identity-text { min-width: 0; padding-bottom: 0.15rem; }
+
+.qf-vprofile-verified {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin: 0 0 0.2rem;
+  font-size: 0.781rem;
+  font-weight: 650;
+  color: var(--qf-brand-success);
+}
+
+.qf-vprofile-verified-note {
+  font-weight: 500;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vprofile-name {
+  margin: 0;
+  font-size: clamp(1.28rem, 4.2vw, 1.72rem);
+  font-weight: 700;
+  letter-spacing: -0.024em;
+  line-height: 1.2;
+  color: var(--qf-brand-ink);
+  /* 100-character business names wrap instead of clipping. */
+  overflow-wrap: break-word;
+}
+
+.qf-vprofile-meta {
+  margin: 0.28rem 0 0;
+  font-size: 0.828rem;
+  color: var(--qf-brand-muted);
+  overflow-wrap: break-word;
+}
+
+/* Published facts only. Never padded with placeholders. */
+.qf-vprofile-facts {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.75rem;
+  margin: 0.95rem 0 0;
+  padding: 0.85rem 1rem 1rem;
+  border-top: 1px solid var(--qf-brand-line);
+}
+
+.qf-vprofile-facts dt {
+  font-size: 0.719rem;
+  font-weight: 650;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vprofile-facts dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.828rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink);
+  overflow-wrap: break-word;
+}
+
+/* ==========================================================================
+   Layout — action card under the hero on phones, sticky rail on desktop
+   ========================================================================== */
+.qf-vprofile-layout {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+  align-items: start;
+}
+
+.qf-vprofile-main { min-width: 0; display: grid; gap: 0.75rem; }
+
+/* Phones: the action card comes first so the primary CTA is above the fold. */
+.qf-vprofile-aside { order: -1; min-width: 0; }
+
+/* ==========================================================================
+   Section nav
+   ========================================================================== */
+.qf-vprofile-nav {
+  display: flex;
+  gap: 0.3rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0.35rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-surface);
+}
+
+.qf-vprofile-nav::-webkit-scrollbar { display: none; }
+
+.qf-vprofile-nav a {
+  flex: 1 0 auto;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.797rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+  text-decoration: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.qf-vprofile-nav a:hover { background: var(--qf-brand-inset); color: var(--qf-brand-blue); }
+
+.qf-vprofile-nav a:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Sections
+   ========================================================================== */
+.qf-vprofile-section {
+  padding: 1rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  scroll-margin-top: calc(var(--qf-public-header-h) + 0.9rem);
+}
+
+.qf-vprofile-section h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.031rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+  overflow-wrap: break-word;
+}
+
+.qf-vprofile-about {
+  margin: 0;
+  font-size: 0.891rem;
+  line-height: 1.65;
+  color: var(--qf-brand-ink-2);
+  overflow-wrap: break-word;
+}
+
+.qf-vprofile-note {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.766rem;
+  line-height: 1.5;
+  color: var(--qf-brand-faint);
+}
+
+/* Services */
+.qf-vprofile-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qf-vprofile-services li {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+}
+
+/* Portfolio */
+.qf-vprofile-portfolio {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.qf-vprofile-portfolio--single { grid-template-columns: minmax(0, 1fr); }
+
+.qf-vprofile-shot {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  /* Bounded height keeps a tall image from dominating the page. */
+  aspect-ratio: 4 / 3;
+}
+
+.qf-vprofile-portfolio--single .qf-vprofile-shot { aspect-ratio: 16 / 9; }
+
+.qf-vprofile-shot > .qf-vprofile-shot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Details */
+.qf-vprofile-details { margin: 0; display: grid; gap: 0; }
+
+.qf-vprofile-details > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.15rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--qf-brand-line);
+}
+
+.qf-vprofile-details > div:last-child { border-bottom: none; }
+
+.qf-vprofile-details dt {
+  font-size: 0.719rem;
+  font-weight: 650;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--qf-brand-faint);
+}
+
+.qf-vprofile-details dd {
+  margin: 0;
+  font-size: 0.859rem;
+  font-weight: 550;
+  color: var(--qf-brand-ink);
+  overflow-wrap: break-word;
+}
+
+.qf-vprofile-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qf-vprofile-areas li {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: 999px;
+  background: var(--qf-brand-inset);
+  font-size: 0.766rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2);
+}
+
+/* FAQ */
+.qf-vprofile-faq { margin: 0; display: grid; gap: 0.75rem; }
+
+.qf-vprofile-faq dt {
+  font-size: 0.859rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vprofile-faq dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.828rem;
+  line-height: 1.6;
+  color: var(--qf-brand-muted);
+}
+
+/* Compare more */
+.qf-vprofile-comparemore {
+  padding: 1.15rem 1rem;
+  border: 1px dashed var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  text-align: center;
+}
+
+.qf-vprofile-comparemore h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-vprofile-comparemore p {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.828rem;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Action card
+   ========================================================================== */
+.qf-vprofile-actioncard {
+  padding: 1rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.qf-vprofile-actioncard h2 {
+  margin: 0.3rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--qf-brand-ink);
+  overflow-wrap: break-word;
+}
+
+.qf-vprofile-actioncard > p {
+  margin: 0.35rem 0 0.8rem;
+  font-size: 0.828rem;
+  line-height: 1.55;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vprofile-actioncard-tel {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.4rem;
+  text-align: center;
+  font-size: 0.812rem;
+  font-weight: 600;
+  color: var(--qf-brand-muted);
+  text-decoration: none;
+  border-radius: var(--qf-radius-sm);
+}
+
+.qf-vprofile-actioncard-tel:hover { color: var(--qf-brand-blue); }
+
+.qf-vprofile-actioncard-tel:focus-visible {
+  outline: 2px solid var(--qf-brand-blue);
+  outline-offset: 2px;
+}
+
+.qf-vprofile-actioncard-points {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--qf-brand-line);
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qf-vprofile-actioncard-points li {
+  position: relative;
+  padding-left: 1.05rem;
+  font-size: 0.781rem;
+  line-height: 1.5;
+  color: var(--qf-brand-ink-2);
+}
+
+.qf-vprofile-actioncard-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qf-brand-success);
+}
+
+/* The inline selected-vendor enquiry form lives inside the card. */
+.qf-vprofile-actioncard .qf-cs-enquiry { display: grid; gap: 0.5rem; }
+
+.qf-vprofile-actioncard .qf-cs-enquiry-hint,
+.qf-vprofile-actioncard .qf-cs-enquiry-multi {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--qf-brand-faint);
+}
+
+/* ==========================================================================
+   Breakpoints
+   ========================================================================== */
+@media (min-width: 620px) {
+  .qf-vprofile-cover { height: 150px; }
+  .qf-vprofile-identity { grid-template-columns: auto minmax(0, 1fr); padding: 0 1.15rem; }
+  .qf-vprofile-avatar { width: 84px; height: 84px; }
+  .qf-vprofile-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0.95rem 1.15rem 1.1rem; }
+  .qf-vprofile-portfolio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .qf-vprofile-section { padding: 1.15rem; }
+
+  .qf-vprofile-details > div {
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 0.9rem;
+    align-items: baseline;
+  }
+}
+
+@media (min-width: 1024px) {
+  .qf-vprofile-page { padding-top: 1.2rem; }
+  .qf-vprofile-cover { height: 196px; }
+  .qf-vprofile-avatar { width: 96px; height: 96px; }
+
+  .qf-vprofile-layout {
+    grid-template-columns: minmax(0, 1fr) 316px;
+    gap: 1.3rem;
+    margin-top: 1.1rem;
+  }
+
+  /* Desktop: back to source order, as the sticky right rail. */
+  .qf-vprofile-aside {
+    order: 0;
+    position: sticky;
+    /* Clears the fixed public header (sticky repaired globally in V2-05). */
+    top: calc(var(--qf-public-header-h) + 1rem);
+  }
+
+  .qf-vprofile-main { order: -1; gap: 0.9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qf-vprofile-nav a,
+  .qf-vprofile-shot { transition-duration: 0.01ms !important; }
+}

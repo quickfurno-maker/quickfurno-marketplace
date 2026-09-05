@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { FAQ } from "@/components/FAQ";
-import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
 import { VendorPortal } from "@/components/vendor/VendorPortal";
+import { VendorPortalFooter } from "@/components/vendor/VendorPortalFooter";
+import { VendorPortalHeader } from "@/components/vendor/VendorPortalHeader";
 
 const steps = [
   {
@@ -14,12 +14,12 @@ const steps = [
     copy: "Our team reviews your profile quality, service fit, and contact details before enabling marketplace access.",
   },
   {
-    title: "Receive relevant leads",
-    copy: "Once active and credited, you can view client requirements assigned to your business from the vendor dashboard.",
+    title: "Account becomes eligible",
+    copy: "Lead access depends on your account being approved and active, with a package and credits in place.",
   },
   {
-    title: "Follow up and close",
-    copy: "Use the dashboard to track lead status, mark progress, and report quality issues when needed.",
+    title: "Manage matched enquiries",
+    copy: "Once eligible, relevant client requirements assigned to your business appear in the vendor dashboard for follow-up.",
   },
 ];
 
@@ -37,15 +37,23 @@ const faqs = [
     answer: "QuickFurno currently supports Interior Designers, Carpenters, Modular Factory, Premium Interiors, Sofa, Painter, and Civil Work vendors.",
   },
   {
-    question: "When will I start receiving leads?",
-    answer: "After your profile is approved and credited, matching client enquiries appear in your dashboard. New profiles stay pending until the QuickFurno team verifies them.",
+    question: "When can matched enquiries appear?",
+    answer: "Matched enquiries can appear once your account is approved and active, with a package and credits in place. Relevant client requirements are then assigned according to QuickFurno's matching rules.",
   },
 ];
 
+/*
+  QF-UI-V2-11R — copy truth correction. The description previously promised
+  "verified home-service client leads": QuickFurno verifies VENDORS, not client
+  enquiries, and "start receiving" read as an outcome guaranteed by signing up.
+  The process steps and the matching FAQ now use the same eligibility wording
+  locked in QF-UI-V2-10 — approved and active, with a package and credits in
+  place. Nothing about auth, the wizard or submission changed.
+*/
 export const metadata: Metadata = {
   title: "Vendor Portal | QuickFurno",
   description:
-    "Log in to your QuickFurno vendor dashboard or create a vendor account to start receiving verified home-service client leads.",
+    "Log in to your QuickFurno vendor dashboard or create a vendor account to submit your business profile for review and manage matched home-service enquiries when eligible.",
 };
 
 export default function VendorPortalPage({
@@ -57,7 +65,14 @@ export default function VendorPortalPage({
 
   return (
     <>
-      <Header />
+      {/*
+        QF-UI-V2-12: the shared public Header/Footer used to wrap this page, so a
+        vendor creating an account saw homeowner navigation, a
+        "Get Free Team Matches" client-enquiry CTA and a hamburger opening the
+        homeowner menu. Dedicated vendor chrome replaces them here; the shared
+        public components are untouched and still serve every homeowner page.
+      */}
+      <VendorPortalHeader />
       <main className="qf-home-page qf-vendor-public-page">
         <div className="qf-home-app-shell">
           <VendorPortal initialMode={initialMode} />
@@ -87,7 +102,7 @@ export default function VendorPortalPage({
           </section>
         </div>
       </main>
-      <Footer />
+      <VendorPortalFooter />
     </>
   );
 }

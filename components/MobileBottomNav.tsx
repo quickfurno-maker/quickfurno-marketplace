@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { whatsappLink } from "@/lib/config";
@@ -17,17 +18,48 @@ function WhatsAppGlyph() {
 }
 
 export function MobileBottomNav() {
+  /**
+   * QF-UI-V2-14: "Home" was hardcoded active, so it stayed highlighted on
+   * /category/*, /enquiry, /privacy, /terms and /vendors - a false active
+   * state on every page except the homepage. Active state is now derived from
+   * the real pathname, and exposed to assistive tech with aria-current.
+   * Categories is a homepage anchor, but a category listing page IS that
+   * section's destination, so it owns the active state there.
+   *
+   * QF-UI-V2-14R: /enquiry IS the Fill Form destination as a full page, so the
+   * nav must say so - it previously showed no active item there at all. The
+   * trigger stays a <button> and keeps its existing modal behaviour; only the
+   * active class and aria-current are added.
+   * WhatsApp leaves the site, so it is never current; its green is brand
+   * support colour, not active state.
+   */
+  const pathname = usePathname();
+  const isHome = pathname === "/";
+  const isCategory = pathname.startsWith("/category");
+  const isEnquiry = pathname === "/enquiry";
+
   return (
     <nav className="qf-bottom-nav" aria-label="Mobile navigation">
-      <Link href="/" className="qf-bottom-nav-item qf-bottom-nav-item--active">
+      <Link
+        href="/"
+        className={`qf-bottom-nav-item${isHome ? " qf-bottom-nav-item--active" : ""}`}
+        aria-current={isHome ? "page" : undefined}
+      >
         <QFIcon name="home" />
         <span>Home</span>
       </Link>
-      <Link href="/#categories" className="qf-bottom-nav-item">
+      <Link
+        href="/#categories"
+        className={`qf-bottom-nav-item${isCategory ? " qf-bottom-nav-item--active" : ""}`}
+        aria-current={isCategory ? "page" : undefined}
+      >
         <QFIcon name="grid" />
         <span>Categories</span>
       </Link>
-      <EnquiryModalTrigger className="qf-bottom-nav-item">
+      <EnquiryModalTrigger
+        className={`qf-bottom-nav-item${isEnquiry ? " qf-bottom-nav-item--active" : ""}`}
+        aria-current={isEnquiry ? "page" : undefined}
+      >
         <QFIcon name="request" />
         <span>Fill Form</span>
       </EnquiryModalTrigger>

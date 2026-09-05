@@ -23,6 +23,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const current = useMemo(() => getAdminSectionByPath(pathname), [pathname]);
 
   const group = useMemo(
@@ -52,6 +53,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /**
+   * QF-UI-V2-13: dismissing the drawer returned focus to <body>, so keyboard
+   * users landed at the top of the document instead of back on the control they
+   * had just used. Only USER-initiated dismissal restores focus; a route change
+   * closes the drawer too, and there focus belongs to the new page.
+   */
+  const closeMobileNav = useCallback(() => {
+    setMobileOpen(false);
+    // The trigger is aria-hidden/tabIndex=-1 while open, so wait for the
+    // re-render that makes it focusable again.
+    requestAnimationFrame(() => menuButtonRef.current?.focus());
+  }, []);
+
   // Cmd/Ctrl+K opens the navigation palette; Escape closes the mobile drawer.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -60,13 +74,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
         event.preventDefault();
         setPaletteOpen(true);
-      } else if (event.key === "Escape") {
-        setMobileOpen(false);
+      } else if (event.key === "Escape" && mobileOpen) {
+        closeMobileNav();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [mobileOpen, closeMobileNav]);
 
   // Close the drawer on navigation so the overlay can never strand the page.
   useEffect(() => {
@@ -92,6 +106,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         Skip to admin content
       </a>
       <button
+        ref={menuButtonRef}
         type="button"
         onClick={() => setMobileOpen(true)}
         className="qfa-focus fixed left-3 top-3 z-40 inline-flex h-10 w-10 items-center justify-center rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white text-slate-700 shadow-[var(--qfa-shadow-1)] lg:hidden"
@@ -108,7 +123,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         open={mobileOpen}
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
-        onClose={() => setMobileOpen(false)}
+        onClose={closeMobileNav}
         onSignOut={signOut}
         backgroundInert={paletteOpen}
       />
@@ -124,7 +139,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 pl-12 lg:pl-0">
               <nav aria-label="Breadcrumb">
-                <ol className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                {/* list-none/p-0: globals.css loads @tailwind utilities WITHOUT
+                    @tailwind base, so Preflight never resets lists and the UA default
+                    painted a "1." marker and a 40px indent here. Scoped to this list
+                    on purpose - no global ol/ul reset. Vertical margin is left alone
+                    so the topbar height is unchanged. */}
+                <ol className="flex list-none flex-wrap items-center gap-1.5 p-0 text-[11px] font-medium text-slate-500">
                   <li>
                     <Link href="/admin/dashboard" className="qfa-focus rounded transition-colors hover:text-slate-900">
                       Admin

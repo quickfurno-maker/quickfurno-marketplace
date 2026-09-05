@@ -6,6 +6,22 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
 import "./vendor-discovery.css";
 import "./qf-redesign.css";
+// QF-UI-V2-05 — public design system. Loaded LAST so its scoped public rules
+// (.qf-site-header / .qf-home-page / .qf-foot / .qf-bottom-nav / .qf-pub-*)
+// win over the legacy styling for those surfaces without deleting legacy
+// selectors that the not-yet-redesigned pages still rely on.
+import "./qf-public-v2.css";
+// QF-UI-V2-08 — client enquiry / callback / inline-enquiry utilities. Loaded
+// after the public system so its scoped .qf-rf-* / .qf-free-interest-* /
+// .qf-cs-enquiry-* rules win over the legacy cream-copper modal styling without
+// deleting selectors other surfaces still use.
+import "./client-enquiry-v2.css";
+// QF-UI-V2-09 — standalone enquiry route + legal pages. Scoped qf-legal-* /
+// qf-enqpage-* only; no global form-control or element rules.
+import "./public-utility-v2.css";
+// QF-UI-V2-11 — vendor auth + onboarding (/vendor login & signup,
+// /vendor/set-password). Scoped qf-vauth-* / qf-vrf-* / qf-vendor-* only.
+import "./vendor-auth-v2.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

@@ -13,8 +13,6 @@ import {
 } from "react";
 import { submitLead } from "@/app/actions";
 import {
-  BUDGET_MAX_PLACEHOLDER,
-  BUDGET_MIN_PLACEHOLDER,
   DISCARD_CONFIRM_BODY,
   DISCARD_CONFIRM_TITLE,
   formatServiceLabels,
@@ -72,9 +70,38 @@ const RF_TIMELINES: { label: string; icon: IconName }[] = [
   { label: "After Three Months", icon: "search" },
 ];
 
-const PHASES = ["Need", "Details", "Match"] as const;
-const LAST_STEP = 6; // 0..5 questions + 6 = match/summary
-const PHASE_PERCENT = [33, 66, 100];
+/**
+ * QF-MOBILE-FORM — budget bands for the single-form redesign.
+ *
+ * The canonical payload has ALWAYS been the free-text `budget_range` string
+ * produced by budgetSummary() from budgetMin / budgetMax / budgetNotSure. This
+ * dropdown does NOT change that contract: each band simply writes the same
+ * three state fields, so the submitted `budget_range` is byte-identical to what
+ * the old two-number step produced for the same range, and "Not sure yet" keeps
+ * the existing budgetNotSure semantics.
+ */
+const BUDGET_BANDS: { id: string; label: string; min: string; max: string; notSure: boolean }[] = [
+  { id: "unsure", label: "Not sure yet", min: "", max: "", notSure: true },
+  { id: "u50k", label: "Under ₹50,000", min: "10000", max: "50000", notSure: false },
+  { id: "50k-2l", label: "₹50,000 – ₹2 lakh", min: "50000", max: "200000", notSure: false },
+  { id: "2l-5l", label: "₹2 lakh – ₹5 lakh", min: "200000", max: "500000", notSure: false },
+  { id: "5l-10l", label: "₹5 lakh – ₹10 lakh", min: "500000", max: "1000000", notSure: false },
+  { id: "10l+", label: "₹10 lakh+", min: "1000000", max: "5000000", notSure: false },
+];
+
+/**
+ * Property type. `property_type` is an EXISTING lead column that
+ * services/leadService.ts already persists (`property_type: input.property_type
+ * ?? null`) and that /enquiry has always sent; the homepage modal simply never
+ * collected it. These are plain strings stored verbatim, exactly as the funnel
+ * stores its own free-text value, so no storage semantics change.
+ */
+const PROPERTY_TYPES = ["1 BHK", "2 BHK", "3 BHK", "4+ BHK", "Villa", "Office", "Shop / Commercial", "Other"];
+
+// QF-MOBILE-FORM: LAST_STEP is retained only because the modal still tracks a
+// `step` value for the preferred-vendor `minStep` lock; PHASES/PHASE_PERCENT
+// described the removed progress chrome and are gone.
+const LAST_STEP = 6;
 
 type RFState = {
   categoryId: string;
@@ -87,6 +114,7 @@ type RFState = {
   budgetMax: string;
   budgetNotSure: boolean;
   timeline: string;
+  propertyType: string;
   name: string;
   phone: string;
   whatsappSame: boolean;
@@ -120,6 +148,7 @@ const initialState: RFState = {
   budgetMax: "",
   budgetNotSure: false,
   timeline: "",
+  propertyType: "",
   name: "",
   phone: "",
   whatsappSame: true,
@@ -481,18 +510,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     5: ["name", "phone", "whatsapp", "consent"],
   };
 
-  function markStepTouched(target: number) {
-    const fields = STEP_FIELDS[target];
-    if (!fields) return;
-    setTouched((prev) => {
-      const next = { ...prev };
-      fields.forEach((f) => {
-        next[f] = true;
-      });
-      return next;
-    });
-  }
-
   const isInterior = form.categoryId === INTERIOR_ID;
 
   function selectCategory(cat: (typeof mainCategories)[number]) {
@@ -632,38 +649,57 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function goNext() {
-    if (step >= LAST_STEP) return;
-    const err = stepError(step);
-    if (err) {
-      // Input-based steps surface inline per-field tick/cross + messages;
-      // tile/chip steps keep the concise banner.
-      if (STEP_FIELDS[step]) {
-        markStepTouched(step);
-        setError("");
-      } else {
-        setError(err);
-      }
-      return;
-    }
-    setError("");
-    // Interior is the only category with a subcategory step — skip step 1 for
-    // Sofa / Painter / Civil Work.
-    let next = step + 1;
-    if (step === 0 && !isInterior) next = 2;
-    next = Math.min(next, LAST_STEP);
-    trackEvent("requirement_step_completed", { step: next, phase: PHASES[phaseFor(step)] });
-    setStep(next);
+  // ── QF-MOBILE-FORM — single-form helpers ──────────────────────────────────
+  // The wizard's per-step rules are the SAME rules; they are simply evaluated
+  // together now. stepError() stays the single source of truth so the form and
+  // any remaining step affordance can never disagree.
+
+  /** Which budget band the current min/max/notSure state corresponds to. */
+  function currentBudgetBandId(): string {
+    if (form.budgetNotSure) return "unsure";
+    const band = BUDGET_BANDS.find(
+      (b) => !b.notSure && b.min === form.budgetMin && b.max === form.budgetMax,
+    );
+    return band ? band.id : "";
   }
 
-  function goBack() {
+  /** Write a band back into the canonical min/max/notSure fields. */
+  function selectBudgetBand(id: string) {
+    const band = BUDGET_BANDS.find((b) => b.id === id);
     setError("");
-    let prev = step - 1;
-    if (step === 2 && !isInterior) prev = 0;
-    // Never step back past minStep — in the preferred-vendor flow this keeps the
-    // prefilled category/subcategory (and city) steps locked away from the client.
-    setStep(Math.max(prev, minStep, 0));
+    setForm((current) => ({
+      ...current,
+      budgetNotSure: band ? band.notSure : false,
+      budgetMin: band ? band.min : "",
+      budgetMax: band ? band.max : "",
+    }));
   }
+
+  /**
+   * The whole form, in the order the fields are shown. Returns the first
+   * problem, or null when the enquiry may be submitted. Every rule is delegated
+   * to stepError(), so the validation contract is unchanged.
+   */
+  function formError(): string | null {
+    for (const target of [0, 1, 2, 3, 4, 5]) {
+      // Interior is the only category with a subcategory requirement.
+      if (target === 1 && !isInterior) continue;
+      const err = stepError(target);
+      if (err) return err;
+    }
+    return null;
+  }
+
+  /** Mark every field touched so inline messages appear on a failed submit. */
+  function markAllTouched() {
+    const next: Record<string, boolean> = {};
+    for (const fields of Object.values(STEP_FIELDS)) {
+      for (const field of fields ?? []) next[field] = true;
+    }
+    setTouched((current) => ({ ...current, ...next }));
+  }
+
+
 
   function requestClose() {
     if (success || !hasData()) {
@@ -891,6 +927,17 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     if (submitting) return;
     setError("");
 
+    // QF-MOBILE-FORM: the whole form is on screen, so validate the whole form.
+    // formError() delegates to the SAME per-step rules the wizard used, so no
+    // requirement was relaxed by removing the step gates; a failing submit now
+    // reveals every inline message at once instead of one screen at a time.
+    const invalid = formError();
+    if (invalid) {
+      markAllTouched();
+      setError(invalid);
+      return;
+    }
+
     if (!form.name.trim() || !isPhoneValid(form.phone) || !form.city || !form.serviceRequired) {
       setError("Please complete your name, a valid 10-digit mobile number, city and service.");
       return;
@@ -957,6 +1004,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       subcategory: form.subcategory || undefined,
       budget_range: budgetText || undefined,
       timeline: form.timeline || undefined,
+      // EXISTING lead column, already persisted by services/leadService.ts and
+      // already sent by /enquiry. The homepage modal simply never collected it.
+      property_type: form.propertyType || undefined,
       requirement: requirementParts.join(" | ") || undefined,
       source: modalOptions.source ?? "Requirement flow",
       location_consent: form.lat != null && form.lng != null,
@@ -1005,20 +1055,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function phaseFor(target: number) {
-    if (target <= 0) return 0;
-    if (target >= LAST_STEP) return 2;
-    return 1;
-  }
-
-  const phaseIndex = phaseFor(step);
-  const percent = PHASE_PERCENT[phaseIndex];
+  // QF-MOBILE-FORM: the phase/percent/question-counter helpers went with the
+  // wizard. A single form has no steps to count.
   const interiorCategory = mainCategories.find((c) => c.id === INTERIOR_ID);
   const subcategoryOptions = interiorCategory?.subcategories ?? [];
-
-  // "Question X of Y" — Interior has 6 questions, the others 5 (no subcategory).
-  const totalQuestions = isInterior ? 6 : 5;
-  const questionNumber = isInterior ? step + 1 : step === 0 ? 1 : step;
 
   function budgetMinError(): string | null {
     if (form.budgetNotSure) return null;
@@ -1062,413 +1102,332 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     };
   }
 
-  function renderStep() {
-    switch (step) {
-      case 0:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
-            <h3 id="qf-rf-title">What service do you need?</h3>
-            <p className="qf-rf-qhint">Pick the category closest to your project.</p>
-            <div className="qf-rf-tiles">
-              {mainCategories.map((cat) => {
-                const selected = form.categoryId === cat.id;
-                return (
-                  <button
-                    type="button"
-                    key={cat.id}
-                    className={`qf-rf-tile${selected ? " is-selected" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => selectCategory(cat)}
-                  >
-                    <span className="qf-rf-tile-icon">
-                      <QFIcon name={cat.icon} />
-                    </span>
-                    <span className="qf-rf-tile-label">{cat.label}</span>
-                    <small className="qf-rf-tile-micro">{cat.tagline}</small>
-                    {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
-                  </button>
-                );
-              })}
+  /**
+   * QF-MOBILE-FORM — ONE continuous form.
+   *
+   * This replaces the six-question wizard presentation. It is PRESENTATION ONLY:
+   * every value, handler, validation rule and submission path is the one the
+   * wizard already used, so the payload, consent, preferred-vendor routing,
+   * location metadata and tracking are unchanged.
+   *
+   * Field order is fixed and mobile-first:
+   *   service -> city -> area -> name -> phone -> whatsapp -> budget ->
+   *   property type -> timeline -> message -> consent -> submit.
+   * Desktop pairs related fields into two columns purely with CSS, so the wide
+   * layout never dictates the mobile structure.
+   */
+  function renderSingleForm() {
+    const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
+    const hasCoordinates =
+      form.lat != null && form.lng != null && Number.isFinite(form.lat) && Number.isFinite(form.lng);
+    const areaUi = fieldUi("area", {
+      valid: form.area.trim().length > 0 || hasCoordinates,
+      value: form.area,
+      error: "Enter your area/locality or use your current location.",
+    });
+    const nameUi = fieldUi("name", {
+      valid: form.name.trim().length >= 2,
+      value: form.name,
+      error: "Please enter your name.",
+    });
+    const phoneUi = fieldUi("phone", {
+      valid: isPhoneValid(form.phone),
+      value: form.phone,
+      error: "Enter a valid 10-digit mobile number.",
+    });
+    const whatsappUi = fieldUi("whatsapp", {
+      valid: isPhoneValid(form.whatsapp),
+      value: form.whatsapp,
+      error: "Enter a valid 10-digit WhatsApp number.",
+    });
+    const consentError = Boolean(touched.consent) && !form.shareConsent;
+    const serviceError = Boolean(touched.service) && !form.categoryId;
+    const subError = Boolean(touched.service) && isInterior && !form.subcategory;
+    const budgetError = Boolean(touched.budgetMin) && currentBudgetBandId() === "";
+    const timelineError = Boolean(touched.timeline) && !form.timeline;
+
+    return (
+      <div className="qf-sf">
+        {/* Service. The category source of truth is unchanged — these are the
+            same mainCategories the tile grid used, rendered as a select. In the
+            preferred-vendor flow the category is fixed by the vendor, so the
+            picker is hidden exactly as the wizard hid those steps. */}
+        {minStep === 0 ? (
+          <label className={`qf-sf-field${serviceError ? " has-error" : ""}`} htmlFor="qf-sf-service">
+            <span className="qf-sf-label">Service needed</span>
+            <select
+              id="qf-sf-service"
+              value={form.categoryId}
+              onChange={(e) => {
+                const cat = mainCategories.find((c) => c.id === e.target.value);
+                if (cat) selectCategory(cat);
+                markTouched("service");
+              }}
+              onBlur={() => markTouched("service")}
+            >
+              <option value="">Select a service</option>
+              {mainCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+            {serviceError ? <span className="qf-rf-field-err">Select a service.</span> : null}
+          </label>
+        ) : null}
+
+        {/* Interior is the only category with a subcategory; this second select
+            appears only once Interior is chosen. */}
+        {minStep === 0 && isInterior ? (
+          <label className={`qf-sf-field${subError ? " has-error" : ""}`} htmlFor="qf-sf-sub">
+            <span className="qf-sf-label">Interior service</span>
+            <select
+              id="qf-sf-sub"
+              value={form.subcategory}
+              onChange={(e) => {
+                const sub = subcategoryOptions.find((o) => o.label === e.target.value);
+                if (sub) selectSubcategory(sub);
+                markTouched("service");
+              }}
+              onBlur={() => markTouched("service")}
+            >
+              <option value="">Select an interior service</option>
+              {subcategoryOptions.map((sub) => (
+                <option key={sub.label} value={sub.label}>
+                  {sub.label}
+                </option>
+              ))}
+            </select>
+            {subError ? <span className="qf-rf-field-err">Select an interior service.</span> : null}
+          </label>
+        ) : null}
+
+        <label className={`qf-sf-field${cityUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-city">
+          <span className="qf-sf-label">City</span>
+          <select
+            id="qf-sf-city"
+            value={form.city}
+            onChange={(e) => {
+              set("city", e.target.value);
+              markTouched("city");
+            }}
+            onBlur={() => markTouched("city")}
+            disabled={citiesLoading && activeCities.length === 0}
+          >
+            <option value="">{citiesLoading && !citiesLoaded ? "Loading cities…" : "Select your city"}</option>
+            {form.city && !activeCities.includes(form.city) ? (
+              <option value={form.city}>{form.city}</option>
+            ) : null}
+            {activeCities.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+          {citiesLoaded && activeCities.length === 0 ? (
+            <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
+          ) : cityUi.showError ? (
+            <span className="qf-rf-field-err">{cityUi.error}</span>
+          ) : null}
+        </label>
+
+        {/* Area keeps the Google enhancement AND the manual fallback verbatim. */}
+        <label className={`qf-sf-field qf-sf-area${areaUi.showError ? " has-error" : ""}`}>
+          <span className="qf-sf-label">Area / locality</span>
+          <div className="qf-rf-input-wrapper">
+            <GooglePlaceAutocomplete
+              value={form.area}
+              city={form.city}
+              mode="locality"
+              onManualChange={onAreaManualChange}
+              onPlaceSelected={onAreaPlaceSelected}
+              onBlur={() => markTouched("area")}
+              placeholder="e.g. Kharadi, Baner, Andheri"
+              autoComplete="off"
+            />
+            <ValidationIcon state={areaUi.iconState} />
+          </div>
+          {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
+        </label>
+
+        <div className="qf-sf-locrow">
+          <button type="button" className="qf-sf-loc" onClick={useMyLocation}>
+            <QFIcon name="pin" />
+            {locStatus === "locating" ? "Getting location…" : "Use my current location"}
+          </button>
+          {locStatus === "captured" ? (
+            <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this to match relevant verified vendors.</p>
+          ) : null}
+          {locStatus === "denied" ? (
+            <p className="qf-sf-note">No problem — your city and area above are enough.</p>
+          ) : null}
+          {locStatus === "unsupported" ? (
+            <p className="qf-sf-note">Your browser does not support location — your city and area are enough.</p>
+          ) : null}
+        </div>
+
+        <label className={`qf-sf-field${nameUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-name">
+          <span className="qf-sf-label">Your name</span>
+          <div className="qf-rf-input-wrapper">
+            <input
+              id="qf-sf-name"
+              ref={nameInputRef}
+              value={form.name}
+              onChange={(e) => {
+                set("name", e.target.value);
+                markTouched("name");
+              }}
+              onBlur={() => markTouched("name")}
+              placeholder="e.g. Rahul Sharma"
+              autoComplete="name"
+            />
+            <ValidationIcon state={nameUi.iconState} />
+          </div>
+          {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
+        </label>
+
+        <label className={`qf-sf-field${phoneUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-phone">
+          <span className="qf-sf-label">Phone number</span>
+          <div className="qf-rf-input-wrapper">
+            <input
+              id="qf-sf-phone"
+              value={form.phone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              onBlur={() => markTouched("phone")}
+              placeholder="10-digit mobile number"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={10}
+            />
+            <ValidationIcon state={phoneUi.iconState} />
+          </div>
+          {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
+        </label>
+
+        <label className="qf-sf-check qf-sf-field--full">
+          <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
+          <span>WhatsApp number same as phone</span>
+        </label>
+
+        {!form.whatsappSame ? (
+          <label className={`qf-sf-field${whatsappUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-wa">
+            <span className="qf-sf-label">WhatsApp number</span>
+            <div className="qf-rf-input-wrapper">
+              <input
+                id="qf-sf-wa"
+                value={form.whatsapp}
+                onChange={(e) => onWhatsappChange(e.target.value)}
+                onBlur={() => markTouched("whatsapp")}
+                placeholder="10-digit WhatsApp number"
+                inputMode="numeric"
+                maxLength={10}
+              />
+              <ValidationIcon state={whatsappUi.iconState} />
             </div>
-          </div>
-        );
-      case 1:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
-            <h3 id="qf-rf-title">Which interior service?</h3>
-            <p className="qf-rf-qhint">Choose the option closest to your project.</p>
-            <div className="qf-rf-tiles">
-              {subcategoryOptions.map((sub) => {
-                const selected = form.subcategory === sub.label;
-                return (
-                  <button
-                    type="button"
-                    key={sub.label}
-                    className={`qf-rf-tile${selected ? " is-selected" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => selectSubcategory(sub)}
-                  >
-                    <span className="qf-rf-tile-icon">
-                      <QFIcon name={SUBCATEGORY_ICONS[sub.label] ?? "home"} />
-                    </span>
-                    <span className="qf-rf-tile-label">{sub.label}</span>
-                    {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      case 2:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
-            <h3 id="qf-rf-title">Where do you need the service?</h3>
-            {(() => {
-              const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
-              // Area is required UNLESS browser-GPS coordinates satisfy the
-              // location requirement. Google selection is never required; manual
-              // typing stays first-class.
-              const hasCoordinates =
-                form.lat != null && form.lng != null && Number.isFinite(form.lat) && Number.isFinite(form.lng);
-              const areaUi = fieldUi("area", {
-                valid: form.area.trim().length > 0 || hasCoordinates,
-                value: form.area,
-                error: "Enter your area/locality or use your current location.",
-              });
-              return (
-                <div className="qf-rf-fields">
-                  <label className={cityUi.className}>
-                    <span>City</span>
-                    <select
-                      value={form.city}
-                      onChange={(e) => {
-                        set("city", e.target.value);
-                        markTouched("city");
-                      }}
-                      onBlur={() => markTouched("city")}
-                      disabled={citiesLoading && activeCities.length === 0}
-                    >
-                      <option value="">
-                        {citiesLoading && !citiesLoaded ? "Loading cities…" : "Select city"}
-                      </option>
-                      {/* Preserve a pre-filled city (e.g. preferred-vendor flow) even
-                          if it isn't in the active list, so the value still shows. */}
-                      {form.city && !activeCities.includes(form.city) ? (
-                        <option value={form.city}>{form.city}</option>
-                      ) : null}
-                      {activeCities.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
-                    {citiesLoaded && activeCities.length === 0 ? (
-                      <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
-                    ) : cityUi.showError ? (
-                      <span className="qf-rf-field-err">{cityUi.error}</span>
-                    ) : null}
-                  </label>
-                  <label className={areaUi.className}>
-                    <span>Area / Locality</span>
-                    <div className="qf-rf-input-wrapper">
-                      {/* Google area enhancement; manual fallback preserved.
-                          Same label, wrapper, validation icon and placeholder —
-                          only the input gains optional Google Places suggestions. */}
-                      <GooglePlaceAutocomplete
-                        value={form.area}
-                        city={form.city}
-                        mode="locality"
-                        onManualChange={onAreaManualChange}
-                        onPlaceSelected={onAreaPlaceSelected}
-                        onBlur={() => markTouched("area")}
-                        placeholder="e.g. Kharadi, Baner"
-                        // Pincode is not a QuickFurno location input: disable the
-                        // browser's address/postal autofill so it can never inject a
-                        // PIN suggestion into the Area / Locality field.
-                        autoComplete="off"
-                      />
-                      <ValidationIcon state={areaUi.iconState} />
-                    </div>
-                    {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
-                  </label>
-              <button type="button" className="qf-rf-loc-btn" onClick={useMyLocation}>
-                <QFIcon name="pin" />
-                {locStatus === "locating" ? "Getting location…" : "Use my current location"}
-              </button>
-              {locStatus === "captured" ? (
-                <p className="qf-rf-loc-note qf-rf-loc-note--ok">Location captured — we&apos;ll use this to match relevant verified vendors.</p>
-              ) : null}
-              {locStatus === "denied" ? (
-                <p className="qf-rf-loc-note">No problem — your city and area above are enough.</p>
-              ) : null}
-              {locStatus === "unsupported" ? (
-                <p className="qf-rf-loc-note">Location isn&apos;t available on this device — please enter city and area.</p>
-              ) : null}
-                </div>
-              );
-            })()}
-          </div>
-        );
-      case 3:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
-            <h3 id="qf-rf-title">What is your approximate budget?</h3>
-            <p className="qf-rf-qhint">Enter your expected budget range. This helps us match you with the right team.</p>
-            {(() => {
-              const minUi = fieldUi("budgetMin", {
-                valid: budgetMinError() === null,
-                value: form.budgetNotSure ? "x" : form.budgetMin,
-                error: budgetMinError(),
-              });
-              const maxUi = fieldUi("budgetMax", {
-                valid: budgetMaxError() === null,
-                value: form.budgetNotSure ? "x" : form.budgetMax,
-                error: budgetMaxError(),
-              });
-              // No tick/cross while "Not sure yet" is selected.
-              const minIcon = form.budgetNotSure ? "none" : minUi.iconState;
-              const maxIcon = form.budgetNotSure ? "none" : maxUi.iconState;
-              return (
-                <div className="qf-rf-fields">
-                  <div className="qf-rf-budget-row">
-                    <label className={form.budgetNotSure ? "qf-rf-field" : minUi.className}>
-                      <span>Minimum budget</span>
-                      <div className="qf-rf-money">
-                        <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
-                        <input
-                          value={form.budgetMin}
-                          onChange={(e) => setBudgetValue("budgetMin", e.target.value)}
-                          onBlur={() => markTouched("budgetMin")}
-                          placeholder={BUDGET_MIN_PLACEHOLDER}
-                          inputMode="numeric"
-                          disabled={form.budgetNotSure}
-                          aria-label="Minimum budget in rupees"
-                        />
-                        <ValidationIcon state={minIcon} />
-                      </div>
-                      {!form.budgetNotSure && minUi.showError ? (
-                        <span className="qf-rf-field-err">{minUi.error}</span>
-                      ) : null}
-                    </label>
-                    <label className={form.budgetNotSure ? "qf-rf-field" : maxUi.className}>
-                      <span>Up to</span>
-                      <div className="qf-rf-money">
-                        <span className="qf-rf-money-prefix" aria-hidden="true">₹</span>
-                        <input
-                          value={form.budgetMax}
-                          onChange={(e) => setBudgetValue("budgetMax", e.target.value)}
-                          onBlur={() => markTouched("budgetMax")}
-                          placeholder={BUDGET_MAX_PLACEHOLDER}
-                          inputMode="numeric"
-                          disabled={form.budgetNotSure}
-                          aria-label="Maximum budget in rupees"
-                        />
-                        <ValidationIcon state={maxIcon} />
-                      </div>
-                      {!form.budgetNotSure && maxUi.showError ? (
-                        <span className="qf-rf-field-err">{maxUi.error}</span>
-                      ) : null}
-                    </label>
-                  </div>
-                  <div className="qf-rf-chips">
-                    <button
-                      type="button"
-                      className={`qf-rf-chip${form.budgetNotSure ? " is-selected" : ""}`}
-                      aria-pressed={form.budgetNotSure}
-                      onClick={toggleNotSure}
-                    >
-                      Not sure yet
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        );
-      case 4:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
-            <h3 id="qf-rf-title">When do you want to start?</h3>
-            <p className="qf-rf-qhint">Choose the timeline closest to your plan.</p>
-            <div className="qf-rf-tiles qf-rf-tiles--wide">
-              {RF_TIMELINES.map((tile) => {
-                const selected = form.timeline === tile.label;
-                return (
-                  <button
-                    type="button"
-                    key={tile.label}
-                    className={`qf-rf-tile${selected ? " is-selected" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => set("timeline", tile.label)}
-                  >
-                    <span className="qf-rf-tile-icon">
-                      <QFIcon name={tile.icon} />
-                    </span>
-                    <span className="qf-rf-tile-label">{tile.label}</span>
-                    {selected ? <span className="qf-rf-tile-check" aria-hidden="true">✓</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      case 5:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">{`Question ${questionNumber} of ${totalQuestions}`}</span>
-            <h3 id="qf-rf-title">Where should teams contact you?</h3>
-            {(() => {
-              const nameUi = fieldUi("name", {
-                valid: form.name.trim().length >= 2,
-                value: form.name,
-                error: "Please enter your name.",
-              });
-              const phoneUi = fieldUi("phone", {
-                valid: isPhoneValid(form.phone),
-                value: form.phone,
-                error: "Enter a valid 10-digit mobile number.",
-              });
-              const whatsappUi = fieldUi("whatsapp", {
-                valid: isPhoneValid(form.whatsapp),
-                value: form.whatsapp,
-                error: "Enter a valid 10-digit WhatsApp number.",
-              });
-              const consentError = Boolean(touched.consent) && !form.shareConsent;
-              return (
-                <div className="qf-rf-fields">
-                  <label className={nameUi.className}>
-                    <span>Name</span>
-                    <div className="qf-rf-input-wrapper">
-                      <input
-                        ref={nameInputRef}
-                        value={form.name}
-                        onChange={(e) => {
-                          set("name", e.target.value);
-                          markTouched("name");
-                        }}
-                        onBlur={() => markTouched("name")}
-                        placeholder="Your full name"
-                        autoComplete="name"
-                      />
-                      <ValidationIcon state={nameUi.iconState} />
-                    </div>
-                    {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
-                  </label>
-                  <label className={phoneUi.className}>
-                    <span>Phone number</span>
-                    <div className="qf-rf-input-wrapper">
-                      <input
-                        value={form.phone}
-                        onChange={(e) => onPhoneChange(e.target.value)}
-                        onBlur={() => markTouched("phone")}
-                        placeholder="10-digit mobile number"
-                        inputMode="numeric"
-                        autoComplete="tel"
-                        maxLength={10}
-                      />
-                      <ValidationIcon state={phoneUi.iconState} />
-                    </div>
-                    {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
-                  </label>
-                  <label className="qf-rf-check">
-                    <input
-                      type="checkbox"
-                      checked={form.whatsappSame}
-                      onChange={(e) => onWhatsappSameChange(e.target.checked)}
-                    />
-                    <span>WhatsApp number same as phone</span>
-                  </label>
-                  {!form.whatsappSame ? (
-                    <label className={whatsappUi.className}>
-                      <span>WhatsApp number</span>
-                      <div className="qf-rf-input-wrapper">
-                        <input
-                          value={form.whatsapp}
-                          onChange={(e) => onWhatsappChange(e.target.value)}
-                          onBlur={() => markTouched("whatsapp")}
-                          placeholder="10-digit WhatsApp number"
-                          inputMode="numeric"
-                          maxLength={10}
-                        />
-                        <ValidationIcon state={whatsappUi.iconState} />
-                      </div>
-                      {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
-                    </label>
-                  ) : null}
-                  <label className="qf-rf-field">
-                    <span>Message / details (optional)</span>
-                    <textarea
-                      value={form.message}
-                      onChange={(e) => set("message", e.target.value)}
-                      placeholder="Anything else the teams should know?"
-                      rows={3}
-                    />
-                  </label>
-                  <label className={`qf-rf-check qf-rf-consent${consentError ? " has-error" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={form.shareConsent}
-                      onChange={(e) => {
-                        set("shareConsent", e.target.checked);
-                        markTouched("consent");
-                      }}
-                    />
-                    <span>
-                      I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request. See our{" "}
-                      <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
-                      and{" "}
-                      <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.
-                    </span>
-                  </label>
-                  {consentError ? (
-                    <span className="qf-rf-field-err qf-rf-field-err--block">
-                      Please accept sharing your details with up to 3 verified vendors to continue.
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })()}
-          </div>
-        );
-      default:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Review &amp; confirm</span>
-            <h3 id="qf-rf-title">Get matched with Verified Teams</h3>
-            <p className="qf-rf-qhint">We&apos;ll connect you with relevant verified vendors.</p>
-            <dl className="qf-rf-summary">
-              <div>
-                <dt>Service</dt>
-                <dd>{form.categoryLabel || "—"}</dd>
-              </div>
-              {form.subcategory ? (
-                <div>
-                  <dt>Interior service</dt>
-                  <dd>{form.subcategory}</dd>
-                </div>
-              ) : null}
-              <div>
-                <dt>Area</dt>
-                <dd>{[form.area, form.city].filter(Boolean).join(", ") || form.city || "—"}</dd>
-              </div>
-              <div>
-                <dt>Budget</dt>
-                <dd>{budgetSummary() || "—"}</dd>
-              </div>
-              <div>
-                <dt>Timeline</dt>
-                <dd>{form.timeline || "—"}</dd>
-              </div>
-            </dl>
-          </div>
-        );
-    }
+            {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
+          </label>
+        ) : null}
+
+        {/* Budget — ONE band select that writes the canonical
+            budgetMin / budgetMax / budgetNotSure fields, so budgetSummary() and
+            the submitted `budget_range` string are unchanged. */}
+        <label className={`qf-sf-field${budgetError ? " has-error" : ""}`} htmlFor="qf-sf-budget">
+          <span className="qf-sf-label">Budget</span>
+          <select
+            id="qf-sf-budget"
+            value={currentBudgetBandId()}
+            onChange={(e) => {
+              selectBudgetBand(e.target.value);
+              markTouched("budgetMin");
+            }}
+            onBlur={() => markTouched("budgetMin")}
+          >
+            <option value="">Select a budget range</option>
+            {BUDGET_BANDS.map((band) => (
+              <option key={band.id} value={band.id}>
+                {band.label}
+              </option>
+            ))}
+          </select>
+          {budgetError ? <span className="qf-rf-field-err">Select a budget range.</span> : null}
+        </label>
+
+        <label className="qf-sf-field" htmlFor="qf-sf-property">
+          <span className="qf-sf-label">Property type</span>
+          <select
+            id="qf-sf-property"
+            value={form.propertyType}
+            onChange={(e) => set("propertyType", e.target.value)}
+          >
+            <option value="">Select property type</option>
+            {PROPERTY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Timeline remains a submitted payload field; it is a select now. */}
+        <label className={`qf-sf-field${timelineError ? " has-error" : ""}`} htmlFor="qf-sf-timeline">
+          <span className="qf-sf-label">When do you want to start?</span>
+          <select
+            id="qf-sf-timeline"
+            value={form.timeline}
+            onChange={(e) => {
+              set("timeline", e.target.value);
+              markTouched("timeline");
+            }}
+            onBlur={() => markTouched("timeline")}
+          >
+            <option value="">Select a timeline</option>
+            {RF_TIMELINES.map((tile) => (
+              <option key={tile.label} value={tile.label}>
+                {tile.label}
+              </option>
+            ))}
+          </select>
+          {timelineError ? <span className="qf-rf-field-err">Select your project timeline.</span> : null}
+        </label>
+
+        <label className="qf-sf-field qf-sf-field--full" htmlFor="qf-sf-message">
+          <span className="qf-sf-label">Message / details (optional)</span>
+          <textarea
+            id="qf-sf-message"
+            value={form.message}
+            onChange={(e) => set("message", e.target.value)}
+            placeholder="Anything else the teams should know?"
+            rows={3}
+          />
+        </label>
+
+        {/* Consent — the SAME legal text and the same share_consent semantics,
+            in a compact row instead of a large card. Never pre-checked. */}
+        <label className={`qf-sf-consent${consentError ? " has-error" : ""}`}>
+          <input
+            type="checkbox"
+            checked={form.shareConsent}
+            onChange={(e) => {
+              set("shareConsent", e.target.checked);
+              markTouched("consent");
+            }}
+          />
+          <span>
+            I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request.{" "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            {" · "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+          </span>
+        </label>
+        {consentError ? (
+          <span className="qf-rf-field-err qf-rf-field-err--block">
+            Please accept sharing your details with up to 3 verified vendors to continue.
+          </span>
+        ) : null}
+      </div>
+    );
   }
+
 
   return (
     <EnquiryModalContext.Provider value={contextValue}>
@@ -1498,32 +1457,18 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 </button>
               </div>
 
+              {/* QF-MOBILE-FORM: the wizard phase strip and progress bar are
+                  gone. One continuous form needs no step indicator, and on a
+                  390px screen that chrome was pushing the first field below the
+                  fold. A short title + one line of context replaces them. */}
               {!success ? (
-                <>
-                  <div className="qf-rf-steps" aria-hidden="true">
-                    {PHASES.map((label, i) => (
-                      <div
-                        key={label}
-                        className={`qf-rf-phase${phaseIndex === i ? " is-active" : ""}${
-                          phaseIndex > i ? " is-done" : ""
-                        }`}
-                      >
-                        <span className="qf-rf-phase-dot">{phaseIndex > i ? "✓" : i + 1}</span>
-                        <span className="qf-rf-phase-label">{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div
-                    className="qf-rf-progress"
-                    role="progressbar"
-                    aria-valuenow={percent}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Form progress"
-                  >
-                    <span className="qf-rf-progress-fill" style={{ width: `${percent}%` }} />
-                  </div>
-                </>
+                <div className="qf-sf-intro">
+                  <h3 id="qf-rf-title">Tell us about your project</h3>
+                  <p>
+                    Share your requirement once. QuickFurno will match you with up to 3 relevant
+                    verified vendors.
+                  </p>
+                </div>
               ) : null}
             </header>
 
@@ -1579,9 +1524,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                       ) : null}
                     </div>
                   ) : null}
-                  <div className="qf-rf-step" key={step}>
-                    {renderStep()}
-                  </div>
+                  {renderSingleForm()}
                 </>
               )}
             </div>
@@ -1593,28 +1536,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 </button>
               </footer>
             ) : (
-              <footer className="qf-rf-footer">
-                {step > minStep ? (
-                  <button type="button" className="qf-rf-btn qf-rf-btn--ghost" onClick={goBack}>
-                    Back
-                  </button>
-                ) : (
-                  <span className="qf-rf-footer-spacer" />
-                )}
-                {step < LAST_STEP ? (
-                  <button type="button" className="qf-rf-btn qf-rf-btn--primary" onClick={goNext}>
-                    Next
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="qf-rf-btn qf-rf-btn--primary"
-                    disabled={submitting}
-                    onClick={handleSubmit}
-                  >
-                    {submitting ? "Submitting…" : "Get Matched With Teams"}
-                  </button>
-                )}
+              <footer className="qf-rf-footer qf-sf-footer">
+                <button
+                  type="button"
+                  className="qf-rf-btn qf-rf-btn--primary qf-sf-cta"
+                  disabled={submitting}
+                  onClick={handleSubmit}
+                >
+                  {submitting ? "Submitting…" : "Get Free Team Matches"}
+                </button>
+                <p className="qf-sf-trust">Free for homeowners · Up to 3 verified vendors · Your details stay private</p>
               </footer>
             )}
 

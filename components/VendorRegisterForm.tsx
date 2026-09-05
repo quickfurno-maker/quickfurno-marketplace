@@ -92,6 +92,14 @@ type WizardState = {
   coversFullCity: boolean;
 };
 
+// QF-MVP-80.16C. The same Indian-mobile contract the server now enforces in
+// services/vendorService.ts and that the notification lane's destination
+// adapter expects. Ten digits was never the rule: a number starting 0-5 is
+// not a mobile and can never receive the WhatsApp lead alert the vendor is
+// charged for. The server stays authoritative; this only stops the mistake
+// being made at all.
+const VENDOR_MOBILE_RE = /^[6-9]\d{9}$/;
+
 const initialState: WizardState = {
   businessName: "",
   ownerName: "",
@@ -167,7 +175,7 @@ export function VendorRegisterForm() {
       case "ownerName":
         return valOf("ownerName").trim().length >= 2;
       case "phone":
-        return /^\d{10}$/.test(valOf("phone"));
+        return VENDOR_MOBILE_RE.test(valOf("phone"));
       case "email":
         return isEmail(valOf("email"));
       case "password":
@@ -394,7 +402,8 @@ export function VendorRegisterForm() {
       case 0:
         if (f.businessName.trim().length < 2) e.push({ key: "businessName", message: "Business name must be at least 2 characters." });
         if (f.ownerName.trim().length < 2) e.push({ key: "ownerName", message: "Owner name must be at least 2 characters." });
-        if (f.phone.replace(/\D/g, "").length !== 10) e.push({ key: "phone", message: "Enter a valid 10-digit WhatsApp number." });
+        if (!VENDOR_MOBILE_RE.test(f.phone.replace(/\D/g, ""))) e.push({ key: "phone", message: "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9." });
+        if (!f.whatsappSame && !VENDOR_MOBILE_RE.test(f.whatsapp.replace(/\D/g, ""))) e.push({ key: "whatsapp", message: "Enter a valid 10-digit WhatsApp number starting with 6, 7, 8 or 9." });
         if (!isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email." });
         if (f.password.length < 6) e.push({ key: "password", message: "Password must be at least 6 characters." });
         if (f.confirmPassword !== f.password) e.push({ key: "confirmPassword", message: "Passwords do not match." });
@@ -577,8 +586,8 @@ export function VendorRegisterForm() {
     const isAllValid =
       businessNameStr.length >= 2 &&
       ownerNameStr.length >= 2 &&
-      phoneDigits.length === 10 &&
-      whatsappDigits.length === 10 &&
+      VENDOR_MOBILE_RE.test(phoneDigits) &&
+      VENDOR_MOBILE_RE.test(whatsappDigits) &&
       isEmail(emailStr) &&
       f.password.length >= 6 &&
       f.confirmPassword === f.password &&

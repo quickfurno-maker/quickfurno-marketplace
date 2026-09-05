@@ -68,6 +68,9 @@ const SERVICE_SRC = readCode("services/communicationRecipientResolver.ts");
 const LIB_SRC = readCode("lib/communication/recipientResolver.ts");
 const PHONE_SRC = readCode("lib/communication/phone.ts");
 const VENDOR_SERVICE_SRC = readCode("services/vendorService.ts");
+// QF-MVP-80.16C moved the registration number rule into a pure module so the
+// server authority, the live form and this lane cannot drift apart.
+const VENDOR_CONTACT_SRC = readCode("lib/vendors/vendorContactContract.ts");
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -216,10 +219,23 @@ check("14 [static] a malformed preferred WhatsApp number still fails closed", ()
   assert(phoneUses === 1, `expected exactly one phone fallback, found ${phoneUses}`);
 });
 
-check("15 [static] vendor registration storage is NOT changed by this phase", () => {
+check("15 [static] vendor registration STORAGE is NOT changed by this phase", () => {
   assert(/replace\(\/\\D\/g, ""\)/.test(VENDOR_SERVICE_SRC), "vendor registration stopped cleaning to digits");
-  assert(/cleanedPhone\.length !== 10/.test(VENDOR_SERVICE_SRC), "the 10-digit registration rule changed");
-  assert(!/\+91/.test(VENDOR_SERVICE_SRC), "registration started writing a country code — that is a separate phase");
+  // The rule this originally pinned as `cleanedPhone.length !== 10` was TIGHTENED
+  // by QF-MVP-80.16C to the exact Indian mobile contract, and moved into a pure
+  // module so the server, the live form and this lane cannot drift apart. What
+  // 80.16B actually needs to stay true is the STORED SHAPE: still exactly ten
+  // bare digits, never an international prefix. `^[6-9]\d{9}$` implies ten
+  // digits, so this is strictly STRONGER than the check it replaces — widening
+  // registration back to "any ten digits", or forward to E.164, still fails here.
+  assert(/isValidIndianMobile\(cleanedPhone\)/.test(VENDOR_SERVICE_SRC),
+    "registration no longer validates the phone through the shared contract");
+  assert(/isValidIndianMobile\(cleanedWhatsapp\)/.test(VENDOR_SERVICE_SRC),
+    "registration no longer validates a supplied WhatsApp number");
+  assert(/INDIAN_MOBILE_RE = \/\^\[6-9\]\\d\{9\}\$\//.test(VENDOR_CONTACT_SRC),
+    "the stored-shape contract is no longer exactly ten digits starting 6-9");
+  assert(!/\+91/.test(VENDOR_SERVICE_SRC) && !/\+91/.test(VENDOR_CONTACT_SRC),
+    "registration started writing a country code — that is a separate phase");
 });
 
 check("16 [static] the adapter matches only the exact stored shape", () => {

@@ -7,6 +7,9 @@ import { appError, AppError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { loadMarketplaceRuntimeSettings } from "../lib/lead-assignment/runtimeSettings";
 import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadContactAccess";
+// QF-MVP-80.16C — the Indian mobile contract, stated once in a pure module so
+// the server authority, the live form and the notification lane cannot drift.
+import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
 import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
@@ -34,7 +37,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       input.office_state
     );
 
-    if (!businessNameClean || !ownerNameClean || cleanedPhone.length !== 10 || !cityClean) {
+    if (!businessNameClean || !ownerNameClean || !isValidIndianMobile(cleanedPhone) || !cityClean) {
       return {
         ok: false,
         code: "VALIDATION",
@@ -48,7 +51,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       // Pincode is no longer required/validated (Phase 1). Location is captured
       // via the Google business base area/locality instead.
       if (
-        cleanedWhatsapp.length !== 10 ||
+        !isValidIndianMobile(cleanedWhatsapp) ||
         !emailClean ||
         !isEmailValid ||
         !input.office_address_line1?.trim() ||

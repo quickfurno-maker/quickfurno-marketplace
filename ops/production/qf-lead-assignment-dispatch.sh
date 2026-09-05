@@ -124,12 +124,15 @@ echo "$http_body" | jq -e 'type == "object"' >/dev/null 2>&1 \
 
 contract_ok="$(
   echo "$http_body" | jq -r '
-    if (. | keys | sort) == ["dispatched","ok","refused","selected","selectionBlocked"]
+    if (. | keys | sort) == ["dispatched","ok","refusalReasons","refused","selected","selectionBlocked"]
        and (.ok | type) == "boolean"
        and (.selected | type) == "number"
        and (.dispatched | type) == "number"
        and (.refused | type) == "number"
        and (.selectionBlocked | type) == "boolean"
+       and (.refusalReasons | type) == "object"
+       and ([.refusalReasons[] | type] | all(. == "number"))
+       and ([.refusalReasons | keys[] | test("^[A-Z_]+$")] | all)
     then "yes" else "no" end' 2>/dev/null || echo "no"
 )"
 [ "$contract_ok" = "yes" ] || fail "contract_violation" "unexpected response shape duration_ms=$duration_ms" 7
@@ -140,7 +143,19 @@ dispatched="$(echo "$http_body"| jq -r '.dispatched')"
 refused="$(echo "$http_body"   | jq -r '.refused')"
 blocked="$(echo "$http_body"   | jq -r '.selectionBlocked')"
 
+# QF-MVP-80.16A — sanitized refusal categories, rendered as `reason_KEY=N` pairs.
+# The response contract above already proved every key matches ^[A-Z_]+$ and
+# every value is a number, so nothing free-form can reach the system log. An
+# all-clear run produces an empty string and the log line is unchanged.
+reasons="$(
+  echo "$http_body" | jq -r '
+    (.refusalReasons // {}) | to_entries
+    | map(if (.key | test("^[A-Z_]+$")) then "reason_" + .key + "=" + (.value | tostring) else empty end)
+    | join(" ")' 2>/dev/null || echo ""
+)"
+[ -z "$reasons" ] || reasons=" $reasons"
+
 [ "$ok" = "true" ] || fail "route_not_ok" "duration_ms=$duration_ms" 8
 
-log "result=success started_at=$started_at status=200 selected=$selected dispatched=$dispatched refused=$refused selectionBlocked=$blocked duration_ms=$duration_ms"
+log "result=success started_at=$started_at status=200 selected=$selected dispatched=$dispatched refused=$refused selectionBlocked=$blocked duration_ms=$duration_ms${reasons}"
 exit 0

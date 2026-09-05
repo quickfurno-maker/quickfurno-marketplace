@@ -130,7 +130,11 @@ const RULES = {
   "W15 a malformed or non-JSON response is refused": () =>
     /malformed_json/.test(WRAPPER_CODE) && /jq -e 'type == "object"'/.test(WRAPPER_CODE),
   "W16 a response outside the exact sanitized contract is refused": () => {
-    const keys = /\["dispatched","ok","refused","selected","selectionBlocked"\]/.test(WRAPPER_CODE);
+    // QF-MVP-80.16A added `refusalReasons`, so the pinned contract grew by one
+    // key. It stays an EXACT match — the point of this rule is that any OTHER
+    // field appearing in the response is refused, not that the shape is frozen
+    // forever. jq sorts "refusalReasons" before "refused".
+    const keys = /\["dispatched","ok","refusalReasons","refused","selected","selectionBlocked"\]/.test(WRAPPER_CODE);
     return keys && /contract_violation/.test(WRAPPER_CODE) &&
       /\[ "\$contract_ok" = "yes" \] \|\| fail/.test(WRAPPER_CODE);
   },

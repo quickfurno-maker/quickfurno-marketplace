@@ -10,8 +10,7 @@ import {
   readLeadFeedback,
   type VendorLeadRawRow,
 } from "@/components/vendor-dashboard-v2/leads/leadsModel";
-import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
-import { evaluateVendorContactAccessEligibility } from "@/lib/vendors/vendorEligibility";
+import { isVendorAccountContactEligible } from "@/lib/vendors/assignedLeadContactAccess";
 import "./vendor-leads-v2.css";
 
 export const metadata = { title: "Vendor leads - QuickFurno" };
@@ -32,18 +31,18 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
     return <VendorNoProfileFallback />;
   }
 
-  // Contact-access authority — UNCHANGED. Same runtime settings, same helper,
-  // same call shape as the pre-V2 page. This is the ONLY eligibility decision on
-  // the page; nothing downstream re-derives it.
-  const runtimeSettings = await loadMarketplaceRuntimeSettings();
-  const contactAccess = evaluateVendorContactAccessEligibility(
-    vendor as unknown as Record<string, unknown>,
-    runtimeSettings,
-  );
-  const eligible = contactAccess.eligible;
-
+  // QF-MVP-80.15C — contact access is decided PER ASSIGNMENT inside
+  // getVendorAssignedLeads(), which already stripped the phone from every row it
+  // did not entitle. The page no longer re-derives a second vendor-wide verdict:
+  // doing so was the bug, because it let a lapsed package or a wallet drained to
+  // zero hide a lead the vendor had already been charged for.
   const leadsResult = await vendorLeads(vendor.id);
   const rows = leadsResult.ok ? (leadsResult.data as VendorLeadRawRow[]) : [];
+
+  // Account-level notice only. This decides NOTHING about the rows; it explains
+  // the one case that still blocks every lead at once — an account that is not
+  // approved, or is inactive.
+  const accountBlocked = !isVendorAccountContactEligible(vendor as unknown as Record<string, unknown>);
 
   // THE BOUNDARY. The board is a client component, so anything handed to it is
   // serialized into the page. buildVendorLeadViews copies fields explicitly,
@@ -51,7 +50,7 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
   // client's phone only when `contactAllowed` is true. A blocked vendor's
   // payload therefore contains no client contact detail to leak — not in
   // markup, not in an attribute, not in the flight data.
-  const leads = buildVendorLeadViews(rows, { contactAllowed: eligible });
+  const leads = buildVendorLeadViews(rows);
 
   const feedback = readLeadFeedback(searchParams?.lead);
 
@@ -81,9 +80,7 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
         </div>
       ) : null}
 
-      {!eligible ? (
-        <VendorLeadAccessNotice vendor={vendor} contactAccess={contactAccess} />
-      ) : null}
+      {accountBlocked ? <VendorLeadAccessNotice vendor={vendor} /> : null}
 
       {rows.length === 0 ? (
         <div className="qf-vendor-v2-panel">
@@ -93,22 +90,22 @@ export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageP
             </span>
             <p className="qf-vendor-v2-empty-title">No leads yet</p>
             <p className="qf-vendor-v2-empty-message">
-              {eligible
-                ? "Matched enquiries will appear here as soon as they are assigned to your business."
-                : "Matched enquiries will appear here when your lead access is active."}
+              {accountBlocked
+                ? "Matched enquiries will appear here once your vendor account is active."
+                : "Matched enquiries will appear here as soon as they are assigned to your business."}
             </p>
-            {eligible ? null : (
+            {accountBlocked ? (
               <Link
-                href="/vendor/dashboard/package"
+                href="/vendor/dashboard/support"
                 className="qf-vendor-v2-btn qf-vendor-v2-btn--quiet"
               >
-                Credits &amp; package
+                Contact support
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       ) : (
-        <VendorLeadsBoard leads={leads} vendorId={vendor.id} contactAllowed={eligible} />
+        <VendorLeadsBoard leads={leads} vendorId={vendor.id} />
       )}
     </div>
   );

@@ -22,18 +22,20 @@ import type { VendorLeadView } from "./leadsModel";
 export function VendorLeadCard({
   lead,
   vendorId,
-  contactAllowed,
   expanded,
   onToggle,
 }: {
   lead: VendorLeadView;
   vendorId: string;
-  contactAllowed: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const panelId = `qf-lead-panel-${lead.id}`;
   const headerId = `qf-lead-head-${lead.id}`;
+  // QF-MVP-80.15C — entitlement travels WITH the lead, not with the vendor. A
+  // charged assignment stays readable even after the package lapsed or the
+  // wallet hit zero, so this can differ from one card to the next.
+  const contactAllowed = lead.contactAllowed;
 
   return (
     <li className="qf-vendor-v2-leads-card" data-expanded={expanded ? "true" : undefined}>
@@ -144,7 +146,8 @@ export function VendorLeadCard({
             ) : (
               <p className="qf-vendor-v2-leads-locked">
                 <VendorIcon name="lock" size={15} />
-                Client contact is hidden until your lead access is active.
+                Client contact is unavailable for this assignment. Contact QuickFurno support if you
+                believe this lead was charged.
               </p>
             )}
           </section>
@@ -182,13 +185,13 @@ export function VendorLeadCard({
             <section className="qf-vendor-v2-leads-detail-block">
               <h4>Status</h4>
               <p className="qf-vendor-v2-leads-note">
-                Status updates and issue reports unlock together with contact access.
+                Status updates and issue reports are unavailable for this assignment.
               </p>
               <Link
-                href="/vendor/dashboard/package"
+                href="/vendor/dashboard/support"
                 className="qf-vendor-v2-btn qf-vendor-v2-btn--quiet"
               >
-                Credits &amp; package
+                Contact support
               </Link>
             </section>
           )}

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="presentation" aria-hidden="true" focusable="false">
+  <!-- QuickFurno category artwork - painter.
+       Original abstract vector art on the approved V2 public palette.
+       Deliberately NEUTRAL: it depicts the SERVICE, never a specific
+       vendor project, office, workshop or logo. No text, no people,
+       no price, no rating, no photography. -->
+  <defs>
+    <linearGradient id="painter-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f8"/><stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="360" rx="14" fill="url(#painter-bg)"/>
+
+  <rect x="52" y="40" width="376" height="240" rx="8" fill="#ffffff" stroke="#b9c6d8" stroke-width="5"/>
+  <rect x="52" y="40" width="188" height="240" rx="8" fill="#7fa4e8"/>
+  <path d="M240 40v240" stroke="#c8dcff" stroke-width="6"/>
+  <rect x="272" y="72" width="124" height="26" rx="8" fill="#33465f"/>
+  <path d="M334 98v46" stroke="#33465f" stroke-width="9" stroke-linecap="round"/>
+  <rect x="316" y="144" width="36" height="22" rx="6" fill="#2563eb"/>
+  <path d="M282 200h108M282 232h72" stroke="#c3cddc" stroke-width="9" stroke-linecap="round"/>
+  <ellipse cx="240" cy="304" rx="180" ry="11" fill="#8fa0b8" opacity="0.26"/>
+</svg>

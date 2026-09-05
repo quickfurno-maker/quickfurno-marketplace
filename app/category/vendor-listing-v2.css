@@ -826,3 +826,60 @@
   .qf-vl-card,
   .qf-vl-chip { transition-duration: 0.01ms !important; }
 }
+
+/* ==========================================================================
+   QF-UI-V2-16 — neutral category artwork slots
+
+   Two category-level surfaces only: the page header and the empty/unavailable
+   state. Never a vendor thumbnail or a profile/gallery image, so generic art
+   can never be read as a vendor's own project. Both slots reserve their box
+   with aspect-ratio so the lazy-loaded SVG cannot shift layout (no CLS).
+   ========================================================================== */
+.qf-cat-intro-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.qf-cat-intro-copy { min-width: 0; }
+
+/* Phones lead with the headline; the artwork supports it underneath and stays
+   small enough that the listing is still reachable in the first scroll. */
+.qf-cat-art {
+  align-self: center;
+  overflow: hidden;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-lg);
+  background: var(--qf-brand-inset);
+}
+
+/* Phones: the COMPLETE 4:3 composition at a modest width, centred. A wide
+   banner crop was tried first and cut the cabinets off mid-panel; a full-width
+   4:3 block pushed the listing off the first screen. This keeps the artwork
+   honest (no crop, no distortion) and still leaves the listing reachable. */
+.qf-cat-art {
+  width: min(240px, 68%);
+  margin-inline: auto;
+}
+
+.qf-cat-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+@media (min-width: 768px) {
+  /* Copy keeps priority; the artwork is a supporting column, not a hero. */
+  .qf-cat-intro-shell {
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 1.6rem;
+  }
+
+  /* Full supporting column from tablet up. */
+  .qf-cat-art {
+    width: auto;
+    margin-inline: 0;
+  }
+}

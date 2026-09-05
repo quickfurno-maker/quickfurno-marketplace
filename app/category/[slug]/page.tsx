@@ -5,6 +5,7 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
+import { categoryArtwork } from "@/components/public-listing/categoryArtwork";
 import { VendorDiscovery } from "@/components/public-listing/VendorDiscovery";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
 import { getPublicVendorsForCategory } from "@/services/publicVendorService";
@@ -53,6 +54,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   // verified businesses. A read failure now shows an honest unavailable state.
   const publicVendors = await getPublicVendorsForCategory(category.name, settings);
   const listingUnavailable = publicVendors === null;
+  // QF-UI-V2-16: neutral SERVICE artwork for this category. Decorative only
+  // (aria-hidden, alt="") and never attached to a vendor, so it cannot read
+  // as any vendor's project. null when the category has no artwork.
+  const artwork = categoryArtwork(category.name);
 
   return (
     <>
@@ -60,28 +65,40 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
       <main className="qf-category-page">
         <section className="qf-cat-intro">
-          <div className="qf-pub-container">
-            <Link href="/#categories" className="qf-cat-back">
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-                <path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Back to services
-            </Link>
+          <div className="qf-pub-container qf-cat-intro-shell">
+            <div className="qf-cat-intro-copy">
+              <Link href="/#categories" className="qf-cat-back">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                  <path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back to services
+              </Link>
 
-            <h1 className="qf-cat-title">{category.name} in Pune &amp; Mumbai</h1>
-            <p className="qf-cat-copy">{category.description}</p>
+              <h1 className="qf-cat-title">{category.name} in Pune &amp; Mumbai</h1>
+              <p className="qf-cat-copy">{category.description}</p>
 
-            <ul className="qf-cat-truths">
-              <li>Verified public vendor profiles</li>
-              <li>Up to 3 matched vendors through one enquiry</li>
-              <li>Free for homeowners</li>
-            </ul>
+              <ul className="qf-cat-truths">
+                <li>Verified public vendor profiles</li>
+                <li>Up to 3 matched vendors through one enquiry</li>
+                <li>Free for homeowners</li>
+              </ul>
+            </div>
+
+            {artwork ? (
+              <div className="qf-cat-art" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local decorative SVG, sized by its slot. */}
+                <img src={artwork} alt="" loading="lazy" />
+              </div>
+            ) : null}
           </div>
         </section>
 
         <section className="qf-cat-listing" aria-label={`${category.name} vendors`}>
           <div className="qf-pub-container qf-cat-layout">
             <div className="qf-cat-results">
+              {/* No artwork in this state on purpose: the page header already
+                  carries this category's visual, and repeating it stacked two
+                  identical illustrations into one viewport on phones. */}
               {listingUnavailable ? (
                 <div className="qf-vl-empty" role="status">
                   <h2>Vendor listings are temporarily unavailable.</h2>

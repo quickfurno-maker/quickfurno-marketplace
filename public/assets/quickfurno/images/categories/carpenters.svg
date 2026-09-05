@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="presentation" aria-hidden="true" focusable="false">
+  <!-- QuickFurno category artwork - carpenters.
+       Original abstract vector art on the approved V2 public palette.
+       Deliberately NEUTRAL: it depicts the SERVICE, never a specific
+       vendor project, office, workshop or logo. No text, no people,
+       no price, no rating, no photography. -->
+  <defs>
+    <linearGradient id="carpenters-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f8"/><stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="carpenters-w" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcb083"/><stop offset="1" stop-color="#c2915c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="360" rx="14" fill="url(#carpenters-bg)"/>
+
+  <rect x="60" y="40" width="360" height="240" rx="8" fill="#33465f"/>
+  <rect x="76" y="56" width="96" height="208" rx="4" fill="#f4f7fb"/>
+  <rect x="184" y="56" width="96" height="208" rx="4" fill="#dde5f0"/>
+  <rect x="292" y="56" width="112" height="100" rx="4" fill="url(#carpenters-w)"/>
+  <rect x="292" y="168" width="112" height="96" rx="4" fill="#f4f7fb"/>
+  <path d="M140 150h18M248 150h18M360 214h18" stroke="#33465f" stroke-width="6" stroke-linecap="round"/>
+  <path d="M292 92h112M292 128h112" stroke="#a3743f" stroke-width="3" opacity="0.5"/>
+  <rect x="60" y="288" width="360" height="10" rx="5" fill="#c3cddc"/>
+  <ellipse cx="240" cy="316" rx="176" ry="11" fill="#8fa0b8" opacity="0.26"/>
+</svg>

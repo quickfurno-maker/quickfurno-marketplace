@@ -19,6 +19,7 @@
 // ============================================================================
 
 import { assert, assertEqual, assertTrue, assertFalse } from '../lib/harness.mjs';
+import { categoryArtwork, categoriesWithArtwork } from '../../../components/public-listing/categoryArtwork.ts';
 import { existsSync, readFileSync } from 'node:fs';
 
 import {
@@ -1364,6 +1365,94 @@ export const suite = {
         }
         // The hero pass must not have taken over the launcher's subsheet.
         assertTrue(src.includes('aria-modal="true"'), 'subsheet dialog semantics intact');
+      },
+    },
+
+    // --- QF-UI-V2-16: neutral category artwork ----------------------------
+    {
+      name: 'every public category has neutral local artwork',
+      run: () => {
+        // The map must cover the EXISTING taxonomy exactly - no invented
+        // categories, none missing.
+        const taxonomy = ['Interior Designers', 'Carpenters', 'Modular Factory',
+                          'Premium Interiors', 'Sofa', 'Painter', 'Civil Work'];
+        assertEqual(categoriesWithArtwork().slice().sort().join('|'),
+          taxonomy.slice().sort().join('|'), 'artwork map matches the taxonomy');
+        const seen = new Set();
+        for (const name of taxonomy) {
+          const url = categoryArtwork(name);
+          assertTrue(typeof url === 'string' && url.length > 0, name + ' has artwork');
+          // Local only: no remote host, no protocol-relative, no data URI.
+          assertTrue(url.startsWith('/assets/quickfurno/images/categories/'), 'local: ' + url);
+          assertFalse(/^https?:|^\/\/|^data:/.test(url), 'no remote asset: ' + url);
+          assertTrue(existsSync('public' + url), 'exists on disk: ' + url);
+          assertFalse(seen.has(url), 'each category has its own artwork: ' + url);
+          seen.add(url);
+        }
+        // An unknown name yields nothing rather than a misleading default.
+        assertEqual(categoryArtwork('Not A Category'), null, 'unknown category -> null');
+        assertEqual(categoryArtwork(''), null, 'empty -> null');
+      },
+    },
+    {
+      name: 'category artwork carries no caption, claim or retired palette',
+      run: () => {
+        for (const name of categoriesWithArtwork()) {
+          const file = 'public' + categoryArtwork(name);
+          const svg = readFileSync(file, 'utf8');
+          // A caption baked into artwork is how the old thumbnails implied a
+          // specific project ("Modular Kitchen", "Premium Living Room").
+          assertFalse(/<text|<tspan/i.test(svg), 'no baked text in ' + file);
+          // Decorative: it must not be announced as content.
+          assertTrue(svg.includes('aria-hidden="true"'), 'decorative: ' + file);
+          assertFalse(/<title>/i.test(svg), 'no accessible name: ' + file);
+          // The retired copper family must not come back.
+          for (const dead of ['#8A6342', '#B98A5B', '#F3EADF', '#FFF8EF', '#E8D7C4', '#C67821']) {
+            assertFalse(svg.toUpperCase().includes(dead), 'no retired token ' + dead + ' in ' + file);
+          }
+        }
+      },
+    },
+    {
+      name: 'generic artwork is never presented as a vendor photo or project',
+      run: () => {
+        // Listing thumbnail: the vendor's OWN image, else initials. No stock.
+        const card = readFileSync('components/public-listing/VendorListingCard.tsx', 'utf8');
+        assertTrue(card.includes('vendor.imageUrl ?'), 'real vendor image wins');
+        assertTrue(card.includes('qf-vl-card-initials'), 'initials are the fallback');
+        assertFalse(card.includes('categoryArtwork'), 'no category art on listing cards');
+        assertFalse(card.includes('images/categories'), 'no category art path on cards');
+
+        // Profile gallery: vendor uploads only, never synthesised.
+        const profile = readFileSync('components/public-vendor/profileModel.ts', 'utf8');
+        assertTrue(profile.includes('vendor.portfolioImages'), 'gallery reads vendor uploads');
+        assertFalse(profile.includes('categoryArtwork'), 'gallery is not synthesised');
+        assertFalse(profile.includes('images/categories'), 'no category art in the profile model');
+
+        // The artwork module states, and keeps, its own boundary.
+        const art = readFileSync('components/public-listing/categoryArtwork.ts', 'utf8');
+        assertTrue(art.includes('never a vendor'), 'module records the contract');
+
+        // Category artwork is only consumed by the category route.
+        const page = readFileSync('app/category/[slug]/page.tsx', 'utf8');
+        assertTrue(page.includes('categoryArtwork(category.name)'), 'category page uses the map');
+        assertTrue(page.includes('aria-hidden="true"'), 'slot is decorative');
+        assertTrue(page.includes('alt=""'), 'decorative image has empty alt');
+      },
+    },
+    {
+      name: 'category empty/error state keeps its honest copy and CTA authority',
+      run: () => {
+        const page = readFileSync('app/category/[slug]/page.tsx', 'utf8');
+        // The error-vs-empty distinction and its wording are unchanged.
+        assertTrue(page.includes('const listingUnavailable = publicVendors === null;'),
+          'error state still comes from a null read');
+        assertTrue(page.includes('Vendor listings are temporarily unavailable.'),
+          'unavailable copy unchanged');
+        assertTrue(page.includes('Get Free Team Matches'), 'primary CTA unchanged');
+        assertTrue(page.includes('Browse services'), 'secondary CTA unchanged');
+        // Routing is untouched by an artwork phase.
+        assertTrue(page.includes('getCategoryBySlug'), 'category routing unchanged');
       },
     },
 

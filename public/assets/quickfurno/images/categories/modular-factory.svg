@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="presentation" aria-hidden="true" focusable="false">
+  <!-- QuickFurno category artwork - modular factory.
+       Original abstract vector art on the approved V2 public palette.
+       Deliberately NEUTRAL: it depicts the SERVICE, never a specific
+       vendor project, office, workshop or logo. No text, no people,
+       no price, no rating, no photography. -->
+  <defs>
+    <linearGradient id="modular-factory-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f8"/><stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="modular-factory-w" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcb083"/><stop offset="1" stop-color="#c2915c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="360" rx="14" fill="url(#modular-factory-bg)"/>
+
+  <rect x="52" y="44" width="376" height="120" rx="6" fill="url(#modular-factory-w)"/>
+  <path d="M52 84h376M52 124h376M177 44v120M303 44v120" stroke="#a3743f" stroke-width="3" opacity="0.45"/>
+  <rect x="52" y="182" width="376" height="18" rx="6" fill="#22303f"/>
+  <rect x="52" y="182" width="376" height="6" rx="3" fill="#2563eb"/>
+  <rect x="52" y="214" width="376" height="90" rx="6" fill="#ffffff" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M177 214v90M303 214v90" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M104 262h22M230 262h22M356 262h22" stroke="#5f6b7d" stroke-width="6" stroke-linecap="round"/>
+  <ellipse cx="240" cy="326" rx="180" ry="11" fill="#8fa0b8" opacity="0.26"/>
+</svg>

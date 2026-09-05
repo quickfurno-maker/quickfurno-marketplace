@@ -11,7 +11,7 @@
 // The vendor would have been redirected to a page that ignored the session, and
 // could never have set a password.
 //
-// The existing /api/vendor/auth/password-reset/* flow does NOT serve this case:
+// The existing /api/vendor/auth/password-reset routes do NOT serve this case:
 // it is the Phase 5E WhatsApp-OTP reset, which requires an already-VERIFIED
 // WhatsApp phone and outbound messaging — neither of which a vendor being given
 // their first login has.

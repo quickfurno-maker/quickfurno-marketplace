@@ -41,6 +41,8 @@ function code(path) {
 }
 /** Whitespace-insensitive form, so reformatting never breaks a rule. */
 const flat = (s) => s.replace(/\s+/g, " ");
+/** Verbatim source, including comments — for rules about literal copy. */
+const readRaw = (path) => readFileSync(path, "utf8");
 
 const MODAL_SRC = code(MODAL);
 const MODAL_FLAT = flat(MODAL_SRC);
@@ -323,6 +325,117 @@ mutant("M21 [mutant] reject: the submit button stops being disabled while submit
   (s) => s.replace("disabled={submitting}", "disabled={false}"),
   (s) => /disabled=\{submitting\}/.test(s));
 
+// ---------------------------------------------------------------------------
+// 5. QF-MVP-80.16A — the hero is informational, not a CTA surface
+// ---------------------------------------------------------------------------
+const HERO = code("components/home/HomeHeroSlider.tsx");
+const HERO_RAW = readRaw("components/home/HomeHeroSlider.tsx");
+const HERO_FLAT = flat(HERO);
+
+check("24 [semantic] no CTA fields remain on a hero slide", () => {
+  assert(!/^\s*primary\s*:/m.test(HERO), "HeroSlide.primary is back");
+  assert(!/^\s*secondary\s*[?:]/m.test(HERO), "HeroSlide.secondary is back");
+  assert(!/\.qf-hero-slide-actions/.test(CSS_SRC), "the hero action row CSS is back");
+  assert(!/qf-hero-slide-actions/.test(HERO), "the hero renders an action row again");
+});
+
+check("25 [semantic] the hero renders no enquiry trigger and no CTA link", () => {
+  assert(!/EnquiryModalTrigger/.test(HERO), "the hero renders an EnquiryModalTrigger again");
+  assert(!/from "next\/link"/.test(HERO), "the hero imports next/link again");
+  assert(!/<Link\b/.test(HERO), "the hero renders a Link CTA again");
+  // The only buttons left must be carousel navigation.
+  const buttons = HERO_FLAT.match(/<button/g) || [];
+  assert(buttons.length > 0, "the carousel lost its navigation buttons");
+  assert(!/qf-pub-btn/.test(HERO), "a public CTA button class is back inside the hero");
+});
+
+check("26 [semantic] the carousel itself is fully preserved", () => {
+  const slides = HERO.match(/\bid:\s*"/g) || [];
+  assert(slides.length === 3, `expected exactly 3 hero slides, found ${slides.length}`);
+  assert(/qf-hero-dots/.test(HERO), "the hero dots are gone");
+  assert(/qf-hero-arrows/.test(HERO) || /qf-hero-arrow/.test(HERO), "the hero arrows are gone");
+  assert(/INTERVAL_MS/.test(HERO), "autoplay timing is gone");
+  assert(/onTouchStart|onPointerDown/.test(HERO), "swipe handling is gone");
+  assert(/ArrowLeft|ArrowRight/.test(HERO), "keyboard navigation is gone");
+  assert(/prefers-reduced-motion/.test(HERO) || /reduced/i.test(HERO),
+    "reduced-motion handling is gone");
+});
+
+check("27 [semantic] the homepage keeps its other conversion entry points", () => {
+  assert(/<HomeServiceLauncher/.test(PAGE_FLAT), "the service launcher is gone");
+  assert(/StickyMobileCTA/.test(PAGE_SRC), "StickyMobileCTA is no longer mounted");
+  const hero = PAGE_FLAT.indexOf("<HomeHeroSlider");
+  const launcher = PAGE_FLAT.indexOf("<HomeServiceLauncher");
+  assert(hero !== -1 && launcher !== -1 && hero < launcher,
+    "the service launcher no longer follows the hero");
+});
+
+// ---------------------------------------------------------------------------
+// 6. QF-MVP-80.16A — dispatch refusal observability stays sanitized
+// ---------------------------------------------------------------------------
+const TRIGGER = code("lib/communication/leadAssignmentDispatchTrigger.ts");
+const TRIGGER_FLAT = flat(TRIGGER);
+const WRAPPER = readRaw("ops/production/qf-lead-assignment-dispatch.sh");
+
+check("28 [semantic] refusal reasons are a CLOSED vocabulary", () => {
+  assert(/export const DispatchRefusalCategory/.test(TRIGGER), "the refusal vocabulary is gone");
+  assert(/SEND_REFUSED_OTHER/.test(TRIGGER), "the catch-all bucket is gone");
+  assert(/export function categorizeDispatchRefusal/.test(TRIGGER), "the categoriser is gone");
+  // The categoriser must never return the raw code.
+  const fn = TRIGGER.slice(TRIGGER.indexOf("export function categorizeDispatchRefusal"));
+  const body = fn.slice(0, fn.indexOf(String.fromCharCode(10, 125)));
+  assert(!/return code\b/.test(body), "categorizeDispatchRefusal returns the raw internal code");
+  assert(/return DispatchRefusalCategory\.SEND_REFUSED_OTHER;/.test(body),
+    "an unrecognised code does not fall back to the opaque bucket");
+});
+
+check("29 [semantic] the response is still constructed field-by-field", () => {
+  const fn = TRIGGER.slice(TRIGGER.indexOf("export function sanitizeDispatchSummary"));
+  assert(!/\.\.\.summary/.test(fn), "the sanitizer spreads the summary");
+  assert(!/outcomes:/.test(fn), "the sanitizer returns outcomes");
+  assert(/refusalReasons: summarizeRefusalReasons\(summary\)/.test(fn),
+    "refusalReasons is not produced by the aggregator");
+  for (const banned of ["intentId", "assignmentId", "vendorId", "leadId", "destination",
+                        "destinationHash", "providerMessageId", "boundaryIso", "message", "stack"]) {
+    assert(!new RegExp(`\b${banned}\b\s*:`).test(fn), `the sanitizer returns ${banned}`);
+  }
+});
+
+check("30 [semantic] the aggregator reads only ok/reason from each outcome", () => {
+  const fn = TRIGGER.slice(TRIGGER.indexOf("function summarizeRefusalReasons"));
+  const body = fn.slice(0, fn.indexOf(String.fromCharCode(10, 125)));
+  assert(/record\.ok/.test(body) && /record\.reason/.test(body), "the aggregator changed shape");
+  assert(!/JSON\.stringify/.test(body), "the aggregator serialises an outcome");
+  assert(/categorizeDispatchRefusal\(record\.reason\)/.test(body),
+    "a raw reason is counted without categorisation");
+});
+
+check("31 [static] the cron wrapper accepts and sanitizes the new field", () => {
+  assert(/"refusalReasons"/.test(WRAPPER), "the wrapper contract still rejects refusalReasons");
+  assert(/test\("\^\[A-Z_\]\+\$"\)/.test(WRAPPER),
+    "the wrapper does not constrain reason keys to a safe shape");
+  assert(/reason_/.test(WRAPPER), "the wrapper does not log the reason counts");
+  // The wrapper must never log the raw body.
+  const codeOnly = WRAPPER.split(String.fromCharCode(10)).filter((l) => !/^\s*#/.test(l)).join(String.fromCharCode(10));
+  assert(!/log ".*http_body/.test(codeOnly), "the wrapper logs the raw response body");
+});
+
+mutant("M29 [mutant] reject: a raw reason field is added to the response",
+  TRIGGER,
+  (s) => s.replace(
+    "    refusalReasons: summarizeRefusalReasons(summary),",
+    "    refusalReasons: summarizeRefusalReasons(summary),\n    error: summary?.selectionRefusal,",
+  ),
+  (s) => {
+    const fn = s.slice(s.indexOf("export function sanitizeDispatchSummary"));
+    return !/\berror\s*:/.test(fn);
+  });
+
+mutant("M24 [mutant] reject: a hero CTA comes back",
+  HERO,
+  (s) => s.replace("type HeroSlide = {", "type HeroSlide = {\n  primary: string;"),
+  (s) => !/^\s*primary\s*:/m.test(s));
+
 // ============================================================================
 let passed = 0;
 const failures = [];
@@ -331,7 +444,7 @@ for (const { name, fn } of checks) {
   catch (e) { failures.push(`   FAIL  ${name} — ${e.message}`); console.log(`   FAIL  ${name} — ${e.message}`); }
 }
 console.log(`\n${"=".repeat(78)}`);
-console.log(`QF-UI mobile focus + homepage layout + single enquiry form — passed ${passed}, failed ${failures.length}`);
+console.log(`QF-UI focus + homepage + single form + hero CTA + dispatch observability — passed ${passed}, failed ${failures.length}`);
 if (failures.length) { console.log("\nFAILURES:"); for (const l of failures) console.log(l); }
 console.log("=".repeat(78));
 process.exit(failures.length ? 1 : 0);

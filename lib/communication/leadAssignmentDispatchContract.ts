@@ -343,3 +343,132 @@ export function buildLeadAssignmentDispatchPlan(input: {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// QF-MVP-80.16C — the CLOSED permanent-refusal policy
+//
+// WHY THIS EXISTS
+// A refusal raised BEFORE any `communication_messages` row exists leaves the
+// intent at `pending`, which is exactly the status the selector requires. A
+// vendor whose stored destination can never resolve therefore produced an
+// infinite once-a-minute select/refuse loop on a live production lane.
+//
+// The cure is deliberately narrow. Only a DETERMINISTIC failure of the
+// recipient's own durable data — the row is absent, holds nothing, or holds
+// something that is not a number — can terminalize the intent. Such a failure
+// yields the identical result on every future tick, so retrying it forever buys
+// nothing and hides real signal.
+//
+// EVERYTHING ELSE STAYS RETRIABLE. A lookup that failed on transport, an
+// unavailable provider, a template or runtime-policy gate that is temporarily
+// closed, a selection-boundary refusal — all of these can succeed on a later
+// tick, and terminalizing them would silently destroy a paid notification.
+// There is no "any refusal ⇒ failed" rule here, and no default branch: a code
+// that is not in the closed set below is retriable, by construction.
+// ---------------------------------------------------------------------------
+
+/**
+ * The CLOSED set. Adding to it is a deliberate act with a test; nothing widens
+ * it at runtime, and no prefix/pattern match can admit a new member.
+ */
+export const PERMANENT_RECIPIENT_REFUSAL_CODES: readonly string[] = Object.freeze([
+  "RECIPIENT_NOT_FOUND",
+  "RECIPIENT_DESTINATION_MISSING",
+  "RECIPIENT_DESTINATION_INVALID",
+]);
+
+/**
+ * True only for a deterministic, permanent failure of the recipient's own data.
+ *
+ * NOTE what is absent on purpose: `RECIPIENT_LOOKUP_FAILED` is a TRANSPORT
+ * failure, not a data failure, and it is retriable. So are PROVIDER_*,
+ * TEMPLATE_*, CONSENT_*, LOOKUP_FAILED and every activation-boundary refusal.
+ */
+export function isPermanentLeadAssignmentRecipientRefusal(code: unknown): boolean {
+  return typeof code === "string" && PERMANENT_RECIPIENT_REFUSAL_CODES.includes(code);
+}
+
+/** What the dispatcher should do with a refusal it just received. */
+export const LeadAssignmentRefusalDisposition = Object.freeze({
+  /** CAS the intent pending → failed. It can never succeed. */
+  TERMINALIZE_INTENT: "TERMINALIZE_INTENT",
+  /** Leave the intent exactly as observed. A later tick may succeed. */
+  RETRY_LATER: "RETRY_LATER",
+} as const);
+
+export type LeadAssignmentRefusalDispositionValue =
+  (typeof LeadAssignmentRefusalDisposition)[keyof typeof LeadAssignmentRefusalDisposition];
+
+/**
+ * The whole decision, pure. Three independent conditions must ALL hold before
+ * an intent may be terminalized, so no single mistake can terminalize the wrong
+ * row:
+ *
+ *   1. the aggregate type is exactly this lane — a campaign intent handed to
+ *      this function is never terminalized, whatever its refusal code;
+ *   2. the refusal code is in the closed permanent set;
+ *   3. the status we actually observed is exactly `pending` — a row already
+ *      moved on by a concurrent writer is left alone rather than regressed.
+ */
+export function classifyLeadAssignmentRefusalDisposition(input: {
+  readonly aggregateType: unknown;
+  readonly code: unknown;
+  readonly observedStatus: unknown;
+}): LeadAssignmentRefusalDispositionValue {
+  if (input.aggregateType !== LEAD_ASSIGNMENT_AGGREGATE_TYPE) {
+    return LeadAssignmentRefusalDisposition.RETRY_LATER;
+  }
+  if (input.observedStatus !== LEAD_ASSIGNMENT_SELECTABLE_STATUS) {
+    return LeadAssignmentRefusalDisposition.RETRY_LATER;
+  }
+  if (!isPermanentLeadAssignmentRecipientRefusal(input.code)) {
+    return LeadAssignmentRefusalDisposition.RETRY_LATER;
+  }
+  return LeadAssignmentRefusalDisposition.TERMINALIZE_INTENT;
+}
+
+/**
+ * The EXACT write a terminalization performs, as data.
+ *
+ * Returning a plan rather than performing the write keeps the whole decision —
+ * which table, which column, which value, and every fence — pure and directly
+ * testable. `services/leadAssignmentDispatchService.ts` does nothing but apply
+ * what this function returns, so the fences below ARE the production fences.
+ */
+export interface LeadAssignmentTerminalizationPlan {
+  readonly table: "communication_intents";
+  readonly patch: { readonly status: typeof IntentResultStatus.FAILED };
+  /** Every filter is an equality; applied together they are the compare-and-set. */
+  readonly filters: readonly (readonly [string, string])[];
+}
+
+/**
+ * Build the terminalization write, or return null to leave the intent alone.
+ *
+ * Null is the answer for every transient refusal, every non-lead-assignment
+ * intent and every status other than the `pending` we actually observed.
+ */
+export function planLeadAssignmentIntentTerminalization(input: {
+  readonly intentId: unknown;
+  readonly aggregateType: unknown;
+  readonly observedStatus: unknown;
+  readonly code: unknown;
+}): LeadAssignmentTerminalizationPlan | null {
+  const disposition = classifyLeadAssignmentRefusalDisposition({
+    aggregateType: input.aggregateType,
+    code: input.code,
+    observedStatus: input.observedStatus,
+  });
+  if (disposition !== LeadAssignmentRefusalDisposition.TERMINALIZE_INTENT) return null;
+  if (typeof input.intentId !== "string" || input.intentId === "") return null;
+
+  return {
+    table: "communication_intents",
+    patch: { status: IntentResultStatus.FAILED },
+    filters: [
+      ["id", input.intentId],
+      ["aggregate_type", LEAD_ASSIGNMENT_AGGREGATE_TYPE],
+      ["status", LEAD_ASSIGNMENT_SELECTABLE_STATUS],
+    ],
+  };
+}

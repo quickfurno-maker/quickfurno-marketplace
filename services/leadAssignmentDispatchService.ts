@@ -47,7 +47,9 @@ import {
   LeadAssignmentDispatchRefusal,
   buildLeadAssignmentDispatchPlan,
   isEligibleLeadAssignmentIntent,
+  isPermanentLeadAssignmentRecipientRefusal,
   parseActivationBoundary,
+  planLeadAssignmentIntentTerminalization,
   type LeadAssignmentActivationBoundary,
   type LeadAssignmentDispatchRefusalValue,
   type LeadAssignmentIntentRow,
@@ -289,7 +291,19 @@ export async function dispatchLeadAssignmentIntent(input: {
   // enforced INSIDE this call — this lane neither repeats nor relaxes them.
   const sent = await service.data.send(plan.intent);
   if (!sent.ok) {
-    return { ok: false, intentId, reason: sent.code ?? LeadAssignmentDispatchRefusal.SEND_REFUSED };
+    const reason = sent.code ?? LeadAssignmentDispatchRefusal.SEND_REFUSED;
+    // QF-MVP-80.16C. A deterministic failure of the recipient's OWN data can
+    // never succeed on a later tick, so the intent is closed here rather than
+    // re-selected every minute forever. The refusal itself is still returned
+    // unchanged, so the run summary and the sanitized refusalReasons telemetry
+    // read exactly as they did before this phase.
+    await failLeadAssignmentIntentOnPermanentRecipientRefusal({
+      intentId: row.id,
+      aggregateType: row.aggregate_type,
+      observedStatus: row.status,
+      code: reason,
+    });
+    return { ok: false, intentId, reason };
   }
 
   const message = sent.data;
@@ -351,6 +365,48 @@ async function advanceLeadAssignmentIntentStatus(input: {
   return derived;
 }
 
+/**
+ * QF-MVP-80.16C — close a lead-assignment intent that can NEVER be delivered.
+ *
+ * This function decides NOTHING. `planLeadAssignmentIntentTerminalization` is a
+ * pure function that returns either the exact write to perform or null, and all
+ * this does is apply it. The table, the single column, the target status and
+ * all three fences therefore live in the pure contract, where they are directly
+ * testable without a database.
+ *
+ * It runs only on the refusal branch, which means no `communication_messages`
+ * row was created and no provider was called. The plan can only ever name
+ * `communication_intents`, so there is no assignment write, no credit write, no
+ * vendor write and no replacement intent reachable from here.
+ *
+ * The three fences, applied in the same statement as the write:
+ *   * `id` — the exact intent the dispatcher just refused;
+ *   * `aggregate_type='lead_assignment'` — a campaign intent is unreachable;
+ *   * `status = pending` — a plain COMPARE-AND-SET, so a concurrent writer that
+ *     already advanced the row wins and this becomes a silent no-op rather than
+ *     a status regression.
+ *
+ * Failure to write is deliberately not fatal. The worst case is that the intent
+ * is selected once more and refused once more — the state this phase improves,
+ * never a send.
+ */
+async function failLeadAssignmentIntentOnPermanentRecipientRefusal(input: {
+  readonly intentId: string;
+  readonly aggregateType: unknown;
+  readonly observedStatus: unknown;
+  readonly code: unknown;
+}): Promise<boolean> {
+  const plan = planLeadAssignmentIntentTerminalization(input);
+  if (plan === null) return false;
+
+  let query = db().from(plan.table).update(plan.patch);
+  for (const [column, value] of plan.filters) query = query.eq(column, value);
+  const { data, error } = await query.select("id, status");
+
+  if (error || !data || data.length === 0) return false;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // 5. The bounded runner seam
 // ---------------------------------------------------------------------------
@@ -404,4 +460,8 @@ export async function runLeadAssignmentDispatchBatch(
 }
 
 /** Re-exported so an operator surface never re-derives the lane's identity. */
-export { INTENT_ENTITY_TYPE, LEAD_ASSIGNMENT_ACTIVATION_POLICY_KEY };
+export {
+  INTENT_ENTITY_TYPE,
+  LEAD_ASSIGNMENT_ACTIVATION_POLICY_KEY,
+  isPermanentLeadAssignmentRecipientRefusal,
+};

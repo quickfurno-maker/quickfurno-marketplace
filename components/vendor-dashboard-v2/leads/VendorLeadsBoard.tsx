@@ -20,17 +20,17 @@ import {
  * pagination contract.
  *
  * Every `VendorLeadView` handed to this component has already been stripped of
- * the client's email, and of the client's phone unless the server proved
- * contact access. See buildVendorLeadViews().
+ * the client's email, and of the client's phone unless the server proved contact
+ * access FOR THAT ASSIGNMENT. Entitlement is per row (QF-MVP-80.15C), so this
+ * component passes none of its own: each card reads `lead.contactAllowed`. See
+ * buildVendorLeadViews().
  */
 export function VendorLeadsBoard({
   leads,
   vendorId,
-  contactAllowed,
 }: {
   leads: VendorLeadView[];
   vendorId: string;
-  contactAllowed: boolean;
 }) {
   const [filter, setFilter] = useState<VendorLeadFilterKey>("all");
   const [query, setQuery] = useState("");
@@ -136,7 +136,6 @@ export function VendorLeadsBoard({
               key={lead.id}
               lead={lead}
               vendorId={vendorId}
-              contactAllowed={contactAllowed}
               expanded={expandedId === lead.id}
               onToggle={() => setExpandedId((current) => (current === lead.id ? null : lead.id))}
             />

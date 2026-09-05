@@ -10,10 +10,18 @@
 // The raw assignment row carries the client's phone and email; a spread of it
 // would ship those to every vendor whose contact access is blocked, even with
 // the markup hidden. So the raw row is NEVER spread: each field is copied
-// explicitly, and `phone` is populated only when the caller has already proven
-// contact access with evaluateVendorContactAccessEligibility(). Email is never
-// copied at all — the pre-V2 page never displayed it, and this redesign does
-// not widen what is shown.
+// explicitly, and `phone` is populated only for a row the SERVICE already
+// marked entitled. Email is never copied at all — the pre-V2 page never
+// displayed it, and this redesign does not widen what is shown.
+//
+// QF-MVP-80.15C — the gate is PER ROW, not per vendor. Contact entitlement is
+// decided per assignment by evaluateAssignedLeadContactAccess() in
+// services/vendorService.ts, which already stripped `phone` from every
+// unentitled row before this model ever sees it. `row.contact_allowed` is that
+// verdict travelling with its own row; this file re-enforces the consequence so
+// a future caller cannot reintroduce the leak by handing over an unsanitized
+// row. A mixed list is normal: one lead's contact may be visible while the next
+// one's is not.
 // ============================================================================
 import type { VendorLeadStatus } from "@/lib/types";
 
@@ -105,6 +113,11 @@ export interface VendorLeadRawRow {
   assignment_source: string | null;
   vendor_status: VendorLeadStatus;
   is_bad_lead_reported: boolean | null;
+  /**
+   * Per-assignment contact entitlement, decided server-side. Anything other than
+   * a literal `true` is treated as "not entitled" — this fails closed.
+   */
+  contact_allowed?: boolean | null;
   lead: {
     id: string;
     name: string;
@@ -142,8 +155,10 @@ export interface VendorLeadView {
   propertyType: string | null;
   timeline: string | null;
   message: string | null;
-  /** Null whenever contact access is not allowed. */
+  /** Null whenever contact access is not allowed for THIS assignment. */
   phone: string | null;
+  /** Whether this specific assignment's client contact may be shown. */
+  contactAllowed: boolean;
   /** Lowercased haystack for local search. Name / service / area / city ONLY. */
   searchText: string;
 }
@@ -157,13 +172,15 @@ const text = (value: string | null | undefined): string | null => {
 /**
  * Build the client-safe view models.
  *
- * `contactAllowed` MUST be the result of the caller's
- * evaluateVendorContactAccessEligibility() check. This function does not decide
- * eligibility and deliberately has no way to; it only enforces the consequence.
+ * Entitlement is NOT decided here and deliberately cannot be: each row arrives
+ * carrying the server's own per-assignment verdict in `contact_allowed`. This
+ * function only enforces the consequence, and it enforces it strictly — a row
+ * whose flag is missing, null or anything other than `true` loses its phone even
+ * if one is somehow present on the raw row.
  */
 export function buildVendorLeadViews(
   rows: VendorLeadRawRow[],
-  options: { contactAllowed: boolean; now?: number },
+  options: { now?: number } = {},
 ): VendorLeadView[] {
   const now = options.now ?? Date.now();
   const views: VendorLeadView[] = [];
@@ -178,6 +195,8 @@ export function buildVendorLeadViews(
     const area = text(lead.area);
     const place = [area, city].filter(Boolean).join(", ");
     const status = (row.vendor_status || "New") as VendorLeadStatus;
+    // Strictly `true`. Missing/null/"true"/1 are all NOT entitlement.
+    const contactAllowed = row.contact_allowed === true;
 
     views.push({
       id: row.id,
@@ -196,8 +215,9 @@ export function buildVendorLeadViews(
       propertyType: text(lead.property_type),
       timeline: text(lead.timeline),
       message: text(lead.message),
-      // The single gate. `lead.phone` is read here and nowhere else.
-      phone: options.contactAllowed ? text(lead.phone) : null,
+      // The single gate, per row. `lead.phone` is read here and nowhere else.
+      phone: contactAllowed ? text(lead.phone) : null,
+      contactAllowed,
       searchText: [name, service, area, city].filter(Boolean).join(" ").toLowerCase(),
     });
   }

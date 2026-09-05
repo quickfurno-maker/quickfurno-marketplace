@@ -81,7 +81,10 @@ export function MarketplaceRuntimeSettingsPanel({
   }
 
   return (
-    <SectionCard title="Paid-Only Auto Matching Controls" description="These switches separate public visibility from paid/trial lead assignment. Changes are stored in marketplace_runtime_settings.">
+    <SectionCard
+      title="Auto Matching &amp; Vendor Visibility"
+      description="Automatic lead assignment is WALLET-CREDIT based: a vendor needs approval, an active account, accepting-leads, no assignment suspension and at least 1 lead credit. Package and paid status are NOT assignment gates. Changes are stored in marketplace_runtime_settings."
+    >
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
         <div className="grid gap-3 md:grid-cols-2">
           <MarketplaceToggle
@@ -100,7 +103,7 @@ export function MarketplaceRuntimeSettingsPanel({
             onChange={(value) => save("notify_free_vendor_recharge_interest", value)}
           />
           <MarketplaceToggle
-            label="Allow trial vendors for assignment"
+            label="Allow trial vendors (legacy preview / vendor-visibility flows)"
             checked={settings.allow_trial_vendors_for_assignment}
             onChange={(value) => save("allow_trial_vendors_for_assignment", value)}
           />
@@ -108,7 +111,9 @@ export function MarketplaceRuntimeSettingsPanel({
 
         <div className="grid gap-3 qfa-quiet p-3">
           <label className="grid gap-1">
-            <span className="text-xs font-semibold uppercase text-slate-500">Minimum paid vendors required</span>
+            <span className="text-xs font-semibold uppercase text-slate-500">
+              Minimum paid vendors required <span className="text-amber-600">(Legacy preview only)</span>
+            </span>
             <input
               type="number"
               min={1}
@@ -118,7 +123,9 @@ export function MarketplaceRuntimeSettingsPanel({
             />
           </label>
           <label className="grid gap-1">
-            <span className="text-xs font-semibold uppercase text-slate-500">Max vendors per lead</span>
+            <span className="text-xs font-semibold uppercase text-slate-500">
+              Max vendors per lead <span className="text-amber-600">(Legacy preview only)</span>
+            </span>
             <input
               type="number"
               min={1}
@@ -129,16 +136,26 @@ export function MarketplaceRuntimeSettingsPanel({
             />
           </label>
           <label className="grid gap-1">
-            <span className="text-xs font-semibold uppercase text-slate-500">Auto assignment mode</span>
+            <span className="text-xs font-semibold uppercase text-slate-500">
+              Auto assignment mode <span className="text-emerald-700">(Live authority)</span>
+            </span>
             <select
               value={settings.auto_assignment_mode}
               onChange={(event) => save("auto_assignment_mode", event.target.value as MarketplaceSettingsView["auto_assignment_mode"])}
               className="qfa-control px-2.5 font-semibold outline-none"
             >
-              <option value="off">off</option>
-              <option value="preview">preview</option>
-              <option value="auto_suggest">auto_suggest</option>
+              <option value="off">off — assignment halted (kill switch)</option>
+              <option value="auto_suggest">auto_suggest — LIVE (recommended label)</option>
+              <option value="preview">preview — LIVE, despite the name</option>
             </select>
+            <p className="text-[11px] leading-snug text-slate-500">
+              Only <strong>off</strong> halts automatic assignment. <strong>preview</strong> and{" "}
+              <strong>auto_suggest</strong> behave identically and are both live and mutating: each
+              assigns vendors, debits 1 lead credit per assignment and can trigger a WhatsApp
+              notification. Prefer <strong>auto_suggest</strong>, because &quot;preview&quot; is not a
+              dry run. The live cap of 3 vendors per lead is enforced by the system and cannot be
+              raised here.
+            </p>
           </label>
         </div>
       </div>

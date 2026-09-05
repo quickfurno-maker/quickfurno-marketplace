@@ -6,7 +6,7 @@ import { adminClient } from "../lib/supabase";
 import { appError, AppError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { loadMarketplaceRuntimeSettings } from "../lib/lead-assignment/runtimeSettings";
-import { evaluateVendorContactAccessEligibility } from "../lib/vendors/vendorEligibility";
+import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadContactAccess";
 import type {
   VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
 } from "../lib/types";
@@ -260,34 +260,128 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
   return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
 }
 
+/**
+ * QF-MVP-80.15C — assigned leads with PER-ASSIGNMENT contact entitlement.
+ *
+ * Before this phase one vendor-level verdict gated every row, so a lapsed
+ * package or a wallet drained to 0 by the assignment itself could hide a lead
+ * the vendor had already been charged for. Contact is now decided per row by
+ * evaluateAssignedLeadContactAccess(), which honours the canonical assignment
+ * receipt (operation_id + credit_deducted) and otherwise falls back to the
+ * previous helper unchanged.
+ *
+ * THE SANITIZATION BOUNDARY IS HERE. `phone` is fetched for the vendor's own
+ * rows and then stripped from every row that is not entitled, BEFORE this
+ * function returns — so nothing unsanitized reaches the server action, the RSC
+ * payload or the browser. The entitlement evidence columns (operation_id,
+ * credit_deducted) are read server-side and deliberately NOT returned: the
+ * client receives only the `contact_allowed` boolean. Email is never selected.
+ */
 export async function getVendorAssignedLeads(vendorId: string): Promise<Result<unknown[]>> {
   try {
-    const contactEligible = await canVendorViewLeadContact(vendorId);
-    if (!contactEligible.ok) return contactEligible;
+    const db = adminClient();
 
-    const leadSelect = contactEligible.data
-      ? "id, name, phone, city, area, service_required, budget, property_type, timeline, message, created_at"
-      : "id, name, city, area, service_required, budget, property_type, timeline, message, created_at";
+    // The vendor row backs BOTH the account safety gates and the legacy fallback.
+    // Read it once; there is no per-row vendor query and no N+1 ledger lookup.
+    let { data: vendorRow, error: vendorError } = await db
+      .from("vendors")
+      .select("status, is_active, paid_status, package_status, package_expires_at, remaining_credits")
+      .eq("id", vendorId)
+      .maybeSingle();
+    if (vendorError && isMissingColumnError(vendorError)) {
+      ({ data: vendorRow, error: vendorError } = await db
+        .from("vendors")
+        .select("status, is_active, paid_status, remaining_credits")
+        .eq("id", vendorId)
+        .maybeSingle());
+    }
+    if (vendorError) throw vendorError;
+    if (!vendorRow) throw appError("UNKNOWN");
 
-    // assignment_source is a Phase 26A-2D column. Try to read it; if the
-    // migration is not applied yet, fall back so the vendor dashboard never
-    // breaks (badge just shows the generic label).
+    const settings = await loadMarketplaceRuntimeSettings();
+
+    // `phone` is always selected now, because entitlement is decided per row and
+    // the strip below is what enforces it. Email is still never selected.
+    const leadSelect =
+      "id, name, phone, city, area, service_required, budget, property_type, timeline, message, created_at";
+
+    // assignment_source is a Phase 26A-2D column and operation_id/credit_deducted
+    // are the canonical-authority receipt. Try the full shape; if a column is not
+    // present the fallback drops it, which FAILS CLOSED for contact: without the
+    // receipt a row is judged by the previous helper, never auto-allowed.
     const runQuery = (columns: string) =>
-      adminClient()
+      db
         .from("lead_assignments")
         .select(`${columns}, lead:leads ( ${leadSelect} )`)
         .eq("vendor_id", vendorId)
         .order("assigned_at", { ascending: false });
 
-    let { data, error } = await runQuery("id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported");
+    let { data, error } = await runQuery(
+      "id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported, operation_id, credit_deducted",
+    );
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await runQuery(
+        "id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported",
+      ));
+    }
     if (error && isMissingColumnError(error)) {
       ({ data, error } = await runQuery("id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported"));
     }
     if (error) throw error;
-    return ok(data ?? []);
+
+    // The select list is built at runtime, so supabase-js cannot type it
+    // statically; go through `unknown` exactly as the previous code did.
+    const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+    return ok(rows.map((row) => sanitizeAssignedLeadRow(row, vendorRow as Record<string, unknown>, settings)));
   } catch (e) {
     return fail(e);
   }
+}
+
+/**
+ * Copy one assignment row into the client-safe shape.
+ *
+ * Nothing is spread: every field is copied by name, so a column added to the
+ * query later cannot silently reach the browser. `phone` survives only when this
+ * specific assignment is entitled, and the evidence columns never leave.
+ */
+function sanitizeAssignedLeadRow(
+  row: Record<string, unknown>,
+  vendorRow: Record<string, unknown>,
+  settings: Record<string, unknown> | { allow_trial_vendors_for_assignment?: boolean | null },
+): Record<string, unknown> {
+  const access = evaluateAssignedLeadContactAccess(vendorRow, row, settings);
+  const rawLead = (row.lead ?? null) as Record<string, unknown> | null;
+
+  const lead = rawLead
+    ? {
+        id: rawLead.id ?? null,
+        name: rawLead.name ?? null,
+        // THE GATE. An unentitled row carries no phone past this line.
+        phone: access.contactAllowed ? (rawLead.phone ?? null) : null,
+        city: rawLead.city ?? null,
+        area: rawLead.area ?? null,
+        service_required: rawLead.service_required ?? null,
+        budget: rawLead.budget ?? null,
+        property_type: rawLead.property_type ?? null,
+        timeline: rawLead.timeline ?? null,
+        message: rawLead.message ?? null,
+        created_at: rawLead.created_at ?? null,
+      }
+    : null;
+
+  return {
+    id: row.id,
+    assigned_at: row.assigned_at ?? null,
+    assignment_type: row.assignment_type ?? null,
+    assignment_source: row.assignment_source ?? null,
+    vendor_status: row.vendor_status ?? null,
+    is_bad_lead_reported: row.is_bad_lead_reported ?? null,
+    // The ONLY entitlement fact the browser is given. operation_id and
+    // credit_deducted stay server-side.
+    contact_allowed: access.contactAllowed,
+    lead,
+  };
 }
 
 /** Vendor updates their pipeline status for a lead + logs it to the timeline. */
@@ -458,30 +552,6 @@ export async function submitStructuredLeadReport(
 
     await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", assignmentId);
     return ok({ id: inserted.data.id });
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-async function canVendorViewLeadContact(vendorId: string): Promise<Result<boolean>> {
-  try {
-    const settings = await loadMarketplaceRuntimeSettings();
-    let { data, error } = await adminClient()
-      .from("vendors")
-      .select("status, is_active, paid_status, package_status, package_expires_at, remaining_credits")
-      .eq("id", vendorId)
-      .maybeSingle();
-    if (error && isMissingColumnError(error)) {
-      ({ data, error } = await adminClient()
-        .from("vendors")
-        .select("status, is_active, paid_status, remaining_credits")
-        .eq("id", vendorId)
-        .maybeSingle());
-    }
-    if (error) throw error;
-    if (!data) throw appError("UNKNOWN");
-
-    return ok(evaluateVendorContactAccessEligibility(data as Record<string, unknown>, settings).eligible);
   } catch (e) {
     return fail(e);
   }

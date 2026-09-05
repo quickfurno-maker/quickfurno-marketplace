@@ -436,6 +436,131 @@ mutant("M24 [mutant] reject: a hero CTA comes back",
   (s) => s.replace("type HeroSlide = {", "type HeroSlide = {\n  primary: string;"),
   (s) => !/^\s*primary\s*:/m.test(s));
 
+
+// ============================================================================
+// QF-UI-HOTFIX-02 — the enquiry modal's ROW CONTRACT.
+//
+// The wizard had four flow children, so the shell declared four grid tracks.
+// The single-form redesign left only header / body / footer, and CSS grid
+// auto-placement then handed the SCROLLING body an `auto` track (sized to its
+// content) and the footer the flexible `minmax(0, 1fr)` track — which collapses
+// to zero once the body has eaten the modal's max-height. On desktop the user
+// could scroll to the consent row and still never see "Get Free Team Matches".
+//
+// The invariant: the flexible track belongs to whichever element owns the
+// overflow, and the submit footer is a SIBLING of the scroller, never inside it.
+// ============================================================================
+
+const ENQUIRY_CSS = "app/client-enquiry-v2.css";
+const ENQUIRY_CSS_SRC = code(ENQUIRY_CSS);
+const ENQUIRY_CSS_FLAT = flat(ENQUIRY_CSS_SRC);
+
+/** The `.qf-rf-modal` shell rule body, comments already stripped. */
+function modalShellRule(src) {
+  const flatSrc = flat(src);
+  const i = flatSrc.indexOf(".qf-rf-modal.qf-rf-modal {");
+  return i === -1 ? "" : flatSrc.slice(i, flatSrc.indexOf("}", i));
+}
+/** The `.qf-rf-body` rule body. */
+function bodyRule(src) {
+  const flatSrc = flat(src);
+  const i = flatSrc.indexOf(".qf-rf-body.qf-rf-body {");
+  return i === -1 ? "" : flatSrc.slice(i, flatSrc.indexOf("}", i));
+}
+
+check("U40 the modal declares exactly THREE tracks: auto minmax(0,1fr) auto", () => {
+  const rule = modalShellRule(ENQUIRY_CSS_SRC);
+  assert(rule !== "", ".qf-rf-modal shell rule not found");
+  assert(/grid-template-rows: auto minmax\(0, ?1fr\) auto;/.test(rule),
+    "the modal no longer declares `auto minmax(0, 1fr) auto`");
+});
+
+check("U41 the obsolete FOUR-track wizard rule is gone from the stylesheet", () => {
+  assert(!/grid-template-rows: auto auto minmax\(0, ?1fr\) auto/.test(ENQUIRY_CSS_FLAT),
+    "the four-track wizard grid is back — the submit CTA will be pushed out of the modal");
+});
+
+check("U42 the scrolling body can shrink: min-height:0 AND overflow-y:auto", () => {
+  const rule = bodyRule(ENQUIRY_CSS_SRC);
+  assert(rule !== "", ".qf-rf-body rule not found");
+  assert(/min-height: 0;/.test(rule), "min-height:0 is missing — an auto min-height re-breaks the footer");
+  assert(/overflow-y: auto;/.test(rule), "the body no longer owns the overflow");
+});
+
+check("U43 the submit footer is a SIBLING that follows the scrolling body", () => {
+  const bodyAt = MODAL_SRC.indexOf('className="qf-rf-body"');
+  const footerAt = MODAL_SRC.indexOf('className="qf-rf-footer qf-sf-footer"');
+  assert(bodyAt !== -1, "qf-rf-body element is gone");
+  assert(footerAt !== -1, "qf-sf-footer element is gone");
+  assert(footerAt > bodyAt, "the submit footer no longer follows the body");
+});
+
+check("U44 the submit CTA is NOT inside the scrolling body", () => {
+  const bodyAt = MODAL_SRC.indexOf('className="qf-rf-body"');
+  const footerAt = MODAL_SRC.indexOf('className="qf-rf-footer qf-sf-footer"');
+  const insideBody = MODAL_SRC.slice(bodyAt, footerAt);
+  assert(!/qf-sf-cta/.test(insideBody), "the submit CTA was moved into the scroll body");
+  assert(!/Get Free Team Matches/.test(insideBody), "the submit CTA label appears inside the scroll body");
+});
+
+check("U45 qf-sf-cta lives inside qf-sf-footer", () => {
+  const footerAt = MODAL_SRC.indexOf('className="qf-rf-footer qf-sf-footer"');
+  const footerEnd = MODAL_SRC.indexOf("</footer>", footerAt);
+  const footer = MODAL_SRC.slice(footerAt, footerEnd);
+  assert(/qf-sf-cta/.test(footer), "qf-sf-cta is no longer inside the submit footer");
+  assert(/Get Free Team Matches/.test(footer), "the CTA label left the submit footer");
+  assert(/qf-sf-trust/.test(footer), "the trust line left the submit footer");
+});
+
+check("U46 the CTA label appears exactly once in the modal", () => {
+  const hits = (MODAL_SRC.match(/Get Free Team Matches/g) || []).length;
+  assert(hits === 1, `expected exactly 1 CTA label, found ${hits}`);
+});
+
+check("U47 no page-fixed footer positioning was introduced", () => {
+  for (const sel of [".qf-rf-footer.qf-rf-footer {", ".qf-sf-footer.qf-sf-footer {"]) {
+    const i = ENQUIRY_CSS_FLAT.indexOf(sel);
+    assert(i !== -1, `${sel} rule not found`);
+    const rule = ENQUIRY_CSS_FLAT.slice(i, ENQUIRY_CSS_FLAT.indexOf("}", i));
+    assert(!/position: fixed/.test(rule),
+      `${sel} uses position:fixed — a viewport-fixed CTA can escape the modal`);
+  }
+});
+
+mutant("M40 [mutant] reject: the old four-track wizard grid is restored",
+  ENQUIRY_CSS_SRC,
+  (s) => s.replace("grid-template-rows: auto minmax(0, 1fr) auto;",
+                   "grid-template-rows: auto auto minmax(0, 1fr) auto;"),
+  (s) => {
+    const rule = modalShellRule(s);
+    return /grid-template-rows: auto minmax\(0, ?1fr\) auto;/.test(rule)
+      && !/grid-template-rows: auto auto minmax\(0, ?1fr\) auto/.test(flat(s));
+  });
+
+mutant("M41 [mutant] reject: the body loses min-height:0",
+  ENQUIRY_CSS_SRC,
+  (s) => s.replace("  min-height: 0;\n  overflow-y: auto;", "  overflow-y: auto;"),
+  (s) => /min-height: 0;/.test(bodyRule(s)));
+
+mutant("M42 [mutant] reject: the submit CTA is moved into the scroll body",
+  MODAL_SRC,
+  (s) => s.replace('<div className="qf-rf-body" ref={bodyRef}>',
+                   '<div className="qf-rf-body" ref={bodyRef}><button className="qf-sf-cta">Get Free Team Matches</button>'),
+  (s) => {
+    const bodyAt = s.indexOf('className="qf-rf-body"');
+    const footerAt = s.indexOf('className="qf-rf-footer qf-sf-footer"');
+    return !/qf-sf-cta/.test(s.slice(bodyAt, footerAt));
+  });
+
+mutant("M43 [mutant] reject: the footer is pinned to the viewport",
+  ENQUIRY_CSS_SRC,
+  (s) => s.replace(".qf-sf-footer.qf-sf-footer {", ".qf-sf-footer.qf-sf-footer {\n  position: fixed;"),
+  (s) => {
+    const f = flat(s);
+    const i = f.indexOf(".qf-sf-footer.qf-sf-footer {");
+    return !/position: fixed/.test(f.slice(i, f.indexOf("}", i)));
+  });
+
 // ============================================================================
 let passed = 0;
 const failures = [];

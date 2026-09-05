@@ -116,6 +116,49 @@ export function normalizeResolvedDestination(raw: string | null | undefined): Re
 }
 
 /**
+ * QF-MVP-80.16B — the VENDOR-ONLY storage adapter.
+ *
+ * WHY THIS EXISTS. `public.vendors.phone` and `.whatsapp_number` are written by
+ * QuickFurno's own vendor registration, which deliberately strips every
+ * non-digit and persists EXACTLY ten digits (`services/vendorService.ts`
+ * rejects anything else). The provider-neutral normalizer, equally
+ * deliberately, refuses a number with no international prefix. Those two
+ * contracts had never met until a real vendor send ran: every dispatch of the
+ * first natural lead was refused with RECIPIENT_DESTINATION_INVALID while the
+ * vendors had already been charged.
+ *
+ * This adapter reconciles them at the ONE boundary where the storage contract
+ * is actually known — a vendor row — and nowhere else.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO:
+ *   • It does not relax normalizePhoneE164. A bare national number stays
+ *     ambiguous everywhere else (client, lead, admin, OTP, future channels),
+ *     and `+91` is assumed here only because the vendor table's own writer
+ *     guarantees an Indian ten-digit mobile.
+ *   • It does not strip or repair characters. It matches the exact shape
+ *     `^[6-9]\d{9}$` — the same rule the enquiry form and the vendor registry
+ *     enforce — and anything else is handed to the normalizer unchanged, so a
+ *     malformed value still fails closed rather than being guessed at.
+ *   • It performs no fallback between fields. Choosing WhatsApp over phone
+ *     remains the caller's decision.
+ */
+const STORED_INDIAN_MOBILE = /^[6-9]\d{9}$/;
+
+export function normalizeStoredVendorDestination(raw: string | null | undefined): Result<string> {
+  if (raw === null || raw === undefined || raw.trim() === "") {
+    return failRecipientResolution(RecipientResolutionError.RECIPIENT_DESTINATION_MISSING);
+  }
+  const trimmed = raw.trim();
+  // Only the exact QuickFurno storage shape is adapted; everything else —
+  // already-international, malformed, too short, too long, wrong first digit —
+  // goes to the canonical normalizer and lives or dies by its rules.
+  if (STORED_INDIAN_MOBILE.test(trimmed)) {
+    return normalizeResolvedDestination(`+91${trimmed}`);
+  }
+  return normalizeResolvedDestination(trimmed);
+}
+
+/**
  * In-memory resolver for tests, harnesses and local sandboxes. Holds only the
  * destinations it was explicitly given — it never guesses and never falls back.
  */

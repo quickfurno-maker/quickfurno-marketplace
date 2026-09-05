@@ -210,6 +210,9 @@ jobs:
       - name: Phase 4 credit wallet and candidate-pool invariants
         run: npm run test:phase4
 
+      - name: QF-MVP-80.16B vendor destination normalization
+        run: npm run test:mvp:80-16b
+
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 

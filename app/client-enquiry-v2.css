@@ -38,7 +38,17 @@
   max-height: 94vh;
   max-height: 94dvh;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  /* QF-UI-HOTFIX-02 — THREE tracks, matching the actual DOM.
+     The wizard had four flow children; the single-form redesign left only
+     header / body / footer, so the old four-track rule mis-assigned them:
+     the SCROLLING body landed in an `auto` track and sized to its content,
+     while the footer took `minmax(0, 1fr)` and collapsed to zero once the
+     body had consumed the modal's max-height. The consent row was reachable
+     but the submit CTA was not — a P1 lead-submission blocker.
+     The flexible track must belong to the element that owns the overflow.
+     (`.qf-rf-confirm` is position:fixed, so it never occupies a track.) */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   border: 0;
   border-radius: var(--qf-radius-lg) var(--qf-radius-lg) 0 0;
   background: var(--qf-brand-surface);
@@ -176,6 +186,10 @@
    Body + question
    ========================================================================== */
 .qf-rf-body.qf-rf-body {
+  /* QF-UI-HOTFIX-02 — a grid item's default min-height is `auto`, which
+     refuses to shrink below its content and would push the footer out of
+     the modal again even with the correct track count. */
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;

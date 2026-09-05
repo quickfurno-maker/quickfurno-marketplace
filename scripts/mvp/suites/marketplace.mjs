@@ -1456,6 +1456,88 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-17: public launch invariants -----------------------------
+    {
+      name: 'footer headings do not skip a level below the page h1',
+      run: () => {
+        // MEASURED DEFECT: the shared footer used h3, so on pages whose main
+        // content has no visible h2 (/enquiry) the outline jumped h1 -> h3.
+        const footer = readFileSync('components/Footer.tsx', 'utf8');
+        assertTrue(footer.includes('<h2 className="qf-foot-acc-head">'), 'footer groups are h2');
+        assertFalse(/<h3 className="qf-foot-acc-head"/.test(footer), 'no h3 regression');
+        // The level change must stay purely semantic: styling lives on the
+        // inner button, so no stylesheet may start targeting the heading tag.
+        const css = readFileSync('app/qf-public-v2.css', 'utf8');
+        assertFalse(/\.qf-foot-acc-head\s+h3|\.qf-foot\s+h3\b/.test(css), 'no tag-based footer heading style');
+      },
+    },
+    {
+      name: 'every public nav target is a real route, never a dead href',
+      run: () => {
+        const header = readFileSync('components/Header.tsx', 'utf8');
+        const bottom = readFileSync('components/MobileBottomNav.tsx', 'utf8');
+        const footer = readFileSync('components/Footer.tsx', 'utf8');
+        const all = header + bottom + footer;
+        // No placeholder or script hrefs may ship.
+        assertFalse(/href="#"/.test(all), 'no bare # href');
+        assertFalse(/href="javascript:/i.test(all), 'no javascript: href');
+        assertFalse(/href=""/.test(all), 'no empty href');
+        // Header anchors must point at ids the homepage actually renders.
+        const home = readFileSync('app/page.tsx', 'utf8')
+          + readFileSync('components/home/HomeSectionsV2.tsx', 'utf8')
+          + readFileSync('components/home/HomeServiceLauncher.tsx', 'utf8');
+        for (const id of ['categories', 'how-it-works', 'why-quickfurno', 'services']) {
+          if (!all.includes('/#' + id) && !all.includes('#' + id)) continue;
+          assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');
+        }
+      },
+    },
+    {
+      name: 'public surfaces keep the approved claims and add no new ones',
+      run: () => {
+        const files = ['app/page.tsx', 'components/home/HomeSectionsV2.tsx',
+                       'components/home/HomeHeroSlider.tsx', 'components/home/HomeServiceLauncher.tsx',
+                       'app/category/[slug]/page.tsx', 'app/enquiry/page.tsx', 'components/Footer.tsx'];
+        for (const file of files) {
+          // Strip comments so a note ABOUT a banned phrase cannot fail the scan.
+          const src = readFileSync(file, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').toLowerCase();
+          for (const banned of ['guaranteed', 'lowest price', 'cheapest', 'top rated',
+                                'same-day', 'trusted by thousands', 'award-winning',
+                                'instant match', 'best price']) {
+            assertFalse(src.includes(banned), file + ' must not claim: ' + banned);
+          }
+          // No invented counts of customers/projects/reviews.
+          assertFalse(/\d[\d,+]*\s*(customers|projects completed|reviews|happy clients)/.test(src),
+            file + ' must not invent counts');
+        }
+        // The approved promises are still present on the homepage.
+        const hero = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8').toLowerCase();
+        assertTrue(hero.includes('up to 3 relevant'), 'keeps the up-to-3 claim');
+        assertTrue(hero.includes('free for homeowners'), 'keeps the free-for-homeowners claim');
+      },
+    },
+    {
+      name: 'legal routes stay linked from the public footer',
+      run: () => {
+        const footer = readFileSync('components/Footer.tsx', 'utf8');
+        assertTrue(footer.includes('/privacy'), 'privacy linked');
+        assertTrue(footer.includes('/terms'), 'terms linked');
+        // The pages themselves must still exist.
+        assertTrue(existsSync('app/privacy/page.tsx'), 'privacy route exists');
+        assertTrue(existsSync('app/terms/page.tsx'), 'terms route exists');
+      },
+    },
+    {
+      name: 'no visual-QA harness route is present at launch',
+      run: () => {
+        // Temporary QA routes from earlier phases must never reach a release.
+        assertFalse(existsSync('app/qf-visual-qa'), 'no qf-visual-qa route');
+        assertFalse(existsSync('app/qf-visual-qa/admin'), 'no admin QA harness');
+        assertFalse(existsSync('app/qf-visual-qa/admin-section'), 'no section QA harness');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

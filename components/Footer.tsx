@@ -97,7 +97,12 @@ export function Footer() {
             const isOpen = open === section.id;
             return (
               <div className={`qf-foot-acc${isOpen ? " is-open" : ""}`} key={section.id}>
-                <h3 className="qf-foot-acc-head">
+                {/* QF-UI-V2-17: h2, not h3. These are the footer landmark's own
+                    top-level groups, and on pages whose main content has no
+                    visible h2 (/enquiry) an h3 here produced an h1 -> h3 jump.
+                    All visual styling sits on .qf-foot-acc-btn, so the level
+                    change is purely semantic. */}
+                <h2 className="qf-foot-acc-head">
                   <button
                     type="button"
                     className="qf-foot-acc-btn"
@@ -108,7 +113,7 @@ export function Footer() {
                     {section.title}
                     <span className="qf-foot-acc-chev" aria-hidden="true" />
                   </button>
-                </h3>
+                </h2>
                 <div className="qf-foot-acc-panel" id={`qf-foot-panel-${section.id}`}>
                   <div className="qf-foot-acc-inner">
                     <FooterLinks links={section.links} />

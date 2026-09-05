@@ -151,11 +151,14 @@ export function VendorDiscovery({
 
       {results.length === 0 ? (
         <div className="qf-vl-empty">
-          <h3>
+          {/* h2 for the same reason as the card name: this replaces the results
+              directly under the page h1. The stylesheet already targets
+              .qf-vl-empty h2 and h3 identically. */}
+          <h2>
             {filtersActive
               ? "No vendors match these filters"
               : "No verified vendors are available in this category right now."}
-          </h3>
+          </h2>
           <p>
             {filtersActive
               ? "Clear the filters to see every vendor in this category, or tell QuickFurno what you need."

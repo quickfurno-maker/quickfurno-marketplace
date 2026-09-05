@@ -1605,6 +1605,33 @@ export const suite = {
       },
     },
 
+    // --- QF-UI-V2-19: listing heading hierarchy ---------------------------
+    {
+      name: 'category listing headings do not skip a level under the page h1',
+      run: () => {
+        // Latent until QF-UI-V2-18 put real vendors on the page: the card name
+        // and the empty-state heading both sit directly under the category h1
+        // with no intervening section heading, so an h3 measured as "1->3".
+        const card = readFileSync('components/public-listing/VendorListingCard.tsx', 'utf8');
+        assertTrue(card.includes('<h2 className="qf-vl-card-name">'), 'card name is an h2');
+        assertFalse(/<h3 className="qf-vl-card-name">/.test(card), 'no h3 regression on the card name');
+
+        const discovery = readFileSync('components/public-listing/VendorDiscovery.tsx', 'utf8');
+        const emptyBlock = discovery.slice(discovery.indexOf('qf-vl-empty'));
+        assertTrue(/<h2>/.test(emptyBlock.slice(0, 600)), 'empty-state heading is an h2');
+
+        // The category page keeps exactly one h1 and does not add another.
+        const page = readFileSync('app/category/[slug]/page.tsx', 'utf8');
+        assertEqual((page.match(/<h1/g) || []).length, 1, 'category page declares exactly one h1');
+        assertFalse(/<h1/.test(card), 'a listing card never declares an h1');
+
+        // The level change must stay semantic: styling is class-based.
+        const css = readFileSync('app/category/vendor-listing-v2.css', 'utf8');
+        assertTrue(css.includes('.qf-vl-card-name {'), 'card name styled by class, not tag');
+        assertTrue(css.includes('.qf-vl-empty h2,'), 'empty rule covers h2');
+      },
+    },
+
     // --- Deterministic no-side-effect boundary ---------------------------
     {
       name: 'security rules block AI / WhatsApp / n8n / db-write side effects',

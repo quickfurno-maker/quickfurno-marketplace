@@ -73,9 +73,13 @@ export function VendorListingCard({
         </Link>
 
         <div className="qf-vl-card-info">
-          <h3 className="qf-vl-card-name">
+          {/* QF-UI-V2-19: h2, not h3. These cards sit directly under the
+              category page h1 with no intervening section heading, so an h3
+              skipped a level once real vendors render. Styling is class-based
+              (.qf-vl-card-name), so the level change is purely semantic. */}
+          <h2 className="qf-vl-card-name">
             <Link href={profileHref}>{vendor.businessName}</Link>
-          </h3>
+          </h2>
 
           <p className="qf-vl-card-meta">
             {vendor.verified ? (

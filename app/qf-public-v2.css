@@ -420,8 +420,9 @@
   border-radius: var(--qf-brand-radius-lg);
   background: var(--qf-brand-surface);
   box-shadow: var(--qf-brand-shadow-md);
-  /* Fixed track height keeps dots and CTAs from moving between slides, and is
-     matched to the launcher beside it so neither panel ends in dead space. */
+  /* Fixed track height keeps dots and CTAs from moving between slides.
+     QF-UI-HOTFIX-01: it is no longer matched to a launcher beside the hero —
+     the hero spans the full container width and the launcher sits below it. */
   min-height: 372px;
 }
 
@@ -549,9 +550,10 @@
 /* --- Service launcher --- */
 .qf-launcher {
   display: grid;
-  /* auto head + growing grid, so the tiles absorb whatever height the hero
-     sets and the panel never ends in a block of dead space. */
-  grid-template-rows: auto 1fr;
+  /* QF-UI-HOTFIX-01: auto head + auto grid. This was `auto 1fr` so the tiles
+     could absorb whatever height the hero BESIDE IT set; the launcher now sits
+     below a full-width hero, so a growing row would just add dead space. */
+  grid-template-rows: auto auto;
   gap: 0.75rem;
   padding: 1.1rem;
   border: 1px solid var(--qf-brand-line);
@@ -575,15 +577,19 @@
   color: var(--qf-brand-muted);
 }
 
+/* QF-UI-HOTFIX-01 — the launcher is now a FULL-WIDTH surface under the hero,
+   so its grid widens with the viewport instead of staying a 2-up sidebar:
+     < 700px   2 columns, Civil Work spanning both (unchanged mobile feel)
+     700-1023  3 columns, Civil Work spanning the final row
+     >= 1024   4 columns: Interior | Carpentry | Modular | Premium Interiors,
+               then Sofa | Painting | Civil Work, where Civil Work takes the
+               remaining TWO columns so the second row is balanced rather than
+               leaving a single orphan tile. */
 .qf-launcher-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
   gap: 0.5rem;
-}
-
-@media (min-width: 1024px) {
-  .qf-launcher-grid { align-content: stretch; grid-auto-rows: minmax(56px, 1fr); }
 }
 
 .qf-launcher-item {
@@ -1093,7 +1099,9 @@
    BREAKPOINTS
    ========================================================================== */
 @media (min-width: 700px) {
-  .qf-launcher-grid { gap: 0.55rem; }
+  /* QF-UI-HOTFIX-01: three columns in the tablet band. Civil Work keeps the
+     base `1 / -1` span, so it fills the final row instead of orphaning. */
+  .qf-launcher-grid { gap: 0.55rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .qf-hero-slider { min-height: 460px; }
   .qf-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qf-usp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1101,14 +1109,30 @@
 }
 
 @media (min-width: 1024px) {
-  /* The locked ~65 / ~35 entry module. */
-  .qf-hero-v2-grid {
-    grid-template-columns: minmax(0, 65fr) minmax(300px, 35fr);
-    gap: 1rem;
-    align-items: stretch;
+  /* QF-UI-HOTFIX-01 — the entry module stays a SINGLE COLUMN at every width.
+     This block used to set `grid-template-columns: minmax(0, 65fr)
+     minmax(300px, 35fr)`, which pinned the service launcher beside the hero and
+     is the layout that was rejected. There is deliberately no
+     `grid-template-columns` here now: the grid inherits the base single-column
+     definition, so hero -> launcher -> trust simply stack full width and the
+     `.qf-hero-v2-trust` column-span that existed only to cross those two
+     columns is gone with them. Do not reintroduce a multi-column rule here. */
+  .qf-hero-v2-grid { gap: 1rem; }
+
+  /* Four across, with a natural row height. The launcher used to stretch its
+     rows (`align-content: stretch` + `grid-auto-rows: minmax(56px, 1fr)`) so it
+     could match the height of the hero SITTING BESIDE IT; below the hero that
+     only produced dead space, so rows size to content off a 60px floor. */
+  .qf-launcher-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-content: start;
+    grid-auto-rows: minmax(60px, auto);
+    gap: 0.6rem;
   }
 
-  .qf-hero-v2-trust { grid-column: 1 / -1; }
+  /* Civil Work takes the two columns left on the second row. */
+  .qf-launcher-item--wide { grid-column: span 2; }
+
   .qf-hero-arrows { display: flex; }
 
   /* Copy left, visual right — copy keeps priority. QF-UI-V2-15: measured at

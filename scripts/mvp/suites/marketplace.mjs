@@ -587,25 +587,33 @@ export const suite = {
       },
     },
     {
-      name: 'budget placeholders are examples, never prefilled values',
+      name: 'budget is never prefilled and still writes the canonical fields',
       run: () => {
-        assertEqual(BUDGET_MIN_PLACEHOLDER, 'e.g. 50,000', 'minimum placeholder copy');
-        assertEqual(BUDGET_MAX_PLACEHOLDER, 'e.g. 3,00,000', 'maximum placeholder copy');
-        for (const text of [BUDGET_MIN_PLACEHOLDER, BUDGET_MAX_PLACEHOLDER]) {
-          assertTrue(text.startsWith('e.g. '), 'reads as an example: ' + text);
-        }
+        // QF-MOBILE-FORM replaced the two numeric budget inputs with ONE band
+        // select, so the old placeholder-binding assertions describe a control
+        // that no longer exists. The INTENT is unchanged and re-pinned here:
+        // nothing may arrive pre-filled, and whatever the client picks must land
+        // in the same budgetMin / budgetMax / budgetNotSure fields the payload
+        // has always been derived from.
         const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
-        // Placeholders only — never a value/defaultValue, and no bare numerics.
         assertFalse(src.includes('placeholder="50000"'), 'old bare minimum placeholder gone');
         assertFalse(src.includes('placeholder="300000"'), 'old bare maximum placeholder gone');
-        assertTrue(src.includes('placeholder={BUDGET_MIN_PLACEHOLDER}'), 'min bound to the constant');
-        assertTrue(src.includes('placeholder={BUDGET_MAX_PLACEHOLDER}'), 'max bound to the constant');
-        assertFalse(src.includes('defaultValue={BUDGET_MIN_PLACEHOLDER}'), 'never a default value');
-        assertFalse(src.includes('value={BUDGET_MIN_PLACEHOLDER}'), 'never a bound value');
-        assertFalse(src.includes('value={BUDGET_MAX_PLACEHOLDER}'), 'never a bound value');
-        // The budget fields stay bound to form state, so nothing can leak to the payload.
-        assertTrue(src.includes('value={form.budgetMin}'), 'min stays bound to form state');
-        assertTrue(src.includes('value={form.budgetMax}'), 'max stays bound to form state');
+        // Empty defaults: no band is selected and no amount exists until chosen.
+        assertTrue(/budgetMin: "",/.test(src), 'budgetMin starts empty');
+        assertTrue(/budgetMax: "",/.test(src), 'budgetMax starts empty');
+        assertTrue(/budgetNotSure: false,/.test(src), 'budgetNotSure starts false');
+        assertTrue(src.includes('<option value="">Select a budget range</option>'),
+          'the budget select opens on an empty option');
+        // The select is bound to the DERIVED band, never to a hardcoded default.
+        assertTrue(src.includes('value={currentBudgetBandId()}'), 'band select reads derived state');
+        assertFalse(/currentBudgetBandId\(\) \|\| "[a-z0-9+-]/.test(src), 'no fallback band is forced');
+        // Choosing a band writes only the canonical fields.
+        const setter = src.slice(src.indexOf('function selectBudgetBand'));
+        for (const field of ['budgetNotSure', 'budgetMin', 'budgetMax']) {
+          assertTrue(setter.includes(field), 'band writes canonical field: ' + field);
+        }
+        // And the payload still derives from budgetSummary(), unchanged.
+        assertTrue(src.includes('budget_range: budgetText'), 'budget_range payload unchanged');
       },
     },
     {
@@ -1577,8 +1585,12 @@ export const suite = {
           || src.includes('aria-labelledby={"qf-rf-title"}'), 'dialog is labelled by its title');
         assertTrue(src.includes('role="dialog"'), 'dialog role kept');
         assertTrue(src.includes('aria-modal="true"'), 'aria-modal kept');
+        // QF-MOBILE-FORM: the wizard titled every one of its steps, so this
+        // used to expect >= 7. One continuous form has one title (plus the
+        // success view), and the contract that matters is unchanged: the dialog
+        // is named by an h3 carrying this exact id, never an h2.
         const titles = src.match(/<h3 id="qf-rf-title">/g) || [];
-        assertTrue(titles.length >= 7, 'every modal step still titles with h3, got ' + titles.length);
+        assertTrue(titles.length >= 1, 'the dialog still has an h3 title, got ' + titles.length);
         assertFalse(/<h2 id="qf-rf-title">/.test(src), 'modal title was not changed to h2');
       },
     },

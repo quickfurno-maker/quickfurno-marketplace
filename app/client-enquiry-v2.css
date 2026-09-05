@@ -1003,3 +1003,248 @@
   .qf-rf-btn,
   .qf-rf-progress-fill { transition-duration: 0.01ms !important; }
 }
+
+/* ==========================================================================
+   QF-MOBILE-FORM — single continuous enquiry form
+   --------------------------------------------------------------------------
+   Replaces the six-question wizard presentation. Mobile-first: one column at
+   390px, no step chrome, and the pairing into two columns happens only from
+   1024px so the wide layout never dictates the mobile structure.
+
+   These rules are additive and scoped to .qf-sf*; the shared .qf-rf-* input,
+   validation-icon and button primitives are reused unchanged so the form still
+   looks like the rest of the modal.
+   ========================================================================== */
+
+/* --- Intro (replaces the phase strip + progress bar) --- */
+.qf-sf-intro { display: grid; gap: 0.25rem; padding-top: 0.15rem; }
+
+.qf-sf-intro h3 {
+  margin: 0;
+  font-size: 1.075rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--qf-brand-ink);
+}
+
+.qf-sf-intro p {
+  margin: 0;
+  font-size: 0.828rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+}
+
+/* --- The form itself --- */
+.qf-sf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  align-content: start;
+}
+
+.qf-sf-field { display: grid; gap: 0.28rem; min-width: 0; }
+
+.qf-sf-label {
+  font-size: 0.797rem;
+  font-weight: 650;
+  color: var(--qf-brand-ink-2, #334155);
+}
+
+/* Inputs reuse the modal primitives; only the touch target grows so every
+   control clears the 48px guidance on a phone. */
+.qf-sf-field input,
+.qf-sf-field select,
+.qf-sf-field textarea,
+.qf-sf .qf-rf-input-wrapper input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-surface);
+  font-family: inherit;
+  font-size: 0.938rem;
+  color: var(--qf-brand-ink);
+}
+
+/* Native select arrow, aligned consistently across the dropdowns. */
+.qf-sf-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.1rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235f6b7d' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+}
+
+.qf-sf-field textarea {
+  min-height: 88px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.qf-sf-field input:focus-visible,
+.qf-sf-field select:focus-visible,
+.qf-sf-field textarea:focus-visible,
+.qf-sf .qf-rf-input-wrapper input:focus-visible {
+  outline: 2px solid var(--qf-brand-blue, #2563eb);
+  outline-offset: 1px;
+  border-color: var(--qf-brand-blue, #2563eb);
+}
+
+.qf-sf-field.has-error input,
+.qf-sf-field.has-error select,
+.qf-sf-field.has-error textarea,
+.qf-sf-field.has-error .qf-rf-input-wrapper input {
+  border-color: #dc7070;
+}
+
+/* --- Location helper row --- */
+.qf-sf-locrow { display: grid; gap: 0.35rem; }
+
+.qf-sf-loc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset, #f8fafc);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--qf-brand-ink-2, #334155);
+  cursor: pointer;
+}
+
+.qf-sf-loc:hover { background: #f1f5f9; }
+.qf-sf-loc svg { width: 16px; height: 16px; }
+
+.qf-sf-note {
+  margin: 0;
+  font-size: 0.766rem;
+  line-height: 1.45;
+  color: var(--qf-brand-muted);
+}
+
+.qf-sf-note--ok { color: var(--qf-brand-success, #0f7a51); }
+
+/* --- WhatsApp toggle --- */
+.qf-sf-check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  font-size: 0.86rem;
+  color: var(--qf-brand-ink-2, #334155);
+  cursor: pointer;
+}
+
+.qf-sf-check input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  accent-color: var(--qf-brand-blue, #2563eb);
+}
+
+/* --- Consent: same legal text, compact row instead of a large card --- */
+.qf-sf-consent {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 0.6rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset, #f8fafc);
+  font-size: 0.766rem;
+  line-height: 1.5;
+  color: var(--qf-brand-muted);
+  cursor: pointer;
+}
+
+.qf-sf-consent input {
+  width: 20px;
+  height: 20px;
+  margin-top: 0.1rem;
+  accent-color: var(--qf-brand-blue, #2563eb);
+}
+
+.qf-sf-consent a {
+  color: var(--qf-brand-blue-deep, #1d4ed8);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.qf-sf-consent.has-error { border-color: #dc7070; background: #fef6f6; }
+
+/* --- Footer: one full-width CTA + a quiet trust line --- */
+.qf-sf-footer.qf-sf-footer {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: stretch;
+}
+
+.qf-sf-cta.qf-sf-cta {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.qf-sf-trust {
+  margin: 0;
+  text-align: center;
+  font-size: 0.719rem;
+  line-height: 1.4;
+  color: var(--qf-brand-muted);
+}
+
+/* ==========================================================================
+   Tablet — the form stays single-column while it still reads best, and only
+   the paired selects share a row.
+   ========================================================================== */
+@media (min-width: 768px) {
+  .qf-sf { gap: 0.8rem; }
+  .qf-sf-intro h3 { font-size: 1.15rem; }
+}
+
+/* ==========================================================================
+   Desktop — pair related fields. Mobile order is preserved; only the visual
+   grouping changes, so nothing about the field sequence depends on width.
+   ========================================================================== */
+/* 992px, not 1024px: at exactly 1024 a vertical scrollbar leaves a 1023px
+   viewport, so a 1024 breakpoint silently never fires on a real 1024 screen.
+   The modal also widens here, because two columns inside the 560px card would
+   leave each field about 245px — too cramped for these labels. */
+@media (min-width: 992px) {
+  .qf-rf-modal.qf-rf-modal { max-width: 760px; }
+
+  .qf-sf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 0.9rem;
+    row-gap: 0.75rem;
+  }
+
+  /* Anything that must own the full row. The Area field joins them because its
+     location helper button sits directly beneath it — pairing Area with an
+     unrelated select would split that pair across two columns and leave a
+     half-empty row. */
+  .qf-sf-field--full,
+  .qf-sf-area,
+  .qf-sf-locrow,
+  .qf-sf-consent,
+  .qf-sf > .qf-rf-field-err {
+    grid-column: 1 / -1;
+  }
+
+  .qf-sf-footer.qf-sf-footer {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .qf-sf-cta.qf-sf-cta { max-width: 420px; }
+}

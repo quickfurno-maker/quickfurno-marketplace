@@ -54,6 +54,20 @@ const check = (name, fn) => checks.push({ name, fn });
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
 /**
+ * A rule that cannot fail proves nothing. `mutant` re-evaluates a rule against a
+ * deliberately broken copy of the source and fails if the rule still passes, so
+ * every guard below is demonstrably able to catch the regression it describes.
+ */
+function mutant(name, source, mutate, stillPasses) {
+  check(name, () => {
+    assert(stillPasses(source), "precondition: the rule must PASS on real source");
+    const broken = mutate(source);
+    assert(broken !== source, "mutation was a no-op — the rule proves nothing");
+    assert(!stillPasses(broken), "the rule ACCEPTED a broken source");
+  });
+}
+
+/**
  * Every `useEffect(... , [deps])` in a file, as { body, deps }.
  * Bodies are matched by scanning to the effect's closing `}, [` marker, which is
  * enough for the shape this codebase uses and needs no parser dependency.
@@ -218,6 +232,97 @@ check("14 /enquiry enforces the same Indian mobile contract as the modal", () =>
   assert(!/length\s*<\s*10/.test(funnel), "the old 'at least 10 digits' check is back — it accepts 11+ digits");
 });
 
+// ---------------------------------------------------------------------------
+// 4. QF-MOBILE-FORM — the enquiry modal is ONE continuous form
+// ---------------------------------------------------------------------------
+check("15 [semantic] the modal renders a single form, not a step", () => {
+  assert(/function renderSingleForm\s*\(/.test(MODAL_SRC), "renderSingleForm() is gone");
+  assert(/\{renderSingleForm\(\)\}/.test(MODAL_FLAT), "the modal body does not render the single form");
+  assert(!/function renderStep\s*\(/.test(MODAL_SRC), "the step renderer is back");
+  assert(!/\{renderStep\(\)\}/.test(MODAL_FLAT), "the modal body still renders a single step");
+});
+
+check("16 [semantic] no wizard step chrome is rendered on any width", () => {
+  for (const marker of ["qf-rf-steps", "qf-rf-progress", "qf-rf-phase", "qf-rf-qcount"]) {
+    assert(!new RegExp(`className=("|\{\`)[^"\`]*${marker}`).test(MODAL_SRC),
+      `the modal still renders wizard chrome: ${marker}`);
+  }
+  assert(!/role="progressbar"/.test(MODAL_SRC), "a step progress bar is back in the enquiry modal");
+  assert(!/Question \$\{questionNumber\}/.test(MODAL_SRC), "the question counter is back");
+});
+
+check("17 [semantic] Back / Next step navigation is gone", () => {
+  assert(!/function goNext\s*\(/.test(MODAL_SRC), "goNext() is back");
+  assert(!/function goBack\s*\(/.test(MODAL_SRC), "goBack() is back");
+  assert(!/>\s*Next\s*</.test(MODAL_SRC), "a Next button is back in the enquiry modal");
+});
+
+check("18 [semantic] every required control is present in the one form", () => {
+  const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
+  for (const id of ["qf-sf-service", "qf-sf-city", "qf-sf-name", "qf-sf-phone",
+                    "qf-sf-budget", "qf-sf-property", "qf-sf-timeline", "qf-sf-message"]) {
+    assert(body.includes(`id="${id}"`), `the single form is missing ${id}`);
+  }
+  assert(/GooglePlaceAutocomplete/.test(body), "the Area field lost its Google autocomplete");
+  assert(/onManualChange=\{onAreaManualChange\}/.test(body), "the Area manual fallback is gone");
+  assert(/type="checkbox"[\s\S]{0,200}form\.shareConsent/.test(body), "the consent checkbox is gone");
+  assert(/form\.whatsappSame/.test(body), "the WhatsApp same-as-phone control is gone");
+});
+
+check("19 [semantic] service and city are real selects bound to the shared sources", () => {
+  const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
+  assert(/mainCategories\.map/.test(body), "the service select does not read mainCategories");
+  assert(/activeCities\.map/.test(body), "the city select does not read the admin-managed active cities");
+  assert(!/const CITIES\s*=\s*\[/.test(MODAL_SRC), "a hardcoded city list was introduced");
+});
+
+check("20 [semantic] the budget band writes the canonical min/max/notSure", () => {
+  assert(/const BUDGET_BANDS/.test(MODAL_SRC), "BUDGET_BANDS is gone");
+  assert(/function selectBudgetBand/.test(MODAL_SRC), "selectBudgetBand() is gone");
+  const fn = MODAL_SRC.slice(MODAL_SRC.indexOf("function selectBudgetBand"));
+  for (const field of ["budgetNotSure", "budgetMin", "budgetMax"]) {
+    assert(fn.includes(field), `selectBudgetBand no longer writes ${field}`);
+  }
+  assert(/budget_range: budgetText/.test(MODAL_FLAT), "the canonical budget_range payload field changed");
+});
+
+check("21 [semantic] submit is blocked while submitting and validates the whole form", () => {
+  assert(/disabled=\{submitting\}/.test(MODAL_SRC), "the submit button is not disabled while submitting");
+  assert(/if \(submitting\) return;/.test(MODAL_SRC), "handleSubmit does not guard against a double submit");
+  assert(/const invalid = formError\(\);/.test(MODAL_SRC), "handleSubmit does not validate the whole form");
+  assert(/function formError/.test(MODAL_SRC), "formError() is gone");
+  // formError must delegate to the pre-existing per-step rules, not re-implement them.
+  const fe = MODAL_SRC.slice(MODAL_SRC.indexOf("function formError"), MODAL_SRC.indexOf("function markAllTouched"));
+  assert(/stepError\(/.test(fe), "formError() re-implements validation instead of reusing stepError()");
+});
+
+check("22 [static] the client modal imports no server/business authority", () => {
+  for (const banned of ["adminClient", "SUPABASE_SERVICE_ROLE_KEY", "qf_assign_lead_vendors",
+                        "services/leadMatchingEngine", "canonicalAssignmentAuthority"]) {
+    assert(!MODAL_SRC.includes(banned), `the client enquiry modal reaches for ${banned}`);
+  }
+});
+
+check("23 [semantic] the consent legal text and share_consent semantics are intact", () => {
+  const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
+  assert(/up to 3 verified vendors initially/.test(body), "the consent cap sentence changed");
+  assert(/may manually connect me with additional verified vendors/.test(body),
+    "the replacement-vendor consent sentence was dropped");
+  assert(/href="\/privacy"/.test(body) && /href="\/terms"/.test(body), "a consent policy link was dropped");
+  assert(!/shareConsent: true/.test(MODAL_SRC), "consent is pre-checked somewhere");
+});
+
+// Mutants for the new contract.
+mutant("M15 [mutant] reject: the step renderer comes back",
+  MODAL_SRC,
+  (s) => s.replace("function renderSingleForm(", "function renderStep(").replace("{renderSingleForm()}", "{renderStep()}"),
+  (s) => /function renderSingleForm\s*\(/.test(s) && !/function renderStep\s*\(/.test(s));
+
+mutant("M21 [mutant] reject: the submit button stops being disabled while submitting",
+  MODAL_SRC,
+  (s) => s.replace("disabled={submitting}", "disabled={false}"),
+  (s) => /disabled=\{submitting\}/.test(s));
+
 // ============================================================================
 let passed = 0;
 const failures = [];
@@ -226,7 +331,7 @@ for (const { name, fn } of checks) {
   catch (e) { failures.push(`   FAIL  ${name} — ${e.message}`); console.log(`   FAIL  ${name} — ${e.message}`); }
 }
 console.log(`\n${"=".repeat(78)}`);
-console.log(`QF-UI-HOTFIX-01 mobile focus + homepage layout — passed ${passed}, failed ${failures.length}`);
+console.log(`QF-UI mobile focus + homepage layout + single enquiry form — passed ${passed}, failed ${failures.length}`);
 if (failures.length) { console.log("\nFAILURES:"); for (const l of failures) console.log(l); }
 console.log("=".repeat(78));
 process.exit(failures.length ? 1 : 0);

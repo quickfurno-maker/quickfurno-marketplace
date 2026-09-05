@@ -1322,7 +1322,7 @@ export const suite = {
       },
     },
     {
-      name: 'hero keeps one H1, distinct headlines and the enquiry CTA authority',
+      name: 'hero keeps one H1, distinct headlines and carries no CTA',
       run: () => {
         const src = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8');
         // Slide 1 is the page H1; the rest are H2 so the outline stays valid.
@@ -1330,9 +1330,14 @@ export const suite = {
         const headlines = (src.match(/headline:\s*\n?\s*"([^"]+)"/g) || []);
         assertEqual(headlines.length, 3, 'three headlines');
         assertEqual(new Set(headlines).size, 3, 'no duplicated headline');
-        // Every slide keeps the governed enquiry trigger - not a raw link.
-        assertEqual((src.match(/<EnquiryModalTrigger/g) || []).length, 1, 'one shared CTA component');
-        assertTrue(src.includes('source={`Homepage hero'), 'CTA still reports its source');
+        // QF-MVP-80.16A INVERTED this assertion. It used to require exactly one
+        // shared EnquiryModalTrigger, because the hero WAS a conversion surface.
+        // The hero is now informational: conversion lives in the header, the
+        // sticky mobile CTA, the service launcher directly below the hero, and
+        // the final CTA section. A CTA here is now the regression.
+        assertEqual((src.match(/<EnquiryModalTrigger/g) || []).length, 0, 'no enquiry CTA in the hero');
+        assertEqual((src.match(/<Link\b/g) || []).length, 0, 'no CTA link in the hero');
+        assertFalse(src.includes('qf-hero-slide-actions'), 'no hero action row');
       },
     },
     {

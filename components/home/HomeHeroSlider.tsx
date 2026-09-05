@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 
 /**
@@ -25,13 +23,17 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
  * (alt="" behind aria-hidden), so swapping in final photography later is a
  * one-line change per slide with no layout or a11y consequence.
  */
+/**
+ * QF-MVP-80.16A — the hero is an INFORMATIONAL carousel, not a CTA surface.
+ * `primary` / `secondary` were removed deliberately: conversion already has
+ * consistent entry points in the header, the sticky mobile CTA, the service
+ * launcher directly below the hero, and the final CTA section. Do not add an
+ * action back here; the UI guard fails the build if these fields return.
+ */
 type HeroSlide = {
   id: string;
   headline: string;
   support: string;
-  /** Enquiry CTA label; every slide keeps a primary action. */
-  primary: string;
-  secondary?: { label: string; href: string };
   media: string;
   alt: string;
 };
@@ -42,8 +44,6 @@ const SLIDES: HeroSlide[] = [
     headline: "Find the right verified team for your home project.",
     support:
       "Get matched with up to 3 relevant verified local teams in Pune & Mumbai — free for homeowners.",
-    primary: "Get Free Team Matches",
-    secondary: { label: "Explore Services", href: "#services" },
     media: "/assets/quickfurno/images/hero/hero-01-matching.svg",
     alt: "",
   },
@@ -52,8 +52,6 @@ const SLIDES: HeroSlide[] = [
     headline: "From custom carpentry to modular work, find the right team.",
     support:
       "Compare verified carpenters and modular specialists across Pune & Mumbai.",
-    primary: "Find Interior Experts",
-    secondary: { label: "Browse interiors", href: "/category/interior-designers" },
     media: "/assets/quickfurno/images/hero/hero-02-carpentry.svg",
     alt: "",
   },
@@ -62,8 +60,6 @@ const SLIDES: HeroSlide[] = [
     headline: "Tell us what you need and we will find relevant verified vendors.",
     support:
       "One enquiry covers interiors, carpentry, painting and civil work — your details stay private.",
-    primary: "Get Free Team Matches",
-    secondary: { label: "Explore Services", href: "#services" },
     media: "/assets/quickfurno/images/hero/hero-03-multiservice.svg",
     alt: "",
   },
@@ -145,21 +141,6 @@ export function HomeHeroSlider() {
             <div className="qf-hero-slide-copy">
               <Heading>{slide.headline}</Heading>
               <p>{slide.support}</p>
-            </div>
-
-            <div className="qf-hero-slide-actions">
-              <EnquiryModalTrigger
-                className="qf-pub-btn qf-pub-btn--primary"
-                source={`Homepage hero — ${slide.id}`}
-              >
-                {slide.primary}
-                <QFIcon name="arrow" />
-              </EnquiryModalTrigger>
-              {slide.secondary ? (
-                <Link href={slide.secondary.href} className="qf-pub-btn qf-pub-btn--secondary">
-                  {slide.secondary.label}
-                </Link>
-              ) : null}
             </div>
           </div>
         );

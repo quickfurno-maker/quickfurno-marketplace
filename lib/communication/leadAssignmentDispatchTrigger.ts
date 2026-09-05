@@ -110,6 +110,93 @@ export function resolveDispatchLimit(body: unknown): number {
 // The response projection
 // ---------------------------------------------------------------------------
 
+/**
+ * QF-MVP-80.16A — the operator-safe refusal vocabulary.
+ *
+ * WHY THIS EXISTS. The lane refused every dispatch of a real, already-charged
+ * lead for an hour and the reason was computed and then thrown away: the run
+ * summary carried `outcomes[]`, and this projection kept only four counters.
+ * Production showed `selected=3 dispatched=0 refused=3` with no stderr, so the
+ * actual cause was unobservable and had to be reconstructed from source reads.
+ *
+ * This is a CLOSED vocabulary, not a passthrough. Internal codes are mapped into
+ * these buckets and anything unrecognised — including any code added later —
+ * collapses to SEND_REFUSED_OTHER. Nothing derived from a lead, vendor,
+ * assignment, destination or provider payload can reach an operator through it.
+ */
+export const DispatchRefusalCategory = Object.freeze({
+  PLAN_INVALID: "PLAN_INVALID",
+  ASSIGNMENT_LOOKUP_FAILED: "ASSIGNMENT_LOOKUP_FAILED",
+  RECIPIENT_UNRESOLVED: "RECIPIENT_UNRESOLVED",
+  RECIPIENT_DESTINATION_INVALID: "RECIPIENT_DESTINATION_INVALID",
+  TEMPLATE_UNAVAILABLE: "TEMPLATE_UNAVAILABLE",
+  TEMPLATE_CONFIGURATION_MISMATCH: "TEMPLATE_CONFIGURATION_MISMATCH",
+  RUNTIME_PROVIDER_UNAVAILABLE: "RUNTIME_PROVIDER_UNAVAILABLE",
+  OUTBOUND_PREFLIGHT_BLOCKED: "OUTBOUND_PREFLIGHT_BLOCKED",
+  CONSENT_BLOCKED_OR_UNAVAILABLE: "CONSENT_BLOCKED_OR_UNAVAILABLE",
+  SEND_REFUSED_OTHER: "SEND_REFUSED_OTHER",
+} as const);
+
+export type DispatchRefusalCategoryValue =
+  (typeof DispatchRefusalCategory)[keyof typeof DispatchRefusalCategory];
+
+/**
+ * Internal code -> operator category. Only these exact strings are recognised;
+ * the default is deliberately the opaque bucket, so a new internal code can
+ * never leak its own text through this surface.
+ */
+const REFUSAL_CATEGORY_BY_CODE: Readonly<Record<string, DispatchRefusalCategoryValue>> = Object.freeze({
+  INTENT_NOT_FOUND: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_IDENTITY_INVALID: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_NOT_LEAD_ASSIGNMENT: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_PURPOSE_UNSUPPORTED: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_CHANNEL_UNSUPPORTED: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_NOT_PENDING: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_CREATED_AT_INVALID: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_BEFORE_ACTIVATION_BOUNDARY: DispatchRefusalCategory.PLAN_INVALID,
+  INTENT_EVIDENCE_INVALID: DispatchRefusalCategory.PLAN_INVALID,
+  ACTIVATION_BOUNDARY_UNCONFIGURED: DispatchRefusalCategory.PLAN_INVALID,
+  ACTIVATION_BOUNDARY_MALFORMED: DispatchRefusalCategory.PLAN_INVALID,
+  VARIABLES_UNRESOLVED: DispatchRefusalCategory.PLAN_INVALID,
+
+  ASSIGNMENT_NOT_FOUND: DispatchRefusalCategory.ASSIGNMENT_LOOKUP_FAILED,
+  LEAD_REFERENCE_UNRESOLVED: DispatchRefusalCategory.ASSIGNMENT_LOOKUP_FAILED,
+  LOOKUP_FAILED: DispatchRefusalCategory.ASSIGNMENT_LOOKUP_FAILED,
+
+  VENDOR_UNRESOLVED: DispatchRefusalCategory.RECIPIENT_UNRESOLVED,
+  RECIPIENT_NOT_FOUND: DispatchRefusalCategory.RECIPIENT_UNRESOLVED,
+  RECIPIENT_TYPE_UNSUPPORTED: DispatchRefusalCategory.RECIPIENT_UNRESOLVED,
+  RECIPIENT_REFERENCE_INVALID: DispatchRefusalCategory.RECIPIENT_UNRESOLVED,
+  RECIPIENT_LOOKUP_FAILED: DispatchRefusalCategory.RECIPIENT_UNRESOLVED,
+  RECIPIENT_DESTINATION_MISSING: DispatchRefusalCategory.RECIPIENT_DESTINATION_INVALID,
+  RECIPIENT_DESTINATION_INVALID: DispatchRefusalCategory.RECIPIENT_DESTINATION_INVALID,
+
+  TEMPLATE_NOT_FOUND_OR_INACTIVE: DispatchRefusalCategory.TEMPLATE_UNAVAILABLE,
+  TEMPLATE_NOT_READY: DispatchRefusalCategory.TEMPLATE_UNAVAILABLE,
+  TEMPLATE_LANE_MISMATCH: DispatchRefusalCategory.TEMPLATE_CONFIGURATION_MISMATCH,
+  TEMPLATE_CHANNEL_MISMATCH: DispatchRefusalCategory.TEMPLATE_CONFIGURATION_MISMATCH,
+
+  PROVIDER_UNAVAILABLE: DispatchRefusalCategory.RUNTIME_PROVIDER_UNAVAILABLE,
+
+  COORDINATOR_UNAVAILABLE: DispatchRefusalCategory.OUTBOUND_PREFLIGHT_BLOCKED,
+
+  SEND_REFUSED: DispatchRefusalCategory.SEND_REFUSED_OTHER,
+});
+
+/** Map ONE internal code onto the closed vocabulary. */
+export function categorizeDispatchRefusal(code: unknown): DispatchRefusalCategoryValue {
+  if (typeof code !== "string") return DispatchRefusalCategory.SEND_REFUSED_OTHER;
+  const mapped = REFUSAL_CATEGORY_BY_CODE[code];
+  if (mapped) return mapped;
+  // Unrecognised codes are bucketed by PREFIX only — never by echoing the code.
+  if (code.startsWith("OUTBOUND_") || code.startsWith("MAPPING_") || code.startsWith("CANARY_")) {
+    return DispatchRefusalCategory.OUTBOUND_PREFLIGHT_BLOCKED;
+  }
+  if (code.startsWith("CONSENT_")) return DispatchRefusalCategory.CONSENT_BLOCKED_OR_UNAVAILABLE;
+  if (code.startsWith("PHONE_")) return DispatchRefusalCategory.RECIPIENT_DESTINATION_INVALID;
+  return DispatchRefusalCategory.SEND_REFUSED_OTHER;
+}
+
 /** The exact, closed shape this route may return. */
 export interface SanitizedDispatchResponse {
   readonly ok: true;
@@ -118,6 +205,12 @@ export interface SanitizedDispatchResponse {
   readonly refused: number;
   /** Whether selection produced nothing because it was fenced. NEVER the reason, never the instant. */
   readonly selectionBlocked: boolean;
+  /**
+   * Refusal COUNTS per operator category. Keys come only from
+   * DispatchRefusalCategory; values are non-negative integers. Categories with
+   * no refusals are omitted, so an all-clear run carries an empty object.
+   */
+  readonly refusalReasons: Readonly<Record<string, number>>;
 }
 
 /** The run summary shape QF-MVP-80.13A returns. Narrowed here, never widened. */
@@ -156,5 +249,41 @@ export function sanitizeDispatchSummary(
     refused: count(summary?.refused),
     selectionBlocked:
       summary?.selectionRefusal !== null && summary?.selectionRefusal !== undefined,
+    refusalReasons: summarizeRefusalReasons(summary),
   };
+}
+
+/**
+ * Aggregate `outcomes[]` into category counts.
+ *
+ * Reads exactly two fields per outcome — `ok` and `reason` — and never copies
+ * the outcome itself, so an intent id, an assignment id or any future
+ * diagnostic field added to the outcome cannot travel with the count. A
+ * selection-level refusal is counted too, because a fenced selection is a
+ * refusal an operator needs categorised, not merely a boolean.
+ */
+function summarizeRefusalReasons(
+  summary: DispatchRunSummaryLike | null | undefined
+): Readonly<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const bump = (category: DispatchRefusalCategoryValue) => {
+    counts[category] = (counts[category] ?? 0) + 1;
+  };
+
+  const selectionRefusal = summary?.selectionRefusal;
+  if (selectionRefusal !== null && selectionRefusal !== undefined) {
+    bump(categorizeDispatchRefusal(selectionRefusal));
+  }
+
+  const outcomes = summary?.outcomes;
+  if (Array.isArray(outcomes)) {
+    for (const outcome of outcomes) {
+      if (!outcome || typeof outcome !== "object") continue;
+      const record = outcome as { ok?: unknown; reason?: unknown };
+      if (record.ok === true) continue;
+      bump(categorizeDispatchRefusal(record.reason));
+    }
+  }
+
+  return counts;
 }

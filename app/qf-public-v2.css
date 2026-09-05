@@ -423,7 +423,7 @@
   /* Fixed track height keeps dots and CTAs from moving between slides.
      QF-UI-HOTFIX-01: it is no longer matched to a launcher beside the hero —
      the hero spans the full container width and the launcher sits below it. */
-  min-height: 372px;
+  min-height: 320px;
 }
 
 .qf-hero-slide {
@@ -459,16 +459,6 @@
   color: var(--qf-brand-muted);
 }
 
-.qf-hero-slide-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 1.1rem;
-}
-
-/* Slightly tighter than the default public button so the primary and secondary
-   hero actions sit on one row inside the slide's copy column. */
-.qf-hero-slide-actions .qf-pub-btn { padding-inline: 1.05rem; }
 
 /*
   Mobile: a very light wash behind the copy, so the card is not flat white.
@@ -495,8 +485,7 @@
   opacity: 0.07;
 }
 
-.qf-hero-slide-copy,
-.qf-hero-slide-actions { position: relative; z-index: 1; }
+.qf-hero-slide-copy { position: relative; z-index: 1; }
 
 /* Controls */
 .qf-hero-dots {
@@ -1102,7 +1091,7 @@
   /* QF-UI-HOTFIX-01: three columns in the tablet band. Civil Work keeps the
      base `1 / -1` span, so it fills the final row instead of orphaning. */
   .qf-launcher-grid { gap: 0.55rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .qf-hero-slider { min-height: 460px; }
+  .qf-hero-slider { min-height: 400px; }
   .qf-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qf-usp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qf-foot .qf-foot-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
@@ -1138,22 +1127,26 @@
   /* Copy left, visual right — copy keeps priority. QF-UI-V2-15: measured at
      1.85fr the artwork was only 29-30% of the hero card once padding and the
      column gap were taken out; 1.4fr puts it back inside the intended band. */
+  /* QF-MVP-80.16A: one row, not two. The second row existed only to hold the
+     hero action buttons; with those gone a two-row grid left the copy pinned to
+     the top of the card against an empty band. Copy and artwork now sit on a
+     single vertically-centred row. */
   .qf-hero-slide {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: auto;
     align-content: center;
+    align-items: center;
     column-gap: 1.6rem;
   }
 
-  .qf-hero-slide-copy { grid-column: 1; grid-row: 1; max-width: 30ch; }
-  .qf-hero-slide-actions { grid-column: 1; grid-row: 2; }
+  .qf-hero-slide-copy { grid-column: 1; grid-row: 1; max-width: 34ch; }
 
   .qf-hero-slide-media {
     position: relative;
     inset: auto;
     grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: stretch;
+    grid-row: 1;
+    align-self: center;
     min-height: 232px;
     border-radius: var(--qf-brand-radius-md);
     background: var(--qf-brand-inset);

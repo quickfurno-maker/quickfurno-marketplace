@@ -22,6 +22,7 @@ import {
   RecipientResolutionError,
   failRecipientResolution,
   normalizeResolvedDestination,
+  normalizeStoredVendorDestination,
   validateRecipientReference,
   type CommunicationRecipientResolver,
 } from "../lib/communication/recipientResolver";
@@ -123,16 +124,20 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
 
     if (!row) return failRecipientResolution(RecipientResolutionError.RECIPIENT_NOT_FOUND);
 
+    // QF-MVP-80.16B: vendor rows store a bare ten-digit Indian mobile, so this
+    // path — and only this path — adapts that exact shape to E.164 before the
+    // canonical normalizer sees it. The WhatsApp-over-phone preference and the
+    // fail-closed rule below are UNCHANGED.
     const preferred = row.whatsapp_number ?? null;
     if (preferred && preferred.trim() !== "") {
-      const resolved = normalizeResolvedDestination(preferred);
+      const resolved = normalizeStoredVendorDestination(preferred);
       if (resolved.ok) return resolved;
       // A malformed WhatsApp number must not silently escalate to the contact
       // phone: surface the misconfiguration instead of dialling a second number.
       return resolved;
     }
 
-    return normalizeResolvedDestination(row.phone ?? null);
+    return normalizeStoredVendorDestination(row.phone ?? null);
   }
 
   /** Admin alerts route to the admin profile's phone. Non-admins never match. */

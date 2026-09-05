@@ -213,6 +213,9 @@ jobs:
       - name: QF-MVP-80.16B vendor destination normalization
         run: npm run test:mvp:80-16b
 
+      - name: QF-MVP-80.16C delivery safety closure
+        run: npm run test:mvp:80-16c
+
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 

@@ -77,6 +77,23 @@ export async function GET(request: Request) {
 
   const encoder = new TextEncoder();
 
+  /**
+   * The ONE cleanup authority for this stream, hoisted so BOTH exit paths can
+   * reach it: the abort listener inside `start`, and the stream's own `cancel`
+   * callback below.
+   *
+   * It has to live out here. `cancel` and `start` are sibling members of the
+   * source object, so a cleanup declared inside `start` is lexically invisible to
+   * `cancel` — which is how an earlier revision ended up asserting that
+   * cancellation "runs through the abort signal". A ReadableStream can be
+   * cancelled without the request signal aborting, and when that happened the
+   * server-side Realtime channel stayed open until the five-minute expiry.
+   *
+   * Before `start` runs there is nothing open, so the initial no-op is correct
+   * rather than a placeholder.
+   */
+  let releaseStream: () => void = () => {};
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
@@ -99,10 +116,16 @@ export async function GET(request: Request) {
       const emit = (event: string, data: unknown) =>
         write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
-      /** Idempotent: safe to call from abort, expiry, failure and write errors. */
+      /**
+       * Idempotent: safe to call from abort, stream cancellation, expiry,
+       * subscription failure and write errors, in any order and more than once.
+       * The `closed` latch is set FIRST, so a cancel racing an abort can never
+       * remove the channel twice.
+       */
       function cleanup() {
         if (closed) return;
         closed = true;
+        request.signal.removeEventListener("abort", cleanup);
         if (debounce !== null) { clearTimeout(debounce); debounce = null; }
         if (heartbeat !== null) { clearInterval(heartbeat); heartbeat = null; }
         if (expiry !== null) { clearTimeout(expiry); expiry = null; }
@@ -138,6 +161,9 @@ export async function GET(request: Request) {
         cleanup();
       }, MAX_STREAM_MS);
 
+      // Both exit paths now point at this one function: the abort listener here,
+      // and the stream's `cancel` callback through the hoisted handle.
+      releaseStream = cleanup;
       request.signal.addEventListener("abort", cleanup);
 
       // ---- 3. Subscribe, server-side, with the service-role credential -----
@@ -178,7 +204,12 @@ export async function GET(request: Request) {
     },
 
     cancel() {
-      // The consumer went away; `start`'s cleanup runs through the abort signal.
+      // The consumer went away. This calls the SAME idempotent cleanup the abort
+      // listener does, rather than assuming an abort will follow — cancellation
+      // and abort are separate signals, and only this call guarantees the
+      // Realtime channel and every timer are released now instead of whenever
+      // the five-minute expiry happens to fire.
+      releaseStream();
     },
   });
 

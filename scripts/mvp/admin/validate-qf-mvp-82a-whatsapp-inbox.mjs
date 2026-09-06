@@ -597,6 +597,56 @@ check("71-77 no row, payload or identifier is ever serialized", () => {
   }
 });
 
+check("78a STREAM CANCELLATION reaches the same cleanup as abort", () => {
+  // Scoped to the `cancel` callback BODY. A broad file-wide search would be
+  // satisfied by the abort listener elsewhere in the route, which is exactly the
+  // gap this check exists to close: `cancel` and `start` are sibling members, so
+  // a cleanup declared inside `start` is invisible to `cancel`, and an earlier
+  // revision left `cancel` empty with a comment claiming abort would cover it.
+  // Cancellation and abort are separate signals; only a real call proves it.
+  const body = /\n\s*cancel\(\)\s*\{([\s\S]*?)\n\s*\},/.exec(STREAM_CODE);
+  assert(body !== null, "the stream declares a cancel callback");
+  const cancelBody = body[1].trim();
+  assert(cancelBody.length > 0, "and its body is not empty");
+
+  // It must invoke a handle, not merely mention one.
+  const invoked = /(\w+)\s*\(\s*\)\s*;/.exec(cancelBody);
+  assert(invoked !== null, `cancel must CALL the cleanup authority, found: ${cancelBody}`);
+  const handle = invoked[1];
+
+  // That handle must be the SAME function the abort listener uses: `start`
+  // assigns it, and the assigned function is the one that removes the channel.
+  assert(new RegExp(`${handle}\\s*=\\s*cleanup;`).test(STREAM_CODE),
+    `${handle} must be assigned the shared cleanup function`);
+  assert(new RegExp(`let ${handle}[^=]*=`).test(STREAM_CODE),
+    `${handle} is hoisted so cancel can reach it`);
+  assert(/request\.signal\.addEventListener\("abort", cleanup\)/.test(STREAM_CODE),
+    "and abort uses that same cleanup");
+
+  // There is exactly ONE cleanup implementation — no duplicated teardown that
+  // could drift, and no second function that removes the channel.
+  eq((STREAM_CODE.match(/function cleanup\(\)/g) ?? []).length, 1, "exactly one cleanup function");
+  eq((STREAM_CODE.match(/removeChannel\(/g) ?? []).length, 1, "which holds the only removeChannel call");
+});
+
+check("78b cleanup is idempotent, so a cancel racing an abort cannot double-remove", () => {
+  // The closed latch is set BEFORE any resource is touched, so a second entry
+  // returns before reaching removeChannel.
+  const fn = /function cleanup\(\)\s*\{([\s\S]*?)\n      \}/.exec(STREAM_CODE);
+  assert(fn !== null, "the cleanup body is readable");
+  const guardAt = fn[1].indexOf("if (closed) return;");
+  const latchAt = fn[1].indexOf("closed = true;");
+  const removeAt = fn[1].indexOf("removeChannel");
+  assert(guardAt === 0 || guardAt < latchAt, "the guard is the first statement");
+  assert(latchAt > -1 && latchAt < removeAt, "the latch is set before the channel is removed");
+  for (const timer of ["clearTimeout(debounce)", "clearInterval(heartbeat)", "clearTimeout(expiry)"]) {
+    assert(fn[1].includes(timer), `${timer} runs inside the single cleanup`);
+  }
+  // The abort listener is detached, so a post-cancel abort cannot re-enter.
+  assert(/removeEventListener\("abort", cleanup\)/.test(STREAM_CODE),
+    "the abort listener is removed during cleanup");
+});
+
 check("78-80 the stream unsubscribes on abort and on expiry", () => {
   assert(/request\.signal\.addEventListener\("abort", cleanup\)/.test(STREAM_CODE), "abort cleans up");
   assert(/MAX_STREAM_MS = 5 \* 60_000/.test(STREAM_CODE), "a bounded lifetime");
@@ -604,14 +654,25 @@ check("78-80 the stream unsubscribes on abort and on expiry", () => {
   assert(/clearInterval\(heartbeat\)/.test(STREAM_CODE), "the heartbeat timer is cleared");
   assert(/clearTimeout\(expiry\)/.test(STREAM_CODE), "the expiry timer is cleared");
   assert(/clearTimeout\(debounce\)/.test(STREAM_CODE), "and the debounce timer");
-  // THE channel must not survive the stream, on ANY exit path.
+  // THE channel must not survive the stream, on ANY exit path — and the call has
+  // to be REACHABLE, not merely present. A mutation to `if (false)` left the
+  // removeChannel text in place while making it dead code, and a text-only
+  // assertion happily passed it.
   assert(/removeChannel\(channel\)/.test(STREAM_CODE), "the Realtime channel is removed");
+  assert(/if \(db !== null && channel !== null\) \{[\s\S]{0,160}removeChannel\(channel\)/.test(STREAM_CODE),
+    "and it is guarded by the real handles, so it actually runs when they exist");
+  // No constant-folded branch anywhere in the route can strand a resource.
+  absent(STREAM_CODE, /if\s*\(\s*(false|true)\s*\)/, "a constant-folded branch");
+  absent(STREAM_CODE, /if\s*\(\s*0\s*\)|if\s*\(\s*1\s*\)/, "a numeric constant branch");
   assert(/if \(closed\) return;\s*closed = true;/.test(STREAM_CODE), "cleanup is idempotent");
-  // Every exit path routes through that one cleanup.
+  // EVERY exit path routes through that one cleanup — abort, expiry,
+  // subscription failure, a write to a vanished client, and stream cancellation.
   for (const path of [
     /request\.signal\.addEventListener\("abort", cleanup\)/,
     /emit\("expired"[\s\S]{0,80}cleanup\(\)/,
     /emit\("unavailable"[\s\S]{0,80}cleanup\(\)/,
+    /catch \{[\s\S]{0,120}cleanup\(\);/,
+    /releaseStream = cleanup;/,
   ]) {
     assert(path.test(STREAM_CODE), `an exit path calls cleanup (${path})`);
   }
@@ -1106,6 +1167,23 @@ check("M21 mutant: a timestamp+direction fix that ignores the eventId tie", () =
   eq(naive(a, b), "TIE", "the mutant cannot separate them");
   eq(pickLaterInboxEvent(a, b).eventId, "evt-bbb", "the real rule breaks the tie by event id");
   eq(pickLaterInboxEvent(b, a).eventId, "evt-bbb", "in either order");
+});
+
+check("M22 mutant: dropping cleanup from the stream-cancel path", () => {
+  // The exact shape the earlier revision shipped: an empty cancel carrying a
+  // comment that assumed the abort signal would cover it. Comments are stripped
+  // before any source check, so the mutant reduces to an empty body — and an
+  // empty body must not satisfy the cancellation proof.
+  const mutant = "\n    cancel() {\n      \n    },";
+  const mutantBody = /\n\s*cancel\(\)\s*\{([\s\S]*?)\n\s*\},/.exec(mutant);
+  assert(mutantBody !== null && mutantBody[1].trim().length === 0,
+    "the mutant leaves cancellation with nothing to run");
+
+  // The real route calls the shared authority from inside that body.
+  const real = /\n\s*cancel\(\)\s*\{([\s\S]*?)\n\s*\},/.exec(STREAM_CODE);
+  assert(real !== null && real[1].trim().length > 0, "the real cancel body is not empty");
+  assert(/releaseStream\(\)\s*;/.test(real[1]), "and it invokes the shared cleanup handle");
+  assert(real[1].trim() !== mutantBody[1].trim(), "real and mutant must differ");
 });
 
 // ============================================================================

@@ -462,13 +462,15 @@ const RULES = {
     ];
     return required.every((step) => CI.includes(step));
   },
-  "Z07 exactly one migration is added by this phase and it is the newest": () => {
+  // QF-MVP-82A-R0 RE-PIN: the global count and "it is the newest file" were both
+  // time-bound claims — a later phase that legitimately adds its own migration
+  // invalidates them while saying nothing about 80.14A. QF-MVP-80.04 hit this first
+  // and resolved it the same way: assert the SCOPE, which is the durable statement,
+  // and leave the global count to G1, which is the one place that pins it.
+  "Z07 exactly one migration is added by this phase, and it is 80.14A own": () => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return (
-      files.length === 103 &&
-      files[files.length - 1] === path.basename(MIGRATION_PATH) &&
-      files.filter((f) => f.includes("80_14a")).length === 1
-    );
+    const mine = files.filter((f) => f.includes("80_14a"));
+    return mine.length === 1 && mine[0] === path.basename(MIGRATION_PATH);
   },
 };
 

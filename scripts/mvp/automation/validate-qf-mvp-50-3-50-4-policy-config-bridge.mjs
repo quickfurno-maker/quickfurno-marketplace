@@ -64,12 +64,17 @@ const FROZEN = [
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality.
-const MIGRATION_COUNT = 103;
+const MIGRATION_COUNT = 104;
 const PRODUCTION_ACTIVATION_NAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
+// QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
+// membership for the two WhatsApp inbox authorities. Applied nowhere.
+const REALTIME_PUBLICATION_NAME =
+  "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql";
 
 // QF-MVP-80.14A RE-PIN: 15 -> 16 (one new SOURCE-PENDING migration).
-const POST_ANCHOR_COUNT = 16;
+// QF-MVP-82A-R0 RE-PIN: 16 -> 17 (ten applied + five reconciled + two pending).
+const POST_ANCHOR_COUNT = 17;
 const PENDING_ORDER = ["20260813000000", "20260814000000", "20260815000000", "20260816000000", "20260817000000"];
 const RECOVERY_NAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
@@ -124,12 +129,12 @@ record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
 // QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
 // in exactly this order; they are now followed by the 50.5 recovery transport, which is
 // named explicitly rather than allowed as "anything newer".
-record("V07a the final eleven versions are in exact chronological order",
-  same(migrationFiles.slice(-11),
+record("V07a the final twelve versions are in exact chronological order",
+  same(migrationFiles.slice(-12),
     [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
      MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME, GEO_POSTGIS_SHORTLIST_NAME,
-     AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME]));
-record("V07 the local migration set is exactly 103",
+     AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME, REALTIME_PUBLICATION_NAME]));
+record("V07 the local migration set is exactly 104",
   migrationFiles.length === MIGRATION_COUNT);
 
 // ---------------------------------------------------------------------------
@@ -323,10 +328,15 @@ record("G05a the bridge no longer appears as pending",
 // reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: exactly ONE pinned pending entry again — the production activation authority.
-record("G06 the pending post-anchor set holds exactly the one pinned activation authority and the five governed authorities are reconciled as APPLIED",
-  manifest.pendingPostAnchorMigrations?.length === 1 &&
+record("G06 the pending post-anchor set holds exactly the two pinned source-pending authorities and the five governed authorities are reconciled as APPLIED",
+  // QF-MVP-82A-R0 RE-PIN: the pending set now holds exactly TWO explicitly pinned
+  // entries — the 80.14A production activation authority and the 82A-R0 Realtime
+  // publication membership. Both are SOURCE-PENDING. Still an exact count, still no `>=`.
+  manifest.pendingPostAnchorMigrations?.length === 2 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
+  manifest.pendingPostAnchorMigrations[1].version === "20260904000000" &&
+  manifest.pendingPostAnchorMigrations[1].operationalStatus === "PENDING" &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   same(manifest.reconciledPostAnchorMigrations.map((r) => r.version), PENDING_ORDER) &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
@@ -335,13 +345,13 @@ record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
-record("G08 the anchor post-anchor count agrees at 16",
+record("G08 the anchor post-anchor count agrees at 17",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 was re-pinned to 103 / 10 applied / 5 reconciled / 1 pending, not loosened",
-  /const MIGRATION_COUNT = 103;/.test(g1Source) &&
+record("G09 G1 was re-pinned to 104 / 10 applied / 5 reconciled / 2 pending, not loosened",
+  /const MIGRATION_COUNT = 104;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 1") &&
+  g1Source.includes("pendingPins.length === 2") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&

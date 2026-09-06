@@ -104,7 +104,13 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
 // the audit_logs forward repair (20260817000000) is the only addition. Exact
 // equality, never loosened.
-check("migration count is unchanged at 102", migrations.length === 102);
+// QF-MVP-82A-R0 RE-PIN: 102 -> 104. This pin had gone STALE on main: QF-MVP-80.14A
+// added the production activation authority (103) without re-pinning it here, so this
+// assertion was already failing on a clean tree before this phase. R0 adds the Realtime
+// publication membership (104). This phase still adds no migration of ITS OWN to this
+// slice; the pin is the live tree size, so it moves to the truthful current count.
+// Still exact equality, never `>=`.
+check("migration count is unchanged at 104", migrations.length === 104);
 check("C-WA1 added no migration", !migrations.some((f) => /wa1|whatsapp_admin|admin_whatsapp/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("the read layer only reads EXISTING communication relations", (() => {

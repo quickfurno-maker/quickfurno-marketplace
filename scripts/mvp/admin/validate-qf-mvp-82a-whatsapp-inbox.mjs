@@ -35,7 +35,9 @@ import {
   inboxEffectiveOccurredAt,
   inboxNeedsReply,
   inboxParticipantDisplayName,
+  latestInboxEvent,
   parseInboxFilter,
+  pickLaterInboxEvent,
   presentInboundMessage,
   presentOutboundMessage,
   resolveInboxParticipant,
@@ -493,11 +495,13 @@ check("61-62 an unauthorized request builds no client and reads nothing", () => 
   const streamStart = STREAM_CODE.indexOf("new ReadableStream");
   assert(auth >= 0 && forbid > auth, "the guard follows the session read");
   assert(streamStart > forbid, "the stream is opened only after the guard");
-  // `adminClient()` lives inside a helper, so where it is DEFINED proves
-  // nothing. What matters is that the helper is never CALLED before the guard.
-  const callSites = [...STREAM_CODE.matchAll(/await readWatermark\(\)/g)].map((m) => m.index);
-  assert(callSites.length >= 1, "the detector is actually called");
-  for (const at of callSites) assert(at > forbid, "no read is reachable before the guard");
+  // The privileged authority here is the Realtime subscription. Every site that
+  // builds a client or opens a channel must sit AFTER the guard.
+  for (const pattern of [/adminClient\(\)/g, /\.channel\(/g, /\.subscribe\(/g, /postgres_changes/g]) {
+    const sites = [...STREAM_CODE.matchAll(pattern)].map((m) => m.index);
+    assert(sites.length >= 1, `${pattern} appears`);
+    for (const at of sites) assert(at > forbid, `no privileged Realtime work is reachable before the guard (${pattern})`);
+  }
   // And nothing privileged is constructed at MODULE scope, where it would run
   // on import — before any request, let alone any session. An unindented
   // declaration is the only shape that would do that; inside a function body it
@@ -523,12 +527,51 @@ check("64-66 the stream is an uncacheable event stream with a heartbeat", () => 
   assert(/setInterval\(\(\) => write\(`: heartbeat/.test(STREAM_CODE), "which is actually armed");
 });
 
-check("67-70 a change on either authority emits a sanitized invalidation", () => {
-  assert(/communication_inbound_messages/.test(STREAM_CODE), "inbound is watched");
-  assert(/communication_messages/.test(STREAM_CODE), "outbound is watched, so delivery updates refresh ticks");
+check("67-70 change detection is server-side postgres_changes on EXACTLY two tables", () => {
+  assert(/postgres_changes/.test(STREAM_CODE), "the route subscribes to postgres_changes");
+  // The subscribed table set is a frozen literal, not an interpolated name.
+  const tableList = /INBOX_TABLES = \[([^\]]*)\]/.exec(STREAM_CODE);
+  assert(tableList !== null, "the table set is a named constant");
+  const tables = (tableList[1].match(/"([a-z_]+)"/g) ?? []).map((t) => t.replace(/"/g, ""));
+  eq(tables.length, 2, `exactly two tables (${tables.join(", ")})`);
+  assert(tables.includes("communication_inbound_messages"), "inbound is watched");
+  assert(tables.includes("communication_messages"), "outbound is watched, so delivery updates refresh ticks");
+  // No third table, and no wildcard scope.
+  for (const forbidden of [
+    "communication_delivery_events", "communication_webhook_receipts",
+    "leads", "vendors", "lead_assignment_approvals", "vendor_credit_logs",
+    "payments", "vendor_packages", "communication_preferences", "automation_jobs",
+  ]) {
+    assert(!tables.includes(forbidden), `${forbidden} must not be subscribed`);
+  }
+  assert(/schema: "public"/.test(STREAM_CODE), "the schema is pinned");
+  absent(STREAM_CODE, /schema:\s*"\*"|table:\s*"\*"/, "a wildcard schema or table");
+  // One fixed marker, and its shape is a frozen literal.
   assert(/emit\("inbox", INBOX_CHANGED\)/.test(STREAM_CODE), "one fixed marker is emitted");
   assert(/INBOX_CHANGED = \{ type: "inbox_changed", scope: "whatsapp_inbox" \}/.test(STREAM_CODE),
     "and its shape is a frozen literal");
+});
+
+check("67b THERE IS NO DATABASE POLLING LEFT", () => {
+  // The watermark detector is gone: no constant, no reader, no timer-driven read.
+  for (const [re, label] of [
+    [/WATERMARK/i, "a watermark constant"],
+    [/readWatermark/, "the watermark reader"],
+    [/\.from\(/, "any PostgREST table read"],
+    [/\.select\(/, "any SELECT"],
+    [/updated_at|received_at/, "a watermark column"],
+  ]) {
+    absent(STREAM_CODE, re, label);
+  }
+  // The only recurring timer is the heartbeat, which writes to the socket and
+  // touches no database.
+  const intervals = [...STREAM_CODE.matchAll(/setInterval\(([\s\S]{0,80}?),/g)].map((m) => m[1]);
+  eq(intervals.length, 1, `exactly one interval (${intervals.length})`);
+  assert(/heartbeat/i.test(intervals[0]), "and it is the heartbeat");
+  assert(/HEARTBEAT_MS = 20_000/.test(STREAM_CODE), "at a bounded cadence");
+  // The change callback takes no argument, so a payload cannot even be read.
+  assert(/const onDatabaseChange = \(\) =>/.test(STREAM_CODE),
+    "the change handler binds no payload argument at all");
 });
 
 check("71-77 no row, payload or identifier is ever serialized", () => {
@@ -542,26 +585,55 @@ check("71-77 no row, payload or identifier is ever serialized", () => {
   const stringifies = (STREAM_CODE.match(/JSON\.stringify\(/g) ?? []).length;
   eq(stringifies, 1, "exactly one serialization site");
   assert(/emit = \(event: string, data: unknown\) =>[\s\S]{0,160}JSON\.stringify\(data\)/.test(STREAM_CODE), "and it is the emit helper");
-  // The watermark is compared, never sent.
-  assert(/return `\$\{out\?\.updated_at \?\? ""\}\|\$\{inb\?\.received_at \?\? ""\}`/.test(STREAM_CODE),
-    "the watermark is built");
-  absent(STREAM_CODE, /emit\([^)]*watermark/, "and it is never emitted");
+  // The postgres_changes callback never binds its payload, so there is nothing
+  // to forward even by accident.
+  absent(STREAM_CODE, /\(payload\)|\(payload:/, "a bound payload argument");
+  absent(STREAM_CODE, /emit\([^)]*payload/, "a payload reaching the wire");
+  // Only the two fixed markers and the lifecycle notices are ever emitted.
+  const emitted = [...STREAM_CODE.matchAll(/emit\("([a-z]+)"/g)].map((m) => m[1]);
+  for (const name of emitted) {
+    assert(["inbox", "ready", "expired", "unavailable"].includes(name),
+      `unexpected SSE event "${name}"`);
+  }
 });
 
 check("78-80 the stream unsubscribes on abort and on expiry", () => {
   assert(/request\.signal\.addEventListener\("abort", cleanup\)/.test(STREAM_CODE), "abort cleans up");
   assert(/MAX_STREAM_MS = 5 \* 60_000/.test(STREAM_CODE), "a bounded lifetime");
   assert(/emit\("expired"/.test(STREAM_CODE), "expiry is announced");
-  assert(/clearInterval\(poll\)/.test(STREAM_CODE) && /clearInterval\(heartbeat\)/.test(STREAM_CODE),
-    "every timer is cleared");
-  assert(/clearTimeout\(expiry\)/.test(STREAM_CODE), "including the expiry itself");
+  assert(/clearInterval\(heartbeat\)/.test(STREAM_CODE), "the heartbeat timer is cleared");
+  assert(/clearTimeout\(expiry\)/.test(STREAM_CODE), "the expiry timer is cleared");
+  assert(/clearTimeout\(debounce\)/.test(STREAM_CODE), "and the debounce timer");
+  // THE channel must not survive the stream, on ANY exit path.
+  assert(/removeChannel\(channel\)/.test(STREAM_CODE), "the Realtime channel is removed");
+  assert(/if \(closed\) return;\s*closed = true;/.test(STREAM_CODE), "cleanup is idempotent");
+  // Every exit path routes through that one cleanup.
+  for (const path of [
+    /request\.signal\.addEventListener\("abort", cleanup\)/,
+    /emit\("expired"[\s\S]{0,80}cleanup\(\)/,
+    /emit\("unavailable"[\s\S]{0,80}cleanup\(\)/,
+  ]) {
+    assert(path.test(STREAM_CODE), `an exit path calls cleanup (${path})`);
+  }
   // Expiry forces a reconnect, which is what re-proves the session.
   const hook = COMPONENT_CODE[`${INBOX_DIR}/useWhatsAppInboxRealtime.ts`];
   assert(/addEventListener\("expired"[\s\S]{0,200}setTimeout\(connect/.test(hook), "the browser reconnects after expiry");
 });
 
-check("81 a failed detector reports unavailable, never a false Live", () => {
+check("81 a failed subscription reports unavailable, never a false Live", () => {
   assert(/emit\("unavailable"/.test(STREAM_CODE), "the server says so");
+  // Every Realtime failure status is handled deliberately.
+  for (const status of ["SUBSCRIBED", "CHANNEL_ERROR", "TIMED_OUT", "CLOSED"]) {
+    assert(new RegExp(status).test(STREAM_CODE), `${status} is handled`);
+  }
+  // "ready" — which is what lets the browser claim Live — is emitted ONLY from
+  // the SUBSCRIBED branch, never optimistically when the stream opens.
+  const readyEmits = (STREAM_CODE.match(/emit\("ready"/g) ?? []).length;
+  eq(readyEmits, 1, "exactly one ready emission");
+  assert(/status === "SUBSCRIBED"[\s\S]{0,200}emit\("ready"/.test(STREAM_CODE),
+    "and it follows a real SUBSCRIBED status");
+  // No silent fallback to polling when Realtime fails.
+  absent(STREAM_CODE, /fallback|WATERMARK|readWatermark/i, "a polling fallback");
   const status = COMPONENT_CODE[`${INBOX_DIR}/WhatsAppInboxRealtimeStatus.tsx`];
   assert(/unavailable: \{/.test(status), "the UI has an unavailable state");
   assert(/Live updates unavailable/.test(status), "and says it plainly");
@@ -593,10 +665,17 @@ check("82-85 the browser opens at most one stream, and only on this tab", () => 
 
 // ---- 86-96. no schema, RLS or grant change in this phase --------------------
 
-check("86-96 this phase adds no migration and changes no grant or policy", () => {
+check("86-96 this phase adds no migration of its own and changes no grant or policy", () => {
   const migrations = readdirSync(resolve("supabase/migrations")).filter((f) => f.endsWith(".sql"));
-  eq(migrations.filter((f) => /82a|82_a/i.test(f)).length, 0,
-    "QF-MVP-82A adds no migration; the Realtime publication change is QF-MVP-82A-R1's own governed slice");
+  // The Realtime publication migration belongs to QF-MVP-82A-R0, which is MERGED
+  // and already certified on staging by R0-S1. The inbox itself still adds none:
+  // the only 82A-family migration in the tree is R0's, and this branch neither
+  // adds another nor edits it.
+  const family = migrations.filter((f) => /82a|82_a/i.test(f));
+  eq(family.length, 1, `exactly the merged R0 migration (${family.join(", ")})`);
+  eq(family[0], "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql", "and it is R0's");
+  eq(migrations.length, 104, "the tree is unchanged at 104");
+  eq(migrations.filter((f) => /82a(?!_r0)/i.test(f)).length, 0, "the inbox slice contributes no migration");
   for (const code of ALL_INBOX_CODE) {
     absent(code, /grant\s+select|GRANT\s+SELECT/, "a grant");
     absent(code, /row level security|enable rls/i, "an RLS change");
@@ -739,6 +818,114 @@ check("R1 there is no composer and no enabled control that could send", () => {
   }
 });
 
+// ---- O1-O5. ONE ORDERING AUTHORITY -----------------------------------------
+//
+// The conversation summary and the visible timeline must never disagree about
+// which message is last. These tests cross the two: they build the events a
+// conversation would hold, derive the SUMMARY latest with the same fold the
+// service uses, sort the TIMELINE the way the thread does, and require the two
+// to name the same event — in every input order.
+
+/** Exactly what services/adminWhatsAppInboxService.ts does when it aggregates. */
+const summaryLatestOf = (events) => events.reduce((acc, e) => pickLaterInboxEvent(e, acc), null);
+/** Exactly what the thread does before rendering. */
+const timelineOf = (events) => [...events].sort(compareInboxEvents);
+
+const SHARED_TS = "2026-09-06T10:00:00.000Z";
+const inboundAt = (ts, id) => eventOf({ eventId: id, direction: InboxDirection.INBOUND, occurredAt: ts, displayText: "customer says hi" });
+const outboundAt = (ts, id) => eventOf({
+  eventId: id, direction: InboxDirection.OUTBOUND, occurredAt: ts,
+  displayText: "Lead assignment alert", deliveryTone: InboxDeliveryTone.DELIVERED, deliveryLabel: "Delivered",
+});
+
+check("O1 EQUAL TIMESTAMP: outbound wins BOTH the timeline and the summary", () => {
+  const inbound = inboundAt(SHARED_TS, "evt-inbound");
+  const outbound = outboundAt(SHARED_TS, "evt-outbound");
+
+  // Both fold orders — the real service reads outbound rows before inbound ones,
+  // which is exactly how the old bug hid.
+  for (const events of [[outbound, inbound], [inbound, outbound]]) {
+    const timeline = timelineOf(events);
+    const summary = summaryLatestOf(events);
+
+    eq(timeline.at(-1).eventId, "evt-outbound", "the timeline ends on the outbound message");
+    eq(summary.eventId, timeline.at(-1).eventId, "and the summary names that same event");
+    eq(summary.direction, InboxDirection.OUTBOUND, "so lastDirection is outbound");
+    eq(summary.occurredAt, SHARED_TS, "lastActivityAt is the shared timestamp");
+    eq(summary.displayText, "Lead assignment alert", "and the preview is the outbound text");
+    // THE defect this phase exists to remove.
+    eq(inboxNeedsReply(summary.direction), false,
+      "Needs reply is FALSE — the last visible bubble is ours");
+  }
+});
+
+check("O2 EQUAL TIMESTAMP, SAME DIRECTION: the eventId tie also matches", () => {
+  const a = inboundAt(SHARED_TS, "evt-aaa");
+  const b = inboundAt(SHARED_TS, "evt-bbb");
+  for (const events of [[a, b], [b, a]]) {
+    const timeline = timelineOf(events);
+    const summary = summaryLatestOf(events);
+    eq(timeline.at(-1).eventId, "evt-bbb", "the higher event id sorts last");
+    eq(summary.eventId, timeline.at(-1).eventId, "and the summary agrees");
+  }
+  // Outbound ties the same way, so the rule is not direction-specific.
+  const c = outboundAt(SHARED_TS, "evt-ccc");
+  const d = outboundAt(SHARED_TS, "evt-ddd");
+  eq(summaryLatestOf([d, c]).eventId, timelineOf([d, c]).at(-1).eventId, "outbound ties agree too");
+});
+
+check("O3 the summary and the timeline agree in EVERY permutation", () => {
+  const events = [
+    inboundAt("2026-09-06T09:00:00.000Z", "evt-1"),
+    outboundAt("2026-09-06T09:00:00.000Z", "evt-2"),
+    inboundAt(SHARED_TS, "evt-3"),
+    outboundAt(SHARED_TS, "evt-4"),
+    outboundAt("2026-09-06T08:00:00.000Z", "evt-5"),
+  ];
+  const expected = timelineOf(events).at(-1).eventId;
+  const permute = (arr) => arr.length <= 1 ? [arr] :
+    arr.flatMap((x, i) => permute([...arr.slice(0, i), ...arr.slice(i + 1)]).map((p) => [x, ...p]));
+  const orders = permute(events);
+  eq(orders.length, 120, "all 120 orderings");
+  for (const order of orders) {
+    eq(summaryLatestOf(order).eventId, expected, "fold order never changes the answer");
+    eq(timelineOf(order).at(-1).eventId, expected, "and neither does sort input order");
+  }
+});
+
+check("O4 the service holds the winning EVENT, not a parallel timestamp", () => {
+  // Structural: the aggregate keeps one event object and reads every "latest"
+  // fact off it, so there is no second field that could drift.
+  assert(/latest: InboxEventView/.test(SERVICE_CODE), "the aggregate holds the event");
+  assert(/pickLaterInboxEvent\(e\.view, existing\.latest\)/.test(SERVICE_CODE),
+    "and chooses it with the shared authority");
+  for (const field of ["lastActivityAt: a.latest.occurredAt", "lastDirection: a.latest.direction",
+                        "preview: boundInboxPreview(a.latest.displayText)",
+                        "needsReply: inboxNeedsReply(a.latest.direction)"]) {
+    assert(SERVICE_CODE.includes(field), `the summary reads ${field}`);
+  }
+  // The old, weaker rule is gone.
+  absent(SERVICE_CODE, /Date\.parse\([^)]*\)\s*>=/, "a timestamp-only latest rule");
+  absent(SERVICE_CODE, /lastActivityAt =|lastDirection =|lastText =/, "parallel latest fields being assigned");
+});
+
+check("O5 there is exactly ONE ordering authority in the read model", () => {
+  // pickLaterInboxEvent is the only thing that decides "later", and it defers to
+  // compareInboxEvents rather than re-implementing the rule.
+  assert(/export function pickLaterInboxEvent/.test(READ_MODEL_CODE), "the authority exists");
+  assert(/return compareInboxEvents\(a, b\) > 0 \? a : b;/.test(READ_MODEL_CODE),
+    "and it defers to the comparator");
+  assert(/export function latestInboxEvent/.test(READ_MODEL_CODE), "the fold exists");
+  assert(/latest = pickLaterInboxEvent\(event, latest\)/.test(READ_MODEL_CODE), "and uses the same authority");
+  // latestInboxEvent must equal sorting and taking the last element.
+  const events = [
+    outboundAt(SHARED_TS, "evt-z"), inboundAt(SHARED_TS, "evt-a"),
+    inboundAt("2026-09-06T07:00:00.000Z", "evt-m"),
+  ];
+  eq(latestInboxEvent(events).eventId, timelineOf(events).at(-1).eventId, "the fold equals the sort");
+  eq(latestInboxEvent([]), null, "and an empty conversation has no latest event");
+});
+
 // ---- mutants ----------------------------------------------------------------
 
 check("M1 mutant: grouping by masked phone would merge two different contacts", () => {
@@ -837,6 +1024,88 @@ check("M14 mutant: removing the refresh debounce", () => {
   assert(/debounceRef/.test(hook), "the real hook debounces");
   assert(/if \(stoppedRef\.current \|\| debounceRef\.current !== null\) return;/.test(hook),
     "and a burst inside the window collapses to one refresh");
+});
+
+
+check("M13 mutant: reintroducing the six-second watermark poll", () => {
+  const naive = 'const WATERMARK_INTERVAL_MS = 6_000; setInterval(() => void readWatermark(), WATERMARK_INTERVAL_MS);';
+  assert(/WATERMARK_INTERVAL_MS/.test(naive) && /readWatermark/.test(naive), "the mutant polls");
+  absent(STREAM_CODE, /WATERMARK/i, "the real route has no watermark constant");
+  absent(STREAM_CODE, /readWatermark/, "and no watermark reader");
+  absent(STREAM_CODE, /\.from\(/, "and reads no table at all");
+});
+
+check("M14 mutant: subscribing to only one of the two authorities", () => {
+  const naive = ["communication_messages"];
+  eq(naive.length, 1, "the mutant watches one table");
+  const tables = (/INBOX_TABLES = \[([^\]]*)\]/.exec(STREAM_CODE)[1].match(/"([a-z_]+)"/g) ?? []);
+  eq(tables.length, 2, "the real route watches both");
+});
+
+check("M15 mutant: subscribing to a third table", () => {
+  const naive = ["communication_inbound_messages", "communication_messages", "communication_delivery_events"];
+  assert(naive.includes("communication_delivery_events"), "the mutant widens the surface");
+  const tables = /INBOX_TABLES = \[([^\]]*)\]/.exec(STREAM_CODE)[1];
+  assert(!/communication_delivery_events/.test(tables), "the real route excludes the event ledger");
+});
+
+check("M16 mutant: forwarding payload.new through the SSE", () => {
+  const naive = 'emit("inbox", { type: "inbox_changed", row: payload.new })';
+  assert(/payload\.new/.test(naive), "the mutant ships the row");
+  absent(STREAM_CODE, /payload\.new|payload\.old/, "the real route never touches the payload");
+  assert(/const onDatabaseChange = \(\) =>/.test(STREAM_CODE), "its callback binds no argument at all");
+});
+
+check("M17 mutant: opening Realtime before authenticating", () => {
+  const guard = STREAM_CODE.indexOf("status: 403");
+  for (const m of STREAM_CODE.matchAll(/\.channel\(/g)) {
+    assert(m.index > guard, "the real route opens no channel before the guard");
+  }
+  const naive = 'const db = adminClient(); const ch = db.channel("x"); const session = await getAdminSession();';
+  assert(naive.indexOf("channel") < naive.indexOf("getAdminSession"), "the mutant subscribes first");
+});
+
+check("M18 mutant: leaving the Realtime channel behind", () => {
+  const naive = "function cleanup() { controller.close(); }";
+  assert(!/removeChannel/.test(naive), "the mutant leaks the channel");
+  assert(/removeChannel\(channel\)/.test(STREAM_CODE), "the real cleanup removes it");
+  assert(/request\.signal\.addEventListener\("abort", cleanup\)/.test(STREAM_CODE), "on abort");
+  assert(/emit\("expired"[\s\S]{0,80}cleanup\(\)/.test(STREAM_CODE), "on expiry");
+  assert(/emit\("unavailable"[\s\S]{0,80}cleanup\(\)/.test(STREAM_CODE), "and on subscription failure");
+});
+
+check("M19 mutant: reverting the aggregate to a timestamp comparison", () => {
+  const naive = (a, b) => Date.parse(a.occurredAt) >= Date.parse(b.occurredAt);
+  const inbound = inboundAt(SHARED_TS, "evt-inbound");
+  const outbound = outboundAt(SHARED_TS, "evt-outbound");
+  // Folding outbound then inbound, the mutant lets inbound take the slot.
+  assert(naive(inbound, outbound) === true, "the mutant treats equal as later");
+  eq(pickLaterInboxEvent(inbound, outbound).eventId, "evt-outbound", "the real rule keeps outbound");
+  absent(SERVICE_CODE, /Date\.parse\([^)]*\)\s*>=/, "and the source carries no such rule");
+});
+
+check("M20 mutant: equal-timestamp inbound overwriting outbound", () => {
+  const inbound = inboundAt(SHARED_TS, "evt-inbound");
+  const outbound = outboundAt(SHARED_TS, "evt-outbound");
+  // The mutant: last-one-folded wins.
+  const naiveLatest = [outbound, inbound].at(-1);
+  eq(naiveLatest.direction, InboxDirection.INBOUND, "the mutant ends on inbound");
+  eq(inboxNeedsReply(naiveLatest.direction), true, "and would demand a reply");
+  const real = summaryLatestOf([outbound, inbound]);
+  eq(real.direction, InboxDirection.OUTBOUND, "the real rule ends on outbound");
+  eq(inboxNeedsReply(real.direction), false, "so Needs reply is false");
+});
+
+check("M21 mutant: a timestamp+direction fix that ignores the eventId tie", () => {
+  const a = inboundAt(SHARED_TS, "evt-aaa");
+  const b = inboundAt(SHARED_TS, "evt-bbb");
+  // The mutant stops at direction, so two same-direction events tie and fold
+  // order decides — the exact partial fix this check exists to reject.
+  const naive = (x, y) => (Date.parse(x.occurredAt) !== Date.parse(y.occurredAt) || x.direction !== y.direction)
+    ? null : "TIE";
+  eq(naive(a, b), "TIE", "the mutant cannot separate them");
+  eq(pickLaterInboxEvent(a, b).eventId, "evt-bbb", "the real rule breaks the tie by event id");
+  eq(pickLaterInboxEvent(b, a).eventId, "evt-bbb", "in either order");
 });
 
 // ============================================================================

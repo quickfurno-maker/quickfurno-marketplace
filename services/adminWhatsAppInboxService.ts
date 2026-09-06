@@ -48,6 +48,7 @@ import {
   inboxEffectiveOccurredAt,
   inboxNeedsReply,
   inboxParticipantDisplayName,
+  pickLaterInboxEvent,
   presentInboundMessage,
   presentOutboundMessage,
   resolveInboxParticipant,
@@ -294,9 +295,14 @@ interface Aggregate {
   readonly provider: string | null;
   conversationId: string;
   contactMasked: string | null;
-  lastActivityAt: string;
-  lastDirection: InboxDirectionValue;
-  lastText: string | null;
+  /**
+   * The conversation's latest EVENT, chosen by the same comparator the timeline
+   * sorts with — not a timestamp, and not whichever row happened to be folded
+   * last. Everything the summary says about "latest" is read off this one object,
+   * so the sidebar and the open thread cannot disagree about which message is
+   * last, or about whether the contact is waiting for a reply.
+   */
+  latest: InboxEventView;
   hasFailure: boolean;
   identityConfidence: string | null;
   readonly principals: InboxPrincipalEvidence[];
@@ -306,6 +312,19 @@ interface Aggregate {
  * Groups a window of events into conversations on (namespace, contact hash) —
  * the durable identity the platform already stores. Never on time proximity,
  * masked-number similarity or display name.
+ *
+ * ONE ORDERING AUTHORITY. The conversation's latest event is chosen with
+ * `compareInboxEvents` — the same comparator the timeline sorts with — and never
+ * by comparing timestamps here.
+ *
+ * An earlier revision used `Date.parse(candidate) >= Date.parse(existing)`, which
+ * is a SECOND, weaker ordering rule. At an equal timestamp it let whichever row
+ * was folded later win, and because outbound rows are read before inbound ones,
+ * an inbound message could take the "latest" slot even though the comparator
+ * orders inbound BEFORE outbound and the visible thread therefore ended on the
+ * outbound bubble. The sidebar then said "Needs reply" about a conversation whose
+ * last visible message was ours. Deferring to the comparator removes the second
+ * rule rather than trying to keep two rules agreeing.
  */
 function aggregate(events: readonly NormalizedEvent[]): Aggregate[] {
   const byKey = new Map<string, Aggregate>();
@@ -320,9 +339,7 @@ function aggregate(events: readonly NormalizedEvent[]): Aggregate[] {
         provider: e.provider,
         conversationId: e.view.conversationId,
         contactMasked: e.contactMasked,
-        lastActivityAt: e.view.occurredAt,
-        lastDirection: e.direction,
-        lastText: e.view.displayText,
+        latest: e.view,
         hasFailure: e.isFailure,
         identityConfidence: e.view.identityConfidence,
         principals: [e.principal],
@@ -331,10 +348,11 @@ function aggregate(events: readonly NormalizedEvent[]): Aggregate[] {
     }
     existing.principals.push(e.principal);
     existing.hasFailure = existing.hasFailure || e.isFailure;
-    if (Date.parse(e.view.occurredAt) >= Date.parse(existing.lastActivityAt)) {
-      existing.lastActivityAt = e.view.occurredAt;
-      existing.lastDirection = e.direction;
-      existing.lastText = e.view.displayText;
+    // Strictly greater: an event that ties completely under the comparator is
+    // the same event, so fold order still cannot decide anything.
+    const later = pickLaterInboxEvent(e.view, existing.latest);
+    if (later !== existing.latest) {
+      existing.latest = later as InboxEventView;
       if (e.contactMasked !== null) existing.contactMasked = e.contactMasked;
       if (e.view.identityConfidence !== null) existing.identityConfidence = e.view.identityConfidence;
     }
@@ -404,6 +422,8 @@ function projectConversation(a: Aggregate, names: ParticipantNames): InboxConver
     verdict.principalType === "client" ? names.clients.get(verdict.principalId) ?? null :
     null;
 
+  // Every "latest" fact below is read off the SAME event object the comparator
+  // chose, so the summary cannot describe a different message than the thread.
   return {
     conversationId: a.conversationId,
     displayName: inboxParticipantDisplayName({ verdict, provenName, maskedDestination: a.contactMasked }),
@@ -412,10 +432,10 @@ function projectConversation(a: Aggregate, names: ParticipantNames): InboxConver
     principalId: verdict.principalId,
     maskedDestination: a.contactMasked,
     identityConfidence: a.identityConfidence,
-    lastActivityAt: a.lastActivityAt,
-    lastDirection: a.lastDirection,
-    preview: boundInboxPreview(a.lastText),
-    needsReply: inboxNeedsReply(a.lastDirection),
+    lastActivityAt: a.latest.occurredAt,
+    lastDirection: a.latest.direction,
+    preview: boundInboxPreview(a.latest.displayText),
+    needsReply: inboxNeedsReply(a.latest.direction),
     hasFailure: a.hasFailure,
     providerAccountLabel: null,
   };

@@ -240,19 +240,29 @@ check("16b the independent re-list and the remote rows are recorded", () => {
 
 // ---- 17-20. this phase changed nothing it must not --------------------------
 
-check("17-18 no application or inbox source belongs to this phase", () => {
-  // The QF-MVP-82A inbox is PR #73 and is frozen. None of it may exist here.
+check("17-18 no application or inbox source belongs to THIS phase's scope", () => {
+  // QF-MVP-82A-C1 RE-SCOPE: this used to assert the inbox files did not EXIST.
+  // That was a valid proxy while the inbox lived only on an unmerged branch, but
+  // it is time-bound in exactly the way QF-MVP-80.14A's Z07 was: the moment PR #73
+  // merges, the files are on main and the assertion fails forever while saying
+  // nothing about this phase. The durable claim is about OWNERSHIP — the inbox is
+  // the 82A slice's artefact, registered under its own validator, and this phase's
+  // scope is the migration and the manifest. That is what is asserted now.
+  // R0-S1's own artefacts are exactly two: the certification document and the
+  // manifest record. Neither may name or contain application source.
   for (const p of [
-    "app/api/admin/whatsapp/inbox/stream/route.ts",
-    "services/adminWhatsAppInboxService.ts",
-    "lib/communication/whatsappInboxReadModel.ts",
-    "lib/communication/whatsappInboxConversationKey.ts",
-    "components/admin/whatsapp/inbox/WhatsAppInbox.tsx",
+    "app/api/admin/whatsapp/inbox",
+    "services/adminWhatsAppInboxService",
+    "lib/communication/whatsappInboxReadModel",
+    "components/admin/whatsapp/inbox",
   ]) {
-    assert(!existsSync(resolve(p)), `${p} belongs to PR #73, not to R0-S1`);
+    assert(!CERT.includes(p), `${p} must not appear in the certification`);
+    assert(!JSON.stringify(stagingApplied).includes(p), `${p} must not appear in the manifest record`);
   }
-  const types = rawOf("components/admin/whatsapp/whatsappAdminTypes.ts");
-  assert(!/"inbox"/.test(types), "the Inbox tab is PR #73's change");
+  // The certification records a DEPLOYMENT, not a code change.
+  absent(CERT, /import |export function|const .* = \(/, "source code in the certification");
+  assert(/No application, inbox, webhook or provider code changed/i.test(CERT_FLAT),
+    "and it states that no application code changed");
 });
 
 check("19-20 no migration was changed and none was added", () => {
@@ -423,10 +433,13 @@ check("M9 mutant: documenting an API-role grant as present", () => {
   eq(stagingApplied.apiRoleGrantsAfterApply, 0, "the real record records zero");
 });
 
-check("M10 mutant: an application or inbox file entering S1 scope", () => {
-  const naive = "services/adminWhatsAppInboxService.ts";
-  assert(/services\//.test(naive), "the mutant adds application code");
-  assert(!existsSync(resolve(naive)), "the real S1 branch carries none");
+check("M10 mutant: application code inside S1's own artefacts", () => {
+  // The mutant names application source in the certification, turning a
+  // deployment record into a code change.
+  const naive = "services/adminWhatsAppInboxService.ts was rewritten";
+  assert(/services\//.test(naive), "the mutant is detectable");
+  assert(!CERT.includes("services/adminWhatsAppInboxService"), "the real certification names none");
+  absent(CERT, /import |export function/, "and contains no source");
 });
 
 // ============================================================================

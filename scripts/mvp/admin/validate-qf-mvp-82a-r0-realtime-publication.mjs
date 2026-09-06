@@ -184,21 +184,37 @@ check("10 no write function, RPC or view", () => {
 
 // ---- 11. no application code rode along ------------------------------------
 
-check("11 no application, UI or inbox source file is part of this phase", () => {
-  // The QF-MVP-82A inbox lives in PR #73 and is FROZEN here. If any of these
-  // exist in the tree, this branch has picked up work that is not R0's.
+check("11 no application or UI source is part of THIS phase's scope", () => {
+  // QF-MVP-82A-C1 RE-SCOPE: this used to assert the inbox files did not EXIST.
+  // That was a valid proxy while the inbox lived only on an unmerged branch, but
+  // it is time-bound in exactly the way QF-MVP-80.14A's Z07 was: the moment PR #73
+  // merges, the files are on main and the assertion fails forever while saying
+  // nothing about this phase. The durable claim is about OWNERSHIP — the inbox is
+  // the 82A slice's artefact, registered under its own validator, and this phase's
+  // scope is the migration and the manifest. That is what is asserted now.
+  // R0's own artefacts are exactly two: the migration and the manifest record.
+  // Neither may contain application code, and the migration is pure DDL.
+  absent(MIGRATION_SQL, /import |require\(|export /, "application code in the migration");
+  const record = JSON.stringify(stagingAppliedOf(R0_VERSION) ?? pendingOf(R0_VERSION) ?? {});
   for (const p of [
-    "app/api/admin/whatsapp/inbox/stream/route.ts",
-    "services/adminWhatsAppInboxService.ts",
-    "lib/communication/whatsappInboxReadModel.ts",
-    "lib/communication/whatsappInboxConversationKey.ts",
-    "components/admin/whatsapp/inbox/WhatsAppInbox.tsx",
+    "app/api/admin/whatsapp/inbox",
+    "services/adminWhatsAppInboxService",
+    "lib/communication/whatsappInboxReadModel",
+    "components/admin/whatsapp/inbox",
   ]) {
-    assert(!existsSync(resolve(p)), `${p} belongs to PR #73, not to R0`);
+    assert(!record.includes(p), `${p} must not appear in R0's manifest record`);
   }
-  // And the inbox tab itself has not been introduced here.
-  const types = rawOf("components/admin/whatsapp/whatsappAdminTypes.ts");
-  assert(!/"inbox"/.test(types), "the Inbox tab is PR #73's change, not R0's");
+  // If the inbox IS present in the tree, it belongs to the 82A slice and carries
+  // its own validator — it is never registered as part of R0's.
+  const pkg = JSON.parse(rawOf("package.json"));
+  if (existsSync(resolve("services/adminWhatsAppInboxService.ts"))) {
+    assert(typeof pkg.scripts["test:mvp:82a"] === "string",
+      "the inbox is present, so it must own its own validator");
+    assert(/validate-qf-mvp-82a-whatsapp-inbox/.test(pkg.scripts["test:mvp:82a"]),
+      "and that validator is the inbox one");
+    assert(!/whatsappInbox|adminWhatsAppInboxService/.test(pkg.scripts["test:mvp:82a-r0"]),
+      "while R0's validator remains the publication one");
+  }
 });
 
 // ---- 12-14. the count truth ------------------------------------------------
@@ -330,7 +346,12 @@ check("25 nothing here reads a database, a network or a credential", () => {
   for (const forbidden of ["node:http", "node:https", "node:net", "node:child_process", "node:dns"]) {
     assert(!imports.includes(forbidden), `${forbidden} is not imported`);
   }
-  absent(self, /^import[\s\S]*?from\s+"(?!node:)/m, "a non-builtin import");
+  // Counted, not pattern-matched across lines: a lazy multi-line regex would
+  // happily span from a real import statement into a STRING that merely contains
+  // the word `from`, and report a non-builtin import that does not exist. The
+  // statement list above is the precise proof; this only checks nothing hid.
+  eq((self.match(/^import\s/gm) ?? []).length, imports.length,
+    "every import statement was parsed, so none escaped the check above");
   // The migration itself performs no connection either; it is DDL only.
   absent(MIGRATION_SQL, /dblink|postgres_fdw|http_post|pg_net/i, "an outbound call from SQL");
 });
@@ -413,10 +434,15 @@ check("M9 mutant: altering the 80.14A pending record", () => {
   eq(e.sha256, "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2", "hash untouched");
 });
 
-check("M10 mutant: an application file riding along in R0", () => {
-  const naive = "services/adminWhatsAppInboxService.ts";
-  assert(/services\//.test(naive), "the mutant adds application code");
-  assert(!existsSync(resolve(naive)), "the real R0 branch carries none");
+check("M10 mutant: application code inside R0's own artefacts", () => {
+  // The mutant puts application source where R0's scope is — its migration.
+  const naive = 'import { adminClient } from "@/lib/supabase";';
+  assert(/import /.test(naive), "the mutant is detectable");
+  absent(MIGRATION_SQL, /import |require\(/, "R0's migration is pure DDL");
+  // And R0's validator is still the publication one, not the inbox one.
+  const pkg = JSON.parse(rawOf("package.json"));
+  assert(/validate-qf-mvp-82a-r0-realtime-publication/.test(pkg.scripts["test:mvp:82a-r0"]),
+    "R0 owns only its publication validator");
 });
 
 // ============================================================================

@@ -322,6 +322,37 @@ export function compareInboxEvents(a: InboxEventView, b: InboxEventView): number
   return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0;
 }
 
+/**
+ * The SINGLE "which of these two events is later" authority.
+ *
+ * The conversation summary and the visible timeline must never disagree about
+ * which message is last, so both resolve it here. A second rule — comparing
+ * timestamps, or trusting whichever row was folded last — is exactly how the two
+ * came apart before: at an equal timestamp the comparator orders inbound BEFORE
+ * outbound, so a timestamp-only fold could hand "latest" to an inbound message
+ * while the thread visibly ended on an outbound one, and the sidebar would ask
+ * for a reply to a conversation we had already answered.
+ */
+export function pickLaterInboxEvent(
+  a: InboxEventView | null,
+  b: InboxEventView | null,
+): InboxEventView | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return compareInboxEvents(a, b) > 0 ? a : b;
+}
+
+/**
+ * The latest event of a set, by the same rule. This is a fold rather than a
+ * sort, so it is linear — but it is REQUIRED to agree with sorting by
+ * `compareInboxEvents` and taking the last element, in any input order.
+ */
+export function latestInboxEvent(events: readonly InboxEventView[]): InboxEventView | null {
+  let latest: InboxEventView | null = null;
+  for (const event of events ?? []) latest = pickLaterInboxEvent(event, latest);
+  return latest;
+}
+
 // ---------------------------------------------------------------------------
 // Participant identity
 // ---------------------------------------------------------------------------

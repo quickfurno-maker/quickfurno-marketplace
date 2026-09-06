@@ -3,36 +3,33 @@
 //
 // WHAT THIS IS
 //   An authenticated, same-origin Server-Sent Events channel that tells an open
-//   inbox "something changed, re-read yourself". All database access lives HERE,
-//   on the server, holding service-role credentials the browser never sees and
-//   could not be given.
+//   inbox "something changed, re-read yourself". The Supabase Realtime
+//   subscription lives HERE, on the server, holding a service-role credential
+//   the browser never sees and could not be given.
 //
 // IT IS AN INVALIDATION CHANNEL, NOT A SECOND DATA AUTHORITY.
-//   The only thing that ever crosses the wire is a fixed, sanitized marker. No
-//   row, no id, no hash, no `content_minimized`, no provider message id and no
-//   timestamp value is serialized. The browser reacts by refreshing the
-//   server-rendered inbox, which re-runs the same read layer under the same
-//   Superadmin session — so the sanitization rules can only ever be applied in
-//   one place.
+//   The only thing that ever crosses the wire is a fixed, sanitized marker. The
+//   postgres_changes payload is deliberately never bound, never read and never
+//   serialized: `payload.new`, `payload.old`, the schema and table names, row
+//   ids, `content_minimized`, `destination_hash`, `sender_hash`,
+//   `provider_account_id`, variables and metadata do not leave this file. The
+//   browser reacts by refreshing the server-rendered inbox, which re-runs the
+//   same read layer under the same Superadmin session — so the sanitization
+//   rules can only ever be applied in one place.
 //
-// HOW CHANGE IS DETECTED (and why it is not Postgres Changes yet)
-//   Supabase Postgres Changes only observes tables that belong to the
-//   `supabase_realtime` publication, and neither communication table does. Adding
-//   them is a governed migration that also amends the staging-history
-//   certification manifest, so it is deliberately NOT bundled into this
-//   read-only UI phase — QF-MVP-82A-R1 owns that change and will swap the
-//   detector below for a real subscription without touching this route's
-//   contract with the browser.
-//
-//   Until then the detector is a BOUNDED server-side watermark: two tiny
-//   ordered-limit-1 reads on a fixed interval, comparing only the newest
-//   timestamp on each authority. It is not a data feed, it never grows with the
-//   table, and it never reaches the browser.
+// EVENT-DRIVEN, NOT POLLED.
+//   An earlier revision detected change with a bounded server-side watermark
+//   poll, because neither communication table was a member of the
+//   `supabase_realtime` publication. QF-MVP-82A-R0 added exactly those two
+//   tables, and QF-MVP-82A-R0-S1 certified that apply on staging, so the poll is
+//   gone: there is no interval here that touches the database, and no query at
+//   all outside the change subscription itself.
 //
 // AUTHENTICATION HAPPENS FIRST.
-//   The session is proved before any Supabase client is constructed and before
-//   any interval is armed. An unauthorized request therefore opens no stream,
-//   builds no client and issues ZERO database reads.
+//   The session is proved before any Supabase client is constructed, before any
+//   channel is created and before any subscription is opened. An unauthorized
+//   request therefore creates ZERO channels and issues ZERO database work; it is
+//   refused with a status code and nothing else happens.
 //
 // BOUNDED LIFETIME.
 //   Every stream heartbeats, and every stream expires. Expiry is what forces the
@@ -47,38 +44,29 @@ import { adminClient } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** How often the server looks for a change. Never a browser-side poll. */
-const WATERMARK_INTERVAL_MS = 6_000;
+/** Coalesces a burst of row changes into a single browser refresh. */
+const DEBOUNCE_MS = 400;
 /** Keeps proxies from closing an idle connection, and proves liveness. */
 const HEARTBEAT_MS = 20_000;
 /** Five minutes. Reconnecting is how the session gets re-proved. */
 const MAX_STREAM_MS = 5 * 60_000;
 
-/** The ONLY change message this route ever emits. */
+/**
+ * The EXACT two tables QF-MVP-82A-R0 added to the `supabase_realtime`
+ * publication, and the only two this route may observe.
+ *
+ * `communication_delivery_events` is deliberately absent: a Meta delivery
+ * callback already updates `communication_messages`, so that UPDATE is the
+ * signal, and subscribing to the append-only event ledger as well would widen
+ * the surface without adding one.
+ */
+const INBOX_TABLES = ["communication_inbound_messages", "communication_messages"] as const;
+
+/** The ONLY message body this route ever emits for a change. */
 const INBOX_CHANGED = { type: "inbox_changed", scope: "whatsapp_inbox" } as const;
 
-/**
- * The newest timestamp on each authority, as an opaque comparison string. The
- * value is compared and then discarded — it is never emitted, because even a
- * timestamp tells an observer when a customer messaged.
- */
-async function readWatermark(): Promise<string> {
-  const db = adminClient();
-  const [outbound, inbound] = await Promise.all([
-    db.from("communication_messages").select("updated_at")
-      .eq("channel", "whatsapp").order("updated_at", { ascending: false }).limit(1),
-    db.from("communication_inbound_messages").select("received_at")
-      .order("received_at", { ascending: false }).limit(1),
-  ]);
-  if (outbound.error) throw outbound.error;
-  if (inbound.error) throw inbound.error;
-  const out = (outbound.data ?? [])[0] as { updated_at?: string } | undefined;
-  const inb = (inbound.data ?? [])[0] as { received_at?: string } | undefined;
-  return `${out?.updated_at ?? ""}|${inb?.received_at ?? ""}`;
-}
-
 export async function GET(request: Request) {
-  // ---- 1. Authenticate BEFORE constructing or reading anything -------------
+  // ---- 1. Authenticate BEFORE constructing or subscribing to anything ------
   const session = await getAdminSession();
   if (!session.isLoggedIn) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -92,11 +80,11 @@ export async function GET(request: Request) {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
-      let watermark: string | null = null;
-      let polling = false;
-      let poll: ReturnType<typeof setInterval> | null = null;
+      let debounce: ReturnType<typeof setTimeout> | null = null;
       let heartbeat: ReturnType<typeof setInterval> | null = null;
       let expiry: ReturnType<typeof setTimeout> | null = null;
+      let db: ReturnType<typeof adminClient> | null = null;
+      let channel: ReturnType<ReturnType<typeof adminClient>["channel"]> | null = null;
 
       const write = (chunk: string) => {
         if (closed) return;
@@ -111,42 +99,39 @@ export async function GET(request: Request) {
       const emit = (event: string, data: unknown) =>
         write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
+      /** Idempotent: safe to call from abort, expiry, failure and write errors. */
       function cleanup() {
         if (closed) return;
         closed = true;
-        if (poll !== null) clearInterval(poll);
-        if (heartbeat !== null) clearInterval(heartbeat);
-        if (expiry !== null) clearTimeout(expiry);
+        if (debounce !== null) { clearTimeout(debounce); debounce = null; }
+        if (heartbeat !== null) { clearInterval(heartbeat); heartbeat = null; }
+        if (expiry !== null) { clearTimeout(expiry); expiry = null; }
+        // Removing the channel is what releases the server-side subscription and
+        // its socket; without it an abandoned tab would leave one running per
+        // reload. removeChannel also unsubscribes, so this is the single call.
+        if (db !== null && channel !== null) {
+          try { void db.removeChannel(channel); } catch { /* already gone */ }
+        }
+        channel = null;
+        db = null;
         try { controller.close(); } catch { /* already closed */ }
       }
 
-      const tick = async () => {
-        // Never overlap: a slow read must not queue a second one behind it.
-        if (closed || polling) return;
-        polling = true;
-        try {
-          const next = await readWatermark();
-          if (closed) return;
-          if (watermark === null) {
-            watermark = next;
-          } else if (next !== watermark) {
-            watermark = next;
-            // ONE signal per interval, however many rows changed inside it.
-            emit("inbox", INBOX_CHANGED);
-          }
-        } catch {
-          // No driver text is logged or sent: it can carry connection detail.
-          // The operator is told updates are not arriving rather than being
-          // left to trust a screen that has silently stopped changing.
-          emit("unavailable", { type: "unavailable", scope: "whatsapp_inbox" });
-          cleanup();
-        } finally {
-          polling = false;
-        }
+      /**
+       * A change arrived. The payload is NOT inspected — the callback takes no
+       * argument at all — because nothing in it may reach the browser.
+       */
+      const onDatabaseChange = () => {
+        if (closed || debounce !== null) return;
+        debounce = setTimeout(() => {
+          debounce = null;
+          emit("inbox", INBOX_CHANGED);
+        }, DEBOUNCE_MS);
       };
 
       // ---- 2. Open the stream --------------------------------------------
-      emit("ready", { type: "ready", scope: "whatsapp_inbox" });
+      // Deliberately NOT "ready" yet: the browser may only claim Live once the
+      // subscription is actually established, which happens below.
       heartbeat = setInterval(() => write(`: heartbeat\n\n`), HEARTBEAT_MS);
       expiry = setTimeout(() => {
         emit("expired", { type: "expired", scope: "whatsapp_inbox" });
@@ -155,9 +140,41 @@ export async function GET(request: Request) {
 
       request.signal.addEventListener("abort", cleanup);
 
-      // ---- 3. Establish the baseline, then watch --------------------------
-      void tick();
-      poll = setInterval(() => void tick(), WATERMARK_INTERVAL_MS);
+      // ---- 3. Subscribe, server-side, with the service-role credential -----
+      try {
+        db = adminClient();
+        let subscription = db.channel("qf-mvp-82a-whatsapp-inbox", {
+          config: { broadcast: { self: false }, presence: { key: "" } },
+        });
+        for (const table of INBOX_TABLES) {
+          subscription = subscription.on(
+            "postgres_changes",
+            { event: "*", schema: "public", table },
+            onDatabaseChange,
+          );
+        }
+        channel = subscription.subscribe((status: string) => {
+          if (closed) return;
+          if (status === "SUBSCRIBED") {
+            // Live is claimed ONLY here — when the server actually holds a
+            // working subscription. Anything else is reported as unavailable.
+            emit("ready", { type: "ready", scope: "whatsapp_inbox" });
+            return;
+          }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            // A failed subscription is never silently treated as live: the
+            // operator would then trust a stale screen, which is worse than
+            // knowing updates are not arriving. No driver detail is emitted.
+            emit("unavailable", { type: "unavailable", scope: "whatsapp_inbox" });
+            cleanup();
+          }
+        });
+      } catch {
+        // Sanitized: a connection error can carry host and credential detail.
+        console.error("[admin-whatsapp-inbox-stream] realtime subscribe failed");
+        emit("unavailable", { type: "unavailable", scope: "whatsapp_inbox" });
+        cleanup();
+      }
     },
 
     cancel() {

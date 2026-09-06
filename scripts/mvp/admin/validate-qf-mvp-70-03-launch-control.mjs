@@ -78,7 +78,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count remains 103", migrations.length === 103);
+check("migration count remains 104", migrations.length === 104);
 // Narrow to names THIS phase could plausibly introduce: "control" and
 // "readiness" already appear in three pre-existing migration filenames.
 check("no launch-control migration was added", !migrations.some((f) => /qf_mvp_70|mvp70|launch_control|launch_readiness/i.test(f)));

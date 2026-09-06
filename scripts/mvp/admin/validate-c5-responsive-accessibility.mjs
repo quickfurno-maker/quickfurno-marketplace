@@ -163,7 +163,13 @@ check("no browser service-role credential", !/SUPABASE_SERVICE_ROLE_KEY|process\
 // QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
 // the audit_logs forward repair (20260817000000) is the only addition. Exact
 // equality, never loosened.
-check("migration count remains 102", readdirSync(join(root, "supabase", "migrations")).length === 102);
+// QF-MVP-82A-R0 RE-PIN: 102 -> 104. This pin had gone STALE on main: QF-MVP-80.14A
+// added the production activation authority (103) without re-pinning it here, so this
+// assertion was already failing on a clean tree before this phase. R0 adds the Realtime
+// publication membership (104). This phase still adds no migration of ITS OWN to this
+// slice; the pin is the live tree size, so it moves to the truthful current count.
+// Still exact equality, never `>=`.
+check("migration count remains 104", readdirSync(join(root, "supabase", "migrations")).length === 104);
 check("C5 added no accessibility/UI dependency", !Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies }).some((name) => /radix|headlessui|framer|focus-trap|axe/i.test(name)));
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);

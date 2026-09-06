@@ -739,11 +739,13 @@ record("G01 the anchor is untouched",
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the Meta production activation authority. Still an exact count, never `>=`.
-record("G02 exactly ten APPLIED, five RECONCILED and ONE PENDING post-anchor migration",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 16 &&
+record("G02 exactly ten APPLIED, five RECONCILED and TWO PENDING post-anchor migrations",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 17 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
-  manifest.pendingPostAnchorMigrations.length === 1 &&
+  // QF-MVP-82A-R0 RE-PIN: 1 -> 2 SOURCE-PENDING entries (80.14A activation authority
+  // + 82A-R0 Realtime publication membership). APPLIED stays ten, RECONCILED stays five.
+  manifest.pendingPostAnchorMigrations.length === 2 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   manifest.reconciledPostAnchorMigrations[0].version === "20260813000000" &&
@@ -809,7 +811,7 @@ record("G05 no applied record fabricates an offline remote status, and only 50.5
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
 record("G06 G1 pins the exact count 99, not a lower bound",
-  /const MIGRATION_COUNT = 103;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 104;/.test(g1Source) &&
   !/>=\s*9[0-9]|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
@@ -830,10 +832,10 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-record("G08 the local migration set is exactly 103 and the 50.2 wedge repair is still present in order",
+record("G08 the local migration set is exactly 104 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 103 &&
+    return files.length === 104 &&
       files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
       files.includes("20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql") &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
@@ -841,12 +843,13 @@ record("G08 the local migration set is exactly 103 and the 50.2 wedge repair is 
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql") &&
       files.includes("20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql") &&
-      files.at(-2) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
-      files.at(-1) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
+      files.at(-3) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
+      files.at(-2) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-1) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 103/.test(d2Source) &&
-  /exactly sixteen migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 104/.test(d2Source) &&
+  /exactly seventeen migrations are newer than the anchor/.test(d2Source) &&
   !/lengths*>=|>=s*9[0-9]/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));

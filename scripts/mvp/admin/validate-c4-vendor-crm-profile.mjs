@@ -115,7 +115,13 @@ const migrationFiles = readdirSync(join(root, "supabase", "migrations"));
 // QF-MVP-80.03 RE-PIN: 101 -> 102. This phase still adds no migration of its own;
 // the audit_logs forward repair (20260817000000) is the only addition. Exact
 // equality, never loosened.
-check("migration count remains 102", migrationFiles.length === 102);
+// QF-MVP-82A-R0 RE-PIN: 102 -> 104. This pin had gone STALE on main: QF-MVP-80.14A
+// added the production activation authority (103) without re-pinning it here, so this
+// assertion was already failing on a clean tree before this phase. R0 adds the Realtime
+// publication membership (104). This phase still adds no migration of ITS OWN to this
+// slice; the pin is the live tree size, so it moves to the truthful current count.
+// Still exact equality, never `>=`.
+check("migration count remains 104", migrationFiles.length === 104);
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);
 console.log("offline: no database, no network, no provider, no auth bypass");

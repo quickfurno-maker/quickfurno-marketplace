@@ -573,16 +573,17 @@ record("G01 the migration matches its pinned canonical hash",
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-record("G02 the local migration set is exactly 103 and 50.5 is the newest APPLIED migration",
+record("G02 the local migration set is exactly 104 and 50.5 is the newest APPLIED migration",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 103 &&
+    return files.length === 104 &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql") &&
-      files.at(-2) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
-      files.at(-1) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-3) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
+      files.at(-2) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-1) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
       manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000";
   })());
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
@@ -598,9 +599,11 @@ record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence,
     const pending = manifest.pendingPostAnchorMigrations ?? null;
     const reconciled = manifest.reconciledPostAnchorMigrations ?? null;
     const pin = (manifest.appliedPostAnchorMigrations ?? []).find((r) => r.version === "20260812000000");
-    return Array.isArray(pending) && pending.length === 1 &&
+    return Array.isArray(pending) && pending.length === 2 &&
       pending[0].version === "20260903040000" &&
       pending[0].operationalStatus === "PENDING" &&
+      pending[1].version === "20260904000000" &&
+      pending[1].operationalStatus === "PENDING" &&
       Array.isArray(reconciled) && reconciled.length === 5 &&
       reconciled[0].version === "20260813000000" &&
       reconciled[1].version === "20260814000000" &&
@@ -628,11 +631,11 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
-  manifest.appliedAnchor.postAnchorMigrationCount === 16);
+  manifest.appliedAnchor.postAnchorMigrationCount === 17);
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 103;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 104;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 1") &&
+  g1Source.includes("pendingPins.length === 2") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
@@ -715,7 +718,7 @@ const mutants = [
   ["one lane starving the other is prevented by construction",
     () => workflow.nodes.filter((n) => n.type === "n8n-nodes-base.scheduleTrigger").length === 2],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 103;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 104;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   // QF-MVP-40.13B: the pending set is non-empty again, so this `every()` is no longer
   // vacuous — it now genuinely guards the SOURCE-PENDING canary authority. The other
@@ -724,7 +727,7 @@ const mutants = [
   // A RECONCILED record must never fabricate a remote-history count nobody observed, and
   // must never borrow the applied ten's owner-reviewed evidence type.
   ["a reconciled record fabricating an observed apply record is impossible",
-    () => (manifest.pendingPostAnchorMigrations ?? []).length === 1 &&
+    () => (manifest.pendingPostAnchorMigrations ?? []).length === 2 &&
       (manifest.reconciledPostAnchorMigrations ?? []).length === 5 &&
       (manifest.reconciledPostAnchorMigrations ?? []).every((r) =>
         r.remoteVersionStatus === "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY" &&

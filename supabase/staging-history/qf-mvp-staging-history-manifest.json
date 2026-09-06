@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 16,
+    "postAnchorMigrationCount": 17,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -897,6 +897,22 @@
       "phase": "QF-MVP-80.14A",
       "operationalStatus": "PENDING",
       "purpose": "Creates public.qf_activate_meta_lead_assignment_v1 — the ONLY authority that can assign activation_status=active, scoped to meta_whatsapp_cloud/whatsapp/lead_assignment_alert/en. Applying it arms nothing.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260904000000",
+      "name": "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication",
+      "path": "supabase/migrations/20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql",
+      "sha256": "9bfcd2ed3b6a58976ad5d237d1ca63bf2f0a86ac6dd75aef1ce9267ef7b68e18",
+      "phase": "QF-MVP-82A-R0",
+      "operationalStatus": "PENDING",
+      "purpose": "Adds EXACTLY public.communication_messages and public.communication_inbound_messages to the supabase_realtime publication, so a server-side Realtime subscription can drive the QF-MVP-82A unified inbox. Publication membership only: it sends nothing, grants no browser access, changes no RLS or policy, and mutates no row.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

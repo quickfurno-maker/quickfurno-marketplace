@@ -224,6 +224,16 @@ jobs:
       - name: QF-MVP-80.17A lead-assignment terminal reconciliation
         run: npm run test:mvp:80-17a
 
+      # QF-MVP-80.17A-R1 — the ONE-SHOT operator for the single historical
+      # QF-MVP-80.16D-R2 anomaly (canonical message failed / derived intent
+      # dispatched). It can reach production, so its narrowness is proved at the
+      # exact head: dry run by default, the production project fence, a frozen
+      # 30-minute trial window no argument can widen, exactly one candidate, a
+      # single-use attestation, and the repair performed only by the deployed
+      # 80.17A service. Offline: no secrets, no network, no Supabase, no send.
+      - name: QF-MVP-80.17A-R1 controlled historical reconciliation
+        run: npm run test:mvp:80-17a-r1
+
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 

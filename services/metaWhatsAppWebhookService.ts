@@ -60,10 +60,15 @@ import {
   decideCallbackIdentity,
   deriveMetaWebhookEventId,
   metaWebhookPayloadHash,
+  normalizeMetaDeliveryWebhook,
   verifyMetaWebhookSignature,
   verifyMetaWebhookSignatureBytes,
   MetaWebhookClassification,
 } from "../lib/communication/providers/metaWhatsAppWebhook";
+// QF-MVP-80.17A — the DERIVED lead-assignment intent projection. It runs only
+// after the canonical message lifecycle has been persisted, holds no delivery
+// authority of its own, and cannot send.
+import { reconcileLeadAssignmentDeliveryResults } from "./leadAssignmentResultService";
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
 import { processInboundConsentCommands } from "./inboundConsentCommandService";
 import { enqueueConsentCommandResponses } from "./consentCommandResponseService";
@@ -144,6 +149,16 @@ export interface MetaWebhookDeps {
     readonly appSecret: string;
     readonly providerAccountId: string;
   }) => Promise<{ readonly ok: boolean; readonly data?: { readonly duplicate: boolean } }>;
+  /**
+   * QF-MVP-80.17A — the DERIVED lead-assignment intent projection. Injected as
+   * its own seam (like `resolveOwnership`) so the harness can prove it runs
+   * exactly once and ONLY AFTER `processDelivery` has persisted canonical truth.
+   */
+  readonly reconcileLeadAssignmentResults: (args: {
+    readonly provider: string;
+    readonly providerMessageIds: readonly string[];
+    readonly providerAccountId: string;
+  }) => Promise<unknown>;
   readonly recordIgnored: (
     rawBody: string,
     payload: Record<string, unknown>,
@@ -167,6 +182,7 @@ export function defaultMetaWebhookDeps(): MetaWebhookDeps {
       const res = await service.processWebhook(rawBody, signature, appSecret, providerAccountId);
       return res.ok ? { ok: true, data: { duplicate: res.data.duplicate } } : { ok: false };
     },
+    reconcileLeadAssignmentResults: (args) => reconcileLeadAssignmentDeliveryResults(args),
     recordIgnored: (rawBody, payload, reason) => recordIgnoredReceipt(rawBody, payload, reason),
     processCommands: (processed) => processInboundConsentCommands(processed),
     enqueueAcks: (input) => enqueueConsentCommandResponses(input),
@@ -287,6 +303,36 @@ async function processVerifiedExpectedMetaWebhook(
       providerAccountId: providerAccountId as string,
     });
     if (!res.ok) return { status: 500, code: "processing_failed" };
+
+    // QF-MVP-80.17A — DERIVED lead-assignment intent reconciliation.
+    //
+    // ORDER IS THE POINT: this runs strictly AFTER `processDelivery` has
+    // persisted the canonical communication_messages lifecycle and its immutable
+    // delivery event. The projection therefore reads settled truth and can never
+    // become authoritative over the message.
+    //
+    // It runs on the DUPLICATE branch too, deliberately. If canonical processing
+    // once succeeded but this projection hit a transient database error, a Meta
+    // redelivery is the retry — and a redelivery cannot cause a second provider
+    // send, a second message or a status regression, because the reconciler only
+    // ever compare-and-sets one intent column forward.
+    //
+    // NON-FATAL by construction: a projection failure must never turn a correctly
+    // processed webhook into a 500 and a retry storm. The canonical row is
+    // already right; the derived row converges on the next event or redelivery.
+    try {
+      const providerMessageIds = normalizeMetaDeliveryWebhook(payload).map((e) => e.providerMessageId);
+      if (providerMessageIds.length > 0) {
+        await deps.reconcileLeadAssignmentResults({
+          provider: META_WHATSAPP_CLOUD_PROVIDER_KEY,
+          providerMessageIds,
+          providerAccountId: providerAccountId as string,
+        });
+      }
+    } catch {
+      /* derived projection only — canonical delivery truth is already durable */
+    }
+
     return { status: 200, result: res.data?.duplicate ? "duplicate" : "delivery_processed" };
   }
 

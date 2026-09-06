@@ -219,6 +219,14 @@ jobs:
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 
+      # QF-UI-TRACKING-01 — paid-acquisition attribution. A production lead filed
+      # with every utm_* null because both lead surfaces sampled the URL only at
+      # submit time. This executes the real tracking module against simulated
+      # browsers (including a hostile sessionStorage) and proves the duplicate
+      # readers stay deleted. Offline: no secrets, no network, no Supabase.
+      - name: QF-UI-TRACKING-01 lead attribution persistence
+        run: npm run test:ui:lead-attribution
+
       - name: Typecheck
         run: npm run typecheck
 

@@ -18,6 +18,10 @@ import {
   formatServiceLabels,
 } from "@/components/client-enquiry/enquiryDisplay";
 import { trackEvent } from "@/lib/config";
+// QF-UI-TRACKING-01: the single browser attribution authority. This module owns
+// UTM capture/persistence/resolution for every homeowner lead surface; the modal
+// no longer parses the URL itself.
+import { captureLeadAttribution, resolveLeadTracking } from "@/lib/analytics/leadTracking";
 import { enquiryServiceForCategory } from "@/lib/quickfurno-data";
 import { mainCategories } from "@/lib/categories";
 import { QFIcon } from "@/components/QuickFurnoIcons";
@@ -212,20 +216,12 @@ function ValidationIcon({ state }: { state: "valid" | "invalid" | "none" }) {
   return null;
 }
 
-/** Read UTM params + the current page URL for lead-source tracking. */
-function readTrackingContext() {
-  if (typeof window === "undefined") return {};
-  const params = new URLSearchParams(window.location.search);
-  const pick = (key: string) => params.get(key)?.trim() || undefined;
-  return {
-    source_url: window.location.href,
-    utm_source: pick("utm_source"),
-    utm_medium: pick("utm_medium"),
-    utm_campaign: pick("utm_campaign"),
-    utm_term: pick("utm_term"),
-    utm_content: pick("utm_content"),
-  };
-}
+// QF-UI-TRACKING-01: the local submit-time URL parser that used to live here is
+// gone. It sampled window.location.search only at submission, so a visitor who
+// arrived on a tagged URL and then navigated anywhere inside QuickFurno filed a
+// lead with every utm_* null. Attribution now comes from
+// lib/analytics/leadTracking.ts, which captures the campaign on mount and
+// resolves it (current URL first, stored campaign second) at submission.
 
 type EnquiryModalOptions = {
   title?: string;
@@ -401,6 +397,22 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   // dependencies. A ref keeps the listener stable, so typing can never tear the
   // listener — or the focus/scroll lifecycle — down and back up.
   const requestCloseRef = useRef<() => void>(() => {});
+
+  // QF-UI-TRACKING-01 — EARLY CAMPAIGN CAPTURE.
+  //
+  // This provider is mounted from app/layout.tsx, so it is the first client code
+  // to run on every public page. Capturing here means a tagged arrival is banked
+  // before the visitor browses, which is exactly the window where attribution
+  // used to be lost.
+  //
+  // The empty dependency array is deliberate and load-bearing: this must run once
+  // per mount and must NEVER be keyed to form/step/open/success state. Keying an
+  // effect to form state is what caused QF-UI-HOTFIX-01 (the mobile keyboard
+  // closing on every keystroke), and this effect touches no focus, no scroll lock
+  // and no DOM — so that lifecycle is untouched.
+  useEffect(() => {
+    captureLeadAttribution();
+  }, []);
 
   const openModal = useCallback((options: EnquiryModalOptions = {}) => {
     // Preferred-vendor flow: the vendor's category/subcategory are the source of
@@ -1012,7 +1024,8 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       location_consent: form.lat != null && form.lng != null,
       share_consent: form.shareConsent,
       ...locationPayload,
-      ...readTrackingContext(),
+      // QF-UI-TRACKING-01: current URL first, stored tagged campaign second.
+      ...resolveLeadTracking(),
       ...preferredPayload,
     };
 

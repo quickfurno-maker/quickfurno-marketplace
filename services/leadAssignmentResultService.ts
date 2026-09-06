@@ -27,15 +27,27 @@
 //   Meta delivery orchestration after that step, never before it.
 //
 // IDEMPOTENT BY CONSTRUCTION.
-//   Re-running against the same message is a NOOP_SAME_STATUS. That is what lets
-//   a Meta redelivery safely re-attempt a projection that previously failed on a
-//   transient database error, without any second provider call, second message or
-//   status regression.
+//   Re-running against a row that already holds the derived state is a PROVEN
+//   NOOP_SAME_STATUS — proven because the contract compared the two statuses. That
+//   is what lets a Meta redelivery safely re-attempt a projection that previously
+//   failed on a transient database error, without any second provider call, second
+//   message or status regression.
+//
+// A ZERO-ROW CAS IS NOT A NO-OP CLAIM.
+//   An earlier revision of this file labelled every zero-row UPDATE
+//   `NOOP_SAME_STATUS` and tallied `APPLIED` from the DECISION, before the
+//   statement ran. Both were untrue: a missed guard proves only that the row no
+//   longer matched what we observed — not that it already reached the derived
+//   state — and one attempt could report `outcomes.APPLIED = 1` beside
+//   `applied = 0`. The write result is now classified by the pure
+//   `classifyReconcileWriteResult`, and a zero-row result is its own closed
+//   outcome, CONCURRENT_MODIFICATION, which claims nothing about the row.
 // ============================================================================
 
 import { adminClient } from "@/lib/supabase";
 import {
   LeadAssignmentReconcileOutcome,
+  classifyReconcileWriteResult,
   evaluateLeadAssignmentReconciliation,
   type LeadAssignmentReconcileOutcomeValue,
   type ReconcilableIntentRow,
@@ -54,16 +66,25 @@ const MAX_PROVIDER_MESSAGE_IDS = 100;
 
 export interface LeadAssignmentReconcileSummary {
   readonly examined: number;
+  /** ONLY writes that actually matched a row. Never a decision, never an attempt. */
   readonly applied: number;
+  /** PROVEN no-ops: the projection already equalled the row, or was non-terminal. */
   readonly unchanged: number;
   readonly notApplicable: number;
+  /**
+   * Guarded writes that matched zero rows. Distinct from `unchanged` on purpose:
+   * this reconciler did not write and did not re-read, so it makes no claim about
+   * the row's current state.
+   */
+  readonly concurrent: number;
   readonly refused: number;
   /** Sanitized outcome tally. Carries no id, destination, vendor or provider text. */
   readonly outcomes: Readonly<Record<string, number>>;
 }
 
 const EMPTY: LeadAssignmentReconcileSummary = Object.freeze({
-  examined: 0, applied: 0, unchanged: 0, notApplicable: 0, refused: 0, outcomes: Object.freeze({}),
+  examined: 0, applied: 0, unchanged: 0, notApplicable: 0, concurrent: 0, refused: 0,
+  outcomes: Object.freeze({}),
 });
 
 /**
@@ -84,7 +105,7 @@ export async function reconcileLeadAssignmentDeliveryResults(input: {
   if (ids.length === 0 || typeof input?.provider !== "string" || input.provider === "") return EMPTY;
 
   const tally: Record<string, number> = {};
-  let examined = 0, applied = 0, unchanged = 0, notApplicable = 0, refused = 0;
+  let examined = 0, applied = 0, unchanged = 0, notApplicable = 0, concurrent = 0, refused = 0;
 
   const note = (outcome: LeadAssignmentReconcileOutcomeValue) => {
     tally[outcome] = (tally[outcome] ?? 0) + 1;
@@ -130,51 +151,62 @@ export async function reconcileLeadAssignmentDeliveryResults(input: {
     }
 
     const decision = evaluateLeadAssignmentReconciliation({ intent, message });
-    note(decision.outcome);
 
-    switch (decision.outcome) {
-      case LeadAssignmentReconcileOutcome.APPLIED:
-        break;
-      case LeadAssignmentReconcileOutcome.NOOP_SAME_STATUS:
-      case LeadAssignmentReconcileOutcome.NOOP_NON_TERMINAL_MESSAGE:
-        unchanged += 1;
-        continue;
-      case LeadAssignmentReconcileOutcome.NOT_APPLICABLE_MESSAGE_NOT_INTENT_LINKED:
-      case LeadAssignmentReconcileOutcome.NOT_APPLICABLE_NOT_LEAD_ASSIGNMENT:
-        notApplicable += 1;
-        continue;
-      default:
-        refused += 1;
-        continue;
+    // A DECISION is not an OUTCOME. Anything that does not attempt a write is
+    // tallied here, exactly once; `APPLIED` is deliberately NOT tallied yet,
+    // because at this point nothing has touched the database.
+    if (decision.outcome !== LeadAssignmentReconcileOutcome.APPLIED || decision.plan === null) {
+      const outcome = decision.plan === null && decision.outcome === LeadAssignmentReconcileOutcome.APPLIED
+        ? LeadAssignmentReconcileOutcome.REFUSED_WRITE_FAILED // an apply decision with no plan is unusable
+        : decision.outcome;
+      note(outcome);
+      switch (outcome) {
+        case LeadAssignmentReconcileOutcome.NOOP_SAME_STATUS:
+        case LeadAssignmentReconcileOutcome.NOOP_NON_TERMINAL_MESSAGE:
+          unchanged += 1;
+          break;
+        case LeadAssignmentReconcileOutcome.NOT_APPLICABLE_MESSAGE_NOT_INTENT_LINKED:
+        case LeadAssignmentReconcileOutcome.NOT_APPLICABLE_NOT_LEAD_ASSIGNMENT:
+          notApplicable += 1;
+          break;
+        default:
+          refused += 1;
+          break;
+      }
+      continue;
     }
 
     const plan = decision.plan;
-    if (plan === null) { refused += 1; continue; }
 
+    // The write, then ONE truthful label derived from what it actually did.
+    let matchedRows: number | null = null;
+    let failed = false;
     try {
       // The plan is applied verbatim: the table, the single column and all three
       // fences are decided in the pure contract, never widened here.
       let update = db().from(plan.table).update(plan.patch);
       for (const [column, value] of plan.filters) update = update.eq(column, value);
       const { data, error } = await update.select("id, status");
-
-      if (error || !data || data.length === 0) {
-        // A concurrent writer already advanced the row and won the CAS. That is a
-        // correct no-op, never a forced overwrite and never a retry loop.
-        unchanged += 1;
-        note(LeadAssignmentReconcileOutcome.NOOP_SAME_STATUS);
-        continue;
-      }
-      applied += 1;
+      if (error) failed = true;
+      else matchedRows = Array.isArray(data) ? data.length : null;
     } catch {
       // Reconciliation failure is NEVER fatal: the canonical message row is
       // already correct, and a Meta redelivery re-attempts this projection.
-      refused += 1;
+      failed = true;
     }
+
+    // `classifyReconcileWriteResult` is pure, so this accounting is provable
+    // offline. A zero-row CAS becomes CONCURRENT_MODIFICATION — never
+    // NOOP_SAME_STATUS, which would claim a state this code never re-read.
+    const writeOutcome = classifyReconcileWriteResult({ matchedRows, failed });
+    note(writeOutcome);
+    if (writeOutcome === LeadAssignmentReconcileOutcome.APPLIED) applied += 1;
+    else if (writeOutcome === LeadAssignmentReconcileOutcome.CONCURRENT_MODIFICATION) concurrent += 1;
+    else refused += 1;
   }
 
   return {
-    examined, applied, unchanged, notApplicable, refused,
+    examined, applied, unchanged, notApplicable, concurrent, refused,
     outcomes: Object.freeze({ ...tally }),
   };
 }

@@ -92,6 +92,24 @@ export const LeadAssignmentReconcileOutcome = Object.freeze({
   /** delivered<->failed, or any backward move. Refused by isForwardTransition. */
   REFUSED_REGRESSION: "REFUSED_REGRESSION",
 
+  /**
+   * The guarded UPDATE matched ZERO rows.
+   *
+   * This has exactly one meaning: the row no longer matched the state we
+   * observed, so this reconciler did not write and WILL NOT GUESS what the row
+   * now holds. It is deliberately NOT `NOOP_SAME_STATUS` — a zero-row CAS proves
+   * only that the guard missed, never that the row already reached the derived
+   * state. A concurrent writer may have moved it to the same terminal state, to
+   * the other terminal state, or to something else entirely.
+   *
+   * Non-fatal and safely retryable: a later redelivery re-reads canonical truth
+   * and reconciles again from whatever the row actually is.
+   */
+  CONCURRENT_MODIFICATION: "CONCURRENT_MODIFICATION",
+
+  /** The write itself failed. Never counted as applied; carries no DB detail. */
+  REFUSED_WRITE_FAILED: "REFUSED_WRITE_FAILED",
+
   /** Not this lane's work. Deterministic and NOT an error. */
   NOT_APPLICABLE_MESSAGE_NOT_INTENT_LINKED: "NOT_APPLICABLE_MESSAGE_NOT_INTENT_LINKED",
   NOT_APPLICABLE_NOT_LEAD_ASSIGNMENT: "NOT_APPLICABLE_NOT_LEAD_ASSIGNMENT",
@@ -149,6 +167,34 @@ export type LeadAssignmentReconcileDecision = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Classify what the guarded UPDATE actually did. PURE, so the truthfulness of the
+ * accounting is testable without a database.
+ *
+ * `APPLIED` is returned ONLY when the write really matched a row. That is the
+ * whole point: an earlier version tallied APPLIED from the DECISION, before the
+ * statement ran, so a single attempt could report `outcomes.APPLIED = 1` next to
+ * `applied = 0` — contradictory evidence about whether production changed.
+ *
+ * A zero-row result is `CONCURRENT_MODIFICATION`, never `NOOP_SAME_STATUS`: the
+ * guard missing is not proof that the row already holds the derived state.
+ */
+export function classifyReconcileWriteResult(input: {
+  /** Rows the guarded UPDATE matched. `null`/undefined is treated as unproven. */
+  readonly matchedRows: number | null | undefined;
+  /** True when the driver reported an error or the statement threw. */
+  readonly failed: boolean;
+}): LeadAssignmentReconcileOutcomeValue {
+  if (input?.failed === true) return LeadAssignmentReconcileOutcome.REFUSED_WRITE_FAILED;
+  const matched = input?.matchedRows;
+  if (typeof matched !== "number" || !Number.isFinite(matched)) {
+    // No trustworthy row count came back — refuse to claim a write happened.
+    return LeadAssignmentReconcileOutcome.CONCURRENT_MODIFICATION;
+  }
+  if (matched >= 1) return LeadAssignmentReconcileOutcome.APPLIED;
+  return LeadAssignmentReconcileOutcome.CONCURRENT_MODIFICATION;
+}
 
 const decide = (
   outcome: LeadAssignmentReconcileOutcomeValue,

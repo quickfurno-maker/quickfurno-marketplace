@@ -27,6 +27,7 @@ import {
   LeadAssignmentReconcileOutcome as OUT,
   LEAD_ASSIGNMENT_RECONCILE_TABLE,
   LEAD_ASSIGNMENT_RECONCILE_COLUMN,
+  classifyReconcileWriteResult as classify,
   evaluateLeadAssignmentReconciliation as evaluate,
 } from "../../../lib/communication/leadAssignmentResultContract.ts";
 import {
@@ -404,11 +405,111 @@ check("34 repeated reconciliation is idempotent", () => {
 
 check("35 a lost CAS cannot force an overwrite", () => {
   // The plan pins the OBSERVED status, so a row a concurrent writer already moved
-  // matches zero rows and the service treats that as unchanged, never a retry.
+  // matches zero rows and this reconciler simply does not write.
   const f = Object.fromEntries(run(intentOf({ status: IntentResultStatus.DISPATCHED }), messageOf()).plan.filters);
   eq(f.status, IntentResultStatus.DISPATCHED, "CAS pins the observed status");
-  assert(/data\.length === 0/.test(SERVICE_CODE), "zero affected rows is handled");
   assert(!/\.neq\(|force|upsert/i.test(SERVICE_CODE), "no forced write path exists");
+});
+
+// ---- CAS-miss classification (PR #71 correction) ---------------------------
+//
+// The earlier revision tallied APPLIED from the DECISION and labelled every
+// zero-row UPDATE `NOOP_SAME_STATUS`. Both were untrue. These checks EXECUTE the
+// pure classifier, so the accounting is proved rather than described.
+
+check("35a a matched write is the ONLY thing that yields APPLIED", () => {
+  eq(classify({ matchedRows: 1, failed: false }), OUT.APPLIED, "one matched row");
+  eq(classify({ matchedRows: 3, failed: false }), OUT.APPLIED, "several matched rows");
+});
+
+check("35b a zero-row CAS is CONCURRENT_MODIFICATION, never NOOP_SAME_STATUS", () => {
+  const got = classify({ matchedRows: 0, failed: false });
+  eq(got, OUT.CONCURRENT_MODIFICATION, "zero rows");
+  assert(got !== OUT.NOOP_SAME_STATUS, "a missed guard must NOT claim the row already matched");
+  assert(got !== OUT.APPLIED, "a missed guard must NOT claim a write happened");
+});
+
+check("35c a zero-row CAS never increments applied", () => {
+  assert(classify({ matchedRows: 0, failed: false }) !== OUT.APPLIED, "no APPLIED from a miss");
+  // and the service only increments `applied` on that exact outcome
+  assert(/writeOutcome === LeadAssignmentReconcileOutcome\.APPLIED\) applied \+= 1/.test(SERVICE_CODE),
+    "applied is incremented only for the APPLIED write outcome");
+});
+
+check("35d an unproven row count is never APPLIED", () => {
+  for (const v of [null, undefined, NaN, "1", {}]) {
+    eq(classify({ matchedRows: v, failed: false }), OUT.CONCURRENT_MODIFICATION,
+      `unproven count ${JSON.stringify(v)} must not claim a write`);
+  }
+});
+
+check("35e a write error is never APPLIED and never a no-op", () => {
+  const got = classify({ matchedRows: 0, failed: true });
+  eq(got, OUT.REFUSED_WRITE_FAILED, "failed write");
+  assert(got !== OUT.APPLIED && got !== OUT.NOOP_SAME_STATUS, "no false success, no false no-op");
+  // failure wins even if a row count is somehow present
+  eq(classify({ matchedRows: 1, failed: true }), OUT.REFUSED_WRITE_FAILED, "failure dominates");
+});
+
+check("35f APPLIED is not tallied before the database write", () => {
+  const decisionTally = SERVICE_CODE.indexOf("note(outcome);");
+  const update = SERVICE_CODE.indexOf(".update(plan.patch)");
+  const writeTally = SERVICE_CODE.indexOf("note(writeOutcome);");
+  assert(decisionTally > 0 && update > 0 && writeTally > 0, "all three sites must exist");
+  assert(update < writeTally, "the write outcome is tallied only AFTER the UPDATE");
+  // The decision-side tally must be unreachable for an apply decision.
+  assert(/decision\.outcome !== LeadAssignmentReconcileOutcome\.APPLIED \|\| decision\.plan === null/
+    .test(SERVICE_CODE), "the decision-side tally is guarded against the APPLIED branch");
+  // There is exactly one place that can record APPLIED, and it is the write path.
+  eq((SERVICE_CODE.match(/note\(/g) ?? []).length, 2, "exactly two tally sites: decision and write");
+});
+
+check("35g one attempt can never tally both APPLIED and NOOP_SAME_STATUS", () => {
+  // The classifier is total and single-valued: one write, one label.
+  const labels = new Set([
+    classify({ matchedRows: 1, failed: false }),
+    classify({ matchedRows: 0, failed: false }),
+    classify({ matchedRows: 0, failed: true }),
+  ]);
+  eq(labels.size, 3, "the three write results are three distinct labels");
+  assert(!labels.has(OUT.NOOP_SAME_STATUS), "no write result may be labelled a proven no-op");
+  // and the write branch `continue`s per message, so no second label is possible
+  assert(!/note\(LeadAssignmentReconcileOutcome\.NOOP_SAME_STATUS\)/.test(SERVICE_CODE),
+    "the service must not hand-label a no-op after a write");
+});
+
+check("35h CONCURRENT_MODIFICATION is accounted separately from proven no-ops", () => {
+  assert(/readonly concurrent: number/.test(SERVICE_CODE), "summary exposes a concurrent counter");
+  assert(/CONCURRENT_MODIFICATION\) concurrent \+= 1/.test(SERVICE_CODE),
+    "a CAS miss increments concurrent, not unchanged");
+});
+
+check("35i a CAS miss is safely retryable and still cannot regress", () => {
+  // After a concurrent writer set the row to the same terminal state, the next
+  // redelivery re-reads and produces a PROVEN no-op — not another write.
+  const after = run(intentOf({ status: IntentResultStatus.DELIVERED }), messageOf({ status: "delivered" }));
+  eq(after.outcome, OUT.NOOP_SAME_STATUS, "proven same-state on re-read");
+  eq(after.plan, null, "no second write");
+  // If the concurrent writer set the OTHER terminal state, the retry refuses.
+  const conflict = run(intentOf({ status: IntentResultStatus.FAILED }), messageOf({ status: "delivered" }));
+  eq(conflict.outcome, OUT.REFUSED_REGRESSION, "conflicting terminal state is refused, never overwritten");
+  eq(conflict.plan, null, "no overwrite");
+});
+
+check("35j mutant: classifying zero rows as a no-op would be a false claim", () => {
+  const real = classify({ matchedRows: 0, failed: false });
+  const naive = ((rows) => (rows === 0 ? OUT.NOOP_SAME_STATUS : OUT.APPLIED))(0);
+  assert(naive === OUT.NOOP_SAME_STATUS, "the mutant asserts an unread state");
+  assert(real !== naive, "real classifier and mutant must differ — otherwise this proves nothing");
+});
+
+check("35k mutant: tallying from the decision would contradict the counters", () => {
+  // Simulate the OLD behaviour: label from the decision, then hit a CAS miss.
+  const decision = run(intentOf(), messageOf({ status: "delivered" }));
+  eq(decision.outcome, OUT.APPLIED, "the decision does say APPLIED");
+  const actual = classify({ matchedRows: 0, failed: false });
+  assert(decision.outcome !== actual,
+    "decision and write result differ — which is exactly why only the write result may be tallied");
 });
 
 // ---- webhook ordering ------------------------------------------------------

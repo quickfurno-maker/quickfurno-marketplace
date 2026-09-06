@@ -249,6 +249,16 @@ jobs:
       - name: QF-MVP-82A-R0 Realtime publication foundation
         run: npm run test:mvp:82a-r0
 
+      # QF-MVP-82A-R0-S1 — the staging deployment record for that migration.
+      # Documentary only, and its whole job is to keep one distinction from
+      # drifting: R0 is applied to STAGING and explicitly NOT to production. It
+      # also holds the 80.14A activation authority unapplied in both environments,
+      # keeps the frozen 80.05 reconciliation count at 102 against a live tree of
+      # 104, and proves no application or inbox file rode along.
+      # Offline: no secrets, no network, no Supabase, no send.
+      - name: QF-MVP-82A-R0-S1 staging deployment certification
+        run: npm run test:mvp:82a-r0-s1
+
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 

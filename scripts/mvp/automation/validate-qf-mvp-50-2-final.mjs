@@ -578,13 +578,16 @@ record("G03a the G1 staging-history gate was re-pinned to the applied truth, not
   // five carries them. The APPLIED ten are untouched. Still exact counts, still no `>=`.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the production activation authority. Still an exact count, still no `>=`.
-  // QF-MVP-82A-R0: it now holds exactly TWO — that authority plus the Realtime
-  // publication membership. Both SOURCE-PENDING; APPLIED stays exactly ten.
-  g1Source.includes("the explicit PENDING post-anchor set holds exactly the two pinned entries") &&
+  // QF-MVP-82A-R0 made it TWO; QF-MVP-82A-R0-S1 applied the Realtime membership to
+  // STAGING, so it moved to its own staging-applied set and PENDING is ONE again —
+  // the production activation authority. APPLIED stays exactly ten throughout.
+  g1Source.includes("the explicit PENDING post-anchor set holds exactly the one pinned entry") &&
+  g1Source.includes("the explicit STAGING-APPLIED post-anchor set holds exactly the one pinned entry") &&
   g1Source.includes("manifest declares exactly five RECONCILED post-anchor migrations") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 10") &&
-  g1Source.includes("pendingPins.length === 2") &&
+  g1Source.includes("pendingPins.length === 1") &&
+  g1Source.includes("stagingAppliedPins.length === 1") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("const MIGRATION_COUNT = 104;"));
 record("G03b the atomic producer staging certification is recorded",
@@ -822,7 +825,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 10") &&
-          g1Source.includes("pendingPins.length === 2") &&
+          g1Source.includes("pendingPins.length === 1") &&
           g1Source.includes("reconciledPins.length === 5") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/reconciledPins\.length\s*>=/.test(g1Source) &&

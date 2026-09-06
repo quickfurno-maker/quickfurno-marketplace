@@ -270,19 +270,6 @@ const POST_ANCHOR_PENDING = [
     sha: "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
     phase: "QF-MVP-80.14A",
   },
-  // QF-MVP-82A-R0. Adds EXACTLY communication_messages and
-  // communication_inbound_messages to the supabase_realtime publication so the
-  // QF-MVP-82A inbox can be driven by a SERVER-SIDE Realtime subscription. It is
-  // SOURCE ONLY: not applied to staging or production, carrying no applied
-  // evidence and no remote history count. Membership is not authorization — both
-  // tables stay RLS-enabled and service-role-only, and applying it sends nothing
-  // and grants nothing to anon or authenticated.
-  {
-    version: "20260904000000",
-    name: "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication",
-    sha: "9bfcd2ed3b6a58976ad5d237d1ca63bf2f0a86ac6dd75aef1ce9267ef7b68e18",
-    phase: "QF-MVP-82A-R0",
-  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -301,8 +288,45 @@ const RECONCILED_HISTORY = [
   ["20260817000000", "qf_mvp_80_03_audit_logs_forward_repair"],
 ];
 
-const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING].map((m) => m.version);
-const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING];
+// QF-MVP-82A-R0-S1 — STAGING-APPLIED, PRODUCTION NOT APPLIED.
+//
+// R0 was applied to staging exactly once from an isolated workspace: an exact-one
+// dry run, one push, and an INDEPENDENT re-list showing the remote row present,
+// followed by read-only verification that the publication holds exactly the two
+// intended tables, puballtables is false, RLS survived on both, and anon and
+// authenticated have zero grants.
+//
+// It belongs in NONE of the three existing sets, and the reason is the same one
+// QF-MVP-80.05 documented above:
+//
+//   POST_ANCHOR_APPLIED means "...and an OBSERVED remote-history count". No count
+//     was observed for R0. Promoting it there would mean fabricating one — the
+//     precise thing the 80.05 note refuses to do.
+//   POST_ANCHOR_RECONCILED means applied to BOTH environments. R0 is not applied
+//     to production, and inferring production from staging is forbidden.
+//   POST_ANCHOR_PENDING would deny a staging apply that demonstrably happened.
+//
+// So, exactly as 80.05 did, this state gets its own set and its own strict rules:
+// staging applied and independently re-listed, production explicitly NOT applied
+// and NOT proven, still behind its own gate, and NO fabricated remote-history
+// count. It waives nothing the applied ten must prove.
+const POST_ANCHOR_STAGING_APPLIED = [
+  {
+    version: "20260904000000",
+    name: "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication",
+    sha: "9bfcd2ed3b6a58976ad5d237d1ca63bf2f0a86ac6dd75aef1ce9267ef7b68e18",
+    phase: "QF-MVP-82A-R0",
+  },
+].map((m) => ({
+  ...m,
+  filename: `${m.version}_${m.name}.sql`,
+  path: `supabase/migrations/${m.version}_${m.name}.sql`,
+}));
+
+// Version order, which is also apply order: the ten applied, the five reconciled,
+// then 80.14A (still pending) and finally R0 (staging-applied).
+const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING, ...POST_ANCHOR_STAGING_APPLIED].map((m) => m.version);
+const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING, ...POST_ANCHOR_STAGING_APPLIED];
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
@@ -532,6 +556,7 @@ function validateState(state) {
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const reconciledPins = Array.isArray(manifest.reconciledPostAnchorMigrations) ? manifest.reconciledPostAnchorMigrations : null;
   const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
+  const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
   check("exactly seventeen local migrations are newer than the anchor", postAnchorLocal.length === 17, `actual=${postAnchorLocal.length}`);
@@ -541,18 +566,37 @@ function validateState(state) {
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
   check("the reconciled records appear in exact pinned order", same(reconciledPins?.map((r) => r.version), POST_ANCHOR_RECONCILED.map((m) => m.version)));
-  // QF-MVP-80.14A opened the PENDING set; QF-MVP-82A-R0 is the second entry. It
-  // is still EXACT: each is pinned by version/name/path/SHA, and neither may
-  // also be claimed applied.
-  check("the explicit PENDING post-anchor set holds exactly the two pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 2,
+  // QF-MVP-82A-R0-S1: R0 left the PENDING set when it was applied to staging, so
+  // PENDING is exactly the 80.14A production activation authority again. It is
+  // still EXACT, pinned by version/name/path/SHA, and must not also be claimed
+  // applied anywhere.
+  check("the explicit PENDING post-anchor set holds exactly the one pinned entry",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 1,
     `actual=${pendingPins?.length}`);
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the one pinned entry",
+    stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
+    stagingAppliedPins.length === 1,
+    `actual=${stagingAppliedPins?.length}`);
+  check("the staging-applied record claims staging and explicitly refuses production",
+    stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
+    stagingAppliedPins?.[0]?.appliedToStaging === true &&
+    stagingAppliedPins?.[0]?.appliedExactlyOnceToStaging === true &&
+    stagingAppliedPins?.[0]?.independentRemoteRelistVerified === true &&
+    stagingAppliedPins?.[0]?.appliedToProduction === false &&
+    stagingAppliedPins?.[0]?.productionVersionStatus === "NOT_APPLIED_NOT_PROVEN" &&
+    stagingAppliedPins?.[0]?.requiresSeparateProductionDeploymentGate === true);
+  check("the staging-applied record fabricates NO remote-history count",
+    stagingAppliedPins?.[0]?.remoteHistoryCountObservedAtApply === false &&
+    stagingAppliedPins?.[0]?.remoteHistoryCountAfterApply === null);
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
-  check("applied truth and pending truth together account for every post-anchor migration, with no overlap",
+  check("applied, staging-applied and pending truth together account for every post-anchor migration, with no overlap",
     appliedTruth.length === 15 &&
-    same([...appliedTruth.map((r) => r.version), ...(pendingPins ?? []).map((r) => r.version)], POST_ANCHOR_ORDER) &&
-    !(pendingPins ?? []).some((p) => appliedTruth.some((a) => a.version === p.version)));
+    same([...appliedTruth.map((r) => r.version), ...(pendingPins ?? []).map((r) => r.version),
+          ...(stagingAppliedPins ?? []).map((r) => r.version)], POST_ANCHOR_ORDER) &&
+    !(pendingPins ?? []).some((p) => appliedTruth.some((a) => a.version === p.version)) &&
+    !(stagingAppliedPins ?? []).some((s) => appliedTruth.some((a) => a.version === s.version)) &&
+    !(stagingAppliedPins ?? []).some((s) => (pendingPins ?? []).some((p) => p.version === s.version)));
 
   for (const expected of POST_ANCHOR_RECONCILED) {
     const label = `${expected.phase} ${expected.version}`;
@@ -672,7 +716,7 @@ function validateState(state) {
   // ...and the live tree is exactly the pinned tree, one migration larger, with the
   // difference accounted for as an explicitly pinned PENDING entry and nothing else.
   check("every migration added since that reconciliation is explicitly pinned as pending",
-    MIGRATION_COUNT - RECONCILIATION_MIGRATION_COUNT === POST_ANCHOR_PENDING.length &&
+    MIGRATION_COUNT - RECONCILIATION_MIGRATION_COUNT === POST_ANCHOR_PENDING.length + POST_ANCHOR_STAGING_APPLIED.length &&
     state.migrations.length === MIGRATION_COUNT);
   check("the reconciliation authorizes no production apply and names both project refs correctly",
     manifest.historyReconciliation?.productionApplyAuthorized === false &&

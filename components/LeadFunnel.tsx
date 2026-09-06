@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { submitLead } from "@/app/actions";
 import { BUDGETS } from "@/lib/config";
+// QF-UI-TRACKING-01: shared attribution authority — the same one the modal uses.
+import { resolveLeadTracking } from "@/lib/analytics/leadTracking";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 import { useActiveCategories, NO_ACTIVE_CATEGORIES_MESSAGE } from "@/lib/categories/useActiveCategories";
 
@@ -74,19 +76,10 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  function readTracking() {
-    if (typeof window === "undefined") return {};
-    const params = new URLSearchParams(window.location.search);
-    const pick = (key: string) => params.get(key)?.trim() || undefined;
-    return {
-      source_url: window.location.href,
-      utm_source: pick("utm_source"),
-      utm_medium: pick("utm_medium"),
-      utm_campaign: pick("utm_campaign"),
-      utm_term: pick("utm_term"),
-      utm_content: pick("utm_content"),
-    };
-  }
+  // QF-UI-TRACKING-01: the duplicate submit-time URL parser that used to live
+  // here is gone. /enquiry now shares the one attribution authority with the
+  // modal, so a visitor who lands tagged and reaches this page untagged keeps
+  // their campaign.
 
   async function onSubmitForm() {
     if (busy) return;
@@ -117,7 +110,8 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         ...form,
         source: "Enquiry funnel",
         share_consent: consent,
-        ...readTracking(),
+        // QF-UI-TRACKING-01: current URL first, stored tagged campaign second.
+        ...resolveLeadTracking(),
       });
       if (!res.ok) {
         setError(res.error);

@@ -685,7 +685,16 @@ export const suite = {
         assertTrue(src.includes('submitLead('), 'same submitLead authority');
         assertTrue(src.includes('source: "Enquiry funnel"'), 'source tag unchanged');
         assertTrue(src.includes('share_consent: consent'), 'consent flag unchanged');
-        assertTrue(src.includes('readTracking()'), 'UTM capture unchanged');
+        // QF-UI-TRACKING-01 RE-PIN. This used to pin the local helper name
+        // `readTracking()`. That helper sampled window.location.search only at
+        // submit time, so a tagged arrival followed by any internal navigation
+        // filed a lead with every utm_* null (proved by a production lead:
+        // source_url = https://quickfurno.in/ with all UTMs null). The surface
+        // still captures UTMs — it now does so through the ONE shared authority
+        // instead of a private copy, which is a stricter pin, not a relaxed one.
+        assertTrue(src.includes('@/lib/analytics/leadTracking'),
+          'UTM capture uses the shared attribution authority');
+        assertTrue(src.includes('resolveLeadTracking()'), 'UTM capture present at submission');
         assertTrue(src.includes('useActiveCities'), 'active-city authority unchanged');
         assertTrue(src.includes('useActiveCategories'), 'active-category authority unchanged');
         assertTrue(src.includes('defaultService'), '?service= prefill preserved');

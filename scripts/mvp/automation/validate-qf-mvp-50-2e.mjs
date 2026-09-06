@@ -739,13 +739,15 @@ record("G01 the anchor is untouched",
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the Meta production activation authority. Still an exact count, never `>=`.
-record("G02 exactly ten APPLIED, five RECONCILED and TWO PENDING post-anchor migrations",
+record("G02 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and ONE PENDING post-anchor migration",
   manifest.appliedAnchor?.postAnchorMigrationCount === 17 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
   // QF-MVP-82A-R0 RE-PIN: 1 -> 2 SOURCE-PENDING entries (80.14A activation authority
   // + 82A-R0 Realtime publication membership). APPLIED stays ten, RECONCILED stays five.
-  manifest.pendingPostAnchorMigrations.length === 2 &&
+  manifest.pendingPostAnchorMigrations.length === 1 &&
+  manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+  manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   manifest.reconciledPostAnchorMigrations[0].version === "20260813000000" &&

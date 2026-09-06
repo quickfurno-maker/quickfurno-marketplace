@@ -182,12 +182,14 @@ function validateState(state) {
   // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
   // (40.13B canary authority + the marketing-consent writer RPC). The APPLIED set is
   // UNCHANGED at ten: neither pending migration has been applied to staging.
-  // QF-MVP-82A-R0 RE-PIN: 1 -> 2 SOURCE-PENDING entries (80.14A activation authority
-  // + 82A-R0 Realtime publication membership). RECONCILED stays exactly five.
-  check("the manifest pending set holds exactly the two pinned source-pending authorities and the five governed authorities are reconciled as APPLIED",
-    pending !== null && pending.length === 2 &&
+  // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to the staging-applied
+  // set, so PENDING is the 80.14A production activation authority alone again.
+  check("the manifest pending set holds exactly the one pinned activation authority, one is staging-applied, and the five governed authorities are reconciled as APPLIED",
+    pending !== null && pending.length === 1 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
-    pending[1].version === "20260904000000" && pending[1].operationalStatus === "PENDING" &&
+    Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
+    state.manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+    state.manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
     reconciled !== null && reconciled.length === 5 &&
     reconciled[0].version === "20260813000000" &&
     reconciled[1].version === "20260814000000" &&
@@ -210,8 +212,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals the ten applied records plus the five reconciled authorities plus the two pinned SOURCE-PENDING authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 2);
+  check("the anchor post-anchor count equals the ten applied records plus five reconciled, one staging-applied and one pending authority",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 1 + 1);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

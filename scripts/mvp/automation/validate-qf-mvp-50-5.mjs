@@ -599,11 +599,13 @@ record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence,
     const pending = manifest.pendingPostAnchorMigrations ?? null;
     const reconciled = manifest.reconciledPostAnchorMigrations ?? null;
     const pin = (manifest.appliedPostAnchorMigrations ?? []).find((r) => r.version === "20260812000000");
-    return Array.isArray(pending) && pending.length === 2 &&
+    const stagingApplied = manifest.stagingAppliedPostAnchorMigrations ?? null;
+    return Array.isArray(pending) && pending.length === 1 &&
       pending[0].version === "20260903040000" &&
       pending[0].operationalStatus === "PENDING" &&
-      pending[1].version === "20260904000000" &&
-      pending[1].operationalStatus === "PENDING" &&
+      Array.isArray(stagingApplied) && stagingApplied.length === 1 &&
+      stagingApplied[0].version === "20260904000000" &&
+      stagingApplied[0].appliedToProduction === false &&
       Array.isArray(reconciled) && reconciled.length === 5 &&
       reconciled[0].version === "20260813000000" &&
       reconciled[1].version === "20260814000000" &&
@@ -635,7 +637,7 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
   /const MIGRATION_COUNT = 104;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 2") &&
+  g1Source.includes("pendingPins.length === 1") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
@@ -727,7 +729,7 @@ const mutants = [
   // A RECONCILED record must never fabricate a remote-history count nobody observed, and
   // must never borrow the applied ten's owner-reviewed evidence type.
   ["a reconciled record fabricating an observed apply record is impossible",
-    () => (manifest.pendingPostAnchorMigrations ?? []).length === 2 &&
+    () => (manifest.pendingPostAnchorMigrations ?? []).length === 1 &&
       (manifest.reconciledPostAnchorMigrations ?? []).length === 5 &&
       (manifest.reconciledPostAnchorMigrations ?? []).every((r) =>
         r.remoteVersionStatus === "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY" &&

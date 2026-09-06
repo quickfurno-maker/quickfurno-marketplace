@@ -67,6 +67,13 @@ const absent = (code, re, label) => assert(!re.test(code), `${label} must not ap
 
 const pendingOf = (version) =>
   (MANIFEST.pendingPostAnchorMigrations ?? []).find((m) => m.version === version) ?? null;
+/**
+ * QF-MVP-82A-R0-S1 applied R0 to staging, so its record moved out of the pending
+ * set into the staging-applied set. This validator follows the RECORD rather than
+ * the array it used to live in — the migration it guards has not changed at all.
+ */
+const stagingAppliedOf = (version) =>
+  (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).find((m) => m.version === version) ?? null;
 
 /** The manifest's own canonicalization: UTF-8, CRLF folded to LF, all other bytes kept. */
 const canonicalSha256 = (path) =>
@@ -219,8 +226,9 @@ check("14 the G1 live pin is the truthful current count", () => {
     "and the manifest's historical record is likewise unchanged");
   // 104 - 102 = 2, which must be exactly the two pinned PENDING entries.
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
-    (MANIFEST.pendingPostAnchorMigrations ?? []).length,
-    "every migration added since that reconciliation is accounted for as PENDING");
+    (MANIFEST.pendingPostAnchorMigrations ?? []).length +
+    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
+    "every migration added since that reconciliation is accounted for as PENDING or STAGING-APPLIED");
 });
 
 // ---- 15-22. the manifest entry ---------------------------------------------
@@ -231,29 +239,34 @@ check("15 the R0 manifest entry appears exactly once", () => {
   const everyRecord = [
     ...(MANIFEST.appliedPostAnchorMigrations ?? []),
     ...(MANIFEST.reconciledPostAnchorMigrations ?? []),
+    ...(MANIFEST.stagingAppliedPostAnchorMigrations ?? []),
     ...(MANIFEST.pendingPostAnchorMigrations ?? []),
   ];
   eq(everyRecord.filter((m) => m.version === R0_VERSION).length, 1, "exactly one record names R0 anywhere");
-  const matches = (MANIFEST.pendingPostAnchorMigrations ?? []).filter((m) => m.version === R0_VERSION);
-  eq(matches.length, 1, "exactly one pending record");
-  // And it is not ALSO claimed applied or reconciled anywhere.
-  for (const key of ["appliedPostAnchorMigrations", "reconciledPostAnchorMigrations"]) {
+  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).filter((m) => m.version === R0_VERSION).length, 1,
+    "exactly one staging-applied record");
+  // And it is not ALSO claimed anywhere else — in particular not in the applied
+  // set, which would assert an observed remote-history count nobody observed, nor
+  // in the reconciled set, which would assert production.
+  for (const key of ["appliedPostAnchorMigrations", "reconciledPostAnchorMigrations", "pendingPostAnchorMigrations"]) {
     assert(!(MANIFEST[key] ?? []).some((m) => m.version === R0_VERSION), `not also in ${key}`);
   }
 });
 
-check("16-21 the R0 record states PENDING and claims no deployment", () => {
-  const e = pendingOf(R0_VERSION);
+check("16-21 the R0 record states STAGING-APPLIED and still refuses production", () => {
+  const e = stagingAppliedOf(R0_VERSION);
   assert(e !== null, "the record exists");
   eq(e.phase, "QF-MVP-82A-R0", "phase");
-  eq(e.operationalStatus, "PENDING", "operationalStatus");
-  eq(e.appliedToStaging, false, "appliedToStaging");
+  eq(e.operationalStatus, "APPLIED_TO_STAGING", "operationalStatus");
+  eq(e.appliedToStaging, true, "appliedToStaging");
+  eq(e.appliedExactlyOnceToStaging, true, "applied exactly once to staging");
+  eq(e.independentRemoteRelistVerified, true, "an independent re-list proved the remote row");
   eq(e.appliedToProduction, false, "appliedToProduction");
-  eq(e.appliedExactlyOnce, false, "appliedExactlyOnce");
-  eq(e.appliedByThisPhase, false, "appliedByThisPhase");
-  eq(e.remoteVersionStatus, "NOT_PROVEN_OFFLINE", "remoteVersionStatus");
-  eq(e.remoteHistoryCountObservedAtApply, false, "no remote history count is claimed");
-  eq(e.requiresSeparateStagingDeploymentGate, true, "requires its own staging gate");
+  eq(e.productionVersionStatus, "NOT_APPLIED_NOT_PROVEN", "production is neither applied nor inferred");
+  eq(e.requiresSeparateProductionDeploymentGate, true, "production is still gated");
+  // The exact distinction that keeps this record OUT of the applied ten.
+  eq(e.remoteHistoryCountObservedAtApply, false, "no remote history count was observed");
+  eq(e.remoteHistoryCountAfterApply, null, "and none is fabricated to qualify for APPLIED");
   eq(e.path, R0_PATH, "path");
   eq(e.name, R0_NAME, "name");
   assert(typeof e.purpose === "string" && e.purpose.length > 40, "it states its purpose");
@@ -261,7 +274,7 @@ check("16-21 the R0 record states PENDING and claims no deployment", () => {
 });
 
 check("22 the manifest hash is the exact hash of the source file", () => {
-  const e = pendingOf(R0_VERSION);
+  const e = stagingAppliedOf(R0_VERSION);
   const actual = canonicalSha256(R0_PATH);
   eq(e.sha256, actual, "the pinned SHA-256 matches the file on disk");
   eq(MANIFEST.migrationSourceHashPolicy.algorithm, "sha256", "under the manifest's own algorithm");
@@ -279,9 +292,10 @@ check("23 the 80.14A pending record is byte-identical", () => {
   eq(e.appliedToStaging, false, "still not applied to staging");
   eq(e.appliedToProduction, false, "still not applied to production");
   eq(e.requiresSeparateStagingDeploymentGate, true, "still gated");
-  // It is still FIRST: R0 was appended, never inserted ahead of it.
-  eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is still first");
-  eq(MANIFEST.pendingPostAnchorMigrations.length, 2, "the pending set is exactly two");
+  // R0 leaving the pending set must not have disturbed it: 80.14A is alone again,
+  // exactly as it was before R0 was ever added.
+  eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is the only entry");
+  eq(MANIFEST.pendingPostAnchorMigrations.length, 1, "the pending set is exactly one");
 });
 
 check("24 applied and reconciled records are unchanged", () => {
@@ -295,8 +309,10 @@ check("24 applied and reconciled records are unchanged", () => {
   }
   // The anchor now accounts for ten + five + two.
   eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 17, "post-anchor count is seventeen");
+  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 1, "one staging-applied");
   eq(MANIFEST.appliedPostAnchorMigrations.length + MANIFEST.reconciledPostAnchorMigrations.length +
-     MANIFEST.pendingPostAnchorMigrations.length, 17, "and the three sets add up to it");
+     MANIFEST.stagingAppliedPostAnchorMigrations.length + MANIFEST.pendingPostAnchorMigrations.length,
+     17, "and the four sets add up to it");
 });
 
 // ---- 25-26. this phase reaches nothing --------------------------------------
@@ -362,18 +378,19 @@ check("M4 mutant: an authenticated SELECT grant would open the tables to the bro
   absent(MIGRATION_SQL, /^\s*grant\s/im, "the real migration grants nothing");
 });
 
-check("M5-M6 mutants: claiming R0 was applied anywhere", () => {
-  const e = pendingOf(R0_VERSION);
-  for (const field of ["appliedToStaging", "appliedToProduction", "appliedExactlyOnce", "appliedByThisPhase"]) {
-    const mutant = { ...e, [field]: true };
-    assert(mutant[field] === true && e[field] === false,
-      `the mutant claims ${field}; the real record does not`);
+check("M5-M6 mutants: claiming R0 reached PRODUCTION", () => {
+  const e = stagingAppliedOf(R0_VERSION);
+  for (const field of ["appliedToProduction", "productionVersionStatus", "requiresSeparateProductionDeploymentGate"]) {
+    assert(field in e, `${field} is stated explicitly, never left to inference`);
   }
-  eq(e.remoteVersionStatus, "NOT_PROVEN_OFFLINE", "and nothing about the remote is claimed");
+  const mutant = { ...e, appliedToProduction: true, productionVersionStatus: "APPLIED" };
+  assert(mutant.appliedToProduction !== e.appliedToProduction, "the mutant claims production");
+  eq(e.appliedToProduction, false, "the real record does not");
+  eq(e.productionVersionStatus, "NOT_APPLIED_NOT_PROVEN", "and refuses to infer production from staging");
 });
 
 check("M7 mutant: a manifest SHA that does not match the file", () => {
-  const e = pendingOf(R0_VERSION);
+  const e = stagingAppliedOf(R0_VERSION);
   const wrong = createHash("sha256").update("not the migration").digest("hex");
   assert(wrong !== e.sha256, "the mutant hash differs");
   eq(e.sha256, canonicalSha256(R0_PATH), "the real one is the file's own hash");

@@ -730,14 +730,16 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the Meta production activation authority. Still an exact count, never `>=`.
-record("G03 exactly ten APPLIED, five RECONCILED and TWO PENDING post-anchor migrations are declared",
+record("G03 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and ONE PENDING post-anchor migration are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 10 &&
   Array.isArray(manifest.reconciledPostAnchorMigrations) && manifest.reconciledPostAnchorMigrations.length === 5 &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
     r.appliedToStaging === true && r.appliedToProduction === true) &&
   // QF-MVP-82A-R0 RE-PIN: 1 -> 2 SOURCE-PENDING entries (80.14A activation authority
   // + 82A-R0 Realtime publication membership). APPLIED stays ten, RECONCILED stays five.
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 2 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 1 &&
+  Array.isArray(manifest.stagingAppliedPostAnchorMigrations) && manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+  manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&

@@ -822,13 +822,18 @@ section('J. MIGRATION GOVERNANCE [static]');
     && geoEntry.appliedByThisPhase === false
     && geoEntry.requiresSeparateStagingDeploymentGate === false
     && !pending.some((m) => m.version === '20260816000000'));
-  check('J06 the manifest post-anchor count is 17: ten applied, five reconciled, two pending',
+  check('J06 the manifest post-anchor count is 17: ten applied, five reconciled, one staging-applied, one pending',
     manifest.appliedAnchor.postAnchorMigrationCount === 17
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
     && reconciled.length === 5
-    && pending.length === 2
+    && pending.length === 1
     && pending[0].version === '20260903040000'
-    && pending[0].operationalStatus === 'PENDING');
+    && pending[0].operationalStatus === 'PENDING'
+    // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to its own set, which
+    // explicitly refuses any production claim.
+    && (manifest.stagingAppliedPostAnchorMigrations ?? []).length === 1
+    && manifest.stagingAppliedPostAnchorMigrations[0].version === '20260904000000'
+    && manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false);
   check('J07 THIS phase still applied nothing: the geo record carries no observed remote-history count',
     geoEntry && geoEntry.remoteVersionStatus === 'PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY'
     && geoEntry.remoteHistoryCountObservedAtApply === false

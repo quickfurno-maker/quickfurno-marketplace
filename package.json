@@ -166,7 +166,9 @@
     "test:mvp:80-16b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-80-16b-vendor-destination.mjs",
     "test:mvp:80-16c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-16c-delivery-safety.mjs",
     "test:ui:lead-attribution": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/ui/validate-lead-attribution.mjs",
-    "test:mvp:80-17a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-intent-reconciliation.mjs"
+    "test:mvp:80-17a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-intent-reconciliation.mjs",
+    "test:mvp:80-17a-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-r1-controlled-reconciliation.mjs",
+    "test:mvp:80-17a-r1-loader": "node scripts/mvp/operator/validate-qf-mvp-80-17a-r1-runtime-loader.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

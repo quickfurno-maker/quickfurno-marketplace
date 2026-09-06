@@ -216,6 +216,14 @@ jobs:
       - name: QF-MVP-80.16C delivery safety closure
         run: npm run test:mvp:80-16c
 
+      # QF-MVP-80.17A — the DERIVED lead-assignment intent projection. Production
+      # proved the drift (message failed / intent still dispatched), so the
+      # forward-only rules, the deterministic linkage fences and the single-column
+      # compare-and-set are executed here against the real pure contract.
+      # Offline: no secrets, no network, no Supabase, no send.
+      - name: QF-MVP-80.17A lead-assignment terminal reconciliation
+        run: npm run test:mvp:80-17a
+
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 

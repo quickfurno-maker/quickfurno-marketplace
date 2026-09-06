@@ -102,6 +102,14 @@ export const R1Refusal = Object.freeze({
   ATTESTATION_LINKAGE_CHANGED: "ATTESTATION_LINKAGE_CHANGED",
   ATTESTATION_EVIDENCE_CHANGED: "ATTESTATION_EVIDENCE_CHANGED",
   ATTESTATION_INSIDE_REPOSITORY: "ATTESTATION_INSIDE_REPOSITORY",
+  ATTESTATION_PATH_OCCUPIED: "ATTESTATION_PATH_OCCUPIED",
+  ATTESTATION_IS_SYMLINK: "ATTESTATION_IS_SYMLINK",
+  ATTESTATION_NOT_REGULAR_FILE: "ATTESTATION_NOT_REGULAR_FILE",
+  ATTESTATION_PERMISSIONS_TOO_BROAD: "ATTESTATION_PERMISSIONS_TOO_BROAD",
+  ATTESTATION_WRONG_OWNER: "ATTESTATION_WRONG_OWNER",
+  ATTESTATION_MULTIPLY_LINKED: "ATTESTATION_MULTIPLY_LINKED",
+  ATTESTATION_PARENT_INSIDE_REPOSITORY: "ATTESTATION_PARENT_INSIDE_REPOSITORY",
+  ATTESTATION_CREATE_FAILED: "ATTESTATION_CREATE_FAILED",
 
   WORKING_TREE_DIRTY: "WORKING_TREE_DIRTY",
   CANON_DISAGREES_WITH_AUTHORITY: "CANON_DISAGREES_WITH_AUTHORITY",
@@ -579,4 +587,65 @@ export function classifyR1FailureEvidence(failureCode) {
 /** Only a bare numeric provider error code may be printed in the clear. */
 export function r1FailureCodeIsSafeToPrint(failureCode) {
   return typeof failureCode === "string" && /^[0-9]{1,10}$/.test(failureCode.trim());
+}
+
+// ---------------------------------------------------------------------------
+// 10. Attestation FILE safety
+//
+// The operator runs as root on a production VPS against a predictable path, so
+// "we wrote it with mode 0600" is not enough on its own. writeFileSync follows
+// an existing symlink, and a mode argument only applies when the file is
+// created. A pre-existing symlink at the fixed path could therefore have
+// redirected the write, and an existing file could have been silently truncated.
+//
+// These classifiers are pure so the offline suite can execute every branch
+// without needing to create the corresponding filesystem object.
+// ---------------------------------------------------------------------------
+
+/** Exactly rw for the owner and nothing for anyone else. */
+export const R1_ATTESTATION_MODE = 0o600;
+
+/**
+ * Preflight refuses to write over ANYTHING already at the path — file, symlink,
+ * directory or socket. It does not follow it, truncate it or remove it; that is
+ * for a human to look at, because on this path an occupant is a surprise.
+ */
+export function decideR1AttestationCreation(input) {
+  if (input?.exists === true) {
+    return { ok: false, reason: R1Refusal.ATTESTATION_PATH_OCCUPIED };
+  }
+  if (input?.parentOutsideRepo !== true) {
+    return { ok: false, reason: R1Refusal.ATTESTATION_PARENT_INSIDE_REPOSITORY };
+  }
+  return { ok: true, reason: null };
+}
+
+/**
+ * Validates an lstat-shaped description of the attestation, used twice: on the
+ * file this operator just created exclusively, and on the file the execution is
+ * about to read. A symlink is refused rather than followed.
+ *
+ * `expectedUid` is optional because process.getuid() does not exist on every
+ * platform; when it is absent the ownership proof is simply not claimed.
+ */
+export function classifyR1AttestationFile(input) {
+  const fail = (reason) => ({ ok: false, reason });
+  if (input?.exists !== true) return fail(R1Refusal.ATTESTATION_MISSING);
+  if (input.isSymbolicLink === true) return fail(R1Refusal.ATTESTATION_IS_SYMLINK);
+  if (input.isFile !== true) return fail(R1Refusal.ATTESTATION_NOT_REGULAR_FILE);
+
+  const mode = input.mode;
+  if (typeof mode !== "number" || !Number.isFinite(mode)) {
+    return fail(R1Refusal.ATTESTATION_PERMISSIONS_TOO_BROAD);
+  }
+  // Anything beyond owner read/write — group, other, or an execute bit — is broader.
+  if ((mode & 0o177) !== 0) return fail(R1Refusal.ATTESTATION_PERMISSIONS_TOO_BROAD);
+
+  if (typeof input.nlink === "number" && Number.isFinite(input.nlink) && input.nlink > 1) {
+    return fail(R1Refusal.ATTESTATION_MULTIPLY_LINKED);
+  }
+  if (typeof input.expectedUid === "number" && Number.isFinite(input.expectedUid)) {
+    if (input.uid !== input.expectedUid) return fail(R1Refusal.ATTESTATION_WRONG_OWNER);
+  }
+  return { ok: true, reason: null };
 }

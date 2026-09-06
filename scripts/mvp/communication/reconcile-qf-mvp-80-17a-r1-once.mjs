@@ -43,7 +43,10 @@
 
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync, constants as fsConstants, fsyncSync, lstatSync, openSync,
+  readFileSync, realpathSync, unlinkSync, writeSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,10 +61,13 @@ import {
   buildR1Attestation,
   certifyR1PostState,
   certifyR1Summary,
+  R1_ATTESTATION_MODE,
   certifyR1WritePlan,
+  classifyR1AttestationFile,
   classifyR1FailureEvidence,
   classifyR1Pair,
   decideR1Discovery,
+  decideR1AttestationCreation,
   decideR1Environment,
   digestOf,
   isR1AttestationPathOutsideRepo,
@@ -77,6 +83,103 @@ const LOADER = path.join(REPO_ROOT, "scripts", "mvp", "operator", "qf-mvp-80-17a
 
 /** Outside the repository, always. Never committed, never a credential store. */
 const ATTESTATION_PATH = path.join(tmpdir(), "qf-mvp-80-17a-r1-attestation.json");
+
+// O_NOFOLLOW is a POSIX flag. Where the platform does not define it the open is
+// still exclusive and every lstat proof below still runs — but this operator is
+// written for the production Linux VPS, where it is defined.
+const O_NOFOLLOW = fsConstants.O_NOFOLLOW ?? 0;
+const currentUid = () => (typeof process.getuid === "function" ? process.getuid() : undefined);
+
+/** lstat, never stat: a symlink is DESCRIBED as a symlink, never followed. */
+function describeAttestationPath(expectedUid) {
+  try {
+    const st = lstatSync(ATTESTATION_PATH);
+    return {
+      exists: true, isSymbolicLink: st.isSymbolicLink(), isFile: st.isFile(),
+      mode: st.mode, uid: st.uid, nlink: st.nlink, expectedUid,
+    };
+  } catch {
+    return { exists: false };
+  }
+}
+
+/** The REAL parent directory must be outside the REAL repository root. */
+function attestationParentIsOutsideRepo() {
+  try {
+    const parent = realpathSync(path.dirname(ATTESTATION_PATH));
+    return isR1AttestationPathOutsideRepo(
+      path.join(parent, path.basename(ATTESTATION_PATH)),
+      realpathSync(REPO_ROOT)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Creates the attestation EXCLUSIVELY. It never overwrites, never truncates and
+ * never follows a symlink.
+ *
+ * An earlier revision used writeFileSync with a mode argument. That was not
+ * enough for a root-run operator on a fixed, predictable path: writeFileSync
+ * follows an existing symlink, and a mode applies only when the file is created,
+ * so an existing file would have been silently truncated and an existing symlink
+ * would have redirected the write. An occupant here is a surprise, so it is a
+ * refusal for a human to look at — never something this operator clears away.
+ */
+function writeAttestationExclusively(attestation) {
+  const may = decideR1AttestationCreation({
+    exists: describeAttestationPath().exists,
+    parentOutsideRepo: attestationParentIsOutsideRepo(),
+  });
+  if (!may.ok) return may;
+
+  let fd;
+  try {
+    fd = openSync(
+      ATTESTATION_PATH,
+      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | O_NOFOLLOW,
+      R1_ATTESTATION_MODE
+    );
+    writeSync(fd, JSON.stringify(attestation, null, 2) + "\n");
+    try { fsyncSync(fd); } catch { /* not every filesystem implements it */ }
+  } catch {
+    return { ok: false, reason: R1Refusal.ATTESTATION_CREATE_FAILED };
+  } finally {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* already closed */ } }
+  }
+
+  // Re-prove the file that now exists before anything trusts it.
+  const verified = classifyR1AttestationFile(describeAttestationPath(currentUid()));
+  if (!verified.ok) {
+    // Removes ONLY the file this call just created exclusively.
+    try { unlinkSync(ATTESTATION_PATH); } catch { /* nothing to undo */ }
+  }
+  return verified;
+}
+
+/** Proves the file BEFORE reading it, and reads through a no-follow descriptor. */
+function readAttestationVerified() {
+  const verified = classifyR1AttestationFile(describeAttestationPath(currentUid()));
+  if (!verified.ok) return { ok: false, reason: verified.reason, attestation: null };
+
+  let fd;
+  let text;
+  try {
+    fd = openSync(ATTESTATION_PATH, fsConstants.O_RDONLY | O_NOFOLLOW);
+    text = readFileSync(fd, "utf8");
+  } catch {
+    return { ok: false, reason: R1Refusal.ATTESTATION_MALFORMED, attestation: null };
+  } finally {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* already closed */ } }
+  }
+  try {
+    return { ok: true, reason: null, attestation: JSON.parse(text) };
+  } catch {
+    return { ok: false, reason: R1Refusal.ATTESTATION_MALFORMED, attestation: null };
+  }
+}
+
 
 const INTENT_COLUMNS = "id, aggregate_type, channel, template_purpose, status, created_at, dispatched_at";
 const MESSAGE_COLUMNS =
@@ -265,7 +368,8 @@ async function main() {
       gitSha,
       nowMs: Date.now(),
     });
-    writeFileSync(ATTESTATION_PATH, `${JSON.stringify(attestation, null, 2)}\n`, { mode: 0o600 });
+    const written = writeAttestationExclusively(attestation);
+    if (!written.ok) refuse(written.reason);
     rule();
     console.log("QF-MVP-80.17A-R1 PREFLIGHT PASS — read-only. No database write was performed.");
     line("database writes performed", "0");
@@ -277,16 +381,13 @@ async function main() {
   }
 
   // --- 6B. Execute: re-validate the attestation, then ONE service call ----
-  let attestation = null;
-  if (existsSync(ATTESTATION_PATH)) {
-    try {
-      attestation = JSON.parse(readFileSync(ATTESTATION_PATH, "utf8"));
-    } catch {
-      attestation = { schema: "unparsable" };
-    }
+  const loaded = readAttestationVerified();
+  if (!loaded.ok) {
+    line("attestation", loaded.reason);
+    refuse(loaded.reason);
   }
   const attestationCheck = validateR1Attestation({
-    attestation,
+    attestation: loaded.attestation,
     nowMs: Date.now(),
     projectRef: env.projectRef,
     gitSha,
@@ -297,7 +398,7 @@ async function main() {
 
   // The attestation is consumed BEFORE the call, so a crash mid-write can never
   // leave a reusable authorization behind.
-  rmSync(ATTESTATION_PATH, { force: true });
+  unlinkSync(ATTESTATION_PATH);
 
   let calls = 0;
   let summary = null;

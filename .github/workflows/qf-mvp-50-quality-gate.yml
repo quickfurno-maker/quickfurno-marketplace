@@ -234,6 +234,11 @@ jobs:
       - name: QF-MVP-80.17A-R1 controlled historical reconciliation
         run: npm run test:mvp:80-17a-r1
 
+      # The same loader smoke also runs here on Node 24, so a regression is
+      # caught by the main gate as well as by the production-runtime job below.
+      - name: QF-MVP-80.17A-R1 runtime loader smoke
+        run: npm run test:mvp:80-17a-r1-loader
+
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 
@@ -250,3 +255,49 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # ==========================================================================
+  # QF-MVP-80.17A-R1 — PRODUCTION RUNTIME loader smoke.
+  #
+  # The R1 operator runs on the production VPS, which is Node 20 and cannot load
+  # `.ts` natively at all — that is the entire reason its CommonJS loader exists.
+  # The main gate above runs on Node 24, so it cannot prove the loader works
+  # where it will actually be used. An earlier revision passed 76/76 on Node 24
+  # while carrying a loader that would have refused its own dependency in
+  # production, because nothing ever called loadR1Runtime().
+  #
+  # This job executes it for real. Entirely offline: no secrets, no Supabase or
+  # Meta environment, no database connection, no network, no send.
+  # ==========================================================================
+  r1-runtime-loader-node20:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual SHA:   $ACTUAL_SHA"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Report Node version
+        run: node --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: QF-MVP-80.17A-R1 runtime loader smoke on production Node 20
+        run: npm run test:mvp:80-17a-r1-loader

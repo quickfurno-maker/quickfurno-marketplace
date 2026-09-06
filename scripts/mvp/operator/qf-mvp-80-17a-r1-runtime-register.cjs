@@ -22,15 +22,26 @@
 //      from its own bundled ws before app code runs; a bare CLI must too. No new
 //      dependency is added and nothing is installed on the server.
 //
-// CAPABILITY DENYLIST — the load-bearing containment
-//   The hook REFUSES to load any send-capable module: every provider adapter,
-//   CommunicationService, the lead-assignment dispatcher, the webhook service
-//   and the campaign result service. The historical repair therefore cannot even
-//   construct the machinery that could send a WhatsApp message, quite apart from
-//   the operator never calling it.
+// EXACT ALLOWLIST — the load-bearing containment
+//   An earlier revision used a DENYLIST of send-capable modules plus a generic
+//   "@/..." mapper. Two things were wrong with that. It was broader than this
+//   operator's authority: every repository file not explicitly named as
+//   dangerous was reachable, and a future import inside an allowed module would
+//   silently gain a new local capability. And it was WRONG — it denied the whole
+//   `communication/providers/` directory, which meant it refused its own
+//   required dependency, the PURE `whatsappTemplateBinding`, that the canonical
+//   `leadAssignmentDispatchContract` reaches through `businessTemplateVariables`.
+//
+//   The boundary is therefore an exact, file-by-file allowlist of the real
+//   runtime graph. Node built-ins and node_modules packages resolve normally;
+//   ANY other file inside this repository is refused, including one a future
+//   edit starts importing. Such an import fails closed until the allowlist is
+//   explicitly reviewed. A pure binding module being permitted is not the same
+//   as permitting its directory: every send-capable provider adapter beside it
+//   remains unreachable.
 //
 // Installation happens only inside loadR1Runtime(). Requiring this file is inert,
-// which is what lets the OFFLINE validator execute the two predicates below.
+// which is what lets the offline validator execute the predicates below.
 // ============================================================================
 
 "use strict";
@@ -40,37 +51,94 @@ const fs = require("node:fs");
 const Module = require("node:module");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+const NODE_MODULES = `${path.join(REPO_ROOT, "node_modules")}${path.sep}`;
 
 /**
- * Send-capable / out-of-scope modules. A match is a hard error, never a silent
- * skip: if the reconciliation graph ever grows one of these, the operator must
- * stop and be re-reviewed rather than quietly gaining the capability.
+ * The EXACT repository files the real runtime graph needs, each with the reason
+ * it is here. Nothing resolves from this repository unless it is on this list.
+ *
+ *   services/leadAssignmentResultService.ts       the ONE write authority
+ *   lib/supabase.ts                               its service-role client factory
+ *   lib/communication/leadAssignmentResultContract.ts   the 80.17A pure decision
+ *   lib/communication/leadAssignmentDispatchContract.ts lane identity + idempotency key
+ *   lib/communication/campaignResultContract.ts    the shared projection authority
+ *   lib/communication/types.ts                     RECIPIENT_REFERENCE_DESTINATION (a value)
+ *   lib/communication/businessTemplateVariables.ts required by the dispatch contract
+ *   lib/communication/providers/whatsappTemplateBinding.ts  PURE; required by the above
+ *   lib/communication/inboundConsentCommandInput.ts the persisted Meta adapter key
  */
-const DENIED_MODULE = new RegExp(
-  [
-    "communication[\\\\/]+providers[\\\\/]+",
-    "services[\\\\/]+communicationService",
-    "services[\\\\/]+leadAssignmentDispatchService",
-    "services[\\\\/]+metaWhatsAppWebhookService",
-    "services[\\\\/]+campaignCommunicationResultService",
-    "services[\\\\/]+inboundWhatsAppMessageService",
-    "services[\\\\/]+consentCommandResponseService",
-    "services[\\\\/]+leadAssignmentSchedulerService",
-    "n8n",
-  ].join("|"),
-  "i"
-);
+const ALLOWED_R1_REPO_MODULES = Object.freeze([
+  "services/leadAssignmentResultService.ts",
+  "lib/supabase.ts",
+  "lib/communication/leadAssignmentResultContract.ts",
+  "lib/communication/leadAssignmentDispatchContract.ts",
+  "lib/communication/campaignResultContract.ts",
+  "lib/communication/types.ts",
+  "lib/communication/businessTemplateVariables.ts",
+  "lib/communication/providers/whatsappTemplateBinding.ts",
+  "lib/communication/inboundConsentCommandInput.ts",
+]);
 
-/** True when the resolved file is one this operator must never be able to load. */
-function r1LoaderDeniesModule(filename) {
-  if (typeof filename !== "string" || filename === "") return false;
-  return DENIED_MODULE.test(filename);
+const ALLOWED_SET = new Set(ALLOWED_R1_REPO_MODULES);
+
+/** Closed verdict vocabulary for one resolved path. */
+const R1Resolution = Object.freeze({
+  ALLOW_EXTERNAL: "ALLOW_EXTERNAL",
+  ALLOW_ALLOWLISTED: "ALLOW_ALLOWLISTED",
+  REFUSE_NOT_ALLOWLISTED: "REFUSE_NOT_ALLOWLISTED",
+});
+
+/**
+ * Repo-relative POSIX path, or null when the file is not repository-local
+ * source (a Node built-in, or anything under node_modules).
+ */
+function r1NormalizeRepoRelative(filename, repoRoot) {
+  if (typeof filename !== "string" || filename === "") return null;
+  if (!path.isAbsolute(filename)) return null;
+  const root = repoRoot || REPO_ROOT;
+  const nodeModules = `${path.join(root, "node_modules")}${path.sep}`;
+  if (filename.startsWith(nodeModules)) return null;
+  const rel = path.relative(root, filename);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return rel.split(path.sep).join("/");
 }
 
-/** Maps the "@/x" tsconfig alias to a repo-root path. Everything else is untouched. */
-function r1MapAliasSpecifier(request, repoRoot) {
+/**
+ * The single decision every resolution passes through. Built-ins and package
+ * dependencies are external and resolve normally; repository source resolves
+ * ONLY when it is on the exact allowlist.
+ */
+function r1ResolutionVerdict(filename, repoRoot) {
+  const rel = r1NormalizeRepoRelative(filename, repoRoot);
+  if (rel === null) return R1Resolution.ALLOW_EXTERNAL;
+  return ALLOWED_SET.has(rel) ? R1Resolution.ALLOW_ALLOWLISTED : R1Resolution.REFUSE_NOT_ALLOWLISTED;
+}
+
+function refusal(filename) {
+  const rel = r1NormalizeRepoRelative(filename, REPO_ROOT) ?? filename;
+  return new Error(
+    `[qf-mvp-80-17a-r1] Refusing to load "${rel}": it is not on the R1 runtime allowlist. ` +
+      `Adding a repository module to this operator's reach requires an explicit review.`
+  );
+}
+
+/**
+ * Resolves the "@/x" tsconfig alias, but ONLY onto an allowlisted file. There is
+ * deliberately no general-purpose alias mapper: "@/services/leadService" and
+ * every other unlisted repository path refuses here rather than resolving and
+ * being caught later.
+ */
+function resolveAllowedR1Alias(request) {
   if (typeof request !== "string" || !request.startsWith("@/")) return null;
-  return path.join(repoRoot || REPO_ROOT, request.slice(2));
+  const base = path.join(REPO_ROOT, request.slice(2));
+  for (const candidate of [base, `${base}.ts`, path.join(base, "index.ts")]) {
+    if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue;
+    if (r1ResolutionVerdict(candidate, REPO_ROOT) === R1Resolution.REFUSE_NOT_ALLOWLISTED) {
+      throw refusal(candidate);
+    }
+    return candidate;
+  }
+  throw refusal(base);
 }
 
 let installed = false;
@@ -89,11 +157,8 @@ function installRuntimeHooks() {
   //    syntax-complete, so parameter properties and enums load fine on Node 20.
   const ts = require(path.join(REPO_ROOT, "node_modules", "typescript"));
   Module._extensions[".ts"] = function compileTypeScript(module, filename) {
-    if (r1LoaderDeniesModule(filename)) {
-      throw new Error(
-        `[qf-mvp-80-17a-r1] Refusing to load a send-capable or out-of-scope module: ` +
-          `${path.relative(REPO_ROOT, filename)}`
-      );
+    if (r1ResolutionVerdict(filename, REPO_ROOT) === R1Resolution.REFUSE_NOT_ALLOWLISTED) {
+      throw refusal(filename);
     }
     const source = fs.readFileSync(filename, "utf8");
     const { outputText } = ts.transpileModule(source, {
@@ -110,41 +175,30 @@ function installRuntimeHooks() {
     module._compile(outputText, filename);
   };
 
-  // 3. Resolve "@/..." and extensionless siblings that only exist as `.ts`.
+  // 3. Resolve the alias and extensionless `.ts` siblings — allowlisted only.
   const originalResolve = Module._resolveFilename;
-  Module._resolveFilename = function resolveWithAlias(request, parent, isMain, options) {
-    const aliased = r1MapAliasSpecifier(request, REPO_ROOT);
+  Module._resolveFilename = function resolveForR1(request, parent, isMain, options) {
+    const aliased = resolveAllowedR1Alias(request);
     const candidate = aliased === null ? request : aliased;
+    let resolved;
     try {
-      const resolved = originalResolve.call(this, candidate, parent, isMain, options);
-      if (r1LoaderDeniesModule(resolved)) {
-        throw new Error(
-          `[qf-mvp-80-17a-r1] Refusing to resolve a send-capable or out-of-scope module: ` +
-            `${path.relative(REPO_ROOT, resolved)}`
-        );
-      }
-      return resolved;
+      resolved = originalResolve.call(this, candidate, parent, isMain, options);
     } catch (err) {
       if (err && err.code !== "MODULE_NOT_FOUND") throw err;
-      if (path.isAbsolute(candidate) || candidate.startsWith(".")) {
-        const base = path.isAbsolute(candidate)
-          ? candidate
-          : path.resolve(path.dirname(parent && parent.filename ? parent.filename : REPO_ROOT), candidate);
-        for (const suffix of [".ts", "/index.ts"]) {
-          const withExt = `${base}${suffix}`;
-          if (fs.existsSync(withExt)) {
-            if (r1LoaderDeniesModule(withExt)) {
-              throw new Error(
-                `[qf-mvp-80-17a-r1] Refusing to resolve a send-capable or out-of-scope module: ` +
-                  `${path.relative(REPO_ROOT, withExt)}`
-              );
-            }
-            return withExt;
-          }
-        }
+      if (!path.isAbsolute(candidate) && !candidate.startsWith(".")) throw err;
+      const base = path.isAbsolute(candidate)
+        ? candidate
+        : path.resolve(path.dirname(parent && parent.filename ? parent.filename : REPO_ROOT), candidate);
+      resolved = null;
+      for (const suffix of [".ts", "/index.ts"]) {
+        if (fs.existsSync(`${base}${suffix}`)) { resolved = `${base}${suffix}`; break; }
       }
-      throw err;
+      if (resolved === null) throw err;
     }
+    if (r1ResolutionVerdict(resolved, REPO_ROOT) === R1Resolution.REFUSE_NOT_ALLOWLISTED) {
+      throw refusal(resolved);
+    }
+    return resolved;
   };
 }
 
@@ -155,7 +209,8 @@ function installRuntimeHooks() {
  *   • the canonical lane identifiers,
  *   • the service-role Supabase client factory (read-back SELECTs only).
  *
- * There is no send path in this object, and no way to obtain one through it.
+ * There is no send path in this object, and no way to obtain one through it:
+ * every provider adapter is off the allowlist and cannot be resolved at all.
  */
 function loadR1Runtime() {
   installRuntimeHooks();
@@ -192,4 +247,13 @@ function loadR1Runtime() {
   };
 }
 
-module.exports = { loadR1Runtime, r1LoaderDeniesModule, r1MapAliasSpecifier, REPO_ROOT };
+module.exports = {
+  loadR1Runtime,
+  resolveAllowedR1Alias,
+  r1ResolutionVerdict,
+  r1NormalizeRepoRelative,
+  ALLOWED_R1_REPO_MODULES,
+  R1Resolution,
+  REPO_ROOT,
+  NODE_MODULES,
+};

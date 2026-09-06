@@ -25,8 +25,12 @@
 // ============================================================================
 
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  chmodSync, closeSync, constants as fsConstants, existsSync, lstatSync, mkdtempSync, openSync,
+  readFileSync, rmSync, symlinkSync, writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import {
   R1,
@@ -34,14 +38,17 @@ import {
   R1FailureEvidence,
   R1Mode,
   R1Refusal,
+  R1_ATTESTATION_MODE,
   assertCanonAgrees,
   buildR1Attestation,
   certifyR1PostState,
   certifyR1Summary,
   certifyR1WritePlan,
+  classifyR1AttestationFile,
   classifyR1FailureEvidence,
   classifyR1Pair,
   decideR1Discovery,
+  decideR1AttestationCreation,
   decideR1Environment,
   digestOf,
   isInsideR1TrialWindow,
@@ -100,6 +107,9 @@ const DISPATCH_CONTRACT_CODE = codeOf(DISPATCH_CONTRACT_PATH);
 const WEBHOOK_CODE = codeOf(WEBHOOK_PATH);
 const MVP_LOADER_RAW = rawOf(MVP_LOADER_PATH);
 const MVP_REGISTER_RAW = rawOf(MVP_REGISTER_PATH);
+const SMOKE_CODE = codeOf("scripts/mvp/operator/validate-qf-mvp-80-17a-r1-runtime-loader.cjs");
+const PACKAGE_RAW = rawOf("package.json");
+const WORKFLOW_RAW = rawOf(".github/workflows/qf-mvp-50-quality-gate.yml");
 
 // The operator-only loader is INERT on require: installation happens inside
 // loadR1Runtime(), which this offline suite never calls.
@@ -493,7 +503,8 @@ check("36 the attestation lives outside the repository", () => {
   assert(/tmpdir\(\)/.test(OPERATOR_CODE), "the operator writes it to the OS temp directory");
   assert(/isR1AttestationPathOutsideRepo\(ATTESTATION_PATH, REPO_ROOT\)/.test(OPERATOR_CODE),
     "and proves that at runtime");
-  assert(/mode: 0o600/.test(OPERATOR_CODE), "owner-only permissions");
+  assert(/R1_ATTESTATION_MODE/.test(OPERATOR_CODE), "owner-only permissions");
+  assert(/realpathSync/.test(OPERATOR_CODE), "and the parent is proved by realpath, not lexically alone");
 });
 
 check("37 the attestation TTL is at most fifteen minutes", () => {
@@ -564,8 +575,8 @@ check("43 a second candidate appearing after the preflight refuses the execution
   const call = OPERATOR_CODE.indexOf("await runtime.reconcile({");
   assert(discover > 0 && attest > discover && call > attest,
     "order is discovery -> attestation -> the single service call");
-  assert(/rmSync\(ATTESTATION_PATH/.test(OPERATOR_CODE), "the attestation is single use");
-  const consume = OPERATOR_CODE.indexOf("rmSync(ATTESTATION_PATH");
+  assert(/unlinkSync\(ATTESTATION_PATH\);/.test(OPERATOR_CODE), "the attestation is single use");
+  const consume = OPERATOR_CODE.indexOf("unlinkSync(ATTESTATION_PATH);");
   assert(consume < call, "it is consumed BEFORE the write, so a crash cannot leave it reusable");
 });
 
@@ -604,17 +615,23 @@ check("46 the operator cannot construct a provider adapter", () => {
     absent(code, /MetaCloudWhatsAppProvider/, "the Meta adapter");
     absent(code, /FetchHttpTransport/, "an HTTP transport");
   }
-  // The loader REFUSES to load provider modules at all.
-  eq(loader.r1LoaderDeniesModule("/repo/lib/communication/providers/metaCloudWhatsAppProvider.ts"), true,
-    "provider modules are denied");
-  eq(loader.r1LoaderDeniesModule("\\repo\\lib\\communication\\providers\\metaWhatsAppInbound.ts"), true,
-    "denied on Windows paths too");
-  eq(loader.r1LoaderDeniesModule("/repo/services/communicationService.ts"), true, "CommunicationService is denied");
-  eq(loader.r1LoaderDeniesModule("/repo/services/leadAssignmentDispatchService.ts"), true, "the dispatcher is denied");
-  eq(loader.r1LoaderDeniesModule("/repo/services/metaWhatsAppWebhookService.ts"), true, "the webhook service is denied");
-  eq(loader.r1LoaderDeniesModule("/repo/services/leadAssignmentResultService.ts"), false,
-    "the ONE permitted service still loads");
-  eq(loader.r1LoaderDeniesModule("/repo/lib/supabase.ts"), false, "the client factory still loads");
+  // The loader boundary is an EXACT ALLOWLIST, not a denylist of known-dangerous
+  // modules. Repository source resolves only when it is named; everything else
+  // in this repository — including a file a future edit starts importing —
+  // refuses until it is explicitly reviewed.
+  const V = loader.R1Resolution;
+  const repoFile = (rel) => join(loader.REPO_ROOT, ...rel.split("/"));
+  const verdict = (rel) => loader.r1ResolutionVerdict(repoFile(rel), loader.REPO_ROOT);
+
+  eq(verdict("lib/communication/providers/metaCloudWhatsAppProvider.ts"), V.REFUSE_NOT_ALLOWLISTED,
+    "the Meta adapter is refused");
+  eq(verdict("lib/communication/providers/metaWhatsAppInbound.ts"), V.REFUSE_NOT_ALLOWLISTED,
+    "every other provider adapter is refused");
+  eq(verdict("services/communicationService.ts"), V.REFUSE_NOT_ALLOWLISTED, "CommunicationService is refused");
+  eq(verdict("services/leadAssignmentDispatchService.ts"), V.REFUSE_NOT_ALLOWLISTED, "the dispatcher is refused");
+  eq(verdict("services/metaWhatsAppWebhookService.ts"), V.REFUSE_NOT_ALLOWLISTED, "the webhook service is refused");
+  eq(verdict("services/leadAssignmentResultService.ts"), V.ALLOW_ALLOWLISTED, "the ONE permitted service loads");
+  eq(verdict("lib/supabase.ts"), V.ALLOW_ALLOWLISTED, "the client factory loads");
 });
 
 check("47 no fetch, no Graph API, no /messages endpoint anywhere in the operator", () => {
@@ -854,6 +871,282 @@ check("P3 canon comes from the real authorities, never a second copy", () => {
     "and that is what the live webhook hands the same service");
 });
 
+// ---- 73-80. the loader boundary is an EXACT ALLOWLIST ----------------------
+//
+// The first revision drew this boundary as a denylist of send-capable modules
+// plus a generic "@/..." mapper. That was both too broad — every unlisted
+// repository file was reachable, and a future import inside an allowed module
+// would have silently widened the operator's reach — and simply WRONG: it
+// denied all of `communication/providers/`, which is where the PURE
+// `whatsappTemplateBinding` the canonical dispatch contract needs actually
+// lives. The loader would have refused its own dependency in production.
+
+const RES = loader.R1Resolution;
+const repoPath = (rel) => join(loader.REPO_ROOT, ...rel.split("/"));
+const resolutionOf = (rel) => loader.r1ResolutionVerdict(repoPath(rel), loader.REPO_ROOT);
+
+const R1_REQUIRED_GRAPH = [
+  "services/leadAssignmentResultService.ts",
+  "lib/supabase.ts",
+  "lib/communication/leadAssignmentResultContract.ts",
+  "lib/communication/leadAssignmentDispatchContract.ts",
+  "lib/communication/campaignResultContract.ts",
+  "lib/communication/types.ts",
+  "lib/communication/businessTemplateVariables.ts",
+  "lib/communication/providers/whatsappTemplateBinding.ts",
+  "lib/communication/inboundConsentCommandInput.ts",
+];
+
+check("73 the allowlist names exact files, never directories or wildcards", () => {
+  const list = loader.ALLOWED_R1_REPO_MODULES;
+  assert(Object.isFrozen(list), "the allowlist is frozen");
+  eq([...list].sort().join("|"), [...R1_REQUIRED_GRAPH].sort().join("|"), "it is exactly the audited graph");
+  for (const rel of list) {
+    assert(/\.ts$/.test(rel), `${rel} names a source FILE`);
+    assert(!/[*?]/.test(rel), `${rel} carries no wildcard`);
+    assert(existsSync(repoPath(rel)), `${rel} exists in the repository`);
+  }
+});
+
+check("74 every module the real runtime graph needs is allowed", () => {
+  for (const rel of R1_REQUIRED_GRAPH) eq(resolutionOf(rel), RES.ALLOW_ALLOWLISTED, rel);
+  // The dependency the first revision wrongly denied, and the import that proves
+  // it is genuinely required rather than defensively added.
+  eq(resolutionOf("lib/communication/providers/whatsappTemplateBinding.ts"), RES.ALLOW_ALLOWLISTED,
+    "the PURE template binding");
+  assert(/from "\.\/providers\/whatsappTemplateBinding"/.test(codeOf("lib/communication/businessTemplateVariables.ts")),
+    "businessTemplateVariables really imports it");
+  assert(/from "\.\/businessTemplateVariables"/.test(DISPATCH_CONTRACT_CODE),
+    "and the canonical dispatch contract really imports that");
+});
+
+check("75 permitting one pure binding does not permit its directory", () => {
+  for (const rel of [
+    "lib/communication/providers/metaCloudWhatsAppProvider.ts",
+    "lib/communication/providers/metaWhatsAppInbound.ts",
+    "lib/communication/providers/metaWhatsAppWebhook.ts",
+    "lib/communication/providers/providerAccountOwnership.ts",
+  ]) {
+    eq(resolutionOf(rel), RES.REFUSE_NOT_ALLOWLISTED, rel);
+  }
+  // No directory prefix appears as a capability anywhere in the loader.
+  absent(LOADER_CODE, /startsWith\(["'`](services|lib)\//, "a directory-prefix allow rule");
+  absent(LOADER_CODE, /providers\/["'`]\s*\)/, "a providers-directory rule");
+});
+
+check("76 the alias resolves ONLY onto allowlisted files", () => {
+  for (const request of [
+    "@/services/communicationService",
+    "@/services/leadAssignmentDispatchService",
+    "@/lib/communication/providers/metaCloudWhatsAppProvider",
+    "@/lib/communication/whatsappTemplate",
+  ]) {
+    let threw = false;
+    try { loader.resolveAllowedR1Alias(request); } catch { threw = true; }
+    assert(threw, `${request} must refuse, not resolve`);
+  }
+  eq(loader.resolveAllowedR1Alias("@/lib/supabase"), repoPath("lib/supabase.ts"),
+    "an allowlisted alias still resolves");
+  eq(loader.resolveAllowedR1Alias("./sibling"), null, "non-alias requests are not claimed");
+});
+
+check("77 anything repo-local and unreviewed is refused by DEFAULT", () => {
+  for (const rel of [
+    "lib/communication/whatsappTemplate.ts",
+    "services/leadMatchingEngine.ts",
+    "app/api/webhooks/whatsapp/meta/route.ts",
+    "lib/invented/tomorrow.ts",
+    "scripts/mvp/communication/reconcile-qf-mvp-80-17a-r1-once.mjs",
+  ]) {
+    eq(resolutionOf(rel), RES.REFUSE_NOT_ALLOWLISTED, rel);
+  }
+  // Default-deny is the point: a module added tomorrow needs a review, not luck.
+  eq(loader.r1NormalizeRepoRelative(repoPath("lib/anything/at/all.ts"), loader.REPO_ROOT),
+    "lib/anything/at/all.ts", "repo-local paths normalize");
+});
+
+check("78 Node built-ins and node_modules dependencies still resolve", () => {
+  eq(loader.r1ResolutionVerdict("node:fs", loader.REPO_ROOT), RES.ALLOW_EXTERNAL, "a built-in");
+  eq(loader.r1ResolutionVerdict("@supabase/supabase-js", loader.REPO_ROOT), RES.ALLOW_EXTERNAL, "a bare package");
+  eq(loader.r1ResolutionVerdict(join(loader.REPO_ROOT, "node_modules", "typescript", "lib", "typescript.js"),
+    loader.REPO_ROOT), RES.ALLOW_EXTERNAL, "a package file inside the repo tree");
+  eq(loader.r1NormalizeRepoRelative(join(loader.REPO_ROOT, "node_modules", "x", "y.js"), loader.REPO_ROOT), null,
+    "node_modules is not repository source");
+});
+
+check("79 there is no generic alias mapper left to misuse", () => {
+  eq(typeof loader.r1MapAliasSpecifier, "undefined", "the old broad mapper is gone");
+  eq(typeof loader.r1LoaderDeniesModule, "undefined", "and so is the old denylist predicate");
+  absent(LOADER_CODE, /r1MapAliasSpecifier|r1LoaderDeniesModule/, "either old helper");
+  // Both hook sites route through the one verdict function.
+  eq((LOADER_CODE.match(/r1ResolutionVerdict\(/g) ?? []).length, 4, "one decision, used at every gate");
+});
+
+check("80 the runtime loader is EXECUTED by its own smoke, and it is wired in", () => {
+  assert(/loader\.loadR1Runtime\(\)/.test(SMOKE_CODE), "the smoke really calls loadR1Runtime()");
+  assert(/delete globalThis\.WebSocket/.test(SMOKE_CODE), "it forces the Node-20 WebSocket branch");
+  absent(SMOKE_CODE, /adminClient\(\)/, "it never constructs a client");
+  assert(/networkAttempts/.test(SMOKE_CODE) && /globalThis\.fetch = \(\)/.test(SMOKE_CODE),
+    "it traps any network attempt");
+  assert(/"test:mvp:80-17a-r1-loader"/.test(PACKAGE_RAW), "npm script exists");
+  assert(/test:mvp:80-17a-r1-loader/.test(WORKFLOW_RAW), "CI runs it");
+  assert(/node-version: '20'/.test(WORKFLOW_RAW), "and it runs on Node 20, the production runtime");
+});
+
+// ---- A1-A10. attestation FILE safety ---------------------------------------
+//
+// The operator runs as root against a fixed, predictable path. writeFileSync
+// follows an existing symlink and its mode argument applies only on creation,
+// so "we wrote it 0600" proved neither that the bytes landed where we meant nor
+// that the file we later read is the one we wrote.
+
+const statLike = (over = {}) => ({
+  exists: true, isSymbolicLink: false, isFile: true,
+  mode: 0o100600, uid: 1000, nlink: 1, expectedUid: 1000, ...over,
+});
+
+check("A1 an occupied attestation path is refused, never overwritten", () => {
+  eq(decideR1AttestationCreation({ exists: true, parentOutsideRepo: true }).reason,
+    R1Refusal.ATTESTATION_PATH_OCCUPIED, "occupied");
+  eq(decideR1AttestationCreation({ exists: false, parentOutsideRepo: true }).ok, true, "free path");
+  eq(decideR1AttestationCreation({ exists: false, parentOutsideRepo: false }).reason,
+    R1Refusal.ATTESTATION_PARENT_INSIDE_REPOSITORY, "a parent inside the repo");
+});
+
+check("A2 a symlink is refused, never followed", () => {
+  eq(classifyR1AttestationFile(statLike({ isSymbolicLink: true })).reason,
+    R1Refusal.ATTESTATION_IS_SYMLINK, "symlink");
+  eq(classifyR1AttestationFile(statLike({ isFile: false })).reason,
+    R1Refusal.ATTESTATION_NOT_REGULAR_FILE, "not a regular file");
+  eq(classifyR1AttestationFile({ exists: false }).reason, R1Refusal.ATTESTATION_MISSING, "absent");
+});
+
+check("A3 permissions broader than 0600 are refused", () => {
+  eq(classifyR1AttestationFile(statLike()).ok, true, "0600 is accepted");
+  for (const mode of [0o100644, 0o100640, 0o100666, 0o100604, 0o100700, 0o100777]) {
+    eq(classifyR1AttestationFile(statLike({ mode })).reason,
+      R1Refusal.ATTESTATION_PERMISSIONS_TOO_BROAD, `mode ${mode.toString(8)}`);
+  }
+  eq(classifyR1AttestationFile(statLike({ mode: "0600" })).reason,
+    R1Refusal.ATTESTATION_PERMISSIONS_TOO_BROAD, "a non-numeric mode is not trusted");
+  eq(R1_ATTESTATION_MODE, 0o600, "the creation mode");
+});
+
+check("A4 a wrong owner or a second hard link is refused", () => {
+  eq(classifyR1AttestationFile(statLike({ uid: 0, expectedUid: 1000 })).reason,
+    R1Refusal.ATTESTATION_WRONG_OWNER, "wrong owner");
+  eq(classifyR1AttestationFile(statLike({ uid: 0, expectedUid: undefined })).ok, true,
+    "where uid is unavailable the claim is simply not made");
+  eq(classifyR1AttestationFile(statLike({ nlink: 2 })).reason,
+    R1Refusal.ATTESTATION_MULTIPLY_LINKED, "a second hard link");
+});
+
+// --- real filesystem, in a temporary directory, entirely offline ------------
+
+const FS_TMP = mkdtempSync(join(tmpdir(), "qf-r1-attest-"));
+const POSIX = process.platform !== "win32";
+const describe = (p, expectedUid) => {
+  try {
+    const st = lstatSync(p);
+    return { exists: true, isSymbolicLink: st.isSymbolicLink(), isFile: st.isFile(),
+      mode: st.mode, uid: st.uid, nlink: st.nlink, expectedUid };
+  } catch { return { exists: false }; }
+};
+const exclusiveCreate = (p) => {
+  const fd = openSync(p, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL |
+    (fsConstants.O_NOFOLLOW ?? 0), R1_ATTESTATION_MODE);
+  closeSync(fd);
+};
+
+check("A5 an exclusive create succeeds once and can never overwrite", () => {
+  const p = join(FS_TMP, "fresh.json");
+  exclusiveCreate(p);
+  const st = describe(p, undefined);
+  eq(st.exists, true, "created");
+  eq(st.isFile, true, "a regular file");
+  eq(st.isSymbolicLink, false, "not a symlink");
+  if (POSIX) {
+    eq(classifyR1AttestationFile(describe(p, undefined)).ok, true, "and it passes every proof");
+  } else {
+    // Windows cannot represent 0600; the classifier refuses rather than pretend.
+    eq(classifyR1AttestationFile(describe(p, undefined)).reason,
+      R1Refusal.ATTESTATION_PERMISSIONS_TOO_BROAD, "win32 cannot express owner-only, so it fails closed");
+  }
+  let second = false;
+  try { exclusiveCreate(p); } catch { second = true; }
+  assert(second, "a second exclusive create must fail — there is no overwrite path");
+  eq(decideR1AttestationCreation({ exists: describe(p).exists, parentOutsideRepo: true }).reason,
+    R1Refusal.ATTESTATION_PATH_OCCUPIED, "and the operator refuses before even trying");
+});
+
+check("A6 an existing REGULAR file blocks creation", () => {
+  const p = join(FS_TMP, "occupied.json");
+  writeFileSync(p, "{}\n");
+  eq(decideR1AttestationCreation({ exists: describe(p).exists, parentOutsideRepo: true }).reason,
+    R1Refusal.ATTESTATION_PATH_OCCUPIED, "occupied by a real file");
+});
+
+check("A7 a real symlink is seen as a symlink and refused", () => {
+  const target = join(FS_TMP, "target.json");
+  const link = join(FS_TMP, "link.json");
+  writeFileSync(target, "{}\n");
+  let symlinked = true;
+  try { symlinkSync(target, link); } catch { symlinked = false; }
+  if (symlinked) {
+    const st = describe(link, undefined);
+    eq(st.isSymbolicLink, true, "lstat sees the link itself, it does not follow it");
+    eq(classifyR1AttestationFile(st).reason, R1Refusal.ATTESTATION_IS_SYMLINK, "and it is refused");
+    eq(decideR1AttestationCreation({ exists: st.exists, parentOutsideRepo: true }).reason,
+      R1Refusal.ATTESTATION_PATH_OCCUPIED, "creation refuses over it too");
+  } else {
+    // Unprivileged Windows cannot create symlinks; the pure proof still stands.
+    eq(classifyR1AttestationFile(statLike({ isSymbolicLink: true })).reason,
+      R1Refusal.ATTESTATION_IS_SYMLINK, "the classifier refuses a symlink");
+  }
+});
+
+check("A8 a symlink pointing INSIDE the repository is refused like any other", () => {
+  const link = join(FS_TMP, "into-repo.json");
+  let symlinked = true;
+  try { symlinkSync(resolve("package.json"), link); } catch { symlinked = false; }
+  if (symlinked) {
+    const st = describe(link, undefined);
+    eq(classifyR1AttestationFile(st).reason, R1Refusal.ATTESTATION_IS_SYMLINK,
+      "refused as a symlink, so its target is never even reached");
+    eq(decideR1AttestationCreation({ exists: st.exists, parentOutsideRepo: true }).reason,
+      R1Refusal.ATTESTATION_PATH_OCCUPIED, "and creation refuses");
+  } else {
+    eq(classifyR1AttestationFile(statLike({ isSymbolicLink: true })).ok, false, "refused");
+  }
+  // The repository is never a legal home for the attestation, by any route.
+  eq(isR1AttestationPathOutsideRepo(resolve("package.json"), resolve(".")), false, "inside the repo");
+  eq(isR1AttestationPathOutsideRepo(join(FS_TMP, "a.json"), resolve(".")), true, "the temp dir is outside");
+});
+
+check("A9 a real 0644 attestation is refused on read", () => {
+  const p = join(FS_TMP, "broad.json");
+  writeFileSync(p, "{}\n");
+  try { chmodSync(p, 0o644); } catch { /* best effort */ }
+  const st = describe(p, undefined);
+  if (POSIX) {
+    eq((st.mode & 0o777).toString(8), "644", "the file really is group/world readable");
+  }
+  eq(classifyR1AttestationFile(st).reason, R1Refusal.ATTESTATION_PERMISSIONS_TOO_BROAD, "refused");
+});
+
+check("A10 the operator proves the file before reading and consumes it before writing", () => {
+  assert(/O_CREAT \| fsConstants\.O_EXCL/.test(OPERATOR_CODE), "exclusive create");
+  assert(/O_NOFOLLOW/.test(OPERATOR_CODE), "no-follow semantics");
+  assert(/lstatSync\(ATTESTATION_PATH\)/.test(OPERATOR_CODE), "lstat, never stat");
+  absent(OPERATOR_CODE, /writeFileSync/, "the unsafe writer");
+  absent(OPERATOR_CODE, /readFileSync\(ATTESTATION_PATH/, "an unverified read of the path");
+  assert(/readFileSync\(fd, "utf8"\)/.test(OPERATOR_CODE), "the read goes through a proved descriptor");
+  const proof = OPERATOR_CODE.indexOf("classifyR1AttestationFile(describeAttestationPath(currentUid()))");
+  const read = OPERATOR_CODE.indexOf("openSync(ATTESTATION_PATH, fsConstants.O_RDONLY");
+  assert(proof > 0 && read > proof, "the proof precedes the read");
+  assert(/realpathSync\(REPO_ROOT\)/.test(OPERATOR_CODE), "the outside-repo proof uses realpath");
+});
+
 // ---- mutants: prove these rules can actually fail ---------------------------
 
 check("M1 mutant: 'at least one candidate' would repair an ambiguous set", () => {
@@ -926,6 +1219,45 @@ check("M10 mutant: dropping the idempotency-key fence would cross-link intents",
     "every OTHER fact still agrees — which is why the key is load-bearing");
 });
 
+
+check("M11 mutant: a generic '@/...' mapper would reach arbitrary repository code", () => {
+  // The naive mapper the first revision shipped: any alias becomes a repo path.
+  const naive = (request) => (request.startsWith("@/") ? join(loader.REPO_ROOT, request.slice(2)) : null);
+  const reached = naive("@/services/communicationService");
+  assert(typeof reached === "string" && reached.includes("communicationService"),
+    "the mutant resolves a send-capable service");
+  let threw = false;
+  try { loader.resolveAllowedR1Alias("@/services/communicationService"); } catch { threw = true; }
+  assert(threw, "the real resolver refuses it — real and mutant must differ");
+});
+
+check("M12 mutant: a providers-directory rule would admit the Meta adapter", () => {
+  const naive = (rel) => rel.startsWith("lib/communication/providers/");
+  assert(naive("lib/communication/providers/metaCloudWhatsAppProvider.ts") === true,
+    "a directory rule would admit the adapter along with the binding");
+  eq(resolutionOf("lib/communication/providers/metaCloudWhatsAppProvider.ts"), RES.REFUSE_NOT_ALLOWLISTED,
+    "the real allowlist refuses it");
+  eq(resolutionOf("lib/communication/providers/whatsappTemplateBinding.ts"), RES.ALLOW_ALLOWLISTED,
+    "while still allowing the one pure file that is genuinely required");
+});
+
+check("M13 mutant: writeFileSync semantics would overwrite an occupied path", () => {
+  // writeFileSync truncates whatever is there and follows a symlink.
+  const naiveWouldWrite = (exists) => true;
+  assert(naiveWouldWrite(true) === true, "the mutant writes regardless");
+  eq(decideR1AttestationCreation({ exists: true, parentOutsideRepo: true }).ok, false,
+    "the real rule refuses an occupied path");
+  absent(OPERATOR_CODE, /writeFileSync/, "and no writeFileSync survives in the operator");
+});
+
+check("M14 mutant: following a symlink or accepting 0644 would trust the wrong file", () => {
+  const naiveAccepts = (st) => st.exists === true;
+  assert(naiveAccepts(statLike({ isSymbolicLink: true })) === true, "the mutant accepts a symlink");
+  assert(naiveAccepts(statLike({ mode: 0o100644 })) === true, "and a world-readable file");
+  eq(classifyR1AttestationFile(statLike({ isSymbolicLink: true })).ok, false, "the real rule refuses the symlink");
+  eq(classifyR1AttestationFile(statLike({ mode: 0o100644 })).ok, false, "and the broad permissions");
+});
+
 // ============================================================================
 let passed = 0;
 const failures = [];
@@ -937,4 +1269,5 @@ console.log(`\n${"=".repeat(78)}`);
 console.log(`QF-MVP-80.17A-R1 controlled historical reconciliation — passed ${passed}, failed ${failures.length}`);
 if (failures.length) { console.log("\nFAILURES:"); for (const l of failures) console.log(l); }
 console.log("=".repeat(78));
+try { rmSync(FS_TMP, { recursive: true, force: true }); } catch { /* best effort */ }
 process.exit(failures.length ? 1 : 0);

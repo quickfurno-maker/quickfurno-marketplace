@@ -53,8 +53,14 @@ const tabMatch = types.match(/export const WHATSAPP_TABS = \[([\s\S]*?)\] as con
 const declaredTabs = tabMatch
   ? [...tabMatch[1].matchAll(/"([a-z]+)"/g)].map((match) => match[1])
   : [];
+// QF-MVP-82A adds the Inbox tab. The point of this assertion is that the tab
+// set is EXACT and that no Billing tab appeared — not that the workspace can
+// never gain a tab — so the pin moves with a reviewed addition and stays exact.
+// `messages` is deliberately still here: Inbox did not replace the forensic
+// direction-separated ledger, it sits beside it.
 const exactTabs = [
   "overview",
+  "inbox",
   "templates",
   "messages",
   "delivery",
@@ -64,7 +70,7 @@ const exactTabs = [
 ];
 
 // 1 — Existing workspace contract and Provider placement.
-check("the seven WhatsApp tabs remain exact", JSON.stringify(declaredTabs) === JSON.stringify(exactTabs));
+check("the eight WhatsApp tabs remain exact", JSON.stringify(declaredTabs) === JSON.stringify(exactTabs));
 check("no Billing tab was added", !declaredTabs.includes("billing"));
 check("Billing & spend is rendered inside WhatsAppProviderTab", /title="Billing & spend"/.test(provider));
 check("the Provider branch alone receives the billing workspace", /<WhatsAppProviderTab workspace=\{payload\.provider\}/.test(shell));

@@ -239,6 +239,17 @@ jobs:
       - name: QF-MVP-80.17A-R1 runtime loader smoke
         run: npm run test:mvp:80-17a-r1-loader
 
+      # QF-MVP-82A — the unified WhatsApp inbox. It renders real customer
+      # conversations to a Superadmin, so its privacy and containment rules are
+      # proved at the exact head: conversations group on the durable contact
+      # hash and never on a masked number, the hash itself never reaches the
+      # browser, minimized inbound content is rendered through a pure sanitizer,
+      # `delivered` is never shown as `read`, the live channel carries a fixed
+      # marker and never a row, and no send, retry or write path exists.
+      # Offline: no secrets, no network, no Supabase, no send.
+      - name: QF-MVP-82A WhatsApp unified inbox
+        run: npm run test:mvp:82a
+
       # QF-MVP-82A-R0 — Realtime publication membership for the two WhatsApp inbox
       # authorities. A migration is a governance event here: it moves the live tree
       # pin, the post-anchor accounting and the staging-history PENDING set, so its

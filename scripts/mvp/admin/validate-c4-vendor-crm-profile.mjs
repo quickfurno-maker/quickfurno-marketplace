@@ -11,6 +11,10 @@ import { fileURLToPath } from "node:url";
 
 import { ADMIN_DIRECTORY_PAGE_SIZE, ADMIN_EMBEDDED_PANEL_LIMIT } from "../../../lib/adminPaging.ts";
 
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
+
 // QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
 // authority (20260905000000). No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality, never a lower bound.
@@ -125,7 +129,7 @@ const migrationFiles = readdirSync(join(root, "supabase", "migrations"));
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count remains 105", migrationFiles.length === 105);
+check("migration count remains 106", migrationFiles.length === 106);
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);
 console.log("offline: no database, no network, no provider, no auth bypass");

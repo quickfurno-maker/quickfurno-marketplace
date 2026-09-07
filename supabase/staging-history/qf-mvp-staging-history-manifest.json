@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 18,
+    "postAnchorMigrationCount": 19,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -946,6 +946,22 @@
       "phase": "QF-MVP-50.6",
       "operationalStatus": "PENDING",
       "purpose": "Creates public.qf_automation_entity_state_v1, public.qf_cancel_orphan_automation_job_v1 and public.qf_cancel_orphan_automation_job_transport_v1 — the only authority that may move an orphan automation job to the existing terminal cancelled status. Grants no direct table mutation and seeds no data.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260906000000",
+      "name": "qf_mvp_50_7_automation_stale_business_cancellation",
+      "path": "supabase/migrations/20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
+      "sha256": "c5513f9fffeb57b879abc31aaf7db405447cbf1f4e74516af8763b793c61ec71",
+      "phase": "QF-MVP-50.7",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates public.qf_automation_vendor_business_state_v1, public.qf_cancel_stale_automation_job_v1 and public.qf_cancel_stale_automation_job_transport_v1 — the only authority that may terminalize a queued job whose entity still exists but whose current business truth is provably stale. Grants no direct table mutation and seeds no data.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

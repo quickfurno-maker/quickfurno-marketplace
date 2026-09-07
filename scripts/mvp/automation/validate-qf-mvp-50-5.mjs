@@ -38,6 +38,10 @@ import {
 } from "../../../lib/automation/recoveryContract.ts";
 import { AUTOMATION_TRANSPORT_MAX_CLOCK_SKEW_SECONDS } from "../../../lib/automation/transportAuth.ts";
 
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
+
 // QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
 // authority (20260905000000). No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality, never a lower bound.
@@ -94,13 +98,13 @@ const record = (name, passed) => results.push({ name, passed: passed === true })
 // ---------------------------------------------------------------------------
 // T. TWO DISTINCT ROUTES — the central owner-locked decision
 // ---------------------------------------------------------------------------
-record("T01 the transport route vocabulary is closed to exactly six, in exact order",
+record("T01 the transport route vocabulary is closed to exactly seven, in exact order",
   // QF-MVP-50.6 RE-PIN: five -> six. cancel_orphan_v1 is appended; the earlier five
   // keep their exact positions. This stays EXACT ORDERED EQUALITY, never a length
   // lower bound and never a membership test.
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 6 &&
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 7 &&
   AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") ===
-    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1");
+    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1,cancel_stale_v1");
 record("T02 the recovery routes are exactly two and are named separately",
   AUTOMATION_RECOVERY_ROUTE_KEYS.length === 2 &&
   same([...AUTOMATION_RECOVERY_ROUTE_KEYS], ["recover_v1", "reconcile_v1"]));
@@ -583,18 +587,19 @@ record("G01 the migration matches its pinned canonical hash",
 // QF-MVP-50.6 RE-PIN: 104 -> 105. 50.5 is still the newest APPLIED migration; the two
 // newer files are both source-pending or staging-only, which is exactly why the APPLIED
 // tail assertion below is unchanged.
-record("G02 the local migration set is exactly 105 and 50.5 is the newest APPLIED migration",
+record("G02 the local migration set is exactly 106 and 50.5 is the newest APPLIED migration",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 105 &&
+    return files.length === 106 &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql") &&
-      files.at(-4) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
-      files.at(-3) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
-      files.at(-2) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
-      files.at(-1) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql" &&
+      files.at(-5) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
+      files.at(-4) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-3) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
+      files.at(-2) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql" &&
+      files.at(-1) === "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql" &&
       manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000";
   })());
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
@@ -613,7 +618,7 @@ record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence,
     const stagingApplied = manifest.stagingAppliedPostAnchorMigrations ?? null;
     // QF-MVP-50.6 RE-PIN: 1 -> 2 pending. Both entries are still pinned by exact
     // version and status; neither may claim application evidence.
-    return Array.isArray(pending) && pending.length === 2 &&
+    return Array.isArray(pending) && pending.length === 3 &&
       pending[0].version === "20260903040000" &&
       pending[0].operationalStatus === "PENDING" &&
       pending[1].version === "20260905000000" &&
@@ -648,13 +653,13 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
-  manifest.appliedAnchor.postAnchorMigrationCount === 18);
+  manifest.appliedAnchor.postAnchorMigrationCount === 19);
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 105;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 106;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
   // QF-MVP-50.6 RE-PIN: G1's pending pin moved 1 -> 2 for the orphan cancellation
   // authority. This assertion still proves G1 pins an EXACT pending count.
-  g1Source.includes("pendingPins.length === 2") &&
+  g1Source.includes("pendingPins.length === 3") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("[21, 22, 23, 24, 25, 26, 27, 28, 29, 30]") &&
@@ -737,7 +742,7 @@ const mutants = [
   ["one lane starving the other is prevented by construction",
     () => workflow.nodes.filter((n) => n.type === "n8n-nodes-base.scheduleTrigger").length === 2],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 105;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 106;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   // QF-MVP-40.13B: the pending set is non-empty again, so this `every()` is no longer
   // vacuous — it now genuinely guards the SOURCE-PENDING canary authority. The other
@@ -746,7 +751,7 @@ const mutants = [
   // A RECONCILED record must never fabricate a remote-history count nobody observed, and
   // must never borrow the applied ten's owner-reviewed evidence type.
   ["a reconciled record fabricating an observed apply record is impossible",
-    () => (manifest.pendingPostAnchorMigrations ?? []).length === 2 &&
+    () => (manifest.pendingPostAnchorMigrations ?? []).length === 3 &&
       (manifest.reconciledPostAnchorMigrations ?? []).length === 5 &&
       (manifest.reconciledPostAnchorMigrations ?? []).every((r) =>
         r.remoteVersionStatus === "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY" &&

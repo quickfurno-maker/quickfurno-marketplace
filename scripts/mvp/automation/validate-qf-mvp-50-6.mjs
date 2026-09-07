@@ -41,6 +41,10 @@ import {
   parseCancelOrphanRequestBody,
 } from "../../../lib/automation/orphanCancellationContract.ts";
 
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (rel) => readFileSync(path.join(ROOT, rel), "utf8");
 const canonicalSha256 = (buffer) =>
@@ -350,10 +354,10 @@ record("R24 every automation quality gate is registered and wired into CI",
 // A. ROUTE AND STATE VOCABULARY — closed, exact, and additive only
 // ---------------------------------------------------------------------------
 
-record("A01 the transport route vocabulary is closed to exactly six, in exact order",
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 6 &&
+record("A01 the transport route vocabulary is closed to exactly seven, in exact order",
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 7 &&
   AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") ===
-    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1");
+    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1,cancel_stale_v1");
 
 record("A02 the migration widens route_key to exactly the same six",
   /check \(route_key in \(\s*'claim_v1',\s*'complete_v1',\s*'execute_v1',\s*'recover_v1',\s*'reconcile_v1',\s*'cancel_orphan_v1'\s*\)\)/
@@ -459,12 +463,12 @@ record("B08 a job already cancelled once is refused a second time",
 record("C01 the migration is the pinned forward-only file and nothing else was added",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA &&
   readdirSync(path.join(ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith(".sql")).sort().at(-1) ===
+    .filter((f) => f.endsWith(".sql")).sort().at(-2) ===
     "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql");
 
-record("C02 the local migration set is exactly 105",
+record("C02 the local migration set is exactly 106",
   readdirSync(path.join(ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith(".sql")).length === 105);
+    .filter((f) => f.endsWith(".sql")).length === 106);
 
 record("C03 a fail-closed dependency preflight runs before anything is installed",
   migrationCode.indexOf("raise exception 'QF-MVP-50.6: the automation persistence and transport tables must exist.'") <
@@ -621,7 +625,7 @@ record("D10 the certified 50.2E / 50.3 / 50.4 / 50.5 workflows are untouched",
     };
     const flows = readdirSync(path.join(ROOT, "automation/n8n"))
       .filter((f) => f.endsWith(".workflow.json")).sort();
-    return flows.length === 7 &&
+    return flows.length === 8 &&
       Object.keys(FROZEN).every((f) => flows.includes(f)) &&
       // every pre-existing workflow is still inactive too
       flows.every((f) => JSON.parse(read(`automation/n8n/${f}`)).active === false);
@@ -702,7 +706,7 @@ record("F03 the manifest pins the new migration as SOURCE-PENDING with no applic
   (() => {
     const pin = (manifest.pendingPostAnchorMigrations ?? [])
       .find((r) => r.version === "20260905000000");
-    return manifest.pendingPostAnchorMigrations.length === 2 &&
+    return manifest.pendingPostAnchorMigrations.length === 3 &&
       pin?.sha256 === MIGRATION_SHA &&
       pin.path === MIGRATION_PATH &&
       pin.phase === "QF-MVP-50.6" &&
@@ -715,13 +719,13 @@ record("F03 the manifest pins the new migration as SOURCE-PENDING with no applic
       pin.requiresSeparateStagingDeploymentGate === true &&
       !("remoteHistoryCountAfterApply" in pin) &&
       !("appliedEvidenceMarker" in pin) &&
-      manifest.appliedAnchor.postAnchorMigrationCount === 18;
+      manifest.appliedAnchor.postAnchorMigrationCount === 19;
   })());
 
 record("F04 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 105;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 106;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 2") &&
+  g1Source.includes("pendingPins.length === 3") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("reconciledPins.length === 5") &&
   // The frozen 80.05 historical fact must NOT have moved with the live count.
@@ -788,7 +792,7 @@ const mutants = [
             .filter((f) => f.endsWith(".workflow.json"))
             .every((f) => JSON.parse(read(`automation/n8n/${f}`)).active === false)],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 105;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 106;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   ["claiming this migration was applied anywhere is detectable",
     () => {
@@ -805,7 +809,7 @@ const mutants = [
            "scripts/mvp/automation/validate-qf-mvp-50-2e.mjs",
            "scripts/mvp/automation/validate-qf-mvp-50-5.mjs"]
       .every((p) => read(p).includes(
-        "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1"))],
+        "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1,cancel_stale_v1"))],
   ["a stale executor entity check would be detectable",
     () => /QF_EXEC_LEAD_NOT_FOUND/.test(clientExecutorCode) &&
           /QF_EXEC_VENDOR_NOT_FOUND/.test(vendorExecutorCode)],

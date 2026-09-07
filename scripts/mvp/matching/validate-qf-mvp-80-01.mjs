@@ -44,6 +44,10 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import {
+
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
   CANONICAL_ACTIVE_ASSIGNMENT_CAP,
   CANONICAL_ASSIGNMENT_CREDIT_COST,
   CANONICAL_LIFETIME_ASSIGNMENT_CAP,
@@ -411,8 +415,8 @@ section('G. MVP INVARIANTS UNCHANGED [pure] [static]');
   // added a migration without re-pinning it here, so this assertion was already failing on
   // a clean tree before this phase. The guard's point is unchanged — THIS phase added no
   // migration of its own — so the pin moves to the truthful live count. Still exact.
-  check('G05 QF-MVP-80.01 itself added NO migration — the repo set is 105',
-    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 105);
+  check('G05 QF-MVP-80.01 itself added NO migration — the repo set is 106',
+    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 106);
 
   check('G06 the three migrations this phase rehearses exist on disk, unrenamed',
     ['20260814000000_qf_mvp_40_marketing_consent_writer.sql',

@@ -61,6 +61,16 @@ export const N8N_CANCEL_ORPHAN_ROUTE_PATH =
   "/api/internal/automation/n8n/cancel-orphan" as const;
 
 /**
+ * QF-MVP-50.7. Stale-business terminalization is a SEPARATE signing path from
+ * orphan cancellation even though both end at `cancelled`, because they rest on
+ * opposite premises: the orphan lane requires the entity to be GONE, this one
+ * requires it to still EXIST. Sharing a path would let one lane's signature
+ * authenticate the other's authority over a job it must never touch.
+ */
+export const N8N_CANCEL_STALE_ROUTE_PATH =
+  "/api/internal/automation/n8n/cancel-stale" as const;
+
+/**
  * Closed transport route vocabulary. Mirrors the ledger's route_key CHECK.
  *
  * QF-MVP-50.5 RE-PIN, NEVER LOOSEN. History of this constant:
@@ -69,6 +79,7 @@ export const N8N_CANCEL_ORPHAN_ROUTE_PATH =
  *   QF-MVP-50.2E  three       + execute_v1
  *   QF-MVP-50.5   five        + recover_v1, reconcile_v1
  *   QF-MVP-50.6   six         + cancel_orphan_v1
+ *   QF-MVP-50.7   seven       + cancel_stale_v1
  *
  * Every gate that pins this array does so by EXACT ORDERED EQUALITY — never a
  * length lower bound and never a membership test — so widening it is a
@@ -81,6 +92,7 @@ export const AUTOMATION_TRANSPORT_ROUTE_KEYS = [
   "recover_v1",
   "reconcile_v1",
   "cancel_orphan_v1",
+  "cancel_stale_v1",
 ] as const;
 export type AutomationTransportRouteKey =
   (typeof AUTOMATION_TRANSPORT_ROUTE_KEYS)[number];
@@ -392,6 +404,25 @@ export interface AutomationTransportCancelOrphanRow {
   job_id: string | null;
   action_request_id: string | null;
   entity_type: string | null;
+  safe_code: string | null;
+}
+
+/**
+ * Exactly what the `cancel_stale_v1` transport RPC returns.
+ *
+ * `action_type` — a CLOSED vocabulary word, never an identifier — is the only
+ * business detail that leaves the database, and it exists purely so an operator
+ * can see WHICH kind of stale work was swept. As on the orphan route there is no
+ * attempt identity, because terminalizing a stale job opens no attempt.
+ */
+export interface AutomationTransportCancelStaleRow {
+  request_id: string;
+  route_key: AutomationTransportRouteKey;
+  state: "cancelled" | "empty";
+  is_replay: boolean;
+  job_id: string | null;
+  action_request_id: string | null;
+  action_type: string | null;
   safe_code: string | null;
 }
 

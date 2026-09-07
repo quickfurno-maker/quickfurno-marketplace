@@ -110,6 +110,16 @@ Stated once in `lib/automation/vendorBusinessEligibility.ts`:
   `remaining_credits > threshold` — note the comparison is strictly greater-than,
   so a balance *equal to* the threshold is still **eligible**.
 
+  **Type parity.** `readLowCreditThreshold` accepts a value only when
+  `typeof raw === "number" && Number.isInteger(raw)`. An earlier revision of the
+  migration used a bare `(config_json ->> 'thresholdCredits')::integer`, which was
+  wrong in two directions: it would have read the JSON *string* `"3"` as `3`
+  (TypeScript refuses it), and it would have **raised** on `3.5`, aborting the
+  transaction. `qf_automation_low_credit_threshold_v1()` now requires a JSON
+  **number** that is integer-valued, exactly as the TypeScript does, and can never
+  raise. The gate executes the whole matrix — `3`, `"3"`, `null`, missing, `3.5`,
+  `NaN` — on both sides.
+
 Verdicts are closed: `eligible | stale | unmapped`. `unmapped` is not a soft
 `stale`; the maintenance lane terminalizes only on a proven `stale`.
 
@@ -157,14 +167,74 @@ those two, which is exactly why it can be stricter than the executor.
 
 ## 6. How TOCTOU is prevented
 
-Selection and mutation are a **single statement**: the candidate is chosen by a
-sub-select under `for update skip locked` inside the `UPDATE`. After the write,
-and inside the same transaction, both the entity state and the business state are
-**re-derived**. If either has moved, the function raises
-`AUTOMATION_STALE_BUSINESS_STATE_CHANGED` and the whole statement rolls back.
+An earlier revision claimed this property on the strength of a post-write re-read.
+**That was not enough.** The re-read held no lock on the business rows, so a
+concurrent transaction could restore eligibility *after* the re-read and *before*
+this transaction committed — leaving a cancelled job whose truth had recovered. A
+second `SELECT` is not the same as holding the truth stable through `COMMIT`.
 
-That error is never caught or reinterpreted as a successful cancellation — there
-is no `when others` handler anywhere in the function.
+The corrected order is **lock, then prove, then write**:
+
+1. lock ONE queue candidate — `for update of j skip locked`, oldest first;
+2. acquire the **action-specific business-row locks**;
+3. re-prove entity presence and business staleness **while those locks are held**;
+4. only then `UPDATE` the job;
+5. every lock is transaction-scoped, so it survives to `COMMIT`.
+
+### Per-action locks
+
+| action | rows locked | why |
+| --- | --- | --- |
+| `vendor.response_reminder` | the exact `lead_assignments` row | freezes `vendor_id` and `vendor_status` |
+| `vendor.onboarding_reminder` | the `vendors` parent **and** the `vendor_crm_profiles` row when present | freezes `onboarding_stage`, and see below |
+| `vendor.package_expiry_warning` | the exact `vendors` row | freezes `package_status` and `package_expires_at` |
+| `vendor.low_credit_warning` | the exact `vendors` row **and** the active policy pointer | freezes `remaining_credits` and the threshold |
+
+### The missing-CRM phantom
+
+For onboarding, an **absent** CRM row means stale — and you cannot lock a row that
+does not exist. The parent lock is what closes it: inserting a
+`vendor_crm_profiles` row must take a `FOR KEY SHARE` lock on the referenced
+`public.vendors` row to satisfy `vcp_vendor_fk`, and **`FOR UPDATE` is the only
+row-lock mode that conflicts with `FOR KEY SHARE`**. So holding `FOR UPDATE` on the
+parent blocks a concurrent CRM insert. `FOR NO KEY UPDATE` would *not* — which is
+why the mode is deliberate rather than incidental, and why the gate pins it.
+
+### The absent policy-pointer phantom
+
+For low-credit, an **absent** active pointer also means refusal — and again there
+is no row to lock. Rather than take a table lock, the maintenance lane simply
+**excludes** that case from selection: an unconfigured threshold is never
+terminalizable. The executor's behaviour is unchanged (it still refuses); only the
+maintenance lane is stricter. Both the SQL selector and
+`isStaleBusinessTerminalizable` carry the identical exclusion.
+
+### Lock order and deadlock
+
+One fixed order: **automation job → primary business entity → dependent row /
+policy pointer → the job update**. Verified against the existing writers: no
+repository function locks `vendor_crm_profiles` at all, none row-locks
+`lead_assignments`, and the vendor automation producer takes no row locks — so
+there is no inverse order to deadlock against. No advisory locks are used, because
+they would only help if every competing writer opted into the same protocol, and
+none does.
+
+### Proven, not just argued
+
+`npm run test:mvp:50-7-toctou` starts a **disposable** Postgres (no published
+port, destroyed on exit — it cannot reach staging, production or a local
+Supabase), loads the **real shipped function bodies** verbatim from the migration
+files, and proves empirically that:
+
+1. a concurrent `UPDATE` restoring `vendor_status='New'` **cannot commit** while
+   the lane holds its lock (it dies on `lock_timeout`);
+2. a concurrent CRM `INSERT` is **blocked** by the parent `FOR UPDATE`;
+3. a recovery that wins *before* lock acquisition makes the job unselectable;
+4. a genuinely stale job still terminalizes, with no attempt row, no communication
+   row, and no mutation of any business row.
+
+11/11 checks pass. It is opt-in rather than part of the offline CI gate, because
+it needs a container runtime.
 
 ## 7. No attempt, no send
 

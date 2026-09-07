@@ -358,6 +358,55 @@ $$;
 --
 --    STABLE and read-only. It reads four tables and writes nothing.
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- 5a. The low-credit threshold reader — TYPE PARITY WITH TYPESCRIPT.
+--
+--     readLowCreditThreshold() in the executor accepts a value only when
+--     `typeof raw === "number" && Number.isInteger(raw)`. An earlier draft of this
+--     migration used a bare `(config_json ->> 'thresholdCredits')::integer`, which
+--     is NOT the same predicate and was wrong in two directions:
+--
+--       {"thresholdCredits": "3"}   TypeScript -> null (refusal)
+--                                   bare cast  -> 3      (disagreement)
+--       {"thresholdCredits": 3.5}   TypeScript -> null (refusal)
+--                                   bare cast  -> raises invalid_text_representation,
+--                                                 aborting the whole transaction
+--
+--     So this reader requires the JSON value to be a NUMBER and to be
+--     integer-valued, exactly as the TypeScript does, and returns null otherwise.
+--     No cast can raise.
+--
+--     `automation_policy_configs` rows are immutable by design; only the ACTIVE
+--     POINTER moves, which is why the maintenance lane locks the pointer row.
+-- ---------------------------------------------------------------------------
+create or replace function public.qf_automation_low_credit_threshold_v1()
+returns integer
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select case
+           when jsonb_typeof(c.config_json -> 'thresholdCredits') = 'number'
+            and (c.config_json ->> 'thresholdCredits') ~ '^-?[0-9]+$'
+           then (c.config_json ->> 'thresholdCredits')::integer
+           else null
+         end
+    from public.automation_policy_active_configs a
+    join public.automation_policy_configs c
+      on c.id = a.config_id
+     and c.policy_key = a.policy_key
+   where a.policy_key = 'vendor_low_credit_warning_threshold';
+$$;
+
+comment on function public.qf_automation_low_credit_threshold_v1() is
+  'QF-MVP-50.7 low-credit threshold reader. Accepts ONLY an integer-valued JSON number, matching readLowCreditThreshold in the TypeScript executor exactly; anything else is null. Never raises on a malformed config value.';
+
+revoke all on function public.qf_automation_low_credit_threshold_v1()
+  from public, anon, authenticated, service_role;
+grant execute on function public.qf_automation_low_credit_threshold_v1()
+  to service_role;
+
 create or replace function public.qf_automation_vendor_business_state_v1(
   p_action_type text,
   p_entity_type text,
@@ -474,13 +523,7 @@ begin
     -- VENDOR_LOW_CREDIT_THRESHOLD_POLICY_KEY from lib/automation/vendorDispatchRegistry.ts.
     -- The join mirrors the composite foreign key (policy_key, config_id) ->
     -- (policy_key, id), so a config can never be read across policies.
-    select (c.config_json ->> 'thresholdCredits')::integer
-      into v_threshold
-      from public.automation_policy_active_configs a
-      join public.automation_policy_configs c
-        on c.id = a.config_id
-       and c.policy_key = a.policy_key
-     where a.policy_key = 'vendor_low_credit_warning_threshold';
+    v_threshold := public.qf_automation_low_credit_threshold_v1();
     if v_threshold is null then return 'stale'; end if;
 
     select v.remaining_credits into v_credits
@@ -520,15 +563,167 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v_job public.automation_jobs%rowtype;
+  v_job_id uuid;
   v_request public.automation_action_requests%rowtype;
+  v_entity_uuid uuid;
   v_state text;
   v_entity text;
+  v_threshold integer;
+  v_found boolean;
 begin
   if p_worker_id is null
      or p_worker_id !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$' then
     raise exception 'AUTOMATION_WORKER_ID_INVALID' using errcode = 'P0001';
   end if;
 
+  -- =========================================================================
+  -- THE TRANSACTION ORDER IS THE SAFETY PROPERTY.
+  --
+  -- An earlier draft selected, WROTE the job, and only then re-read the business
+  -- rows. That re-read proved nothing durable: it held no lock on those rows, so
+  -- a concurrent transaction could restore business eligibility AFTER the re-read
+  -- and BEFORE this transaction committed, leaving a cancelled job whose truth
+  -- had recovered. A second SELECT is not the same as holding the truth stable.
+  --
+  -- The order below closes that window:
+  --   1. lock ONE queue candidate (skip locked, oldest first)
+  --   2. acquire the ACTION-SPECIFIC business-row locks
+  --   3. re-prove entity + business state WHILE THOSE LOCKS ARE HELD
+  --   4. only then write the job
+  --   5. every lock is transaction-scoped, so it survives to COMMIT
+  --
+  -- LOCK ORDER, fixed for this lane and safe against the existing writers:
+  --   automation_jobs -> primary business entity -> dependent row / policy
+  --   pointer -> the job UPDATE. No repository function locks
+  --   vendor_crm_profiles at all, none row-locks lead_assignments, and the
+  --   vendor automation producer takes no row locks, so there is no inverse
+  --   order to deadlock against.
+  -- =========================================================================
+
+  -- 1. PRELIMINARY CANDIDATE. Locks only the job row.
+  select j.id
+    into v_job_id
+    from public.automation_jobs j
+    join public.automation_action_requests r on r.id = j.action_request_id
+   where j.status in ('pending', 'retry_scheduled')
+     -- THE HARD BOUNDARY AGAINST QF-MVP-50.6: the entity must still EXIST.
+     and public.qf_automation_entity_state_v1(r.entity_type, r.entity_id) = 'present'
+     -- The CLOSED v1 stale vocabulary.
+     and r.action_type in (
+       'vendor.response_reminder',
+       'vendor.onboarding_reminder',
+       'vendor.package_expiry_warning',
+       'vendor.low_credit_warning'
+     )
+     -- The SHARED predicate. Only a proven 'stale' qualifies.
+     and public.qf_automation_vendor_business_state_v1(
+           r.action_type, r.entity_type, r.entity_id, r.idempotency_key
+         ) = 'stale'
+     -- MAINTENANCE-ONLY EXTRA CONSERVATISM. An UNCONFIGURED low-credit threshold
+     -- is a refusal for the executor, but it must never be a terminalization
+     -- here: the active pointer is absent, so there is no row to lock and a
+     -- concurrent INSERT could restore eligibility between proof and commit.
+     -- Excluding it removes that phantom without taking a table lock.
+     and (
+       r.action_type <> 'vendor.low_credit_warning'
+       or public.qf_automation_low_credit_threshold_v1() is not null
+     )
+     -- Already terminalized once? Then it is terminal and invisible anyway.
+     and not exists (
+       select 1
+         from public.automation_transport_requests t
+        where t.route_key = 'cancel_stale_v1'
+          and t.job_id = j.id
+     )
+   order by j.created_at asc, j.id asc
+   for update of j skip locked
+   limit 1;
+
+  if v_job_id is null then
+    return;
+  end if;
+
+  select r.* into v_request
+    from public.automation_action_requests r
+    join public.automation_jobs j on j.action_request_id = r.id
+   where j.id = v_job_id;
+
+  -- The entity id must be a uuid to address any of these tables. A non-uuid is
+  -- entity truth, not business truth, and belongs to QF-MVP-50.6.
+  begin
+    v_entity_uuid := v_request.entity_id::uuid;
+  exception
+    when invalid_text_representation then
+      raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED' using errcode = 'P0001';
+  end;
+
+  -- 2. ACTION-SPECIFIC BUSINESS LOCKS, acquired BEFORE any proof and BEFORE the write.
+  if v_request.action_type = 'vendor.response_reminder' then
+    -- Freeze vendor_id and vendor_status on the exact assignment.
+    select true into v_found
+      from public.lead_assignments la
+     where la.id = v_entity_uuid
+     for update;
+    if not found then
+      -- The assignment vanished between selection and lock. That is entity
+      -- absence, which is QF-MVP-50.6's lane; this one refuses.
+      raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED' using errcode = 'P0001';
+    end if;
+  else
+    -- The three vendor-entity actions all lock the vendor row FIRST.
+    --
+    -- FOR UPDATE, NOT a weaker mode, ON PURPOSE. Inserting a vendor_crm_profiles
+    -- row takes a FOR KEY SHARE lock on the referenced public.vendors row to
+    -- satisfy vcp_vendor_fk. FOR UPDATE is the only row-lock mode that conflicts
+    -- with FOR KEY SHARE, so holding it here BLOCKS a concurrent CRM INSERT —
+    -- which is exactly the phantom an absent CRM row would otherwise expose for
+    -- vendor.onboarding_reminder. FOR NO KEY UPDATE would leave that race open.
+    select true into v_found
+      from public.vendors v
+     where v.id = v_entity_uuid
+     for update;
+    if not found then
+      raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED' using errcode = 'P0001';
+    end if;
+
+    if v_request.action_type = 'vendor.onboarding_reminder' then
+      -- Lock the CRM row when it exists. When it does NOT exist there is no row
+      -- to lock, and the parent FOR UPDATE above is what prevents one appearing.
+      perform 1
+         from public.vendor_crm_profiles p
+        where p.vendor_id = v_entity_uuid
+        for update;
+    end if;
+
+    if v_request.action_type = 'vendor.low_credit_warning' then
+      -- Freeze the ACTIVE POINTER so the threshold cannot move or be retargeted.
+      -- The pointed-at automation_policy_configs row is immutable by design, so
+      -- pinning the pointer pins the whole threshold. An ABSENT pointer was
+      -- already excluded by the selector above, so no phantom remains.
+      perform 1
+         from public.automation_policy_active_configs a
+        where a.policy_key = 'vendor_low_credit_warning_threshold'
+        for update;
+      v_threshold := public.qf_automation_low_credit_threshold_v1();
+      if v_threshold is null then
+        raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED' using errcode = 'P0001';
+      end if;
+    end if;
+  end if;
+
+  -- 3. RE-PROVE UNDER THE LOCKS. Every mutable row the predicate reads is now
+  --    locked by this transaction, so this verdict cannot be invalidated by a
+  --    concurrent writer between here and COMMIT.
+  v_entity := public.qf_automation_entity_state_v1(v_request.entity_type, v_request.entity_id);
+  v_state := public.qf_automation_vendor_business_state_v1(
+    v_request.action_type, v_request.entity_type, v_request.entity_id, v_request.idempotency_key
+  );
+  if v_entity is distinct from 'present' or v_state is distinct from 'stale' then
+    raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED' using errcode = 'P0001';
+  end if;
+
+  -- 4. ONLY NOW write the job. Its row has been locked since step 1, so its
+  --    status cannot have moved either.
   update public.automation_jobs
      set status = 'cancelled',
          completed_at = now(),
@@ -542,63 +737,16 @@ begin
          last_result_classification = null,
          last_safe_code = 'QF_AUTOMATION_BUSINESS_STATE_NO_LONGER_ELIGIBLE',
          updated_at = now()
-   where id = (
-     select j.id
-       from public.automation_jobs j
-       join public.automation_action_requests r on r.id = j.action_request_id
-      -- ONLY the two non-executing, non-terminal states.
-      where j.status in ('pending', 'retry_scheduled')
-        -- THE HARD BOUNDARY AGAINST QF-MVP-50.6: the entity must still EXIST.
-        -- An absent entity is the orphan lane's business, never this one.
-        and public.qf_automation_entity_state_v1(r.entity_type, r.entity_id) = 'present'
-        -- The CLOSED v1 stale vocabulary.
-        and r.action_type in (
-          'vendor.response_reminder',
-          'vendor.onboarding_reminder',
-          'vendor.package_expiry_warning',
-          'vendor.low_credit_warning'
-        )
-        -- The SHARED predicate. Only a proven 'stale' qualifies; 'eligible' and
-        -- 'unmapped' are both left untouched.
-        and public.qf_automation_vendor_business_state_v1(
-              r.action_type, r.entity_type, r.entity_id, r.idempotency_key
-            ) = 'stale'
-        -- Already terminalized once? Then it is terminal and invisible anyway;
-        -- this makes the uniqueness index unreachable rather than merely unlikely.
-        and not exists (
-          select 1
-            from public.automation_transport_requests t
-           where t.route_key = 'cancel_stale_v1'
-             and t.job_id = j.id
-        )
-      -- Oldest first, so a growing stale set drains deterministically and no
-      -- single job can be starved by newer arrivals.
-      order by j.created_at asc, j.id asc
-      for update skip locked
-      limit 1
-   )
+   where id = v_job_id
+     and status in ('pending', 'retry_scheduled')
    returning * into v_job;
 
   if v_job.id is null then
-    return;
-  end if;
-
-  select * into v_request
-    from public.automation_action_requests
-   where id = v_job.action_request_id;
-
-  -- TOCTOU DEFENCE. The selector already required 'stale' and 'present', and in
-  -- a consistent database this cannot disagree — but if the authoritative truth
-  -- moved between the select and the write, the whole statement rolls back
-  -- rather than leaving a job cancelled that had just become eligible again.
-  v_entity := public.qf_automation_entity_state_v1(v_request.entity_type, v_request.entity_id);
-  v_state := public.qf_automation_vendor_business_state_v1(
-    v_request.action_type, v_request.entity_type, v_request.entity_id, v_request.idempotency_key
-  );
-  if v_entity is distinct from 'present' or v_state is distinct from 'stale' then
     raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED' using errcode = 'P0001';
   end if;
 
+  -- 5. Every lock taken above is transaction-scoped: it is released only at
+  --    COMMIT or ROLLBACK, never here. No business row was modified by this lane.
   return query
   select
     v_job.id,

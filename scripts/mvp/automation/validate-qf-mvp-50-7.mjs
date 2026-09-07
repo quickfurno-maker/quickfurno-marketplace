@@ -63,7 +63,7 @@ const stripSql = (src) => src.replace(/^\s*--.*$/gm, "");
 
 const MIGRATION_PATH =
   "supabase/migrations/20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql";
-const MIGRATION_SHA = "ace82115973f56cf0e9e0c309f680a41a263d56d1b23005531a095bcc8218b98";
+const MIGRATION_SHA = "975242918a5010a2376397173f1aecd171452daf4db26a4172de5d0c0d6ce6c5";
 const ORPHAN_MIGRATION_PATH =
   "supabase/migrations/20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql";
 const ORPHAN_MIGRATION_SHA = "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63";
@@ -94,6 +94,11 @@ const g1Source = read("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
 
 const results = [];
 const record = (name, passed) => results.push({ name, passed: passed === true });
+
+/** The body of the mutating terminalization authority, for order assertions. */
+const staleAuthorityFn = () =>
+  (migrationCode.match(
+    /create or replace function public\.qf_cancel_stale_automation_job_v1[\s\S]*?\$\$;/) ?? [""])[0];
 
 const VENDOR = "0ffd1cf7-b6c1-4f0e-9d2a-5f3b7c9e1a2b";
 const S = VendorBusinessState;
@@ -301,7 +306,9 @@ record("I02 a conflicting worker / body / route on the same request id is REJECT
 record("I03 a replay of an EMPTY request answers empty again, not a fresh selection",
   /case when v_request\.job_id is null[\s\S]{0,120}then null::text/.test(migrationCode));
 record("J01 exactly one candidate per call, under skip-locked",
-  /for update skip locked\s*limit 1/.test(migrationCode) &&
+  // QF-MVP-50.7-C2: the candidate is now selected (not selected-and-updated), so
+  // the lock names the job alias explicitly and locks ONLY the job row.
+  /for update of j skip locked\s*\n\s*limit 1;/.test(migrationCode) &&
   /order by j\.created_at asc, j\.id asc/.test(migrationCode));
 record("J02 one terminalization per job is structural, and route-scoped so it cannot collide with 50.6",
   /create unique index if not exists uq_automation_transport_requests_cancel_stale_job[\s\S]{0,200}\(job_id\)[\s\S]{0,200}route_key = 'cancel_stale_v1'/
@@ -325,7 +332,7 @@ record("K02 the SQL writes exactly that shape",
   /last_safe_code = 'QF_AUTOMATION_BUSINESS_STATE_NO_LONGER_ELIGIBLE'/.test(migrationCode));
 record("K03 attempt_count and the attempt ledger cannot change",
   (() => {
-    const setClause = (migrationCode.match(/update public\.automation_jobs\s+set([\s\S]*?)where id = \(/) ?? [])[1];
+    const setClause = (migrationCode.match(/update public\.automation_jobs\s+set([\s\S]*?)where id = v_job_id/) ?? [])[1];
     if (!setClause) return false;
     const persistence = stripSql(read("supabase/migrations/20260801110000_qf_mvp_automation_action_persistence.sql"));
     return !/attempt_count|max_attempts|attempt_id/.test(setClause) &&
@@ -336,29 +343,46 @@ record("K03 attempt_count and the attempt ledger cannot change",
 record("K04 no definitive_failure classification is fabricated for a job that never ran",
   !/last_result_classification = 'definitive_failure'/.test(migrationCode) &&
   STALE_BUSINESS_CANCELLED_JOB_SHAPE.lastResultClassification === null);
-record("K05 TOCTOU: business truth AND entity state are re-proven AFTER the write, and disagreement rolls back",
+record("K05 TOCTOU: the stale proof happens BEFORE the write, under held locks, and disagreement rolls back",
   (() => {
-    const write = migrationCode.indexOf("set status = 'cancelled'");
-    const reproof = migrationCode.indexOf("v_state := public.qf_automation_vendor_business_state_v1");
-    const raise = migrationCode.indexOf("AUTOMATION_STALE_BUSINESS_STATE_CHANGED");
-    return write > 0 && reproof > write && raise > reproof &&
-      /v_entity is distinct from 'present' or v_state is distinct from 'stale'/.test(migrationCode) &&
+    // QF-MVP-50.7-C2 INVERTED THIS ASSERTION ON PURPOSE.
+    //
+    // The previous revision proved "re-proof AFTER the write", which is exactly
+    // the defect: a post-write SELECT holds no lock, so a concurrent writer could
+    // restore eligibility after it and before COMMIT. The order that is actually
+    // safe is lock -> prove -> write, and that is what is pinned now.
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const firstLock = fn.indexOf("for update");
+    const proof = fn.indexOf("v_state := public.qf_automation_vendor_business_state_v1");
+    const entityProof = fn.indexOf("v_entity := public.qf_automation_entity_state_v1");
+    const write = fn.indexOf("update public.automation_jobs");
+    return firstLock > 0 && entityProof > firstLock && proof > firstLock &&
+      write > proof && write > entityProof &&
+      /v_entity is distinct from 'present' or v_state is distinct from 'stale'/.test(fn) &&
       STALE_BUSINESS_STATE_CHANGED === "AUTOMATION_STALE_BUSINESS_STATE_CHANGED";
   })());
+
 record("K06 the state-race error is never caught or reinterpreted as a successful cancellation",
   (() => {
-    // The terminalization function must contain NO exception handler at all, so
-    // the raise propagates and the transaction rolls back. (The read-only
-    // authority's `when invalid_text_representation` handler is a different
-    // function and swallows nothing — it only classifies a non-uuid id.)
-    const fn = (migrationCode.match(
-      /create or replace function public\.qf_cancel_stale_automation_job_v1[\s\S]*?\$\$;/) ?? [""])[0];
-    return fn.length > 0 &&
-      !/\bexception\s+when\b/i.test(fn) &&
-      !/when others then/i.test(migrationCode) &&
-      // the wrapper does not swallow it either
-      !/\bexception\s+when\b/i.test(
-        (migrationCode.match(/create or replace function public\.qf_cancel_stale_automation_job_transport_v1[\s\S]*?\$\$;/) ?? [""])[0]);
+    // QF-MVP-50.7-C2 NARROWED THIS. The authority now contains exactly ONE
+    // exception handler — `when invalid_text_representation`, which converts a
+    // non-uuid entity id into the state-change refusal. That handler SWALLOWS
+    // NOTHING: its body raises. What must never exist is a `when others`, or any
+    // handler that catches AUTOMATION_STALE_BUSINESS_STATE_CHANGED and continues.
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const handlers = fn.match(/\bexception\s+when\s+([a-z_]+)/gi) ?? [];
+    const onlyUuidHandler =
+      handlers.length === 1 && /invalid_text_representation/i.test(handlers[0]);
+    const handlerRaises =
+      /when invalid_text_representation then\s*\n\s*raise exception 'AUTOMATION_STALE_BUSINESS_STATE_CHANGED'/.test(fn);
+    const noCatchAll = !/when others then/i.test(migrationCode);
+    // and the wrapper still swallows nothing at all
+    const wrapper = (migrationCode.match(
+      /create or replace function public\.qf_cancel_stale_automation_job_transport_v1[\s\S]*?\$\$;/) ?? [""])[0];
+    return onlyUuidHandler && handlerRaises && noCatchAll &&
+      !/\bexception\s+when\b/i.test(wrapper);
   })());
 
 // ---------------------------------------------------------------------------
@@ -445,9 +469,12 @@ record("M04b the SQL maintenance authority is MORE conservative: a query error a
   // The mutating function has no exception handler at all, so any SQL error
   // propagates and rolls the transaction back rather than being read as staleness.
   (() => {
-    const fn = (migrationCode.match(
-      /create or replace function public\.qf_cancel_stale_automation_job_v1[\s\S]*?\$\$;/) ?? [""])[0];
-    return fn.length > 0 && !/\bexception\s+when\b/i.test(fn) &&
+    const fn = staleAuthorityFn();
+    // A genuine query error has no handler to catch it — the sole handler is the
+    // non-uuid conversion, which itself raises — so it propagates and rolls back.
+    return !!fn && !/when others then/i.test(fn) &&
+      (fn.match(/\bexception\s+when\s+([a-z_]+)/gi) ?? []).length === 1 &&
+      /when invalid_text_representation/i.test(fn) &&
       /genuine SQL query error inside this authority ABORTS/i.test(migrationSource);
   })());
 record("M05 the executor collapses stale AND unmapped to one code; only the maintenance lane separates them",
@@ -605,11 +632,13 @@ record("Q04 every function fixes its search_path",
   (() => {
     const fns = (migrationCode.match(/create or replace function public\.qf_/g) ?? []).length;
     const paths = (migrationCode.match(/set search_path = pg_catalog, public, pg_temp/g) ?? []).length;
-    return fns === 5 && paths === 5 && fns === paths;
+    // QF-MVP-50.7-C2: six now — the low-credit threshold reader was extracted so
+    // SQL and TypeScript accept exactly the same JSON shapes.
+    return fns === 6 && paths === 6 && fns === paths;
   })());
 record("Q05 PUBLIC/anon/authenticated are revoked and only service_role may execute",
-  (migrationCode.match(/revoke all on function[\s\S]{0,200}from public, anon, authenticated, service_role;/g) ?? []).length === 3 &&
-  (migrationCode.match(/grant execute on function[\s\S]{0,200}to service_role;/g) ?? []).length === 3 &&
+  (migrationCode.match(/revoke all on function[\s\S]{0,200}from public, anon, authenticated, service_role;/g) ?? []).length === 4 &&
+  (migrationCode.match(/grant execute on function[\s\S]{0,200}to service_role;/g) ?? []).length === 4 &&
   !/grant\s+(insert|update|delete|truncate)/i.test(migrationCode));
 record("Q06 no table gains direct mutation and the SELECT-only posture is re-proved",
   !/grant .* on (table )?public\.automation_/i.test(migrationCode) &&
@@ -672,6 +701,172 @@ record("Q13 the design document records the decisions and the out-of-scope bound
   /NO STAGING MUTATION/.test(doc) && /NO PRODUCTION MUTATION/.test(doc) &&
   /NO META\/WHATSAPP SEND/.test(doc) &&
   /50\.8|destination normalization/i.test(doc));
+
+// ---------------------------------------------------------------------------
+// L2. BUSINESS-TRUTH LOCKING  (QF-MVP-50.7-C2)
+//
+// The C1 revision claimed NO TOCTOU on the strength of a post-write re-read. That
+// was not enough: the re-read held no lock, so a concurrent transaction could
+// restore business eligibility after it and before COMMIT, leaving a cancelled
+// job whose truth had recovered. These assertions pin the corrected order —
+// lock the business rows, prove under the locks, then write — and pin each
+// action's specific lock.
+// ---------------------------------------------------------------------------
+record("L2-01 the authority locks the queue candidate with skip-locked, oldest-first",
+  (() => {
+    const fn = staleAuthorityFn();
+    return !!fn && /for update of j skip locked\s*\n\s*limit 1;/.test(fn) &&
+      /order by j\.created_at asc, j\.id asc/.test(fn);
+  })());
+
+record("L2-02 response_reminder locks the EXACT lead_assignments row before proving",
+  (() => {
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const lock = fn.indexOf("from public.lead_assignments la");
+    const proof = fn.indexOf("v_state := public.qf_automation_vendor_business_state_v1");
+    return lock > 0 && proof > lock &&
+      /from public\.lead_assignments la\s*\n\s*where la\.id = v_entity_uuid\s*\n\s*for update;/.test(fn);
+  })());
+
+record("L2-03 the vendor-entity actions lock the EXACT vendors row before proving",
+  (() => {
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const lock = fn.indexOf("from public.vendors v");
+    const proof = fn.indexOf("v_state := public.qf_automation_vendor_business_state_v1");
+    return lock > 0 && proof > lock &&
+      /from public\.vendors v\s*\n\s*where v\.id = v_entity_uuid\s*\n\s*for update;/.test(fn);
+  })());
+
+record("L2-04 onboarding locks the CRM row when present, and the PARENT lock closes the missing-CRM phantom",
+  (() => {
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    // The CRM row is locked when it exists...
+    const crmLock =
+      /from public\.vendor_crm_profiles p\s*\n\s*where p\.vendor_id = v_entity_uuid\s*\n\s*for update;/.test(fn);
+    // ...and the parent lock must be FOR UPDATE specifically, because that is the
+    // only row-lock mode conflicting with the FOR KEY SHARE an FK insert takes.
+    const parentIsForUpdate = /from public\.vendors v\s*\n\s*where v\.id = v_entity_uuid\s*\n\s*for update;/.test(fn) &&
+      !/for no key update/i.test(fn);
+    // and the FK that makes that work must still exist upstream
+    const fkIntact =
+      /constraint vcp_vendor_fk foreign key \(vendor_id\)\s*\n\s*references public\.vendors \(id\)/
+        .test(read("supabase/migrations/20260723001100_qf_mvp_vendor_crm_foundation.sql")) &&
+      /constraint vcp_pkey primary key \(vendor_id\)/
+        .test(read("supabase/migrations/20260723001100_qf_mvp_vendor_crm_foundation.sql"));
+    // and the reasoning is recorded in source, not just here
+    const documented = /FOR KEY SHARE/.test(migrationSource) && /vcp_vendor_fk/.test(migrationSource);
+    return crmLock && parentIsForUpdate && fkIntact && documented;
+  })());
+
+record("L2-05 low_credit locks the active policy pointer AND excludes the absent-pointer phantom",
+  (() => {
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const pointerLock =
+      /from public\.automation_policy_active_configs a\s*\n\s*where a\.policy_key = 'vendor_low_credit_warning_threshold'\s*\n\s*for update;/.test(fn);
+    // An ABSENT pointer has no row to lock, so it is excluded from SELECTION.
+    const absentExcluded =
+      /r\.action_type <> 'vendor\.low_credit_warning'\s*\n\s*or public\.qf_automation_low_credit_threshold_v1\(\) is not null/.test(fn);
+    // and a pointer that disappears between selection and lock is a state change.
+    const recheck = /v_threshold := public\.qf_automation_low_credit_threshold_v1\(\);[\s\S]{0,200}AUTOMATION_STALE_BUSINESS_STATE_CHANGED/.test(fn);
+    return pointerLock && absentExcluded && recheck;
+  })());
+
+record("L2-06 the TypeScript maintenance guard carries the SAME absent-threshold exclusion",
+  // Executed on both sides of the boundary: stale for the executor, NOT
+  // terminalizable for the maintenance lane.
+  decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+    lowCreditThreshold: null, remainingCredits: 9 }) === S.STALE &&
+  isStaleBusinessTerminalizable({
+    facts: { actionType: "vendor.low_credit_warning", entityType: "vendor",
+      lowCreditThreshold: null, remainingCredits: 9 },
+    entityState: "present", jobStatus: "pending" }) === false &&
+  isStaleBusinessTerminalizable({
+    facts: { actionType: "vendor.low_credit_warning", entityType: "vendor",
+      lowCreditThreshold: undefined, remainingCredits: 9 },
+    entityState: "present", jobStatus: "pending" }) === false &&
+  // but a CONFIGURED threshold with a recovered balance is still terminalizable
+  isStaleBusinessTerminalizable({
+    facts: { actionType: "vendor.low_credit_warning", entityType: "vendor",
+      lowCreditThreshold: 3, remainingCredits: 9 },
+    entityState: "present", jobStatus: "pending" }) === true);
+
+record("L2-07 the job UPDATE happens ONLY after every lock and the final proof",
+  (() => {
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const write = fn.indexOf("update public.automation_jobs");
+    const proof = fn.indexOf("v_state := public.qf_automation_vendor_business_state_v1");
+    // every lock site must precede the write
+    const lockPositions = [...fn.matchAll(/for update/g)].map((m) => m.index);
+    return write > 0 && proof > 0 && proof < write &&
+      lockPositions.length >= 5 && lockPositions.every((i) => i < write);
+  })());
+
+record("L2-08 locks are transaction-scoped: nothing commits, releases or unlocks mid-function",
+  (() => {
+    const fn = staleAuthorityFn();
+    return !!fn &&
+      !/\bcommit\b|\brollback\b|\bsavepoint\b|pg_advisory_unlock|\bunlock\b/i.test(fn) &&
+      // no advisory locks at all: they would only work if every competing writer
+      // opted into the same protocol, and none does.
+      !/pg_advisory/i.test(migrationCode) &&
+      /transaction-scoped/i.test(migrationSource);
+  })());
+
+record("L2-09 the maintenance lane MUTATES no business row",
+  (() => {
+    const fn = staleAuthorityFn();
+    if (!fn) return false;
+    const writes = fn.match(/^\s*(update|insert into|delete from)\s+public\.\w+/gim) ?? [];
+    // the ONLY write in the whole authority is the automation_jobs row
+    return writes.length === 1 && /update\s+public\.automation_jobs/i.test(writes[0]) &&
+      !/update\s+public\.(vendors|lead_assignments|vendor_crm_profiles|automation_policy)/i.test(migrationCode);
+  })());
+
+record("L2-10 the documented lock order is stated and no advisory-lock shortcut is used",
+  /LOCK ORDER/i.test(migrationSource) &&
+  /automation_jobs -> primary business entity/i.test(migrationSource) &&
+  !/pg_advisory/i.test(migrationSource));
+
+// ---------------------------------------------------------------------------
+// L3. LOW-CREDIT SQL / TYPESCRIPT TYPE PARITY  (QF-MVP-50.7-C2)
+// ---------------------------------------------------------------------------
+record("L3-01 the SQL threshold reader requires an integer-valued JSON NUMBER, exactly as TypeScript does",
+  /jsonb_typeof\(c\.config_json -> 'thresholdCredits'\) = 'number'/.test(migrationCode) &&
+  /\(c\.config_json ->> 'thresholdCredits'\) ~ '\^-\?\[0-9\]\+\$'/.test(migrationCode) &&
+  // the unsafe bare cast is gone — it both disagreed with TypeScript on "3" and
+  // could RAISE on 3.5, aborting the transaction
+  !/select \(c\.config_json ->> 'thresholdCredits'\)::integer\s*\n\s*into v_threshold/.test(migrationCode));
+
+record("L3-02 TypeScript accepts exactly the same shapes — executed across the malformed matrix",
+  (() => {
+    const lc = (t) => decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+      lowCreditThreshold: t, remainingCredits: 9 });
+    return lc(3) === S.STALE &&            // numeric 3, credits above -> stale
+      lc("3") === S.STALE &&               // JSON string "3" -> unusable -> refusal
+      lc(null) === S.STALE &&              // null -> refusal
+      lc(undefined) === S.STALE &&         // missing -> refusal
+      lc(3.5) === S.STALE &&               // fractional -> refusal
+      lc(NaN) === S.STALE &&               // unusable -> refusal
+      // and with a usable threshold the eligible side still works
+      decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+        lowCreditThreshold: 3, remainingCredits: 3 }) === S.ELIGIBLE;
+  })());
+
+record("L3-03 a malformed threshold can never TERMINALIZE, on either side",
+  ["3", null, undefined, 3.5, NaN].every((t) => isStaleBusinessTerminalizable({
+    facts: { actionType: "vendor.low_credit_warning", entityType: "vendor",
+      lowCreditThreshold: t, remainingCredits: 9 },
+    entityState: "present", jobStatus: "pending" }) === false));
+
+record("L3-04 the executor's own helper is unchanged and still the single reader",
+  /if \(error \|\| !data\) return null;/.test(vendorExecutorCode) &&
+  /readLowCreditThreshold/.test(vendorExecutorCode) &&
+  /VENDOR_LOW_CREDIT_THRESHOLD_POLICY_KEY/.test(vendorExecutorCode));
 
 // ---------------------------------------------------------------------------
 // T. TRUTHFULNESS OF THE RATIONALE  (QF-MVP-50.7-C1)
@@ -767,10 +962,17 @@ const mutants = [
   ["terminalizing a processing job is impossible",
     () => !term({ jobStatus: "processing" }) &&
           !/'processing'/.test((migrationCode.match(/j\.status in \([^)]*\)/) ?? [""])[0])],
-  ["removing the post-write business re-proof is detectable",
-    () => /AUTOMATION_STALE_BUSINESS_STATE_CHANGED/.test(migrationCode) &&
-          migrationCode.indexOf("v_state := public.qf_automation_vendor_business_state_v1") >
-            migrationCode.indexOf("set status = 'cancelled'")],
+  ["removing the locked stale re-proof is detectable",
+    // QF-MVP-50.7-C2: the proof must come BEFORE the write, not after it.
+    () => {
+      const fn = staleAuthorityFn();
+      if (!fn) return false;
+      const proof = fn.indexOf("v_state := public.qf_automation_vendor_business_state_v1");
+      const write = fn.indexOf("update public.automation_jobs");
+      const lock = fn.indexOf("for update;");
+      return /AUTOMATION_STALE_BUSINESS_STATE_CHANGED/.test(fn) &&
+        proof > 0 && write > proof && lock > 0 && proof > lock;
+    }],
   ["turning a lookup failure into stale is impossible",
     () => /QF_EXEC_LEAD_LOOKUP_FAILED/.test(vendorExecutorCode) && !/lookupFailed/.test(predicateCode)],
   ["assuming a low-credit threshold of 3 is impossible",

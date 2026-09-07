@@ -259,6 +259,25 @@ export function isStaleBusinessTerminalizable(input: {
   // Entity MUST still exist — this is the hard boundary against the orphan lane.
   if (input.entityState !== "present") return false;
   if (input.jobStatus !== "pending" && input.jobStatus !== "retry_scheduled") return false;
+
+  // MAINTENANCE-ONLY EXTRA CONSERVATISM (QF-MVP-50.7-C2).
+  //
+  // An UNCONFIGURED low-credit threshold is a refusal for the EXECUTOR — that is
+  // owner-locked behaviour and `decideVendorBusinessState` still returns `stale`
+  // for it. But it must never be a TERMINALIZATION, for a concurrency reason:
+  // with no active policy pointer there is no row to lock, so a concurrent INSERT
+  // could configure the threshold and restore eligibility between the proof and
+  // the commit. Refusing here removes that phantom without taking a table lock.
+  //
+  // The SQL selector carries the identical exclusion, so the two agree.
+  if (
+    input.facts.actionType === "vendor.low_credit_warning" &&
+    !(typeof input.facts.lowCreditThreshold === "number" &&
+      Number.isInteger(input.facts.lowCreditThreshold))
+  ) {
+    return false;
+  }
+
   return decideVendorBusinessState(input.facts) === VendorBusinessState.STALE;
 }
 

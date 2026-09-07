@@ -115,10 +115,28 @@ Stated once in `lib/automation/vendorBusinessEligibility.ts`:
   migration used a bare `(config_json ->> 'thresholdCredits')::integer`, which was
   wrong in two directions: it would have read the JSON *string* `"3"` as `3`
   (TypeScript refuses it), and it would have **raised** on `3.5`, aborting the
-  transaction. `qf_automation_low_credit_threshold_v1()` now requires a JSON
-  **number** that is integer-valued, exactly as the TypeScript does, and can never
-  raise. The gate executes the whole matrix — `3`, `"3"`, `null`, missing, `3.5`,
-  `NaN` — on both sides.
+  transaction. A second revision then claimed "no cast can raise" — **also
+  false**: `{"thresholdCredits": 2147483648}` is a valid, integer-valued JSON
+  number that satisfied both guards and then made `::integer` raise *out of range
+  for type integer*. Nothing in the policy schema bounds that value to int4.
+
+  `qf_automation_low_credit_threshold_v1()` now uses a **nested** `CASE` — a flat
+  `AND` chain does not guarantee evaluation order, and a `::numeric` applied to a
+  JSON string would itself raise — checking in order: JSON `number` → cast to
+  arbitrary-precision `numeric` → integer-valued → **inside the int4 domain** →
+  only then `::integer`. **No JSON value can make it raise.**
+
+  **This is deliberately narrower than TypeScript at the int4 boundary.** An
+  integer-valued JSON number outside int4 is accepted by the executor and refused
+  here. The divergence is one-directional and safe: a null threshold makes the job
+  **non-terminalizable**, so the maintenance lane simply declines to act on a
+  threshold the database cannot represent, while the executor keeps its existing
+  behaviour. It can never cause an over-cancellation, and widening the persisted
+  policy domain is not this phase's business.
+
+  The gate executes the full matrix — `3`, `"3"`, `null`, missing, `3.5`, `NaN`,
+  `-3`, `2147483647`, `2147483648`, `-2147483648`, `-2147483649` and a 30-digit
+  integer — and the local harness runs the SQL side of it against a real Postgres.
 
 Verdicts are closed: `eligible | stale | unmapped`. `unmapped` is not a soft
 `stale`; the maintenance lane terminalizes only on a proven `stale`.

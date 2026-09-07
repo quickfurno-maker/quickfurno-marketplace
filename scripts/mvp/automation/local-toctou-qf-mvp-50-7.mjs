@@ -210,6 +210,43 @@ async function main() {
     check("the business row itself was NOT mutated by the lane",
       psql(`select vendor_status from public.lead_assignments where id='${assign}';`).stdout.includes("Contacted"));
 
+    console.log("\n=== SCENARIO 5 - the low-credit threshold reader is NON-THROWING across the int4 boundary ===");
+    // Every case is executed against the REAL helper on a REAL Postgres. The
+    // decisive one is 2147483648: a valid, integer-valued JSON number that an
+    // earlier revision let reach ::integer, which RAISES out of range.
+    const MATRIX = [
+      ["3", "3"], ['"3"', ""], ["null", ""], ["3.5", ""],
+      ["-3", "-3"], ["2147483647", "2147483647"], ["2147483648", ""],
+      ["-2147483648", "-2147483648"], ["-2147483649", ""],
+      ["999999999999999999999999999999", ""],
+    ];
+    const cfg = randomUUID();
+    psql(`insert into public.automation_policy_configs(id, policy_key, config_json)
+          values ('${cfg}','vendor_low_credit_warning_threshold','{}'::jsonb);
+          insert into public.automation_policy_active_configs(policy_key, config_id)
+          values ('vendor_low_credit_warning_threshold','${cfg}');`);
+    let matrixOk = true;
+    const detail = [];
+    for (const [json, expect] of MATRIX) {
+      psql(`update public.automation_policy_configs
+            set config_json = '{"thresholdCredits": ${json}}'::jsonb where id='${cfg}';`);
+      const r = psql("select coalesce(public.qf_automation_low_credit_threshold_v1()::text,'NULL') as t;");
+      const raised = r.status !== 0;
+      const val = raised ? "RAISED"
+        : ((r.stdout.split("\n")[2] || "").trim() || "NULL");
+      const want = expect === "" ? "NULL" : expect;
+      const ok = !raised && val === want;
+      if (!ok) matrixOk = false;
+      detail.push(`${json}=>${val}${ok ? "" : "(want " + want + ")"}`);
+    }
+    check("threshold matrix: every value returns a bound integer or NULL, and NOTHING raises",
+      matrixOk, detail.join(" "));
+    // and the missing-key case
+    psql(`update public.automation_policy_configs set config_json = '{}'::jsonb where id='${cfg}';`);
+    const missing = psql("select coalesce(public.qf_automation_low_credit_threshold_v1()::text,'NULL') as t;");
+    check("a missing thresholdCredits key returns NULL without raising",
+      missing.status === 0 && (missing.stdout.split("\n")[2] || "").trim() === "NULL");
+
     const passed = results.filter(Boolean).length;
     console.log(`\nQF-MVP-50.7 local TOCTOU: ${passed}/${results.length} PASS`);
     process.exitCode = passed === results.length ? 0 : 1;

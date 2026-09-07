@@ -109,6 +109,14 @@ export const RESPONSE_REMINDER_WINDOW_SUFFIXES = Object.freeze([":resp2h", ":res
 export const EXPIRY_STAMP_PATTERN = /^\d{14}$/;
 
 /**
+ * The PostgreSQL int4 domain. A configured low-credit threshold outside it cannot
+ * be represented by the SQL reader the maintenance lane uses, so the maintenance
+ * lane refuses to act on one. See `isStaleBusinessTerminalizable`.
+ */
+export const INT4_MIN = -2147483648;
+export const INT4_MAX = 2147483647;
+
+/**
  * The facts each decision rests on. Every field is nullable because the caller
  * may legitimately have found nothing — and "nothing" is a fact this module is
  * allowed to reason about. What it is NEVER handed is "the read failed": callers
@@ -270,10 +278,18 @@ export function isStaleBusinessTerminalizable(input: {
   // the commit. Refusing here removes that phantom without taking a table lock.
   //
   // The SQL selector carries the identical exclusion, so the two agree.
+  // The bound is INT4, not just "an integer", because the SQL reader this mirrors
+  // cannot represent anything wider: `qf_automation_low_credit_threshold_v1()`
+  // returns null outside the int4 domain rather than let `::integer` raise. The
+  // executor's own decision (`decideVendorBusinessState`) keeps plain JavaScript
+  // integer semantics and is unchanged; only this MAINTENANCE helper mirrors the
+  // database domain, so the two sides of the maintenance lane agree exactly.
   if (
     input.facts.actionType === "vendor.low_credit_warning" &&
     !(typeof input.facts.lowCreditThreshold === "number" &&
-      Number.isInteger(input.facts.lowCreditThreshold))
+      Number.isInteger(input.facts.lowCreditThreshold) &&
+      input.facts.lowCreditThreshold >= INT4_MIN &&
+      input.facts.lowCreditThreshold <= INT4_MAX)
   ) {
     return false;
   }

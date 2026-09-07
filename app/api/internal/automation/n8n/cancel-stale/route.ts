@@ -132,8 +132,9 @@ export async function POST(request: Request) {
     // exactly where it was — still queued, still stale, and still eligible for the
     // next sweep. Failing to terminalize is always safe; the dangerous direction is
     // terminalizing something that should still run, and that direction is guarded
-    // by the RPC's own post-write business re-proof (which raises
-    // AUTOMATION_STALE_BUSINESS_STATE_CHANGED and rolls back) rather than here.
+    // by the RPC itself: it re-proves entity presence and business staleness UNDER
+    // the action-specific row locks BEFORE it writes, and raises
+    // AUTOMATION_STALE_BUSINESS_STATE_CHANGED (rolling back) if either has moved.
     return rejected(
       "AUTOMATION_TRANSPORT_INTERNAL_FAILURE",
       500,

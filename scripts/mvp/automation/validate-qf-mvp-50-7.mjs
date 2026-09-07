@@ -39,6 +39,8 @@ import {
   VendorBusinessState,
   decideVendorBusinessState,
   isStaleBusinessAction,
+  INT4_MAX,
+  INT4_MIN,
   isStaleBusinessTerminalizable,
   resolveBoundExpiryStamp,
   resolveResponseReminderWindow,
@@ -63,7 +65,7 @@ const stripSql = (src) => src.replace(/^\s*--.*$/gm, "");
 
 const MIGRATION_PATH =
   "supabase/migrations/20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql";
-const MIGRATION_SHA = "975242918a5010a2376397173f1aecd171452daf4db26a4172de5d0c0d6ce6c5";
+const MIGRATION_SHA = "e71e8739a5d776c75edcb0ae10470d7d9589eb7949326411ea26540de1baa809";
 const ORPHAN_MIGRATION_PATH =
   "supabase/migrations/20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql";
 const ORPHAN_MIGRATION_SHA = "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63";
@@ -835,12 +837,16 @@ record("L2-10 the documented lock order is stated and no advisory-lock shortcut 
 // ---------------------------------------------------------------------------
 // L3. LOW-CREDIT SQL / TYPESCRIPT TYPE PARITY  (QF-MVP-50.7-C2)
 // ---------------------------------------------------------------------------
-record("L3-01 the SQL threshold reader requires an integer-valued JSON NUMBER, exactly as TypeScript does",
-  /jsonb_typeof\(c\.config_json -> 'thresholdCredits'\) = 'number'/.test(migrationCode) &&
-  /\(c\.config_json ->> 'thresholdCredits'\) ~ '\^-\?\[0-9\]\+\$'/.test(migrationCode) &&
-  // the unsafe bare cast is gone — it both disagreed with TypeScript on "3" and
-  // could RAISE on 3.5, aborting the transaction
-  !/select \(c\.config_json ->> 'thresholdCredits'\)::integer\s*\n\s*into v_threshold/.test(migrationCode));
+record("L3-01 the SQL threshold reader requires an integer-valued JSON NUMBER inside int4",
+  // QF-MVP-50.7-C3 NARROWED THIS TITLE. The reader is deliberately NOT exact
+  // TypeScript parity any more: it is bounded to int4, because ::integer raises
+  // outside that domain. L4-06 pins the guard order, L4-10 pins the disclosure.
+  /jsonb_typeof\(c\.config_json -> 'thresholdCredits'\) <> 'number' then null/.test(migrationCode) &&
+  /not between -2147483648 and 2147483647/.test(migrationCode) &&
+  // BOTH unsafe earlier forms are gone: the bare cast, and the unbounded
+  // regex-guarded cast that still raised on 2147483648.
+  !/select \(c\.config_json ->> 'thresholdCredits'\)::integer\s*\n\s*into v_threshold/.test(migrationCode) &&
+  !/~ '\^-\?\[0-9\]\+\$'\s*\n\s*then \(c\.config_json ->> 'thresholdCredits'\)::integer/.test(migrationCode));
 
 record("L3-02 TypeScript accepts exactly the same shapes — executed across the malformed matrix",
   (() => {
@@ -951,6 +957,134 @@ record("T08 the parity claim is narrowed: one rule DEFINITION plus a transaction
   /second implementation/i.test(migrationSource + read(PREDICATE_PATH)));
 
 // ---------------------------------------------------------------------------
+// L4. SOURCE TRUTH AFTER C2, AND THE BOUNDED THRESHOLD CAST  (QF-MVP-50.7-C3)
+//
+// C2 changed the implementation to lock -> prove -> write but left several
+// canonical comments describing the OLD write-then-reprove design, and claimed the
+// threshold reader could never raise. Both are pinned here: current-tense claims
+// must match the current code, and the reader must be provably non-throwing.
+// ---------------------------------------------------------------------------
+record("L4-01 NO current-tense source claims proof-after-write",
+  (() => {
+    // The phrases may appear ONLY inside an explicitly historical passage. The
+    // migration header keeps one, clearly labelled; nothing else may.
+    const FALSE_NOW = /re-?proves? business truth after the write|post-write (business )?re-?proof|after the write the business state is re-derived/i;
+    const surfaces = [read(SERVICE_PATH), read(PREDICATE_PATH), read(CONTRACT_PATH), read(ROUTE_PATH)];
+    if (surfaces.some((x) => FALSE_NOW.test(x))) return false;
+    // the migration may only contain such wording under a HISTORICAL NOTE
+    const mig = migrationSource;
+    if (FALSE_NOW.test(mig)) return false;
+    return true;
+  })());
+
+record("L4-02 the migration header states the CURRENT lock -> prove -> write order",
+  /LOCK, THEN PROVE, THEN WRITE/i.test(migrationSource) &&
+  /acquire the ACTION-SPECIFIC business-row locks/i.test(migrationSource) &&
+  /re-prove entity-present AND business-stale WHILE those locks are held/i.test(migrationSource) &&
+  /only then UPDATE the job to cancelled/i.test(migrationSource) &&
+  /retained until COMMIT/i.test(migrationSource));
+
+record("L4-03 the C2 history is kept but marked explicitly historical, not current",
+  /HISTORICAL NOTE/i.test(migrationSource) &&
+  /EARLIER, DEFECTIVE revision/i.test(migrationSource) &&
+  /it is not what the function below does/i.test(migrationSource));
+
+record("L4-04 COMMENT ON FUNCTION describes the locked pre-write proof",
+  (() => {
+    const c = (migrationSource.match(
+      /comment on function public\.qf_cancel_stale_automation_job_v1\(text\) is[\s\S]*?;/) ?? [""])[0];
+    return /UNDER THE ACTION-SPECIFIC ROW LOCKS BEFORE writing/i.test(c) &&
+      /holding those locks until commit/i.test(c) &&
+      !/after the write/i.test(c);
+  })());
+
+record("L4-05 the service comment describes the locked pre-write proof",
+  (() => {
+    const svc = read(SERVICE_PATH);
+    return /the stale\s*\n \* re-proof taken UNDER those locks/i.test(svc) &&
+      /every lock is held until commit/i.test(svc) &&
+      !/post-write/i.test(svc);
+  })());
+
+record("L4-06 the threshold reader can NEVER reach ::integer with an out-of-range value",
+  (() => {
+    const fn = (migrationCode.match(
+      /create or replace function public\.qf_automation_low_credit_threshold_v1\(\)[\s\S]*?\$\$;/) ?? [""])[0];
+    if (!fn) return false;
+    return (
+      // nested CASE, so guard order is guaranteed (a flat AND chain is not)
+      /when jsonb_typeof\(c\.config_json -> 'thresholdCredits'\) <> 'number' then null/.test(fn) &&
+      /else case/.test(fn) &&
+      // integer-valued check, on arbitrary-precision numeric
+      /<> trunc\(\(c\.config_json -> 'thresholdCredits'\)::text::numeric\)/.test(fn) &&
+      // explicit int4 bound BEFORE the integer cast
+      /not between -2147483648 and 2147483647/.test(fn) &&
+      fn.indexOf("not between -2147483648 and 2147483647") <
+        fn.lastIndexOf("::text::numeric::integer") &&
+      // and the old unbounded forms are gone
+      !/~ '\^-\?\[0-9\]\+\$'\s*\n\s*then \(c\.config_json ->> 'thresholdCredits'\)::integer/.test(fn)
+    );
+  })());
+
+record("L4-07 the int4 bounds are stated once and shared with the TypeScript maintenance guard",
+  INT4_MIN === -2147483648 && INT4_MAX === 2147483647 &&
+  /INT4_MIN/.test(predicateCode) && /INT4_MAX/.test(predicateCode) &&
+  new RegExp(String(INT4_MAX)).test(migrationCode) &&
+  new RegExp(String(INT4_MIN)).test(migrationCode));
+
+record("L4-08 the TypeScript maintenance guard refuses a threshold outside int4, matching the SQL reader",
+  (() => {
+    // remainingCredits must EXCEED every threshold under test, otherwise the job
+    // is business-ELIGIBLE and the int4 guard is never reached at all.
+    const term = (t) => isStaleBusinessTerminalizable({
+      facts: { actionType: "vendor.low_credit_warning", entityType: "vendor",
+        lowCreditThreshold: t, remainingCredits: Number.MAX_SAFE_INTEGER },
+      entityState: "present", jobStatus: "pending" });
+    return term(3) === true && term(INT4_MAX) === true && term(INT4_MIN) === true &&
+      term(INT4_MAX + 1) === false && term(INT4_MIN - 1) === false &&
+      term(1e30) === false && term(null) === false && term("3") === false &&
+      term(3.5) === false && term(NaN) === false;
+  })());
+
+record("L4-09 the executor's own decision keeps plain JS integer semantics — unchanged by C3",
+  // decideVendorBusinessState must NOT have gained the int4 narrowing: that would
+  // be a behaviour change to the executor smuggled into a maintenance fix.
+  decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+    lowCreditThreshold: INT4_MAX + 1, remainingCredits: 5 }) === S.ELIGIBLE &&
+  decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+    lowCreditThreshold: INT4_MAX + 1, remainingCredits: 1e12 }) === S.STALE &&
+  !/INT4_M(IN|AX)/.test(
+    (predicateCode.match(/export function decideVendorBusinessState[\s\S]*?\n\}/) ?? [""])[0]));
+
+record("L4-10 the divergence at the int4 boundary is DOCUMENTED, not claimed as exact parity",
+  /deliberately narrower than TypeScript at the int4 boundary/i.test(doc) &&
+  /one-directional/i.test(doc) &&
+  /never cause an over-cancellation/i.test(doc) &&
+  /DELIBERATE, DOCUMENTED DIVERGENCE/i.test(migrationSource) &&
+  // the over-strong claims are gone from canonical source
+  !/matching readLowCreditThreshold in the TypeScript executor exactly/i.test(migrationSource) &&
+  !/No cast can raise\./.test(migrationSource) &&
+  !/exactly as the TypeScript does, and can never\s*\n\s*raise/i.test(doc));
+
+record("L4-11 the local concurrency harness covers the int4 boundary matrix against a real Postgres",
+  (() => {
+    const h = read("scripts/mvp/automation/local-toctou-qf-mvp-50-7.mjs");
+    // Pinned as EXACT matrix entries, not bare numbers: `2147483648` also occurs
+    // as a substring of `-2147483648`, so a loose test let the decisive
+    // out-of-range case be deleted while still appearing to pass.
+    const ENTRIES = [
+      '["3", "3"]', '[\'"3"\', ""]', '["null", ""]', '["3.5", ""]', '["-3", "-3"]',
+      '["2147483647", "2147483647"]', '["2147483648", ""]',
+      '["-2147483648", "-2147483648"]', '["-2147483649", ""]',
+      '["999999999999999999999999999999", ""]',
+    ];
+    return ENTRIES.every((e) => h.includes(e)) &&
+      /NOTHING raises/i.test(h) &&
+      /missing thresholdCredits key returns NULL without raising/i.test(h) &&
+      typeof pkg.scripts["test:mvp:50-7-toctou"] === "string";
+  })());
+
+// ---------------------------------------------------------------------------
 // R. MUTANTS — each names a real defect this phase must not be able to ship
 // ---------------------------------------------------------------------------
 const mutants = [
@@ -1011,6 +1145,15 @@ const mutants = [
   ["breaking the 50.6 orphan route is detectable",
     () => canonicalSha256(readFileSync(path.join(ROOT, ORPHAN_MIGRATION_PATH))) === ORPHAN_MIGRATION_SHA &&
           AUTOMATION_TRANSPORT_ROUTE_KEYS.includes("cancel_orphan_v1")],
+  ["reintroducing an unbounded ::integer cast is detectable",
+    () => {
+      const fn = (migrationCode.match(
+        /create or replace function public\.qf_automation_low_credit_threshold_v1\(\)[\s\S]*?\$\$;/) ?? [""])[0];
+      return /not between -2147483648 and 2147483647/.test(fn);
+    }],
+  ["a current-tense proof-after-write claim reappearing is detectable",
+    () => !/re-?proves? business truth after the write|post-write (business )?re-?proof/i
+      .test(read(SERVICE_PATH) + read(PREDICATE_PATH) + migrationSource)],
   ["altering vendor executor semantics during the refactor is detectable",
     () => /QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(vendorExecutorCode) &&
           (vendorExecutorCode.match(/QF_EXEC_LEAD_LOOKUP_FAILED/g) ?? []).length >= 4 &&

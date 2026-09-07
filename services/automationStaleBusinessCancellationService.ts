@@ -76,8 +76,9 @@ function assertTransportIdentity(input: AutomationCancelStaleTransportInput): vo
  * Terminalize AT MOST ONE stale-business job.
  *
  * The entire operation — durable transport identity, candidate selection under
- * `for update skip locked`, the post-write business re-proof and the single job
- * UPDATE — is one SQL transaction. So there is no window in which a job is half
+ * `for update skip locked`, the action-specific business-row locks, the stale
+ * re-proof taken UNDER those locks, and the single job UPDATE that follows it —
+ * is one SQL transaction, and every lock is held until commit. So there is no window in which a job is half
  * terminalized, and none in which two workers terminalize the same job.
  *
  * A REPLAY RE-EXECUTES NOTHING. A duplicate request UUID finds its own durable

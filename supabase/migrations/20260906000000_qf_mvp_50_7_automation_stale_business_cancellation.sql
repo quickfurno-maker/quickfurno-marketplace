@@ -46,12 +46,22 @@
 --   A genuine SQL query error inside this authority ABORTS the cancellation
 --   transaction. It is never interpreted as staleness.
 --
--- AND NO TOCTOU
---   Selection and mutation happen in ONE statement under `for update skip
---   locked`, and after the write the business state is re-derived a second time
---   inside the same transaction. If it is not still `stale`, the whole statement
---   raises AUTOMATION_STALE_BUSINESS_STATE_CHANGED and rolls back. A job whose
---   truth recovered between select and write is never left cancelled.
+-- AND NO TOCTOU — LOCK, THEN PROVE, THEN WRITE
+--   CURRENT IMPLEMENTATION, in this exact order:
+--     1. lock ONE queue candidate (`for update of j skip locked`, oldest first)
+--     2. acquire the ACTION-SPECIFIC business-row locks
+--     3. re-prove entity-present AND business-stale WHILE those locks are held
+--     4. only then UPDATE the job to cancelled
+--     5. every lock is transaction-scoped and is retained until COMMIT
+--   If step 3 disagrees, AUTOMATION_STALE_BUSINESS_STATE_CHANGED is raised and
+--   the whole statement rolls back.
+--
+--   HISTORICAL NOTE — what an EARLIER, DEFECTIVE revision did (QF-MVP-50.7-C1):
+--   it selected, WROTE the job, and only then re-read the business rows. That
+--   re-read held no lock, so a concurrent transaction could restore eligibility
+--   after it and before COMMIT, leaving a cancelled job whose truth had
+--   recovered. QF-MVP-50.7-C2 replaced it with the order above. This paragraph
+--   describes the OLD revision only; it is not what the function below does.
 --
 -- THE HARD BOUNDARY AGAINST 50.6
 --   This lane requires the mapped entity to be PRESENT, using the SAME
@@ -359,22 +369,43 @@ $$;
 --    STABLE and read-only. It reads four tables and writes nothing.
 -- ---------------------------------------------------------------------------
 -- ---------------------------------------------------------------------------
--- 5a. The low-credit threshold reader — TYPE PARITY WITH TYPESCRIPT.
+-- 5a. The low-credit threshold reader — BOUNDED, NON-THROWING, DELIBERATELY
+--     NARROWER THAN TYPESCRIPT AT THE INT4 BOUNDARY.
 --
---     readLowCreditThreshold() in the executor accepts a value only when
---     `typeof raw === "number" && Number.isInteger(raw)`. An earlier draft of this
---     migration used a bare `(config_json ->> 'thresholdCredits')::integer`, which
---     is NOT the same predicate and was wrong in two directions:
+--     readLowCreditThreshold() in the executor accepts a value when
+--     `typeof raw === "number" && Number.isInteger(raw)`. Two earlier drafts of
+--     this reader were wrong:
 --
---       {"thresholdCredits": "3"}   TypeScript -> null (refusal)
---                                   bare cast  -> 3      (disagreement)
---       {"thresholdCredits": 3.5}   TypeScript -> null (refusal)
---                                   bare cast  -> raises invalid_text_representation,
---                                                 aborting the whole transaction
+--       DRAFT 1 — a bare `(config_json ->> 'thresholdCredits')::integer`:
+--         {"thresholdCredits": "3"}  TypeScript -> null;  bare cast -> 3 (disagreed)
+--         {"thresholdCredits": 3.5}  TypeScript -> null;  bare cast -> RAISED
 --
---     So this reader requires the JSON value to be a NUMBER and to be
---     integer-valued, exactly as the TypeScript does, and returns null otherwise.
---     No cast can raise.
+--       DRAFT 2 — jsonb_typeof = 'number' plus an integer-text regex, which
+--         claimed "no cast can raise". THAT CLAIM WAS FALSE:
+--         {"thresholdCredits": 2147483648}
+--           is a valid JSON number, is integer-valued, satisfies both guards —
+--           and `::integer` then RAISES `out of range for type integer`, aborting
+--           the transaction. Nothing in the policy schema bounds this value to
+--           int4; the table only guarantees config_json is an object.
+--
+--     CURRENT DESIGN. Nested CASE, so each guard is evaluated only after the
+--     previous one passed (a flat `AND` chain does not guarantee evaluation
+--     order, and a `::numeric` applied to a JSON string would itself raise):
+--       1. the value must be a JSON `number`;
+--       2. cast to `numeric` — always safe once (1) holds, and arbitrary
+--          precision, so a 30-digit integer cannot overflow it;
+--       3. it must be integer-valued (`= trunc(...)`);
+--       4. it must lie inside the int4 domain;
+--       only then is `::integer` evaluated. NO INPUT CAN MAKE THIS RAISE.
+--
+--     DELIBERATE, DOCUMENTED DIVERGENCE. An integer-valued JSON number OUTSIDE
+--     int4 — 2147483648, say — is accepted by the TypeScript executor and
+--     REFUSED here (null). That is not exact parity, and this comment no longer
+--     claims it is. The divergence is one-directional and safe: a null threshold
+--     makes the job non-terminalizable, so the maintenance lane simply declines
+--     to act on a threshold the database cannot represent, while the executor
+--     keeps its existing behaviour. It can never cause an over-cancellation.
+--     Widening the persisted policy domain is not this phase's business.
 --
 --     `automation_policy_configs` rows are immutable by design; only the ACTIVE
 --     POINTER moves, which is why the maintenance lane locks the pointer row.
@@ -387,10 +418,18 @@ security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
   select case
-           when jsonb_typeof(c.config_json -> 'thresholdCredits') = 'number'
-            and (c.config_json ->> 'thresholdCredits') ~ '^-?[0-9]+$'
-           then (c.config_json ->> 'thresholdCredits')::integer
-           else null
+           when jsonb_typeof(c.config_json -> 'thresholdCredits') <> 'number' then null
+           else case
+                  -- Safe: (1) proved it is a JSON number, so ::numeric cannot raise,
+                  -- and numeric is arbitrary precision so nothing overflows here.
+                  when (c.config_json -> 'thresholdCredits')::text::numeric
+                         <> trunc((c.config_json -> 'thresholdCredits')::text::numeric)
+                    then null
+                  when (c.config_json -> 'thresholdCredits')::text::numeric
+                         not between -2147483648 and 2147483647
+                    then null
+                  else (c.config_json -> 'thresholdCredits')::text::numeric::integer
+                end
          end
     from public.automation_policy_active_configs a
     join public.automation_policy_configs c
@@ -400,7 +439,7 @@ as $$
 $$;
 
 comment on function public.qf_automation_low_credit_threshold_v1() is
-  'QF-MVP-50.7 low-credit threshold reader. Accepts ONLY an integer-valued JSON number, matching readLowCreditThreshold in the TypeScript executor exactly; anything else is null. Never raises on a malformed config value.';
+  'QF-MVP-50.7 low-credit threshold reader. Accepts ONLY an integer-valued JSON number that also fits the int4 domain; anything else, including an integer beyond int4 that the TypeScript executor would accept, returns null. Provably non-throwing for every JSON value. The int4 narrowing is deliberate and one-directional: a null threshold makes the job non-terminalizable, so it can never over-cancel.';
 
 revoke all on function public.qf_automation_low_credit_threshold_v1()
   from public, anon, authenticated, service_role;
@@ -757,7 +796,7 @@ end;
 $$;
 
 comment on function public.qf_cancel_stale_automation_job_v1(text) is
-  'QF-MVP-50.7 stale-business terminalization. Selects ONE pending/retry_scheduled job whose entity is still PRESENT but whose current business truth is provably stale under the shared predicate, and moves it to the existing terminal cancelled state. Opens no execution attempt, never touches attempt_count, never selects processing or terminal jobs, and re-proves business truth after the write.';
+  'QF-MVP-50.7 stale-business terminalization. Selects ONE pending/retry_scheduled job whose entity is still PRESENT but whose current business truth is provably stale under the shared predicate, and moves it to the existing terminal cancelled state. Opens no execution attempt, never touches attempt_count, never selects processing or terminal jobs, and re-proves entity presence and business staleness UNDER THE ACTION-SPECIFIC ROW LOCKS BEFORE writing, holding those locks until commit.';
 
 revoke all on function public.qf_cancel_stale_automation_job_v1(text)
   from public, anon, authenticated, service_role;

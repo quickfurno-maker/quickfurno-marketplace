@@ -8,20 +8,35 @@
 //   A job whose business ENTITY is healthy but whose business TRUTH has moved
 //   on: the vendor's onboarding progressed past `new`, the assignment was
 //   already responded to, the package was cancelled, the credit balance
-//   recovered. The executor correctly refuses every one of these — and the retry
-//   policy immediately requeues them. This lane gives them an exit.
+//   recovered.
+//
+//   BE PRECISE ABOUT WHY THIS IS WORTH DOING. Such a job is never rescheduled.
+//   If it is claimed and reaches the executor, the pre-communication refusal
+//   QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE is ruled `definitive_failure`, and
+//   qf_complete_automation_attempt_v1 turns that into job status `failed` with no
+//   next_retry_at. Normal execution already terminalizes it safely and sends
+//   nothing.
+//
+//   The value of this lane is that it removes provably stale work WITHOUT
+//   opening an execution attempt, without consuming a claim slot, and without
+//   recording an attempt outcome for a send that was never going to happen. It is
+//   governed pre-execution queue hygiene. It is NOT a fix for a scheduling loop:
+//   no such loop exists, and claiming one would misdescribe the runtime.
 //
 // NOT THE ORPHAN LANE
 //   QF-MVP-50.6 requires the entity to be GONE. This requires it to still be
 //   PRESENT, proven through the SAME entity authority. A job is a candidate for
 //   exactly one of the two lanes, never both.
 //
-// ONE PREDICATE, TWO CONSUMERS
+// ONE RULE DEFINITION, PLUS A TRANSACTION-BOUND MIRROR
 //   The rules are not restated here. `lib/automation/vendorBusinessEligibility`
-//   holds them, the vendor executor consumes them, and the SQL authority
-//   re-proves the same predicates transactionally at the mutation boundary. This
-//   service supplies the signed transport identity and then checks that what
-//   came back is internally consistent.
+//   defines them and the vendor executor consumes them directly. The SQL
+//   authority is a MIRROR of the four maintenance predicates — a second
+//   implementation by necessity, because the re-proof must happen inside the
+//   mutating transaction where TypeScript cannot reach. The 50.7 gate pins each
+//   rule on both sides so they cannot drift silently. This service supplies the
+//   signed transport identity and then checks that what came back is internally
+//   consistent.
 //
 // NOTHING IS EVER SENT. No message, no attempt, no execute envelope.
 // ============================================================================

@@ -14,8 +14,16 @@
 //
 //   If those two grew separate copies of the rules, a job could be "stale enough
 //   to cancel" while the executor still considered it sendable, or worse the
-//   reverse. So the rules live HERE, once, as pure total functions over facts the
-//   caller has already read, and both sides consume them.
+//   reverse. So the executor's rules live HERE, once, as pure total functions
+//   over facts the caller has already read.
+//
+//   BE HONEST ABOUT THE SHAPE OF THIS. The maintenance lane cannot literally call
+//   this module: its re-proof must happen INSIDE the mutating SQL transaction,
+//   where TypeScript cannot reach. So the migration carries a SQL MIRROR of the
+//   four maintenance predicates. This is therefore ONE rule DEFINITION plus a
+//   transaction-bound mirror — not one executable predicate in both places. The
+//   50.7 gate pins each mirrored rule on both sides, so the two cannot drift
+//   silently, but the mirror is a second implementation and should be read as one.
 //
 // WHAT THIS MODULE DELIBERATELY DOES NOT DO
 //   It performs NO database access. Reading the facts stays with each caller —

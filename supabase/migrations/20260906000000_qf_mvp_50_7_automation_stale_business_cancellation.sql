@@ -6,22 +6,45 @@
 --   outlive its business TRUTH while the entity is perfectly healthy: the vendor
 --   still exists and their onboarding simply moved past `new`; the assignment
 --   still exists and the vendor already responded; the package was cancelled;
---   the credit balance recovered. The executor correctly refuses all of these
---   with QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE — and then the retry policy puts
---   them straight back on the queue, forever.
+--   the credit balance recovered.
 --
---   Staging currently holds 11 such rows. They are not orphans. Cancelling them
---   through the orphan authority would be a lie about why they are terminal.
+--   WHAT ACTUALLY HAPPENS TO SUCH A JOB TODAY — stated precisely, because an
+--   earlier draft of this comment got it wrong. These rows sit in the queue
+--   simply because nothing has executed them yet. If one IS claimed and reaches
+--   the executor, the executor refuses it pre-communication with
+--   QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE, which
+--   lib/automation/clientExecutionContract.ts rules as `definitive_failure`, and
+--   qf_complete_automation_attempt_v1 maps that to job status `failed` with NO
+--   next_retry_at (a terminal classification carrying one is rejected outright
+--   with AUTOMATION_TERMINAL_RESULT_NEXT_RETRY_FORBIDDEN). So a stale job is
+--   never rescheduled: one execution terminalizes it permanently. Normal
+--   execution already disposes of it safely, without sending anything.
+--
+--   THIS LANE IS THEREFORE PRE-EXECUTION QUEUE HYGIENE, NOT AN INFINITE-RETRY
+--   FIX. Its value is that it removes provably stale work WITHOUT opening an
+--   execution attempt, without consuming a claim slot, and without recording an
+--   attempt outcome for a send that was never going to happen — a state Core can
+--   already prove before execution. It is the difference between "the queue
+--   learns this by running it" and "Core knew, so it never ran".
+--
+--   These rows are not orphans. Cancelling them through the orphan authority
+--   would be a lie about why they are terminal.
 --
 -- THE ONE THING THAT MATTERS MOST HERE: NO PREDICATE DRIFT
 --   If this migration restated the eligibility rules in SQL and the TypeScript
 --   executor kept its own copy, the two would drift and a job could become
 --   "stale enough to cancel" while the executor still considered it sendable.
---   So the rules are stated ONCE in lib/automation/vendorBusinessEligibility.ts,
---   the executor now delegates to that module, and the function below is the
---   TRANSACTIONAL RE-PROOF of the same predicates against the same columns. The
---   50.7 gate executes the TypeScript authority over a case matrix and pins each
---   predicate encoded here, so changing one side alone fails the build.
+--   So the executor's rules are stated ONCE, in
+--   lib/automation/vendorBusinessEligibility.ts, and the executor delegates to
+--   that module. The function below is a SQL MIRROR of the four maintenance
+--   predicates — a second implementation by necessity, because the re-proof has
+--   to happen inside the mutating transaction where TypeScript cannot reach.
+--   The two are not one executable predicate; they are one rule DEFINITION plus
+--   a transaction-bound mirror, and the 50.7 gate pins each mirrored rule on both
+--   sides so changing one alone fails the build.
+--
+--   A genuine SQL query error inside this authority ABORTS the cancellation
+--   transaction. It is never interpreted as staleness.
 --
 -- AND NO TOCTOU
 --   Selection and mutation happen in ONE statement under `for update skip

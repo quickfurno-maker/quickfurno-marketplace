@@ -7,11 +7,16 @@
 // applying the migration and certifying it against the real staging rows are
 // separate, later gates.
 //
-// THE CENTRAL THING THIS GATE PROVES is that there is exactly ONE statement of
-// "is this vendor action still business-eligible?" and that both consumers use
-// it. Sections A-E EXECUTE the shared predicate over a case matrix rather than
-// grepping for it, so a behaviour change fails here even if every word of the
-// source stays the same.
+// THE CENTRAL THING THIS GATE PROVES is that there is exactly ONE DEFINITION of
+// "is this vendor action still business-eligible?" — the pure module the executor
+// consumes directly — plus a transaction-bound SQL MIRROR of the four maintenance
+// predicates, with each rule pinned on both sides so they cannot drift silently.
+// It does NOT claim a single executable predicate in both places; the mirror is a
+// second implementation by necessity (the re-proof must run inside the mutating
+// transaction). Sections A-E EXECUTE the pure module over a case matrix rather
+// than grepping it, so a behaviour change fails here even if the wording is
+// identical. Section T pins the RATIONALE itself, after an earlier draft of this
+// phase justified it with a retry loop that does not exist.
 // ============================================================================
 
 import { createHash } from "node:crypto";
@@ -58,7 +63,7 @@ const stripSql = (src) => src.replace(/^\s*--.*$/gm, "");
 
 const MIGRATION_PATH =
   "supabase/migrations/20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql";
-const MIGRATION_SHA = "c5513f9fffeb57b879abc31aaf7db405447cbf1f4e74516af8763b793c61ec71";
+const MIGRATION_SHA = "ace82115973f56cf0e9e0c309f680a41a263d56d1b23005531a095bcc8218b98";
 const ORPHAN_MIGRATION_PATH =
   "supabase/migrations/20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql";
 const ORPHAN_MIGRATION_SHA = "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63";
@@ -392,12 +397,17 @@ record("M02 the vendor executor DELEGATES to the shared authority",
 record("M03 the executor still returns its EXACT pre-existing refusal code",
   EXECUTOR_BUSINESS_REFUSAL_CODE === "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" &&
   /return \{ ok: false, code: EXECUTOR_BUSINESS_REFUSAL_CODE \}/.test(vendorExecutorCode));
-record("M04 a failed lookup is STILL infrastructure, never a business fact",
+record("M04 every DIRECT BUSINESS-ROW PostgREST error in gatherVendorBusinessFacts returns QF_EXEC_LEAD_LOOKUP_FAILED",
   (() => {
-    // Scoped to the fact-gathering function, and proven EXHAUSTIVELY: every single
-    // `if (error)` branch in it must return the infrastructure code. A count-based
-    // threshold was not enough — with several occurrences in the file, converting
-    // ONE branch into a fabricated "not found" fact would have slipped through.
+    // Scoped and EXHAUSTIVE: every `if (error)` branch in the fact gatherer must
+    // return the infrastructure code. A count threshold was not enough — with
+    // several occurrences in the file, converting ONE branch into a fabricated
+    // "not found" fact slipped through until this was tightened.
+    //
+    // NOTE THE DELIBERATE NARROWING OF THE CLAIM. This says "direct business-row
+    // error", not "every failed read anywhere". The policy-config read inside
+    // readLowCreditThreshold is a separate, PRE-EXISTING behaviour pinned by
+    // M04a below, and this phase does not change it.
     const gather = (vendorExecutorCode.match(
       /async function gatherVendorBusinessFacts\([\s\S]*?\n\}/) ?? [""])[0];
     if (!gather) return false;
@@ -409,6 +419,36 @@ record("M04 a failed lookup is STILL infrastructure, never a business fact",
       !/if \(error\) return \{ ok: true/.test(gather) &&
       // and the pure decider is never handed an error state at all
       !/lookupFailed|queryError|errorState/.test(predicateCode);
+  })());
+
+record("M04a the PRE-EXISTING low-credit policy-read behaviour is preserved byte-for-byte, not changed by this phase",
+  (() => {
+    // readLowCreditThreshold has ALWAYS collapsed a policy-config read error to
+    // null, and the predicate has ALWAYS treated a null threshold as a refusal.
+    // That is baseline behaviour: changing it here would be a behaviour change
+    // smuggled into a refactor, so the gate pins it as-is.
+    const helper = (vendorExecutorCode.match(
+      /async function readLowCreditThreshold\([\s\S]*?\n\}/) ?? [""])[0];
+    if (!helper) return false;
+    return /if \(error \|\| !data\) return null;/.test(helper) &&
+      // no numeric fallback anywhere on either side
+      !/thresholdCredits\s*(\?\?|\|\|)\s*\d/.test(vendorExecutorCode) &&
+      !/lowCreditThreshold\s*(\?\?|\|\|)\s*\d/.test(predicateCode) &&
+      // and a null threshold is a refusal in the pure predicate — executed
+      decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+        lowCreditThreshold: null, remainingCredits: 1 }) === S.STALE &&
+      decide({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+        lowCreditThreshold: undefined, remainingCredits: 1 }) === S.STALE;
+  })());
+
+record("M04b the SQL maintenance authority is MORE conservative: a query error aborts, never terminalizes",
+  // The mutating function has no exception handler at all, so any SQL error
+  // propagates and rolls the transaction back rather than being read as staleness.
+  (() => {
+    const fn = (migrationCode.match(
+      /create or replace function public\.qf_cancel_stale_automation_job_v1[\s\S]*?\$\$;/) ?? [""])[0];
+    return fn.length > 0 && !/\bexception\s+when\b/i.test(fn) &&
+      /genuine SQL query error inside this authority ABORTS/i.test(migrationSource);
   })());
 record("M05 the executor collapses stale AND unmapped to one code; only the maintenance lane separates them",
   /const state = decideVendorBusinessState\(gathered\.facts\)/.test(vendorExecutorCode) &&
@@ -632,6 +672,88 @@ record("Q13 the design document records the decisions and the out-of-scope bound
   /NO STAGING MUTATION/.test(doc) && /NO PRODUCTION MUTATION/.test(doc) &&
   /NO META\/WHATSAPP SEND/.test(doc) &&
   /50\.8|destination normalization/i.test(doc));
+
+// ---------------------------------------------------------------------------
+// T. TRUTHFULNESS OF THE RATIONALE  (QF-MVP-50.7-C1)
+//
+// An earlier draft justified this phase with "the retry policy requeues them
+// forever". That was FALSE, and a false rationale in canonical source is a defect
+// in its own right: it would mislead the next reader into believing a loop exists
+// that does not. These assertions pin the REAL executor outcome and forbid the
+// false wording from coming back.
+// ---------------------------------------------------------------------------
+const clientExecutionContract = read("lib/automation/clientExecutionContract.ts");
+const persistenceMigrationSql = stripSql(
+  read("supabase/migrations/20260801110000_qf_mvp_automation_action_persistence.sql"));
+
+record("T01 QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE is ruled definitive_failure",
+  /QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE: \{\s*classification: "definitive_failure",\s*safeCode: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE",\s*\}/
+    .test(clientExecutionContract));
+
+record("T02 qf_complete_automation_attempt_v1 maps definitive_failure to the terminal job status `failed`",
+  /when 'definitive_failure' then 'failed'/.test(persistenceMigrationSql));
+
+record("T03 a definitive failure can carry NO retry timestamp",
+  // Two independent guarantees: passing one is rejected outright, and the job
+  // update writes next_retry_at only for retry_scheduled.
+  /AUTOMATION_TERMINAL_RESULT_NEXT_RETRY_FORBIDDEN/.test(persistenceMigrationSql) &&
+  /next_retry_at = case\s*when v_next_status = 'retry_scheduled' then p_next_retry_at\s*else null\s*end/
+    .test(persistenceMigrationSql));
+
+record("T04 NO new 50.7 source surface claims stale work requeues or cycles forever",
+  (() => {
+    const FALSE_CLAIMS =
+      /requeue|requeues|straight back on the queue|cycles? forever|retry forever|retries forever|loops? forever/i;
+    const surfaces = [migrationSource, read(PREDICATE_PATH), read(CONTRACT_PATH),
+      read(SERVICE_PATH), read(ROUTE_PATH), workflowText];
+    // The doc may say the words ONLY to disclaim them, so it is checked separately.
+    return surfaces.every((s) => !FALSE_CLAIMS.test(s));
+  })());
+
+record("T05 the migration and service state the TRUE pre-execution-hygiene rationale",
+  // The real outcome chain must be named on both surfaces, and the phase's value
+  // must be stated as hygiene rather than as fixing a loop that does not exist.
+  /definitive_failure/.test(migrationSource) &&
+  /never rescheduled/i.test(migrationSource) &&
+  /qf_complete_automation_attempt_v1/.test(migrationSource) &&
+  /PRE-EXECUTION QUEUE HYGIENE|pre-execution queue hygiene/i.test(migrationSource) &&
+  /never rescheduled/i.test(read(SERVICE_PATH)) &&
+  /pre-execution queue hygiene/i.test(read(SERVICE_PATH)) &&
+  /qf_complete_automation_attempt_v1/.test(read(SERVICE_PATH)) &&
+  // and the document opens by correcting the earlier false claim explicitly
+  /That is false/i.test(doc) && /pre-execution queue hygiene/i.test(doc));
+
+record("T06 no 50.7 surface claims staging holds 11 stale rows",
+  [migrationSource, read(PREDICATE_PATH), read(CONTRACT_PATH), read(SERVICE_PATH),
+   read(ROUTE_PATH), workflowText]
+    .every((s) => !/11 such rows|holds 11|identifies 11|11 stale/i.test(s)));
+
+record("T07 the certification plan pins exactly EIGHT stale evidence rows and protects the THREE eligible low-credit rows",
+  (() => {
+    const STALE_8 = [
+      "2e1f8999-6b33-4bc9-b8b2-f34cc7d25b09", "6bcf9d90-ff2d-43be-b992-0af8768c3fae",
+      "11c3f572-d08c-4e0e-a99f-b279a3ab374c", "48c10e01-613a-459c-8efc-d963d6088df5",
+      "b04f135f-6985-4b8d-a0f4-bcc803896e74", "f41348f4-2c77-4f1a-bacb-14505be91459",
+      "06ac0afa-cc67-4b83-aef8-730283ab3c04", "5ac40d60-356f-4a42-b97f-b295af238955"];
+    const ELIGIBLE_3 = [
+      "1e8e82ee-387f-4a9d-9edf-9a802c0eeeda", "5c26f321-e6e3-4bb5-a998-95218fb8fde3",
+      "eed762b8-1c13-4429-bd27-88021e46e6ff"];
+    return STALE_8.every((id) => doc.includes(id)) &&
+      ELIGIBLE_3.every((id) => doc.includes(id)) &&
+      /MUST NOT be terminalized/i.test(doc) &&
+      /true stale set is \*\*8\*\*/i.test(doc) &&
+      // and the evidence ids stay OUT of every runtime surface
+      [...STALE_8, ...ELIGIBLE_3].every((id) =>
+        !(migrationSource + read(PREDICATE_PATH) + read(CONTRACT_PATH) +
+          read(SERVICE_PATH) + read(ROUTE_PATH) + workflowText).includes(id));
+  })());
+
+record("T08 the parity claim is narrowed: one rule DEFINITION plus a transaction-bound SQL mirror",
+  /mirror/i.test(read(PREDICATE_PATH)) &&
+  /not one executable predicate|are not one executable predicate/i.test(migrationSource + read(PREDICATE_PATH)) &&
+  /transaction-bound mirror/i.test(doc) &&
+  // and the honest statement that the SQL is a second implementation
+  /second implementation/i.test(migrationSource + read(PREDICATE_PATH)));
 
 // ---------------------------------------------------------------------------
 // R. MUTANTS — each names a real defect this phase must not be able to ship

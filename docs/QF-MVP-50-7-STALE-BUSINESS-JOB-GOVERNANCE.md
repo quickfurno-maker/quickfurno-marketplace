@@ -11,6 +11,38 @@ requires its own separate deployment gate.
 
 ---
 
+## 0. What this lane is actually for — stated precisely
+
+An earlier draft of this document and of the migration header claimed that a
+stale-business job "retries forever". **That is false**, and the correction
+matters because it changes the justification for the whole phase.
+
+Repository truth:
+
+| step | what happens |
+| --- | --- |
+| executor refuses | `QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE` (pre-communication, no send) |
+| `lib/automation/clientExecutionContract.ts` rules it | `classification: definitive_failure` |
+| `qf_complete_automation_attempt_v1` maps it | job status **`failed`** |
+| retry timestamp | **none** — a terminal classification carrying one is rejected with `AUTOMATION_TERMINAL_RESULT_NEXT_RETRY_FORBIDDEN` |
+
+So a stale job does **not** requeue and does **not** cycle. If it is claimed and
+executed, normal execution already terminalizes it safely, without sending
+anything. These rows sit in the queue only because nothing has executed them yet.
+
+**QF-MVP-50.7 is governed pre-execution queue hygiene, not an infinite-retry
+fix.** Its value is that it removes provably stale work:
+
+- **without opening an execution attempt** — no attempt row, no `attempt_count`
+  movement, no consumed claim slot;
+- **without recording an attempt outcome** for a send that was never going to
+  happen;
+- **without forcing normal execution** merely to discover a business state Core
+  can already prove beforehand.
+
+It is the difference between "the queue learns this by running it" and "Core
+knew, so it never ran".
+
 ## 1. Entity orphan vs business stale
 
 QF-MVP-50.6 solved jobs whose business **entity** had been deleted. This phase
@@ -86,7 +118,13 @@ Verdicts are closed: `eligible | stale | unmapped`. `unmapped` is not a soft
 This was the central design requirement, and it is solved structurally rather
 than by discipline.
 
-1. The rules live in **one pure module**, `vendorBusinessEligibility.ts`.
+0. **Be honest about the shape.** This is *not* one executable predicate in both
+   places. The maintenance lane's re-proof must run inside the mutating SQL
+   transaction, where TypeScript cannot reach, so the migration carries a SQL
+   **mirror** of the four maintenance predicates. What the phase guarantees is
+   **one rule definition plus a transaction-bound mirror, guarded against drift**
+   — not a single implementation everywhere.
+1. The executor's rules live in **one pure module**, `vendorBusinessEligibility.ts`.
 2. `automationVendorExecutionService` **no longer contains any rule**. It gathers
    facts with exactly the same queries as before and calls
    `decideVendorBusinessState`. There is nothing left in the executor to edit, so
@@ -96,6 +134,20 @@ than by discipline.
    one alone and `M06` fails.
 4. The gate **executes** the pure module over a case matrix (sections A–E) rather
    than grepping it, so a behaviour change fails even if the wording is identical.
+
+**Where a failed read goes — precisely.** Every *direct business-row* PostgREST
+error inside `gatherVendorBusinessFacts` returns `QF_EXEC_LEAD_LOOKUP_FAILED` and
+never reaches the decider. There is one deliberate exception, and it **predates
+this phase**: `readLowCreditThreshold` collapses a policy-config read error to
+`null` (`if (error || !data) return null`), and the predicate then treats a null
+threshold as a refusal. QF-MVP-50.7 does **not** change that, because doing so
+would be a behaviour change smuggled into a refactor. If policy-read failures
+should become infrastructure-transient, that is its own phase.
+
+The SQL maintenance authority is *more* conservative than the executor here: a
+genuine SQL query error aborts the cancellation transaction outright and is never
+interpreted as staleness. That asymmetry is fail-closed in the direction that
+matters, and it is stated rather than hidden.
 
 The executor's observable behaviour is unchanged: it still distinguishes an
 infrastructure lookup failure (`QF_EXEC_LEAD_LOOKUP_FAILED`) from a business fact,
@@ -187,6 +239,31 @@ stale.
 The true stale set is **8**: 2 onboarding_reminder, 4 package_expiry_warning,
 2 response_reminder. The 3 low-credit jobs are blocked only by the provider
 runtime, like the other 29.
+
+### The 8 stale certification evidence rows
+
+These are **evidence only**. They appear in no migration, contract, service,
+route, workflow or selector, and the gate asserts their absence from runtime
+surfaces.
+
+| action | job id |
+| --- | --- |
+| `vendor.onboarding_reminder` | `2e1f8999-6b33-4bc9-b8b2-f34cc7d25b09` |
+| `vendor.onboarding_reminder` | `6bcf9d90-ff2d-43be-b992-0af8768c3fae` |
+| `vendor.package_expiry_warning` | `11c3f572-d08c-4e0e-a99f-b279a3ab374c` |
+| `vendor.package_expiry_warning` | `48c10e01-613a-459c-8efc-d963d6088df5` |
+| `vendor.package_expiry_warning` | `b04f135f-6985-4b8d-a0f4-bcc803896e74` |
+| `vendor.package_expiry_warning` | `f41348f4-2c77-4f1a-bacb-14505be91459` |
+| `vendor.response_reminder` | `06ac0afa-cc67-4b83-aef8-730283ab3c04` |
+| `vendor.response_reminder` | `5ac40d60-356f-4a42-b97f-b295af238955` |
+
+### The 3 low-credit rows that MUST NOT be terminalized
+
+`1e8e82ee-387f-4a9d-9edf-9a802c0eeeda`, `5c26f321-e6e3-4bb5-a998-95218fb8fde3`,
+`eed762b8-1c13-4429-bd27-88021e46e6ff` — all hold exactly 3 credits against a
+threshold of 3, and the rule is strictly greater-than, so all three are
+**business-ELIGIBLE**. Any certification run that terminalizes one of these has
+found a real defect and must stop.
 
 ## 13. Staging certification plan (after merge and deploy)
 

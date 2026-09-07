@@ -289,7 +289,7 @@ const POST_ANCHOR_PENDING = [
   {
     version: "20260906000000",
     name: "qf_mvp_50_7_automation_stale_business_cancellation",
-    sha: "c5513f9fffeb57b879abc31aaf7db405447cbf1f4e74516af8763b793c61ec71",
+    sha: "ace82115973f56cf0e9e0c309f680a41a263d56d1b23005531a095bcc8218b98",
     phase: "QF-MVP-50.7",
   },
 ].map((m) => ({

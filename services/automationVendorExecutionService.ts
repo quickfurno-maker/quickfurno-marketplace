@@ -49,6 +49,14 @@ import type { CommunicationIntent } from "@/lib/communication/types";
 import { BUSINESS_VARIABLE_BUILDERS } from "@/lib/communication/businessTemplateVariables";
 import type { BusinessVariableResult } from "@/lib/communication/businessTemplateVariables";
 import { buildAutomationCommunicationIdempotencyKey } from "@/lib/automation/clientDispatchRegistry";
+// QF-MVP-50.7 — the SINGLE authoritative business-eligibility predicate, shared
+// with the stale-business maintenance lane so the two can never drift apart.
+import {
+  decideVendorBusinessState,
+  EXECUTOR_BUSINESS_REFUSAL_CODE,
+  VendorBusinessState,
+  type VendorBusinessFacts,
+} from "@/lib/automation/vendorBusinessEligibility";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -514,39 +522,60 @@ async function proveVendorExecutionEligibility(
   facts: VendorFacts,
   sourceEventKey: string,
 ): Promise<EligibilityResult> {
+  // QF-MVP-50.7 — THE RULES MOVED, THE BEHAVIOUR DID NOT.
+  //
+  // This function still performs exactly the same reads, still distinguishes an
+  // infrastructure lookup failure from a business fact, and still returns exactly
+  // the same two codes. What changed is that it no longer RESTATES the business
+  // predicates: it gathers facts and asks `decideVendorBusinessState`, the single
+  // authority the stale-business maintenance lane also consumes.
+  //
+  // That is the whole anti-drift device. A future edit to a rule happens in one
+  // place and both consumers move together; a rule edited here alone would be a
+  // compile-time no-op, because there are no rules left here to edit.
+  //
+  // `stale` and `unmapped` both collapse to the pre-existing refusal code, which
+  // is what this function has always returned for every non-eligible case — the
+  // maintenance lane is the only caller that distinguishes them.
+  const gathered = await gatherVendorBusinessFacts(definition, entityType, entityId, facts, sourceEventKey);
+  if (!gathered.ok) return { ok: false, code: gathered.code };
+
+  const state = decideVendorBusinessState(gathered.facts);
+  if (state === VendorBusinessState.ELIGIBLE) return { ok: true };
+  return { ok: false, code: EXECUTOR_BUSINESS_REFUSAL_CODE };
+}
+
+type GatheredFactsResult =
+  | { ok: true; facts: VendorBusinessFacts }
+  | { ok: false; code: string };
+
+/**
+ * Read exactly the facts each action's rule needs — no more, and from the same
+ * tables and columns as before.
+ *
+ * A FAILED READ IS NEVER A BUSINESS FACT. Every `error` branch below returns
+ * `QF_EXEC_LEAD_LOOKUP_FAILED` and never reaches the decider, so a transient
+ * database blip can never be mistaken for "this vendor is no longer eligible" —
+ * which, in the maintenance lane, would mean cancelling live work over a network
+ * hiccup.
+ */
+async function gatherVendorBusinessFacts(
+  definition: VendorAutomationDispatchDefinition,
+  entityType: string,
+  entityId: string,
+  facts: VendorFacts,
+  sourceEventKey: string,
+): Promise<GatheredFactsResult> {
+  const base = {
+    actionType: definition.actionType,
+    entityType,
+    sourceEventKey,
+    resolvedVendorId: facts.vendorId,
+  } as const;
+
   switch (definition.actionType) {
-    case "vendor.lead_offer": {
-      // The assignment must still exist and still belong to this vendor. This
-      // is a one-way notice: no acceptance is requested, recorded or measured.
-      const { data, error } = await adminClient()
-        .from("lead_assignments")
-        .select("id, vendor_id")
-        .eq("id", entityId)
-        .maybeSingle();
-      if (error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
-      const row = data as { id: string; vendor_id: string | null } | null;
-      if (!row) return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      if (row.vendor_id !== facts.vendorId) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      return { ok: true };
-    }
-
+    case "vendor.lead_offer":
     case "vendor.response_reminder": {
-      // The 2h and 24h reminders are distinguished by their durable source
-      // identity; both require the SAME live truth: the assigned lead has not
-      // progressed past 'New'. This is a progress nudge, never an acceptance
-      // prompt.
-      const window =
-        sourceEventKey.endsWith(":resp2h")
-          ? "resp2h"
-          : sourceEventKey.endsWith(":resp24h")
-            ? "resp24h"
-            : null;
-      if (!window) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-
       const { data, error } = await adminClient()
         .from("lead_assignments")
         .select("id, vendor_id, vendor_status")
@@ -556,43 +585,32 @@ async function proveVendorExecutionEligibility(
       const row = data as
         | { id: string; vendor_id: string | null; vendor_status: string | null }
         | null;
-      if (!row || row.vendor_id !== facts.vendorId) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      if (row.vendor_status !== "New") {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      return { ok: true };
+      return {
+        ok: true,
+        facts: {
+          ...base,
+          assignmentExists: row !== null,
+          assignmentVendorId: row?.vendor_id ?? null,
+          assignmentVendorStatus: row?.vendor_status ?? null,
+        },
+      };
     }
 
     case "vendor.onboarding_reminder": {
-      // Eligible only while onboarding has not progressed from the exact
-      // canonical initial stage the producer bound this reminder to.
       const { data, error } = await adminClient()
         .from("vendor_crm_profiles")
         .select("vendor_id, onboarding_stage")
         .eq("vendor_id", facts.vendorId)
         .maybeSingle();
       if (error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
-      const row = data as
-        | { vendor_id: string; onboarding_stage: string | null }
-        | null;
-      if (!row) return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      if (row.onboarding_stage !== "new") {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      return { ok: true };
+      const row = data as { vendor_id: string; onboarding_stage: string | null } | null;
+      return {
+        ok: true,
+        facts: { ...base, crmProfileExists: row !== null, onboardingStage: row?.onboarding_stage ?? null },
+      };
     }
 
     case "vendor.package_expiry_warning": {
-      // The producer bound this warning to an EXACT expiry instant. A renewal
-      // that moves package_expires_at makes the old warning stale, and the new
-      // expiry produces its own new pair.
-      const stamp = sourceEventKey.split(".").pop() ?? "";
-      if (!/^\d{14}$/.test(stamp)) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-
       const { data, error } = await adminClient()
         .from("vendors")
         .select("id, package_status, package_expires_at")
@@ -602,25 +620,20 @@ async function proveVendorExecutionEligibility(
       const row = data as
         | { id: string; package_status: string | null; package_expires_at: string | null }
         | null;
-      if (!row) return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      if (row.package_status !== "active" || !row.package_expires_at) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      if (formatExpiryStamp(row.package_expires_at) !== stamp) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      return { ok: true };
+      return {
+        ok: true,
+        facts: {
+          ...base,
+          // A missing vendor row leaves BOTH package facts null, which the decider
+          // reads as stale — exactly the previous `!row` branch.
+          packageStatus: row?.package_status ?? null,
+          packageExpiresAtStamp: row?.package_expires_at ? formatExpiryStamp(row.package_expires_at) : null,
+        },
+      };
     }
 
     case "vendor.low_credit_warning": {
-      // The threshold is read from the SAME policy config the producer used.
-      // There is deliberately no numeric fallback here: an unconfigured
-      // threshold is a terminal non-send, never an assumed 3.
       const threshold = await readLowCreditThreshold();
-      if (threshold === null) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-
       const { data, error } = await adminClient()
         .from("vendors")
         .select("id, remaining_credits")
@@ -628,18 +641,16 @@ async function proveVendorExecutionEligibility(
         .maybeSingle();
       if (error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
       const row = data as { id: string; remaining_credits: number | null } | null;
-      if (!row || row.remaining_credits === null) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      // A recharge back above the threshold makes the warning stale.
-      if (row.remaining_credits > threshold) {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      return { ok: true };
+      return {
+        ok: true,
+        facts: { ...base, lowCreditThreshold: threshold, remainingCredits: row?.remaining_credits ?? null },
+      };
     }
 
     default:
-      return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+      // An unregistered action needs no facts: the decider returns `unmapped` and
+      // the caller collapses it to the same refusal the old `default:` produced.
+      return { ok: true, facts: base };
   }
 }
 

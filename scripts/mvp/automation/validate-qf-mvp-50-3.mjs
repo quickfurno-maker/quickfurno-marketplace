@@ -24,6 +24,18 @@ import {
   isAllowedVendorDispatchEntityType,
 } from "../../../lib/automation/vendorDispatchRegistry.ts";
 import { AUTOMATION_ACTION_TYPES, getWorkflowFamilyForAction } from "../../../lib/automation/actionRegistry.ts";
+// QF-MVP-50.7: the vendor business rules moved OUT of the executor into this single
+// shared authority, which the stale-business maintenance lane also consumes. These
+// assertions now EXECUTE the rules instead of pattern-matching the executor, which
+// is strictly stronger, and additionally prove the executor still delegates to it.
+import {
+  VendorBusinessState,
+  decideVendorBusinessState,
+} from "../../../lib/automation/vendorBusinessEligibility.ts";
+
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
 
 // QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
 // authority (20260905000000). No existing migration was changed, renamed, deleted or
@@ -419,7 +431,7 @@ record("G08 CI still takes no secret, database, provider or deployment action",
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
 record("G09 the local migration set is exactly 104",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 105);
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 106);
 
 // ---------------------------------------------------------------------------
 // V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject
@@ -765,6 +777,7 @@ for (const [name, fn] of claimMutants) {
 // ---------------------------------------------------------------------------
 const vendorRoute = read("app/api/internal/automation/n8n/execute-vendor/route.ts");
 const vendorService = read("services/automationVendorExecutionService.ts");
+const predicateAuthority = read("lib/automation/vendorBusinessEligibility.ts");
 const familyContract = read("lib/automation/familyExecutionContract.ts");
 const vendorWorkflowSource = read("automation/n8n/QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json");
 const vendorWorkflow = JSON.parse(vendorWorkflowSource);
@@ -810,28 +823,77 @@ record("V10 durable communication evidence is read BEFORE reserving",
 record("V11 the execute_v1 reservation is the frozen shared one",
   /recordClientExecutionTransportIdentity/.test(vendorService) &&
   /AUTOMATION_EXECUTION_RESERVATION_REFUSED/.test(vendorService));
+const VID = "0ffd1cf7-b6c1-4f0e-9d2a-5f3b7c9e1a2b";
+const S = VendorBusinessState;
 record("V12 lead_offer reproof re-reads the assignment and its vendor",
-  /case "vendor\.lead_offer":[\s\S]{0,700}?from\("lead_assignments"\)[\s\S]{0,400}?row\.vendor_id !== facts\.vendorId/.test(vendorService));
+  // the rule, executed
+  decideVendorBusinessState({ actionType: "vendor.lead_offer", entityType: "lead_assignment",
+    assignmentExists: true, assignmentVendorId: VID, resolvedVendorId: VID }) === S.ELIGIBLE &&
+  decideVendorBusinessState({ actionType: "vendor.lead_offer", entityType: "lead_assignment",
+    assignmentExists: false, resolvedVendorId: VID }) === S.STALE &&
+  decideVendorBusinessState({ actionType: "vendor.lead_offer", entityType: "lead_assignment",
+    assignmentExists: true, assignmentVendorId: "other", resolvedVendorId: VID }) === S.STALE &&
+  // and the executor still reads exactly that row before deciding
+  /from\("lead_assignments"\)[\s\S]{0,200}?select\("id, vendor_id, vendor_status"\)/.test(vendorService));
 record("V13 response_reminder requires vendor_status still exactly 'New'",
-  /case "vendor\.response_reminder":[\s\S]{0,1200}?row\.vendor_status !== "New"/.test(vendorService) &&
-  /resp2h/.test(vendorService) && /resp24h/.test(vendorService));
+  decideVendorBusinessState({ actionType: "vendor.response_reminder", entityType: "lead_assignment",
+    sourceEventKey: "k:resp2h", assignmentExists: true, assignmentVendorId: VID,
+    resolvedVendorId: VID, assignmentVendorStatus: "New" }) === S.ELIGIBLE &&
+  decideVendorBusinessState({ actionType: "vendor.response_reminder", entityType: "lead_assignment",
+    sourceEventKey: "k:resp24h", assignmentExists: true, assignmentVendorId: VID,
+    resolvedVendorId: VID, assignmentVendorStatus: "Contacted" }) === S.STALE &&
+  decideVendorBusinessState({ actionType: "vendor.response_reminder", entityType: "lead_assignment",
+    sourceEventKey: "k:nope", assignmentExists: true, assignmentVendorId: VID,
+    resolvedVendorId: VID, assignmentVendorStatus: "New" }) === S.STALE &&
+  /resp2h/.test(predicateAuthority) && /resp24h/.test(predicateAuthority));
 record("V14 onboarding reproof requires onboarding_stage still 'new'",
-  /case "vendor\.onboarding_reminder":[\s\S]{0,700}?row\.onboarding_stage !== "new"/.test(vendorService));
+  decideVendorBusinessState({ actionType: "vendor.onboarding_reminder", entityType: "vendor",
+    crmProfileExists: true, onboardingStage: "new" }) === S.ELIGIBLE &&
+  ["contacted","churned","qualified"].every((st) => decideVendorBusinessState({
+    actionType: "vendor.onboarding_reminder", entityType: "vendor",
+    crmProfileExists: true, onboardingStage: st }) === S.STALE) &&
+  /from\("vendor_crm_profiles"\)/.test(vendorService));
 record("V15 package reproof requires the exact source expiry identity",
-  /case "vendor\.package_expiry_warning":[\s\S]{0,1600}?formatExpiryStamp\(row\.package_expires_at\) !== stamp/.test(vendorService) &&
-  /row\.package_status !== "active"/.test(vendorService));
+  decideVendorBusinessState({ actionType: "vendor.package_expiry_warning", entityType: "vendor",
+    sourceEventKey: "k.20260901120000", packageStatus: "active",
+    packageExpiresAtStamp: "20260901120000" }) === S.ELIGIBLE &&
+  decideVendorBusinessState({ actionType: "vendor.package_expiry_warning", entityType: "vendor",
+    sourceEventKey: "k.20260901120000", packageStatus: "active",
+    packageExpiresAtStamp: "20270101000000" }) === S.STALE &&
+  decideVendorBusinessState({ actionType: "vendor.package_expiry_warning", entityType: "vendor",
+    sourceEventKey: "k.20260901120000", packageStatus: "cancelled",
+    packageExpiresAtStamp: "20260901120000" }) === S.STALE &&
+  /formatExpiryStamp\(row\.package_expires_at\)/.test(vendorService));
 record("V16 low-credit reproof reads the policy config, never a literal",
   /VENDOR_LOW_CREDIT_THRESHOLD_POLICY_KEY/.test(vendorService) &&
   /readLowCreditThreshold/.test(vendorService) &&
-  /row\.remaining_credits > threshold/.test(vendorService) &&
-  // no hard-coded numeric threshold anywhere in the executor
+  decideVendorBusinessState({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+    lowCreditThreshold: 3, remainingCredits: 4 }) === S.STALE &&
+  decideVendorBusinessState({ actionType: "vendor.low_credit_warning", entityType: "vendor",
+    lowCreditThreshold: 3, remainingCredits: 3 }) === S.ELIGIBLE &&
+  // no hard-coded numeric threshold anywhere in the executor or the authority
   !/remaining_credits\s*(<=|<|>=|>)\s*\d/.test(vendorService) &&
-  !/thresholdCredits\s*[:=]\s*\d/.test(vendorService));
+  !/thresholdCredits\s*[:=]\s*\d/.test(vendorService) &&
+  !/lowCreditThreshold\s*(\?\?|\|\|)\s*\d/.test(predicateAuthority));
 record("V17 an unconfigured threshold is a terminal non-send, not an assumed 3",
-  /threshold === null[\s\S]{0,160}?QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(vendorService) &&
-  /never an assumed 3/.test(vendorService));
+  [null, undefined].every((t) => decideVendorBusinessState({
+    actionType: "vendor.low_credit_warning", entityType: "vendor",
+    lowCreditThreshold: t, remainingCredits: 1 }) === S.STALE) &&
+  (/never an assumed 3/.test(vendorService) || /assuming a number would send a warning/.test(predicateAuthority)));
+record("V17a the executor no longer restates any rule and delegates to the shared authority",
+  /decideVendorBusinessState\(/.test(vendorService) &&
+  !/row\.vendor_status !== "New"/.test(vendorService) &&
+  !/row\.onboarding_stage !== "new"/.test(vendorService) &&
+  !/row\.package_status !== "active"/.test(vendorService) &&
+  !/row\.remaining_credits > threshold/.test(vendorService) &&
+  // a failed lookup is still infrastructure, never a business fact
+  (vendorService.match(/QF_EXEC_LEAD_LOOKUP_FAILED/g) ?? []).length >= 4);
 record("V18 every stale reproof is a pre-communication no-send",
-  (vendorService.match(/QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/g) ?? []).length >= 8 &&
+  // QF-MVP-50.7: the executor now returns the ONE shared constant instead of
+  // repeating the literal per branch, so the count moved to the authority that
+  // defines it. The guarantee is unchanged and is still proven on both sides.
+  /EXECUTOR_BUSINESS_REFUSAL_CODE/.test(vendorService) &&
+  /QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(predicateAuthority) &&
   /PRE-COMMUNICATION no-send/.test(vendorService));
 record("V19 vendor.document_reminder can never be executed",
   /getNonProducibleVendorReason\(envelope\.actionType\)/.test(vendorService) &&
@@ -889,11 +951,18 @@ const vendorExecMutants = [
     () => !/remaining_credits\s*(<=|<|>=|>)\s*\d/.test(vendorService) &&
           /readLowCreditThreshold/.test(vendorService)],
   ["sending after a package renewal is impossible",
-    () => /formatExpiryStamp\(row\.package_expires_at\) !== stamp/.test(vendorService)],
+    () => decideVendorBusinessState({ actionType: "vendor.package_expiry_warning", entityType: "vendor",
+      sourceEventKey: "k.20260901120000", packageStatus: "active",
+      packageExpiresAtStamp: "20270101000000" }) === VendorBusinessState.STALE],
   ["reminding when vendor_status is not New is impossible",
-    () => /row\.vendor_status !== "New"/.test(vendorService)],
+    () => ["Contacted", "Quoted", "Won", "Lost"].every((st) => decideVendorBusinessState({
+      actionType: "vendor.response_reminder", entityType: "lead_assignment", sourceEventKey: "k:resp2h",
+      assignmentExists: true, assignmentVendorId: VID, resolvedVendorId: VID,
+      assignmentVendorStatus: st }) === VendorBusinessState.STALE)],
   ["reminding after onboarding progressed is impossible",
-    () => /row\.onboarding_stage !== "new"/.test(vendorService)],
+    () => ["contacted", "churned", "qualified"].every((st) => decideVendorBusinessState({
+      actionType: "vendor.onboarding_reminder", entityType: "vendor",
+      crmProfileExists: true, onboardingStage: st }) === VendorBusinessState.STALE)],
   ["executing vendor.document_reminder is impossible",
     () => /AUTOMATION_EXECUTION_VENDOR_ACTION_NOT_PRODUCIBLE/.test(vendorService)],
   ["a vendor accept/reject concept in the executor is impossible",

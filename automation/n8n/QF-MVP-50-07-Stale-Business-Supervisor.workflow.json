@@ -1,0 +1,533 @@
+{
+  "active": false,
+  "connections": {
+    "Schedule Trigger — Stale Sweep Lane INACTIVE": {
+      "main": [
+        [
+          {
+            "node": "QF.50.7 Stale Sweep Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger — Stale Sweep Lane Test": {
+      "main": [
+        [
+          {
+            "node": "QF.50.7 Stale Sweep Preconditions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QF.50.7 Stale Sweep Preconditions": {
+      "main": [
+        [
+          {
+            "node": "IF — Stale Sweep Transport Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Stale Sweep Transport Configured": {
+      "main": [
+        [
+          {
+            "node": "Generate Stale Sweep Request UUID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Stale Sweep Runtime Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Stale Sweep Request UUID": {
+      "main": [
+        [
+          {
+            "node": "Build Exact Stale Sweep Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Exact Stale Sweep Body": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Stale Sweep Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Stale Sweep Body": {
+      "main": [
+        [
+          {
+            "node": "Build Stale Sweep Request Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Stale Sweep Request Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Stale Sweep Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Stale Sweep Request": {
+      "main": [
+        [
+          {
+            "node": "POST Signed Stale Sweep to Core — STAGING ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Signed Stale Sweep to Core — STAGING ONLY": {
+      "main": [
+        [
+          {
+            "node": "Normalize Stale Sweep Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Stale Sweep Response": {
+      "main": [
+        [
+          {
+            "node": "SHA256 — Stale Sweep Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 — Stale Sweep Response Body": {
+      "main": [
+        [
+          {
+            "node": "Build Stale Sweep Response Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Stale Sweep Response Canonical": {
+      "main": [
+        [
+          {
+            "node": "HMAC — Verify Stale Sweep Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HMAC — Verify Stale Sweep Response": {
+      "main": [
+        [
+          {
+            "node": "Verify Signed Stale Sweep Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signed Stale Sweep Response": {
+      "main": [
+        [
+          {
+            "node": "IF — Stale Sweep Response Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Stale Sweep Response Verified": {
+      "main": [
+        [
+          {
+            "node": "Branch On Core Stale Sweep State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STOP — Reject Unverified Stale Sweep Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch On Core Stale Sweep State": {
+      "main": [
+        [
+          {
+            "node": "STOP — Stale Sweep Cycle Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "id": "qfmvp5007stalebusinesssupervisor",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "name": "QF-MVP-50-07-Stale-Business-Supervisor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger — Stale Sweep Lane INACTIVE",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3000,
+        -700
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger — Stale Sweep Lane Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3000,
+        -520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.7 fail-closed runtime preconditions for the stale sweep lane.\n// Identical env contract to the certified 50.2E / 50.3 / 50.4 / 50.5 lanes. NO new\n// variable is introduced by 50.6, and no secret VALUE is ever built or logged here.\nconst enabled = $env.QF_N8N_TRANSPORT_ENABLED === 'true';\nconst baseUrl = ($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nconst inbound = $env.QF_N8N_TO_CORE_HMAC_SECRET || '';\nconst response = $env.QF_CORE_TO_N8N_HMAC_SECRET || '';\nconst configured = Boolean(\n  enabled &&\n  /^https:\\/\\//.test(baseUrl) &&\n  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId) &&\n  inbound.length >= 32 &&\n  response.length >= 32 &&\n  inbound !== response\n);\nreturn [{ json: {\n  phase: 'QF-MVP-50.7',\n  lane: 'cancel_stale',\n  transportVersion: 1,\n  configured,\n  transportEnabled: enabled,\n  secretSource: 'selfhost_env',\n  workerId\n} }];"
+      },
+      "name": "QF.50.7 Stale Sweep Preconditions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2760,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e70000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.configured }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Stale Sweep Transport Configured",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2520,
+        -620
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Stale Sweep Runtime Not Configured",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "requestId"
+      },
+      "name": "Generate Stale Sweep Request UUID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -2300,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The EXACT three-key stale sweep body.\n//\n// n8n contributes NO job id, entity id, entity type, reason, safe code, status,\n// force flag, batch size or limit. Core selects the job, proves the entity is\n// gone and chooses the reason. Adding any field here would be rejected by the\n// closed exact-key parse on the Core side, which is the point: this graph is\n// structurally incapable of naming a job to cancel.\nconst requestId = $json.requestId;\nconst workerId = $env.QF_N8N_WORKER_ID || '';\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new Error('QF_50_7_CANCEL_STALE_REQUEST_ID_INVALID');\nif (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(workerId)) throw new Error('QF_50_7_CANCEL_STALE_WORKER_ID_INVALID');\nconst timestamp = Math.floor(Date.now() / 1000);\nconst rawBody = JSON.stringify({ transportVersion: 1, requestId, workerId });\nreturn [{ json: { requestId, workerId, timestamp, rawBody } }];"
+      },
+      "name": "Build Exact Stale Sweep Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2060,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawBody }}",
+        "dataPropertyName": "bodySha256"
+      },
+      "name": "SHA256 — Stale Sweep Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1820,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'N8N_TO_CORE',\n  'POST',\n  '/api/internal/automation/n8n/cancel-stale',\n  $json.requestId,\n  String($json.timestamp),\n  $json.bodySha256\n].join('\\n');\nreturn [{ json: { ...$json, requestCanonical: canonical } }];"
+      },
+      "name": "Build Stale Sweep Request Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1580,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.requestCanonical }}",
+        "dataPropertyName": "requestHmac",
+        "secret": "={{ $env.QF_N8N_TO_CORE_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Stale Sweep Request",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1340,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QF-MVP-50.7 signed transport. Same discipline as every certified 50.x POST node:\n// request signing stays upstream, response verification stays downstream, and this\n// node emits only plain, fully-serialisable data. No credential, secret value or\n// business field is built here.\nconst items = $input.all();\nif (items.length !== 1) throw new Error('QF_50_7_CANCEL_STALE_ITEM_COUNT_INVALID');\nconst input = items[0].json;\nif (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('QF_50_7_CANCEL_STALE_INPUT_INVALID');\n\nconst pick = (o, k) => { try { return o === null || o === undefined ? undefined : o[k]; } catch (_) { return undefined; } };\nconst scalar = (v) => (typeof v === 'string' ? v : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null);\n\nconst requestId = scalar(input.requestId);\nconst timestamp = scalar(input.timestamp);\nconst bodySha256 = scalar(input.bodySha256);\nconst requestHmac = scalar(input.requestHmac);\nif (!requestId || !timestamp || !bodySha256 || !requestHmac) throw new Error('QF_50_7_CANCEL_STALE_IDENTITY_INVALID');\nif (/[\\r\\n\\u0000]/.test(requestId + timestamp + bodySha256 + requestHmac)) throw new Error('QF_50_7_CANCEL_STALE_IDENTITY_UNSAFE');\n\nconst rawBody = input.rawBody;\nif (typeof rawBody !== 'string' || rawBody.length === 0) throw new Error('QF_50_7_CANCEL_STALE_RAW_BODY_INVALID');\nif (rawBody !== rawBody.trim()) throw new Error('QF_50_7_CANCEL_STALE_RAW_BODY_UNSTABLE');\ntry { JSON.parse(rawBody); } catch (_) { throw new Error('QF_50_7_CANCEL_STALE_RAW_BODY_NOT_JSON'); }\n\nconst baseUrl = String($env.QF_CORE_STAGING_BASE_URL || '').replace(/\\/$/, '');\nif (!/^https:\\/\\//.test(baseUrl)) throw new Error('QF_50_7_CANCEL_STALE_BASE_URL_INVALID');\nconst routePath = '/api/internal/automation/n8n/cancel-stale';\n// The signed path and the requested path are the SAME value. The allowed set for\n// this lane holds exactly ONE entry, so this graph can reach no other Core route\n// — not claim, not execute, not complete, not recover, not reconcile.\nconst ALLOWED_PATHS = new Set([\n  '/api/internal/automation/n8n/cancel-stale'\n]);\nif (!ALLOWED_PATHS.has(routePath)) throw new Error('QF_50_7_CANCEL_STALE_ROUTE_PATH_NOT_ALLOWED');\nconst url = baseUrl + routePath;\n\nlet httpResponse;\ntry {\n  httpResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: url,\n    headers: {\n      'content-type': 'application/json',\n      'x-qf-transport-version': '1',\n      'x-qf-request-id': requestId,\n      'x-qf-timestamp': timestamp,\n      'x-qf-body-sha256': bodySha256,\n      'x-qf-signature': 'v1=' + requestHmac\n    },\n    body: rawBody,\n    timeout: 10000,\n    returnFullResponse: true,\n    encoding: 'text',\n    json: false,\n    ignoreHttpStatusErrors: true,\n    disableFollowRedirect: true\n  });\n} catch (error) {\n  const raw = pick(error, 'code');\n  const c = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'UNKNOWN';\n  throw new Error('QF_50_7_CANCEL_STALE_CALL_FAILED_' + c);\n}\n\nif (!httpResponse || typeof httpResponse !== 'object' || Array.isArray(httpResponse)) throw new Error('QF_50_7_CANCEL_STALE_RESULT_INVALID');\nconst statusCode = pick(httpResponse, 'statusCode');\nconst body = pick(httpResponse, 'body');\nconst headersIn = pick(httpResponse, 'headers');\nif (!Number.isInteger(statusCode)) throw new Error('QF_50_7_CANCEL_STALE_STATUS_INVALID');\nif (statusCode >= 300 && statusCode < 400) throw new Error('QF_50_7_CANCEL_STALE_REDIRECT_REFUSED');\nif (typeof body !== 'string') throw new Error('QF_50_7_CANCEL_STALE_BODY_NOT_STRING');\nif (!headersIn || typeof headersIn !== 'object' || Array.isArray(headersIn)) throw new Error('QF_50_7_CANCEL_STALE_HEADERS_INVALID');\n\nlet entries = Object.entries(headersIn);\nif (entries.length === 0 && typeof pick(headersIn, 'entries') === 'function') {\n  try { entries = Array.from(headersIn.entries()); } catch (_) { entries = []; }\n}\nconst headers = {};\nfor (const pair of entries) {\n  const name = String(pair[0]).toLowerCase();\n  if (name === '__proto__') continue;\n  if (Object.prototype.hasOwnProperty.call(headers, name)) continue;\n  const value = pair[1];\n  const normalized = Array.isArray(value) ? value.map(scalar).filter((x) => x !== null) : scalar(value);\n  if (normalized === null) continue;\n  headers[name] = normalized;\n}\nif (Object.keys(headers).length === 0) throw new Error('QF_50_7_CANCEL_STALE_HEADERS_EMPTY');\n\nreturn [{ json: { statusCode: statusCode, body: body, headers: headers } }];"
+      },
+      "name": "POST Signed Stale Sweep to Core — STAGING ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst headers = response.headers || {};\nconst rawBody = typeof response.body === 'string' ? response.body : JSON.stringify(response.body ?? '');\nconst h = {};\nfor (const [k, v] of Object.entries(headers)) h[String(k).toLowerCase()] = Array.isArray(v) ? String(v[0] ?? '') : String(v ?? '');\nreturn [{ json: {\n  requestId: $('Build Exact Stale Sweep Body').first().json.requestId,\n  statusCode: Number(response.statusCode),\n  rawResponseBody: rawBody,\n  responseVersion: h['x-qf-response-version'] || '',\n  responseRequestId: h['x-qf-response-request-id'] || '',\n  responseTimestamp: h['x-qf-response-timestamp'] || '',\n  responseBodySha256Header: h['x-qf-response-body-sha256'] || '',\n  responseSignature: h['x-qf-response-signature'] || '',\n  exchange: 'cancel_stale'\n} }];"
+      },
+      "name": "Normalize Stale Sweep Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -860,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.rawResponseBody }}",
+        "dataPropertyName": "actualResponseBodySha256"
+      },
+      "name": "SHA256 — Stale Sweep Response Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const canonical = [\n  'QF-AUTOMATION-TRANSPORT-V1',\n  'CORE_TO_N8N_RESPONSE',\n  '/api/internal/automation/n8n/cancel-stale',\n  $json.responseRequestId,\n  $json.responseTimestamp,\n  $json.actualResponseBodySha256\n].join('\\n');\nreturn [{ json: { ...$json, responseCanonical: canonical } }];"
+      },
+      "name": "Build Stale Sweep Response Canonical",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.responseCanonical }}",
+        "dataPropertyName": "expectedResponseHmac",
+        "secret": "={{ $env.QF_CORE_TO_N8N_HMAC_SECRET }}"
+      },
+      "name": "HMAC — Verify Stale Sweep Response",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Math.floor(Date.now() / 1000);\nconst ts = Number($json.responseTimestamp);\nconst expectedSig = 'v1=' + $json.expectedResponseHmac;\nconst checks = {\n  version: $json.responseVersion === '1',\n  requestId: $json.responseRequestId === $json.requestId,\n  timestamp: /^\\d{10}$/.test($json.responseTimestamp) && Number.isSafeInteger(ts) && Math.abs(now - ts) <= 300,\n  bodyHash: /^[0-9a-f]{64}$/.test($json.responseBodySha256Header) && $json.responseBodySha256Header === $json.actualResponseBodySha256,\n  signature: /^v1=[0-9a-f]{64}$/.test($json.responseSignature) && $json.responseSignature === expectedSig,\n  status: Number.isInteger($json.statusCode) && $json.statusCode >= 200 && $json.statusCode < 600\n};\nconst verified = Object.values(checks).every(Boolean);\nreturn [{ json: { ...$json, verified, checks } }];"
+      },
+      "name": "Verify Signed Stale Sweep Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        -760
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "50e70000-0000-4000-8000-000000000002",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF — Stale Sweep Response Verified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        -760
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Reject Unverified Stale Sweep Response",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// THE STALE SWEEP IS TERMINAL FOR n8n IN EVERY OUTCOME.\n//\n// There is no branch that forwards work onward, because a cancelled job HAS no\n// executable work by definition. This lane never executes, never completes, never\n// recovers and never reconciles in response to anything Core says here.\n//\n// The three states below are the COMPLETE closed set; anything else stops the lane.\nlet payload;\ntry { payload = JSON.parse($json.rawResponseBody); } catch { throw new Error('QF_50_7_CANCEL_STALE_RESPONSE_JSON_INVALID'); }\nif (!payload || typeof payload !== 'object' || payload.transportVersion !== 1 || payload.requestId !== $json.requestId) {\n  throw new Error('QF_50_7_CANCEL_STALE_RESPONSE_ENVELOPE_INVALID');\n}\nif (payload.route !== 'cancel_stale_v1') throw new Error('QF_50_7_CANCEL_STALE_RESPONSE_ROUTE_INVALID');\n\nconst CLOSED_STATES = new Set(['cancel_stale_empty', 'cancel_stale_cancelled', 'rejected']);\nif (!CLOSED_STATES.has(payload.orchestrationState)) throw new Error('QF_50_7_CANCEL_STALE_RESPONSE_STATE_INVALID');\n\n// A rejection is an authenticated refusal, not a crash, and not something to retry\n// from here: nothing was mutated and the next cycle will look again. An empty sweep\n// is the ordinary steady state once the backlog is drained and is not an incident.\nif (payload.orchestrationState === 'rejected' && payload.ok !== false) throw new Error('QF_50_7_CANCEL_STALE_REJECTION_INVARIANT');\nif (payload.orchestrationState !== 'rejected' && payload.ok !== true) throw new Error('QF_50_7_CANCEL_STALE_SUCCESS_INVARIANT');\n\n// Core's reason is a fixed repository constant. If a cancellation ever arrives\n// carrying a different one, something other than this lane wrote it.\nif (payload.orchestrationState === 'cancel_stale_cancelled' && payload.safeCode !== 'QF_AUTOMATION_BUSINESS_STATE_NO_LONGER_ELIGIBLE') {\n  throw new Error('QF_50_7_CANCEL_STALE_SAFE_CODE_INVARIANT');\n}\n\nreturn [{ json: {\n  lane: 'cancel_stale',\n  orchestrationState: payload.orchestrationState,\n  replayed: payload.replayed === true,\n  // Observability only, and a CLOSED vocabulary word rather than an identifier.\n  // This lane branches on orchestrationState and nothing else.\n  actionType: typeof payload.actionType === 'string' ? payload.actionType : '',\n  safeCode: typeof payload.safeCode === 'string' ? payload.safeCode : '',\n  followUpCall: 'none'\n} }];"
+      },
+      "name": "Branch On Core Stale Sweep State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -900
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "STOP — Stale Sweep Cycle Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -900
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## QF-MVP-50.7 — STALE-BUSINESS SUPERVISOR (SELF-HOSTED STAGING CANDIDATE)\n\n**KEEP INACTIVE / UNPUBLISHED.**\n\nDefault path is fail-closed because `QF_N8N_TRANSPORT_ENABLED` must equal `true`.\n\nSecrets are runtime env references only; never paste secret values into this workflow.\n\nRequired later on self-hosted n8n: `QF_CORE_STAGING_BASE_URL`, `QF_N8N_WORKER_ID`, `QF_N8N_TO_CORE_HMAC_SECRET`, `QF_CORE_TO_N8N_HMAC_SECRET`, `QF_N8N_TRANSPORT_ENABLED`. **No new variable is introduced by 50.6.**\n\n### WHY A FOURTH LANE\n\nFresh `pending` work belongs to the certified client/vendor/campaign executors. Due retries belong to the 50.5 `recover` lane. Stale in-flight attempts belong to the 50.5 `reconcile` lane. None of those three can ever remove a job whose business entity has been deleted: claim keeps offering it, recovery keeps rescheduling it, and every executor that picks it up fails to resolve a recipient.\n\nThis lane is the fourth class of work — jobs that must LEAVE the executable set — and it gets its own schedule trigger and its own n8n execution so it can never starve, or be starved by, the other three.\n\nOne unit of work per cycle, every 5 minutes. A standing backlog drains steadily and the lane then answers `cancel_stale_empty` indefinitely, which is the intended resting state.\n\n### n8n OWNS NO BUSINESS AUTHORITY HERE\n\nIt sends three identity fields and nothing else. It never chooses the job, the entity, the reason or the moment. It cannot ask for a specific job to be cancelled, because the Core parser rejects any body that carries a fourth key — a property visible in `lib/automation/staleBusinessContract.ts`, not merely asserted here.\n\nIt holds no Supabase credential, queries no table, calls no Meta endpoint and sends no message. It decides nothing about staleness; Core proves the entity still EXISTS and that current business truth is stale, inside the same transaction that writes the terminalization — and re-proves it after the write.\n\n### WHAT THIS WORKFLOW CANNOT DO\n\nIt cannot reach any Core route but `/api/internal/automation/n8n/cancel-stale` — the allowed-path set in the POST node holds exactly one entry. It cannot claim, execute, complete, recover or reconcile. It cannot open an attempt or consume an attempt budget: the transport shape constraint requires `attempt_id`, `attempt_number` and `max_attempts` to be null on this route. It cannot cancel a `processing` job, a terminal job, or a job whose entity still exists. It cannot delete automation history — `cancelled` is a terminal state, and every job, action and attempt row is preserved.\n\nEvery outcome of this graph is a STOP. Nothing is ever forwarded.\n\nThe certified QF-MVP-50.2E / 50.3 / 50.4 / 50.5 workflows are NOT modified by this phase.",
+        "height": 1180,
+        "width": 900
+      },
+      "name": "SECURITY — QF.50.7 READ FIRST",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3000,
+        -1100
+      ]
+    }
+  ],
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true
+  },
+  "tags": [],
+  "versionId": "50e70001-0000-4000-8000-000000000001"
+}

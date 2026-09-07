@@ -19,6 +19,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
+
 // QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
 // authority (20260905000000). No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality, never a lower bound.
@@ -77,7 +81,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count is unchanged at 105", migrations.length === 105);
+check("migration count is unchanged at 106", migrations.length === 106);
 check("QF-MVP-70 added no migration", !migrations.some((f) => /qf_mvp_70|mvp70|operations|incident/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("no source creates a function, index or policy", allSources.every((s) => !/create (or replace )?function|create index|create policy/i.test(s)));

@@ -70,6 +70,10 @@ import {
   splitRankedPool,
 } from '../../../lib/matchcore/automaticMatchDecision.ts';
 import {
+
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
   CANONICAL_ACTIVE_ASSIGNMENT_CAP,
   CANONICAL_ASSIGNMENT_CREDIT_COST,
   CANONICAL_LIFETIME_ASSIGNMENT_CAP,
@@ -1025,8 +1029,8 @@ section('L. GOVERNANCE [static]');
   // orphan cancellation authority (105) each added a migration without re-pinning here,
   // so this assertion was already failing on a clean tree before this phase. 75.04 still
   // adds no migration of its own, which L02 below proves independently by name.
-  check('L01 QF-MVP-75.04 itself adds NO migration — the set is exactly 105',
-    migrations.length === 105, `found ${migrations.length}`);
+  check('L01 QF-MVP-75.04 itself adds NO migration — the set is exactly 106',
+    migrations.length === 106, `found ${migrations.length}`);
 
   check('L02 no 75.04 migration file exists',
     migrations.filter((f) => /qf_mvp_75_04|geofair/i.test(f)).length === 0);

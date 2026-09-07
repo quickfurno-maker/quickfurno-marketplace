@@ -27,6 +27,10 @@ import {
 } from "../../../lib/automation/campaignDispatchRegistry.ts";
 import { AUTOMATION_ACTION_TYPES, getWorkflowFamilyForAction } from "../../../lib/automation/actionRegistry.ts";
 
+// QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
+// terminalization authority (20260906000000). No existing migration was changed,
+// renamed, deleted or reordered. Still exact equality, never a lower bound.
+
 // QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
 // authority (20260905000000). No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality, never a lower bound.
@@ -334,11 +338,12 @@ record("G02 pending holds exactly two pinned source-only authorities, one is sta
   // Both sets stay exact; APPLIED stays ten and RECONCILED stays five.
   // QF-MVP-50.6 RE-PIN: 1 -> 2. The orphan cancellation authority is source-only and
   // joins PENDING. APPLIED stays ten, RECONCILED stays five, staging-applied stays one.
-  manifest.pendingPostAnchorMigrations.length === 2 &&
+  manifest.pendingPostAnchorMigrations.length === 3 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
   manifest.pendingPostAnchorMigrations[1].operationalStatus === "PENDING" &&
+  manifest.pendingPostAnchorMigrations[2].version === "20260906000000" &&
   manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
   manifest.stagingAppliedPostAnchorMigrations[0].version === "20260904000000" &&
   manifest.stagingAppliedPostAnchorMigrations[0].operationalStatus === "APPLIED_TO_STAGING" &&
@@ -371,7 +376,7 @@ record("G05 the validator is registered and wired into CI after 50.3",
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
 record("G06 the local migration set is exactly 104",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 105);
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 106);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

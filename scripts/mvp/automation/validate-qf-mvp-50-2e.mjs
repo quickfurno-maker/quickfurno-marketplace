@@ -44,6 +44,10 @@ import { COMMUNICATION_MESSAGE_STATUSES } from "../../../lib/communication/types
 import { AUTOMATION_RESULT_CLASSIFICATIONS } from "../../../lib/automation/actionContract.ts";
 import { COMPLETION_EVIDENCE_RULINGS } from "../../../lib/automation/completionContract.ts";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
 const sha256 = (v) => createHash("sha256").update(v).digest("hex");
@@ -400,9 +404,12 @@ record("E01 the migration matches its pinned hash",
 // exactly the three routes it knew about — `recover_v1`/`reconcile_v1` arrive in
 // 20260812000000, so a 50.2E migration mentioning either would mean it had been edited.
 record("E02 the route vocabulary is closed to exactly five",
-  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 5 &&
+  // QF-MVP-50.6 RE-PIN: five -> six. cancel_orphan_v1 is appended; the earlier five
+  // keep their exact positions. This stays EXACT ORDERED EQUALITY, never a length
+  // lower bound and never a membership test.
+  AUTOMATION_TRANSPORT_ROUTE_KEYS.length === 6 &&
   AUTOMATION_TRANSPORT_ROUTE_KEYS.join(",") ===
-    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1" &&
+    "claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1,cancel_orphan_v1" &&
   /check \(route_key in \('claim_v1', 'complete_v1', 'execute_v1'\)\)/.test(migrationCode) &&
   !/recover_v1|reconcile_v1/.test(migrationCode));
 record("E03 the state vocabulary adds exactly one new terminal state",
@@ -699,17 +706,21 @@ record("N19 every workflow in the tree is inactive and unpublished",
 // QF-MVP-50.5 RE-PIN: six candidates, by exact name. The three certified executors and
 // both dispatcher candidates are unchanged; 50.5 adds ONE new supervisor rather than
 // modifying any of them.
-record("N20 exactly six workflow candidates exist, by exact name",
+// QF-MVP-50.6 RE-PIN: six -> seven. The orphan cancellation supervisor is added as a
+// NEW file; not one of the six certified candidates is renamed, edited or removed, and
+// the list stays an EXACT sorted allowlist rather than a count or a prefix match.
+record("N20 exactly seven workflow candidates exist, by exact name",
   (() => {
     const flows = readdirSync(path.join(ROOT, "automation/n8n"))
       .filter((f) => f.endsWith(".workflow.json")).sort();
-    return flows.length === 6 && same(flows, [
+    return flows.length === 7 && same(flows, [
       "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json",
       "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json",
       "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
       "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
       "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
       "QF-MVP-50-05-Recovery-Supervisor.workflow.json",
+      "QF-MVP-50-06-Orphan-Cancellation-Supervisor.workflow.json",
     ]);
   })());
 
@@ -739,16 +750,18 @@ record("G01 the anchor is untouched",
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the Meta production activation authority. Still an exact count, never `>=`.
-record("G02 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and ONE PENDING post-anchor migration",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 17 &&
+record("G02 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and TWO PENDING post-anchor migrations",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 18 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
   // QF-MVP-82A-R0 RE-PIN: 1 -> 2 SOURCE-PENDING entries (80.14A activation authority
   // + 82A-R0 Realtime publication membership). APPLIED stays ten, RECONCILED stays five.
-  manifest.pendingPostAnchorMigrations.length === 1 &&
+  // QF-MVP-50.6 RE-PIN: 1 -> 2 SOURCE-PENDING entries. APPLIED stays ten.
+  manifest.pendingPostAnchorMigrations.length === 2 &&
   manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
   manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
+  manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   manifest.reconciledPostAnchorMigrations[0].version === "20260813000000" &&
   manifest.reconciledPostAnchorMigrations[0].operationalStatus === "APPLIED" &&
@@ -813,7 +826,7 @@ record("G05 no applied record fabricates an offline remote status, and only 50.5
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
 record("G06 G1 pins the exact count 99, not a lower bound",
-  /const MIGRATION_COUNT = 104;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 105;/.test(g1Source) &&
   !/>=\s*9[0-9]|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
@@ -834,10 +847,10 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-record("G08 the local migration set is exactly 104 and the 50.2 wedge repair is still present in order",
+record("G08 the local migration set is exactly 105 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 104 &&
+    return files.length === 105 &&
       files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
       files.includes("20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql") &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
@@ -845,13 +858,14 @@ record("G08 the local migration set is exactly 104 and the 50.2 wedge repair is 
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql") &&
       files.includes("20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql") &&
-      files.at(-3) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
-      files.at(-2) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
-      files.at(-1) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql";
+      files.at(-4) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
+      files.at(-3) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-2) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
+      files.at(-1) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 104/.test(d2Source) &&
-  /exactly seventeen migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 105/.test(d2Source) &&
+  /exactly eighteen migrations are newer than the anchor/.test(d2Source) &&
   !/lengths*>=|>=s*9[0-9]/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));

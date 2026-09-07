@@ -21,6 +21,10 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
 
@@ -652,7 +656,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count remains 104", migrations.length === 104);
+check("migration count remains 105", migrations.length === 105);
 check(
   "no Phase 70 migration exists",
   !migrations.some((f) => /qf_mvp_70|mvp_?70|operations_control|launch_control|launch_readiness|attention_queue/i.test(f)),

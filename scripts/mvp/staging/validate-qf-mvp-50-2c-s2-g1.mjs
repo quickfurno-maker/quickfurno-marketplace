@@ -263,12 +263,25 @@ const POST_ANCHOR_RECONCILED = [
 // nothing (its §3.10 refuses to commit if any sendable policy, active canary destination
 // or active mapping exists), but it is the migration that makes production sending
 // REACHABLE, so its gate is the most consequential of the set.
+//
+// QF-MVP-50.6 adds the SECOND pending entry: the orphan cancellation authority
+// (20260905000000). It is SOURCE ONLY — not applied to staging, not applied to
+// production, no applied evidence and no remote history count — so PENDING is the
+// only set it can honestly occupy. Note that it sorts AFTER the staging-applied R0
+// migration, which is why the post-anchor order below is now derived by version
+// rather than by category block.
 const POST_ANCHOR_PENDING = [
   {
     version: "20260903040000",
     name: "qf_mvp_80_14a_meta_lead_assignment_production_activation",
     sha: "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
     phase: "QF-MVP-80.14A",
+  },
+  {
+    version: "20260905000000",
+    name: "qf_mvp_50_6_automation_orphan_cancellation",
+    sha: "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63",
+    phase: "QF-MVP-50.6",
   },
 ].map((m) => ({
   ...m,
@@ -323,10 +336,23 @@ const POST_ANCHOR_STAGING_APPLIED = [
   path: `supabase/migrations/${m.version}_${m.name}.sql`,
 }));
 
-// Version order, which is also apply order: the ten applied, the five reconciled,
-// then 80.14A (still pending) and finally R0 (staging-applied).
-const POST_ANCHOR_ORDER = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING, ...POST_ANCHOR_STAGING_APPLIED].map((m) => m.version);
-const POST_ANCHOR_ALL = [...POST_ANCHOR_APPLIED, ...POST_ANCHOR_RECONCILED, ...POST_ANCHOR_PENDING, ...POST_ANCHOR_STAGING_APPLIED];
+// ON-DISK ORDER IS VERSION ORDER, and until QF-MVP-50.6 that happened to coincide
+// with category order: the ten applied, the five reconciled, then 80.14A (pending)
+// and finally R0 (staging-applied) were already ascending as written.
+//
+// That coincidence is now gone — 50.6's pending 20260905000000 sorts AFTER R0's
+// staging-applied 20260904000000 — so the order is DERIVED by sorting on version
+// instead of being an artifact of how the four sets happen to be concatenated.
+// Deriving it is strictly stronger: the assertion compares the on-disk sequence
+// against a sorted pin rather than against a block layout that a future phase
+// could silently invalidate again.
+const POST_ANCHOR_ALL = [
+  ...POST_ANCHOR_APPLIED,
+  ...POST_ANCHOR_RECONCILED,
+  ...POST_ANCHOR_PENDING,
+  ...POST_ANCHOR_STAGING_APPLIED,
+].sort((a, b) => (a.version < b.version ? -1 : a.version > b.version ? 1 : 0));
+const POST_ANCHOR_ORDER = POST_ANCHOR_ALL.map((m) => m.version);
 const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
@@ -345,7 +371,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 104;
+const MIGRATION_COUNT = 105;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -559,19 +585,20 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly seventeen local migrations are newer than the anchor", postAnchorLocal.length === 17, `actual=${postAnchorLocal.length}`);
+  check("exactly eighteen local migrations are newer than the anchor", postAnchorLocal.length === 18, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 17);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 18);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
   check("the reconciled records appear in exact pinned order", same(reconciledPins?.map((r) => r.version), POST_ANCHOR_RECONCILED.map((m) => m.version)));
   // QF-MVP-82A-R0-S1: R0 left the PENDING set when it was applied to staging, so
-  // PENDING is exactly the 80.14A production activation authority again. It is
-  // still EXACT, pinned by version/name/path/SHA, and must not also be claimed
-  // applied anywhere.
-  check("the explicit PENDING post-anchor set holds exactly the one pinned entry",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 1,
+  // PENDING was exactly the 80.14A production activation authority again.
+  // QF-MVP-50.6 RE-PIN: 1 -> 2. The orphan cancellation authority (20260905000000)
+  // is source-only and joins PENDING. Both are still EXACT, pinned by
+  // version/name/path/SHA, and neither may also be claimed applied anywhere.
+  check("the explicit PENDING post-anchor set holds exactly the two pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 2,
     `actual=${pendingPins?.length}`);
   check("the explicit STAGING-APPLIED post-anchor set holds exactly the one pinned entry",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
@@ -590,10 +617,16 @@ function validateState(state) {
     stagingAppliedPins?.[0]?.remoteHistoryCountAfterApply === null);
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
+  // The four sets are compared as a SORTED union, not as concatenated blocks. Since
+  // QF-MVP-50.6 a pending migration legitimately sorts after a staging-applied one,
+  // so block order no longer equals version order — but the property being asserted
+  // was always "every post-anchor migration is accounted for exactly once", and that
+  // is what a sorted comparison states.
   check("applied, staging-applied and pending truth together account for every post-anchor migration, with no overlap",
     appliedTruth.length === 15 &&
     same([...appliedTruth.map((r) => r.version), ...(pendingPins ?? []).map((r) => r.version),
-          ...(stagingAppliedPins ?? []).map((r) => r.version)], POST_ANCHOR_ORDER) &&
+          ...(stagingAppliedPins ?? []).map((r) => r.version)]
+           .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), POST_ANCHOR_ORDER) &&
     !(pendingPins ?? []).some((p) => appliedTruth.some((a) => a.version === p.version)) &&
     !(stagingAppliedPins ?? []).some((s) => appliedTruth.some((a) => a.version === s.version)) &&
     !(stagingAppliedPins ?? []).some((s) => (pendingPins ?? []).some((p) => p.version === s.version)));

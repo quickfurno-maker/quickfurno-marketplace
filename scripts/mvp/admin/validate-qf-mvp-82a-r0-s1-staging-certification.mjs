@@ -25,6 +25,10 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const R0_VERSION = "20260904000000";
 const R0_NAME = "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication";
 const R0_PATH = `supabase/migrations/${R0_VERSION}_${R0_NAME}.sql`;
@@ -39,7 +43,7 @@ const PRODUCTION_REF = "yqpgcsduqbxulrlzwzap";
 
 const PUBLISHED_TABLES = ["public.communication_inbound_messages", "public.communication_messages"];
 
-const LIVE_MIGRATION_COUNT = 104;
+const LIVE_MIGRATION_COUNT = 105;
 const FROZEN_RECONCILIATION_COUNT = 102;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
@@ -255,21 +259,26 @@ check("17-18 no application or inbox source belongs to this phase", () => {
   assert(!/"inbox"/.test(types), "the Inbox tab is PR #73's change");
 });
 
-check("19-20 no migration was changed and none was added", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is still 104");
+check("19-20 S1 changed no migration and added none", () => {
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 105");
   eq(canonicalSha256(R0_PATH), R0_SHA, "R0 is byte-identical");
-  // Exactly one R0 migration, and no S1 migration at all.
+  // Exactly one R0 migration, and no S1 migration at all — which is the whole point
+  // of this check: S1 was a certification phase and contributed no SQL of its own.
   eq(MIGRATIONS.filter((f) => /82a_r0/i.test(f)).length, 1, "one R0 migration");
   eq(MIGRATIONS.filter((f) => /82a_r0_s1|r0_s1/i.test(f)).length, 0, "and no S1 migration");
-  eq(MIGRATIONS.at(-1), `${R0_VERSION}_${R0_NAME}.sql`, "R0 is still the newest");
+  // QF-MVP-50.6 RE-PIN: R0 is no longer the newest file, because a later phase
+  // legitimately added one. Its exact position is what S1 can honestly assert.
+  eq(MIGRATIONS[MIGRATIONS.indexOf(`${R0_VERSION}_${R0_NAME}.sql`) - 1],
+    "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+    "R0 still sits immediately after 80.14A");
 });
 
 // ---- 21-22. the two counts -------------------------------------------------
 
-check("21 the live source migration count is still 104", () => {
+check("21 the live source migration count is 105", () => {
   eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 104;/.test(g1), "and G1 still pins 104");
+  assert(/const MIGRATION_COUNT = 105;/.test(g1), "and G1 still pins 105");
 });
 
 check("22 the frozen 80.05 reconciliation count is still 102", () => {
@@ -321,9 +330,11 @@ check("24 no historical applied or reconciled record was rewritten", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 17, "the anchor still totals seventeen");
+  // QF-MVP-50.6 RE-PIN: 17 -> 18. The applied ten and reconciled five — which is what
+  // this check is actually about — are untouched.
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 18, "the anchor totals eighteen");
   eq(10 + 5 + (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length +
-     (MANIFEST.pendingPostAnchorMigrations ?? []).length, 17, "and the four sets add up");
+     (MANIFEST.pendingPostAnchorMigrations ?? []).length, 18, "and the four sets add up");
 });
 
 check("25 no production-applied claim exists for R0 anywhere", () => {

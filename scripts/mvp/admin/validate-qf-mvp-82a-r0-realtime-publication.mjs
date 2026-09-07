@@ -23,6 +23,10 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const MIGRATIONS_DIR = "supabase/migrations";
 const R0_VERSION = "20260904000000";
 const R0_NAME = "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication";
@@ -36,6 +40,11 @@ const PUBLISHED_TABLES = ["public.communication_messages", "public.communication
 /** The migration count on main before R0, and after it. */
 const MIGRATION_COUNT_BEFORE_R0 = 103;
 const MIGRATION_COUNT_WITH_R0 = 104;
+// QF-MVP-50.6 RE-PIN. The two constants above are HISTORICAL facts about R0's own
+// phase — the tree was 103 before it and 104 after it — and must not move. The LIVE
+// tree is a separate, current fact, pinned exactly and separately for the same reason
+// G1 keeps RECONCILIATION_MIGRATION_COUNT apart from MIGRATION_COUNT.
+const LIVE_MIGRATION_COUNT = 105;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
 /**
@@ -86,9 +95,14 @@ check("1 this phase adds exactly one migration", () => {
   eq(mine.length, 1, "exactly one R0 migration");
   eq(mine[0], R0_FILE, "and it is the expected file");
   assert(existsSync(resolve(R0_PATH)), "which exists on disk");
-  // It sorts last, after the 80.14A activation authority.
-  eq(MIGRATIONS.at(-1), R0_FILE, "it is the newest migration");
-  assert(R0_VERSION > "20260903040000", "and its version sorts after 80.14A");
+  // QF-MVP-50.6 RE-PIN: R0 is no longer the newest FILE in the tree, because a later
+  // phase legitimately added one. What R0's own phase claimed — that it added exactly
+  // one migration, sorting immediately after 80.14A — is unchanged and is what is
+  // asserted here. "Immediately after" is still an exact positional proof.
+  assert(R0_VERSION > "20260903040000", "its version sorts after 80.14A");
+  eq(MIGRATIONS[MIGRATIONS.indexOf(R0_FILE) - 1],
+    "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+    "and 80.14A is immediately before it");
 });
 
 check("2 the publication is exactly supabase_realtime", () => {
@@ -203,12 +217,16 @@ check("11 no application, UI or inbox source file is part of this phase", () => 
 
 // ---- 12-14. the count truth ------------------------------------------------
 
-check("12-13 the tree grows by exactly one, from 103 to 104", () => {
-  eq(MIGRATIONS.length, MIGRATION_COUNT_WITH_R0, "the tree is 104");
-  // Equivalent offline proof of the starting count: remove this phase's own
-  // single migration and what remains is exactly the 103 that were on main.
+check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 105", () => {
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 105");
+  // Equivalent offline proof of R0's own contribution: remove this phase's single
+  // migration AND every migration added after it, and what remains is exactly the 103
+  // that were on main when R0 was written.
   const withoutR0 = MIGRATIONS.filter((f) => !/82a_r0/i.test(f));
-  eq(withoutR0.length, MIGRATION_COUNT_BEFORE_R0, "and it was 103 before R0");
+  eq(MIGRATIONS.filter((f) => f < R0_FILE).length + 1, MIGRATION_COUNT_WITH_R0,
+    "R0 was the 104th migration");
+  eq(MIGRATIONS.filter((f) => f < R0_FILE).length, MIGRATION_COUNT_BEFORE_R0,
+    "and it was 103 before R0");
   // No existing migration was renamed, removed or reordered.
   assert(withoutR0.includes("20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql"),
     "80.14A is still present");
@@ -217,7 +235,7 @@ check("12-13 the tree grows by exactly one, from 103 to 104", () => {
 
 check("14 the G1 live pin is the truthful current count", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 104;/.test(g1), "G1 pins the live tree at 104");
+  assert(/const MIGRATION_COUNT = 105;/.test(g1), "G1 pins the live tree at 105");
   // The 80.05 reconciliation count is a HISTORICAL observation and must NOT move:
   // G1 says so itself, and the pending accounting depends on the difference.
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1),
@@ -294,8 +312,12 @@ check("23 the 80.14A pending record is byte-identical", () => {
   eq(e.requiresSeparateStagingDeploymentGate, true, "still gated");
   // R0 leaving the pending set must not have disturbed it: 80.14A is alone again,
   // exactly as it was before R0 was ever added.
-  eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is the only entry");
-  eq(MANIFEST.pendingPostAnchorMigrations.length, 1, "the pending set is exactly one");
+  // QF-MVP-50.6 RE-PIN: pending is two again — 80.14A plus the source-only orphan
+  // cancellation authority. What this check exists to prove is that R0 leaving the
+  // pending set did not disturb the 80.14A record, and that is still exact.
+  eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is the first entry");
+  eq(MANIFEST.pendingPostAnchorMigrations[1].version, "20260905000000", "followed by 50.6");
+  eq(MANIFEST.pendingPostAnchorMigrations.length, 2, "the pending set is exactly two");
 });
 
 check("24 applied and reconciled records are unchanged", () => {
@@ -307,12 +329,12 @@ check("24 applied and reconciled records are unchanged", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  // The anchor now accounts for ten + five + two.
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 17, "post-anchor count is seventeen");
+  // QF-MVP-50.6 RE-PIN: the anchor accounts for ten + five + one + two.
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 18, "post-anchor count is eighteen");
   eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 1, "one staging-applied");
   eq(MANIFEST.appliedPostAnchorMigrations.length + MANIFEST.reconciledPostAnchorMigrations.length +
      MANIFEST.stagingAppliedPostAnchorMigrations.length + MANIFEST.pendingPostAnchorMigrations.length,
-     17, "and the four sets add up to it");
+     18, "and the four sets add up to it");
 });
 
 // ---- 25-26. this phase reaches nothing --------------------------------------
@@ -399,7 +421,7 @@ check("M7 mutant: a manifest SHA that does not match the file", () => {
 check("M8 mutant: leaving the migration count stale", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(!/const MIGRATION_COUNT = 103;/.test(g1), "the stale pin is gone");
-  assert(/const MIGRATION_COUNT = 104;/.test(g1), "and replaced by the truthful one");
+  assert(/const MIGRATION_COUNT = 105;/.test(g1), "and replaced by the truthful one");
   // No pin was loosened to an inequality to make this pass.
   assert(!/MIGRATION_COUNT\s*>=|migrations\.length\s*>=/.test(g1), "no `>=` was introduced");
   assert(!/postAnchorLocal\.length\s*>=/.test(g1), "nor on the post-anchor set");

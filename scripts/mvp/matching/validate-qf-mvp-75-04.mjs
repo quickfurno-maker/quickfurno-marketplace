@@ -1020,8 +1020,13 @@ section('L. GOVERNANCE [static]');
 {
   const migrations = readdirSync(path.join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
 
-  check('L01 QF-MVP-75.04 itself adds NO migration — the set is exactly 102 after the QF-MVP-80.03 audit repair',
-    migrations.length === 102, `found ${migrations.length}`);
+  // QF-MVP-50.6 RE-PIN: 102 -> 105, for the same reason and with the same stale-pin
+  // history as validate-qf-mvp-80-01.mjs G05 — 80.14A (103), 82A-R0 (104) and the 50.6
+  // orphan cancellation authority (105) each added a migration without re-pinning here,
+  // so this assertion was already failing on a clean tree before this phase. 75.04 still
+  // adds no migration of its own, which L02 below proves independently by name.
+  check('L01 QF-MVP-75.04 itself adds NO migration — the set is exactly 105',
+    migrations.length === 105, `found ${migrations.length}`);
 
   check('L02 no 75.04 migration file exists',
     migrations.filter((f) => /qf_mvp_75_04|geofair/i.test(f)).length === 0);

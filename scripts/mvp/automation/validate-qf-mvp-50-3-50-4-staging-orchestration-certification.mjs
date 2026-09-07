@@ -7,6 +7,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (relativePath) => readFileSync(path.join(ROOT, relativePath), "utf8");
 const digest = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -130,15 +134,17 @@ function validateState(state) {
 // renamed, deleted or reordered. Still exact equality.
   // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
   // activation authority (20260903040000). Still exact equality.
-  check("local migration count remains exactly 104", state.migrationFiles.length === 104);
+  check("local migration count remains exactly 105", state.migrationFiles.length === 105);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set holds exactly the one pinned activation authority, one is staging-applied, and the five governed authorities are reconciled as APPLIED",
+  check("the governed pending set holds exactly the two pinned source-only authorities, one is staging-applied, and the five governed authorities are reconciled as APPLIED",
     // QF-MVP-82A-R0 RE-PIN: the SOURCE-PENDING set grows from one to two, adding
     // ONLY the Realtime publication membership. The APPLIED ten and RECONCILED five
     // are untouched. Still exact counts, still no `>=`.
-    Array.isArray(pending) && pending.length === 1 &&
+    // QF-MVP-50.6 RE-PIN: 1 -> 2 pending, both source-only.
+    Array.isArray(pending) && pending.length === 2 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
+    pending[1].version === "20260905000000" && pending[1].operationalStatus === "PENDING" &&
     Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
     state.manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
     state.manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&

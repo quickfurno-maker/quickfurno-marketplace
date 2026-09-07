@@ -51,6 +51,16 @@ export const N8N_RECONCILE_ROUTE_PATH =
   "/api/internal/automation/n8n/reconcile" as const;
 
 /**
+ * QF-MVP-50.6. Orphan cancellation is its own signing path for the same reason
+ * recover and reconcile are: it holds a DIFFERENT authority over the job state
+ * machine. It may move a job to the terminal cancelled state and may do nothing
+ * else — it cannot claim, execute, complete or recover — so a signature minted
+ * for any other route must never authenticate here.
+ */
+export const N8N_CANCEL_ORPHAN_ROUTE_PATH =
+  "/api/internal/automation/n8n/cancel-orphan" as const;
+
+/**
  * Closed transport route vocabulary. Mirrors the ledger's route_key CHECK.
  *
  * QF-MVP-50.5 RE-PIN, NEVER LOOSEN. History of this constant:
@@ -58,6 +68,7 @@ export const N8N_RECONCILE_ROUTE_PATH =
  *   QF-MVP-50.2D  two routes  + complete_v1
  *   QF-MVP-50.2E  three       + execute_v1
  *   QF-MVP-50.5   five        + recover_v1, reconcile_v1
+ *   QF-MVP-50.6   six         + cancel_orphan_v1
  *
  * Every gate that pins this array does so by EXACT ORDERED EQUALITY — never a
  * length lower bound and never a membership test — so widening it is a
@@ -69,6 +80,7 @@ export const AUTOMATION_TRANSPORT_ROUTE_KEYS = [
   "execute_v1",
   "recover_v1",
   "reconcile_v1",
+  "cancel_orphan_v1",
 ] as const;
 export type AutomationTransportRouteKey =
   (typeof AUTOMATION_TRANSPORT_ROUTE_KEYS)[number];
@@ -358,6 +370,29 @@ export interface AutomationStaleAttemptCandidateRow {
   execute_request_id: string | null;
   execute_reserved_at: string | null;
   execute_reservation_stale: boolean;
+}
+
+/**
+ * Exactly what the `cancel_orphan_v1` transport RPC returns.
+ *
+ * NOTE THE ABSENCES. There is no attempt_id, attempt_number or max_attempts,
+ * because cancelling an orphan opens no attempt and touches no attempt budget —
+ * the transport shape CHECK constraint enforces that all three stay null, so the
+ * missing fields here are a restatement of a database invariant rather than a
+ * convenience.
+ *
+ * `safe_code` is read back from the job row Core just wrote, so a replay reports
+ * the durable reason rather than a remembered one.
+ */
+export interface AutomationTransportCancelOrphanRow {
+  request_id: string;
+  route_key: AutomationTransportRouteKey;
+  state: "cancelled" | "empty";
+  is_replay: boolean;
+  job_id: string | null;
+  action_request_id: string | null;
+  entity_type: string | null;
+  safe_code: string | null;
 }
 
 export interface AutomationTransportRuntimeConfig {

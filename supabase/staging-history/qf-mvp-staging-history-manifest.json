@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 17,
+    "postAnchorMigrationCount": 18,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -930,6 +930,22 @@
       "phase": "QF-MVP-80.14A",
       "operationalStatus": "PENDING",
       "purpose": "Creates public.qf_activate_meta_lead_assignment_v1 — the ONLY authority that can assign activation_status=active, scoped to meta_whatsapp_cloud/whatsapp/lead_assignment_alert/en. Applying it arms nothing.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260905000000",
+      "name": "qf_mvp_50_6_automation_orphan_cancellation",
+      "path": "supabase/migrations/20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
+      "sha256": "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63",
+      "phase": "QF-MVP-50.6",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates public.qf_automation_entity_state_v1, public.qf_cancel_orphan_automation_job_v1 and public.qf_cancel_orphan_automation_job_transport_v1 — the only authority that may move an orphan automation job to the existing terminal cancelled status. Grants no direct table mutation and seeds no data.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

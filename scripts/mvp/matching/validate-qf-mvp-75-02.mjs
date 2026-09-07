@@ -51,6 +51,10 @@ import {
   splitRankedPool,
 } from '../../../lib/matchcore/automaticMatchDecision.ts';
 import {
+
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
   CANONICAL_ACTIVE_ASSIGNMENT_CAP,
   CANONICAL_ASSIGNMENT_CREDIT_COST,
   CANONICAL_LIFETIME_ASSIGNMENT_CAP,
@@ -783,7 +787,7 @@ section('J. MIGRATION GOVERNANCE [static]');
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-  check('J01 the local migration set is exactly 104', migrations.length === 104,
+  check('J01 the local migration set is exactly 105', migrations.length === 105,
     `found ${migrations.length}`);
   // QF-MVP-80.03: the geo migration is no longer the TAIL of the set — the
   // audit_logs forward repair (20260817000000) was added after it. What 75.02
@@ -798,7 +802,7 @@ section('J. MIGRATION GOVERNANCE [static]');
   const g1 = read('scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs');
   const geoSha = sha256(MIGRATION_RAW.replace(/\r\n/g, '\n'));
   check('J03 G1 is re-pinned to 103 by exact equality, never loosened to >=',
-    /const MIGRATION_COUNT = 104;/.test(g1)
+    /const MIGRATION_COUNT = 105;/.test(g1)
     && !/MIGRATION_COUNT\s*[><]=/.test(g1));
   // QF-MVP-80.05 RECONCILIATION: 20260816000000 was applied to staging and production,
   // proved by read-only history queries, so the manifest now carries it as RECONCILED /
@@ -822,13 +826,17 @@ section('J. MIGRATION GOVERNANCE [static]');
     && geoEntry.appliedByThisPhase === false
     && geoEntry.requiresSeparateStagingDeploymentGate === false
     && !pending.some((m) => m.version === '20260816000000'));
-  check('J06 the manifest post-anchor count is 17: ten applied, five reconciled, one staging-applied, one pending',
-    manifest.appliedAnchor.postAnchorMigrationCount === 17
+  // QF-MVP-50.6 RE-PIN: 17 -> 18 and pending 1 -> 2, adding ONLY the source-only
+  // orphan cancellation authority. APPLIED stays ten, RECONCILED stays five.
+  check('J06 the manifest post-anchor count is 18: ten applied, five reconciled, one staging-applied, two pending',
+    manifest.appliedAnchor.postAnchorMigrationCount === 18
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
     && reconciled.length === 5
-    && pending.length === 1
+    && pending.length === 2
     && pending[0].version === '20260903040000'
     && pending[0].operationalStatus === 'PENDING'
+    && pending[1].version === '20260905000000'
+    && pending[1].operationalStatus === 'PENDING'
     // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to its own set, which
     // explicitly refuses any production claim.
     && (manifest.stagingAppliedPostAnchorMigrations ?? []).length === 1

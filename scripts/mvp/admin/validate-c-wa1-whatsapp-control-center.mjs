@@ -22,6 +22,10 @@ import { dirname, join } from "node:path";
 
 import { ADMIN_DIRECTORY_PAGE_SIZE, ADMIN_EMBEDDED_PANEL_LIMIT } from "../../../lib/adminPaging.ts";
 import {
+
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
   META_OPERATIONS,
   ReadinessState,
 } from "../../../lib/communication/providers/metaRuntimeReadiness.ts";
@@ -110,7 +114,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count is unchanged at 104", migrations.length === 104);
+check("migration count is unchanged at 105", migrations.length === 105);
 check("C-WA1 added no migration", !migrations.some((f) => /wa1|whatsapp_admin|admin_whatsapp/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("the read layer only reads EXISTING communication relations", (() => {

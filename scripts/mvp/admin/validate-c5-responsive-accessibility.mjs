@@ -11,6 +11,10 @@ import { fileURLToPath } from "node:url";
 
 import { ADMIN_DIRECTORY_PAGE_SIZE, ADMIN_EMBEDDED_PANEL_LIMIT } from "../../../lib/adminPaging.ts";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 const shell = read("components/admin/AdminShell.tsx");
@@ -169,7 +173,7 @@ check("no browser service-role credential", !/SUPABASE_SERVICE_ROLE_KEY|process\
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count remains 104", readdirSync(join(root, "supabase", "migrations")).length === 104);
+check("migration count remains 105", readdirSync(join(root, "supabase", "migrations")).length === 105);
 check("C5 added no accessibility/UI dependency", !Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies }).some((name) => /radix|headlessui|framer|focus-trap|axe/i.test(name)));
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);

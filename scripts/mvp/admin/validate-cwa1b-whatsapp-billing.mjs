@@ -9,6 +9,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 const stripComments = (source) =>
@@ -149,7 +153,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((nam
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count remains exactly 104", migrations.length === 104);
+check("migration count remains exactly 105", migrations.length === 105);
 check("C-WA1B package command is wired", typeof pkg.scripts["test:admin:cwa1b"] === "string");
 
 // 7 — Focused mutation self-tests for the highest-risk claims.

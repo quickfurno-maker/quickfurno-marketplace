@@ -32,6 +32,10 @@ import { dirname, join } from "node:path";
 
 import { ADMIN_DIRECTORY_PAGE_SIZE, ADMIN_EMBEDDED_PANEL_LIMIT } from "../../../lib/adminPaging.ts";
 
+// QF-MVP-50.6 RE-PIN: 104 -> 105, adding ONLY the SOURCE-PENDING orphan cancellation
+// authority (20260905000000). No existing migration was changed, renamed, deleted or
+// reordered. Still exact equality, never a lower bound.
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -231,7 +235,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count is unchanged at 104", migrations.length === 104);
+check("migration count is unchanged at 105", migrations.length === 105);
 
 console.log(`\nC6 integrated Admin V2: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

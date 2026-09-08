@@ -598,6 +598,98 @@ check("42 [static] job ids are never hardcoded as runtime authority", () => {
 });
 
 // ---------------------------------------------------------------------------
+// E2. [pure+static] QF-MVP-50.9-C1 — the two idempotency identities
+//
+// Independent review found the first revision passed the ATTEMPT-scoped
+// communication key (qf_auto_v1:<job>:<attempt>) into the clarification parser,
+// which accepts only qf_action_v1 — so both clarification actions still failed
+// closed. The parser was right; the WIRING was wrong. These rules pin the
+// separation structurally so the swap cannot be reintroduced silently.
+// ---------------------------------------------------------------------------
+const execBody = () => bodyOf(SERVICE_SRC, "export async function executeClientAutomationForN8nTransport");
+
+check("43 [pure] a qf_auto_v1 COMMUNICATION key can never resolve a clarification request", () => {
+  const job = "7f2c1a44-9c6e-4a2b-8d11-77aa0b3c5e91";
+  const attempt = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+  const communicationKey = `qf_auto_v1:${job}:${attempt}`;
+  for (const action of [REQUIREMENT, REMINDER]) {
+    const r = parseClarificationRequestIdentity({ actionType: action, leadId: LEAD, idempotencyKey: communicationKey });
+    assert(r.ok === false, `${action}: the communication key was accepted as producer evidence`);
+  }
+  // …and the matching ACTION key for the same lead still resolves exactly.
+  assert(parseClarificationRequestIdentity({
+    actionType: REQUIREMENT, leadId: LEAD, idempotencyKey: reqKey(),
+  }).requestId === REQ, "the action key stopped resolving");
+  assert(parseClarificationRequestIdentity({
+    actionType: REMINDER, leadId: LEAD, idempotencyKey: remKey(),
+  }).requestId === REQ, "the reminder action key stopped resolving");
+});
+
+check("44 [static] the executor derives BOTH identities from their own sources", () => {
+  const body = execBody();
+  assert(/const communicationIdempotencyKey = buildAutomationCommunicationIdempotencyKey\(/.test(body),
+    "the attempt-scoped communication key is not built under its explicit name");
+  assert(/actionIdempotencyKey: envelope\.idempotencyKey,/.test(body),
+    "the ACTION key is not taken from envelope.idempotencyKey");
+  assert(/\n\s*communicationIdempotencyKey,\n/.test(body),
+    "the communication key is not passed separately to the intent builder");
+  // The action key must never be REBUILT from parts — the envelope already
+  // carries Core's own source identity.
+  assert(!/qf_action_v1/.test(body), "the executor hand-builds a qf_action_v1 key instead of using the envelope");
+});
+
+check("45 [static] the intent-builder boundary carries NO generic idempotency name", () => {
+  const sig = SERVICE_SRC.slice(
+    SERVICE_SRC.indexOf("async function buildClientCommunicationIntent"),
+    SERVICE_SRC.indexOf("}): Promise<PreparedIntent>"),
+  );
+  assert(/actionIdempotencyKey: string;/.test(sig), "actionIdempotencyKey is not an explicit argument");
+  assert(/communicationIdempotencyKey: string;/.test(sig), "communicationIdempotencyKey is not an explicit argument");
+  assert(!/(^|[^a-zA-Z])idempotencyKey: string;/.test(sig),
+    "a generic `idempotencyKey` survives at the boundary — the two identities are confusable again");
+});
+
+check("46 [static] the parser receives the ACTION key and only the ACTION key", () => {
+  const build = bodyOf(SERVICE_SRC, "async function buildClientCommunicationIntent");
+  assert(/resolveClarificationExecutionFacts\(\s*args\.definition,\s*args\.leadId,\s*args\.actionIdempotencyKey,\s*\)/.test(build),
+    "the clarification binding does not receive args.actionIdempotencyKey");
+  assert(!/resolveClarificationExecutionFacts\([\s\S]{0,120}?communicationIdempotencyKey/.test(build),
+    "the clarification binding receives the communication key");
+  const clar = clarBody();
+  assert(/actionIdempotencyKey: string,/.test(clar), "the resolver no longer demands the action key by name");
+  assert(/idempotencyKey: actionIdempotencyKey,/.test(clar),
+    "the parser is not handed the action key");
+  assert(!/communicationIdempotencyKey/.test(clar), "the communication key reached the clarification resolver");
+});
+
+check("47 [static] the communication row keeps its own ATTEMPT-scoped identity", () => {
+  const build = bodyOf(SERVICE_SRC, "async function buildClientCommunicationIntent");
+  assert(/idempotency_key: args\.communicationIdempotencyKey,/.test(build),
+    "the communication intent no longer uses the attempt-scoped key");
+  assert(!/idempotency_key: args\.actionIdempotencyKey/.test(build),
+    "the ACTION key became the communication row's send identity");
+});
+
+check("48 [static] durable evidence is read with the COMMUNICATION key only", () => {
+  const body = execBody();
+  const calls = body.match(/readCommunicationEvidence\([^)]*\)/g) || [];
+  assert(calls.length === 2, `expected exactly 2 evidence reads, found ${calls.length}`);
+  for (const c of calls) {
+    assert(/readCommunicationEvidence\(communicationIdempotencyKey\)/.test(c),
+      `an evidence read does not use the communication key: ${c}`);
+  }
+  assert(!/readCommunicationEvidence\(envelope\.idempotencyKey\)|readCommunicationEvidence\(actionIdempotencyKey\)/.test(SERVICE_SRC),
+    "durable evidence is being read with the ACTION key");
+});
+
+check("49 [static] envelope.idempotencyKey is used for clarification evidence and nothing else", () => {
+  const uses = (SERVICE_SRC.match(/envelope\.idempotencyKey/g) || []).length;
+  assert(uses === 1, `envelope.idempotencyKey is used ${uses} times — it must feed only the action-key argument`);
+  assert(/actionIdempotencyKey: envelope\.idempotencyKey,/.test(SERVICE_SRC),
+    "envelope.idempotencyKey is not wired to actionIdempotencyKey");
+});
+
+// ---------------------------------------------------------------------------
 // F. [mutant] every rule must REJECT a broken source
 // ---------------------------------------------------------------------------
 mutant("M01 [mutant] reject: latest-request-by-lead instead of the sealed request",
@@ -664,7 +756,7 @@ mutant("M11 [mutant] reject: the binding runs AFTER variables are resolved",
   SERVICE_RAW,
   (s) => {
     const c = s;
-    const block = "  const clarification = await resolveClarificationExecutionFacts(\n    args.definition,\n    args.leadId,\n    args.idempotencyKey,\n  );\n  if (!clarification.ok) return { ok: false, code: clarification.code };\n\n";
+    const block = "  const clarification = await resolveClarificationExecutionFacts(\n    args.definition,\n    args.leadId,\n    args.actionIdempotencyKey,\n  );\n  if (!clarification.ok) return { ok: false, code: clarification.code };\n\n";
     if (!c.includes(block)) throw new Error("mutation anchor missing");
     return c.replace(block, "").replace("  const built = (args.builder", block + "  const built = (args.builder");
   },
@@ -772,6 +864,54 @@ mutant("M28 [mutant] reject: the action prefix is no longer compared",
   CONTRACT_SRC,
   (s) => s.replace("  if (action !== actionType) return { ok: false };", ""),
   (s) => /if \(action !== actionType\) return \{ ok: false \};/.test(s));
+
+// --- C1 mutants: the exact wiring swap independent review caught ------------
+mutant("C1-M01 [mutant] reject: the call site feeds the COMMUNICATION key as the action key",
+  SERVICE_RAW,
+  (s) => s.replace("    actionIdempotencyKey: envelope.idempotencyKey,", "    actionIdempotencyKey: communicationIdempotencyKey,"),
+  (s) => /actionIdempotencyKey: envelope\.idempotencyKey,/.test(stripComments(s)));
+
+mutant("C1-M02 [mutant] reject: the parser is handed the communication key",
+  SERVICE_RAW,
+  (s) => s.replace("    args.actionIdempotencyKey,\n  );", "    args.communicationIdempotencyKey,\n  );"),
+  (s) => /resolveClarificationExecutionFacts\(\s*args\.definition,\s*args\.leadId,\s*args\.actionIdempotencyKey,\s*\)/.test(
+    bodyOf(stripComments(s), "async function buildClientCommunicationIntent")));
+
+mutant("C1-M03 [mutant] reject: the ACTION key becomes the communication row identity",
+  SERVICE_RAW,
+  (s) => s.replace("      idempotency_key: args.communicationIdempotencyKey,", "      idempotency_key: args.actionIdempotencyKey,"),
+  (s) => /idempotency_key: args\.communicationIdempotencyKey,/.test(stripComments(s)) &&
+         !/idempotency_key: args\.actionIdempotencyKey/.test(stripComments(s)));
+
+mutant("C1-M04 [mutant] reject: durable evidence is read with the ACTION key",
+  SERVICE_RAW,
+  (s) => s.replace("  const existingEvidence = await readCommunicationEvidence(communicationIdempotencyKey);",
+                   "  const existingEvidence = await readCommunicationEvidence(envelope.idempotencyKey);"),
+  (s) => {
+    const body = bodyOf(stripComments(s), "export async function executeClientAutomationForN8nTransport");
+    const calls = body.match(/readCommunicationEvidence\([^)]*\)/g) || [];
+    return calls.length === 2 && calls.every((c) => /readCommunicationEvidence\(communicationIdempotencyKey\)/.test(c));
+  });
+
+mutant("C1-M05 [mutant] reject: the two arguments collapse back into one generic name",
+  SERVICE_RAW,
+  (s) => s.replace("  /** qf_action_v1 — ACTION-scoped producer identity. Clarification evidence only. */\n  actionIdempotencyKey: string;\n  /** qf_auto_v1 — ATTEMPT-scoped. The communication row's own identity. */\n  communicationIdempotencyKey: string;",
+                   "  idempotencyKey: string;"),
+  (s) => {
+    const c = stripComments(s);
+    const sig = c.slice(c.indexOf("async function buildClientCommunicationIntent"), c.indexOf("}): Promise<PreparedIntent>"));
+    return /actionIdempotencyKey: string;/.test(sig) && /communicationIdempotencyKey: string;/.test(sig) &&
+      !/(^|[^a-zA-Z])idempotencyKey: string;/.test(sig);
+  });
+
+mutant("C1-M06 [mutant] reject: the action key is hand-rebuilt instead of taken from the envelope",
+  SERVICE_RAW,
+  (s) => s.replace("    actionIdempotencyKey: envelope.idempotencyKey,",
+                   "    actionIdempotencyKey: `qf_action_v1:${envelope.actionType}:lead:${envelope.entityId}:clar`,"),
+  (s) => {
+    const body = bodyOf(stripComments(s), "export async function executeClientAutomationForN8nTransport");
+    return /actionIdempotencyKey: envelope\.idempotencyKey,/.test(body) && !/qf_action_v1/.test(body);
+  });
 
 // ============================================================================
 (async () => {

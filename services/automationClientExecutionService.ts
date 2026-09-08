@@ -141,18 +141,32 @@ export async function executeClientAutomationForN8nTransport(
 
   const { job, attempt } = ownership;
 
-  const idempotencyKey = buildAutomationCommunicationIdempotencyKey(
+  // QF-MVP-50.9-C1 — TWO DIFFERENT IDENTITIES LIVE IN THIS FUNCTION.
+  //
+  //   communicationIdempotencyKey  qf_auto_v1:<jobId>:<attemptId>
+  //     ATTEMPT-scoped. Owns communication_messages identity, durable evidence
+  //     lookup and one-attempt send identity. A retry gets a NEW one.
+  //
+  //   envelope.idempotencyKey      qf_action_v1:<action>:lead:<lead>:<evidence>
+  //     ACTION-scoped, reconstructed from automation_action_requests. It is the
+  //     ONLY key carrying the producer's clarification-request evidence.
+  //
+  // The first revision of 50.9 passed the COMMUNICATION key into the
+  // clarification parser, which accepts only qf_action_v1 — so both
+  // clarification actions still failed QF_EXEC_VARIABLES_UNRESOLVED. Neither
+  // name is generic any more, precisely so that swap cannot be made silently.
+  const communicationIdempotencyKey = buildAutomationCommunicationIdempotencyKey(
     input.jobId,
     input.attemptId,
   );
-  if (!idempotencyKey) {
+  if (!communicationIdempotencyKey) {
     throw new Error("AUTOMATION_TRANSPORT_EXECUTION_IDENTITY_INVALID");
   }
 
   // -------------------------------------------------------------------------
   // B. Durable communication evidence FIRST — the authoritative split
   // -------------------------------------------------------------------------
-  const existingEvidence = await readCommunicationEvidence(idempotencyKey);
+  const existingEvidence = await readCommunicationEvidence(communicationIdempotencyKey);
 
   if (existingEvidence) {
     // A row exists. Core does not classify, does not finalize and does not
@@ -306,7 +320,11 @@ export async function executeClientAutomationForN8nTransport(
     channel,
     leadId: envelope.entityId,
     correlationId: envelope.correlationId,
-    idempotencyKey,
+    // The ACTION key carries the producer's clarification evidence; the
+    // COMMUNICATION key owns the send/evidence identity. Both are passed
+    // explicitly and are never interchangeable.
+    actionIdempotencyKey: envelope.idempotencyKey,
+    communicationIdempotencyKey,
     builder,
   });
 
@@ -329,7 +347,7 @@ export async function executeClientAutomationForN8nTransport(
   // -------------------------------------------------------------------------
   // F. Re-read durable evidence. This, not the return value above, decides.
   // -------------------------------------------------------------------------
-  const evidence = await readCommunicationEvidence(idempotencyKey);
+  const evidence = await readCommunicationEvidence(communicationIdempotencyKey);
   if (evidence) {
     return evidenceResult(input.requestId, evidence, reservationReplayed);
   }
@@ -474,7 +492,10 @@ async function buildClientCommunicationIntent(args: {
   channel: "whatsapp";
   leadId: string;
   correlationId: string;
-  idempotencyKey: string;
+  /** qf_action_v1 — ACTION-scoped producer identity. Clarification evidence only. */
+  actionIdempotencyKey: string;
+  /** qf_auto_v1 — ATTEMPT-scoped. The communication row's own identity. */
+  communicationIdempotencyKey: string;
   builder: ClientVariableBuilder;
 }): Promise<PreparedIntent> {
   const facts = await readLeadFacts(args.leadId);
@@ -496,7 +517,7 @@ async function buildClientCommunicationIntent(args: {
   const clarification = await resolveClarificationExecutionFacts(
     args.definition,
     args.leadId,
-    args.idempotencyKey,
+    args.actionIdempotencyKey,
   );
   if (!clarification.ok) return { ok: false, code: clarification.code };
 
@@ -535,7 +556,7 @@ async function buildClientCommunicationIntent(args: {
       entity_type: "lead",
       entity_id: args.leadId,
       correlation_id: args.correlationId,
-      idempotency_key: args.idempotencyKey,
+      idempotency_key: args.communicationIdempotencyKey,
       priority: "normal",
       scheduled_at: null,
       policy_decision_id: null,
@@ -692,7 +713,8 @@ type ClarificationExecutionResult =
 async function resolveClarificationExecutionFacts(
   definition: ClientAutomationDispatchDefinition,
   leadId: string,
-  idempotencyKey: string,
+  /** MUST be the qf_action_v1 ACTION key. A qf_auto_v1 key can never resolve here. */
+  actionIdempotencyKey: string,
 ): Promise<ClarificationExecutionResult> {
   // Every other client action is untouched and carries no clarification facts.
   if (!isClarificationActionType(definition.actionType)) {
@@ -702,7 +724,7 @@ async function resolveClarificationExecutionFacts(
   const identity = parseClarificationRequestIdentity({
     actionType: definition.actionType,
     leadId,
-    idempotencyKey,
+    idempotencyKey: actionIdempotencyKey,
   });
   if (!identity.ok) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
 

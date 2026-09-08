@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import { submitLead } from "@/app/actions";
+import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import {
   DISCARD_CONFIRM_BODY,
   DISCARD_CONFIRM_TITLE,
@@ -175,7 +176,11 @@ const initialState: RFState = {
 const inrFormatter = new Intl.NumberFormat("en-IN");
 
 // Indian mobile: exactly 10 digits, first digit 6-9.
-const PHONE_RE = /^[6-9]\d{9}$/;
+// QF-MVP-50.8: the accepted national shape is IMPORTED from the shared lead
+// contract rather than re-declared, so this modal, the /enquiry funnel, the
+// server capture authority and the lead destination adapter cannot drift apart.
+// The modal stays national-only by design; see LeadFunnel for why widening it
+// to international input would be form redesign, not validation.
 
 /**
  * Strip everything but digits and normalise a pasted Indian number down to a
@@ -189,7 +194,7 @@ function cleanPhone(raw: string): string {
 }
 
 function isPhoneValid(digits: string): boolean {
-  return PHONE_RE.test(digits);
+  return isIndianLeadMobile(digits);
 }
 
 /** Inline tick / cross shown inside a field (same look as the vendor form). */

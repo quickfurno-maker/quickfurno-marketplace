@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { submitLead } from "@/app/actions";
 import { ENQUIRY_SERVICES } from "@/lib/config";
+import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import { cities } from "@/lib/quickfurno-data";
 
 type LeadFormState = {
@@ -55,8 +56,14 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       return;
     }
 
-    if (form.phone.replace(/\D/g, "").length < 10) {
-      setError("Please enter a valid 10 digit phone number.");
+    // QF-MVP-50.8 — the SAME shared lead contract the live surfaces
+    // (ClientEnquiryModal, LeadFunnel) and the server capture authority use,
+    // imported rather than restated. The previous rule counted digits after
+    // stripping every non-digit, so "1234567890", "0000000000" and
+    // "98-765-43210" all looked valid here while producing a lead the dispatcher
+    // could never reach. The server remains authoritative.
+    if (!isIndianLeadMobile(form.phone.trim())) {
+      setError("Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9.");
       return;
     }
     if (!shareConsent) {

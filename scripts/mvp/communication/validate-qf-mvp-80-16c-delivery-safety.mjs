@@ -411,7 +411,29 @@ check(
   bare.ok === false && bare.code === "PHONE_MISSING_COUNTRY_CODE",
   JSON.stringify({ ok: bare.ok, code: bare.code })
 );
-check("the vendor-only adapter is still the single +91 assumption", (resolverCode.match(/\+91/g) ?? []).length === 1);
+// QF-MVP-50.8 RE-PIN. This was `length === 1` — "the vendor adapter is the only
+// +91 assumption in the resolver". QF-MVP-50.8 added a second, separately named
+// LEAD adapter, so the count is now exactly 2. The property being protected is
+// not the NUMBER but the CONTAINMENT: every +91 assumption must live inside an
+// explicitly recipient-scoped adapter, and none may sit in shared resolver code.
+check(
+  "every +91 assumption is contained in a named recipient-scoped adapter",
+  (() => {
+    const occurrences = (resolverCode.match(/\+91/g) ?? []).length;
+    if (occurrences !== 2) return false;
+    const bodyOfFn = (name) => {
+      const start = resolverCode.indexOf(`export function ${name}`);
+      if (start === -1) return "";
+      return resolverCode.slice(start, resolverCode.indexOf("\n}", start));
+    };
+    const vendor = bodyOfFn("normalizeStoredVendorDestination");
+    const lead = bodyOfFn("normalizeStoredLeadDestination");
+    return (
+      (vendor.match(/\+91/g) ?? []).length === 1 &&
+      (lead.match(/\+91/g) ?? []).length === 1
+    );
+  })()
+);
 check(
   "the adapter still matches a SHAPE and never strips characters",
   /STORED_INDIAN_MOBILE = \/\^\[6-9\]\\d\{9\}\$\//.test(resolverCode) &&

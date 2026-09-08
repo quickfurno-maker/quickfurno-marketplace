@@ -10,6 +10,7 @@ import {
   blockedClientSelectedAssignment,
 } from "./canonicalAssignmentAuthority";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
+import { normalizeLeadContactForStorage } from "../lib/leads/leadContactContract";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
 import { emitLeadClarificationRequiredEvent } from "../lib/aos/events/emitLeadClarificationRequiredEvent";
@@ -51,6 +52,20 @@ export async function createLead(
 
     if (!name || !phone || !city || !serviceRequired) throw appError("VALIDATION");
 
+    // QF-MVP-50.8 — the lead-contact contract is enforced HERE, before the
+    // duplicate probe and before the INSERT, because the server is the only
+    // authority: the public form can be bypassed, and `public.leads.phone` has
+    // no database CHECK constraint to catch what slips through. Accepting an
+    // unreachable number costs a lead that can never be contacted, so it is
+    // refused at capture rather than discovered later by the dispatcher.
+    //
+    // `storage` is the trimmed input, never an E.164 rewrite: `check_duplicate_lead`
+    // matches `phone` by exact equality, so canonicalising here would silently
+    // change duplicate detection for every existing row.
+    const contact = normalizeLeadContactForStorage(phone);
+    if (!contact.ok) throw appError("VALIDATION");
+    const storedPhone = contact.storage;
+
     const db = adminClient();
 
     console.info("[lead submit] starting", {
@@ -63,7 +78,7 @@ export async function createLead(
 
     // duplicate check (RPC honours app_settings.duplicate_lead_window_days)
     const { data: dupId, error: dupErr } = await db.rpc("check_duplicate_lead", {
-      p_phone: phone,
+      p_phone: storedPhone,
       p_service: serviceRequired,
       p_city: city,
     });
@@ -73,7 +88,7 @@ export async function createLead(
 
     const basePayload = {
       name,
-      phone,
+      phone: storedPhone,
       city,
       area: input.area ?? null,
       service_required: serviceRequired,

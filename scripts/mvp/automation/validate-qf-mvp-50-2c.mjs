@@ -468,8 +468,27 @@ record("F04 lead resolver reads public.leads by id",
 record("F05 lead resolver selects only the phone column, exactly once",
   /from\("leads"\)\s*\n?\s*\.select\("phone"\)/.test(leadBody) &&
   (leadBody.match(/\.select\(/g) ?? []).length === 1);
-record("F06 lead resolver uses the canonical normalization path",
-  /normalizeResolvedDestination/.test(leadBody));
+// QF-MVP-50.8 RE-PIN. This required the lead branch to call
+// `normalizeResolvedDestination` DIRECTLY. The lead branch now calls the
+// lead-only storage adapter instead — but the canonical path is not bypassed:
+// the adapter's every return goes through `normalizeResolvedDestination`, so a
+// lead destination is still normalized by exactly the same authority. Both
+// halves are asserted, so replacing the adapter with a hand-rolled normalizer
+// (or letting it return a raw string) still fails here.
+record("F06 lead resolver reaches the canonical normalization path",
+  /normalizeStoredLeadDestination/.test(leadBody) &&
+  (() => {
+    const lib = stripJsComments(read("lib/communication/recipientResolver.ts"));
+    const start = lib.indexOf("export function normalizeStoredLeadDestination");
+    if (start === -1) return false;
+    const body = lib.slice(start, lib.indexOf("\n}", start));
+    const returns = body.match(/return\s+\w+/g) ?? [];
+    return (
+      returns.length > 0 &&
+      returns.every((r) => /failRecipientResolution|normalizeResolvedDestination/.test(
+        body.slice(body.indexOf(r), body.indexOf(r) + 60)))
+    );
+  })());
 record("F07 lead resolver has no client_accounts fallback",
   !/client_accounts|vendors|phone_e164/.test(leadBody));
 record("F08 lead resolver performs no write",

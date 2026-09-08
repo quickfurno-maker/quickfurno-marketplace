@@ -192,18 +192,37 @@ const vendorBranch = () => {
   return SERVICE_SRC.slice(start, SERVICE_SRC.indexOf("\n  }", start));
 };
 
-check("13 [static] only the VENDOR branch uses the adapter", () => {
+check("13 [static] the VENDOR adapter is used by the vendor branch and by NO other", () => {
   const branch = vendorBranch();
   assert(/normalizeStoredVendorDestination/.test(branch), "the vendor branch does not use the adapter");
-  // Every other resolver must still use the generic helper.
+
+  // QF-MVP-50.8 RE-PIN. This check originally required every OTHER branch to
+  // call the generic normalizer, which encoded "vendor is the only recipient
+  // type with a storage adapter". QF-MVP-50.8 added a second, separately named
+  // LEAD adapter for `public.leads.phone`, so that clause is no longer the
+  // truth — but the property this check actually protects is unchanged and is
+  // still enforced below: THE VENDOR ADAPTER MAY NOT LEAK INTO ANY OTHER
+  // BRANCH. Client and admin additionally still use the generic normalizer,
+  // and lead is pinned to its own adapter rather than left unconstrained.
   for (const other of ["resolveClient", "resolveLead", "resolveAdmin"]) {
     const s = SERVICE_SRC.indexOf(`private async ${other}`);
     assert(s !== -1, `${other} is gone`);
     const body = SERVICE_SRC.slice(s, SERVICE_SRC.indexOf("\n  }", s));
     assert(!/normalizeStoredVendorDestination/.test(body),
       `${other} was widened to use the vendor-only adapter`);
-    assert(/normalizeResolvedDestination/.test(body), `${other} no longer uses the generic normalizer`);
   }
+
+  for (const generic of ["resolveClient", "resolveAdmin"]) {
+    const s = SERVICE_SRC.indexOf(`private async ${generic}`);
+    const body = SERVICE_SRC.slice(s, SERVICE_SRC.indexOf("\n  }", s));
+    assert(/normalizeResolvedDestination/.test(body), `${generic} no longer uses the generic normalizer`);
+    assert(!/normalizeStoredLeadDestination/.test(body), `${generic} was widened to use the lead adapter`);
+  }
+
+  const leadStart = SERVICE_SRC.indexOf("private async resolveLead");
+  const leadBody = SERVICE_SRC.slice(leadStart, SERVICE_SRC.indexOf("\n  }", leadStart));
+  assert(/normalizeStoredLeadDestination/.test(leadBody),
+    "the lead branch uses neither the lead adapter nor the generic normalizer");
 });
 
 check("14 [static] a malformed preferred WhatsApp number still fails closed", () => {

@@ -711,7 +711,25 @@ export const suite = {
         // "00000000000") while the canonical homepage modal already required
         // ^[6-9]\d{9}$. The two live lead-entry surfaces now enforce the SAME
         // contract; this is a stricter pin, not a relaxed one.
-        assertTrue(src.includes('/^[6-9]\\d{9}$/'), 'Indian mobile rule matches the canonical modal');
+        // QF-MVP-50.8 RE-PIN. This required the literal `^[6-9]\d{9}$` to appear
+        // in this file — which proved the two surfaces agreed only by matching
+        // copies. Both now IMPORT the one shared definition
+        // (lib/leads/indianMobile.ts), which the server capture authority and
+        // the lead destination adapter also use, so agreement is structural
+        // rather than coincidental. Re-declaring the literal here is now the
+        // regression, and is asserted against below.
+        assertTrue(src.includes("from \"@/lib/leads/indianMobile\""),
+          'Indian mobile rule comes from the shared lead contract');
+        assertTrue(src.includes('isIndianLeadMobile('), 'submit gate calls the shared predicate');
+        assertFalse(src.includes('/^[6-9]\\d{9}$/'),
+          'the national shape must not be re-declared locally — it belongs to the shared contract');
+        {
+          const modalSrc = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
+          assertTrue(modalSrc.includes("from \"@/lib/leads/indianMobile\""),
+            'the canonical modal uses the same shared contract');
+          assertFalse(modalSrc.includes('/^[6-9]\\d{9}$/'),
+            'the canonical modal must not re-declare the national shape either');
+        }
         assertTrue(src.includes('maxLength={10}'), 'phone field is capped at 10 characters');
         assertTrue(src.includes('sanitizePhone('), 'phone input is sanitized to digits');
         assertFalse(src.includes('replace(/\\D/g, "").length < 10'),

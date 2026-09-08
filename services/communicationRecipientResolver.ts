@@ -10,6 +10,12 @@
 //   client → public.client_accounts.phone_e164      (Phase 5A identity)
 //   vendor → public.vendors.whatsapp_number ?? .phone
 //   admin  → public.profiles.phone  (role = 'admin')
+//   lead   → public.leads.phone                     (raw capture text)
+//
+// Each recipient type uses the adapter matching ITS OWN storage contract, and
+// no other: vendor rows use the vendor adapter, lead rows use the lead adapter,
+// and client/admin rows — which already hold international numbers — go straight
+// to the canonical normalizer. The adapters are never shared across types.
 //
 // integration / system recipients have no destination and always fail closed.
 // A row whose stored number is absent or malformed also fails closed — this
@@ -22,6 +28,7 @@ import {
   RecipientResolutionError,
   failRecipientResolution,
   normalizeResolvedDestination,
+  normalizeStoredLeadDestination,
   normalizeStoredVendorDestination,
   validateRecipientReference,
   type CommunicationRecipientResolver,
@@ -66,6 +73,11 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
    * matching, vendor fallback, or durable plaintext copy. A lead is a contact reference,
    * not a proof of account ownership, so a match by number would be a wrong-subject
    * decision. Anything unresolvable fails closed.
+   *
+   * QF-MVP-50.8: the stored text may be an Indian mobile in national form, which is
+   * one of the two shapes lead capture accepts (`lib/leads/leadContactContract.ts`),
+   * so it is adapted by the LEAD-ONLY adapter before the canonical normalizer sees
+   * it. Every other value still goes to the normalizer unchanged and fails closed.
    */
   private async resolveLead(leadId: string): Promise<Result<string>> {
     const { data, error } = await adminClient()
@@ -76,7 +88,7 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
 
     if (error) return failRecipientResolution(RecipientResolutionError.RECIPIENT_LOOKUP_FAILED);
     if (!data) return failRecipientResolution(RecipientResolutionError.RECIPIENT_NOT_FOUND);
-    return normalizeResolvedDestination((data as { phone: string | null }).phone);
+    return normalizeStoredLeadDestination((data as { phone: string | null }).phone);
   }
 
   /** Phase 5A `client_accounts.phone_e164` is already the normalized identity. */

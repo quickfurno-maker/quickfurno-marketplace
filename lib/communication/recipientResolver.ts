@@ -21,6 +21,10 @@
 // ============================================================================
 
 import { AppError, fail, ok, type Result } from "../errors";
+// QF-MVP-50.8: the lead national-mobile shape is imported from the ONE lead
+// capture contract rather than re-declared here, so the value this adapter
+// adapts is exactly the value lead capture agreed to accept.
+import { INDIAN_LEAD_MOBILE_RE } from "../leads/indianMobile";
 import { normalizePhoneE164 } from "./phone";
 import type { CommunicationRecipientType } from "./types";
 
@@ -153,6 +157,43 @@ export function normalizeStoredVendorDestination(raw: string | null | undefined)
   // already-international, malformed, too short, too long, wrong first digit —
   // goes to the canonical normalizer and lives or dies by its rules.
   if (STORED_INDIAN_MOBILE.test(trimmed)) {
+    return normalizeResolvedDestination(`+91${trimmed}`);
+  }
+  return normalizeResolvedDestination(trimmed);
+}
+
+/**
+ * QF-MVP-50.8 — the LEAD-ONLY storage adapter.
+ *
+ * WHY IT IS SEPARATE FROM THE VENDOR ONE. The two boundaries reach the same
+ * `+91` interpretation from DIFFERENT evidence, and collapsing them into one
+ * "stored destination" helper would erase that difference:
+ *
+ *   * vendor: `services/vendorService.ts` refuses to persist anything but ten
+ *     bare digits, so the storage contract is enforced at write time.
+ *   * lead: `public.leads.phone` has NO database CHECK constraint, and before
+ *     QF-MVP-50.8 its writer only required a non-empty string. The justification
+ *     here is therefore the newly explicit CAPTURE contract in
+ *     `lib/leads/leadContactContract.ts`, not a pre-existing storage guarantee —
+ *     which is exactly why that contract had to be written down first.
+ *
+ * Keeping two named adapters means a future change to one boundary's rule
+ * cannot silently move the other, and the resolver's static contract can prove
+ * which recipient type uses which.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO. Identical restraint to the vendor adapter:
+ * it does not relax `normalizePhoneE164`, it does not strip or repair
+ * characters, and it matches only the exact national shape. Anything else is
+ * handed to the canonical normalizer unchanged and fails closed on its own
+ * terms. `98765 43210` is NOT adapted — a formatted bare national number is
+ * still a number with no country code.
+ */
+export function normalizeStoredLeadDestination(raw: string | null | undefined): Result<string> {
+  if (raw === null || raw === undefined || raw.trim() === "") {
+    return failRecipientResolution(RecipientResolutionError.RECIPIENT_DESTINATION_MISSING);
+  }
+  const trimmed = raw.trim();
+  if (INDIAN_LEAD_MOBILE_RE.test(trimmed)) {
     return normalizeResolvedDestination(`+91${trimmed}`);
   }
   return normalizeResolvedDestination(trimmed);

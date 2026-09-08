@@ -7,6 +7,7 @@ import { BUDGETS } from "@/lib/config";
 import { resolveLeadTracking } from "@/lib/analytics/leadTracking";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 import { useActiveCategories, NO_ACTIVE_CATEGORIES_MESSAGE } from "@/lib/categories/useActiveCategories";
+import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 
 /**
  * Standalone enquiry funnel for /enquiry.
@@ -31,14 +32,22 @@ type Step = "form" | "done";
  * digits, caps at 10, and the submit gate uses the exact same regexp. No
  * backend, schema or business rule is touched.
  */
-const PHONE_RE = /^[6-9]\d{9}$/;
-
+// QF-MVP-50.8: the accepted shape is IMPORTED from the shared lead contract, not
+// re-declared here. The server (`services/leadService.ts`) and the lead
+// destination adapter test the same constant, so this form cannot drift into
+// accepting a number the dispatcher could never reach.
+//
+// This funnel stays deliberately NATIONAL-ONLY: the field sanitizes to digits
+// and caps at ten, which is the India-market input design from the mobile-form
+// phase. The server additionally accepts an explicitly international number;
+// being stricter here is a UI choice, and widening it is form redesign rather
+// than validation, so it is out of scope for this phase.
 function sanitizePhone(value: string): string {
   return value.replace(/\D/g, "").slice(0, 10);
 }
 
 function isPhoneValid(digits: string): boolean {
-  return PHONE_RE.test(digits);
+  return isIndianLeadMobile(digits);
 }
 
 export function LeadFunnel({ defaultService }: { defaultService?: string }) {

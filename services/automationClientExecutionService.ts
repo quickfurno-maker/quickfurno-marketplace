@@ -39,6 +39,11 @@ import {
   type ClientAutomationDispatchDefinition,
 } from "@/lib/automation/clientDispatchRegistry";
 import { getClientActionVariableBuilder } from "@/lib/automation/clientDispatchVariables";
+import {
+  deriveOutstandingItem,
+  isClarificationActionType,
+  parseClarificationRequestIdentity,
+} from "@/lib/automation/clientClarificationExecution";
 import type { AutomationWorkflowFamily } from "@/lib/automation/actionRegistry";
 import {
   resolveCommunicationExecutionPartition,
@@ -136,18 +141,32 @@ export async function executeClientAutomationForN8nTransport(
 
   const { job, attempt } = ownership;
 
-  const idempotencyKey = buildAutomationCommunicationIdempotencyKey(
+  // QF-MVP-50.9-C1 — TWO DIFFERENT IDENTITIES LIVE IN THIS FUNCTION.
+  //
+  //   communicationIdempotencyKey  qf_auto_v1:<jobId>:<attemptId>
+  //     ATTEMPT-scoped. Owns communication_messages identity, durable evidence
+  //     lookup and one-attempt send identity. A retry gets a NEW one.
+  //
+  //   envelope.idempotencyKey      qf_action_v1:<action>:lead:<lead>:<evidence>
+  //     ACTION-scoped, reconstructed from automation_action_requests. It is the
+  //     ONLY key carrying the producer's clarification-request evidence.
+  //
+  // The first revision of 50.9 passed the COMMUNICATION key into the
+  // clarification parser, which accepts only qf_action_v1 — so both
+  // clarification actions still failed QF_EXEC_VARIABLES_UNRESOLVED. Neither
+  // name is generic any more, precisely so that swap cannot be made silently.
+  const communicationIdempotencyKey = buildAutomationCommunicationIdempotencyKey(
     input.jobId,
     input.attemptId,
   );
-  if (!idempotencyKey) {
+  if (!communicationIdempotencyKey) {
     throw new Error("AUTOMATION_TRANSPORT_EXECUTION_IDENTITY_INVALID");
   }
 
   // -------------------------------------------------------------------------
   // B. Durable communication evidence FIRST — the authoritative split
   // -------------------------------------------------------------------------
-  const existingEvidence = await readCommunicationEvidence(idempotencyKey);
+  const existingEvidence = await readCommunicationEvidence(communicationIdempotencyKey);
 
   if (existingEvidence) {
     // A row exists. Core does not classify, does not finalize and does not
@@ -301,7 +320,11 @@ export async function executeClientAutomationForN8nTransport(
     channel,
     leadId: envelope.entityId,
     correlationId: envelope.correlationId,
-    idempotencyKey,
+    // The ACTION key carries the producer's clarification evidence; the
+    // COMMUNICATION key owns the send/evidence identity. Both are passed
+    // explicitly and are never interchangeable.
+    actionIdempotencyKey: envelope.idempotencyKey,
+    communicationIdempotencyKey,
     builder,
   });
 
@@ -324,7 +347,7 @@ export async function executeClientAutomationForN8nTransport(
   // -------------------------------------------------------------------------
   // F. Re-read durable evidence. This, not the return value above, decides.
   // -------------------------------------------------------------------------
-  const evidence = await readCommunicationEvidence(idempotencyKey);
+  const evidence = await readCommunicationEvidence(communicationIdempotencyKey);
   if (evidence) {
     return evidenceResult(input.requestId, evidence, reservationReplayed);
   }
@@ -469,7 +492,10 @@ async function buildClientCommunicationIntent(args: {
   channel: "whatsapp";
   leadId: string;
   correlationId: string;
-  idempotencyKey: string;
+  /** qf_action_v1 — ACTION-scoped producer identity. Clarification evidence only. */
+  actionIdempotencyKey: string;
+  /** qf_auto_v1 — ATTEMPT-scoped. The communication row's own identity. */
+  communicationIdempotencyKey: string;
   builder: ClientVariableBuilder;
 }): Promise<PreparedIntent> {
   const facts = await readLeadFacts(args.leadId);
@@ -484,7 +510,22 @@ async function buildClientCommunicationIntent(args: {
   const eligibility = await proveExecutionTimeEligibility(args.definition, args.leadId, facts.lead);
   if (!eligibility.ok) return { ok: false, code: eligibility.code };
 
-  const variableInput = resolveVariableInput(args.definition, facts.lead);
+  // QF-MVP-50.9 — bind the two clarification actions to the EXACT producer
+  // request sealed into their own idempotency key, and re-prove that request is
+  // still the lead's current outstanding one. Runs BEFORE any variable is built
+  // and therefore before any communication row, provider call or send.
+  const clarification = await resolveClarificationExecutionFacts(
+    args.definition,
+    args.leadId,
+    args.actionIdempotencyKey,
+  );
+  if (!clarification.ok) return { ok: false, code: clarification.code };
+
+  const variableInput = resolveVariableInput(
+    args.definition,
+    facts.lead,
+    clarification.outstandingItem,
+  );
   if (!variableInput.ok) return { ok: false, code: variableInput.code };
 
   // The builders are declared with an `input: never` parameter so no caller can
@@ -515,7 +556,7 @@ async function buildClientCommunicationIntent(args: {
       entity_type: "lead",
       entity_id: args.leadId,
       correlation_id: args.correlationId,
-      idempotency_key: args.idempotencyKey,
+      idempotency_key: args.communicationIdempotencyKey,
       priority: "normal",
       scheduled_at: null,
       policy_decision_id: null,
@@ -648,6 +689,116 @@ async function readLeadFacts(leadId: string): Promise<LeadFactsResult> {
   };
 }
 
+/**
+ * QF-MVP-50.9 — the exact clarification-request binding.
+ *
+ * `outstandingItem` used to have no proven Core source, so both clarification
+ * actions failed closed. It now has exactly one: the clarification request the
+ * PRODUCER sealed into this action's own idempotency key.
+ *
+ * There is deliberately NO "latest clarification request for this lead" query.
+ * A lead can be asked for clarification more than once, and a newer request must
+ * never supply content for — or authorize — an older queued job.
+ *
+ * Two authorities, kept apart:
+ *   * the exact request row is MESSAGE-CONTENT authority (its persisted
+ *     question KEYS, mapped through a closed client-safe label registry);
+ *   * the live lead row is BUSINESS-ELIGIBILITY authority (still required, and
+ *     still required to point at THIS request).
+ */
+type ClarificationExecutionResult =
+  | { ok: true; outstandingItem: string | null }
+  | { ok: false; code: string };
+
+async function resolveClarificationExecutionFacts(
+  definition: ClientAutomationDispatchDefinition,
+  leadId: string,
+  /** MUST be the qf_action_v1 ACTION key. A qf_auto_v1 key can never resolve here. */
+  actionIdempotencyKey: string,
+): Promise<ClarificationExecutionResult> {
+  // Every other client action is untouched and carries no clarification facts.
+  if (!isClarificationActionType(definition.actionType)) {
+    return { ok: true, outstandingItem: null };
+  }
+
+  const identity = parseClarificationRequestIdentity({
+    actionType: definition.actionType,
+    leadId,
+    idempotencyKey: actionIdempotencyKey,
+  });
+  if (!identity.ok) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
+  // The EXACT row, by primary key. Only the fields this decision needs.
+  const requestRead = await adminClient()
+    .from("lead_clarification_requests")
+    .select("id, lead_id, status, questions_json, missing_fields")
+    .eq("id", identity.requestId)
+    .maybeSingle();
+
+  // A broken lookup is INFRASTRUCTURE, never a business fact — the same
+  // distinction the rest of this service makes, so a transient blip cannot
+  // become a permanent definitive failure.
+  if (requestRead.error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+
+  const request = requestRead.data as {
+    id: string;
+    lead_id: string | null;
+    status: string | null;
+    questions_json: unknown;
+    missing_fields: unknown;
+  } | null;
+
+  // The sealed evidence names a request that does not exist: nothing can be
+  // built, and no other row may be borrowed in its place.
+  if (!request) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
+  // The request must belong to the lead this job is for. A key that survived
+  // parsing but names another lead's request is a hard refusal.
+  if (request.lead_id !== leadId) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
+  // ---- EXECUTION-TIME BUSINESS REPROOF -----------------------------------
+  // Beyond this point the failure is BUSINESS state, not missing content: the
+  // request was real, but the clarification has moved on.
+  const leadRead = await adminClient()
+    .from("leads")
+    .select("clarification_required, clarification_status, clarification_last_request_id")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (leadRead.error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+
+  const leadRow = leadRead.data as {
+    clarification_required: boolean | null;
+    clarification_status: string | null;
+    clarification_last_request_id: string | null;
+  } | null;
+  if (!leadRow) return { ok: false, code: "QF_EXEC_LEAD_NOT_FOUND" };
+
+  if (request.status !== "preview_prepared") {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  if (leadRow.clarification_required !== true) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  if (leadRow.clarification_status !== "preview_prepared") {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  // The decisive one: a NEWER clarification request must never authorize this
+  // older job. The lead's current request has to be exactly the sealed one.
+  if (leadRow.clarification_last_request_id !== identity.requestId) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+
+  // ---- CONTENT -----------------------------------------------------------
+  // Derived from the persisted question KEYS of the exact request, through the
+  // closed label registry. `missing_fields` is not consulted: it is a mutable
+  // convenience column, while questions_json is what was actually asked.
+  const derived = deriveOutstandingItem(request.questions_json);
+  if (!derived.ok) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
+  return { ok: true, outstandingItem: derived.outstandingItem };
+}
+
 type VariableInputResult =
   | { ok: true; input: Record<string, unknown> }
   | { ok: false; code: string };
@@ -655,15 +806,19 @@ type VariableInputResult =
 /**
  * Map Core-owned lead facts onto each action's declared builder input.
  *
- * `outstandingItem` has NO proven Core source in this repository today, so the
- * two clarification actions resolve to nothing and fail closed. That is the
- * honest answer: inventing a value would put unproven text in front of a client.
- * Both of those templates are DRAFT and unmapped in any case, so this changes no
- * live capability — it records the gap instead of papering over it.
+ * QF-MVP-50.9: `outstandingItem` now has exactly ONE Core source — the exact
+ * clarification request sealed into the action's own idempotency key, resolved
+ * by `resolveClarificationExecutionFacts` above and handed in here. It is still
+ * never invented: if that binding produced nothing, this function is not even
+ * reached, because the caller has already failed closed.
+ *
+ * `outstandingItem` is a parameter rather than something re-derived here so the
+ * database work stays in one auditable place and this function stays pure.
  */
 function resolveVariableInput(
   definition: ClientAutomationDispatchDefinition,
   lead: LeadFacts,
+  outstandingItem: string | null,
 ): VariableInputResult {
   const unresolved: VariableInputResult = {
     ok: false,
@@ -690,7 +845,11 @@ function resolveVariableInput(
       };
     case "client.requirement_collection":
     case "client.missing_information_reminder":
-      return unresolved;
+      // The builders remain the final variable-contract authority: they still
+      // validate every field and still prove the emitted key set equals their
+      // declared contract exactly. This only supplies the proven input.
+      if (outstandingItem === null) return unresolved;
+      return { ok: true, input: { clientName: lead.name, outstandingItem } };
     default:
       return unresolved;
   }

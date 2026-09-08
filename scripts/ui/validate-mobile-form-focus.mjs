@@ -227,8 +227,22 @@ check("13 the wide tile spans, rather than orphaning, on the desktop grid", () =
 // ---------------------------------------------------------------------------
 check("14 /enquiry enforces the same Indian mobile contract as the modal", () => {
   const funnel = code("components/LeadFunnel.tsx");
-  assert(/\/\^\[6-9\]\\d\{9\}\$\//.test(funnel.replace(/\s+/g, "")),
-    "LeadFunnel does not enforce ^[6-9]\\d{9}$");
+  // QF-MVP-50.8 RE-PIN. This required the literal `^[6-9]\d{9}$` to appear in
+  // LeadFunnel, which proved the funnel and the modal agreed only because two
+  // copies happened to match. Both now IMPORT the one shared definition
+  // (lib/leads/indianMobile.ts) — which the server capture authority and the
+  // lead destination adapter also use — so the agreement is structural. The
+  // rule is asserted as SHARED, and a locally re-declared regex is now itself
+  // the regression.
+  const modal = code("components/ClientEnquiryModal.tsx");
+  for (const [label, src] of [["LeadFunnel", funnel], ["ClientEnquiryModal", modal]]) {
+    assert(/from "@\/lib\/leads\/indianMobile"/.test(src),
+      `${label} does not take the Indian mobile contract from the shared module`);
+    assert(/isIndianLeadMobile\(/.test(src),
+      `${label} does not call the shared Indian mobile predicate`);
+    assert(!/\/\^\[6-9\]\\d\{9\}\$\//.test(src.replace(/\s+/g, "")),
+      `${label} re-declares the national shape locally instead of sharing it`);
+  }
   assert(/maxLength=\{10\}/.test(flat(funnel)), "the /enquiry phone field has no 10-character cap");
   assert(/sanitizePhone\(/.test(funnel), "the /enquiry phone field does not sanitize to digits");
   assert(!/length\s*<\s*10/.test(funnel), "the old 'at least 10 digits' check is back — it accepts 11+ digits");

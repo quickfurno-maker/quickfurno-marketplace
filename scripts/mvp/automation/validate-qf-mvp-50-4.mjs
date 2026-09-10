@@ -329,7 +329,7 @@ record("G01 the migration is forensically reconciled APPLIED with exact identity
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
 // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
 // the Meta production activation authority. Still an exact count, never `>=`.
-record("G02 pending holds exactly three pinned source-only authorities, one is staging-applied, five are reconciled, and 50.5 is the newest applied record",
+record("G02 pending holds exactly three pinned source-only authorities, two are staging-applied, five are reconciled, and 50.5 is the newest applied record",
   // QF-MVP-82A-R0 RE-PIN: the pending set now holds exactly TWO explicitly pinned
   // entries — the 80.14A production activation authority and the 82A-R0 Realtime
   // publication membership. Both are SOURCE-PENDING. Still an exact count, still no `>=`.
@@ -344,7 +344,7 @@ record("G02 pending holds exactly three pinned source-only authorities, one is s
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
   manifest.pendingPostAnchorMigrations[1].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[2].version === "20260906000000" &&
-  manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+  manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
   manifest.stagingAppliedPostAnchorMigrations[0].version === "20260904000000" &&
   manifest.stagingAppliedPostAnchorMigrations[0].operationalStatus === "APPLIED_TO_STAGING" &&
   manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
@@ -376,7 +376,7 @@ record("G05 the validator is registered and wired into CI after 50.3",
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
 record("G06 the local migration set is exactly 104",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 107);
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 108);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

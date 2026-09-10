@@ -587,20 +587,21 @@ record("G01 the migration matches its pinned canonical hash",
 // QF-MVP-50.6 RE-PIN: 104 -> 105. 50.5 is still the newest APPLIED migration; the two
 // newer files are both source-pending or staging-only, which is exactly why the APPLIED
 // tail assertion below is unchanged.
-record("G02 the local migration set is exactly 107 and 50.5 is the newest APPLIED migration",
+record("G02 the local migration set is exactly 108 and 50.5 is the newest APPLIED migration",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 107 &&
+    return files.length === 108 &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql") &&
-      files.at(-6) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
-      files.at(-5) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
-      files.at(-4) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
-      files.at(-3) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql" &&
-      files.at(-2) === "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql" &&
-      files.at(-1) === "20260910060000_qf_mvp_40_canary_quiesce_transition.sql" &&
+      files.at(-7) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
+      files.at(-6) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-5) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
+      files.at(-4) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql" &&
+      files.at(-3) === "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql" &&
+      files.at(-2) === "20260910060000_qf_mvp_40_canary_quiesce_transition.sql" &&
+      files.at(-1) === "20260911000000_qf_launch_security_closeout.sql" &&
       manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000";
   })());
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: the SOURCE-PENDING set grows from one to two
@@ -624,7 +625,7 @@ record("G03 the manifest pins 50.5 as APPLIED with first-party staging evidence,
       pending[0].operationalStatus === "PENDING" &&
       pending[1].version === "20260905000000" &&
       pending[1].operationalStatus === "PENDING" &&
-      Array.isArray(stagingApplied) && stagingApplied.length === 1 &&
+      Array.isArray(stagingApplied) && stagingApplied.length === 2 &&
       stagingApplied[0].version === "20260904000000" &&
       stagingApplied[0].appliedToProduction === false &&
       Array.isArray(reconciled) && reconciled.length === 5 &&
@@ -654,9 +655,9 @@ record("G04 the ten APPLIED records run 21-30 with 50.5 newest and the anchor co
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
-  manifest.appliedAnchor.postAnchorMigrationCount === 20);
+  manifest.appliedAnchor.postAnchorMigrationCount === 21);
 record("G05 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 107;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
   // QF-MVP-50.6 RE-PIN: G1's pending pin moved 1 -> 2 for the orphan cancellation
   // authority. This assertion still proves G1 pins an EXACT pending count.
@@ -743,7 +744,7 @@ const mutants = [
   ["one lane starving the other is prevented by construction",
     () => workflow.nodes.filter((n) => n.type === "n8n-nodes-base.scheduleTrigger").length === 2],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 107;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 108;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   // QF-MVP-40.13B: the pending set is non-empty again, so this `every()` is no longer
   // vacuous — it now genuinely guards the SOURCE-PENDING canary authority. The other

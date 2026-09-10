@@ -48,7 +48,7 @@ const MIGRATION_COUNT_WITH_R0 = 104;
 // phase — the tree was 103 before it and 104 after it — and must not move. The LIVE
 // tree is a separate, current fact, pinned exactly and separately for the same reason
 // G1 keeps RECONCILIATION_MIGRATION_COUNT apart from MIGRATION_COUNT.
-const LIVE_MIGRATION_COUNT = 107;
+const LIVE_MIGRATION_COUNT = 108;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
 /**
@@ -222,7 +222,7 @@ check("11 no application, UI or inbox source file is part of this phase", () => 
 // ---- 12-14. the count truth ------------------------------------------------
 
 check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 105", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 107");
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 108");
   // Equivalent offline proof of R0's own contribution: remove this phase's single
   // migration AND every migration added after it, and what remains is exactly the 103
   // that were on main when R0 was written.
@@ -239,7 +239,7 @@ check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 
 
 check("14 the G1 live pin is the truthful current count", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 107;/.test(g1), "G1 pins the live tree at 107");
+  assert(/const MIGRATION_COUNT = 108;/.test(g1), "G1 pins the live tree at 108");
   // The 80.05 reconciliation count is a HISTORICAL observation and must NOT move:
   // G1 says so itself, and the pending accounting depends on the difference.
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1),
@@ -334,11 +334,11 @@ check("24 applied and reconciled records are unchanged", () => {
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
   // QF-MVP-50.6 RE-PIN: the anchor accounts for ten + five + one + two.
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 20, "post-anchor count is twenty");
-  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 1, "one staging-applied");
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 21, "post-anchor count is twenty-one");
+  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 2, "two staging-applied");
   eq(MANIFEST.appliedPostAnchorMigrations.length + MANIFEST.reconciledPostAnchorMigrations.length +
      MANIFEST.stagingAppliedPostAnchorMigrations.length + MANIFEST.pendingPostAnchorMigrations.length,
-     20, "and the four sets add up to it");
+     21, "and the four sets add up to it");
 });
 
 // ---- 25-26. this phase reaches nothing --------------------------------------
@@ -425,7 +425,7 @@ check("M7 mutant: a manifest SHA that does not match the file", () => {
 check("M8 mutant: leaving the migration count stale", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(!/const MIGRATION_COUNT = 103;/.test(g1), "the stale pin is gone");
-  assert(/const MIGRATION_COUNT = 107;/.test(g1), "and replaced by the truthful one");
+  assert(/const MIGRATION_COUNT = 108;/.test(g1), "and replaced by the truthful one");
   // No pin was loosened to an inequality to make this pass.
   assert(!/MIGRATION_COUNT\s*>=|migrations\.length\s*>=/.test(g1), "no `>=` was introduced");
   assert(!/postAnchorLocal\.length\s*>=/.test(g1), "nor on the post-anchor set");

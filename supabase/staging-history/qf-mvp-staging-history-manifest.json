@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 20,
+    "postAnchorMigrationCount": 21,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -919,6 +919,39 @@
       "rowLevelSecurityEnabledAfterApply": true,
       "apiRoleGrantsAfterApply": 0,
       "evidencePath": "docs/QF-MVP-82A-R0-STAGING-CERTIFICATION.md"
+    },
+    {
+      "version": "20260910060000",
+      "name": "qf_mvp_40_canary_quiesce_transition",
+      "path": "supabase/migrations/20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
+      "sha256": "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
+      "phase": "QF-MVP-40",
+      "operationalStatus": "APPLIED_TO_STAGING",
+      "purpose": "Creates public.qf_quiesce_meta_canary_v1 — the closure-only de-escalation that takes the Meta WhatsApp runtime policy from canary (or an already-exact readiness posture) down to the existing readiness posture, leaving outbound OFF while webhook processing stays ON so a late delivery-status callback is still accepted, and deactivating every active canary destination and template mapping. It can never reach active or canary, never enables outbound, never creates a policy row, never writes communication_provider_accounts and refuses every other prior state including disabled. Grants no direct table mutation and seeds no data. Applying it arms nothing.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": true,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_APPLIED_TO_PRODUCTION",
+      "remoteHistoryCountObservedAtApply": false,
+      "stagingApplyCertifiedByPhase": "QF-MVP-40 staging history reconciliation",
+      "appliedEvidenceType": "REMOTE_HISTORY_RECONCILIATION_PLUS_OBJECT_AND_POSTURE_VERIFICATION",
+      "migrationSqlRerunDuringReconciliation": false,
+      "appliedExactlyOnceToStaging": true,
+      "stagingRemoteVersionStatus": "PRESENT_IN_STAGING_HISTORY",
+      "accidentalDuplicateVersionObserved": "20260910100753",
+      "accidentalDuplicateVersionRemoved": true,
+      "stagingObjectVerification": "public.qf_quiesce_meta_canary_v1() exists exactly once",
+      "stagingPostureVerifiedAfterIdempotentQuiesce": {
+        "activation_status": "readiness_only",
+        "outbound_enabled": false,
+        "webhook_processing_enabled": true,
+        "health_check_enabled": true,
+        "activeProviderTemplateMappings": 0,
+        "activeCanaryDestinations": 0,
+        "providerAccountUnchanged": true
+      },
+      "requiresSeparateProductionDeploymentGate": true
     }
   ],
   "pendingPostAnchorMigrations": [
@@ -971,13 +1004,13 @@
       "requiresSeparateStagingDeploymentGate": true
     },
     {
-      "version": "20260910060000",
-      "name": "qf_mvp_40_canary_quiesce_transition",
-      "path": "supabase/migrations/20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
-      "sha256": "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
-      "phase": "QF-MVP-40",
+      "version": "20260911000000",
+      "name": "qf_launch_security_closeout",
+      "path": "supabase/migrations/20260911000000_qf_launch_security_closeout.sql",
+      "sha256": "44606797e6ad380d80b12e6250f0eed6d86504ac6ce5117473420300514fb44e",
+      "phase": "QF-LAUNCH-SECURITY-CLOSEOUT",
       "operationalStatus": "PENDING",
-      "purpose": "Creates public.qf_quiesce_meta_canary_v1 — the closure-only de-escalation that takes the Meta WhatsApp runtime policy from canary (or an already-exact readiness posture) down to the existing readiness posture, leaving outbound OFF while webhook processing stays ON so a late delivery-status callback is still accepted, and deactivating every active canary destination and template mapping. It can never reach active or canary, never enables outbound, never creates a policy row, never writes communication_provider_accounts and refuses every other prior state including disabled. Grants no direct table mutation and seeds no data. Applying it arms nothing.",
+      "purpose": "Hardens the public read boundary: makes public.vendor_public_v explicitly read-only for PUBLIC/anon/authenticated (every write verb revoked and asserted), removes SECURITY DEFINER from public.get_public_eligible_vendors by repointing it at the already-trusted projection, revokes browser EXECUTE on three functions whose only application callers run under the service role, and pins search_path on six functions the advisor flagged. Grants no new access, drops no policy, disables no RLS and mutates no row.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

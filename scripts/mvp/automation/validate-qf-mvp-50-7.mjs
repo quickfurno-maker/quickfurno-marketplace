@@ -621,10 +621,10 @@ record("P07 no pre-existing shape clause was weakened",
 // ---------------------------------------------------------------------------
 record("Q01 the migration is the pinned forward-only file and is the newest 50.x authority",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().at(-2) ===
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().at(-3) ===
     "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql");
-record("Q02 the local migration set is exactly 107",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 107);
+record("Q02 the local migration set is exactly 108",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 108);
 record("Q03 a fail-closed dependency preflight runs before anything is installed",
   migrationCode.indexOf("QF-MVP-50.7: the automation persistence and transport tables must exist.") <
     migrationCode.indexOf("create or replace function public.qf_automation_vendor_business_state_v1") &&
@@ -674,10 +674,10 @@ record("Q09 the manifest pins the migration as SOURCE-PENDING with no applicatio
       pin.remoteHistoryCountObservedAtApply === false &&
       pin.requiresSeparateStagingDeploymentGate === true &&
       !("remoteHistoryCountAfterApply" in pin) && !("appliedEvidenceMarker" in pin) &&
-      manifest.appliedAnchor.postAnchorMigrationCount === 20;
+      manifest.appliedAnchor.postAnchorMigrationCount === 21;
   })());
 record("Q10 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 107;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
   g1Source.includes("pendingPins.length === 4") &&
   g1Source.includes("appliedPins.length === 10") &&
@@ -687,7 +687,7 @@ record("Q10 G1 was re-pinned to the exact new truth, never loosened",
 record("Q11 the applied / reconciled / staging-applied sets are untouched by this source-only phase",
   manifest.appliedPostAnchorMigrations.length === 10 &&
   manifest.reconciledPostAnchorMigrations.length === 5 &&
-  manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+  manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000");
 record("Q12 the gate is registered and wired into CI immediately after 50.6",
   pkg.scripts["test:mvp:50-7"] ===

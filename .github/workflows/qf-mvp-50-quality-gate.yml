@@ -125,6 +125,9 @@ jobs:
       - name: QF-MVP-50.7 validator
         run: npm run test:mvp:50-7
 
+      - name: QF launch security closeout validator
+        run: npm run test:security:launch-closeout
+
       - name: QF-MVP-50.3/50.4 policy-config bridge validator
         run: npm run test:mvp:50-3-50-4-bridge
 

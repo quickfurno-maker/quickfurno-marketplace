@@ -463,12 +463,12 @@ record("B08 a job already cancelled once is refused a second time",
 record("C01 the migration is the pinned forward-only file and nothing else was added",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA &&
   readdirSync(path.join(ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith(".sql")).sort().at(-3) ===
+    .filter((f) => f.endsWith(".sql")).sort().at(-4) ===
     "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql");
 
-record("C02 the local migration set is exactly 107",
+record("C02 the local migration set is exactly 108",
   readdirSync(path.join(ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith(".sql")).length === 107);
+    .filter((f) => f.endsWith(".sql")).length === 108);
 
 record("C03 a fail-closed dependency preflight runs before anything is installed",
   migrationCode.indexOf("raise exception 'QF-MVP-50.6: the automation persistence and transport tables must exist.'") <
@@ -719,11 +719,11 @@ record("F03 the manifest pins the new migration as SOURCE-PENDING with no applic
       pin.requiresSeparateStagingDeploymentGate === true &&
       !("remoteHistoryCountAfterApply" in pin) &&
       !("appliedEvidenceMarker" in pin) &&
-      manifest.appliedAnchor.postAnchorMigrationCount === 20;
+      manifest.appliedAnchor.postAnchorMigrationCount === 21;
   })());
 
 record("F04 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 107;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
   g1Source.includes("pendingPins.length === 4") &&
   g1Source.includes("appliedPins.length === 10") &&
@@ -736,7 +736,7 @@ record("F04 G1 was re-pinned to the exact new truth, never loosened",
 record("F05 the applied and reconciled sets were NOT touched by this source-only phase",
   manifest.appliedPostAnchorMigrations.length === 10 &&
   manifest.reconciledPostAnchorMigrations.length === 5 &&
-  manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+  manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
   manifest.appliedPostAnchorMigrations.at(-1).version === "20260812000000" &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]));
@@ -792,7 +792,7 @@ const mutants = [
             .filter((f) => f.endsWith(".workflow.json"))
             .every((f) => JSON.parse(read(`automation/n8n/${f}`)).active === false)],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 107;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 108;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   ["claiming this migration was applied anywhere is detectable",
     () => {

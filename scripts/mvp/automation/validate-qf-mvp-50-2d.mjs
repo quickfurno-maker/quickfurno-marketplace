@@ -666,8 +666,8 @@ record("I02 the 50.2D migration matches its pinned hash",
 // deleted or reordered. Still exact equality.
 // QF-MVP-50.6 RE-PIN: 17 -> 18, adding ONLY the SOURCE-PENDING orphan cancellation
 // authority (20260905000000). Still exact equality.
-record("I03 exactly twenty migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 20);
+record("I03 exactly twenty-one migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 21);
 record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, the execute_v1 repair, the fresh-claim wedge repair, the policy-config bridge, the 50.3/50.4 set, then the 50.5 recovery transport, then the marketing-consent writer",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
        [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME,
@@ -693,13 +693,14 @@ record("I04 they are exactly the 50.2D completion route, the 50.2E execution rou
         // QF-MVP-50.7 RE-PIN: 18 -> 19, adding ONLY the SOURCE-PENDING
         // stale-business authority. Still exact equality, still an ordering proof.
         "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
-        "20260910060000_qf_mvp_40_canary_quiesce_transition.sql"]));
+        "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
+        "20260911000000_qf_launch_security_closeout.sql"]));
 // QF-MVP-40.13B RE-PIN: 97 -> 98, adding only the SOURCE-PENDING canary activation
 // authority. Still exact equality.
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("I05 the local migration count is exactly 107", migrationFiles.length === 107);
+record("I05 the local migration count is exactly 108", migrationFiles.length === 108);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -762,7 +763,7 @@ record("G03 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and FOUR P
   // QF-MVP-50.6 RE-PIN: 1 -> 2 again, adding the SOURCE-PENDING orphan cancellation
   // authority (20260905000000). APPLIED stays ten, RECONCILED stays five.
   Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 4 &&
-  Array.isArray(manifest.stagingAppliedPostAnchorMigrations) && manifest.stagingAppliedPostAnchorMigrations.length === 1 &&
+  Array.isArray(manifest.stagingAppliedPostAnchorMigrations) && manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
   manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
@@ -772,7 +773,7 @@ record("G03 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and FOUR P
   manifest.pendingPostAnchorMigrations[2].operationalStatus === "PENDING" &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 20 &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 21 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
@@ -811,7 +812,7 @@ record("G07 no generic future-migration allowance was granted",
 // state an EXACT count with no `>=` anywhere — so the literal moves and the shape
 // requirement does not.
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 107;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",

@@ -660,7 +660,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count remains 107", migrations.length === 107);
+check("migration count remains 108", migrations.length === 108);
 check(
   "no Phase 70 migration exists",
   !migrations.some((f) => /qf_mvp_70|mvp_?70|operations_control|launch_control|launch_readiness|attention_queue/i.test(f)),

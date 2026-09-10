@@ -791,7 +791,7 @@ section('J. MIGRATION GOVERNANCE [static]');
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-  check('J01 the local migration set is exactly 107', migrations.length === 107,
+  check('J01 the local migration set is exactly 108', migrations.length === 108,
     `found ${migrations.length}`);
   // QF-MVP-80.03: the geo migration is no longer the TAIL of the set — the
   // audit_logs forward repair (20260817000000) was added after it. What 75.02
@@ -806,7 +806,7 @@ section('J. MIGRATION GOVERNANCE [static]');
   const g1 = read('scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs');
   const geoSha = sha256(MIGRATION_RAW.replace(/\r\n/g, '\n'));
   check('J03 G1 is re-pinned to 103 by exact equality, never loosened to >=',
-    /const MIGRATION_COUNT = 107;/.test(g1)
+    /const MIGRATION_COUNT = 108;/.test(g1)
     && !/MIGRATION_COUNT\s*[><]=/.test(g1));
   // QF-MVP-80.05 RECONCILIATION: 20260816000000 was applied to staging and production,
   // proved by read-only history queries, so the manifest now carries it as RECONCILED /
@@ -832,8 +832,8 @@ section('J. MIGRATION GOVERNANCE [static]');
     && !pending.some((m) => m.version === '20260816000000'));
   // QF-MVP-50.6 RE-PIN: 17 -> 18 and pending 1 -> 2, adding ONLY the source-only
   // orphan cancellation authority. APPLIED stays ten, RECONCILED stays five.
-  check('J06 the manifest post-anchor count is 20: ten applied, five reconciled, one staging-applied, four pending',
-    manifest.appliedAnchor.postAnchorMigrationCount === 20
+  check('J06 the manifest post-anchor count is 21: ten applied, five reconciled, two staging-applied, four pending',
+    manifest.appliedAnchor.postAnchorMigrationCount === 21
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
     && reconciled.length === 5
     && pending.length === 4
@@ -843,9 +843,12 @@ section('J. MIGRATION GOVERNANCE [static]');
     && pending[1].operationalStatus === 'PENDING'
     // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to its own set, which
     // explicitly refuses any production claim.
-    && (manifest.stagingAppliedPostAnchorMigrations ?? []).length === 1
+    // QF-MVP-40: the canary quiesce authority joined the staging-applied set after its
+    // staging history was reconciled. Both members still refuse any production claim.
+    && (manifest.stagingAppliedPostAnchorMigrations ?? []).length === 2
     && manifest.stagingAppliedPostAnchorMigrations[0].version === '20260904000000'
-    && manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false);
+    && manifest.stagingAppliedPostAnchorMigrations[1].version === '20260910060000'
+    && manifest.stagingAppliedPostAnchorMigrations.every((m) => m.appliedToProduction === false));
   check('J07 THIS phase still applied nothing: the geo record carries no observed remote-history count',
     geoEntry && geoEntry.remoteVersionStatus === 'PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY'
     && geoEntry.remoteHistoryCountObservedAtApply === false

@@ -292,14 +292,14 @@ const POST_ANCHOR_PENDING = [
     sha: "e71e8739a5d776c75edcb0ae10470d7d9589eb7949326411ea26540de1baa809",
     phase: "QF-MVP-50.7",
   },
-  // QF-MVP-40 adds the FOURTH pending entry: the closure-only canary quiesce
-  // authority (20260910060000). Source only — not applied to staging, not applied
-  // to production, no applied evidence and no remote history count.
+  // QF LAUNCH SECURITY CLOSEOUT replaces it as the newest pending entry: the
+  // public read-boundary hardening (20260911000000). Source only — not applied
+  // to staging, not applied to production, no applied evidence.
   {
-    version: "20260910060000",
-    name: "qf_mvp_40_canary_quiesce_transition",
-    sha: "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
-    phase: "QF-MVP-40",
+    version: "20260911000000",
+    name: "qf_launch_security_closeout",
+    sha: "44606797e6ad380d80b12e6250f0eed6d86504ac6ce5117473420300514fb44e",
+    phase: "QF-LAUNCH-SECURITY-CLOSEOUT",
   },
 ].map((m) => ({
   ...m,
@@ -348,6 +348,16 @@ const POST_ANCHOR_STAGING_APPLIED = [
     sha: "9bfcd2ed3b6a58976ad5d237d1ca63bf2f0a86ac6dd75aef1ce9267ef7b68e18",
     phase: "QF-MVP-82A-R0",
   },
+  // QF-MVP-40: the canary quiesce authority is now PRESENT IN STAGING HISTORY.
+  // The migration SQL was NOT re-executed during the history reconciliation; the
+  // canonical version row was reconciled and an accidental connector-generated
+  // version (20260910100753) was removed. Production is NOT claimed.
+  {
+    version: "20260910060000",
+    name: "qf_mvp_40_canary_quiesce_transition",
+    sha: "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
+    phase: "QF-MVP-40",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -392,7 +402,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 107;
+const MIGRATION_COUNT = 108;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -606,9 +616,9 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly twenty local migrations are newer than the anchor", postAnchorLocal.length === 20, `actual=${postAnchorLocal.length}`);
+  check("exactly twenty-one local migrations are newer than the anchor", postAnchorLocal.length === 21, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 20);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 21);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -621,9 +631,9 @@ function validateState(state) {
   check("the explicit PENDING post-anchor set holds exactly the four pinned entries",
     pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 4,
     `actual=${pendingPins?.length}`);
-  check("the explicit STAGING-APPLIED post-anchor set holds exactly the one pinned entry",
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the two pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-    stagingAppliedPins.length === 1,
+    stagingAppliedPins.length === 2,
     `actual=${stagingAppliedPins?.length}`);
   check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&

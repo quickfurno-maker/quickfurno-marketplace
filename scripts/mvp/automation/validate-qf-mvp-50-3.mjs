@@ -431,7 +431,7 @@ record("G08 CI still takes no secret, database, provider or deployment action",
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
 record("G09 the local migration set is exactly 104",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 107);
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 108);
 
 // ---------------------------------------------------------------------------
 // V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject

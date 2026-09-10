@@ -298,7 +298,7 @@ const POST_ANCHOR_PENDING = [
   {
     version: "20260910060000",
     name: "qf_mvp_40_canary_quiesce_transition",
-    sha: "05223dd559012622285d31c87bf6de12b374b68062d6ff1fb1d398e65ed8f60a",
+    sha: "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
     phase: "QF-MVP-40",
   },
 ].map((m) => ({

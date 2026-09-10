@@ -10,7 +10,7 @@
 // real WhatsApp send path, so a guard that cannot fail is worse than no guard.
 // ============================================================================
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -612,7 +612,11 @@ const READINESS_POL = POL({ activation_status: "readiness_only", outbound_enable
 // it to simulate a server that wrote nothing, refused, or failed ambiguously.
 function quiesceClient({ policy, mappings = [], canaryRows = [], account = readyAccount(), rpcImpl } = {}) {
   const state = { policy: { ...policy }, mappings: mappings.map((m) => ({ ...m })),
-    canaryRows: canaryRows.map((r) => ({ ...r })), account: { ...account } };
+    canaryRows: canaryRows.map((r) => ({ ...r })),
+    // QF-MVP-40 correction: quiesce compares the provider/channel-scoped account SET, so
+    // the fake must expose an array, not a single row.
+    accounts: [{ id: "acct-1", provider_key: "meta_whatsapp_cloud", channel: "whatsapp", ...account }],
+    account: { ...account } };
   const log = { selects: [], rpcs: [], writes: [] };
   const applyRpc = () => {
     state.policy = { ...state.policy, activation_status: "readiness_only", outbound_enabled: false,
@@ -633,6 +637,8 @@ function quiesceClient({ policy, mappings = [], canaryRows = [], account = ready
       then(resolve) {
         if (name === "communication_provider_template_mappings") return resolve({ data: state.mappings, error: null });
         if (name === "communication_provider_canary_destinations") return resolve({ data: state.canaryRows, error: null });
+        // QF-MVP-40 correction: the provider/channel-scoped account SET read.
+        if (name === "communication_provider_accounts") return resolve({ data: state.accounts, error: null });
         return resolve({ data: [], error: null });
       },
       update() { log.writes.push(`${name}:update`); return b; },
@@ -766,7 +772,7 @@ record("Q22b quiesce refuses if the provider account was altered by the transiti
       rpcImpl: (n, a, state) => {
         state.policy = { ...state.policy, activation_status: "readiness_only", outbound_enabled: false,
           webhook_processing_enabled: true, health_check_enabled: true };
-        state.account = { ...state.account, readiness_status: "disabled" };
+        state.accounts = state.accounts.map((x) => ({ ...x, readiness_status: "disabled" }));
         return { data: [{ ok: true }], error: null };
       },
     });
@@ -820,6 +826,220 @@ record("Q33 adding quiesce did not relax either opening arm",
   ["ARM_READINESS", "ARM_CANARY"].every((m) =>
     R.MODE_REQUIREMENTS[m].attestation === true && R.MODE_REQUIREMENTS[m].meta === true
       && R.MODE_REQUIREMENTS[m].indexProof === true && R.MODE_REQUIREMENTS[m].assetScope === true));
+
+
+// ---------------------------------------------------------------------------
+// QR. QUIESCE — REAL-CLI CONTRACT: no Meta env at all.
+//
+//    REVIEW CORRECTION. The Q-series above drives runOperator with a POPULATED
+//    `expected`, and the shared fake's `eq()` is a no-op whose `maybeSingle()` always
+//    returns an account — so it could not reproduce the real CLI, where quiesce runs with
+//    ONLY the staging Supabase URL + service-role key and `expected.phoneNumberId` is
+//    null. On that path an account read filtered by the expected phone reference degrades
+//    to `eq(phone_number_reference, null)`, and the before/after proof then compares null
+//    to null and "proves" the account unchanged without ever reading it.
+//
+//    These tests use a fake whose eq() ACTUALLY FILTERS, so a null-id dependency cannot
+//    hide, and drive runCli end-to-end with every Meta/canary variable removed.
+// ---------------------------------------------------------------------------
+const STAGING_URL = "https://uckafzuochmbvtiodmcl.supabase.co";
+
+// A filtering fake: unlike the shared one, `eq()` is honoured. A read filtered by a null
+// phone reference therefore returns NOTHING, exactly as PostgREST would behave.
+function filteringClient({ accounts, policy, mappings = [], canaryRows = [], rpcImpl } = {}) {
+  const state = { accounts: accounts.map((a) => ({ ...a })), policy: { ...policy },
+    mappings: mappings.map((m) => ({ ...m })), canaryRows: canaryRows.map((r) => ({ ...r })) };
+  const log = { rpcs: [], writes: [], reads: [] };
+  const rowsFor = (name) =>
+    name === "communication_provider_accounts" ? state.accounts
+    : name === "communication_provider_template_mappings" ? state.mappings
+    : name === "communication_provider_canary_destinations" ? state.canaryRows
+    : name === "communication_provider_runtime_policies" ? (state.policy ? [state.policy] : [])
+    : [];
+  const table = (name) => {
+    const filters = [];
+    const b = {
+      select() { log.reads.push(name); return b; },
+      eq(col, val) { filters.push([col, val]); return b; },
+      apply() { return rowsFor(name).filter((r) => filters.every(([c, v]) => r[c] === v)); },
+      async maybeSingle() { const m = b.apply(); return { data: m[0] ?? null, error: null }; },
+      then(resolve) { return resolve({ data: b.apply(), error: null }); },
+      update() { log.writes.push(`${name}:update`); return b; },
+      insert() { log.writes.push(`${name}:insert`); return b; },
+      upsert() { log.writes.push(`${name}:upsert`); return b; },
+    };
+    return b;
+  };
+  const applyRpc = () => {
+    state.policy = { ...state.policy, activation_status: "readiness_only", outbound_enabled: false,
+      webhook_processing_enabled: true, health_check_enabled: true };
+    state.mappings = state.mappings.map((m) => ({ ...m, is_active: false }));
+    state.canaryRows = state.canaryRows.map((r) => ({ ...r, is_active: false }));
+    return { data: [{ policy_activation_status: "readiness_only" }], error: null };
+  };
+  return { log, state, from: (n) => table(n),
+    async rpc(name, args) { log.rpcs.push({ name, args }); return (rpcImpl ?? applyRpc)(name, args, state); } };
+}
+
+const ACCOUNT_ROW = {
+  id: "acct-1", provider_key: "meta_whatsapp_cloud", channel: "whatsapp",
+  phone_number_reference: "1088396637681784", business_account_reference: "2920988211610262",
+  ...REQUIRED_ACCOUNT_READINESS,
+};
+
+// Every Meta/canary variable is ABSENT. Only the staging DB credential is present.
+const NO_META_ENV = Object.freeze({
+  QF_STAGING_SUPABASE_URL: STAGING_URL,
+  QF_STAGING_SUPABASE_SERVICE_ROLE_KEY: "test-only-service-role-value",
+});
+
+async function runQuiesceCli(client, envOverrides = {}) {
+  const calls = { adapterFactory: 0, indexProof: 0, attestationIo: 0, assetProof: 0, headResolver: 0, meta: 0 };
+  const out = await R.runCli({
+    argv: ["--quiesce-canary"],
+    env: { ...NO_META_ENV, ...envOverrides },
+    log: () => {},
+    now: () => Date.parse("2026-09-10T00:00:00Z"),
+    nonce: () => "n".repeat(32),
+    headResolver: async () => { calls.headResolver += 1; return "0".repeat(40); },
+    adapterFactory: async ({ need }) => {
+      calls.adapterFactory += 1;
+      if (need.meta) calls.meta += 1;
+      return { db: R.createSupabaseDbAdapter(client), meta: null, health: null,
+        expected: { phoneNumberId: envOverrides.QF_META_PHONE_NUMBER_ID ?? null,
+                    wabaId: envOverrides.QF_META_WABA_ID ?? null } };
+    },
+    indexProofFactory: async () => { calls.indexProof += 1; return { verify: async () => ({ ok: true, hash: null }) }; },
+    attestationIoFactory: async () => { calls.attestationIo += 1; return { load: async () => ({ ok: false }), consume: async () => {} }; },
+    stagingAssetProofFactory: async () => { calls.assetProof += 1; return { verify: async () => ({ ok: true }) }; },
+  });
+  return { out, calls, client };
+}
+
+const cli1 = await runQuiesceCli(filteringClient({
+  accounts: [ACCOUNT_ROW], policy: { ...CANARY_POL },
+  mappings: [mapping({ is_active: true })],
+  canaryRows: [{ provider_key: "meta_whatsapp_cloud", channel: "whatsapp",
+    destination_hash: "a".repeat(64), is_active: true, expires_at: null }],
+}));
+
+record("QR01 the REAL CLI reaches QUIESCE_CANARY with NO Meta env whatsoever",
+  cli1.out.ok === true && cli1.out.stage === "QUIESCE_CANARY",
+  JSON.stringify(cli1.out.reason ?? cli1.out.detail ?? ""));
+record("QR02 it succeeds with QF_META_ACCESS_TOKEN absent", cli1.out.ok === true);
+record("QR03 it succeeds with QF_META_WABA_ID absent", cli1.out.ok === true);
+record("QR04 it succeeds with QF_META_PHONE_NUMBER_ID absent", cli1.out.ok === true);
+record("QR05 it succeeds with QF_META_GRAPH_API_VERSION absent", cli1.out.ok === true);
+record("QR06 it succeeds with the canary destination absent", cli1.out.ok === true);
+record("QR07 no Meta adapter was requested and no index/asset/attestation factory ran",
+  cli1.calls.meta === 0 && cli1.calls.indexProof === 0 &&
+  cli1.calls.assetProof === 0 && cli1.calls.attestationIo === 0);
+record("QR08 closure needs no reviewed-source HEAD",
+  cli1.calls.headResolver === 0);
+record("QR09 exactly ONE quiesce RPC, and no arm or disable RPC",
+  cli1.client.log.rpcs.length === 1 && cli1.client.log.rpcs[0].name === R.RPC_NAMES.quiesce);
+record("QR10 no direct write to any table",
+  cli1.client.log.writes.length === 0);
+record("QR11 the account comparison actually READ the provider/channel account set",
+  cli1.out.accountsCompared === 1);
+record("QR12 readback proves outbound closed while webhook processing stays open",
+  cli1.out.observed.policy.activation_status === "readiness_only" &&
+  cli1.out.observed.policy.outbound_enabled === false &&
+  cli1.out.observed.policy.webhook_processing_enabled === true);
+
+record("QR13 a MUTATED account state fails readback on the real no-Meta CLI path",
+  (await (async () => {
+    const c = filteringClient({
+      accounts: [ACCOUNT_ROW], policy: { ...CANARY_POL },
+      rpcImpl: (n, a, state) => {
+        state.policy = { ...state.policy, activation_status: "readiness_only", outbound_enabled: false,
+          webhook_processing_enabled: true, health_check_enabled: true };
+        state.accounts = state.accounts.map((x) => ({ ...x, readiness_status: "disabled" }));
+        return { data: [{ ok: true }], error: null };
+      },
+    });
+    const r = await runQuiesceCli(c);
+    return r.out.ok === false && r.out.reason === F.READBACK_MISMATCH;
+  })()));
+
+record("QR14 the filtering fake genuinely filters, so a null-id read returns NOTHING",
+  (await (async () => {
+    const c = filteringClient({ accounts: [ACCOUNT_ROW], policy: { ...CANARY_POL } });
+    const db = R.createSupabaseDbAdapter(c);
+    const byNull = await db.readAccount(null);
+    const scoped = await db.readProviderAccounts();
+    return byNull === null && scoped.length === 1;
+  })()));
+
+record("QR15 MUTANT: a quiesce that read the account via the expected phone id would break here",
+  (await (async () => {
+    // Emulate the pre-correction implementation on the real CLI contract.
+    const c = filteringClient({ accounts: [ACCOUNT_ROW], policy: { ...CANARY_POL } });
+    const db = R.createSupabaseDbAdapter(c);
+    const before = await db.readAccount(null);   // what the old code did
+    const after = await db.readAccount(null);
+    const vacuous = before === null && after === null &&
+      JSON.stringify(before) === JSON.stringify(after);
+    // The OLD proof would have called this "unchanged" without reading anything.
+    // The CORRECTED proof compares a genuinely populated set instead.
+    const corrected = R.canonicalAccountSet(await db.readProviderAccounts());
+    return vacuous === true && corrected.includes("acct-1");
+  })()));
+
+record("QR16 the real quiesce implementation never reads the account by expected phone id",
+  (() => {
+    const body = runtimeCode.slice(runtimeCode.indexOf("export async function runQuiesce"),
+      runtimeCode.indexOf("export async function runDisable"));
+    return body.length > 0 &&
+      !/readAccount\s*\(/.test(body) &&
+      !/ctx\.expected\.phoneNumberId/.test(body) &&
+      /readProviderAccounts\s*\(\s*\)/.test(body);
+  })());
+record("QR17 the frozen-gate proof uses coherent identity derived from the DB row",
+  (() => {
+    const body = runtimeCode.slice(runtimeCode.indexOf("export async function runQuiesce"),
+      runtimeCode.indexOf("export async function runDisable"));
+    return /business_account_reference/.test(body) && /proveQuiescedIsFailClosed/.test(body);
+  })());
+record("QR18 ARM/PREFLIGHT keep the phone-scoped readAccount unchanged",
+  typeof R.createSupabaseDbAdapter(filteringClient({ accounts: [], policy: {} })).readAccount === "function" &&
+  runtimeCode.includes("readAccount(ctx.expected.phoneNumberId)"));
+
+// -- migration structure ------------------------------------------------------
+const QUIESCE_MIGRATION = readFileSync(
+  path.join(ROOT, "supabase/migrations/20260910060000_qf_mvp_40_canary_quiesce_transition.sql"), "utf8");
+record("QR19 the quiesce migration is explicitly transaction-wrapped",
+  (() => {
+    const ls = QUIESCE_MIGRATION.split("\n");
+    const b = ls.findIndex((l) => l.trim().toLowerCase() === "begin;");
+    const c = ls.findIndex((l) => l.trim().toLowerCase() === "commit;");
+    const create = ls.findIndex((l) => l.startsWith("create function public.qf_quiesce"));
+    const verifyEnd = ls.findIndex((l) => l.trim() === "$verify$;");
+    const onlyOne = ls.filter((l) => l.trim().toLowerCase() === "begin;").length === 1 &&
+                    ls.filter((l) => l.trim().toLowerCase() === "commit;").length === 1;
+    const noRollback = !ls.some((l) => l.trim().toLowerCase().startsWith("rollback"));
+    return b >= 0 && c >= 0 && b < create && c > verifyEnd && onlyOne && noRollback;
+  })());
+record("QR20 the migration verifies INSERT/UPDATE/DELETE revocation on BOTH switch tables for ALL three client roles",
+  /array\['service_role', 'anon', 'authenticated'\]/.test(QUIESCE_MIGRATION) &&
+  /array\['insert', 'update', 'delete'\]/.test(QUIESCE_MIGRATION) &&
+  /communication_provider_runtime_policies/.test(QUIESCE_MIGRATION) &&
+  /communication_provider_canary_destinations/.test(QUIESCE_MIGRATION) &&
+  /lost select on/.test(QUIESCE_MIGRATION));
+record("QR21 the historical 40.13B authority migration is untouched by this change",
+  existsSync(path.join(ROOT, "supabase/migrations/20260813000000_qf_mvp_40_13b_canary_activation_authority.sql")));
+record("QR22 the quiesce FUNCTION BODY reaches no provider network and no send endpoint",
+  (() => {
+    // Scan the function definition only. The migration's own self-verification block
+    // legitimately spells `/messages`, `graph.facebook` and `pg_net` in the regex that
+    // FORBIDS them, so a whole-file scan would fail on the guard itself.
+    const i = QUIESCE_MIGRATION.indexOf("create function public.qf_quiesce_meta_canary_v1()");
+    const j = QUIESCE_MIGRATION.indexOf("$$;", i);
+    const body = QUIESCE_MIGRATION.slice(i, j);
+    return body.length > 0 &&
+      !/\/messages/.test(body) && !/graph\.facebook/.test(body) &&
+      !/pg_net|http_post|http_get|dblink|https?:\/\//.test(body);
+  })());
 
 // ---------------------------------------------------------------------------
 // A. ATTESTATION AND DRIFT

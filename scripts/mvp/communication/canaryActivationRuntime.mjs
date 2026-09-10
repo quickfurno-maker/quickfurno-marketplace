@@ -246,6 +246,27 @@ export function createSupabaseDbAdapter(client) {
       record(`rpc:${RPC_NAMES.armCanary}`);
       return client.rpc(RPC_NAMES.armCanary, args);
     },
+    /**
+     * QF-MVP-40 — the provider/channel-scoped account read used by CLOSURE paths.
+     *
+     * `readAccount` filters by a phone-number reference that comes from the operator's
+     * Meta env. A closure mode must not require Meta env at all, so filtering by it would
+     * either match nothing or — worse — silently compare null to null and "prove" the
+     * account unchanged without ever reading it. This read is scoped ONLY by the
+     * hard-coded provider/channel, so it is correct with no Meta variable set.
+     *
+     * Non-secret columns only; the references it returns are used for internal invariant
+     * comparison and are never logged.
+     */
+    async readProviderAccounts() {
+      record("readProviderAccounts");
+      const { data, error } = await client
+        .from("communication_provider_accounts")
+        .select("id,provider_key,channel,phone_number_reference,business_account_reference,readiness_status,configuration_status,business_verification_status,phone_number_status,webhook_status,health_status")
+        .eq("provider_key", PROVIDER_KEY).eq("channel", CHANNEL);
+      if (error) throw new Error(ActivationFailure.SCHEMA_MISSING);
+      return Array.isArray(data) ? data : [];
+    },
     async rpcQuiesce() {
       record(`rpc:${RPC_NAMES.quiesce}`);
       return client.rpc(RPC_NAMES.quiesce, {});
@@ -527,6 +548,31 @@ function digestOf(value) {
 // WRITE MODES — fresh preflight, exact drift comparison, one RPC, readback
 // ---------------------------------------------------------------------------
 
+/**
+ * QF-MVP-40 — an order-stable, non-secret projection of the provider/channel account set,
+ * used ONLY to prove a closure changed nothing. Sorted by id so row order cannot mask a
+ * change; the references it includes are compared, never logged.
+ */
+export function canonicalAccountSet(rows) {
+  return JSON.stringify(
+    (Array.isArray(rows) ? rows : [])
+      .map((r) => ({
+        id: r.id ?? null,
+        provider_key: r.provider_key ?? null,
+        channel: r.channel ?? null,
+        phone_number_reference: r.phone_number_reference ?? null,
+        business_account_reference: r.business_account_reference ?? null,
+        readiness_status: r.readiness_status ?? null,
+        configuration_status: r.configuration_status ?? null,
+        business_verification_status: r.business_verification_status ?? null,
+        phone_number_status: r.phone_number_status ?? null,
+        webhook_status: r.webhook_status ?? null,
+        health_status: r.health_status ?? null,
+      }))
+      .sort((a, b) => (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0)),
+  );
+}
+
 const RPC_UNCERTAIN = Object.freeze({ ok: false, reason: ActivationFailure.WRITE_OUTCOME_UNCERTAIN });
 
 /**
@@ -651,10 +697,15 @@ export async function runArmCanary(ctx) {
  * Exactly ONE write, never retried. No Meta provider client is constructed on this path.
  */
 export async function runQuiesce(ctx) {
-  // 1. Read-only before-state. Also what the pure plan is decided against, so an
-  //    unsupported posture is refused CLIENT-side before any write is attempted.
+  // 1. Read-only before-state.
+  //
+  //    The account set is read PROVIDER/CHANNEL-SCOPED, never by the operator's expected
+  //    Meta identity. A closure mode requires no Meta env, so that expected phone-number
+  //    reference is legitimately null on the real CLI; filtering an account read by it
+  //    would compare null to null and vacuously "prove" the account unchanged without ever
+  //    having read it. The validator asserts this function never takes that route.
+  const beforeAccounts = await ctx.db.readProviderAccounts();
   const before = {
-    account: await ctx.db.readAccount(ctx.expected.phoneNumberId),
     policy: await ctx.db.readPolicy(),
     mappings: await ctx.db.readMappings(),
     canaryRows: await ctx.db.readCanaryDestinations(),
@@ -677,7 +728,7 @@ export async function runQuiesce(ctx) {
       let observedAfter = null;
       try {
         observedAfter = sanitizeObserved({
-          account: await ctx.db.readAccount(ctx.expected.phoneNumberId),
+          account: (await ctx.db.readProviderAccounts())[0] ?? null,
           policy: await ctx.db.readPolicy(),
           mappings: await ctx.db.readMappings(),
           canaryRows: await ctx.db.readCanaryDestinations(),
@@ -688,8 +739,9 @@ export async function runQuiesce(ctx) {
     return written;
   }
 
+  const afterAccounts = await ctx.db.readProviderAccounts();
   const after = {
-    account: await ctx.db.readAccount(ctx.expected.phoneNumberId),
+    account: afterAccounts[0] ?? null,
     policy: await ctx.db.readPolicy(),
     mappings: await ctx.db.readMappings(),
     canaryRows: await ctx.db.readCanaryDestinations(),
@@ -705,17 +757,25 @@ export async function runQuiesce(ctx) {
     return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "quiesce posture not reached" };
   }
 
-  // 4. The account row must be untouched by a quiesce: readiness and identity survive.
-  const beforeAcct = sanitizeObserved(before).accountReadiness;
-  const afterAcct = sanitizeObserved(after).accountReadiness;
-  if (JSON.stringify(beforeAcct) !== JSON.stringify(afterAcct)) {
+  // 4. The account rows must be untouched by a quiesce: readiness and identity survive.
+  //    Compared as a canonical, order-stable projection of the WHOLE provider/channel set,
+  //    so an added, removed or edited row is all equally detectable.
+  if (canonicalAccountSet(beforeAccounts) !== canonicalAccountSet(afterAccounts)) {
     return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "provider account was altered" };
   }
 
   // 5. Proven through the FROZEN gate, not by re-reading the columns we just wrote.
+  //
+  //    The expected identity is derived from the DB row when one exists, so the proof is
+  //    COHERENT rather than vacuous: the gate must refuse because the quiesced posture is
+  //    fail-closed, not merely because an identity was absent. No Meta call is involved.
+  const proofAccount = afterAccounts[0] ?? null;
+  const proofExpected = proofAccount
+    ? { wabaId: proofAccount.business_account_reference, phoneNumberId: proofAccount.phone_number_reference }
+    : ctx.expected;
   const failsClosed = proveQuiescedIsFailClosed({
-    account: after.account ?? { provider_key: PROVIDER_KEY, channel: CHANNEL },
-    expected: ctx.expected,
+    account: proofAccount ?? { provider_key: PROVIDER_KEY, channel: CHANNEL },
+    expected: proofExpected,
     destinationHash: ctx.destinationHash ?? "0".repeat(64),
     nowMs: ctx.now,
   });
@@ -728,6 +788,7 @@ export async function runQuiesce(ctx) {
     stage: "QUIESCE_CANARY",
     priorActivationStatus: plan.plan.priorActivationStatus,
     idempotent: plan.plan.idempotent,
+    accountsCompared: beforeAccounts.length,
     observed: sanitizeObserved(after),
   };
 }

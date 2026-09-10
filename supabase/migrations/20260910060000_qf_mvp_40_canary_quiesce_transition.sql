@@ -34,6 +34,18 @@
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
+-- Explicit transaction wrapper.
+--
+-- This file creates a SECURITY DEFINER function, changes function privileges, and THEN
+-- runs fail-loud self-verification. Without an all-file transaction, a verification
+-- failure could leave the function and its grants partially applied — and because the
+-- preflight deliberately REFUSES to redefine an existing function, the rerun would then
+-- abort on "already exists" and need manual recovery. Matching 40.13B, everything below
+-- commits together or not at all.
+-- ---------------------------------------------------------------------------
+begin;
+
+-- ---------------------------------------------------------------------------
 -- 0. Preflight — the objects this authority depends on must already exist.
 -- ---------------------------------------------------------------------------
 do $preflight$
@@ -232,6 +244,8 @@ declare
   v_oid oid;
   v_def text;
   v_other text;
+  v_role text;
+  v_priv text;
 begin
   v_oid := to_regprocedure(v_sig);
   if v_oid is null then
@@ -312,12 +326,38 @@ begin
     end if;
   end loop;
 
-  -- 3.7 Direct writes to the two switch tables remain revoked for every client role.
-  if has_table_privilege('service_role', 'public.communication_provider_runtime_policies', 'update')
-     or has_table_privilege('service_role', 'public.communication_provider_canary_destinations', 'update')
-     or has_table_privilege('anon', 'public.communication_provider_runtime_policies', 'update')
-     or has_table_privilege('authenticated', 'public.communication_provider_canary_destinations', 'update') then
-    raise exception 'QF-MVP-40 quiesce aborted: a direct write path to a switch table was restored.';
-  end if;
+  -- 3.7 Direct writes to the two switch tables remain revoked for EVERY client role.
+  --
+  --     This is a DRIFT DETECTOR, not a privilege redesign: it grants and revokes nothing,
+  --     it only proves the boundary 40.13B established is still whole. The previous
+  --     revision asserted four of the eighteen combinations while the comment claimed the
+  --     complete boundary, so the claim outran the check. All 2 x 3 x 3 are now proven.
+  foreach v_other in array array[
+    'public.communication_provider_runtime_policies',
+    'public.communication_provider_canary_destinations'
+  ] loop
+    foreach v_role in array array['service_role', 'anon', 'authenticated'] loop
+      foreach v_priv in array array['insert', 'update', 'delete'] loop
+        if has_table_privilege(v_role, v_other, v_priv) then
+          raise exception
+            'QF-MVP-40 quiesce aborted: % holds % on % — a direct write path was restored.',
+            v_role, v_priv, v_other;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+
+  -- 3.8 The SELECT the operator legitimately needs is UNCHANGED, so this migration
+  --     cannot have over-revoked while tightening the write boundary.
+  foreach v_other in array array[
+    'public.communication_provider_runtime_policies',
+    'public.communication_provider_canary_destinations'
+  ] loop
+    if not has_table_privilege('service_role', v_other, 'select') then
+      raise exception 'QF-MVP-40 quiesce aborted: service_role lost select on %.', v_other;
+    end if;
+  end loop;
 end;
 $verify$;
+
+commit;

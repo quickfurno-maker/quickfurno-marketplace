@@ -51,10 +51,12 @@ import {
   buildWabaGetUrl,
   deriveAccountReadinessFromEvidence,
   planCanaryArm,
+  planCanaryQuiesce,
   planDisable,
   planFingerprint,
   planReadinessArm,
   proveDisabledIsFailClosed,
+  proveQuiescedIsFailClosed,
   resolveActivationTarget,
   resolveTemplateSelection,
   verifyAttestation,
@@ -66,8 +68,18 @@ import { PROVIDER_KEY, CHANNEL, LANGUAGE, SEED_SET } from "./seed-meta-staging-i
 export const RPC_NAMES = Object.freeze({
   armReadiness: "qf_arm_meta_provider_readiness_v1",
   armCanary: "qf_arm_meta_canary_v1",
+  // QF-MVP-40 — the closure-only de-escalation. A sibling of `disable`, not a
+  // replacement: it drops outbound while webhook processing stays on.
+  quiesce: "qf_quiesce_meta_canary_v1",
   disable: "qf_disable_meta_canary_v1",
 });
+
+/**
+ * The modes that only ever REDUCE authority. They are exempt from the reviewed-source-HEAD
+ * pin, because closing or de-escalating a gate must never be blocked by an operator
+ * checkout that has moved on. Opening modes are never added here.
+ */
+export const CLOSURE_MODES = Object.freeze(["DISABLE", "QUIESCE_CANARY"]);
 
 /** The two switch tables that must NEVER be written directly by this runtime. */
 export const FORBIDDEN_DIRECT_WRITE_TABLES = Object.freeze([
@@ -90,6 +102,10 @@ export const MODE_REQUIREMENTS = Object.freeze({
   // QF-MVP-40-R3: emergency closure stays independent of the staging-asset attestation,
   // for the same reason it is independent of Meta, the index proof and the git HEAD —
   // closing a gate must never be harder than opening one.
+  // QF-MVP-40 quiesce carries the SAME requirement shape as DISABLE, and for the same
+  // reason: de-escalating authority must never depend on Meta, an index proof, a
+  // destination, a git HEAD, an asset attestation or an expiring provider credential.
+  QUIESCE_CANARY:      { db: true,  meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: true,  assetScope: false },
   DISABLE:             { db: true,  meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: true,  assetScope: false },
 });
 
@@ -229,6 +245,31 @@ export function createSupabaseDbAdapter(client) {
     async rpcArmCanary(args) {
       record(`rpc:${RPC_NAMES.armCanary}`);
       return client.rpc(RPC_NAMES.armCanary, args);
+    },
+    /**
+     * QF-MVP-40 — the provider/channel-scoped account read used by CLOSURE paths.
+     *
+     * `readAccount` filters by a phone-number reference that comes from the operator's
+     * Meta env. A closure mode must not require Meta env at all, so filtering by it would
+     * either match nothing or — worse — silently compare null to null and "prove" the
+     * account unchanged without ever reading it. This read is scoped ONLY by the
+     * hard-coded provider/channel, so it is correct with no Meta variable set.
+     *
+     * Non-secret columns only; the references it returns are used for internal invariant
+     * comparison and are never logged.
+     */
+    async readProviderAccounts() {
+      record("readProviderAccounts");
+      const { data, error } = await client
+        .from("communication_provider_accounts")
+        .select("id,provider_key,channel,phone_number_reference,business_account_reference,readiness_status,configuration_status,business_verification_status,phone_number_status,webhook_status,health_status")
+        .eq("provider_key", PROVIDER_KEY).eq("channel", CHANNEL);
+      if (error) throw new Error(ActivationFailure.SCHEMA_MISSING);
+      return Array.isArray(data) ? data : [];
+    },
+    async rpcQuiesce() {
+      record(`rpc:${RPC_NAMES.quiesce}`);
+      return client.rpc(RPC_NAMES.quiesce, {});
     },
     async rpcDisable() {
       record(`rpc:${RPC_NAMES.disable}`);
@@ -507,6 +548,31 @@ function digestOf(value) {
 // WRITE MODES — fresh preflight, exact drift comparison, one RPC, readback
 // ---------------------------------------------------------------------------
 
+/**
+ * QF-MVP-40 — an order-stable, non-secret projection of the provider/channel account set,
+ * used ONLY to prove a closure changed nothing. Sorted by id so row order cannot mask a
+ * change; the references it includes are compared, never logged.
+ */
+export function canonicalAccountSet(rows) {
+  return JSON.stringify(
+    (Array.isArray(rows) ? rows : [])
+      .map((r) => ({
+        id: r.id ?? null,
+        provider_key: r.provider_key ?? null,
+        channel: r.channel ?? null,
+        phone_number_reference: r.phone_number_reference ?? null,
+        business_account_reference: r.business_account_reference ?? null,
+        readiness_status: r.readiness_status ?? null,
+        configuration_status: r.configuration_status ?? null,
+        business_verification_status: r.business_verification_status ?? null,
+        phone_number_status: r.phone_number_status ?? null,
+        webhook_status: r.webhook_status ?? null,
+        health_status: r.health_status ?? null,
+      }))
+      .sort((a, b) => (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0)),
+  );
+}
+
 const RPC_UNCERTAIN = Object.freeze({ ok: false, reason: ActivationFailure.WRITE_OUTCOME_UNCERTAIN });
 
 /**
@@ -614,6 +680,117 @@ export async function runArmCanary(ctx) {
 
   await ctx.attestationIo.consume(attestation.attestation_sha256);
   return { ok: true, stage: "ARM_CANARY", observed: sanitizeObserved(after) };
+}
+
+/**
+ * QF-MVP-40 — the CLOSURE-ONLY de-escalation from canary back to readiness.
+ *
+ * Requires ONLY staging identity and the DB credential — no Meta token, no destination,
+ * no index proof, no asset proof and no attestation, for the same reason `--disable`
+ * requires none of them: reducing authority must never be harder, or more fragile, than
+ * granting it. In particular it must still work when the provider has just gone RED or
+ * the access token has expired, because that is exactly when it is needed.
+ *
+ * Outbound closes; webhook processing stays ON so a late delivery-status callback from
+ * the canary send is still accepted. `--disable` remains the way to close everything.
+ *
+ * Exactly ONE write, never retried. No Meta provider client is constructed on this path.
+ */
+export async function runQuiesce(ctx) {
+  // 1. Read-only before-state.
+  //
+  //    The account set is read PROVIDER/CHANNEL-SCOPED, never by the operator's expected
+  //    Meta identity. A closure mode requires no Meta env, so that expected phone-number
+  //    reference is legitimately null on the real CLI; filtering an account read by it
+  //    would compare null to null and vacuously "prove" the account unchanged without ever
+  //    having read it. The validator asserts this function never takes that route.
+  const beforeAccounts = await ctx.db.readProviderAccounts();
+  const before = {
+    policy: await ctx.db.readPolicy(),
+    mappings: await ctx.db.readMappings(),
+    canaryRows: await ctx.db.readCanaryDestinations(),
+  };
+
+  const plan = planCanaryQuiesce({
+    policy: before.policy,
+    mappings: before.mappings,
+    canaryRows: before.canaryRows,
+  });
+  if (!plan.ok) return plan;
+
+  // 2. EXACTLY ONE write. `invokeOnce` never retries — not on timeout, not on abort,
+  //    not on a 5xx, not on an ambiguous transport failure.
+  const written = await invokeOnce(() => ctx.db.rpcQuiesce());
+  if (!written.ok) {
+    // An ambiguous outcome stays ambiguous. The write MAY have committed, so we report
+    // a separately observed read-only state without claiming the mutation succeeded.
+    if (written.reason === ActivationFailure.WRITE_OUTCOME_UNCERTAIN) {
+      let observedAfter = null;
+      try {
+        observedAfter = sanitizeObserved({
+          account: (await ctx.db.readProviderAccounts())[0] ?? null,
+          policy: await ctx.db.readPolicy(),
+          mappings: await ctx.db.readMappings(),
+          canaryRows: await ctx.db.readCanaryDestinations(),
+        });
+      } catch { observedAfter = null; }
+      return { ...written, stage: "QUIESCE_CANARY", outcomeKnown: false, observedAfter };
+    }
+    return written;
+  }
+
+  const afterAccounts = await ctx.db.readProviderAccounts();
+  const after = {
+    account: afterAccounts[0] ?? null,
+    policy: await ctx.db.readPolicy(),
+    mappings: await ctx.db.readMappings(),
+    canaryRows: await ctx.db.readCanaryDestinations(),
+  };
+
+  // 3. Prove the exact target posture — outbound closed, webhook STILL open.
+  if (after.policy?.activation_status !== "readiness_only"
+      || after.policy?.outbound_enabled !== false
+      || after.policy?.webhook_processing_enabled !== true
+      || after.policy?.health_check_enabled !== true
+      || after.mappings.some((m) => m.is_active)
+      || after.canaryRows.some((r) => r.is_active)) {
+    return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "quiesce posture not reached" };
+  }
+
+  // 4. The account rows must be untouched by a quiesce: readiness and identity survive.
+  //    Compared as a canonical, order-stable projection of the WHOLE provider/channel set,
+  //    so an added, removed or edited row is all equally detectable.
+  if (canonicalAccountSet(beforeAccounts) !== canonicalAccountSet(afterAccounts)) {
+    return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "provider account was altered" };
+  }
+
+  // 5. Proven through the FROZEN gate, not by re-reading the columns we just wrote.
+  //
+  //    The expected identity is derived from the DB row when one exists, so the proof is
+  //    COHERENT rather than vacuous: the gate must refuse because the quiesced posture is
+  //    fail-closed, not merely because an identity was absent. No Meta call is involved.
+  const proofAccount = afterAccounts[0] ?? null;
+  const proofExpected = proofAccount
+    ? { wabaId: proofAccount.business_account_reference, phoneNumberId: proofAccount.phone_number_reference }
+    : ctx.expected;
+  const failsClosed = proveQuiescedIsFailClosed({
+    account: proofAccount ?? { provider_key: PROVIDER_KEY, channel: CHANNEL },
+    expected: proofExpected,
+    destinationHash: ctx.destinationHash ?? "0".repeat(64),
+    nowMs: ctx.now,
+  });
+  if (!failsClosed) {
+    return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "frozen gate still permits outbound" };
+  }
+
+  return {
+    ok: true,
+    stage: "QUIESCE_CANARY",
+    priorActivationStatus: plan.plan.priorActivationStatus,
+    idempotent: plan.plan.idempotent,
+    accountsCompared: beforeAccounts.length,
+    observed: sanitizeObserved(after),
+  };
 }
 
 /**
@@ -835,6 +1012,7 @@ export async function runOperator(ctx) {
   }
   if (mode === "ARM_READINESS") return runArmReadiness(ctx);
   if (mode === "ARM_CANARY") return runArmCanary(ctx);
+  if (mode === "QUIESCE_CANARY") return runQuiesce(ctx);
   if (mode === "DISABLE") return runDisable(ctx);
   return { ok: false, reason: ActivationFailure.MODE_MISSING, detail: mode };
 }
@@ -915,9 +1093,11 @@ export async function runCli({
     if (!reconciled.ok) return { ok: false, reason: reconciled.reason, detail: reconciled.fields?.join(",") };
   }
 
-  // Opening modes pin the exact reviewed source HEAD. Closure never depends on it.
+  // Opening modes pin the exact reviewed source HEAD. Closure never depends on it —
+  // QF-MVP-40 adds QUIESCE_CANARY to that set for the same reason DISABLE is in it:
+  // a de-escalation must not be blocked because the operator checkout moved.
   let head = null;
-  if (mode !== "DISABLE") {
+  if (!CLOSURE_MODES.includes(mode)) {
     let resolved = null;
     try { resolved = await headResolver(); } catch { resolved = null; }
     const proven = resolveSourceHead({ resolved, envPin: env.QF_ACTIVATION_BRANCH_HEAD });

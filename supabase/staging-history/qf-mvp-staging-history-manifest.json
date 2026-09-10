@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 19,
+    "postAnchorMigrationCount": 20,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -962,6 +962,22 @@
       "phase": "QF-MVP-50.7",
       "operationalStatus": "PENDING",
       "purpose": "Creates public.qf_automation_vendor_business_state_v1, public.qf_cancel_stale_automation_job_v1 and public.qf_cancel_stale_automation_job_transport_v1 — the only authority that may terminalize a queued job whose entity still exists but whose current business truth is provably stale. Grants no direct table mutation and seeds no data.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260910060000",
+      "name": "qf_mvp_40_canary_quiesce_transition",
+      "path": "supabase/migrations/20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
+      "sha256": "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
+      "phase": "QF-MVP-40",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates public.qf_quiesce_meta_canary_v1 — the closure-only de-escalation that takes the Meta WhatsApp runtime policy from canary (or an already-exact readiness posture) down to the existing readiness posture, leaving outbound OFF while webhook processing stays ON so a late delivery-status callback is still accepted, and deactivating every active canary destination and template mapping. It can never reach active or canary, never enables outbound, never creates a policy row, never writes communication_provider_accounts and refuses every other prior state including disabled. Grants no direct table mutation and seeds no data. Applying it arms nothing.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

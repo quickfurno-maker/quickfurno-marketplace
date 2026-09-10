@@ -292,6 +292,15 @@ const POST_ANCHOR_PENDING = [
     sha: "e71e8739a5d776c75edcb0ae10470d7d9589eb7949326411ea26540de1baa809",
     phase: "QF-MVP-50.7",
   },
+  // QF-MVP-40 adds the FOURTH pending entry: the closure-only canary quiesce
+  // authority (20260910060000). Source only — not applied to staging, not applied
+  // to production, no applied evidence and no remote history count.
+  {
+    version: "20260910060000",
+    name: "qf_mvp_40_canary_quiesce_transition",
+    sha: "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
+    phase: "QF-MVP-40",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -383,7 +392,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 106;
+const MIGRATION_COUNT = 107;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -597,9 +606,9 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly nineteen local migrations are newer than the anchor", postAnchorLocal.length === 19, `actual=${postAnchorLocal.length}`);
+  check("exactly twenty local migrations are newer than the anchor", postAnchorLocal.length === 20, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 19);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 20);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -609,8 +618,8 @@ function validateState(state) {
   // QF-MVP-50.6 RE-PIN: 1 -> 2. The orphan cancellation authority (20260905000000)
   // is source-only and joins PENDING. Both are still EXACT, pinned by
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
-  check("the explicit PENDING post-anchor set holds exactly the three pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 3,
+  check("the explicit PENDING post-anchor set holds exactly the four pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 4,
     `actual=${pendingPins?.length}`);
   check("the explicit STAGING-APPLIED post-anchor set holds exactly the one pinned entry",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&

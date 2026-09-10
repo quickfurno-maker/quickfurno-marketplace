@@ -123,9 +123,16 @@ const canaryArmArgs = (over = {}) => ({
 // ---------------------------------------------------------------------------
 // M. MODE — exactly one per invocation
 // ---------------------------------------------------------------------------
-record("M01 the mode vocabulary is closed to exactly five",
-  A.ACTIVATION_MODES.length === 5 &&
-  A.ACTIVATION_MODES.join(",") === "DRY_RUN,PREFLIGHT_READONLY,ARM_READINESS,ARM_CANARY,DISABLE");
+// QF-MVP-40 widened this from five to SIX, deliberately and exactly once, to admit the
+// closure-only QUIESCE_CANARY. The guard stays a closed literal list, so a sixth mode
+// can still never appear unnoticed.
+record("M01 the mode vocabulary is closed to exactly six",
+  A.ACTIVATION_MODES.length === 6 &&
+  A.ACTIVATION_MODES.join(",") === "DRY_RUN,PREFLIGHT_READONLY,ARM_READINESS,ARM_CANARY,QUIESCE_CANARY,DISABLE");
+record("M01b the only added mode is a CLOSURE mode: it writes, but needs no network and no attestation",
+  (() => { const m = A.resolveMode(["--quiesce-canary"]);
+    return m.ok && m.mode === "QUIESCE_CANARY" && m.writes === true
+      && m.network === false && m.attested === false; })());
 record("M02 the default is an OFFLINE dry run with no network and no writes",
   (() => { const m = A.resolveMode([]); return m.ok && m.mode === "DRY_RUN" && m.network === false && m.writes === false; })());
 record("M03 preflight reads but never writes",

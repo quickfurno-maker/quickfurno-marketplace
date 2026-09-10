@@ -51,10 +51,12 @@ import {
   buildWabaGetUrl,
   deriveAccountReadinessFromEvidence,
   planCanaryArm,
+  planCanaryQuiesce,
   planDisable,
   planFingerprint,
   planReadinessArm,
   proveDisabledIsFailClosed,
+  proveQuiescedIsFailClosed,
   resolveActivationTarget,
   resolveTemplateSelection,
   verifyAttestation,
@@ -66,8 +68,18 @@ import { PROVIDER_KEY, CHANNEL, LANGUAGE, SEED_SET } from "./seed-meta-staging-i
 export const RPC_NAMES = Object.freeze({
   armReadiness: "qf_arm_meta_provider_readiness_v1",
   armCanary: "qf_arm_meta_canary_v1",
+  // QF-MVP-40 — the closure-only de-escalation. A sibling of `disable`, not a
+  // replacement: it drops outbound while webhook processing stays on.
+  quiesce: "qf_quiesce_meta_canary_v1",
   disable: "qf_disable_meta_canary_v1",
 });
+
+/**
+ * The modes that only ever REDUCE authority. They are exempt from the reviewed-source-HEAD
+ * pin, because closing or de-escalating a gate must never be blocked by an operator
+ * checkout that has moved on. Opening modes are never added here.
+ */
+export const CLOSURE_MODES = Object.freeze(["DISABLE", "QUIESCE_CANARY"]);
 
 /** The two switch tables that must NEVER be written directly by this runtime. */
 export const FORBIDDEN_DIRECT_WRITE_TABLES = Object.freeze([
@@ -90,6 +102,10 @@ export const MODE_REQUIREMENTS = Object.freeze({
   // QF-MVP-40-R3: emergency closure stays independent of the staging-asset attestation,
   // for the same reason it is independent of Meta, the index proof and the git HEAD —
   // closing a gate must never be harder than opening one.
+  // QF-MVP-40 quiesce carries the SAME requirement shape as DISABLE, and for the same
+  // reason: de-escalating authority must never depend on Meta, an index proof, a
+  // destination, a git HEAD, an asset attestation or an expiring provider credential.
+  QUIESCE_CANARY:      { db: true,  meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: true,  assetScope: false },
   DISABLE:             { db: true,  meta: false, indexProof: false, canaryDestination: false, attestation: false, writes: true,  assetScope: false },
 });
 
@@ -229,6 +245,10 @@ export function createSupabaseDbAdapter(client) {
     async rpcArmCanary(args) {
       record(`rpc:${RPC_NAMES.armCanary}`);
       return client.rpc(RPC_NAMES.armCanary, args);
+    },
+    async rpcQuiesce() {
+      record(`rpc:${RPC_NAMES.quiesce}`);
+      return client.rpc(RPC_NAMES.quiesce, {});
     },
     async rpcDisable() {
       record(`rpc:${RPC_NAMES.disable}`);
@@ -617,6 +637,102 @@ export async function runArmCanary(ctx) {
 }
 
 /**
+ * QF-MVP-40 — the CLOSURE-ONLY de-escalation from canary back to readiness.
+ *
+ * Requires ONLY staging identity and the DB credential — no Meta token, no destination,
+ * no index proof, no asset proof and no attestation, for the same reason `--disable`
+ * requires none of them: reducing authority must never be harder, or more fragile, than
+ * granting it. In particular it must still work when the provider has just gone RED or
+ * the access token has expired, because that is exactly when it is needed.
+ *
+ * Outbound closes; webhook processing stays ON so a late delivery-status callback from
+ * the canary send is still accepted. `--disable` remains the way to close everything.
+ *
+ * Exactly ONE write, never retried. No Meta provider client is constructed on this path.
+ */
+export async function runQuiesce(ctx) {
+  // 1. Read-only before-state. Also what the pure plan is decided against, so an
+  //    unsupported posture is refused CLIENT-side before any write is attempted.
+  const before = {
+    account: await ctx.db.readAccount(ctx.expected.phoneNumberId),
+    policy: await ctx.db.readPolicy(),
+    mappings: await ctx.db.readMappings(),
+    canaryRows: await ctx.db.readCanaryDestinations(),
+  };
+
+  const plan = planCanaryQuiesce({
+    policy: before.policy,
+    mappings: before.mappings,
+    canaryRows: before.canaryRows,
+  });
+  if (!plan.ok) return plan;
+
+  // 2. EXACTLY ONE write. `invokeOnce` never retries — not on timeout, not on abort,
+  //    not on a 5xx, not on an ambiguous transport failure.
+  const written = await invokeOnce(() => ctx.db.rpcQuiesce());
+  if (!written.ok) {
+    // An ambiguous outcome stays ambiguous. The write MAY have committed, so we report
+    // a separately observed read-only state without claiming the mutation succeeded.
+    if (written.reason === ActivationFailure.WRITE_OUTCOME_UNCERTAIN) {
+      let observedAfter = null;
+      try {
+        observedAfter = sanitizeObserved({
+          account: await ctx.db.readAccount(ctx.expected.phoneNumberId),
+          policy: await ctx.db.readPolicy(),
+          mappings: await ctx.db.readMappings(),
+          canaryRows: await ctx.db.readCanaryDestinations(),
+        });
+      } catch { observedAfter = null; }
+      return { ...written, stage: "QUIESCE_CANARY", outcomeKnown: false, observedAfter };
+    }
+    return written;
+  }
+
+  const after = {
+    account: await ctx.db.readAccount(ctx.expected.phoneNumberId),
+    policy: await ctx.db.readPolicy(),
+    mappings: await ctx.db.readMappings(),
+    canaryRows: await ctx.db.readCanaryDestinations(),
+  };
+
+  // 3. Prove the exact target posture — outbound closed, webhook STILL open.
+  if (after.policy?.activation_status !== "readiness_only"
+      || after.policy?.outbound_enabled !== false
+      || after.policy?.webhook_processing_enabled !== true
+      || after.policy?.health_check_enabled !== true
+      || after.mappings.some((m) => m.is_active)
+      || after.canaryRows.some((r) => r.is_active)) {
+    return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "quiesce posture not reached" };
+  }
+
+  // 4. The account row must be untouched by a quiesce: readiness and identity survive.
+  const beforeAcct = sanitizeObserved(before).accountReadiness;
+  const afterAcct = sanitizeObserved(after).accountReadiness;
+  if (JSON.stringify(beforeAcct) !== JSON.stringify(afterAcct)) {
+    return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "provider account was altered" };
+  }
+
+  // 5. Proven through the FROZEN gate, not by re-reading the columns we just wrote.
+  const failsClosed = proveQuiescedIsFailClosed({
+    account: after.account ?? { provider_key: PROVIDER_KEY, channel: CHANNEL },
+    expected: ctx.expected,
+    destinationHash: ctx.destinationHash ?? "0".repeat(64),
+    nowMs: ctx.now,
+  });
+  if (!failsClosed) {
+    return { ok: false, reason: ActivationFailure.READBACK_MISMATCH, detail: "frozen gate still permits outbound" };
+  }
+
+  return {
+    ok: true,
+    stage: "QUIESCE_CANARY",
+    priorActivationStatus: plan.plan.priorActivationStatus,
+    idempotent: plan.plan.idempotent,
+    observed: sanitizeObserved(after),
+  };
+}
+
+/**
  * The emergency close path. Requires ONLY staging identity and the DB credential: no
  * Meta token, no canary destination, no index proof and no attestation. It must succeed
  * even when Meta is unreachable.
@@ -835,6 +951,7 @@ export async function runOperator(ctx) {
   }
   if (mode === "ARM_READINESS") return runArmReadiness(ctx);
   if (mode === "ARM_CANARY") return runArmCanary(ctx);
+  if (mode === "QUIESCE_CANARY") return runQuiesce(ctx);
   if (mode === "DISABLE") return runDisable(ctx);
   return { ok: false, reason: ActivationFailure.MODE_MISSING, detail: mode };
 }
@@ -915,9 +1032,11 @@ export async function runCli({
     if (!reconciled.ok) return { ok: false, reason: reconciled.reason, detail: reconciled.fields?.join(",") };
   }
 
-  // Opening modes pin the exact reviewed source HEAD. Closure never depends on it.
+  // Opening modes pin the exact reviewed source HEAD. Closure never depends on it —
+  // QF-MVP-40 adds QUIESCE_CANARY to that set for the same reason DISABLE is in it:
+  // a de-escalation must not be blocked because the operator checkout moved.
   let head = null;
-  if (mode !== "DISABLE") {
+  if (!CLOSURE_MODES.includes(mode)) {
     let resolved = null;
     try { resolved = await headResolver(); } catch { resolved = null; }
     const proven = resolveSourceHead({ resolved, envPin: env.QF_ACTIVATION_BRANCH_HEAD });

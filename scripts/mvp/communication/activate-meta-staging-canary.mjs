@@ -85,6 +85,12 @@ export const ActivationFailure = Object.freeze({
   MAPPING_ALREADY_ACTIVE: "MAPPING_ALREADY_ACTIVE",
   UNRELATED_ACTIVE_MAPPING: "UNRELATED_ACTIVE_MAPPING",
   READINESS_NOT_PROVEN: "READINESS_NOT_PROVEN",
+  // QF-MVP-40 quiesce. The closure-only de-escalation refuses on exactly two grounds,
+  // and both are fail-closed: there is no policy row to reduce, or the prior posture is
+  // not one of the two supported starting states (disabled included — quiesce can never
+  // reopen a closed environment).
+  QUIESCE_POLICY_MISSING: "QUIESCE_POLICY_MISSING",
+  QUIESCE_STATE_NOT_SUPPORTED: "QUIESCE_STATE_NOT_SUPPORTED",
   READINESS_EVIDENCE_INSUFFICIENT: "READINESS_EVIDENCE_INSUFFICIENT",
   META_IDENTITY_MISMATCH: "META_IDENTITY_MISMATCH",
   META_PHONE_NOT_CONNECTED: "META_PHONE_NOT_CONNECTED",
@@ -494,11 +500,12 @@ export const CANARY_ELIGIBLE_KEYS = Object.freeze(
 // ---------------------------------------------------------------------------
 
 export const ACTIVATION_MODES = Object.freeze([
-  "DRY_RUN", "PREFLIGHT_READONLY", "ARM_READINESS", "ARM_CANARY", "DISABLE",
+  "DRY_RUN", "PREFLIGHT_READONLY", "ARM_READINESS", "ARM_CANARY", "QUIESCE_CANARY", "DISABLE",
 ]);
 
 const KNOWN_FLAGS = Object.freeze([
-  "--preflight-readonly", "--arm-readiness", "--arm-canary", "--disable", "--templates",
+  "--preflight-readonly", "--arm-readiness", "--arm-canary", "--quiesce-canary",
+  "--disable", "--templates",
   // QF-MVP-40.13C-R1. Which opening transition a preflight is approving. It was
   // previously computed from an undeclared `--stage=canary`, which resolveMode refused as
   // UNKNOWN_FLAG — so a real CLI preflight could only ever mint a READINESS attestation
@@ -522,12 +529,19 @@ export function resolveMode(argv = []) {
     if (!KNOWN_FLAGS.includes(name)) return { ok: false, reason: ActivationFailure.UNKNOWN_FLAG, detail: name };
   }
   const has = (f) => argv.some((a) => a === f || a.startsWith(`${f}=`));
-  const selected = ["--preflight-readonly", "--arm-readiness", "--arm-canary", "--disable"]
+  const selected = ["--preflight-readonly", "--arm-readiness", "--arm-canary",
+    "--quiesce-canary", "--disable"]
     .filter((f) => has(f));
   if (selected.length > 1) {
     return { ok: false, reason: ActivationFailure.MODE_CONFLICT, detail: selected.join(" ") };
   }
   if (has("--disable")) return { ok: true, mode: "DISABLE", network: false, writes: true, attested: false };
+  // QF-MVP-40 quiesce. A CLOSURE-ONLY de-escalation, so it sits with `--disable` rather
+  // than with the arms: it writes, but it needs no Meta network, no destination, no index
+  // proof and no attestation. Closing a gate must never be harder than opening one.
+  if (has("--quiesce-canary")) {
+    return { ok: true, mode: "QUIESCE_CANARY", network: false, writes: true, attested: false };
+  }
   if (has("--arm-canary")) return { ok: true, mode: "ARM_CANARY", network: true, writes: true, attested: true };
   if (has("--arm-readiness")) return { ok: true, mode: "ARM_READINESS", network: true, writes: true, attested: true };
   if (has("--preflight-readonly")) {
@@ -882,6 +896,105 @@ export function planDisable({ policy, mappings, canaryRows }) {
   };
 }
 
+/**
+ * QF-MVP-40 — the CLOSURE-ONLY canary de-escalation.
+ *
+ * The middle transition of the controlled sequence:
+ *   ARM_READINESS -> ARM_CANARY -> one authorised send -> QUIESCE_CANARY -> DISABLE
+ *
+ * It exists because `--disable` also closes webhook processing, so a delivery-status
+ * callback arriving just after the canary send would hit a closed gate. Quiescing drops
+ * outbound while webhook processing stays ON, so the callback is still accepted.
+ *
+ * CLOSED PRIOR-STATE RULE — only two starting states, and in BOTH of them webhook
+ * processing and health checks are already on, so this transition never has to turn
+ * either of them on and therefore can never reopen a closed environment:
+ *
+ *   A. `canary` with webhook=true and health=true. `outbound_enabled` may be true or
+ *      already false — quiesce only ever reduces authority.
+ *   B. exactly `READINESS_POSTURE` — idempotent closure. Still sweeps any stray active
+ *      destination or mapping, because those are additional send surface.
+ *
+ * Everything else is refused, `disabled` included. DISABLED IS NEVER REOPENED here;
+ * abnormal-posture recovery stays with the canonical DISABLE path.
+ *
+ * Deliberately independent of provider health and readiness evidence: a provider can go
+ * unhealthy the instant after a send, and that must never block closing outbound.
+ * The SQL RPC remains the server-side authority; this function makes the client-side
+ * intent testable.
+ */
+export function planCanaryQuiesce({ policy, mappings, canaryRows }) {
+  if (!policy) {
+    return { ok: false, reason: ActivationFailure.QUIESCE_POLICY_MISSING };
+  }
+  const status = policy.activation_status;
+  const webhookOn = policy.webhook_processing_enabled === true;
+  const healthOn = policy.health_check_enabled === true;
+
+  let supported = false;
+  if (status === "canary") {
+    // outbound may be either value; the other two gates must already be open.
+    supported = webhookOn && healthOn;
+  } else if (status === "readiness_only") {
+    supported = policy.outbound_enabled === false && webhookOn && healthOn;
+  }
+  if (!supported) {
+    return {
+      ok: false,
+      reason: ActivationFailure.QUIESCE_STATE_NOT_SUPPORTED,
+      detail: String(status ?? "missing"),
+    };
+  }
+
+  const plan = {
+    stage: "QUIESCE_CANARY",
+    priorActivationStatus: status,
+    idempotent: status === "readiness_only",
+    // The EXISTING readiness posture — deliberately not a third bespoke posture.
+    policy: { ...READINESS_POSTURE },
+    // The account row is untouched: readiness and identity survive a quiesce. That is
+    // the whole point of the middle transition.
+    accountUnchanged: true,
+    canaryToDeactivate: (Array.isArray(canaryRows) ? canaryRows : [])
+      .filter((r) => r.is_active === true)
+      .map((r) => r.destination_hash),
+    mappingsToDeactivate: (Array.isArray(mappings) ? mappings : [])
+      .filter((m) => m.is_active === true)
+      .map((m) => m.template_key),
+  };
+
+  // Structural guarantee, asserted rather than assumed: the plan cannot carry send
+  // authority. A future edit that reintroduced one of these fails here, not in staging.
+  if (plan.policy.outbound_enabled !== false
+      || plan.policy.activation_status !== "readiness_only"
+      || plan.policy.webhook_processing_enabled !== true
+      || plan.policy.health_check_enabled !== true) {
+    return { ok: false, reason: ActivationFailure.QUIESCE_STATE_NOT_SUPPORTED, detail: "plan posture" };
+  }
+  return { ok: true, plan };
+}
+
+/**
+ * The quiesced result must fail the real gate for ANY destination — proven through the
+ * FROZEN gate, exactly as `--disable` proves its own closure, rather than by trusting
+ * the columns we just wrote. `targetZeroActive` mirrors the RPC's post-write invariant:
+ * no active canary destination survives, so the gate is evaluated against that reality.
+ */
+export function proveQuiescedIsFailClosed({ account, expected, destinationHash, nowMs }) {
+  const gate = evaluateMetaOutboundGate({
+    policy: { provider_key: PROVIDER_KEY, channel: CHANNEL, ...READINESS_POSTURE },
+    account,
+    // Hostile input on purpose: even if an active destination somehow remained, the
+    // readiness posture must still refuse, because `outbound_enabled` is false.
+    canaryRows: [{ provider_key: PROVIDER_KEY, channel: CHANNEL,
+      destination_hash: destinationHash, is_active: true, expires_at: null }],
+    destinationHash,
+    expected,
+    now: nowMs,
+  });
+  return gate.ok === false;
+}
+
 /** The disabled result must fail the real gate for ANY destination. */
 export function proveDisabledIsFailClosed({ account, expected, destinationHash, nowMs }) {
   const gate = evaluateMetaOutboundGate({
@@ -1002,7 +1115,9 @@ export default {
   planReadinessArm,
   planCanaryArm,
   planDisable,
+  planCanaryQuiesce,
   proveDisabledIsFailClosed,
+  proveQuiescedIsFailClosed,
   verifyAttestation,
 };
 

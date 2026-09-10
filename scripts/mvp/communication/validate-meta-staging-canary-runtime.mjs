@@ -17,6 +17,10 @@ import { fileURLToPath } from "node:url";
 import * as R from "./canaryActivationRuntime.mjs";
 import { ActivationFailure, AssetScope, attestationDigest, planFingerprint, planCanaryArm, planReadinessArm }
   from "./activate-meta-staging-canary.mjs";
+// QF-MVP-40 quiesce coverage reaches several operator exports at once (resolveMode,
+// planCanaryQuiesce, proveQuiescedIsFailClosed, ATTESTATION_TARGETS), so the whole
+// operator namespace is bound here rather than growing the named list further.
+import * as A from "./activate-meta-staging-canary.mjs";
 import { REQUIRED_ACCOUNT_READINESS } from "../../../lib/communication/providers/metaRuntimeGate.ts";
 import { hashPhoneE164 } from "../../../lib/communication/phone.ts";
 
@@ -230,7 +234,7 @@ record("I03 the real client is constructed only AFTER the staging fence passes",
     operatorCode.indexOf('await import("@supabase/supabase-js")'));
 record("I04 the mode vocabulary and requirement table are closed and aligned",
   Object.keys(R.MODE_REQUIREMENTS).join(",") ===
-    "DRY_RUN,PREFLIGHT_READONLY,ARM_READINESS,ARM_CANARY,DISABLE");
+    "DRY_RUN,PREFLIGHT_READONLY,ARM_READINESS,ARM_CANARY,QUIESCE_CANARY,DISABLE");
 record("I05 exactly one mode is dispatched per invocation",
   (await R.runOperator({ mode: "DRY_RUN" })).stage === "DRY_RUN" &&
   (await R.runOperator({ mode: "NOT_A_MODE" })).reason === F.MODE_MISSING);
@@ -587,6 +591,236 @@ record("D07 the requirement table states disable needs neither Meta nor attestat
   R.MODE_REQUIREMENTS.DISABLE.indexProof === false &&
   R.MODE_REQUIREMENTS.DISABLE.canaryDestination === false);
 
+
+// ---------------------------------------------------------------------------
+// Q. QUIESCE_CANARY - QF-MVP-40 closure-only de-escalation.
+//
+//    The middle transition: outbound OFF while webhook processing stays ON, so a late
+//    delivery-status callback from the canary send is still accepted. It must never be
+//    able to OPEN authority, and must never reopen a disabled environment.
+// ---------------------------------------------------------------------------
+const POL = (o) => ({ provider_key: "meta_whatsapp_cloud", channel: "whatsapp", ...o });
+const CANARY_POL = POL({ activation_status: "canary", outbound_enabled: true,
+  webhook_processing_enabled: true, health_check_enabled: true });
+const READINESS_POL = POL({ activation_status: "readiness_only", outbound_enabled: false,
+  webhook_processing_enabled: true, health_check_enabled: true });
+
+// A STATEFUL fake, because quiesce is a transition: the runtime reads the before-state,
+// writes once, then reads back INDEPENDENTLY. The shared `fakeClient` is deliberately
+// static, so a purpose-built one is used here rather than weakening that helper.
+// `applyRpc` models exactly what qf_quiesce_meta_canary_v1 commits; a test can replace
+// it to simulate a server that wrote nothing, refused, or failed ambiguously.
+function quiesceClient({ policy, mappings = [], canaryRows = [], account = readyAccount(), rpcImpl } = {}) {
+  const state = { policy: { ...policy }, mappings: mappings.map((m) => ({ ...m })),
+    canaryRows: canaryRows.map((r) => ({ ...r })), account: { ...account } };
+  const log = { selects: [], rpcs: [], writes: [] };
+  const applyRpc = () => {
+    state.policy = { ...state.policy, activation_status: "readiness_only", outbound_enabled: false,
+      webhook_processing_enabled: true, health_check_enabled: true };
+    state.mappings = state.mappings.map((m) => ({ ...m, is_active: false }));
+    state.canaryRows = state.canaryRows.map((r) => ({ ...r, is_active: false }));
+    return { data: [{ prior_activation_status: "canary", policy_activation_status: "readiness_only" }], error: null };
+  };
+  const table = (name) => {
+    const b = {
+      select() { log.selects.push(name); return b; },
+      eq() { return b; },
+      async maybeSingle() {
+        if (name === "communication_provider_accounts") return { data: state.account, error: null };
+        if (name === "communication_provider_runtime_policies") return { data: state.policy ?? null, error: null };
+        return { data: null, error: null };
+      },
+      then(resolve) {
+        if (name === "communication_provider_template_mappings") return resolve({ data: state.mappings, error: null });
+        if (name === "communication_provider_canary_destinations") return resolve({ data: state.canaryRows, error: null });
+        return resolve({ data: [], error: null });
+      },
+      update() { log.writes.push(`${name}:update`); return b; },
+      insert() { log.writes.push(`${name}:insert`); return b; },
+      upsert() { log.writes.push(`${name}:upsert`); return b; },
+    };
+    return b;
+  };
+  return {
+    log, state,
+    from: (name) => table(name),
+    async rpc(name, args) {
+      log.rpcs.push({ name, args });
+      if (rpcImpl) return rpcImpl(name, args, state);
+      return applyRpc();
+    },
+  };
+}
+
+async function runQuiesceFrom(policyBefore, opts) {
+  const o = opts || {};
+  const c = quiesceClient({
+    policy: policyBefore,
+    mappings: o.mappings || [mapping({ is_active: false })],
+    canaryRows: o.canaryRows || [],
+    rpcImpl: o.rpcImpl,
+  });
+  const out = await R.runOperator(baseCtx({
+    mode: "QUIESCE_CANARY", db: R.createSupabaseDbAdapter(c),
+    meta: null, health: null, indexProof: null, attestationIo: null,
+  }));
+  return { out, client: c };
+}
+
+// -- mode / CLI ------------------------------------------------------------
+record("Q01 --quiesce-canary resolves to QUIESCE_CANARY: writes, no network, unattested",
+  (() => { const m = A.resolveMode(["--quiesce-canary"]);
+    return m.ok && m.mode === "QUIESCE_CANARY" && m.network === false
+      && m.writes === true && m.attested === false; })());
+record("Q02 --quiesce-canary conflicts with every other mode flag",
+  ["--arm-readiness", "--arm-canary", "--disable", "--preflight-readonly"].every(
+    (f) => A.resolveMode(["--quiesce-canary", f]).reason === F.MODE_CONFLICT));
+record("Q03 --attest-for is refused for quiesce",
+  A.resolveAttestationTarget(["--attest-for=canary"], "QUIESCE_CANARY").reason
+    === F.ATTESTATION_TARGET_NOT_PERMITTED);
+record("Q04 quiesce is NOT an attestation target",
+  Object.values(A.ATTESTATION_TARGETS).includes("QUIESCE_CANARY") === false);
+record("Q05 the requirement table gives quiesce the DISABLE shape - no Meta, no proof, no attestation",
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.db === true &&
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.meta === false &&
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.indexProof === false &&
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.canaryDestination === false &&
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.attestation === false &&
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.assetScope === false &&
+  R.MODE_REQUIREMENTS.QUIESCE_CANARY.writes === true);
+record("Q06 quiesce is a closure mode, so it is exempt from the source-HEAD pin",
+  R.CLOSURE_MODES.includes("QUIESCE_CANARY") && R.CLOSURE_MODES.includes("DISABLE")
+    && !R.CLOSURE_MODES.includes("ARM_CANARY") && !R.CLOSURE_MODES.includes("ARM_READINESS"));
+
+// -- pure plan --------------------------------------------------------------
+record("Q07 exact CANARY plans down to the EXISTING readiness posture",
+  (() => { const r = A.planCanaryQuiesce({ policy: CANARY_POL });
+    return r.ok && r.plan.policy.activation_status === "readiness_only"
+      && r.plan.policy.outbound_enabled === false
+      && r.plan.policy.webhook_processing_enabled === true
+      && r.plan.policy.health_check_enabled === true; })());
+record("Q08 CANARY with outbound ALREADY false is accepted - quiesce only reduces",
+  A.planCanaryQuiesce({ policy: POL({ ...CANARY_POL, outbound_enabled: false }) }).ok === true);
+record("Q09 exact READINESS posture is idempotent closure",
+  (() => { const r = A.planCanaryQuiesce({ policy: READINESS_POL });
+    return r.ok === true && r.plan.idempotent === true; })());
+record("Q10 DISABLED is REFUSED - quiesce can never reopen a closed environment",
+  A.planCanaryQuiesce({ policy: POL({ activation_status: "disabled", outbound_enabled: false,
+    webhook_processing_enabled: false, health_check_enabled: false }) }).reason
+    === F.QUIESCE_STATE_NOT_SUPPORTED);
+record("Q11 active, paused and shadow are all refused",
+  [["active", true, true, true], ["paused", false, true, true], ["shadow", false, true, true]]
+    .every(([st, ob, wh, he]) => A.planCanaryQuiesce({ policy: POL({ activation_status: st,
+      outbound_enabled: ob, webhook_processing_enabled: wh, health_check_enabled: he }) })
+      .reason === F.QUIESCE_STATE_NOT_SUPPORTED));
+record("Q12 an unexpected gate combination is refused in both supported statuses",
+  A.planCanaryQuiesce({ policy: POL({ ...READINESS_POL, outbound_enabled: true }) }).reason === F.QUIESCE_STATE_NOT_SUPPORTED &&
+  A.planCanaryQuiesce({ policy: POL({ ...READINESS_POL, webhook_processing_enabled: false }) }).reason === F.QUIESCE_STATE_NOT_SUPPORTED &&
+  A.planCanaryQuiesce({ policy: POL({ ...CANARY_POL, webhook_processing_enabled: false }) }).reason === F.QUIESCE_STATE_NOT_SUPPORTED &&
+  A.planCanaryQuiesce({ policy: POL({ ...CANARY_POL, health_check_enabled: false }) }).reason === F.QUIESCE_STATE_NOT_SUPPORTED);
+record("Q13 a missing policy row is refused, never created",
+  A.planCanaryQuiesce({ policy: null }).reason === F.QUIESCE_POLICY_MISSING);
+record("Q14 a quiesce plan can NEVER carry outbound=true, canary or active",
+  [CANARY_POL, READINESS_POL, POL({ ...CANARY_POL, outbound_enabled: false })]
+    .map((x) => A.planCanaryQuiesce({ policy: x })).filter((r) => r.ok)
+    .every((r) => r.plan.policy.outbound_enabled === false
+      && !["canary", "active"].includes(r.plan.policy.activation_status)));
+record("Q15 the plan leaves the provider account untouched",
+  A.planCanaryQuiesce({ policy: CANARY_POL }).plan.accountUnchanged === true);
+
+// -- one-shot write ---------------------------------------------------------
+const q1 = await runQuiesceFrom(CANARY_POL, {
+  mappings: [mapping({ is_active: true })],
+  canaryRows: [{ provider_key: "meta_whatsapp_cloud", channel: "whatsapp",
+    destination_hash: "a".repeat(64), is_active: true, expires_at: null }],
+});
+record("Q16 quiesce succeeds with NO Meta adapter, NO health adapter, NO attestation",
+  q1.out.ok === true, JSON.stringify(q1.out.reason || ""));
+record("Q17 quiesce invokes EXACTLY qf_quiesce_meta_canary_v1, exactly once",
+  q1.client.log.rpcs.length === 1 && q1.client.log.rpcs[0].name === R.RPC_NAMES.quiesce
+    && R.RPC_NAMES.quiesce === "qf_quiesce_meta_canary_v1");
+record("Q18 quiesce calls NO arm RPC and NO disable RPC",
+  q1.client.log.rpcs.every((r) => ![R.RPC_NAMES.armCanary, R.RPC_NAMES.armReadiness,
+    R.RPC_NAMES.disable].includes(r.name)));
+record("Q19 quiesce performs NO direct write to either switch table",
+  q1.client.log.writes.length === 0);
+record("Q20 readback proves outbound CLOSED while webhook processing stays OPEN",
+  q1.out.observed.policy.activation_status === "readiness_only" &&
+  q1.out.observed.policy.outbound_enabled === false &&
+  q1.out.observed.policy.webhook_processing_enabled === true &&
+  q1.out.observed.policy.health_check_enabled === true);
+record("Q21 readback proves zero active mappings and zero active canary destinations",
+  q1.out.observed.activeMappingKeys.length === 0 && q1.out.observed.activeCanaryCount === 0);
+record("Q22 quiesce refuses to report success while a sending gate is still open",
+  (await (async () => {
+    // A server that reports success but commits nothing: the readback must catch it.
+    const r = await runQuiesceFrom(CANARY_POL, {
+      mappings: [mapping({ is_active: true })],
+      rpcImpl: () => ({ data: [{ ok: true }], error: null }),
+    });
+    return r.out.ok === false && r.out.reason === F.READBACK_MISMATCH;
+  })()));
+record("Q22b quiesce refuses if the provider account was altered by the transition",
+  (await (async () => {
+    const r = await runQuiesceFrom(CANARY_POL, {
+      rpcImpl: (n, a, state) => {
+        state.policy = { ...state.policy, activation_status: "readiness_only", outbound_enabled: false,
+          webhook_processing_enabled: true, health_check_enabled: true };
+        state.account = { ...state.account, readiness_status: "disabled" };
+        return { data: [{ ok: true }], error: null };
+      },
+    });
+    return r.out.ok === false && r.out.reason === F.READBACK_MISMATCH;
+  })()));
+record("Q23 an AMBIGUOUS write outcome is never retried and never reported as success",
+  (await (async () => {
+    const r = await runQuiesceFrom(CANARY_POL, { rpcImpl: () => { throw new Error("transport"); } });
+    return r.out.ok === false && r.out.reason === F.WRITE_OUTCOME_UNCERTAIN
+      && r.out.outcomeKnown === false && r.client.log.rpcs.length === 1;
+  })()));
+record("Q24 a DEFINITE server refusal is not retried either",
+  (await (async () => {
+    const r = await runQuiesceFrom(CANARY_POL, {
+      rpcImpl: () => ({ data: null, error: { message: "QF_CANARY_QUIESCE_STATE_NOT_SUPPORTED" } }) });
+    return r.out.ok === false && r.client.log.rpcs.length === 1;
+  })()));
+record("Q25 an unsupported prior state is refused CLIENT-side, before any RPC is attempted",
+  (await (async () => {
+    const r = await runQuiesceFrom(POL({ activation_status: "disabled", outbound_enabled: false,
+      webhook_processing_enabled: false, health_check_enabled: false }));
+    return r.out.ok === false && r.out.reason === F.QUIESCE_STATE_NOT_SUPPORTED
+      && r.client.log.rpcs.length === 0;
+  })()));
+
+// -- no send / no network ---------------------------------------------------
+const quiesceSrc = runtimeCode.slice(runtimeCode.indexOf("export async function runQuiesce"),
+  runtimeCode.indexOf("export async function runDisable"));
+record("Q26 the quiesce implementation contains no /messages endpoint",
+  quiesceSrc.length > 0 && quiesceSrc.includes("/messages") === false);
+record("Q27 the quiesce implementation constructs no Meta client and issues no fetch",
+  /fetch\(|createMetaGetAdapter|MetaCloudWhatsAppProvider/.test(quiesceSrc) === false);
+record("Q28 the quiesce implementation logs no plaintext destination or secret",
+  /destination_e164|accessToken|serviceRoleKey|appSecret/i.test(quiesceSrc) === false);
+record("Q29 the quiesce RPC takes NO caller-controlled target state",
+  runtimeCode.includes("client.rpc(RPC_NAMES.quiesce, {})"));
+record("Q30 quiesce proves closure through the FROZEN gate, not the columns it wrote",
+  quiesceSrc.includes("proveQuiescedIsFailClosed"));
+record("Q31 the frozen gate refuses outbound under the quiesced posture",
+  A.proveQuiescedIsFailClosed({
+    account: { provider_key: "meta_whatsapp_cloud", channel: "whatsapp", ...REQUIRED_ACCOUNT_READINESS },
+    expected: { wabaId: "2920988211610262", phoneNumberId: "1088396637681784" },
+    destinationHash: "a".repeat(64), nowMs: Date.now(),
+  }) === true);
+
+// -- existing behaviour unchanged -------------------------------------------
+record("Q32 adding quiesce did not give DISABLE a Meta or attestation requirement",
+  R.MODE_REQUIREMENTS.DISABLE.meta === false && R.MODE_REQUIREMENTS.DISABLE.attestation === false
+    && R.MODE_REQUIREMENTS.DISABLE.assetScope === false);
+record("Q33 adding quiesce did not relax either opening arm",
+  ["ARM_READINESS", "ARM_CANARY"].every((m) =>
+    R.MODE_REQUIREMENTS[m].attestation === true && R.MODE_REQUIREMENTS[m].meta === true
+      && R.MODE_REQUIREMENTS[m].indexProof === true && R.MODE_REQUIREMENTS[m].assetScope === true));
+
 // ---------------------------------------------------------------------------
 // A. ATTESTATION AND DRIFT
 // ---------------------------------------------------------------------------
@@ -764,10 +998,17 @@ record("S03 the db adapter cannot express a table write at all",
     return typeof adapter.update === "undefined" && typeof adapter.insert === "undefined" &&
       typeof adapter.upsert === "undefined" && typeof adapter.delete === "undefined";
   })());
-record("S04 the runtime names exactly the three permitted RPCs and no other",
-  Object.values(R.RPC_NAMES).length === 3 &&
-  (runtimeCode.match(/qf_arm_meta_provider_readiness_v1|qf_arm_meta_canary_v1|qf_disable_meta_canary_v1/g) ?? []).length === 3 &&
+// QF-MVP-40 widened this allowlist from three to FOUR, deliberately and exactly once,
+// to admit the closure-only `qf_quiesce_meta_canary_v1`. The shape of the guard is
+// unchanged: the set is still closed, still named literally, and the runtime still
+// cannot express a string-literal `.rpc("...")` call outside RPC_NAMES.
+record("S04 the runtime names exactly the four permitted RPCs and no other",
+  Object.values(R.RPC_NAMES).length === 4 &&
+  (runtimeCode.match(/qf_arm_meta_provider_readiness_v1|qf_arm_meta_canary_v1|qf_quiesce_meta_canary_v1|qf_disable_meta_canary_v1/g) ?? []).length === 4 &&
   !/\.rpc\(["']/.test(runtimeCode));
+record("S04b the fourth RPC is the closure-only quiesce, and it is the ONLY addition",
+  R.RPC_NAMES.quiesce === "qf_quiesce_meta_canary_v1" &&
+  Object.keys(R.RPC_NAMES).sort().join(",") === "armCanary,armReadiness,disable,quiesce");
 record("S05 the two switch tables are never written directly",
   R.FORBIDDEN_DIRECT_WRITE_TABLES.every((t) =>
     !new RegExp(`from\\(["']${t}["']\\)[\\s\\S]{0,200}\\.(update|insert|upsert)\\(`).test(runtimeCode)));

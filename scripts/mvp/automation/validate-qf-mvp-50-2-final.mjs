@@ -419,7 +419,7 @@ record("R18 the execute_v1 repair is present, ordered immediately before the wed
     // QF-MVP-82A-R0 RE-PIN: 103 -> 104, adding ONLY the SOURCE-PENDING Realtime
     // publication membership (20260904000000). Still exact equality, still an
     // ordering proof — no existing migration moved.
-    return files.length === 106 &&
+    return files.length === 107 &&
       files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
@@ -512,7 +512,7 @@ record("W19 the wedge repair is present and the set is exactly 104",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 106 && files.includes(WEDGE_NAME);
+    return files.length === 107 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -572,9 +572,9 @@ record("G02 the ten applied records are 21 through 30 in exact ascending order",
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-50.6 RE-PIN: 17 / 104 -> 18 / 105, adding ONLY the SOURCE-PENDING orphan
 // cancellation authority (20260905000000). Still exact equality on both numbers.
-record("G03 post-anchor count and local migration count agree at 19 / 106",
-  manifest.appliedAnchor.postAnchorMigrationCount === 19 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 106);
+record("G03 post-anchor count and local migration count agree at 19 / 107",
+  manifest.appliedAnchor.postAnchorMigrationCount === 20 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 107);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
@@ -593,15 +593,15 @@ record("G03a the G1 staging-history gate was re-pinned to the applied truth, not
   // the production activation authority. APPLIED stays exactly ten throughout.
   // QF-MVP-50.6: PENDING is TWO again — the 80.14A production activation authority
   // and the source-only orphan cancellation authority. Still an exact count.
-  g1Source.includes("the explicit PENDING post-anchor set holds exactly the three pinned entries") &&
+  g1Source.includes("the explicit PENDING post-anchor set holds exactly the four pinned entries") &&
   g1Source.includes("the explicit STAGING-APPLIED post-anchor set holds exactly the one pinned entry") &&
   g1Source.includes("manifest declares exactly five RECONCILED post-anchor migrations") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 10") &&
-  g1Source.includes("pendingPins.length === 3") &&
+  g1Source.includes("pendingPins.length === 4") &&
   g1Source.includes("stagingAppliedPins.length === 1") &&
   g1Source.includes("reconciledPins.length === 5") &&
-  g1Source.includes("const MIGRATION_COUNT = 106;"));
+  g1Source.includes("const MIGRATION_COUNT = 107;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -837,7 +837,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 10") &&
-          g1Source.includes("pendingPins.length === 3") &&
+          g1Source.includes("pendingPins.length === 4") &&
           g1Source.includes("reconciledPins.length === 5") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/reconciledPins\.length\s*>=/.test(g1Source) &&

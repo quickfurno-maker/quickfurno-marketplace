@@ -69,6 +69,31 @@ const SHA_40_13B = "517b6ce01e27df8bb32cc473a1fb3d80775ad96190cff71175725ac3053e
 const RPC = "qf_activate_meta_transactional_mapping_v1";
 const PARAMS = ["p_template_key", "p_activation_evidence_digest"];
 
+/**
+ * The table the authority guards. Direct service_role INSERT/UPDATE on it is the
+ * bypass that would make every gate in the RPC optional, so §5a revokes both and
+ * §6.12 proves the closure at apply time. SELECT is deliberately preserved.
+ */
+const MAPPING_TABLE = "communication_provider_template_mappings";
+
+/**
+ * The three controlled authorities that must stay reachable by service_role once
+ * the direct write is gone: the live lead-assignment lane (80.14A), this phase's
+ * transactional authority, and the unconditional kill switch (40.13B). Closing a
+ * bypass must never strand the governed route or the way back.
+ */
+const CONTROLLED_AUTHORITIES = [
+  "public.qf_activate_meta_lead_assignment_v1(text,text,text)",
+  `public.${RPC}(text,text)`,
+  "public.qf_disable_meta_canary_v1()",
+];
+
+/** The predecessor functions this phase reads but must never redefine or weaken. */
+const PREDECESSOR_FUNCTIONS = [
+  "qf_activate_meta_lead_assignment_v1",
+  "qf_disable_meta_canary_v1",
+];
+
 /** THE CLOSED ACTIVATION SET. Exactly these four keys, and never a fifth. */
 const CLOSED_SET = [
   "lead_received",
@@ -617,6 +642,71 @@ const RULES = {
     /granted beyond service_role/.test(s) && /service_role lost execute on %/.test(s) &&
     /is not SECURITY DEFINER/.test(s) && /lacks the pinned search_path/.test(s),
 
+  // ---- K5..K9. the direct-write escape hatch on the MAPPING TABLE is closed --------
+  //
+  // A narrow RPC is not an authority while service_role can still write the table
+  // it guards: one direct `set is_active = true` bypasses the closed four-key set,
+  // every readiness precondition and every postcondition, and §2 never runs. These
+  // rules exist so that closure cannot be quietly undone.
+  "K05 direct INSERT and UPDATE on the mapping table are revoked from service_role": (s) =>
+    new RegExp(
+      `revoke insert, update on table public\\.${MAPPING_TABLE} from service_role;`
+    ).test(codeOnly(s)),
+  "K06 the revoke runs AFTER the seed and BEFORE the final verification": (s) => {
+    const code = codeOnly(s);
+    const revoke = code.indexOf(`revoke insert, update on table public.${MAPPING_TABLE}`);
+    const seedEnd = code.indexOf("$seed$;");
+    const verifyStart = code.indexOf("do $verify$");
+    return revoke !== -1 && seedEnd !== -1 && verifyStart !== -1 &&
+      seedEnd < revoke && revoke < verifyStart;
+  },
+  "K07 service_role SELECT on the mapping table is preserved, never revoked": (s) => {
+    const code = codeOnly(s);
+    // No revoke that touches this table may name select, or use the `all` blanket.
+    const revokes = [...code.matchAll(
+      new RegExp(`revoke ([a-z, ]+?) on (?:table )?public\\.${MAPPING_TABLE}`, "g"))]
+      .map((m) => m[1].trim());
+    return revokes.length > 0 &&
+      revokes.every((priv) => !/\bselect\b/.test(priv) && !/\ball\b/.test(priv));
+  },
+  "K08 no direct mapping-table write is granted back anywhere in the migration": (s) => {
+    const code = codeOnly(s);
+    return !new RegExp(
+      `grant [a-z, ]*(?:insert|update|delete|all)[a-z, ]* on (?:table )?public\\.${MAPPING_TABLE}`
+    ).test(code) &&
+      // and no blanket grant of any kind on this table, in either order of writing
+      !new RegExp(`grant all on (?:table )?public\\.${MAPPING_TABLE}`).test(code);
+  },
+  "K09 apply time proves SELECT true / INSERT false / UPDATE false / DELETE false": (s) => {
+    const privOf = (priv) =>
+      new RegExp(
+        `has_table_privilege\\(\\s*\\n?\\s*'service_role', 'public\\.${MAPPING_TABLE}', '${priv}'\\)`
+      );
+    const code = codeOnly(s);
+    return (
+      // SELECT must be asserted PRESENT (`if not has_table_privilege(...)`)
+      new RegExp(`if not ${privOf("SELECT").source}`).test(code) &&
+      // the three write privileges must each be asserted ABSENT (`if has_...`)
+      ["INSERT", "UPDATE", "DELETE"].every((priv) =>
+        new RegExp(`if ${privOf(priv).source}`).test(code) &&
+        !new RegExp(`if not ${privOf(priv).source}`).test(code)) &&
+      /still holds INSERT on public\./.test(s) &&
+      /still holds UPDATE on public\./.test(s) &&
+      /lost SELECT on public\./.test(s)
+    );
+  },
+  "K10 apply time proves all three controlled authorities keep service_role EXECUTE": (s) => {
+    const block = between(s, "-- 6.13", "end loop;");
+    return CONTROLLED_AUTHORITIES.every((sig) => block.includes(`'${sig}'`)) &&
+      /has_function_privilege\('service_role', v_oid, 'execute'\)/.test(block) &&
+      /controlled authority % is absent/.test(block);
+  },
+  "K11 apply time proves all three controlled authorities are SECURITY DEFINER": (s) => {
+    const block = between(s, "-- 6.13", "end loop;");
+    return /select p\.prosecdef from pg_proc p where p\.oid = v_oid/.test(block) &&
+      /controlled authority % is not SECURITY DEFINER/.test(block);
+  },
+
   // ---- L. predecessors untouched -----------------------------------------------------
   "L01 the QF-MVP-80.14A migration is byte-identical to its pinned hash": () =>
     sha256(canonicalBytes(H_80_14A)) === SHA_80_14A,
@@ -656,6 +746,28 @@ const RULES = {
     !new RegExp(`update public\\.[a-z_]+[\\s\\S]{0,200}${ANCHOR_KEY}`).test(codeOnly(fn(s))) &&
     !new RegExp(`${ANCHOR_KEY}[\\s\\S]{0,120}set is_active`).test(codeOnly(fn(s))) &&
     !codeOnly(seed(s)).includes(ANCHOR_KEY) && !codeOnly(catalogue(s)).includes(ANCHOR_KEY),
+  "L08 both predecessor authorities are SECURITY DEFINER in their pinned sources": () => {
+    // Why this matters HERE: §5a removes service_role's direct write on the
+    // mapping table. That is only safe because the governed routes execute as
+    // their OWNER, not as the caller. A SECURITY INVOKER predecessor would be
+    // disabled by the revoke instead of narrowed by it.
+    const declaresDefiner = (source, name) => {
+      const start = source.indexOf(`create or replace function public.${name}(`);
+      if (start === -1) return false;
+      const body = source.slice(start, start + 4000);
+      return /\nlanguage plpgsql\nsecurity definer\nset search_path = pg_catalog, public, pg_temp\n/.test(body);
+    };
+    return declaresDefiner(H_80_14A, PREDECESSOR_FUNCTIONS[0]) &&
+      declaresDefiner(H_40_13B, PREDECESSOR_FUNCTIONS[1]);
+  },
+  "L09 this migration redefines no predecessor body and changes no function": (s) => {
+    const code = codeOnly(s);
+    return PREDECESSOR_FUNCTIONS.every((name) =>
+      !new RegExp(`create (or replace )?function public\\.${name}\\b`).test(code) &&
+      !new RegExp(`(drop|alter) function public\\.${name}\\b`, "i").test(code)) &&
+      // and nothing revokes the governed routes' own execute privilege
+      !/revoke [a-z, ]*on function public\.qf_(activate_meta_lead_assignment|disable_meta_canary)/.test(code);
+  },
 
   // ---- M. no provider call, no credential ---------------------------------------------
   "M01 no network extension, HTTP call, Meta endpoint or credential appears": (s) =>
@@ -849,6 +961,81 @@ const MUTANTS = [
   ["K03", "a direct table write grant is restored",
     (s) => s.replace("grant execute on function",
       "grant update on public.communication_provider_template_mappings to service_role;\ngrant execute on function")],
+
+  // THE DIRECT-WRITE ESCAPE HATCH IS RE-OPENED. This is the defect the correction
+  // exists to close, so each way of re-opening it gets its own mutant.
+  ["K05", "the revoke is deleted outright",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;\n`, "")],
+  ["K05", "the revoke is commented out",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `-- revoke insert, update on table public.${MAPPING_TABLE} from service_role;`)],
+  ["K05", "INSERT is retained by narrowing the revoke to UPDATE only",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `revoke update on table public.${MAPPING_TABLE} from service_role;`)],
+  ["K05", "UPDATE is retained by narrowing the revoke to INSERT only",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `revoke insert on table public.${MAPPING_TABLE} from service_role;`)],
+  ["K05", "the revoke is aimed at a browser role instead of service_role",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `revoke insert, update on table public.${MAPPING_TABLE} from anon;`)],
+  ["K06", "the revoke is moved ahead of the seed, where it could not survive",
+    (s) => {
+      const stmt = `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`;
+      return s.replace(`${stmt}\n`, "").replace("do $catalogue$", `${stmt}\n\ndo $catalogue$`);
+    }],
+  ["K07", "SELECT is revoked along with the writes, breaking every read path",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `revoke select, insert, update on table public.${MAPPING_TABLE} from service_role;`)],
+  ["K07", "the revoke is widened to `all`, taking SELECT with it",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `revoke all on table public.${MAPPING_TABLE} from service_role;`)],
+  ["K08", "the write is granted straight back after the revoke",
+    (s) => s.replace(
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;`,
+      `revoke insert, update on table public.${MAPPING_TABLE} from service_role;\ngrant insert, update on table public.${MAPPING_TABLE} to service_role;`)],
+  ["K08", "the write is granted back later in the migration, past the revoke",
+    (s) => s.replace("do $verify$",
+      `grant update on table public.${MAPPING_TABLE} to service_role;\n\ndo $verify$`)],
+  ["K09", "the INSERT-absence assertion is deleted",
+    (s) => s.replace(
+      /  if has_table_privilege\(\n       'service_role', 'public\.communication_provider_template_mappings', 'INSERT'\) then[\s\S]*?end if;\n/,
+      "")],
+  ["K09", "the UPDATE-absence assertion is inverted into a requirement",
+    (s) => s.replace(
+      "  if has_table_privilege(\n       'service_role', 'public.communication_provider_template_mappings', 'UPDATE') then",
+      "  if not has_table_privilege(\n       'service_role', 'public.communication_provider_template_mappings', 'UPDATE') then")],
+  ["K09", "the DELETE-absence assertion is deleted",
+    (s) => s.replace(
+      /  if has_table_privilege\(\n       'service_role', 'public\.communication_provider_template_mappings', 'DELETE'\) then[\s\S]*?end if;\n/,
+      "")],
+  ["K09", "the SELECT-preserved assertion is deleted",
+    (s) => s.replace(
+      /  if not has_table_privilege\(\n       'service_role', 'public\.communication_provider_template_mappings', 'SELECT'\) then[\s\S]*?end if;\n/,
+      "")],
+  ["K10", "the kill switch is dropped from the execute-preserved proof",
+    (s) => s.replace("    'public.qf_disable_meta_canary_v1()'\n  ] loop\n    v_oid := to_regprocedure(v_name);",
+      "    'public.qf_activate_meta_transactional_mapping_v1(text,text)'\n  ] loop\n    v_oid := to_regprocedure(v_name);")],
+  ["K10", "the execute-preserved assertion is removed from the 6.13 loop",
+    (s) => s.replace(
+      /    if not has_function_privilege\('service_role', v_oid, 'execute'\) then[\s\S]*?end if;\n  end loop;/,
+      "  end loop;")],
+  ["K11", "the SECURITY DEFINER proof is removed from the 6.13 loop",
+    (s) => s.replace(
+      /    if not \(select p\.prosecdef from pg_proc p where p\.oid = v_oid\) then[\s\S]*?end if;\n/,
+      "")],
+  ["L09", "this migration starts redefining the kill switch body",
+    (s) => s.replace("do $verify$",
+      "create or replace function public.qf_disable_meta_canary_v1()\nreturns void language sql as $x$ select 1 $x$;\n\ndo $verify$")],
+  ["L09", "the governed lead-assignment route has its execute revoked",
+    (s) => s.replace(`grant execute on function public.${RPC}(text, text)`,
+      `revoke all on function public.qf_activate_meta_lead_assignment_v1(text, text, text) from service_role;\ngrant execute on function public.${RPC}(text, text)`)],
 
   // PREDECESSORS / KILL SWITCH.
   ["L03", "the kill switch is redefined by this migration",

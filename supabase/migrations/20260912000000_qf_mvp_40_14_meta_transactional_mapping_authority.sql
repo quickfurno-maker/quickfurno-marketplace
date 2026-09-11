@@ -43,11 +43,11 @@
 --
 -- WHY AN RPC AND NOT A SEED-THEN-UPDATE
 --   20260813000000 revoked insert/update on the runtime-policy and canary tables
---   from service_role, but communication_provider_template_mappings is still
---   directly writable, so "activation" today means an unguarded one-column
---   UPDATE that anything holding the service key could perform against ANY
---   mapping row. This function is the narrow alternative and adds what a direct
---   write structurally cannot:
+--   from service_role, but left communication_provider_template_mappings
+--   directly writable, so "activation" before this migration meant an unguarded
+--   one-column UPDATE that anything holding the service key could perform
+--   against ANY mapping row. This function is the narrow alternative and adds
+--   what a direct write structurally cannot:
 --     * EVERY production-scope value is a CONSTANT. Provider, channel, language,
 --       category, version, approval status, the active flag, the provider
 --       template name, the provider template id and the binding schema are all
@@ -58,6 +58,15 @@
 --       lead_assignment_alert mapping.
 --     * POSTCONDITIONS that re-read what was written and roll the whole call back
 --       unless the resulting sending surface is exactly the reviewed one.
+--
+--   None of that is worth anything while the bypass remains, so §5a REVOKES
+--   INSERT and UPDATE on communication_provider_template_mappings from
+--   service_role — after this migration's own seed has completed — leaving
+--   SELECT intact. §2 is SECURITY DEFINER and runs as its owner, so it becomes
+--   the EXCLUSIVE activation route rather than merely the polite one. 6.12
+--   proves SELECT true / INSERT false / UPDATE false / DELETE false at apply
+--   time, and 6.13 proves all three controlled authorities are still SECURITY
+--   DEFINER and still executable by service_role.
 --
 -- APPLYING THIS MIGRATION CREATES ZERO SEND AUTHORITY
 --   The four mappings are seeded is_active = false. §4 captures the number of
@@ -845,9 +854,50 @@ end;
 $seed$;
 
 -- ---------------------------------------------------------------------------
--- 5. Privileges — matched to the 40.13B / 80.14A grant style exactly.
---    Browser roles get NO activation capability, now or ever.
+-- 5. Privileges
+--
+-- 5a. THE DIRECT-WRITE ESCAPE HATCH IS CLOSED.
+--
+--     This migration's own header states the problem it exists to solve:
+--     20260813000000 "left communication_provider_template_mappings directly
+--     writable, so 'activation' before this migration meant an unguarded
+--     one-column UPDATE that anything holding the service key could perform
+--     against ANY mapping row."
+--
+--     Adding a narrow RPC does not remove that. While service_role keeps direct
+--     INSERT/UPDATE on the mapping table, every gate in §2 is merely OPTIONAL —
+--     the closed four-key vocabulary, the six readiness preconditions, the
+--     already-active runtime policy, the empty canary surface, the quiet
+--     automation queue, the byte-identical anchor and every postcondition are
+--     all bypassed by one direct `set is_active = true`, or by INSERTing a fresh
+--     ACTIVE row pointed at any provider template id at all. §2 would never run.
+--
+--     So the authority is made EXCLUSIVE the only way an authority can be: the
+--     alternative route is removed. 20260709000100 §9 granted this table exactly
+--     `select, insert, update` to service_role (no DELETE, no TRUNCATE); the two
+--     write privileges go, and SELECT stays.
+--
+--     WHY THIS BREAKS NOTHING THAT MAY RUN:
+--       * §2 is SECURITY DEFINER and executes as its OWNER, not as the caller,
+--         so the sole governed activation path is unaffected. 6.13 re-proves
+--         service_role still holds EXECUTE on it and on both predecessors.
+--       * A migration applies as its own (owner) role, never as service_role, so
+--         §3 and §4 above — which have already completed by this point — are
+--         unaffected, as is any future migration.
+--       * Every runtime reader keeps working. The ONLY repository runtime paths
+--         that touch this table are SELECT-only:
+--           services/providerTemplateMappingService.ts  (send-time resolution)
+--           services/adminWhatsAppService.ts            (admin read model)
+--           services/smsProviderRuntimeService.ts       (sms mapping read)
+--         No file under services/, lib/ or app/ INSERTs or UPDATEs it.
+--
+--     Nothing here GRANTS any table privilege. DELETE was never granted and is
+--     not granted now; 6.12 asserts it is still absent.
 -- ---------------------------------------------------------------------------
+revoke insert, update on table public.communication_provider_template_mappings from service_role;
+
+-- 5b. Function privileges — matched to the 40.13B / 80.14A grant style exactly.
+--     Browser roles get NO activation capability, now or ever.
 revoke all on function public.qf_activate_meta_transactional_mapping_v1(text, text)
   from public, anon, authenticated, service_role;
 
@@ -1050,6 +1100,56 @@ begin
   if exists (select 1 from pg_extension where extname in ('pg_net', 'http', 'dblink')) then
     raise exception 'QF-MVP-40.14 aborted: database network extension appeared.';
   end if;
+
+  -- 6.12 THE DIRECT-WRITE ESCAPE HATCH IS PROVEN CLOSED.
+  --
+  --      This is what makes §2 the EXCLUSIVE activation authority rather than
+  --      merely the polite one. Asserted with has_table_privilege(), which
+  --      resolves EFFECTIVE privilege, so a write re-granted through some other
+  --      role service_role is a member of is caught as well as a direct ACL entry.
+  if not has_table_privilege(
+       'service_role', 'public.communication_provider_template_mappings', 'SELECT') then
+    raise exception
+      'QF-MVP-40.14 aborted: service_role lost SELECT on public.communication_provider_template_mappings; the send-time and admin READ paths must keep working.';
+  end if;
+  if has_table_privilege(
+       'service_role', 'public.communication_provider_template_mappings', 'INSERT') then
+    raise exception
+      'QF-MVP-40.14 aborted: service_role still holds INSERT on public.communication_provider_template_mappings; a fresh ACTIVE row could be written past every gate in this migration.';
+  end if;
+  if has_table_privilege(
+       'service_role', 'public.communication_provider_template_mappings', 'UPDATE') then
+    raise exception
+      'QF-MVP-40.14 aborted: service_role still holds UPDATE on public.communication_provider_template_mappings; a direct is_active = true would bypass every gate in this migration.';
+  end if;
+  if has_table_privilege(
+       'service_role', 'public.communication_provider_template_mappings', 'DELETE') then
+    raise exception
+      'QF-MVP-40.14 aborted: service_role holds DELETE on public.communication_provider_template_mappings, which 20260709000100 never granted; that is an unreviewed privilege posture and is reconciled out of band, never silently by this push.';
+  end if;
+
+  -- 6.13 CLOSING THE DIRECT WRITE MUST NOT STRAND THE GOVERNED ROUTES.
+  --      All three controlled authorities still exist, are still SECURITY
+  --      DEFINER (so they are unaffected by the revoke above, which applies to
+  --      the CALLER's role), and are still executable by service_role.
+  foreach v_name in array array[
+    'public.qf_activate_meta_lead_assignment_v1(text,text,text)',
+    'public.qf_activate_meta_transactional_mapping_v1(text,text)',
+    'public.qf_disable_meta_canary_v1()'
+  ] loop
+    v_oid := to_regprocedure(v_name);
+    if v_oid is null then
+      raise exception 'QF-MVP-40.14 aborted: controlled authority % is absent.', v_name;
+    end if;
+    if not (select p.prosecdef from pg_proc p where p.oid = v_oid) then
+      raise exception
+        'QF-MVP-40.14 aborted: controlled authority % is not SECURITY DEFINER; the revoke in §5a would disable it instead of narrowing the caller.', v_name;
+    end if;
+    if not has_function_privilege('service_role', v_oid, 'execute') then
+      raise exception
+        'QF-MVP-40.14 aborted: service_role lost execute on %; the direct write is closed, so the governed route must stay open.', v_name;
+    end if;
+  end loop;
 end;
 $verify$;
 

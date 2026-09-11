@@ -284,6 +284,53 @@ const catalogue = (s) => between(s, "do $catalogue$", "$catalogue$;");
 const codeOnly = (text) => text.replace(/^\s*--.*$/gm, "");
 
 /**
+ * THE DATABASE REPRESENTATION OF THE AUTHORITY.
+ *
+ * PostgreSQL stores a PL/pgSQL body VERBATIM in pg_proc.prosrc — comments and
+ * all — and pg_get_functiondef() hands that same text back unchanged. The
+ * migration's own §6.4 scans exactly that text, so to §6.4 a prose comment is
+ * indistinguishable from executable code.
+ *
+ * codeOnly() therefore models the SOURCE, not the DATABASE. A containment rule
+ * evaluated on codeOnly(fn(s)) can be green in CI while the identical check
+ * inside §6.4 aborts the push. That is not hypothetical: the first exact
+ * production db-push of this migration failed closed inside §6.4 with
+ *
+ *   QF-MVP-40.14 aborted: excluded key campaign is reachable from this authority.
+ *
+ * because the body carried a prose comment ending "... or campaign write." and
+ * G05 had stripped it before looking. Rules G08..G10 below close that gap by
+ * evaluating the SAME vocabulary §6.4 uses against the SAME text Postgres would
+ * return. G05 is kept as-is: it is still the right test for executable reach.
+ */
+const asStoredByPostgres = (s) => fn(s);
+
+/**
+ * The excluded-token vocabulary EXACTLY as the migration's own §6.4 declares it,
+ * read out of the migration rather than restated here — so a token added to §6.4
+ * is automatically enforced offline too, and one deleted from §6.4 is noticed.
+ */
+function declaredExcludedTokens(source) {
+  const block = between(source, "-- 6.4", "end loop;");
+  const m = /foreach v_name in array array\[([\s\S]*?)\] loop/.exec(block);
+  if (!m) return null;
+  return [...m[1].matchAll(/'([a-z0-9_.]+)'/g)].map((x) => x[1]);
+}
+
+/**
+ * Every generic/forbidden token that must not appear in the STORED definition,
+ * in comments or otherwise. Superset of §6.4's own list on purpose: `marketing`,
+ * `vendor_campaigns` and `campaign_recipients` are not in §6.4 but naming any of
+ * them in the body would be the same class of mistake.
+ */
+const STORED_DEFINITION_FORBIDDEN_TOKENS = [
+  ...EXCLUDED_BUSINESS_KEYS,
+  ...EXCLUDED_CONSENT_KEYS,
+  ...EXCLUDED_CAMPAIGN_TOKENS,
+  EXCLUDED_DUPLICATE_PROVIDER_TEMPLATE,
+];
+
+/**
  * Pull one of the two hard-coded JSON contracts out of the migration and parse
  * it. Returns null on any structural surprise, so a rule fails closed.
  */
@@ -534,6 +581,50 @@ const RULES = {
     [...EXCLUDED_BUSINESS_KEYS, ...EXCLUDED_CONSENT_KEYS].every((k) =>
       new RegExp(`'${k}'`).test(between(s, "do $verify$", "$verify$;"))) &&
     /excluded key % is reachable from this authority/.test(s),
+
+  // ---- G08..G10. THE pg_get_functiondef REPRESENTATION -------------------------
+  // See asStoredByPostgres(). §6.4 scans the body Postgres stored, comments
+  // included; these rules scan the same text with the same vocabulary, so an
+  // apply-time §6.4 abort is now impossible to reach with a green CI.
+  "G08 §6.4 still declares the generic campaign exclusion and a full vocabulary": (s) => {
+    const tokens = declaredExcludedTokens(s);
+    return Array.isArray(tokens) &&
+      tokens.includes("campaign") &&
+      // every business, consent and duplicate-template exclusion is still named
+      [...EXCLUDED_BUSINESS_KEYS, ...EXCLUDED_CONSENT_KEYS,
+        EXCLUDED_DUPLICATE_PROVIDER_TEMPLATE].every((k) => tokens.includes(k)) &&
+      // and §6.4 never names a token this validator does not also model
+      tokens.every((t) => STORED_DEFINITION_FORBIDDEN_TOKENS.includes(t));
+  },
+  "G09 no forbidden token appears in the STORED definition, COMMENTS INCLUDED": (s) => {
+    const stored = asStoredByPostgres(s);
+    if (!stored) return false;
+    const declared = declaredExcludedTokens(s);
+    if (!Array.isArray(declared) || declared.length === 0) return false;
+    // both §6.4's own vocabulary and this validator's superset, un-stripped
+    return [...new Set([...declared, ...STORED_DEFINITION_FORBIDDEN_TOKENS])]
+      .every((t) => !new RegExp(t).test(stored));
+  },
+  "G11 §6.4 scans the RAW definition and is never softened to ignore comments": (s) => {
+    // The wrong fix for the production abort would have been to make §6.4 strip
+    // comments too. That would weaken the database-level structural check to
+    // match the offline one instead of the other way round, so it is refused.
+    const block = between(s, "-- 6.4", "end loop;");
+    return /select pg_get_functiondef\(v_oid\) into v_def;/.test(s) &&
+      /if v_def ~ v_name then/.test(block) &&
+      !/regexp_replace\s*\(\s*v_def/.test(block) &&
+      !/(strip|comment_free|code_only|v_def_code)/i.test(block);
+  },
+  "G10 stripping comments does not change the verdict for any §6.4 token": (s) => {
+    // The defect this models: codeOnly() and the raw body disagreeing. If they
+    // ever disagree again, CI is green while the production push aborts.
+    const declared = declaredExcludedTokens(s);
+    if (!Array.isArray(declared) || declared.length === 0) return false;
+    const stored = asStoredByPostgres(s);
+    const stripped = codeOnly(stored);
+    return declared.every((t) =>
+      new RegExp(t).test(stored) === new RegExp(t).test(stripped));
+  },
 
   // ---- H. readiness, posture and queue gates -----------------------------------
   "H01 exactly one fully ready provider account is required": (s) =>
@@ -909,6 +1000,38 @@ const MUTANTS = [
       "    'vendor_onboarding_reminder',\n    'consent_stop_acknowledgement'\n  ];\n\n  -- An automation job")],
   ["G05", "a campaign surface is referenced from the authority",
     (s) => s.replace("  v_count   integer;", "  v_count   integer;\n  v_campaign uuid;")],
+
+  // THE pg_get_functiondef REPRESENTATION DEFECT ITSELF. The first exact
+  // production db-push of this migration aborted inside §6.4 on a harmless prose
+  // comment, while this validator was green — because G05 stripped comments and
+  // §6.4 does not. These mutants restore that defect verbatim and require the
+  // comment-inclusive rules to reject it. G05 deliberately still passes on them:
+  // that is the whole point, and why G09/G10 had to be added rather than G05
+  // merely re-pointed.
+  ["G09", "THE PRODUCTION DEFECT: a body comment names `campaign` again",
+    (s) => s.replace(
+      "  -- any assignment, credit, lead or vendor write, and any write to the",
+      "  -- any assignment, credit, lead, vendor or campaign write, and any write to the")],
+  ["G10", "THE PRODUCTION DEFECT: codeOnly() hides a §6.4 token the database sees",
+    (s) => s.replace(
+      "  -- any assignment, credit, lead or vendor write, and any write to the",
+      "  -- any assignment, credit, lead, vendor or campaign write, and any write to the")],
+  ["G09", "a body comment names an excluded MARKETING template key",
+    (s) => s.replace("  -- One row, addressed by the id resolved above",
+      "  -- This lane is not low_credit_warning, which stays out of scope.\n  -- One row, addressed by the id resolved above")],
+  ["G09", "a body comment names the duplicate provider template it must never touch",
+    (s) => s.replace("  -- One row, addressed by the id resolved above",
+      "  -- Never qf_lead_assignment_alert_v1.\n  -- One row, addressed by the id resolved above")],
+  ["G08", "§6.4 drops the generic campaign exclusion",
+    (s) => s.replace("'qf_lead_assignment_alert_v1', 'campaign'", "'qf_lead_assignment_alert_v1'")],
+  ["G08", "§6.4 names a token this validator does not model",
+    (s) => s.replace("'qf_lead_assignment_alert_v1', 'campaign'",
+      "'qf_lead_assignment_alert_v1', 'campaign', 'communication_provider_accounts'")],
+  ["G11", "§6.4 is softened to scan a comment-stripped copy of the definition",
+    (s) => s.replace("    if v_def ~ v_name then",
+      "    if regexp_replace(v_def, '^\\s*--.*$', '', 'gn') ~ v_name then")],
+  ["G11", "the §6.4 containment test is deleted outright",
+    (s) => s.replace("    if v_def ~ v_name then", "    if false then")],
   ["G06", "the duplicate lead-assignment provider template is seeded",
     (s) => s.replace('"provider_template_name": "qf_lead_received_v1"',
       '"provider_template_name": "qf_lead_assignment_alert_v1"')],

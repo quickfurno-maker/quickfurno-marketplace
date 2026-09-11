@@ -476,7 +476,16 @@ begin
   -- Deliberately absent: any runtime-policy write, any canary-destination write,
   -- any provider-account write, any other mapping write, any communication
   -- intent/message/event write, any automation job/action-request/attempt write,
-  -- any assignment, credit, lead, vendor or campaign write.
+  -- any assignment, credit, lead or vendor write, and any write to the
+  -- promotional surfaces §6.7 enumerates in full.
+  --
+  -- The forbidden token vocabulary is deliberately NOT restated inside this body.
+  -- PostgreSQL stores a PL/pgSQL body VERBATIM, comments included, and
+  -- pg_get_functiondef() hands that same text back — so §6.4 scans THIS comment
+  -- exactly as it scans executable code. Naming an excluded key here, even only
+  -- to disclaim it, makes the migration abort on its own prose. Every exclusion
+  -- is therefore asserted from OUTSIDE the body, in §6.4 and §6.7, where naming
+  -- the thing being refused is safe.
   update public.communication_provider_template_mappings
      set is_active = true, updated_at = now()
    where id = v_mapping.id;

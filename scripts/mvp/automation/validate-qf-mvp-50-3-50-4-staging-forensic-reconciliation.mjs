@@ -51,7 +51,7 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. Still exact equality.
-const MIGRATION_COUNT = 108;
+const MIGRATION_COUNT = 109;
 const PRODUCTION_ACTIVATION_FILENAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -175,8 +175,11 @@ function validateState(state) {
   check("migration count is exactly 104", state.migrationFiles.length === MIGRATION_COUNT);
   // QF-MVP-50.6 RE-PIN: the tail grows from twelve to thirteen, adding ONLY the
   // source-only orphan cancellation authority. Still an EXACT ordered comparison.
-  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration, the five reconciled governed authorities, the two staging-applied authorities and the three pinned SOURCE-PENDING authorities",
-    same(state.migrationFiles.slice(-16),
+  // QF-MVP-40.14 RE-PIN: the tail grows from sixteen to seventeen, adding ONLY the
+  // source-only Meta transactional mapping seed + activation authority. Still an
+  // EXACT ordered comparison.
+  check("the exact final four forensic migration filenames are frozen, followed only by the applied 50.5 migration, the five reconciled governed authorities, the two staging-applied authorities and the four pinned SOURCE-PENDING authorities",
+    same(state.migrationFiles.slice(-17),
       [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
        CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
        GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,
@@ -184,7 +187,8 @@ function validateState(state) {
        "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
        "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
         "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
-        "20260911000000_qf_launch_security_closeout.sql"]));
+        "20260911000000_qf_launch_security_closeout.sql",
+        "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql"]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -200,7 +204,7 @@ function validateState(state) {
   // set, so PENDING is the 80.14A production activation authority alone again.
   // QF-MVP-50.6 RE-PIN: 1 -> 2 pending, both source-only.
   check("the manifest pending set holds exactly the three pinned source-only authorities, two are staging-applied, and the five governed authorities are reconciled as APPLIED",
-    pending !== null && pending.length === 4 &&
+    pending !== null && pending.length === 5 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
     pending[1].version === "20260905000000" && pending[1].operationalStatus === "PENDING" &&
     Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
@@ -229,7 +233,7 @@ function validateState(state) {
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
   check("the anchor post-anchor count equals the ten applied records plus five reconciled, one staging-applied and three pending authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 2 + 4);
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 2 + 5);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

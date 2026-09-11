@@ -338,7 +338,7 @@ record("G02 pending holds exactly three pinned source-only authorities, two are 
   // Both sets stay exact; APPLIED stays ten and RECONCILED stays five.
   // QF-MVP-50.6 RE-PIN: 1 -> 2. The orphan cancellation authority is source-only and
   // joins PENDING. APPLIED stays ten, RECONCILED stays five, staging-applied stays one.
-  manifest.pendingPostAnchorMigrations.length === 4 &&
+  manifest.pendingPostAnchorMigrations.length === 5 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
@@ -376,7 +376,7 @@ record("G05 the validator is registered and wired into CI after 50.3",
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
 record("G06 the local migration set is exactly 104",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 108);
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 109);
 
 // ---------------------------------------------------------------------------
 // M. MUTANTS

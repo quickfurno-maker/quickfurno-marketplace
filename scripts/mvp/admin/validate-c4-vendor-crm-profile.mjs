@@ -129,7 +129,7 @@ const migrationFiles = readdirSync(join(root, "supabase", "migrations"));
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count remains 108", migrationFiles.length === 108);
+check("migration count remains 109", migrationFiles.length === 109);
 
 console.log(`\nchecks: ${passed} passed, ${failed} failed (of ${passed + failed})`);
 console.log("offline: no database, no network, no provider, no auth bypass");

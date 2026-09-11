@@ -463,12 +463,12 @@ record("B08 a job already cancelled once is refused a second time",
 record("C01 the migration is the pinned forward-only file and nothing else was added",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA &&
   readdirSync(path.join(ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith(".sql")).sort().at(-4) ===
+    .filter((f) => f.endsWith(".sql")).sort().at(-5) ===
     "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql");
 
-record("C02 the local migration set is exactly 108",
+record("C02 the local migration set is exactly 109",
   readdirSync(path.join(ROOT, "supabase/migrations"))
-    .filter((f) => f.endsWith(".sql")).length === 108);
+    .filter((f) => f.endsWith(".sql")).length === 109);
 
 record("C03 a fail-closed dependency preflight runs before anything is installed",
   migrationCode.indexOf("raise exception 'QF-MVP-50.6: the automation persistence and transport tables must exist.'") <
@@ -706,7 +706,7 @@ record("F03 the manifest pins the new migration as SOURCE-PENDING with no applic
   (() => {
     const pin = (manifest.pendingPostAnchorMigrations ?? [])
       .find((r) => r.version === "20260905000000");
-    return manifest.pendingPostAnchorMigrations.length === 4 &&
+    return manifest.pendingPostAnchorMigrations.length === 5 &&
       pin?.sha256 === MIGRATION_SHA &&
       pin.path === MIGRATION_PATH &&
       pin.phase === "QF-MVP-50.6" &&
@@ -719,13 +719,13 @@ record("F03 the manifest pins the new migration as SOURCE-PENDING with no applic
       pin.requiresSeparateStagingDeploymentGate === true &&
       !("remoteHistoryCountAfterApply" in pin) &&
       !("appliedEvidenceMarker" in pin) &&
-      manifest.appliedAnchor.postAnchorMigrationCount === 21;
+      manifest.appliedAnchor.postAnchorMigrationCount === 22;
   })());
 
 record("F04 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 109;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 4") &&
+  g1Source.includes("pendingPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("reconciledPins.length === 5") &&
   // The frozen 80.05 historical fact must NOT have moved with the live count.
@@ -792,7 +792,7 @@ const mutants = [
             .filter((f) => f.endsWith(".workflow.json"))
             .every((f) => JSON.parse(read(`automation/n8n/${f}`)).active === false)],
   ["silently loosening the G1 pin is impossible",
-    () => /const MIGRATION_COUNT = 108;/.test(g1Source) &&
+    () => /const MIGRATION_COUNT = 109;/.test(g1Source) &&
           !/state\.migrations\.length\s*>=/.test(g1Source)],
   ["claiming this migration was applied anywhere is detectable",
     () => {

@@ -72,7 +72,7 @@ const FROZEN = [
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality.
-const MIGRATION_COUNT = 108;
+const MIGRATION_COUNT = 109;
 const PRODUCTION_ACTIVATION_NAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -89,11 +89,15 @@ const STALE_BUSINESS_NAME =
 // QF-MVP-40: the closure-only canary quiesce authority, newest and SOURCE-PENDING.
 const CANARY_QUIESCE_NAME =
   "20260910060000_qf_mvp_40_canary_quiesce_transition.sql";
-// QF LAUNCH SECURITY CLOSEOUT: the newest pending authority.
+// QF LAUNCH SECURITY CLOSEOUT.
 const LAUNCH_SECURITY_CLOSEOUT_NAME =
   "20260911000000_qf_launch_security_closeout.sql";
-// QF-MVP-50.6 RE-PIN: 17 -> 18.
-const POST_ANCHOR_COUNT = 21;
+// QF-MVP-40.14: the newest pending authority — the Meta transactional mapping seed
+// plus its one-at-a-time activation RPC.
+const TRANSACTIONAL_MAPPING_NAME =
+  "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql";
+// QF-MVP-50.6 RE-PIN: 17 -> 18. QF-MVP-40.14 RE-PIN: 21 -> 22.
+const POST_ANCHOR_COUNT = 22;
 const PENDING_ORDER = ["20260813000000", "20260814000000", "20260815000000", "20260816000000", "20260817000000"];
 const RECOVERY_NAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
@@ -148,14 +152,14 @@ record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
 // QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
 // in exactly this order; they are now followed by the 50.5 recovery transport, which is
 // named explicitly rather than allowed as "anything newer".
-record("V07a the final sixteen versions are in exact chronological order",
-  same(migrationFiles.slice(-16),
+record("V07a the final seventeen versions are in exact chronological order",
+  same(migrationFiles.slice(-17),
     [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
      MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME, GEO_POSTGIS_SHORTLIST_NAME,
      AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME, REALTIME_PUBLICATION_NAME,
      ORPHAN_CANCELLATION_NAME, STALE_BUSINESS_NAME, CANARY_QUIESCE_NAME,
-     LAUNCH_SECURITY_CLOSEOUT_NAME]));
-record("V07 the local migration set is exactly 108",
+     LAUNCH_SECURITY_CLOSEOUT_NAME, TRANSACTIONAL_MAPPING_NAME]));
+record("V07 the local migration set is exactly 109",
   migrationFiles.length === MIGRATION_COUNT);
 
 // ---------------------------------------------------------------------------
@@ -357,7 +361,7 @@ record("G06 pending holds exactly three pinned source-only authorities, two are 
   // staging-applied set. PENDING is the 80.14A production activation authority alone.
   // Both sets stay exact; APPLIED stays ten and RECONCILED stays five.
   // QF-MVP-50.6 RE-PIN: 1 -> 2, adding the source-only orphan cancellation authority.
-  manifest.pendingPostAnchorMigrations?.length === 4 &&
+  manifest.pendingPostAnchorMigrations?.length === 5 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
@@ -373,13 +377,13 @@ record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
-record("G08 the anchor post-anchor count agrees at 21",
+record("G08 the anchor post-anchor count agrees at 22",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 was re-pinned to 108 / 10 applied / 5 reconciled / 1 staging-applied / 4 pending, not loosened",
-  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
+record("G09 G1 was re-pinned to 109 / 10 applied / 5 reconciled / 2 staging-applied / 5 pending, not loosened",
+  /const MIGRATION_COUNT = 109;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 4") &&
+  g1Source.includes("pendingPins.length === 5") &&
   g1Source.includes("stagingAppliedPins.length === 2") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&

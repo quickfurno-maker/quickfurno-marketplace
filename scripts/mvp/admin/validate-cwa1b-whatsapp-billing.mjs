@@ -157,7 +157,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((nam
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count remains exactly 108", migrations.length === 108);
+check("migration count remains exactly 109", migrations.length === 109);
 check("C-WA1B package command is wired", typeof pkg.scripts["test:admin:cwa1b"] === "string");
 
 // 7 — Focused mutation self-tests for the highest-risk claims.

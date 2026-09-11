@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 21,
+    "postAnchorMigrationCount": 22,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1011,6 +1011,22 @@
       "phase": "QF-LAUNCH-SECURITY-CLOSEOUT",
       "operationalStatus": "PENDING",
       "purpose": "Hardens the public read boundary: makes public.vendor_public_v explicitly read-only for PUBLIC/anon/authenticated (every write verb revoked and asserted), removes SECURITY DEFINER from public.get_public_eligible_vendors by repointing it at the already-trusted projection, revokes browser EXECUTE on three functions whose only application callers run under the service role, and pins search_path on six functions the advisor flagged. Grants no new access, drops no policy, disables no RLS and mutates no row.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260912000000",
+      "name": "qf_mvp_40_14_meta_transactional_mapping_authority",
+      "path": "supabase/migrations/20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+      "sha256": "93665d654c33c61dc48be173598963d3422e0ab629d627cc12f4cc67e7523a62",
+      "phase": "QF-MVP-40.14",
+      "operationalStatus": "PENDING",
+      "purpose": "Seeds exactly four APPROVED but INACTIVE Meta/WhatsApp provider template mappings (lead_received, client_lead_status_update, client_matching_update, vendor_onboarding_reminder) and creates public.qf_activate_meta_transactional_mapping_v1 — the only authority that can activate one of them, one key per call, from a closed four-key vocabulary with every provider/category/language/version/schema value hard-coded. Ensures the four communication_templates catalogue rows the mapping foreign key requires, creating only on proven absence and never modifying an existing row. Refuses drift on any existing mapping rather than overwriting it. After its own seed completes, REVOKES direct INSERT and UPDATE on communication_provider_template_mappings from service_role — preserving SELECT and granting no table privilege — so the SECURITY DEFINER RPC is the EXCLUSIVE activation route rather than one route beside an unguarded direct write; proves at apply time that service_role holds SELECT but not INSERT/UPDATE/DELETE, and that qf_activate_meta_lead_assignment_v1, qf_activate_meta_transactional_mapping_v1 and qf_disable_meta_canary_v1 are all still SECURITY DEFINER and still executable by service_role. Applying it activates nothing, writes no runtime policy, no canary destination and no provider account, and creates zero send authority.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

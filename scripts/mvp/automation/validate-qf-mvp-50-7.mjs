@@ -621,10 +621,10 @@ record("P07 no pre-existing shape clause was weakened",
 // ---------------------------------------------------------------------------
 record("Q01 the migration is the pinned forward-only file and is the newest 50.x authority",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().at(-3) ===
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().at(-4) ===
     "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql");
-record("Q02 the local migration set is exactly 108",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 108);
+record("Q02 the local migration set is exactly 109",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 109);
 record("Q03 a fail-closed dependency preflight runs before anything is installed",
   migrationCode.indexOf("QF-MVP-50.7: the automation persistence and transport tables must exist.") <
     migrationCode.indexOf("create or replace function public.qf_automation_vendor_business_state_v1") &&
@@ -666,7 +666,7 @@ record("Q08 no staging evidence id is hard-coded anywhere",
 record("Q09 the manifest pins the migration as SOURCE-PENDING with no application evidence",
   (() => {
     const pin = (manifest.pendingPostAnchorMigrations ?? []).find((r) => r.version === "20260906000000");
-    return manifest.pendingPostAnchorMigrations.length === 4 &&
+    return manifest.pendingPostAnchorMigrations.length === 5 &&
       pin?.sha256 === MIGRATION_SHA && pin.path === MIGRATION_PATH && pin.phase === "QF-MVP-50.7" &&
       pin.operationalStatus === "PENDING" && pin.appliedToStaging === false &&
       pin.appliedToProduction === false && pin.appliedByThisPhase === false &&
@@ -674,12 +674,12 @@ record("Q09 the manifest pins the migration as SOURCE-PENDING with no applicatio
       pin.remoteHistoryCountObservedAtApply === false &&
       pin.requiresSeparateStagingDeploymentGate === true &&
       !("remoteHistoryCountAfterApply" in pin) && !("appliedEvidenceMarker" in pin) &&
-      manifest.appliedAnchor.postAnchorMigrationCount === 21;
+      manifest.appliedAnchor.postAnchorMigrationCount === 22;
   })());
 record("Q10 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 108;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 109;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 4") &&
+  g1Source.includes("pendingPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("reconciledPins.length === 5") &&
   /const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1Source) &&

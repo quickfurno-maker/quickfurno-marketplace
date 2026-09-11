@@ -118,7 +118,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count is unchanged at 108", migrations.length === 108);
+check("migration count is unchanged at 109", migrations.length === 109);
 check("C-WA1 added no migration", !migrations.some((f) => /wa1|whatsapp_admin|admin_whatsapp/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("the read layer only reads EXISTING communication relations", (() => {

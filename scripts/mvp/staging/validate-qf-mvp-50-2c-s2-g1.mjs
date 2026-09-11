@@ -307,7 +307,7 @@ const POST_ANCHOR_PENDING = [
   {
     version: "20260912000000",
     name: "qf_mvp_40_14_meta_transactional_mapping_authority",
-    sha: "93665d654c33c61dc48be173598963d3422e0ab629d627cc12f4cc67e7523a62",
+    sha: "f1f03dfe265fbbe245bcf4a53bb91f8b144f1b99aafa9de9f3108e8a244c8cf5",
     phase: "QF-MVP-40.14",
   },
 ].map((m) => ({

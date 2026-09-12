@@ -177,6 +177,7 @@
     "test:mvp:80-17a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-intent-reconciliation.mjs",
     "test:mvp:80-17a-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-r1-controlled-reconciliation.mjs",
     "test:mvp:80-17a-r1-loader": "node scripts/mvp/operator/validate-qf-mvp-80-17a-r1-runtime-loader.cjs",
+    "test:mvp:82a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-whatsapp-inbox.mjs",
     "test:mvp:82a-r0": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-realtime-publication.mjs",
     "test:mvp:82a-r0-s1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-s1-staging-certification.mjs"
   },

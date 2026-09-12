@@ -21,8 +21,11 @@ import type {
 } from "@/services/adminWhatsAppService";
 import type { DirectoryPage } from "@/lib/adminPaging";
 
+import type { WhatsAppInboxViewModel } from "./inbox/WhatsAppInbox";
+
 export const WHATSAPP_TABS = [
   "overview",
+  "inbox",
   "templates",
   "messages",
   "delivery",
@@ -36,6 +39,7 @@ export type WhatsAppTab = (typeof WHATSAPP_TABS)[number];
 /** Human tab labels, in the same order as WHATSAPP_TABS. */
 export const WHATSAPP_TAB_LABELS: Readonly<Record<WhatsAppTab, string>> = Object.freeze({
   overview: "Overview",
+  inbox: "Inbox",
   templates: "Templates",
   messages: "Messages",
   delivery: "Delivery",
@@ -51,6 +55,12 @@ export const WHATSAPP_TAB_LABELS: Readonly<Record<WhatsAppTab, string>> = Object
 export interface WhatsAppControlCenterPayload {
   readonly tab: WhatsAppTab;
   readonly overview?: WhatsAppAdminOverview;
+  /**
+   * QF-MVP-82A. The human conversation view. It is a DERIVED read model over
+   * the same two authorities the forensic `messages` ledger reads — the
+   * ledger below is unchanged and remains the direction-separated record.
+   */
+  readonly inbox?: WhatsAppInboxViewModel;
   readonly templates?: WhatsAppTemplatePageResult;
   readonly messages?: { readonly data: DirectoryPage<WhatsAppMessageRow>; readonly fault: SectionFault | null };
   readonly inbound?: { readonly data: DirectoryPage<WhatsAppInboundRow>; readonly fault: SectionFault | null };

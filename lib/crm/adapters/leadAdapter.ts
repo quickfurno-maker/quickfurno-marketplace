@@ -5,7 +5,7 @@
 // WhatsApp, no distribution, and no credit deduction.
 //
 // Existing lead table: public.leads (see services/adminService.ts snapshot).
-// This adapter is defensive — every field has a safe fallback so it never throws
+// This adapter is defensive â€” every field has a safe fallback so it never throws
 // if the live schema differs or columns are missing.
 //
 // Phone safety: list/table/card views must use `phone_masked` only. The raw
@@ -28,7 +28,7 @@ export type CRMLeadLoadState = "live" | "empty" | "failed";
 
 const TEST_NAME_RE = /^(test|abc|xyz|asdf|asdfgh|demo|qwerty|aaa+|na|n\/?a|sample|dummy)\b/i;
 
-// Compute privacy-preserving scoring signals from a raw lead. Booleans only —
+// Compute privacy-preserving scoring signals from a raw lead. Booleans only â€”
 // raw phone / email / message text never leave this function.
 export function computeLeadSignals(lead: Lead, phoneFrequency?: Map<string, number>): LeadScoringSignals {
   const digits = String(lead.phone ?? "").replace(/\D/g, "");
@@ -117,7 +117,7 @@ export function crmLeadAdapter(lead: Lead, phoneFrequency?: Map<string, number>)
     id: lead.id,
     lead_id: lead.id,
     client_name: lead.name || "Unnamed lead",
-    // Masked only — full phone is never placed in the CRM view model.
+    // Masked only â€” full phone is never placed in the CRM view model.
     phone_masked: maskPhone(lead.phone),
     email_masked: maskEmail(lead.email),
     service: lead.service_required || lead.category || "Not set",
@@ -147,6 +147,15 @@ export function crmLeadAdapter(lead: Lead, phoneFrequency?: Map<string, number>)
       landing_page: lead.page_url ?? null,
     },
     signals: computeLeadSignals(lead, phoneFrequency),
+    metadata: {
+      core_quality_score: lead.lead_quality_score ?? null,
+      core_quality_class: lead.lead_quality_class ?? null,
+      core_quality_status: lead.lead_quality_status ?? null,
+      core_quality_hard_block_reason: lead.lead_quality_hard_block_reason ?? null,
+      core_quality_recommended_action: lead.lead_quality_recommended_action ?? null,
+      core_quality_checked_at: lead.lead_quality_checked_at ?? null,
+      core_is_duplicate: lead.is_duplicate === true,
+    },
   };
 }
 

@@ -338,60 +338,17 @@ export interface AOSAuditLog {
 // These types describe placeholder-only agents that are NOT activated and have
 // NO side effects. They reuse the existing foundation types where possible.
 // ----------------------------------------------------------------------------
-export type AgentMode = "placeholder" | "rule_based" | "ai_assisted" | "hybrid";
+export type AgentMode = "rule_based" | "ai_assisted" | "hybrid" | "placeholder";
 
 export type AgentLifecycleStatus =
   | "active"
   | "testing"
   | "paused"
-  | "future"
   | "inactive";
 
 export type AgentRiskLevel = "controlled" | "low" | "medium" | "high";
 
-// Safety flags for a future agent. Literal `false`/`true` types make it a
-// compile-time error to accidentally enable a side effect on a future agent.
-export interface FutureAgentPermissionFlags {
-  canReadData: boolean; // false by default unless clearly marked as a future permission
-  canWriteData: false;
-  canSendMessages: false;
-  canDeductCredits: false;
-}
-
-export interface FutureAgentConfig {
-  id: string;
-  name: string;
-  slug: string;
-  status: "future";
-  isActive: false;
-  autoExecute: false;
-  aiEnabled: false;
-  whatsappEnabled: false;
-  n8nEnabled: false;
-  creditDeductionEnabled: false;
-  requiresAdminApproval: true;
-  mode: "placeholder";
-  version: "v0.1-future";
-  riskLevel: "controlled";
-  description: string;
-  futureResponsibilities: string[];
-  permissions: FutureAgentPermissionFlags;
-}
-
-// Safe result shape returned by future-agent placeholder services. Distinct from
-// AgentResult so it can carry the "future_inactive" status without side effects.
-export interface FutureAgentResult {
-  agentName: string;
-  status: "future_inactive";
-  mode: "placeholder";
-  summary: string;
-  data: Record<string, unknown>;
-  warnings: string[];
-  executedSideEffects: false;
-  requiresAdminApproval: true;
-  createdAt: string;
-}
-
+// Safe default permission set used by the seven advisory AOS agents.
 export const noExternalSideEffectsPermission: AgentPermission = {
   canReadLeads: false,
   canReadVendors: false,

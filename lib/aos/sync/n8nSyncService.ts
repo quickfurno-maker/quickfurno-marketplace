@@ -168,20 +168,22 @@ export async function handleWhatsAppStatusUpdate(payload: unknown): Promise<Quic
 }
 
 export async function queueEventForN8n(payload: QuickFurnoN8nEventPayload | Record<string, unknown>): Promise<QuickFurnoN8nEventResult> {
-  let result: QuickFurnoN8nEventResult;
-
-  try {
-    result = await sendEventToN8n(payload);
-  } catch {
-    result = createSafeN8nWebhookFailureResult(payload);
-  }
-
+  // AOS V2 hard retirement: this legacy seam can no longer perform network I/O.
+  // Kept only so historical preview callers fail safely while they are removed.
+  const eventType = asRecord(payload).eventType ?? asRecord(payload).event ?? "aos.failure";
+  const normalized = isQuickFurnoN8nEventType(eventType) ? eventType : "aos.failure";
   return {
-    ...result,
+    ok: true,
+    status: "mocked",
+    eventType: normalized,
+    workflowName: getWorkflowForN8nEvent(normalized),
+    message: "Legacy direct AOS -> n8n routing is retired. No webhook was called.",
+    mockMode: true,
+    sideEffects: createSafeSideEffectReport(),
     details: {
-      ...result.details,
-      queueMode: "safe_mock",
+      queueMode: "retired",
       databasePersisted: false,
+      outboundWebhookCalled: false,
     },
   };
 }

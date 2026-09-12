@@ -12,11 +12,11 @@ import {
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { normalizeLeadContactForStorage } from "../lib/leads/leadContactContract";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
-import { emitLeadCreatedEvent } from "../lib/aos/events/emitLeadCreatedEvent";
-import { emitLeadClarificationRequiredEvent } from "../lib/aos/events/emitLeadClarificationRequiredEvent";
 import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
 import { createClarificationRequestForLead, shouldCreateClarificationForLead } from "./leadClarificationService";
 import { canAutoDistributeLead, scoreAndStoreLead, type LeadQualityScoreResult } from "./leadQualityService";
+import { runAosV2LeadIntelligence } from "./aosV2IntelligenceService";
+import type { AosV2CoreMatchEvidence } from "../lib/aos/v2/contracts";
 import {
   holdPreferredVendorForQualityGate,
   routePreferredVendorLead,
@@ -190,25 +190,6 @@ export async function createLead(
       source,
     });
 
-    // ── Phase 9: Real Lead Form → AOS Event Bridge ──────────────────────────
-    // The lead is now safely persisted. Emit a SAFE, non-blocking `lead.created`
-    // AOS event. This is fire-and-forget: it never awaits the user response, has
-    // its own timeout, never throws, and performs no side effects (no WhatsApp,
-    // no credits, no assignment, no extra DB writes). Failures cannot affect the
-    // lead submission, which already succeeded above.
-    void emitLeadCreatedEvent({
-      leadId: data.id,
-      name,
-      phone,
-      city,
-      area: input.area ?? null,
-      category: serviceRequired,
-      budget: budget || null,
-      message: message || null,
-      isDuplicate: Boolean(data.is_duplicate),
-      formSource: source,
-    });
-
     let scoreResult: LeadQualityScoreResult | null = null;
     try {
       scoreResult = await scoreAndStoreLead(data.id, {
@@ -222,55 +203,16 @@ export async function createLead(
         message,
         is_duplicate: Boolean(data.is_duplicate),
       });
-      void emitLeadCreatedEvent({
-        leadId: data.id,
-        name,
-        phone,
-        city,
-        area: input.area ?? null,
-        category: serviceRequired,
-        budget: budget || null,
-        message: message || null,
-        isDuplicate: Boolean(data.is_duplicate),
-        formSource: "lead.quality.preview",
-        eventType: "lead.scored",
-      });
+
       if (shouldCreateClarificationForLead({ is_duplicate: Boolean(data.is_duplicate) }, scoreResult)) {
         const clarification = await createClarificationRequestForLead(data.id);
-        if (clarification.ok) {
-          void emitLeadClarificationRequiredEvent({
-            leadId: data.id,
-            score: scoreResult.total_score,
-            scoreClass: scoreResult.score_class,
-            missingFields: clarification.data.missing_fields ?? [],
-            parentCategoryGroup: clarification.data.parent_category_group,
-            marketplaceCategory: clarification.data.marketplace_category,
-            serviceRequired: clarification.data.service_required,
-            previewMessage: clarification.data.preview_message,
-            questionsCount: clarification.data.questions_json?.length ?? 0,
-            source: "lead.quality.preview",
-          });
-        } else {
-          console.warn("[lead clarification] preview preparation skipped", {
+        if (!clarification.ok) {
+          console.warn("[lead clarification] preparation skipped", {
             lead_id: data.id,
             code: clarification.code,
             error: clarification.error,
           });
         }
-      } else {
-        void emitLeadCreatedEvent({
-          leadId: data.id,
-          name,
-          phone,
-          city,
-          area: input.area ?? null,
-          category: serviceRequired,
-          budget: budget || null,
-          message: message || null,
-          isDuplicate: Boolean(data.is_duplicate),
-          formSource: "lead.quality.preview",
-          eventType: qualityEventType(scoreResult),
-        });
       }
     } catch (qualityError) {
       console.warn("[lead quality] scoring failed; distribution held to protect vendor trust", {
@@ -291,6 +233,7 @@ export async function createLead(
     const qualityGatePassed = scoreResult ? canAutoDistributeLead(scoreResult) : false;
 
     let preferredVendor: PreferredVendorRoutingResult | undefined;
+    let coreMatch: AosV2CoreMatchEvidence | null = null;
 
     if (isPreferredVendorIntent) {
       if (qualityGatePassed) {
@@ -321,7 +264,20 @@ export async function createLead(
       }
     } else if (qualityGatePassed && !isClientSelectedIntent) {
       const matching = await runAutoLeadMatchingForLead(data.id);
-      if (!matching.ok) {
+      if (matching.ok) {
+        coreMatch = {
+          status: matching.data.status,
+          eligibleVendorCount: matching.data.eligibleVendorCount,
+          selectedVendorIds: matching.data.selectedVendorIds,
+          failureReason: matching.data.failureReason ?? null,
+        };
+      } else {
+        coreMatch = {
+          status: "failed",
+          eligibleVendorCount: 0,
+          selectedVendorIds: [],
+          failureReason: matching.code,
+        };
         console.warn("[lead matching] auto matching failed without blocking lead submission", {
           lead_id: data.id,
           code: matching.code,
@@ -330,18 +286,31 @@ export async function createLead(
       }
     }
 
+    // AOS V2 runs strictly AFTER Core quality/routing/matching. It observes the
+    // canonical outcome and writes advisory intelligence only. AOS failure can
+    // never roll back or alter the already-completed business flow.
+    void runAosV2LeadIntelligence({
+      lead: {
+        leadId: data.id,
+        city,
+        area: input.area ?? null,
+        serviceRequired,
+        budget: budget || null,
+        isDuplicate: Boolean(data.is_duplicate),
+        shareConsent: input.share_consent === true,
+        leadIntent: input.lead_intent ?? null,
+        assignmentIntent: input.assignment_intent ?? null,
+        targetVendorId: preferredVendorId || null,
+      },
+      quality: scoreResult,
+      coreMatch,
+    });
+
     return ok({ id: data.id, is_duplicate: data.is_duplicate, preferred_vendor: preferredVendor });
   } catch (e) {
     return fail(e);
   }
 }
-
-function qualityEventType(scoreResult: LeadQualityScoreResult): "lead.qualified" | "lead.clarification_required" | "lead.rejected_quality" {
-  if (canAutoDistributeLead(scoreResult)) return "lead.qualified";
-  if (scoreResult.recommended_action === "clarification_required") return "lead.clarification_required";
-  return "lead.rejected_quality";
-}
-
 /** Vendors eligible for a lead — safe public fields only (no phone/email). */
 export async function getEligibleVendors(leadId: string): Promise<Result<PublicVendorCard[]>> {
   try {

@@ -1,5 +1,5 @@
 // ============================================================================
-// QuickFurno AOS → CRM sync service (Phase 6 façade · Phase 7 real engines)
+// QuickFurno AOS â†’ CRM sync service (Phase 6 faÃ§ade Â· Phase 7 real engines)
 // Thin integration layer between the rule-based AOS engines and the CRM /
 // Analytics UI. Still 100% safe: no real AI, no WhatsApp, no n8n, no credit
 // deduction, no auto-assignment. When AI is enabled+configured server-side, the
@@ -56,7 +56,7 @@ export function getLeadAosSnapshot(lead: CRMLead, vendors: MatchForgeVendor[] = 
 
   const timeline: AosTimelineEntry[] = [
     { agent: leadLens.agent, action: "lead_quality_score", decision: `Score ${leadLens.lead_score} (${leadLens.lead_quality})`, mode: leadLens.mode, label: AOS_LABELS.ruleBasedFallback },
-    { agent: trustShield.agent, action: "spam_duplicate_check", decision: `Spam ${trustShield.spam_risk} · Duplicate ${trustShield.duplicate_risk}${trustShield.review_recommended ? " · review recommended" : ""}`, mode: trustShield.mode, label: AOS_LABELS.ruleBasedFallback },
+    { agent: trustShield.agent, action: "spam_duplicate_check", decision: `Spam ${trustShield.spam_risk} Â· Duplicate ${trustShield.duplicate_risk}${trustShield.review_recommended ? " Â· review recommended" : ""}`, mode: trustShield.mode, label: AOS_LABELS.ruleBasedFallback },
     { agent: matchForge.agent, action: "vendor_suggestion", decision: matchForge.reason, mode: matchForge.mode, label: AOS_LABELS.ruleBasedFallback },
     { agent: leadFlow.agent, action: "assignment_preview", decision: leadFlow.reason, mode: leadFlow.mode, label: AOS_LABELS.placeholderDecision },
   ];
@@ -66,4 +66,4 @@ export function getLeadAosSnapshot(lead: CRMLead, vendors: MatchForgeVendor[] = 
 
 // Re-export engine entry points for convenience.
 export { runLeadLens, runTrustShield, runMatchForge, runLeadFlow };
-export { runOpsBrief, type OpsBriefReport } from "@/lib/aos/agents/engines";
+export { runOpsBrief, type OpsBriefReport } from "@/lib/aos/v2/opsBrief";

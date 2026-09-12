@@ -3,14 +3,14 @@
   "generator": "scripts/mvp/inventory/run.mjs",
   "note": "Regex-extracted OBJECT DECLARATIONS from committed migration SQL — repository evidence only. Applied-in-DB status is UNKNOWN_UNVERIFIED (see docs/QF-MVP-10-DATABASE-RECONCILIATION.md). Not a full SQL parser.",
   "counts": {
-    "migrations": 68,
-    "uniqueTablesCreated": 100,
-    "uniqueFunctions": 50,
-    "uniqueTriggers": 2,
+    "migrations": 110,
+    "uniqueTablesCreated": 122,
+    "uniqueFunctions": 131,
+    "uniqueTriggers": 49,
     "uniqueEnums": 0,
-    "uniqueExtensions": 1,
+    "uniqueExtensions": 2,
     "uniquePolicies": 77,
-    "tablesWithRlsEnabled": 89
+    "tablesWithRlsEnabled": 111
   },
   "aggregate": {
     "tablesCreated": [
@@ -30,16 +30,23 @@
       "aos_audit_logs",
       "aos_cost_logs",
       "aos_failures",
+      "aos_recommendations",
+      "aos_runs",
       "aos_runtime_settings",
       "app_settings",
+      "assignment_operations",
       "audit_logs",
       "auth_security_events",
       "authentication_delivery_attempts",
       "authentication_transport_failure_rules",
       "authentication_transport_policies",
+      "automation_action_requests",
+      "automation_execution_attempts",
+      "automation_jobs",
       "automation_logs",
       "automation_policy_active_configs",
       "automation_policy_configs",
+      "automation_transport_requests",
       "automations",
       "bad_lead_report_comments",
       "bad_lead_reports",
@@ -54,7 +61,9 @@
       "communication_consent_command_receipts",
       "communication_consent_events",
       "communication_delivery_events",
+      "communication_frequency_policies",
       "communication_inbound_messages",
+      "communication_intents",
       "communication_messages",
       "communication_preferences",
       "communication_provider_accounts",
@@ -64,6 +73,8 @@
       "communication_suppressions",
       "communication_templates",
       "communication_webhook_receipts",
+      "credit_ledger_reconciliation_exceptions",
+      "credit_restoration_approvals",
       "crm_activities",
       "crm_calendar_events",
       "crm_followups",
@@ -76,6 +87,7 @@
       "free_vendor_profile_interests",
       "idempotency_records",
       "lead_assignment_approvals",
+      "lead_assignment_events",
       "lead_assignment_queue",
       "lead_assignments",
       "lead_attribution",
@@ -96,17 +108,27 @@
       "password_reset_grants",
       "payments",
       "profiles",
+      "replacement_requests",
       "reviews",
       "service_categories",
+      "vendor_campaign_audience_members",
+      "vendor_campaign_events",
+      "vendor_campaigns",
+      "vendor_contacts",
       "vendor_credit_logs",
+      "vendor_crm_profiles",
       "vendor_dashboard_users",
       "vendor_internal_notes",
       "vendor_notifications",
       "vendor_package_orders",
       "vendor_packages",
       "vendor_profile_change_requests",
+      "vendor_segments",
       "vendor_support_messages",
       "vendor_support_threads",
+      "vendor_tag_assignments",
+      "vendor_tags",
+      "vendor_tasks",
       "vendors",
       "verification_challenges",
       "whatsapp_logs",
@@ -136,28 +158,109 @@
       "is_admin",
       "owns_vendor",
       "qf_acquire_domain_event",
+      "qf_activate_meta_lead_assignment_v1",
+      "qf_activate_meta_transactional_mapping_v1",
+      "qf_apply_credit_mutation_v2",
+      "qf_apply_marketing_consent_v1",
       "qf_apply_vendor_credit_delta",
       "qf_apply_workflow_step",
+      "qf_approve_credit_restoration_v2",
+      "qf_approve_vendor_campaign_v1",
+      "qf_arm_meta_canary_v1",
+      "qf_arm_meta_provider_readiness_v1",
+      "qf_assign_lead_vendors_v2",
+      "qf_automation_action_workflow_family_v1",
+      "qf_automation_context_has_forbidden_key",
+      "qf_automation_entity_state_v1",
+      "qf_automation_low_credit_threshold_v1",
+      "qf_automation_vendor_business_state_v1",
       "qf_begin_idempotent_operation",
+      "qf_campaign_snapshot_fingerprint_v1",
+      "qf_cancel_orphan_automation_job_transport_v1",
+      "qf_cancel_orphan_automation_job_v1",
+      "qf_cancel_stale_automation_job_transport_v1",
+      "qf_cancel_stale_automation_job_v1",
+      "qf_canonical_text_field_v1",
       "qf_category_groups_for_label",
       "qf_category_labels_match",
       "qf_claim_auth_delivery_attempt",
+      "qf_claim_automation_job_for_family_v1",
+      "qf_claim_automation_job_transport_for_family_v1",
+      "qf_claim_automation_job_transport_v1",
+      "qf_claim_automation_job_v1",
       "qf_claim_consent_ack_intents",
       "qf_claim_due_outbox_event",
       "qf_claim_due_workflow_task",
+      "qf_communication_template_fingerprint_v1",
+      "qf_complete_automation_attempt_transport_v1",
+      "qf_complete_automation_attempt_v1",
+      "qf_create_automation_action_request_v1",
+      "qf_create_automation_job_v1",
+      "qf_crm_touch_updated_at",
       "qf_dead_letter_domain_event",
+      "qf_decide_automation_action_request_v1",
+      "qf_disable_meta_canary_v1",
+      "qf_enforce_lead_assignment_active_cap",
+      "qf_enforce_lead_lifetime_vendor_cap",
+      "qf_enforce_segment_definition_pair",
+      "qf_enqueue_campaign_recipient_automation_v1",
+      "qf_enqueue_client_automation_v1",
+      "qf_enqueue_vendor_automation_v1",
       "qf_expire_consent_ack_intents",
       "qf_finalize_auth_delivery_attempt",
+      "qf_geo_vendor_shortlist_v1",
+      "qf_guard_automation_action_request_insert",
+      "qf_guard_automation_action_request_update",
+      "qf_guard_automation_attempt_insert",
+      "qf_guard_automation_attempt_update",
+      "qf_guard_automation_job_insert",
+      "qf_guard_automation_job_update",
+      "qf_guard_automation_transport_request_insert",
+      "qf_guard_automation_transport_request_update",
+      "qf_guard_vendor_campaign_transition",
+      "qf_handoff_vendor_campaign_intents_v1",
       "qf_lead_vendor_category_matches",
       "qf_lead_vendor_parent_group_compatible",
       "qf_norm_text",
       "qf_normalize_category_label",
       "qf_parent_category_group",
+      "qf_prepare_vendor_campaign_v1",
+      "qf_prevent_automation_history_delete",
       "qf_prevent_automation_policy_config_mutation",
+      "qf_prevent_automation_transport_history_delete",
+      "qf_prevent_campaign_audience_mutation",
+      "qf_prevent_campaign_event_mutation",
+      "qf_prevent_credit_ledger_exception_mutation",
+      "qf_prevent_credit_ledger_exception_truncate",
+      "qf_prevent_frequency_policy_delete",
+      "qf_prevent_frequency_policy_history_rewrite",
+      "qf_prevent_lead_assignment_event_mutation",
+      "qf_prevent_lead_assignment_event_truncate",
+      "qf_prevent_vendor_campaign_delete",
+      "qf_prevent_vendor_note_mutation",
+      "qf_prevent_vendor_note_truncate",
+      "qf_produce_campaign_recipient_action",
+      "qf_produce_client_clarification_actions",
+      "qf_produce_client_lead_confirmation",
+      "qf_produce_client_matching_update",
+      "qf_produce_client_status_actions",
+      "qf_produce_vendor_assignment_actions",
+      "qf_produce_vendor_low_credit_warning",
+      "qf_produce_vendor_onboarding_reminder",
+      "qf_produce_vendor_package_expiry_warnings",
+      "qf_quiesce_meta_canary_v1",
+      "qf_reconcile_automation_attempt_transport_v1",
+      "qf_record_automation_execution_transport_v1",
+      "qf_recover_automation_job_transport_v1",
+      "qf_recover_automation_job_v1",
       "qf_recover_stale_dispatching_consent_ack_intents",
+      "qf_request_replacement_v2",
       "qf_reserve_consent_ack_provider_attempt",
       "qf_schedule_domain_event_retry",
+      "qf_select_stale_automation_attempt_v1",
       "qf_terminalize_consent_ack_intent",
+      "qf_vendor_assignment_eligible",
+      "qf_vendor_low_credit_threshold_v1",
       "refresh_requirement_group_counters",
       "restore_vendor_credit",
       "update_vendor_visibility",
@@ -169,11 +272,59 @@
     ],
     "triggers": [
       "on_auth_user_created",
-      "trg_automation_policy_configs_immutable"
+      "trg_automation_action_request_insert_guard",
+      "trg_automation_action_request_update_guard",
+      "trg_automation_action_requests_no_delete",
+      "trg_automation_action_requests_no_truncate",
+      "trg_automation_attempt_insert_guard",
+      "trg_automation_attempt_update_guard",
+      "trg_automation_attempts_no_delete",
+      "trg_automation_attempts_no_truncate",
+      "trg_automation_job_insert_guard",
+      "trg_automation_job_update_guard",
+      "trg_automation_jobs_no_delete",
+      "trg_automation_jobs_no_truncate",
+      "trg_automation_policy_configs_immutable",
+      "trg_automation_transport_request_insert_guard",
+      "trg_automation_transport_request_update_guard",
+      "trg_automation_transport_requests_no_delete",
+      "trg_automation_transport_requests_no_truncate",
+      "trg_cfp_history_immutable",
+      "trg_cfp_no_delete",
+      "trg_cfp_no_truncate",
+      "trg_clre_immutable",
+      "trg_clre_no_truncate",
+      "trg_lead_assignment_events_immutable",
+      "trg_lead_assignment_events_lifetime_cap",
+      "trg_lead_assignment_events_no_truncate",
+      "trg_lead_assignments_active_cap",
+      "trg_qf_produce_campaign_recipient_action",
+      "trg_qf_produce_client_clarification_actions",
+      "trg_qf_produce_client_lead_confirmation",
+      "trg_qf_produce_client_matching_update",
+      "trg_qf_produce_client_status_actions",
+      "trg_qf_produce_vendor_assignment_actions",
+      "trg_qf_produce_vendor_low_credit_warning",
+      "trg_qf_produce_vendor_onboarding_reminder",
+      "trg_qf_produce_vendor_package_expiry_warnings",
+      "trg_vcam_immutable",
+      "trg_vce_immutable",
+      "trg_vcm_no_delete",
+      "trg_vcm_touch",
+      "trg_vcm_transition_guard",
+      "trg_vco_touch",
+      "trg_vcp_touch",
+      "trg_vin_immutable",
+      "trg_vin_no_truncate",
+      "trg_vsg_definition_pair",
+      "trg_vsg_touch",
+      "trg_vtg_touch",
+      "trg_vtk_touch"
     ],
     "enums": [],
     "extensions": [
-      "pgcrypto"
+      "pgcrypto",
+      "postgis"
     ],
     "policies": [
       "ai agents admin all ON ai_agents",
@@ -271,14 +422,21 @@
       "aos_audit_logs",
       "aos_cost_logs",
       "aos_failures",
+      "aos_recommendations",
+      "aos_runs",
       "aos_runtime_settings",
       "app_settings",
+      "assignment_operations",
       "audit_logs",
       "auth_security_events",
       "authentication_transport_failure_rules",
+      "automation_action_requests",
+      "automation_execution_attempts",
+      "automation_jobs",
       "automation_logs",
       "automation_policy_active_configs",
       "automation_policy_configs",
+      "automation_transport_requests",
       "automations",
       "bad_lead_report_comments",
       "bad_lead_reports",
@@ -292,7 +450,9 @@
       "communication_consent_command_receipts",
       "communication_consent_events",
       "communication_delivery_events",
+      "communication_frequency_policies",
       "communication_inbound_messages",
+      "communication_intents",
       "communication_messages",
       "communication_preferences",
       "communication_provider_canary_destinations",
@@ -300,6 +460,8 @@
       "communication_suppressions",
       "communication_templates",
       "communication_webhook_receipts",
+      "credit_ledger_reconciliation_exceptions",
+      "credit_restoration_approvals",
       "crm_activities",
       "crm_calendar_events",
       "crm_followups",
@@ -311,6 +473,7 @@
       "domain_events",
       "idempotency_records",
       "lead_assignment_approvals",
+      "lead_assignment_events",
       "lead_assignments",
       "lead_attribution",
       "lead_delivery_logs",
@@ -326,17 +489,27 @@
       "password_reset_grants",
       "payments",
       "profiles",
+      "replacement_requests",
       "reviews",
       "service_categories",
+      "vendor_campaign_audience_members",
+      "vendor_campaign_events",
+      "vendor_campaigns",
+      "vendor_contacts",
       "vendor_credit_logs",
+      "vendor_crm_profiles",
       "vendor_dashboard_users",
       "vendor_internal_notes",
       "vendor_notifications",
       "vendor_package_orders",
       "vendor_packages",
       "vendor_profile_change_requests",
+      "vendor_segments",
       "vendor_support_messages",
       "vendor_support_threads",
+      "vendor_tag_assignments",
+      "vendor_tags",
+      "vendor_tasks",
       "vendors",
       "verification_challenges",
       "whatsapp_logs",
@@ -499,7 +672,7 @@
       "name": "20260620000003_functions.sql",
       "order": 3,
       "timestampPrefix": "20260620000003",
-      "bytes": 17162,
+      "bytes": 16755,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [],
@@ -528,7 +701,7 @@
         "rlsEnabled": [],
         "policies": [],
         "grants": [
-          "execute ON get_public_eligible_vendors(text, text, text),\r\n  public.check_duplicate_lead(text, text, text),\r\n  public.get_setting_int(text, int) TO anon, authenticated, service_role"
+          "execute ON get_public_eligible_vendors(text, text, text),\n  public.check_duplicate_lead(text, text, text),\n  public.get_setting_int(text, int) TO anon, authenticated, service_role"
         ]
       },
       "appliedStatus": {
@@ -542,7 +715,7 @@
       "name": "20260620000004_seed_data.sql",
       "order": 4,
       "timestampPrefix": "20260620000004",
-      "bytes": 1826,
+      "bytes": 1784,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [],
@@ -714,7 +887,7 @@
       "name": "20260622000007_vendor_location.sql",
       "order": 7,
       "timestampPrefix": "20260622000007",
-      "bytes": 1164,
+      "bytes": 1146,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -752,7 +925,7 @@
       "name": "20260624000008_lead_capture_consent.sql",
       "order": 8,
       "timestampPrefix": "20260624000008",
-      "bytes": 1038,
+      "bytes": 1021,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -790,7 +963,7 @@
       "name": "20260624000009_vendor_onboarding.sql",
       "order": 9,
       "timestampPrefix": "20260624000009",
-      "bytes": 1870,
+      "bytes": 1840,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -835,7 +1008,7 @@
       "name": "20260624000010_vendor_exact_columns.sql",
       "order": 10,
       "timestampPrefix": "20260624000010",
-      "bytes": 1889,
+      "bytes": 1859,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -879,7 +1052,7 @@
       "name": "20260624000011_vendor_office_address.sql",
       "order": 11,
       "timestampPrefix": "20260624000011",
-      "bytes": 1253,
+      "bytes": 1233,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -917,7 +1090,7 @@
       "name": "20260627000012_aos_management_foundation.sql",
       "order": 12,
       "timestampPrefix": "20260627000012",
-      "bytes": 23759,
+      "bytes": 23318,
       "objects": {
         "tablesCreated": [
           "aos_agent_logs",
@@ -1023,7 +1196,7 @@
       "name": "20260627000013_crm_analytics_foundation.sql",
       "order": 13,
       "timestampPrefix": "20260627000013",
-      "bytes": 15486,
+      "bytes": 15160,
       "objects": {
         "tablesCreated": [
           "campaign_performance",
@@ -1111,7 +1284,7 @@
       "name": "20260628000014_aos_control_center_foundation.sql",
       "order": 14,
       "timestampPrefix": "20260628000014",
-      "bytes": 30611,
+      "bytes": 30103,
       "objects": {
         "tablesCreated": [
           "aos_agent_logs",
@@ -1226,7 +1399,7 @@
       "name": "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
       "order": 15,
       "timestampPrefix": "20260628000015",
-      "bytes": 12987,
+      "bytes": 12705,
       "objects": {
         "tablesCreated": [
           "campaign_performance",
@@ -1571,7 +1744,7 @@
       "name": "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
       "order": 22,
       "timestampPrefix": "20260701000022",
-      "bytes": 5254,
+      "bytes": 5151,
       "objects": {
         "tablesCreated": [
           "free_vendor_profile_interests",
@@ -3868,6 +4041,1951 @@
         "rlsEnabled": [],
         "policies": [],
         "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000100_qf_mvp_marketplace_authority_foundation.sql",
+      "name": "20260723000100_qf_mvp_marketplace_authority_foundation.sql",
+      "order": 69,
+      "timestampPrefix": "20260723000100",
+      "bytes": 39291,
+      "objects": {
+        "tablesCreated": [
+          "assignment_operations",
+          "communication_intents",
+          "credit_restoration_approvals",
+          "lead_assignment_events",
+          "replacement_requests"
+        ],
+        "tablesAltered": [
+          "lead_assignments",
+          "vendor_credit_logs",
+          "vendors"
+        ],
+        "columnsAdded": [
+          "actor_id",
+          "actor_kind",
+          "approval_reference",
+          "assignment_suspended_at",
+          "assignment_suspended_by",
+          "assignment_suspended_until",
+          "assignment_suspension_reason",
+          "assignment_suspension_reference",
+          "idempotency_key",
+          "lifecycle_status",
+          "lifecycle_updated_at",
+          "operation_id",
+          "replaced_by_assignment_id"
+        ],
+        "constraints": [
+          "assignment_operations_actor_kind_check",
+          "assignment_operations_lead_id_fkey",
+          "assignment_operations_mode_check",
+          "assignment_operations_replacement_ref_check",
+          "assignment_operations_replacement_request_id_fkey",
+          "assignment_operations_request_fingerprint_check",
+          "assignment_operations_status_check",
+          "assignment_operations_terminal_completion_check",
+          "communication_intents_aggregate_type_check",
+          "communication_intents_attempt_count_check",
+          "communication_intents_channel_check",
+          "communication_intents_status_check",
+          "communication_intents_uncertain_terminal_check",
+          "credit_restoration_approvals_applied_ledger_check",
+          "credit_restoration_approvals_approved_by_check",
+          "credit_restoration_approvals_evidence_type_check",
+          "credit_restoration_approvals_lead_id_fkey",
+          "credit_restoration_approvals_original_assignment_id_fkey",
+          "credit_restoration_approvals_restoration_ledger_id_fkey",
+          "credit_restoration_approvals_status_check",
+          "credit_restoration_approvals_supersedes_approval_id_fkey",
+          "credit_restoration_approvals_vendor_id_fkey",
+          "lead_assignment_events_actor_kind_check",
+          "lead_assignment_events_assignment_id_fkey",
+          "lead_assignment_events_created_from_null_check",
+          "lead_assignment_events_event_type_check",
+          "lead_assignment_events_lead_id_fkey",
+          "lead_assignment_events_lifecycle_from_check",
+          "lead_assignment_events_lifecycle_to_check",
+          "lead_assignment_events_operation_id_fkey",
+          "lead_assignment_events_source_kind_check",
+          "lead_assignment_events_vendor_id_fkey",
+          "lead_assignments_lifecycle_status_check",
+          "lead_assignments_operation_id_fkey",
+          "lead_assignments_replaced_by_assignment_id_fkey",
+          "replacement_requests_approved_by_check",
+          "replacement_requests_lead_id_fkey",
+          "replacement_requests_original_assignment_id_fkey",
+          "replacement_requests_original_vendor_id_fkey",
+          "replacement_requests_replacement_assignment_id_fkey",
+          "replacement_requests_status_check",
+          "uq_assignment_operations_idempotency",
+          "uq_communication_intents_idempotency",
+          "uq_credit_restoration_approvals_idempotency",
+          "uq_lead_assignment_events_idempotency",
+          "vendor_credit_logs_actor_kind_check",
+          "vendor_credit_logs_approval_reference_fkey",
+          "vendor_credit_logs_change_type_check",
+          "vendor_credit_logs_restoration_approval_check"
+        ],
+        "indexes": [
+          "idx_assignment_operations_lead",
+          "idx_communication_intents_aggregate",
+          "idx_communication_intents_claimable",
+          "idx_lead_assignment_events_assignment",
+          "idx_lead_assignment_events_lead",
+          "idx_lead_assignment_events_lifetime",
+          "idx_lead_assignments_active",
+          "idx_lead_assignments_operation",
+          "idx_replacement_requests_lead",
+          "idx_vendors_assignment_suspended",
+          "uq_replacement_requests_idempotency",
+          "uq_replacement_requests_open_per_lead",
+          "uq_restoration_per_assignment_reason",
+          "uq_vendor_credit_logs_idempotency"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "assignment_operations",
+          "communication_intents",
+          "credit_restoration_approvals",
+          "lead_assignment_events",
+          "replacement_requests"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert ON lead_assignment_events TO service_role",
+          "select, insert, update, delete ON assignment_operations TO service_role",
+          "select, insert, update, delete ON communication_intents TO service_role",
+          "select, insert, update, delete ON credit_restoration_approvals TO service_role",
+          "select, insert, update, delete ON replacement_requests TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000200_qf_mvp_assignment_lineage_backfill.sql",
+      "name": "20260723000200_qf_mvp_assignment_lineage_backfill.sql",
+      "order": 70,
+      "timestampPrefix": "20260723000200",
+      "bytes": 18155,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000300_qf_mvp_canonical_assignment_authority.sql",
+      "name": "20260723000300_qf_mvp_canonical_assignment_authority.sql",
+      "order": 71,
+      "timestampPrefix": "20260723000300",
+      "bytes": 58766,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_apply_credit_mutation_v2",
+          "qf_approve_credit_restoration_v2",
+          "qf_assign_lead_vendors_v2",
+          "qf_request_replacement_v2",
+          "qf_vendor_assignment_eligible"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_apply_credit_mutation_v2(uuid, integer, text, text, text, text, text, uuid, text, boolean) TO service_role",
+          "execute ON qf_approve_credit_restoration_v2(uuid, uuid, text) TO service_role",
+          "execute ON qf_request_replacement_v2(uuid, uuid, text, text, uuid) TO service_role",
+          "execute ON qf_vendor_assignment_eligible(uuid, uuid, integer) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000400_qf_mvp_lineage_append_only_grants.sql",
+      "name": "20260723000400_qf_mvp_lineage_append_only_grants.sql",
+      "order": 72,
+      "timestampPrefix": "20260723000400",
+      "bytes": 5960,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000500_qf_mvp_assignment_universal_enforcement.sql",
+      "name": "20260723000500_qf_mvp_assignment_universal_enforcement.sql",
+      "order": 73,
+      "timestampPrefix": "20260723000500",
+      "bytes": 26932,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_enforce_lead_assignment_active_cap",
+          "qf_enforce_lead_lifetime_vendor_cap",
+          "qf_prevent_lead_assignment_event_mutation",
+          "qf_prevent_lead_assignment_event_truncate"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_lead_assignment_events_immutable",
+          "trg_lead_assignment_events_lifetime_cap",
+          "trg_lead_assignment_events_no_truncate",
+          "trg_lead_assignments_active_cap"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000600_qf_mvp_public_projection_privilege_hardening.sql",
+      "name": "20260723000600_qf_mvp_public_projection_privilege_hardening.sql",
+      "order": 74,
+      "timestampPrefix": "20260723000600",
+      "bytes": 19386,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "SELECT ON vendor_public_v TO anon, authenticated, service_role only",
+          "select ON vendor_public_v TO anon, authenticated, service_role",
+          "select ON vendors TO authenticated"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000700_qf_mvp_auth_user_onboarding_trigger.sql",
+      "name": "20260723000700_qf_mvp_auth_user_onboarding_trigger.sql",
+      "order": 75,
+      "timestampPrefix": "20260723000700",
+      "bytes": 23657,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "handle_new_user"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "on_auth_user_created"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON handle_new_user() TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql",
+      "name": "20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql",
+      "order": 76,
+      "timestampPrefix": "20260723000800",
+      "bytes": 16023,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON assign_client_selected_vendor_to_group(uuid, uuid, uuid, integer) TO service_role",
+          "execute ON assign_lead_to_preferred_vendor(uuid, uuid) TO service_role",
+          "execute ON assign_vendor_to_requirement_group(uuid, uuid, uuid, text, integer, text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql",
+      "name": "20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql",
+      "order": 77,
+      "timestampPrefix": "20260723000900",
+      "bytes": 23552,
+      "objects": {
+        "tablesCreated": [
+          "credit_ledger_reconciliation_exceptions"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "clre_audit_run_id_nonempty",
+          "clre_audit_sql_sha256_hex",
+          "clre_balance_mutation_false",
+          "clre_classification_locked",
+          "clre_correction_mode_locked",
+          "clre_decision_locked",
+          "clre_idempotency_key_unique",
+          "clre_idempotency_nonempty",
+          "clre_manifest_sha256_hex",
+          "clre_no_ledger_backfill",
+          "clre_no_self_supersede",
+          "clre_package_mutation_false",
+          "clre_pkey",
+          "clre_reason_nonempty",
+          "clre_reviewer_actor_check",
+          "clre_supersedes_self_fk"
+        ],
+        "indexes": [],
+        "functions": [
+          "qf_prevent_credit_ledger_exception_mutation",
+          "qf_prevent_credit_ledger_exception_truncate"
+        ],
+        "securityDefinerFunctions": false,
+        "triggers": [
+          "trg_clre_immutable",
+          "trg_clre_no_truncate"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "credit_ledger_reconciliation_exceptions"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert ON credit_ledger_reconciliation_exceptions TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723001000_qf_mvp_profiles_privilege_admin_role_cleanup.sql",
+      "name": "20260723001000_qf_mvp_profiles_privilege_admin_role_cleanup.sql",
+      "order": 78,
+      "timestampPrefix": "20260723001000",
+      "bytes": 12823,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "profiles"
+        ],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "profiles"
+        ],
+        "policies": [],
+        "grants": [
+          "select ON profiles TO authenticated",
+          "select, insert, update ON profiles TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723001100_qf_mvp_vendor_crm_foundation.sql",
+      "name": "20260723001100_qf_mvp_vendor_crm_foundation.sql",
+      "order": 79,
+      "timestampPrefix": "20260723001100",
+      "bytes": 38068,
+      "objects": {
+        "tablesCreated": [
+          "vendor_contacts",
+          "vendor_crm_profiles",
+          "vendor_internal_notes",
+          "vendor_tag_assignments",
+          "vendor_tags",
+          "vendor_tasks"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [
+          "category",
+          "supersedes_note_id"
+        ],
+        "constraints": [
+          "vco_channel_check",
+          "vco_contactable",
+          "vco_created_by_fk",
+          "vco_name_nonempty",
+          "vco_pkey",
+          "vco_updated_by_fk",
+          "vco_vendor_fk",
+          "vcp_account_manager_fk",
+          "vcp_created_by_fk",
+          "vcp_onboarding_stage_check",
+          "vcp_pkey",
+          "vcp_relationship_status_check",
+          "vcp_res_com_scope_check",
+          "vcp_travel_nonneg",
+          "vcp_updated_by_fk",
+          "vcp_vendor_fk",
+          "vcp_years_nonneg",
+          "vin_category_check",
+          "vin_created_by_fk",
+          "vin_no_self_supersede",
+          "vin_note_nonempty",
+          "vin_supersedes_fk",
+          "vin_vendor_fk",
+          "vin_vendor_required",
+          "vta_assigned_by_fk",
+          "vta_pkey",
+          "vta_removed_by_fk",
+          "vta_removed_consistency",
+          "vta_tag_fk",
+          "vta_vendor_fk",
+          "vtg_created_by_fk",
+          "vtg_name_nonempty",
+          "vtg_normalized_nonempty",
+          "vtg_normalized_unique",
+          "vtg_pkey",
+          "vtk_completed_consistency",
+          "vtk_created_by_fk",
+          "vtk_owner_fk",
+          "vtk_pkey",
+          "vtk_priority_check",
+          "vtk_source_check",
+          "vtk_status_check",
+          "vtk_title_nonempty",
+          "vtk_type_check",
+          "vtk_updated_by_fk",
+          "vtk_vendor_fk"
+        ],
+        "indexes": [
+          "idx_vendor_contacts_vendor",
+          "idx_vendor_internal_notes_vendor",
+          "idx_vendor_tag_assignments_tag",
+          "idx_vendor_tag_assignments_vendor",
+          "idx_vendor_tasks_due",
+          "idx_vendor_tasks_vendor",
+          "uq_vendor_contacts_active_phone",
+          "uq_vendor_contacts_active_primary",
+          "uq_vendor_tag_active",
+          "uq_vendor_tasks_idempotency"
+        ],
+        "functions": [
+          "qf_crm_touch_updated_at",
+          "qf_prevent_vendor_note_mutation",
+          "qf_prevent_vendor_note_truncate"
+        ],
+        "securityDefinerFunctions": false,
+        "triggers": [
+          "trg_vco_touch",
+          "trg_vcp_touch",
+          "trg_vin_immutable",
+          "trg_vin_no_truncate",
+          "trg_vtg_touch",
+          "trg_vtk_touch"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "vendor_contacts",
+          "vendor_crm_profiles",
+          "vendor_internal_notes",
+          "vendor_tag_assignments",
+          "vendor_tags",
+          "vendor_tasks"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert ON vendor_internal_notes TO service_role",
+          "select, insert, update ON vendor_contacts TO service_role",
+          "select, insert, update ON vendor_crm_profiles TO service_role",
+          "select, insert, update ON vendor_tag_assignments TO service_role",
+          "select, insert, update ON vendor_tags TO service_role",
+          "select, insert, update ON vendor_tasks TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723001200_qf_mvp_vendor_segment_foundation.sql",
+      "name": "20260723001200_qf_mvp_vendor_segment_foundation.sql",
+      "order": 80,
+      "timestampPrefix": "20260723001200",
+      "bytes": 16302,
+      "objects": {
+        "tablesCreated": [
+          "vendor_segments"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "vsg_archived_by_fk",
+          "vsg_archived_consistency",
+          "vsg_created_by_fk",
+          "vsg_definition_is_object",
+          "vsg_definition_size",
+          "vsg_definition_version_check",
+          "vsg_description_len",
+          "vsg_fingerprint_shape",
+          "vsg_name_len",
+          "vsg_name_nonempty",
+          "vsg_pkey",
+          "vsg_schema_version_check",
+          "vsg_status_check",
+          "vsg_updated_by_fk"
+        ],
+        "indexes": [
+          "ix_vendor_segments_fingerprint",
+          "ix_vendor_segments_status_updated",
+          "uq_vendor_segments_live_name"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [
+          "trg_vsg_touch"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "vendor_segments"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert, update ON vendor_segments TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723001300_qf_mvp_vendor_campaign_foundation.sql",
+      "name": "20260723001300_qf_mvp_vendor_campaign_foundation.sql",
+      "order": 81,
+      "timestampPrefix": "20260723001300",
+      "bytes": 50589,
+      "objects": {
+        "tablesCreated": [
+          "vendor_campaign_audience_members",
+          "vendor_campaign_events",
+          "vendor_campaigns"
+        ],
+        "tablesAltered": [
+          "communication_templates"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "communication_templates_category_check",
+          "vcam_campaign_fk",
+          "vcam_disposition_check",
+          "vcam_ordinal_check",
+          "vcam_pkey",
+          "vcam_snapshot_revision_check",
+          "vcam_suppression_reason_check",
+          "vcam_unique_member",
+          "vcam_unique_ordinal",
+          "vcam_vendor_fk",
+          "vce_actor_fk",
+          "vce_campaign_fk",
+          "vce_campaign_revision_check",
+          "vce_event_type_check",
+          "vce_idempotency_unique",
+          "vce_metadata_object",
+          "vce_metadata_size",
+          "vce_pkey",
+          "vce_reason_code_len",
+          "vce_snapshot_revision_check",
+          "vcm_approved_by_fk",
+          "vcm_approved_consistency",
+          "vcm_archived_by_fk",
+          "vcm_archived_consistency",
+          "vcm_cancelled_by_fk",
+          "vcm_cancelled_consistency",
+          "vcm_channel_check",
+          "vcm_consent_scope_check",
+          "vcm_created_by_fk",
+          "vcm_description_len",
+          "vcm_exclusion_summary_object",
+          "vcm_exclusion_summary_size",
+          "vcm_marketing_requires_marketing_template",
+          "vcm_name_len",
+          "vcm_name_nonempty",
+          "vcm_no_self_supersede",
+          "vcm_pkey",
+          "vcm_prepared_by_fk",
+          "vcm_prepared_evidence_complete",
+          "vcm_prepared_template_category_check",
+          "vcm_purpose_check",
+          "vcm_recipient_count_check",
+          "vcm_revision_check",
+          "vcm_segment_fingerprint_shape",
+          "vcm_segment_fk",
+          "vcm_segment_version_check",
+          "vcm_snapshot_fingerprint_shape",
+          "vcm_snapshot_revision_check",
+          "vcm_status_check",
+          "vcm_supersedes_fk",
+          "vcm_template_fingerprint_shape",
+          "vcm_updated_by_fk"
+        ],
+        "indexes": [
+          "ix_vcam_campaign_revision",
+          "ix_vcam_snapshot",
+          "ix_vce_campaign_occurred",
+          "ix_vendor_campaigns_segment",
+          "ix_vendor_campaigns_status_updated",
+          "uq_vendor_campaigns_idempotency",
+          "uq_vendor_campaigns_live_name"
+        ],
+        "functions": [
+          "qf_approve_vendor_campaign_v1",
+          "qf_guard_vendor_campaign_transition",
+          "qf_prepare_vendor_campaign_v1",
+          "qf_prevent_campaign_audience_mutation",
+          "qf_prevent_campaign_event_mutation",
+          "qf_prevent_vendor_campaign_delete"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_vcam_immutable",
+          "trg_vce_immutable",
+          "trg_vcm_no_delete",
+          "trg_vcm_touch",
+          "trg_vcm_transition_guard"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "vendor_campaign_audience_members",
+          "vendor_campaign_events",
+          "vendor_campaigns"
+        ],
+        "policies": [],
+        "grants": [
+          "execute ON qf_approve_vendor_campaign_v1(uuid, integer, uuid, text) TO service_role",
+          "execute ON qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text) TO service_role",
+          "select, insert ON vendor_campaign_audience_members TO service_role",
+          "select, insert ON vendor_campaign_events TO service_role",
+          "select, insert, update ON vendor_campaigns TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql",
+      "name": "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql",
+      "order": 82,
+      "timestampPrefix": "20260723001400",
+      "bytes": 57619,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "vendor_campaigns"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "vcm_prepared_evidence_complete"
+        ],
+        "indexes": [],
+        "functions": [
+          "qf_approve_vendor_campaign_v1",
+          "qf_campaign_snapshot_fingerprint_v1",
+          "qf_canonical_text_field_v1",
+          "qf_communication_template_fingerprint_v1",
+          "qf_prepare_vendor_campaign_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_approve_vendor_campaign_v1(uuid, integer, uuid, text) TO service_role",
+          "execute ON qf_prepare_vendor_campaign_v1(uuid, integer, uuid, integer, text, text, text, jsonb, text, jsonb, text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql",
+      "name": "20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql",
+      "order": 83,
+      "timestampPrefix": "20260728001500",
+      "bytes": 32686,
+      "objects": {
+        "tablesCreated": [
+          "communication_frequency_policies"
+        ],
+        "tablesAltered": [
+          "communication_intents",
+          "vendor_campaign_events"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "cfp_channel_check",
+          "cfp_created_by_fk",
+          "cfp_effective_range_check",
+          "cfp_max_per_window_check",
+          "cfp_min_interval_check",
+          "cfp_policy_reference_check",
+          "cfp_scope_check",
+          "cfp_window_length_check",
+          "communication_intents_aggregate_type_check",
+          "vce_event_type_check"
+        ],
+        "indexes": [
+          "uq_communication_frequency_policies_active"
+        ],
+        "functions": [
+          "qf_enforce_segment_definition_pair",
+          "qf_handoff_vendor_campaign_intents_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_vsg_definition_pair"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "communication_frequency_policies"
+        ],
+        "policies": [],
+        "grants": [
+          "execute ON qf_handoff_vendor_campaign_intents_v1(uuid,integer,uuid,integer,text) TO service_role",
+          "select, insert, update ON communication_frequency_policies TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260728001600_qf_mvp_frequency_policy_history_hardening.sql",
+      "name": "20260728001600_qf_mvp_frequency_policy_history_hardening.sql",
+      "order": 84,
+      "timestampPrefix": "20260728001600",
+      "bytes": 12249,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_prevent_frequency_policy_delete",
+          "qf_prevent_frequency_policy_history_rewrite"
+        ],
+        "securityDefinerFunctions": false,
+        "triggers": [
+          "trg_cfp_history_immutable",
+          "trg_cfp_no_delete",
+          "trg_cfp_no_truncate"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "select, insert, update ON communication_frequency_policies TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260801110000_qf_mvp_automation_action_persistence.sql",
+      "name": "20260801110000_qf_mvp_automation_action_persistence.sql",
+      "order": 85,
+      "timestampPrefix": "20260801110000",
+      "bytes": 52581,
+      "objects": {
+        "tablesCreated": [
+          "automation_action_requests",
+          "automation_execution_attempts",
+          "automation_jobs"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_action_requests_action_type_check",
+          "automation_action_requests_context_check",
+          "automation_action_requests_contract_version_check",
+          "automation_action_requests_decision_actor_check",
+          "automation_action_requests_decision_shape_check",
+          "automation_action_requests_decision_status_check",
+          "automation_action_requests_identity_check",
+          "automation_action_requests_requested_actor_check",
+          "automation_action_requests_source_action_scope_check",
+          "automation_action_requests_source_actor_pair_check",
+          "automation_action_requests_source_check",
+          "automation_execution_attempts_classification_check",
+          "automation_execution_attempts_executor_ref_check",
+          "automation_execution_attempts_number_check",
+          "automation_execution_attempts_safe_code_check",
+          "automation_execution_attempts_shape_check",
+          "automation_execution_attempts_status_check",
+          "automation_execution_attempts_worker_check",
+          "automation_jobs_attempt_bounds_check",
+          "automation_jobs_attempt_count_check",
+          "automation_jobs_completion_shape_check",
+          "automation_jobs_last_classification_check",
+          "automation_jobs_lock_shape_check",
+          "automation_jobs_max_attempts_check",
+          "automation_jobs_result_shape_check",
+          "automation_jobs_retry_shape_check",
+          "automation_jobs_safe_code_check",
+          "automation_jobs_status_check",
+          "automation_jobs_worker_identity_check"
+        ],
+        "indexes": [
+          "idx_automation_action_requests_correlation",
+          "idx_automation_action_requests_decision_status",
+          "idx_automation_action_requests_entity",
+          "idx_automation_execution_attempts_job",
+          "idx_automation_jobs_claim",
+          "idx_automation_jobs_processing_lock",
+          "uq_automation_action_requests_decision_id",
+          "uq_automation_action_requests_idempotency",
+          "uq_automation_execution_attempts_job_number",
+          "uq_automation_jobs_action_request"
+        ],
+        "functions": [
+          "qf_automation_context_has_forbidden_key",
+          "qf_claim_automation_job_v1",
+          "qf_complete_automation_attempt_v1",
+          "qf_create_automation_action_request_v1",
+          "qf_create_automation_job_v1",
+          "qf_decide_automation_action_request_v1",
+          "qf_guard_automation_action_request_insert",
+          "qf_guard_automation_action_request_update",
+          "qf_guard_automation_attempt_insert",
+          "qf_guard_automation_attempt_update",
+          "qf_guard_automation_job_insert",
+          "qf_guard_automation_job_update",
+          "qf_prevent_automation_history_delete"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_automation_action_request_insert_guard",
+          "trg_automation_action_request_update_guard",
+          "trg_automation_action_requests_no_delete",
+          "trg_automation_action_requests_no_truncate",
+          "trg_automation_attempt_insert_guard",
+          "trg_automation_attempt_update_guard",
+          "trg_automation_attempts_no_delete",
+          "trg_automation_attempts_no_truncate",
+          "trg_automation_job_insert_guard",
+          "trg_automation_job_update_guard",
+          "trg_automation_jobs_no_delete",
+          "trg_automation_jobs_no_truncate"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "automation_action_requests",
+          "automation_execution_attempts",
+          "automation_jobs"
+        ],
+        "policies": [],
+        "grants": [
+          "execute ON qf_claim_automation_job_v1(text) TO service_role",
+          "execute ON qf_complete_automation_attempt_v1(\n  uuid, uuid, text, text, text, text, timestamptz\n) TO service_role",
+          "execute ON qf_create_automation_action_request_v1(\n  uuid, integer, text, text, text, text, text, text, timestamptz, text, text, jsonb\n) TO service_role",
+          "execute ON qf_create_automation_job_v1(\n  uuid, integer, timestamptz\n) TO service_role",
+          "execute ON qf_decide_automation_action_request_v1(\n  uuid, text, text, text, text, text\n) TO service_role",
+          "select ON automation_action_requests TO service_role",
+          "select ON automation_execution_attempts TO service_role",
+          "select ON automation_jobs TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260801152049_qf_mvp_automation_transport_replay_guard.sql",
+      "name": "20260801152049_qf_mvp_automation_transport_replay_guard.sql",
+      "order": 86,
+      "timestampPrefix": "20260801152049",
+      "bytes": 17562,
+      "objects": {
+        "tablesCreated": [
+          "automation_transport_requests"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_transport_requests_attempt_number_check",
+          "automation_transport_requests_body_hash_check",
+          "automation_transport_requests_direction_check",
+          "automation_transport_requests_max_attempts_check",
+          "automation_transport_requests_route_check",
+          "automation_transport_requests_shape_check",
+          "automation_transport_requests_state_check",
+          "automation_transport_requests_version_check",
+          "automation_transport_requests_worker_check"
+        ],
+        "indexes": [
+          "idx_automation_transport_requests_created",
+          "idx_automation_transport_requests_state",
+          "uq_automation_transport_requests_job"
+        ],
+        "functions": [
+          "qf_claim_automation_job_transport_v1",
+          "qf_guard_automation_transport_request_insert",
+          "qf_guard_automation_transport_request_update",
+          "qf_prevent_automation_transport_history_delete"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_automation_transport_request_insert_guard",
+          "trg_automation_transport_request_update_guard",
+          "trg_automation_transport_requests_no_delete",
+          "trg_automation_transport_requests_no_truncate"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "automation_transport_requests"
+        ],
+        "policies": [],
+        "grants": [
+          "execute ON qf_claim_automation_job_transport_v1(uuid, text, text) TO service_role",
+          "select ON automation_transport_requests TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql",
+      "name": "20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql",
+      "order": 87,
+      "timestampPrefix": "20260803000000",
+      "bytes": 7233,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "communication_messages"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "communication_messages_recipient_type_check"
+        ],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260804000000_qf_mvp_50_2d_automation_transport_completion_route.sql",
+      "name": "20260804000000_qf_mvp_50_2d_automation_transport_completion_route.sql",
+      "order": 88,
+      "timestampPrefix": "20260804000000",
+      "bytes": 23215,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "automation_transport_requests"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_transport_requests_route_check",
+          "automation_transport_requests_shape_check",
+          "automation_transport_requests_state_check"
+        ],
+        "indexes": [
+          "idx_automation_transport_requests_route",
+          "uq_automation_transport_requests_claim_job",
+          "uq_automation_transport_requests_complete_attempt"
+        ],
+        "functions": [
+          "qf_complete_automation_attempt_transport_v1",
+          "qf_guard_automation_transport_request_insert",
+          "qf_guard_automation_transport_request_update"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_complete_automation_attempt_transport_v1(\n  uuid, text, text, uuid, uuid, text, text, text, timestamptz\n) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql",
+      "name": "20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql",
+      "order": 89,
+      "timestampPrefix": "20260805000000",
+      "bytes": 26063,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "automation_transport_requests"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_transport_requests_route_check",
+          "automation_transport_requests_shape_check",
+          "automation_transport_requests_state_check"
+        ],
+        "indexes": [
+          "uq_automation_transport_requests_execute_attempt"
+        ],
+        "functions": [
+          "qf_guard_automation_transport_request_insert",
+          "qf_guard_automation_transport_request_update",
+          "qf_record_automation_execution_transport_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_record_automation_execution_transport_v1(\n  uuid, text, text, uuid, uuid\n) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql",
+      "name": "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql",
+      "order": 90,
+      "timestampPrefix": "20260806000000",
+      "bytes": 20486,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_enqueue_client_automation_v1",
+          "qf_produce_client_clarification_actions",
+          "qf_produce_client_lead_confirmation",
+          "qf_produce_client_matching_update",
+          "qf_produce_client_status_actions"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_qf_produce_client_clarification_actions",
+          "trg_qf_produce_client_lead_confirmation",
+          "trg_qf_produce_client_matching_update",
+          "trg_qf_produce_client_status_actions"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_enqueue_client_automation_v1(text, uuid, text, timestamptz) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260807000000_qf_mvp_50_2_execute_v1_reservation_ambiguity_repair.sql",
+      "name": "20260807000000_qf_mvp_50_2_execute_v1_reservation_ambiguity_repair.sql",
+      "order": 91,
+      "timestampPrefix": "20260807000000",
+      "bytes": 15711,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_record_automation_execution_transport_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_record_automation_execution_transport_v1(\n  uuid, text, text, uuid, uuid\n) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql",
+      "name": "20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql",
+      "order": 92,
+      "timestampPrefix": "20260808000000",
+      "bytes": 12824,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_claim_automation_job_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_claim_automation_job_v1(text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql",
+      "name": "20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql",
+      "order": 93,
+      "timestampPrefix": "20260808500000",
+      "bytes": 18899,
+      "objects": {
+        "tablesCreated": [
+          "automation_policy_active_configs",
+          "automation_policy_configs"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_policy_active_configs_config_fk",
+          "automation_policy_active_configs_policy_key_non_empty",
+          "automation_policy_configs_config_json_object",
+          "automation_policy_configs_fingerprint_sha256_lower_hex",
+          "automation_policy_configs_policy_fingerprint_unique",
+          "automation_policy_configs_policy_id_unique",
+          "automation_policy_configs_policy_key_non_empty",
+          "automation_policy_configs_policy_version_non_empty"
+        ],
+        "indexes": [
+          "idx_automation_policy_active_configs_config_id",
+          "idx_automation_policy_configs_created_at",
+          "idx_automation_policy_configs_policy_version"
+        ],
+        "functions": [
+          "qf_prevent_automation_policy_config_mutation"
+        ],
+        "securityDefinerFunctions": false,
+        "triggers": [
+          "trg_automation_policy_configs_immutable"
+        ],
+        "enums": [],
+        "extensions": [
+          "pgcrypto"
+        ],
+        "rlsEnabled": [
+          "automation_policy_active_configs",
+          "automation_policy_configs"
+        ],
+        "policies": [],
+        "grants": [
+          "execute ON qf_prevent_automation_policy_config_mutation() TO service_role",
+          "select, insert ON automation_policy_configs TO service_role",
+          "select, insert, update, delete ON automation_policy_active_configs TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260809000000_qf_mvp_50_3_vendor_automation_producer.sql",
+      "name": "20260809000000_qf_mvp_50_3_vendor_automation_producer.sql",
+      "order": 94,
+      "timestampPrefix": "20260809000000",
+      "bytes": 23138,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_enqueue_vendor_automation_v1",
+          "qf_produce_vendor_assignment_actions",
+          "qf_produce_vendor_low_credit_warning",
+          "qf_produce_vendor_onboarding_reminder",
+          "qf_produce_vendor_package_expiry_warnings",
+          "qf_vendor_low_credit_threshold_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_qf_produce_vendor_assignment_actions",
+          "trg_qf_produce_vendor_low_credit_warning",
+          "trg_qf_produce_vendor_onboarding_reminder",
+          "trg_qf_produce_vendor_package_expiry_warnings"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_enqueue_vendor_automation_v1(text, text, uuid, text, timestamptz) TO service_role",
+          "execute ON qf_vendor_low_credit_threshold_v1() TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260810000000_qf_mvp_50_4_campaign_recipient_automation.sql",
+      "name": "20260810000000_qf_mvp_50_4_campaign_recipient_automation.sql",
+      "order": 95,
+      "timestampPrefix": "20260810000000",
+      "bytes": 13035,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_enqueue_campaign_recipient_automation_v1",
+          "qf_produce_campaign_recipient_action"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_qf_produce_campaign_recipient_action"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_enqueue_campaign_recipient_automation_v1(uuid) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql",
+      "name": "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql",
+      "order": 96,
+      "timestampPrefix": "20260811000000",
+      "bytes": 24998,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_automation_action_workflow_family_v1",
+          "qf_claim_automation_job_for_family_v1",
+          "qf_claim_automation_job_transport_for_family_v1",
+          "qf_claim_automation_job_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_automation_action_workflow_family_v1(text) TO service_role",
+          "execute ON qf_claim_automation_job_for_family_v1(text, text) TO service_role",
+          "execute ON qf_claim_automation_job_transport_for_family_v1(uuid, text, text, text) TO service_role",
+          "execute ON qf_claim_automation_job_v1(text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql",
+      "name": "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql",
+      "order": 97,
+      "timestampPrefix": "20260812000000",
+      "bytes": 59556,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "automation_transport_requests"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_transport_requests_route_check",
+          "automation_transport_requests_shape_check",
+          "automation_transport_requests_state_check"
+        ],
+        "indexes": [
+          "uq_automation_transport_requests_recover_generation"
+        ],
+        "functions": [
+          "qf_guard_automation_transport_request_insert",
+          "qf_guard_automation_transport_request_update",
+          "qf_reconcile_automation_attempt_transport_v1",
+          "qf_recover_automation_job_transport_v1",
+          "qf_recover_automation_job_v1",
+          "qf_select_stale_automation_attempt_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_reconcile_automation_attempt_transport_v1(\n  uuid, text, text, text, integer, uuid, uuid, text, text, text, timestamptz\n) TO service_role",
+          "execute ON qf_recover_automation_job_transport_v1(uuid, text, text) TO service_role",
+          "execute ON qf_recover_automation_job_v1(text) TO service_role",
+          "execute ON qf_select_stale_automation_attempt_v1(integer) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260813000000_qf_mvp_40_13b_canary_activation_authority.sql",
+      "name": "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql",
+      "order": 98,
+      "timestampPrefix": "20260813000000",
+      "bytes": 33335,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_arm_meta_canary_v1",
+          "qf_arm_meta_provider_readiness_v1",
+          "qf_disable_meta_canary_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_arm_meta_canary_v1(text, text, text, text, timestamptz, text) TO service_role",
+          "execute ON qf_arm_meta_provider_readiness_v1(text, text, text) TO service_role",
+          "execute ON qf_disable_meta_canary_v1() TO service_role",
+          "select ON communication_provider_canary_destinations TO service_role",
+          "select ON communication_provider_runtime_policies TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260814000000_qf_mvp_40_marketing_consent_writer.sql",
+      "name": "20260814000000_qf_mvp_40_marketing_consent_writer.sql",
+      "order": 99,
+      "timestampPrefix": "20260814000000",
+      "bytes": 9164,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_apply_marketing_consent_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_apply_marketing_consent_v1(\n  text, text, text, uuid, text, text, text, text, timestamptz) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql",
+      "name": "20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql",
+      "order": 100,
+      "timestampPrefix": "20260815000000",
+      "bytes": 36642,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_assign_lead_vendors_v2"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql",
+      "name": "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql",
+      "order": 101,
+      "timestampPrefix": "20260816000000",
+      "bytes": 21365,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "leads",
+          "vendors"
+        ],
+        "columnsAdded": [
+          "geo_point"
+        ],
+        "constraints": [],
+        "indexes": [
+          "idx_leads_geo_point_gist",
+          "idx_vendors_geo_point_gist"
+        ],
+        "functions": [
+          "qf_geo_vendor_shortlist_v1"
+        ],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [
+          "postgis"
+        ],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_geo_vendor_shortlist_v1(uuid, integer) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql",
+      "name": "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql",
+      "order": 102,
+      "timestampPrefix": "20260817000000",
+      "bytes": 8243,
+      "objects": {
+        "tablesCreated": [
+          "audit_logs"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [
+          "idx_audit_logs_created"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "audit_logs"
+        ],
+        "policies": [
+          "audit admin insert ON audit_logs",
+          "audit admin read ON audit_logs"
+        ],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+      "name": "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+      "order": 103,
+      "timestampPrefix": "20260903040000",
+      "bytes": 35778,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_activate_meta_lead_assignment_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_activate_meta_lead_assignment_v1(text, text, text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql",
+      "name": "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql",
+      "order": 104,
+      "timestampPrefix": "20260904000000",
+      "bytes": 6982,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
+      "name": "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
+      "order": 105,
+      "timestampPrefix": "20260905000000",
+      "bytes": 27061,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "automation_transport_requests"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_transport_requests_route_check",
+          "automation_transport_requests_shape_check",
+          "automation_transport_requests_state_check"
+        ],
+        "indexes": [
+          "uq_automation_transport_requests_cancel_orphan_job"
+        ],
+        "functions": [
+          "qf_automation_entity_state_v1",
+          "qf_cancel_orphan_automation_job_transport_v1",
+          "qf_cancel_orphan_automation_job_v1",
+          "qf_guard_automation_transport_request_insert",
+          "qf_guard_automation_transport_request_update"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_automation_entity_state_v1(text, text) TO service_role",
+          "execute ON qf_cancel_orphan_automation_job_transport_v1(uuid, text, text) TO service_role",
+          "execute ON qf_cancel_orphan_automation_job_v1(text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
+      "name": "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
+      "order": 106,
+      "timestampPrefix": "20260906000000",
+      "bytes": 43223,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "automation_transport_requests"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_transport_requests_route_check",
+          "automation_transport_requests_shape_check"
+        ],
+        "indexes": [
+          "uq_automation_transport_requests_cancel_stale_job"
+        ],
+        "functions": [
+          "qf_automation_low_credit_threshold_v1",
+          "qf_automation_vendor_business_state_v1",
+          "qf_cancel_stale_automation_job_transport_v1",
+          "qf_cancel_stale_automation_job_v1",
+          "qf_guard_automation_transport_request_insert",
+          "qf_guard_automation_transport_request_update"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_automation_low_credit_threshold_v1() TO service_role",
+          "execute ON qf_automation_vendor_business_state_v1(text, text, text, text) TO service_role",
+          "execute ON qf_cancel_stale_automation_job_transport_v1(uuid, text, text) TO service_role",
+          "execute ON qf_cancel_stale_automation_job_v1(text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
+      "name": "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
+      "order": 107,
+      "timestampPrefix": "20260910060000",
+      "bytes": 16996,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_quiesce_meta_canary_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_quiesce_meta_canary_v1() TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260911000000_qf_launch_security_closeout.sql",
+      "name": "20260911000000_qf_launch_security_closeout.sql",
+      "order": 108,
+      "timestampPrefix": "20260911000000",
+      "bytes": 19734,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "get_public_eligible_vendors"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON get_public_eligible_vendors(text, text, text) TO anon, authenticated, service_role",
+          "select ON vendor_public_v TO anon, authenticated, service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+      "name": "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+      "order": 109,
+      "timestampPrefix": "20260912000000",
+      "bytes": 58036,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_activate_meta_transactional_mapping_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_activate_meta_transactional_mapping_v1(text, text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "UNKNOWN_UNVERIFIED",
+        "production": "UNKNOWN_UNVERIFIED",
+        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260912040000_qf_aos_v2_intelligence.sql",
+      "name": "20260912040000_qf_aos_v2_intelligence.sql",
+      "order": 110,
+      "timestampPrefix": "20260912040000",
+      "bytes": 11707,
+      "objects": {
+        "tablesCreated": [
+          "aos_agent_logs",
+          "aos_agent_memory",
+          "aos_audit_logs",
+          "aos_recommendations",
+          "aos_runs"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [
+          "idx_aos_agent_logs_agent_created",
+          "idx_aos_agent_logs_entity_created",
+          "idx_aos_agent_logs_run",
+          "idx_aos_agent_memory_expiry",
+          "idx_aos_agent_memory_subject",
+          "idx_aos_audit_logs_created",
+          "idx_aos_audit_logs_entity",
+          "idx_aos_recommendations_action_state",
+          "idx_aos_recommendations_entity_created",
+          "idx_aos_recommendations_key_created",
+          "idx_aos_runs_correlation",
+          "idx_aos_runs_entity_created",
+          "idx_aos_runs_status_created"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [
+          "pgcrypto"
+        ],
+        "rlsEnabled": [
+          "aos_agent_logs",
+          "aos_agent_memory",
+          "aos_audit_logs",
+          "aos_recommendations",
+          "aos_runs"
+        ],
+        "policies": [],
+        "grants": [
+          "select ON aos_agent_logs TO authenticated",
+          "select ON aos_agent_memory TO authenticated",
+          "select ON aos_audit_logs TO authenticated",
+          "select ON aos_recommendations TO authenticated",
+          "select ON aos_runs TO authenticated"
+        ]
       },
       "appliedStatus": {
         "staging": "UNKNOWN_UNVERIFIED",

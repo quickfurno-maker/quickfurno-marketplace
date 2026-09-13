@@ -47,7 +47,7 @@ const PRODUCTION_REF = "yqpgcsduqbxulrlzwzap";
 
 const PUBLISHED_TABLES = ["public.communication_inbound_messages", "public.communication_messages"];
 
-const LIVE_MIGRATION_COUNT = 109;
+const LIVE_MIGRATION_COUNT = 111;
 const FROZEN_RECONCILIATION_COUNT = 102;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
@@ -264,7 +264,7 @@ check("17-18 no application or inbox source belongs to this phase", () => {
 });
 
 check("19-20 S1 changed no migration and added none", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 109");
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 111");
   eq(canonicalSha256(R0_PATH), R0_SHA, "R0 is byte-identical");
   // Exactly one R0 migration, and no S1 migration at all — which is the whole point
   // of this check: S1 was a certification phase and contributed no SQL of its own.
@@ -279,10 +279,10 @@ check("19-20 S1 changed no migration and added none", () => {
 
 // ---- 21-22. the two counts -------------------------------------------------
 
-check("21 the live source migration count is 109", () => {
+check("21 the live source migration count is 111", () => {
   eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 109;/.test(g1), "and G1 still pins 109");
+  assert(/const MIGRATION_COUNT = 111;/.test(g1), "and G1 still pins 111");
 });
 
 check("22 the frozen 80.05 reconciliation count is still 102", () => {
@@ -336,11 +336,11 @@ check("24 no historical applied or reconciled record was rewritten", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  // QF-MVP-50.6 RE-PIN: 17 -> 18. The applied ten and reconciled five — which is what
+  // Current ledger totals 24. The applied ten and reconciled five — which is what
   // this check is actually about — are untouched.
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 22, "the anchor totals twenty-two");
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 24, "the anchor totals twenty-four");
   eq(10 + 5 + (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length +
-     (MANIFEST.pendingPostAnchorMigrations ?? []).length, 22, "and the four sets add up");
+     (MANIFEST.pendingPostAnchorMigrations ?? []).length, 24, "and the four sets add up");
 });
 
 check("25 no production-applied claim exists for R0 anywhere", () => {

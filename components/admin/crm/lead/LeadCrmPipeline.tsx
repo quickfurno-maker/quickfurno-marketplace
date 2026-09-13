@@ -17,7 +17,7 @@ export function PipelineBoard({ rows, onSelect }: { rows: CrmRow[]; onSelect: (r
   return (
     <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
       {PIPELINE_COLUMNS.map((column) => {
-        const columnRows = rows.filter((row) => (column.bucket === "spam" ? row.bucket === "spam" || row.bucket === "duplicate" : row.bucket === column.bucket));
+        const columnRows = rows.filter((row) => row.bucket === column.bucket);
         const headingId = `pipeline-${column.bucket}`;
         return (
           <section
@@ -54,7 +54,6 @@ export function PipelineBoard({ rows, onSelect }: { rows: CrmRow[]; onSelect: (r
                     </div>
                     <p className="mt-1.5 truncate text-[10px] text-slate-400">
                       Created {formatDate(row.createdAt)}
-                      {row.followUp ? ` · Follow-up ${formatDate(row.followUp)}` : ""}
                     </p>
                   </button>
                 ))
@@ -78,5 +77,5 @@ export function PipelineBoard({ rows, onSelect }: { rows: CrmRow[]; onSelect: (r
 }
 
 // ---------------------------------------------------------------------------
-// Follow-ups (real follow_up_date data only)
+// Lead-generation flow only; post-delivery sales stages are intentionally absent.
 // ---------------------------------------------------------------------------

@@ -1,8 +1,9 @@
 // ============================================================================
 // QuickFurno — QF-MVP-50.1A Unified Action Contract
 //
-// Core is authority. Jarvis/Riya/Anisha may REQUEST. n8n may EXECUTE only a
-// Core-authorized job. Meta delivers. Results return to Core.
+// Core is authority and owns automation triggering. Jarvis/Riya/Anisha have no
+// trigger authority; they may converse only after Core authorization. n8n executes
+// authorized jobs, Meta delivers, and structured results return to Core.
 //
 // Pure module: no database, network, environment, provider or clock I/O.
 // ============================================================================

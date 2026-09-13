@@ -3,7 +3,6 @@ export * from "./leadCrmUtils";
 export * from "./LeadCrmSummary";
 export * from "./LeadCrmInbox";
 export * from "./LeadCrmPipeline";
-export * from "./LeadCrmFollowUps";
 export * from "./LeadCrmAssignmentQueue";
 export * from "./LeadCrmVendorContext";
 export * from "./LeadCrmSourceAnalytics";

@@ -31,7 +31,7 @@ type AnalyticsDashboardProps = {
 const tabs = [
   "Overview",
   "Lead Sources",
-  "CRM Funnel",
+  "Lead Generation Flow",
   "Services",
   "Cities & Areas",
   "Vendors",
@@ -57,7 +57,7 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
       <TabPanel id="analytics-tabs" active={active}>
         {active === "Overview" ? <Overview stats={stats} /> : null}
         {active === "Lead Sources" ? <LeadSourceAnalytics rows={model.sources} /> : null}
-        {active === "CRM Funnel" ? <FunnelAnalytics rows={model.funnel} /> : null}
+        {active === "Lead Generation Flow" ? <FunnelAnalytics rows={model.funnel} /> : null}
         {active === "Services" ? <ServiceAnalytics rows={model.services} /> : null}
         {active === "Cities & Areas" ? <AreaAnalytics rows={model.areas} /> : null}
         {active === "Vendors" ? <VendorAnalytics rows={model.vendors} /> : null}
@@ -72,11 +72,9 @@ function Overview({ stats }: { stats: Record<string, number | string> }) {
   const cards: Array<{ key: string; label: string; value: React.ReactNode; helper: string; tone: "emerald" | "indigo" | "amber" | "rose" | "slate" }> = [
     { key: "total_leads", label: "Total Leads", value: formatNumber(stats.total_leads), helper: "Live count", tone: "indigo" },
     { key: "leads_today", label: "Leads Today", value: formatNumber(stats.leads_today), helper: "Created today (live count)", tone: "emerald" },
-    { key: "assigned_leads", label: "Assigned Leads", value: formatNumber(stats.assigned_leads), helper: "Assigned or later stage (live count)", tone: "indigo" },
-    { key: "conversion_rate", label: "Conversion Rate", value: `${Number(stats.conversion_rate ?? 0)}%`, helper: "Converted / total (live counts)", tone: "emerald" },
+    { key: "assigned_leads", label: "Assigned / Delivered", value: formatNumber(stats.assigned_leads), helper: "Quality leads assigned to vendors", tone: "indigo" },
     { key: "active_vendors", label: "Active Vendors", value: formatNumber(stats.active_vendors), helper: "Approved and active (live count)", tone: "indigo" },
     { key: "paid_vendors", label: "Paid Vendors", value: formatNumber(stats.paid_vendors), helper: "With a paid/active package", tone: "emerald" },
-    { key: "followups_due", label: "Follow-ups Due", value: formatNumber(stats.pending_followups), helper: "Open working statuses (live count)", tone: "amber" },
     { key: "revenue_month", label: "Revenue This Month", value: formatINR(stats.revenue_this_month), helper: `${formatINR(stats.total_revenue)} lifetime`, tone: "emerald" },
   ];
   return (
@@ -99,8 +97,6 @@ function LeadSourceAnalytics({ rows }: { rows: SourceMetric[] }) {
         { header: "Leads", cell: (row) => formatNumber(row.leads) },
         { header: "Hot leads", cell: (row) => formatNumber(row.hot_leads) },
         { header: "Assigned", cell: (row) => formatNumber(row.assigned_leads) },
-        { header: "Won", cell: (row) => formatNumber(row.won_leads) },
-        { header: "Lost", cell: (row) => formatNumber(row.lost_leads) },
       ]}
     />
   );
@@ -110,7 +106,7 @@ function FunnelAnalytics({ rows }: { rows: FunnelMetric[] }) {
   const max = Math.max(1, ...rows.map((row) => row.count));
   return (
     <section className="qfa-panel p-4">
-      <h3 className="text-base font-semibold text-slate-950">CRM Funnel</h3>
+      <h3 className="text-base font-semibold text-slate-950">Lead Generation Flow</h3>
       <div className="mt-5 space-y-4">
         {rows.map((row) => (
           <div key={row.key} className="space-y-1.5">
@@ -139,7 +135,6 @@ function ServiceAnalytics({ rows }: { rows: ServiceMetric[] }) {
         { header: "Leads", cell: (row) => formatNumber(row.leads) },
         { header: "Hot leads", cell: (row) => formatNumber(row.hot_leads) },
         { header: "Assigned", cell: (row) => formatNumber(row.assigned) },
-        { header: "Won", cell: (row) => formatNumber(row.won) },
       ]}
     />
   );

@@ -17,7 +17,7 @@ export default async function VendorDashboardPage() {
 
   const [statsRes, leadsRes] = await Promise.all([vendorDashboard(vendor.id), vendorLeads(vendor.id)]);
   const stats = (statsRes.ok ? statsRes.data : {
-    remaining_credits: 0, total_credits: 0, total_leads: 0, won: 0, lost: 0, in_progress: 0, bad_lead_reports: 0,
+    remaining_credits: 0, total_credits: 0, total_leads: 0, bad_lead_reports: 0,
   }) as VendorDashboardStats;
   const leads = (leadsRes.ok ? leadsRes.data : []) as VendorOverviewLead[];
 

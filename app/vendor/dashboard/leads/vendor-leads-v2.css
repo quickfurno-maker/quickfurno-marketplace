@@ -419,30 +419,6 @@
   white-space: nowrap;
 }
 
-.qf-vendor-v2-leads-status[data-status="New"] {
-  background: var(--v2-blue-tint);
-  border-color: var(--v2-blue-line);
-  color: var(--v2-blue-deep);
-}
-
-.qf-vendor-v2-leads-status[data-status="Follow-up Needed"] {
-  background: var(--v2-warn-tint);
-  border-color: var(--v2-warn-line);
-  color: var(--v2-warn);
-}
-
-.qf-vendor-v2-leads-status[data-status="Converted"],
-.qf-vendor-v2-leads-status[data-status="Won"] {
-  background: var(--v2-ok-tint);
-  border-color: var(--v2-ok-line);
-  color: var(--v2-ok);
-}
-
-.qf-vendor-v2-leads-status[data-status="Lost"] {
-  background: var(--v2-danger-tint);
-  border-color: var(--v2-danger-line);
-  color: var(--v2-danger);
-}
 
 /* Assignment source — deliberately quieter than the CRM status. */
 .qf-vendor-v2-leads-source {
@@ -819,4 +795,60 @@
   .qf-vendor-v2-leads-card {
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Assignment-specific 24-hour connection assurance. */
+.qf-vendor-v2-connection-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  padding: 0.7rem 0.85rem;
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-inset);
+}
+
+.qf-vendor-v2-connection-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.qf-vendor-v2-connection-copy strong {
+  font-size: 0.8125rem;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-connection-copy span {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--v2-muted);
+}
+.qf-vendor-v2-connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.qf-vendor-v2-connection-actions button {
+  min-height: 34px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--v2-line);
+  border-radius: 8px;
+  background: var(--v2-surface);
+  color: var(--v2-ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.qf-vendor-v2-connection-actions button:hover:not(:disabled) {
+  border-color: var(--v2-blue-line);
+}
+
+.qf-vendor-v2-connection-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }

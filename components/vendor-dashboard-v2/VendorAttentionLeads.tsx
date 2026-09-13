@@ -7,7 +7,7 @@ import {
   formatAssignedAgo,
   isVendorPaid,
   isVendorVerified,
-  selectAttentionLeads,
+  selectRecentLeads,
   type VendorOverviewLead,
 } from "./vendorOverviewModel";
 
@@ -28,26 +28,26 @@ export function VendorAttentionLeads({
   vendor: VendorProfileSummary;
   leads: VendorOverviewLead[];
 }) {
-  const shortlist = selectAttentionLeads(leads);
+  const shortlist = selectRecentLeads(leads);
   const contactAllowed = canViewClientContact(vendor);
   const verified = isVendorVerified(vendor);
 
   return (
     <VendorPanel
-      title="Needs your attention"
-      hint="Open enquiries, most urgent first."
+      title="Recent delivered leads"
+      hint="Latest quality leads delivered to your account."
       action={leads.length > 0 ? { label: "All leads", href: LEADS_HREF } : undefined}
     >
       {shortlist.length === 0 ? (
         <VendorEmptyState
           icon="inbox"
-          title={leads.length === 0 ? "No leads assigned yet" : "Nothing needs attention"}
+          title="No leads assigned yet"
           message={
             leads.length === 0
               ? verified
                 ? "Matched client enquiries will appear here as soon as they are assigned to you."
                 : "Client enquiries will start arriving once your profile is verified and lead access is active."
-              : "Every assigned enquiry is marked converted or closed. New matches will show up here."
+              : "New matched leads will show up here."
           }
           action={leads.length === 0 ? undefined : { label: "Open Leads", href: LEADS_HREF }}
         />
@@ -66,12 +66,7 @@ export function VendorAttentionLeads({
                   <div className="qf-vendor-v2-leadrow-main">
                     <div className="qf-vendor-v2-leadrow-title">
                       <strong>{lead.name}</strong>
-                      <span
-                        className="qf-vendor-v2-leadstatus"
-                        data-status={assignment.vendor_status}
-                      >
-                        {assignment.vendor_status}
-                      </span>
+                      <span className="qf-vendor-v2-leadstatus">Delivered</span>
                     </div>
                     <p className="qf-vendor-v2-leadrow-service">{lead.service_required}</p>
                     <ul className="qf-vendor-v2-leadrow-meta">
@@ -125,7 +120,7 @@ export function VendorAttentionLeads({
             {/* One flex item, so the space before the trailing clause is a real
                 space rather than the row's gap (which reads as a double space). */}
             <span>
-              View all leads<span className="qf-vendor-v2-foot-link-more"> and update statuses</span>
+              View all leads<span className="qf-vendor-v2-foot-link-more"> and review details</span>
             </span>
             <VendorIcon name="arrow-right" size={16} />
           </Link>

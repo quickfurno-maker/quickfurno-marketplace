@@ -127,10 +127,14 @@ export const CLIENT_SELECTION_WINDOW_MINUTES = 60;
 export const LEAD_STATUSES = [
   "New",
   "Verified",
-  "Assigned",
-  "Contacted",
-  "Converted",
+  "Quality Checked",
+  "Clarification Required",
+  "Hot Lead",
+  "Nurture",
+  "Rejected Quality",
+  "Duplicate",
   "Bad Lead",
+  "Assigned",
 ] as const;
 export type LeadWorkflowStatus = (typeof LEAD_STATUSES)[number];
 

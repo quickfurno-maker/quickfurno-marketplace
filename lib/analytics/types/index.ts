@@ -21,10 +21,8 @@ export interface CampaignMetric {
   source: string;
   leads: number;
   hot_leads?: number;
-  won_leads?: number;
   spend_placeholder?: string | null;
   cpl_placeholder?: string | null;
-  conversion_placeholder?: string | null;
   quality_score_placeholder?: string | null;
 }
 
@@ -39,7 +37,6 @@ export interface ServiceMetric {
   leads: number;
   hot_leads: number;
   assigned: number;
-  won: number;
   revenue_estimate?: string | null;
   vendor_supply_gap_placeholder?: string | null;
 }
@@ -61,13 +58,11 @@ export interface AreaMetric {
 export interface VendorMetric {
   vendor: string;
   assigned_leads: number;
-  response_rate_placeholder?: string | null;
   package?: string | null;
   lead_balance_placeholder?: string | null;
   category?: string | null;
   city?: string | null;
   leads_received: number;
-  response_time_placeholder?: string | null;
   rating_placeholder?: string | null;
   credits_placeholder?: string | null;
   status?: string | null;
@@ -85,21 +80,14 @@ export interface SourceMetric {
   leads: number;
   hot_leads: number;
   assigned_leads: number;
-  won_leads: number;
-  lost_leads: number;
   cost_placeholder?: string | null;
   cpl_placeholder?: string | null;
   cost_per_hot_lead_placeholder?: string | null;
-  cost_per_won_lead_placeholder?: string | null;
 }
 
 export interface FollowUpAnalytics {
-  follow_ups_due: number;
-  overdue: number;
-  completed: number;
+  clarification_due: number;
   nurture_scheduled: number;
-  site_visits: number;
-  quotation_followups: number;
 }
 
 export interface AgentAnalyticsRow {

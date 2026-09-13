@@ -1,5 +1,5 @@
 // ============================================================================
-// QuickFurno AOS — Phase 12: Admin-Controlled AOS / n8n Activation Switch
+// QuickFurno AOS â€” Phase 12: Admin-Controlled AOS / n8n Activation Switch
 //
 // Runtime setting reader/writer for the AOS -> n8n master router gate (Lock 2).
 //
@@ -15,7 +15,7 @@
 //
 // SAFETY CONTRACT:
 //   - SERVER ONLY. Reads/writes via the Supabase service-role client. Never
-//     import this from a client component — it must never reach the browser.
+//     import this from a client component â€” it must never reach the browser.
 //   - Never throws on read: a missing table/row/error resolves to a safe OFF
 //     default so lead submission is never blocked.
 //   - Stores NO secrets. Exposes NO webhook URL or new_n8n_secret.
@@ -55,7 +55,7 @@ export interface AosN8nEnvLock {
 export interface AosN8nActivation {
   envLock: AosN8nEnvLock;
   runtime: AosRuntimeSetting;
-  /** All four conditions true → QuickFurno may forward to the preview router. */
+  /** All four conditions true â†’ QuickFurno may forward to the preview router. */
   shouldCallN8n: boolean;
   /** Human-readable reason used for logs and the API status response. */
   reason: string;
@@ -126,7 +126,7 @@ export interface SetAosN8nMasterRouterResult {
 }
 
 /**
- * Upsert the master-router runtime setting. SERVER ONLY — callers MUST verify
+ * Upsert the master-router runtime setting. SERVER ONLY â€” callers MUST verify
  * the caller is a Superadmin before invoking this. Rejects production_locked
  * (reserved / coming soon). When enabled is false the mode is forced to 'off'
  * so a disabled switch can never advertise an active mode.
@@ -187,24 +187,15 @@ export function readAosN8nEnvLock(): AosN8nEnvLock {
  * Never throws: falls back to a safe OFF runtime default.
  */
 export async function resolveAosN8nActivation(): Promise<AosN8nActivation> {
+  // AOS V2 permanently retires the legacy direct webhook authority. We still
+  // expose the historical row/env state for forensic/admin compatibility, but
+  // there is no combination of switches that can make AOS call n8n directly.
   const envLock = readAosN8nEnvLock();
   const runtime = await getAosN8nMasterRouterSetting();
-
-  const runtimeReady = runtime.enabled && runtime.mode === "preview";
-  const shouldCallN8n = envLock.bothEnabled && runtimeReady;
-
-  let reason: string;
-  if (!envLock.n8nEnabled) {
-    reason = "Lock 1 OFF: N8N_ENABLED is not true. Running in safe mock mode.";
-  } else if (!envLock.outboundWebhookEnabled) {
-    reason = "Lock 1 OFF: N8N_OUTBOUND_WEBHOOK_ENABLED is not true. Running in safe mock mode.";
-  } else if (!runtime.enabled) {
-    reason = "Lock 2 OFF: admin runtime switch is disabled. Running in safe mock mode.";
-  } else if (runtime.mode !== "preview") {
-    reason = `Lock 2 mode is '${runtime.mode}', not 'preview'. Running in safe mock mode.`;
-  } else {
-    reason = "Both locks ON (preview). Events may be forwarded to the n8n Master Preview Router.";
-  }
-
-  return { envLock, runtime, shouldCallN8n, reason };
+  return {
+    envLock,
+    runtime,
+    shouldCallN8n: false,
+    reason: "Legacy direct AOS -> n8n routing is retired. AOS V2 can only recommend; Core owns the modern automation request/job boundary.",
+  };
 }

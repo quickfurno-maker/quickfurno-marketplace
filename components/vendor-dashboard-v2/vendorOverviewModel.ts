@@ -6,19 +6,16 @@
 // writes, no new service. Every number the Overview shows must come from here
 // so it is auditable and provably derived from real loaded rows.
 //
-// Deliberately NOT modelled here, because no honest source exists:
-//   - response rate (the removed KPI computed (total - in_progress) / total,
-//     which measures CRM progress, not responsiveness)
-//   - revenue / earnings / conversion rate / ranking / views / impressions
-//   - an "accepting leads" self-toggle (no authorised vendor-side mutation)
+// Deliberately NOT modelled here: vendor response, follow-up, site visit, quotation,
+// negotiation, conversion, won/lost or project execution. QuickFurno stops at
+// quality-lead delivery. Revenue/ranking/views are also outside this lead view.
 // ============================================================================
-import type { VendorLeadStatus, VendorProfileSummary } from "@/lib/types";
+import type { VendorProfileSummary } from "@/lib/types";
 
 export interface VendorOverviewLead {
   id: string;
   assigned_at: string;
   assignment_type: string;
-  vendor_status: VendorLeadStatus;
   is_bad_lead_reported: boolean;
   lead: {
     id: string;
@@ -35,56 +32,17 @@ export interface VendorOverviewLead {
   } | null;
 }
 
-/**
- * Statuses that still need vendor work. "Converted" and "Lost" are terminal CRM
- * states, so they are excluded — everything else is open follow-up.
- */
-export const ACTIVE_LEAD_STATUSES: readonly VendorLeadStatus[] = [
-  "New",
-  "Contacted",
-  "Follow-up Needed",
-  "Site Visit Scheduled",
-  "Quotation Sent",
-];
-
-/** Lower number = surfaces higher in "Needs your attention". */
-const ATTENTION_RANK: Partial<Record<VendorLeadStatus, number>> = {
-  New: 0,
-  "Follow-up Needed": 1,
-  "Site Visit Scheduled": 2,
-  "Quotation Sent": 3,
-  Contacted: 4,
-};
-
-export function isActiveLeadStatus(status: VendorLeadStatus | null | undefined): boolean {
-  return Boolean(status) && ACTIVE_LEAD_STATUSES.includes(status as VendorLeadStatus);
+/** Count of loaded leads currently under a validity review. */
+export function countReportedLeads(leads: VendorOverviewLead[]): number {
+  return leads.filter((assignment) => assignment.is_bad_lead_reported === true).length;
 }
 
-/** Count of loaded assignments still needing work. Derived, never fabricated. */
-export function countActiveLeads(leads: VendorOverviewLead[]): number {
-  return leads.filter((assignment) => isActiveLeadStatus(assignment.vendor_status)).length;
-}
-
-/** Count of loaded assignments in one specific CRM state. */
-export function countByStatus(leads: VendorOverviewLead[], status: VendorLeadStatus): number {
-  return leads.filter((assignment) => assignment.vendor_status === status).length;
-}
-
-/**
- * The handful of assignments worth acting on right now: open statuses only,
- * ordered by urgency then most recently assigned. This is a SHORTLIST of the
- * Leads page, never a replacement for it.
- */
-export function selectAttentionLeads(leads: VendorOverviewLead[], limit = 4): VendorOverviewLead[] {
+/** Latest delivered leads only. No vendor sales-stage ranking exists. */
+export function selectRecentLeads(leads: VendorOverviewLead[], limit = 4): VendorOverviewLead[] {
   return leads
-    .filter((assignment) => assignment.lead && isActiveLeadStatus(assignment.vendor_status))
+    .filter((assignment) => Boolean(assignment.lead))
     .slice()
-    .sort((a, b) => {
-      const rankA = ATTENTION_RANK[a.vendor_status] ?? 9;
-      const rankB = ATTENTION_RANK[b.vendor_status] ?? 9;
-      if (rankA !== rankB) return rankA - rankB;
-      return timestamp(b.assigned_at) - timestamp(a.assigned_at);
-    })
+    .sort((a, b) => timestamp(b.assigned_at) - timestamp(a.assigned_at))
     .slice(0, limit);
 }
 

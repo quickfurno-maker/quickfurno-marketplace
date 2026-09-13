@@ -8,7 +8,7 @@ import { VendorOverviewHeader } from "./VendorOverviewHeader";
 import { VendorProfileProgress } from "./VendorProfileProgress";
 import {
   LOW_CREDIT_THRESHOLD,
-  countActiveLeads,
+  countReportedLeads,
   evaluateProfileCompletion,
   type VendorOverviewLead,
 } from "./vendorOverviewModel";
@@ -20,10 +20,9 @@ import {
  * Overview stays off the client bundle. The only client code in the portal is
  * the shell's active-nav state and the mobile "More" drawer.
  *
- * Four KPIs, no more. "Response Rate" was REMOVED rather than restyled: its
- * formula, (total_leads - in_progress) / total_leads, measured how many
- * assignments had left the in-progress bucket, which is CRM progress, not
- * responsiveness. No honest replacement exists from loaded data.
+ * Four marketplace KPIs only. Vendor sales progress is intentionally absent:
+ * QuickFurno owns quality-lead delivery, credits and validity review, not the
+ * vendor's follow-up, quotation, site visit, conversion or project execution.
  */
 export function VendorOverview({
   vendor,
@@ -34,7 +33,7 @@ export function VendorOverview({
   stats: VendorDashboardStats;
   leads: VendorOverviewLead[];
 }) {
-  const activeLeads = countActiveLeads(leads);
+  const reportedLeads = countReportedLeads(leads);
   const completion = evaluateProfileCompletion(vendor);
   const credits = stats.remaining_credits;
 
@@ -48,11 +47,11 @@ export function VendorOverview({
       href: "/vendor/dashboard/leads",
     },
     {
-      key: "active",
-      label: "Needs follow-up",
-      value: String(activeLeads),
-      caption: "Open leads not yet converted or closed",
-      icon: "clock",
+      key: "validity",
+      label: "Validity reports",
+      value: String(reportedLeads),
+      caption: "Lead-quality issues submitted for review",
+      icon: "alert",
       href: "/vendor/dashboard/leads",
     },
     {

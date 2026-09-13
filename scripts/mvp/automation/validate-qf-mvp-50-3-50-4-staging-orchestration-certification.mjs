@@ -138,17 +138,23 @@ function validateState(state) {
 // renamed, deleted or reordered. Still exact equality.
   // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
   // activation authority (20260903040000). Still exact equality.
-  check("local migration count remains exactly 109", state.migrationFiles.length === 109);
+  check("local migration count remains exactly 111", state.migrationFiles.length === 111);
   check("histories 21 through 30 remain applied in exact order",
     same(applied.map((record) => [record.version, record.remoteHistoryCountAfterApply]), EXPECTED_APPLIED));
-  check("the governed pending set holds exactly the three pinned source-only authorities, two are staging-applied, and the five governed authorities are reconciled as APPLIED",
+  check("the governed pending set holds exactly seven pinned source-only authorities, two are staging-applied, and the five governed authorities are reconciled as APPLIED",
     // QF-MVP-82A-R0 RE-PIN: the SOURCE-PENDING set grows from one to two, adding
     // ONLY the Realtime publication membership. The APPLIED ten and RECONCILED five
     // are untouched. Still exact counts, still no `>=`.
     // QF-MVP-50.6 RE-PIN: 1 -> 2 pending, both source-only.
-    Array.isArray(pending) && pending.length === 5 &&
+    Array.isArray(pending) && pending.length === 7 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
     pending[1].version === "20260905000000" && pending[1].operationalStatus === "PENDING" &&
+    pending[2].version === "20260906000000" &&
+    pending[3].version === "20260911000000" &&
+    pending[4].version === "20260912000000" &&
+    pending[5].version === "20260912040000" &&
+    pending[6].version === "20260912050000" &&
+    pending.every((r) => r.operationalStatus === "PENDING") &&
     Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
     state.manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
     state.manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&

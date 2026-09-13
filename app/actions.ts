@@ -35,7 +35,7 @@ import { updateMarketplaceRuntimeSetting } from "../lib/lead-assignment/runtimeS
 import { vendorPrincipalAppMetadata } from "../lib/identity/authPrincipalMarker";
 import type { AosDecisionLogInput } from "../services/aosService";
 import type {
-  CreateLeadInput, VendorRegistrationInput, VendorLeadStatus,
+  CreateLeadInput, VendorRegistrationInput,
 } from "../lib/types";
 
 type AdminRoleName =
@@ -396,11 +396,23 @@ export async function vendorLeads(vendorId: string) {
   return vendors.getVendorAssignedLeads(vendorId);
 }
 
-export async function vendorUpdateLeadStatus(
-  vendorId: string, assignmentId: string, status: VendorLeadStatus, notes?: string
-) {
-  try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
-  return vendors.updateVendorLeadStatus(vendorId, assignmentId, status, notes);
+export async function vendorRecordClientResponseFromForm(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const outcome = String(formData.get("outcome") ?? "");
+  const result = await vendors.recordVendorClientResponse(
+    me.data.id,
+    assignmentId,
+    outcome === "responded" ? "responded" : outcome === "no_response" ? "no_response" : ("" as never),
+  );
+  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard");
+  if (!result.ok) {
+    redirect(`/vendor/dashboard/leads?lead=connection-failed&code=${encodeURIComponent(result.code)}`);
+  }
+  redirect(`/vendor/dashboard/leads?lead=${outcome === "responded" ? "client-responded" : "client-no-response"}`);
 }
 
 export async function vendorReportBadLead(
@@ -422,20 +434,6 @@ export async function vendorSubmitLeadReport(
   revalidatePath("/vendor/dashboard");
   revalidatePath("/admin/leads");
   return result;
-}
-
-export async function vendorUpdateLeadStatusFromForm(formData: FormData) {
-  const me = await getMyVendor();
-  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
-
-  const assignmentId = String(formData.get("assignmentId") ?? "");
-  const status = String(formData.get("status") ?? "") as VendorLeadStatus;
-  const result = await vendorUpdateLeadStatus(me.data.id, assignmentId, status);
-
-  revalidatePath("/vendor/dashboard/leads");
-  revalidatePath("/vendor/dashboard");
-  if (!result.ok) redirect(`/vendor/dashboard/leads?lead=failed&code=${encodeURIComponent(result.code)}`);
-  redirect("/vendor/dashboard/leads?lead=status-updated");
 }
 
 export async function vendorReportBadLeadFromForm(formData: FormData) {

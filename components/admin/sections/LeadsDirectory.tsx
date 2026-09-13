@@ -28,6 +28,7 @@ import { formatDate, formatNumber, maskPhone } from "../adminUtils";
 import { BadLeadReportsReviewPanel } from "../LeadMatchingAuditPanels";
 import { Strong } from "./shared";
 import { LeadDetailDrawer, LeadPriorityBadge, SourceBadge, leadStatuses } from "./LeadsSection";
+import { statusBucket, statusLabel } from "../crm/lead/leadCrmUtils";
 
 type BadLeadReview = Pick<Snapshot, "badReports" | "badLeadReportComments" | "assignments" | "vendors" | "leads">;
 
@@ -164,7 +165,7 @@ export function LeadsDirectory({
           { header: "Budget", cell: (lead) => lead.budget || "Not set" },
           { header: "Priority", cell: (lead) => <LeadPriorityBadge lead={lead} /> },
           { header: "Source", cell: (lead) => <SourceBadge value={lead.source || "Website"} /> },
-          { header: "Status", cell: (lead) => <StatusBadge value={lead.status || "New"} /> },
+          { header: "Stage", cell: (lead) => <StatusBadge value={statusLabel(statusBucket(lead, lead.lead_assignments?.length ?? 0))} /> },
           { header: "Assigned", cell: (lead) => <StatusBadge value={`${formatNumber(lead.lead_assignments?.length ?? 0)} vendors`} tone={(lead.lead_assignments?.length ?? 0) > 0 ? "emerald" : "amber"} /> },
           { header: "Created", cell: (lead) => formatDate(lead.created_at) },
           {
@@ -173,7 +174,6 @@ export function LeadsDirectory({
               <ActionMenu
                 actions={[
                   { label: "View lead", onClick: () => setSelected(lead) },
-                  { label: "Mark contacted", onClick: () => runAction("Lead status update", () => adminUpdateLeadStatus(lead.id, "Contacted")) },
                 ]}
               />
             ),

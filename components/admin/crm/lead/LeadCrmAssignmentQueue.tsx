@@ -89,7 +89,3 @@ export function AssignmentQueue({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Vendor Response (vendor_status on assignments + delivery logs)
-// ---------------------------------------------------------------------------

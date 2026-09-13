@@ -8,15 +8,10 @@
 export type CRMLeadStatus =
   | "new"
   | "qualified"
+  | "clarification_required"
   | "spam_review"
   | "vendor_matching"
   | "assigned"
-  | "vendor_contact_pending"
-  | "client_contacted"
-  | "site_visit_scheduled"
-  | "quotation_sent"
-  | "won"
-  | "lost"
   | "nurture_later"
   | "invalid"
   | "duplicate";
@@ -50,15 +45,10 @@ export type CRMNurtureReason =
 export const crmLeadStatuses: CRMLeadStatus[] = [
   "new",
   "qualified",
+  "clarification_required",
   "spam_review",
   "vendor_matching",
   "assigned",
-  "vendor_contact_pending",
-  "client_contacted",
-  "site_visit_scheduled",
-  "quotation_sent",
-  "won",
-  "lost",
   "nurture_later",
   "invalid",
   "duplicate",
@@ -158,9 +148,9 @@ export type CRMActivityType =
   | "whatsapp_logged"
   | "vendor_matched"
   | "vendor_assigned"
-  | "client_contacted"
+  | "clarification_requested"
+  | "clarification_completed"
   | "nurture_scheduled"
-  | "follow_up_scheduled"
   | "nurture_moved";
 
 export interface CRMActivity {
@@ -203,27 +193,18 @@ export interface CRMSource {
   leads: number;
   hot_leads?: number;
   assigned_leads?: number;
-  won_leads?: number;
   created_at?: string | null;
 }
 
 export type CRMCalendarEventType =
-  | "client_call"
-  | "vendor_call"
-  | "site_visit"
-  | "quotation_followup"
+  | "clarification_followup"
   | "nurture_followup"
-  | "complaint_followup"
-  | "renewal_followup";
+  | "complaint_followup";
 
 export const crmCalendarEventTypes: CRMCalendarEventType[] = [
-  "client_call",
-  "vendor_call",
-  "site_visit",
-  "quotation_followup",
+  "clarification_followup",
   "nurture_followup",
   "complaint_followup",
-  "renewal_followup",
 ];
 
 export type CRMCalendarEventStatus = "scheduled" | "due" | "overdue" | "done" | "cancelled";
@@ -245,7 +226,7 @@ export interface CRMCalendarEvent {
 export interface CRMFollowUpSchedule {
   id: string;
   lead_id: string;
-  follow_up_type: "follow_up" | "nurture";
+  follow_up_type: "clarification" | "nurture";
   scheduled_date: string;
   preset?: string | null;
   custom_date_enabled?: boolean;

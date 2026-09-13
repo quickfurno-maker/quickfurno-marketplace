@@ -72,6 +72,14 @@ type ClientVariableBuilder = (input: never) => BusinessVariableResult;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_WORKER_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
+const POST_DELIVERY_LEAD_STATUSES = new Set([
+  "Contacted",
+  "Site Visit Scheduled",
+  "Quotation Sent",
+  "Converted",
+  "Won",
+  "Lost",
+]);
 
 /**
  * The client workflow family dispatches on exactly one channel. Declared as a
@@ -521,10 +529,18 @@ async function buildClientCommunicationIntent(args: {
   );
   if (!clarification.ok) return { ok: false, code: clarification.code };
 
+  const connection = await resolveConnectionAssuranceExecutionFacts(
+    args.definition,
+    args.leadId,
+    args.actionIdempotencyKey,
+  );
+  if (!connection.ok) return { ok: false, code: connection.code };
+
   const variableInput = resolveVariableInput(
     args.definition,
     facts.lead,
     clarification.outstandingItem,
+    connection.facts,
   );
   if (!variableInput.ok) return { ok: false, code: variableInput.code };
 
@@ -587,6 +603,18 @@ async function proveExecutionTimeEligibility(
   leadId: string,
   lead: LeadFacts,
 ): Promise<EligibilityResult> {
+  // `client.transactional_followup` is admitted only by the separate exact
+  // connection-assurance evidence check below. Historical quotation-era keys
+  // fail there before any communication can be created.
+
+  if (
+    definition.actionType === "client.lead_status_update" &&
+    lead.status != null &&
+    POST_DELIVERY_LEAD_STATUSES.has(lead.status)
+  ) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+
   switch (definition.actionType) {
     case "client.missing_information_reminder": {
       // Owner policy B1: only remind while the clarification is genuinely still
@@ -615,19 +643,112 @@ async function proveExecutionTimeEligibility(
       return { ok: true };
     }
 
-    case "client.transactional_followup": {
-      // Owner policy B2: only follow up while the lead is STILL exactly in the
-      // status that justified the follow-up. If it moved on — won, lost,
-      // re-quoted, anything — the follow-up is silently dropped.
-      if (lead.status !== "Quotation Sent") {
-        return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
-      }
-      return { ok: true };
-    }
-
     default:
       return { ok: true };
   }
+}
+
+interface ConnectionAssuranceFacts {
+  readonly vendorName: string;
+  readonly vendorPhone: string;
+}
+
+type ConnectionAssuranceExecutionResult =
+  | { ok: true; facts: ConnectionAssuranceFacts | null }
+  | { ok: false; code: string };
+
+const CONNECTION_ACTION_KEY_RE =
+  /^qf_action_v1:client\.transactional_followup:lead:([0-9a-f-]{36}):conn_([0-9a-f]{32})_r([1-5])$/i;
+
+function expandCompactUuid(value: string): string | null {
+  if (!/^[0-9a-f]{32}$/i.test(value)) return null;
+  const uuid = `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
+  return UUID_RE.test(uuid) ? uuid : null;
+}
+
+function vendorContact(value: unknown): string | null {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (/^[6-9]\d{9}$/.test(digits)) return `+91${digits}`;
+  if (/^91[6-9]\d{9}$/.test(digits)) return `+${digits}`;
+  return null;
+}
+
+async function resolveConnectionAssuranceExecutionFacts(
+  definition: ClientAutomationDispatchDefinition,
+  leadId: string,
+  actionIdempotencyKey: string,
+): Promise<ConnectionAssuranceExecutionResult> {
+  if (definition.actionType !== "client.transactional_followup") {
+    return { ok: true, facts: null };
+  }
+
+  const match = CONNECTION_ACTION_KEY_RE.exec(actionIdempotencyKey);
+  if (!match || match[1].toLowerCase() !== leadId.toLowerCase()) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  const assignmentId = expandCompactUuid(match[2]);
+  const reminderStep = Number(match[3]);
+  if (!assignmentId || reminderStep < 1 || reminderStep > 5) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+
+  const assuranceRead = await adminClient()
+    .from("lead_connection_assurance")
+    .select("assignment_id, lead_id, vendor_id, vendor_outcome, client_responded_at, reminder_limit")
+    .eq("assignment_id", assignmentId)
+    .maybeSingle();
+  if (assuranceRead.error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+  const assurance = assuranceRead.data as {
+    assignment_id: string;
+    lead_id: string;
+    vendor_id: string;
+    vendor_outcome: string;
+    client_responded_at: string | null;
+    reminder_limit: number;
+  } | null;
+  if (!assurance) return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  if (assurance.lead_id !== leadId || assurance.vendor_outcome !== "no_response") {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  if (assurance.client_responded_at !== null || reminderStep > assurance.reminder_limit) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+
+  const assignmentRead = await adminClient()
+    .from("lead_assignments")
+    .select("id, lead_id, vendor_id")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (assignmentRead.error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+
+  const assignment = assignmentRead.data as {
+    id: string;
+    lead_id: string | null;
+    vendor_id: string | null;
+  } | null;
+  if (!assignment || assignment.lead_id !== leadId || assignment.vendor_id !== assurance.vendor_id) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+
+  const vendorRead = await adminClient()
+    .from("vendors")
+    .select("id, business_name, whatsapp_number, phone")
+    .eq("id", assurance.vendor_id)
+    .maybeSingle();
+  if (vendorRead.error) return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+  const vendor = vendorRead.data as {
+    id: string;
+    business_name: string | null;
+    whatsapp_number: string | null;
+    phone: string | null;
+  } | null;
+  if (!vendor || !vendor.business_name?.trim()) {
+    return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+  }
+  const phone = vendorContact(vendor.whatsapp_number) ?? vendorContact(vendor.phone);
+  if (!phone) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
+  return { ok: true, facts: { vendorName: vendor.business_name.trim(), vendorPhone: phone } };
 }
 
 interface LeadFacts {
@@ -819,6 +940,7 @@ function resolveVariableInput(
   definition: ClientAutomationDispatchDefinition,
   lead: LeadFacts,
   outstandingItem: string | null,
+  connectionFacts: ConnectionAssuranceFacts | null,
 ): VariableInputResult {
   const unresolved: VariableInputResult = {
     ok: false,
@@ -839,9 +961,14 @@ function resolveVariableInput(
         input: { clientName: lead.name, leadStatusLabel: lead.status },
       };
     case "client.transactional_followup":
+      if (connectionFacts === null) return unresolved;
       return {
         ok: true,
-        input: { clientName: lead.name, leadReference: lead.reference },
+        input: {
+          clientName: lead.name,
+          vendorName: connectionFacts.vendorName,
+          vendorPhone: connectionFacts.vendorPhone,
+        },
       };
     case "client.requirement_collection":
     case "client.missing_information_reminder":

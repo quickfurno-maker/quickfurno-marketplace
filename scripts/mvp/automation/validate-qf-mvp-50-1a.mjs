@@ -55,11 +55,14 @@ for (const actionType of AUTOMATION_ACTION_TYPES) {
     `05 registry identity matches for ${actionType}`,
     def?.actionType === actionType,
   );
+  const retired = actionType === "vendor.response_reminder";
   record(
-    `06 core/admin/system may request ${actionType}`,
-    ["core", "admin", "system"].every((source) =>
-      canSourceRequestAction(source, actionType),
-    ),
+    retired
+      ? `06 retired action is requestable by nobody: ${actionType}`
+      : `06 core/admin/system may request ${actionType}`,
+    retired
+      ? AUTOMATION_REQUEST_SOURCES.every((source) => !canSourceRequestAction(source, actionType))
+      : ["core", "admin", "system"].every((source) => canSourceRequestAction(source, actionType)),
   );
 }
 
@@ -76,20 +79,27 @@ for (const campaignAction of [
 }
 
 record(
-  "08 Riya has client request provision",
-  canSourceRequestAction("riya", "client.requirement_collection") &&
-    canSourceRequestAction("riya", "client.transactional_followup"),
+  "08 Jarvis/Riya/Anisha have no automation trigger authority",
+  ["jarvis", "riya", "anisha"].every((source) =>
+    AUTOMATION_ACTION_TYPES.every((actionType) => !canSourceRequestAction(source, actionType)),
+  ),
 );
 record(
-  "09 Anisha has client request provision",
-  canSourceRequestAction("anisha", "client.lead_status_update") &&
-    canSourceRequestAction("anisha", "client.transactional_followup"),
+  "09 Core owns standard clarification triggers",
+  canSourceRequestAction("core", "client.requirement_collection") &&
+    canSourceRequestAction("core", "client.missing_information_reminder"),
 );
 record(
-  "10 Jarvis has narrow vendor-reminder provision but no vendor lead-offer authority",
-  canSourceRequestAction("jarvis", "vendor.response_reminder") &&
-    canSourceRequestAction("jarvis", "vendor.document_reminder") &&
-    !canSourceRequestAction("jarvis", "vendor.lead_offer"),
+  "10 bounded client connection assurance is Core-only and vendor chasing is retired",
+  ["core", "admin", "system"].every((source) =>
+    canSourceRequestAction(source, "client.transactional_followup"),
+  ) &&
+    ["jarvis", "riya", "anisha"].every((source) =>
+      !canSourceRequestAction(source, "client.transactional_followup"),
+    ) &&
+    AUTOMATION_REQUEST_SOURCES.every((source) =>
+      !canSourceRequestAction(source, "vendor.response_reminder"),
+    ),
 );
 record(
   "11 workflow families are separated",
@@ -132,7 +142,7 @@ record(
 );
 
 const idempotency = createActionIdempotencyKey({
-  actionType: "client.transactional_followup",
+  actionType: "client.requirement_collection",
   entityType: "lead",
   entityId: "11111111-1111-1111-1111-111111111111",
   evidenceId: "followup-001",
@@ -140,7 +150,7 @@ const idempotency = createActionIdempotencyKey({
 record(
   "14 idempotency key is deterministic and scoped",
   idempotency ===
-    "qf_action_v1:client.transactional_followup:lead:11111111-1111-1111-1111-111111111111:followup-001",
+    "qf_action_v1:client.requirement_collection:lead:11111111-1111-1111-1111-111111111111:followup-001",
 );
 record(
   "15 correlation ID is deterministic",
@@ -153,11 +163,11 @@ record(
 const request = {
   contractVersion: 1,
   requestId: "request-001",
-  actionType: "client.transactional_followup",
+  actionType: "client.requirement_collection",
   entityType: "lead",
   entityId: "11111111-1111-1111-1111-111111111111",
-  source: "riya",
-  requestedBy: { actorType: "jarvis_agent", actorId: "riya" },
+  source: "core",
+  requestedBy: { actorType: "core_service", actorId: "quickfurno-core" },
   requestedAt: "2026-08-01T12:00:00.000Z",
   idempotencyKey: idempotency,
   correlationId: "qf_corr_v1:lead:11111111-1111-1111-1111-111111111111",
@@ -168,7 +178,7 @@ const request = {
 };
 
 record(
-  "16 a safe Riya request envelope validates but is not itself authorization",
+  "16 a safe Core request envelope validates but is not itself authorization",
   validateCoreActionRequestEnvelope(request).ok,
 );
 
@@ -209,7 +219,7 @@ const job = buildAutomationJobEnvelope(
 
 record(
   "18 authorized job preserves provenance without turning source into permission",
-  job.source === "riya" &&
+  job.source === "core" &&
     job.actionRequestId === "request-001" &&
     job.authorizedBy.actorType === "core_service",
 );

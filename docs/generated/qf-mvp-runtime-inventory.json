@@ -3,29 +3,45 @@
   "generator": "scripts/mvp/inventory/run.mjs",
   "note": "Repository-derived, read-only. Presence of code proves EXISTENCE, not that it is wired/configured/deployed/active. No DB/provider/network access.",
   "counts": {
-    "apiRoutes": 31,
-    "pages": 23,
-    "services": 64,
-    "libModules": 283,
-    "providerAdapters": 19,
-    "components": 65,
-    "packageScripts": 47
+    "apiRoutes": 42,
+    "pages": 33,
+    "services": 96,
+    "libModules": 291,
+    "providerAdapters": 20,
+    "components": 170,
+    "packageScripts": 177
   },
   "routes": {
     "api": [
+      {
+        "path": "app/api/admin/aos-recommendations/[id]/propose/route.ts",
+        "url": "/api/admin/aos-recommendations/[id]/propose",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/services/aosV2ProposalService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
       {
         "path": "app/api/admin/aos-runtime-settings/route.ts",
         "url": "/api/admin/aos-runtime-settings",
         "audience": "api",
         "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
+        "external": [],
         "supabase": [],
         "envRefs": [],
         "internalImports": [
           "@/app/actions",
-          "@/lib/aos/runtime/aosRuntimeSettings"
+          "@/lib/aos/v2/runtime",
+          "@/services/aosV2AdminService"
         ],
         "kind": "api_route",
         "methods": [
@@ -312,14 +328,12 @@
         "url": "/api/aos/events",
         "audience": "api",
         "directives": [],
-        "external": [],
+        "external": [
+          "n8n_automation"
+        ],
         "supabase": [],
         "envRefs": [],
-        "internalImports": [
-          "@/lib/aos/events/safeAgentEventPipeline",
-          "@/lib/aos/sync/n8nSyncService",
-          "@/lib/aos/tools/n8nTool"
-        ],
+        "internalImports": [],
         "kind": "api_route",
         "methods": [
           "POST"
@@ -330,13 +344,12 @@
         "url": "/api/aos/failure",
         "audience": "api",
         "directives": [],
-        "external": [],
+        "external": [
+          "n8n_automation"
+        ],
         "supabase": [],
         "envRefs": [],
-        "internalImports": [
-          "@/lib/aos/sync/n8nSyncService",
-          "@/lib/aos/tools/n8nTool"
-        ],
+        "internalImports": [],
         "kind": "api_route",
         "methods": [
           "POST"
@@ -351,12 +364,8 @@
           "n8n_automation"
         ],
         "supabase": [],
-        "envRefs": [
-          "NODE_ENV"
-        ],
-        "internalImports": [
-          "@/lib/aos/workflows/processLeadWorkflow"
-        ],
+        "envRefs": [],
+        "internalImports": [],
         "kind": "api_route",
         "methods": [
           "POST"
@@ -367,13 +376,12 @@
         "url": "/api/aos/whatsapp-status",
         "audience": "api",
         "directives": [],
-        "external": [],
+        "external": [
+          "n8n_automation"
+        ],
         "supabase": [],
         "envRefs": [],
-        "internalImports": [
-          "@/lib/aos/sync/n8nSyncService",
-          "@/lib/aos/tools/n8nTool"
-        ],
+        "internalImports": [],
         "kind": "api_route",
         "methods": [
           "POST"
@@ -430,6 +438,201 @@
         ]
       },
       {
+        "path": "app/api/internal/automation/n8n/cancel-orphan/route.ts",
+        "url": "/api/internal/automation/n8n/cancel-orphan",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/orphanCancellationContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationOrphanCancellationService",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/cancel-stale/route.ts",
+        "url": "/api/internal/automation/n8n/cancel-stale",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/staleBusinessContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationStaleBusinessCancellationService",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/claim/route.ts",
+        "url": "/api/internal/automation/n8n/claim",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/complete/route.ts",
+        "url": "/api/internal/automation/n8n/complete",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/completionContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/execute-campaign/route.ts",
+        "url": "/api/internal/automation/n8n/execute-campaign",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/familyExecutionContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationCampaignExecutionService",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/execute-client/route.ts",
+        "url": "/api/internal/automation/n8n/execute-client",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/clientExecutionContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationClientExecutionService",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/execute-vendor/route.ts",
+        "url": "/api/internal/automation/n8n/execute-vendor",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/familyExecutionContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationTransportService",
+          "@/services/automationVendorExecutionService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/reconcile/route.ts",
+        "url": "/api/internal/automation/n8n/reconcile",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/recoveryContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationRecoveryService",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/automation/n8n/recover/route.ts",
+        "url": "/api/internal/automation/n8n/recover",
+        "audience": "api",
+        "directives": [],
+        "external": [
+          "n8n_automation"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/automation/recoveryContract",
+          "@/lib/automation/transportAuth",
+          "@/lib/automation/transportTypes",
+          "@/services/automationRecoveryService",
+          "@/services/automationTransportService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
         "path": "app/api/internal/process-consent-ack-intents/route.ts",
         "url": "/api/internal/process-consent-ack-intents",
         "audience": "api",
@@ -443,6 +646,24 @@
         "internalImports": [
           "@/lib/communication/consentAckIntent",
           "@/services/consentAckWorkerService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/internal/process-lead-assignment-intents/route.ts",
+        "url": "/api/internal/process-lead-assignment-intents",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/communication/leadAssignmentDispatchTrigger",
+          "@/services/leadAssignmentDispatchService"
         ],
         "kind": "api_route",
         "methods": [
@@ -576,7 +797,9 @@
         "internalImports": [
           "@/app/actions",
           "@/components/admin/AdminSectionPage",
-          "@/components/admin/adminConfig"
+          "@/components/admin/adminConfig",
+          "@/components/admin/sections/LeadsDirectory",
+          "@/components/admin/sections/VendorsSection"
         ],
         "kind": "page"
       },
@@ -609,6 +832,23 @@
         "kind": "page"
       },
       {
+        "path": "app/admin/operations/page.tsx",
+        "url": "/admin/operations",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/operations/OperationsControlCenter",
+          "@/components/admin/operations/operationsTypes",
+          "@/services/adminLaunchControlService",
+          "@/services/adminOperationsService"
+        ],
+        "kind": "page"
+      },
+      {
         "path": "app/admin/page.tsx",
         "url": "/admin",
         "audience": "admin",
@@ -620,6 +860,133 @@
         "kind": "page"
       },
       {
+        "path": "app/admin/vendor-crm/[vendorId]/page.tsx",
+        "url": "/admin/vendor-crm/[vendorId]",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/VendorCrmProfile",
+          "@/lib/adminPaging",
+          "@/lib/crm/vendorCrmContracts",
+          "@/lib/crm/vendorCrmProfileTypes",
+          "@/services/vendorCrmProfileReadService",
+          "@/services/vendorCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/vendor-crm/campaigns/[campaignId]/page.tsx",
+        "url": "/admin/vendor-crm/campaigns/[campaignId]",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/campaigns/CampaignHandoffPanel",
+          "@/components/admin/crm/campaigns/VendorCampaignEditor",
+          "@/services/campaignHandoffService",
+          "@/services/vendorCampaignService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/vendor-crm/campaigns/page.tsx",
+        "url": "/admin/vendor-crm/campaigns",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/campaigns/VendorCampaignDirectory",
+          "@/services/vendorCampaignService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/vendor-crm/frequency-policies/page.tsx",
+        "url": "/admin/vendor-crm/frequency-policies",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/policies/FrequencyPolicyManager",
+          "@/services/communicationFrequencyPolicyService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/vendor-crm/page.tsx",
+        "url": "/admin/vendor-crm",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/VendorCrmDirectory",
+          "@/services/vendorCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/vendor-crm/segments/[segmentId]/page.tsx",
+        "url": "/admin/vendor-crm/segments/[segmentId]",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/segments/VendorSegmentEditor",
+          "@/services/vendorSegmentService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/vendor-crm/segments/page.tsx",
+        "url": "/admin/vendor-crm/segments",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/crm/segments/VendorSegmentDirectory",
+          "@/services/vendorSegmentService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/whatsapp/page.tsx",
+        "url": "/admin/whatsapp",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/whatsapp/WhatsAppControlCenter",
+          "@/components/admin/whatsapp/whatsappAdminTypes",
+          "@/services/adminWhatsAppService"
+        ],
+        "kind": "page"
+      },
+      {
         "path": "app/category/[slug]/page.tsx",
         "url": "/category/[slug]",
         "audience": "public_client",
@@ -628,10 +995,13 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
+          "../vendor-listing-v2.css",
           "@/components/ClientEnquiryModal",
           "@/components/Footer",
           "@/components/Header",
-          "@/components/VendorCards",
+          "@/components/StickyMobileCTA",
+          "@/components/public-listing/VendorDiscovery",
+          "@/components/public-listing/categoryArtwork",
           "@/lib/lead-assignment/runtimeSettings",
           "@/lib/quickfurno-data",
           "@/services/publicVendorService"
@@ -646,13 +1016,7 @@
         "external": [],
         "supabase": [],
         "envRefs": [],
-        "internalImports": [
-          "./vendor-listing.module.css",
-          "@/components/ClientEnquiryModal",
-          "@/components/Footer",
-          "@/components/Header",
-          "@/lib/config"
-        ],
+        "internalImports": [],
         "kind": "page"
       },
       {
@@ -666,7 +1030,8 @@
         "internalImports": [
           "@/components/Footer",
           "@/components/Header",
-          "@/components/LeadFunnel"
+          "@/components/LeadFunnel",
+          "@/components/StickyMobileCTA"
         ],
         "kind": "page"
       },
@@ -690,13 +1055,12 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
-          "@/components/ClientEnquiryModal",
           "@/components/Footer",
           "@/components/Header",
-          "@/components/QuickFurnoIcons",
           "@/components/StickyMobileCTA",
-          "@/components/home/HomeCategoryGrid",
-          "@/components/home/HomeSections"
+          "@/components/home/HomeHeroSlider",
+          "@/components/home/HomeSectionsV2",
+          "@/components/home/HomeServiceLauncher"
         ],
         "kind": "page"
       },
@@ -722,6 +1086,7 @@
         "internalImports": [
           "@/components/Footer",
           "@/components/Header",
+          "@/components/StickyMobileCTA",
           "@/lib/config"
         ],
         "kind": "page"
@@ -737,6 +1102,7 @@
         "internalImports": [
           "@/components/Footer",
           "@/components/Header",
+          "@/components/StickyMobileCTA",
           "@/lib/config"
         ],
         "kind": "page"
@@ -750,12 +1116,15 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
+          "./vendor-leads-v2.css",
           "@/app/actions",
           "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
-          "@/components/vendors/VendorLeadReportForm",
-          "@/lib/lead-assignment/runtimeSettings",
-          "@/lib/types",
-          "@/lib/vendors/vendorEligibility"
+          "@/components/vendor-dashboard-v2/icons",
+          "@/components/vendor-dashboard-v2/leads/VendorLeadAccessNotice",
+          "@/components/vendor-dashboard-v2/leads/VendorLeadsBoard",
+          "@/components/vendor-dashboard-v2/leads/VendorLeadsFeedback",
+          "@/components/vendor-dashboard-v2/leads/leadsModel",
+          "@/lib/vendors/assignedLeadContactAccess"
         ],
         "kind": "page"
       },
@@ -768,8 +1137,11 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
+          "./vendor-notifications-v2.css",
           "@/app/actions",
           "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/components/vendor-dashboard-v2/notifications/VendorNotificationsWorkspace",
+          "@/components/vendor-dashboard-v2/notifications/notificationsModel",
           "@/services/vendorNotificationService"
         ],
         "kind": "page"
@@ -783,8 +1155,11 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
+          "./vendor-package-v2.css",
           "@/app/actions",
           "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/components/vendor-dashboard-v2/package/VendorPackageWorkspace",
+          "@/components/vendor-dashboard-v2/package/packageModel",
           "@/services/vendorPackageOrderService"
         ],
         "kind": "page"
@@ -800,7 +1175,8 @@
         "internalImports": [
           "@/app/actions",
           "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
-          "@/components/VendorDashboard",
+          "@/components/vendor-dashboard-v2/VendorOverview",
+          "@/components/vendor-dashboard-v2/vendorOverviewModel",
           "@/lib/types"
         ],
         "kind": "page"
@@ -814,8 +1190,11 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
+          "./vendor-profile-v2.css",
           "@/app/actions",
           "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/components/vendor-dashboard-v2/profile/VendorProfileWorkspace",
+          "@/components/vendor-dashboard-v2/profile/profileModel",
           "@/services/vendorProfileChangeService"
         ],
         "kind": "page"
@@ -829,8 +1208,11 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
+          "./vendor-support-v2.css",
           "@/app/actions",
           "@/app/vendor/dashboard/_components/VendorNoProfileFallback",
+          "@/components/vendor-dashboard-v2/support/VendorSupportWorkspace",
+          "@/components/vendor-dashboard-v2/support/supportModel",
           "@/services/vendorSupportService"
         ],
         "kind": "page"
@@ -845,9 +1227,30 @@
         "envRefs": [],
         "internalImports": [
           "@/components/FAQ",
-          "@/components/Footer",
-          "@/components/Header",
-          "@/components/vendor/VendorPortal"
+          "@/components/vendor/VendorPortal",
+          "@/components/vendor/VendorPortalFooter",
+          "@/components/vendor/VendorPortalHeader"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/set-password/page.tsx",
+        "url": "/vendor/set-password",
+        "audience": "vendor",
+        "directives": [
+          "use client"
+        ],
+        "external": [
+          "supabase"
+        ],
+        "supabase": [
+          "browser",
+          "lib_supabase_import"
+        ],
+        "envRefs": [],
+        "internalImports": [
+          "@/lib/identity/vendorPasswordReset",
+          "@/lib/supabaseBrowser"
         ],
         "kind": "page"
       },
@@ -860,15 +1263,13 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
-          "@/components/ClientEnquiryModal",
+          "../vendor-profile-v2.css",
           "@/components/Footer",
-          "@/components/FreeVendorInterestButton",
           "@/components/Header",
-          "@/components/PortfolioGallery",
-          "@/components/VendorCards",
-          "@/components/VendorDetailHeader",
-          "@/components/vendors/ClientSelectedVendorEnquiry",
-          "@/lib/config",
+          "@/components/StickyMobileCTA",
+          "@/components/public-vendor/VendorProfileActions",
+          "@/components/public-vendor/VendorProfileSections",
+          "@/components/public-vendor/profileModel",
           "@/lib/lead-assignment/runtimeSettings",
           "@/lib/quickfurno-data",
           "@/lib/vendors/categoryMatching",
@@ -899,8 +1300,7 @@
           "./vendors.module.css",
           "@/components/Footer",
           "@/components/Header",
-          "@/components/QuickFurnoIcons",
-          "@/components/vendors/VendorHeroStats"
+          "@/components/StickyMobileCTA"
         ],
         "kind": "page"
       },
@@ -943,11 +1343,141 @@
       ]
     },
     {
+      "path": "services/adminDirectoryService.ts",
+      "name": "adminDirectoryService",
+      "exports": [
+        "AdminLeadsQuery",
+        "AdminVendorsQuery",
+        "CrmInboxQuery",
+        "getAdminCommandCenterData",
+        "getAdminLeadContext",
+        "getAdminLeadsDirectory",
+        "getAdminVendorsDirectory",
+        "getCrmInboxPage"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/adminPaging",
+        "../lib/errors",
+        "../lib/supabase",
+        "./adminService"
+      ]
+    },
+    {
+      "path": "services/adminLaunchControlService.ts",
+      "name": "adminLaunchControlService",
+      "exports": [
+        "LAUNCH_CONTROL_STATES",
+        "LAUNCH_READINESS_VERDICTS",
+        "LaunchControl",
+        "LaunchControlImpact",
+        "LaunchControlSourceStatus",
+        "LaunchControlState",
+        "LaunchHealthFacts",
+        "LaunchReadiness",
+        "LaunchReadinessVerdict",
+        "OperationsLaunchSnapshot",
+        "deriveLaunchHealth",
+        "deriveLaunchReadiness",
+        "getOperationsLaunchSnapshot"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/aos/runtime/aosRuntimeSettings",
+        "../lib/errors",
+        "../lib/lead-assignment/runtimeSettings",
+        "../lib/supabase",
+        "./adminOperationsService"
+      ]
+    },
+    {
+      "path": "services/adminOperationsService.ts",
+      "name": "adminOperationsService",
+      "exports": [
+        "DEFAULT_INCIDENT_CLASS",
+        "OPERATIONAL_INCIDENT_CLASSES",
+        "OPERATIONAL_SUBSYSTEMS",
+        "OPERATIONAL_SUBSYSTEM_LABELS",
+        "OperationalClassSummary",
+        "OperationalHealth",
+        "OperationalIncident",
+        "OperationalIncidentClass",
+        "OperationalIncidentClassDescription",
+        "OperationalRecoveryInference",
+        "OperationalSeverity",
+        "OperationalSubsystem",
+        "OperationalSubsystemSummary",
+        "OperationsIncidentPage",
+        "OperationsOverview",
+        "SectionFault",
+        "compareAttentionIncidents",
+        "describeIncidentClass",
+        "findIncidentInPool",
+        "getOperationsIncidentPage",
+        "getOperationsOverview",
+        "isOperationalIncidentClass",
+        "listIncidentClassDescriptions"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/adminPaging",
+        "../lib/automation/recoveryContract",
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/adminSectionService.ts",
+      "name": "adminSectionService",
+      "exports": [
+        "AdminAuditLogsQuery",
+        "AdminPaymentsQuery",
+        "AdminSubscriptionsQuery",
+        "CrmTabKey",
+        "DistributionTabKey",
+        "getAdminAnalyticsPage",
+        "getAdminAuditLogsPage",
+        "getAdminCategoriesPage",
+        "getAdminCitiesPage",
+        "getAdminCrmBase",
+        "getAdminNotificationsPage",
+        "getAdminPackagesPage",
+        "getAdminPaymentsPage",
+        "getAdminReportsPage",
+        "getAdminSettingsPage",
+        "getAdminSubscriptionsPage",
+        "getAdminUsersPage",
+        "getCrmTabData",
+        "getLeadDistributionTab",
+        "getVendorsForEligibility"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/adminPaging",
+        "../lib/errors",
+        "../lib/supabase",
+        "./adminService"
+      ]
+    },
+    {
       "path": "services/adminService.ts",
       "name": "adminService",
       "exports": [
         "approveBadLeadReport",
         "approveVendor",
+        "collectAdminKpiStats",
         "createCategory",
         "createCity",
         "createPackage",
@@ -958,6 +1488,8 @@
         "getSuperadminSnapshot",
         "rejectBadLeadReport",
         "rejectVendor",
+        "safeAggregateRows",
+        "safeCount",
         "setCategoryActive",
         "setCityActive",
         "setPackageActive",
@@ -971,6 +1503,75 @@
         "../lib/errors",
         "../lib/supabase",
         "../lib/types"
+      ]
+    },
+    {
+      "path": "services/adminWhatsAppService.ts",
+      "name": "adminWhatsAppService",
+      "exports": [
+        "ProviderAccountView",
+        "RuntimePolicyView",
+        "SectionFault",
+        "SectionResult",
+        "TemplateMappingView",
+        "TemplateRuntimeEligibility",
+        "TemplateRuntimeEligibilityValue",
+        "WHATSAPP_CONSENT_SCOPES",
+        "WHATSAPP_DELIVERY_EVENT_TYPES",
+        "WHATSAPP_LANES",
+        "WHATSAPP_MESSAGE_STATUSES",
+        "WHATSAPP_SUPPRESSION_SCOPES",
+        "WhatsAppAdminOverview",
+        "WhatsAppAutomationPageResult",
+        "WhatsAppAutomationQuery",
+        "WhatsAppAutomationRow",
+        "WhatsAppBillingFact",
+        "WhatsAppConsentPageResult",
+        "WhatsAppConsentQuery",
+        "WhatsAppDeliveryEventType",
+        "WhatsAppDeliveryQuery",
+        "WhatsAppDeliveryRow",
+        "WhatsAppInboundQuery",
+        "WhatsAppInboundRow",
+        "WhatsAppMessageDetail",
+        "WhatsAppMessageQuery",
+        "WhatsAppMessageRow",
+        "WhatsAppMessageStatus",
+        "WhatsAppPreferenceRow",
+        "WhatsAppProviderBilling",
+        "WhatsAppProviderReadiness",
+        "WhatsAppSuppressionRow",
+        "WhatsAppTemplatePageResult",
+        "WhatsAppTemplateQuery",
+        "WhatsAppTemplateRow",
+        "getWhatsAppAdminOverview",
+        "getWhatsAppAutomationPage",
+        "getWhatsAppConsentPage",
+        "getWhatsAppDeliveryPage",
+        "getWhatsAppInboundPage",
+        "getWhatsAppMessageDetail",
+        "getWhatsAppMessagePage",
+        "getWhatsAppProviderBilling",
+        "getWhatsAppProviderReadiness",
+        "getWhatsAppTemplatePage"
+      ],
+      "external": [
+        "meta_whatsapp",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/admin/whatsappSourceCatalogue",
+        "../lib/adminPaging",
+        "../lib/automation/actionRegistry",
+        "../lib/communication/outboundConsentScope",
+        "../lib/communication/providers/metaCloudWhatsAppConfig",
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/metaRuntimeGate",
+        "../lib/communication/providers/metaRuntimeReadiness",
+        "../lib/errors",
+        "../lib/supabase"
       ]
     },
     {
@@ -989,6 +1590,71 @@
       "internalImports": [
         "../lib/errors",
         "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/aosV2AdminService.ts",
+      "name": "aosV2AdminService",
+      "exports": [
+        "AosV2AdminSnapshot",
+        "getAosV2AdminSnapshot"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/aos/v2/agentCapabilities",
+        "@/lib/aos/v2/runtime",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/aosV2IntelligenceService.ts",
+      "name": "aosV2IntelligenceService",
+      "exports": [
+        "runAosV2LeadIntelligence"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "./aosService",
+        "@/lib/aos/v2/contracts",
+        "@/lib/aos/v2/leadIntelligence",
+        "@/lib/aos/v2/runtime",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/aosV2ProposalService.ts",
+      "name": "aosV2ProposalService",
+      "exports": [
+        "AosProposalResult",
+        "proposeAosRecommendationToCore"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "./automationPersistenceService",
+        "@/lib/aos/v2/proposalPolicy",
+        "@/lib/aos/v2/runtime",
+        "@/lib/automation/actionContract",
+        "@/lib/automation/actionRegistry",
+        "@/lib/supabase"
       ]
     },
     {
@@ -1060,6 +1726,302 @@
         "../lib/communication/authenticationTransportDecision",
         "../lib/errors",
         "../lib/identity/authTransport",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/automationCampaignExecutionService.ts",
+      "name": "automationCampaignExecutionService",
+      "exports": [
+        "CAMPAIGN_EXECUTION_WORKFLOW_FAMILY",
+        "ExecuteCampaignAutomationInput",
+        "executeCampaignAutomationForN8nTransport"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/campaignDispatchRegistry",
+        "@/lib/automation/clientDispatchRegistry",
+        "@/lib/automation/clientExecutionContract",
+        "@/lib/automation/familyExecutionContract",
+        "@/lib/automation/retryPolicy",
+        "@/lib/communication/types",
+        "@/lib/supabase",
+        "@/services/automationPersistenceService",
+        "@/services/automationTransportService",
+        "@/services/campaignCommunicationResultService",
+        "@/services/runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/automationClientExecutionService.ts",
+      "name": "automationClientExecutionService",
+      "exports": [
+        "ExecuteClientAutomationInput",
+        "ExecuteClientAutomationResult",
+        "executeClientAutomationForN8nTransport"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/actionRegistry",
+        "@/lib/automation/clientClarificationExecution",
+        "@/lib/automation/clientDispatchRegistry",
+        "@/lib/automation/clientDispatchVariables",
+        "@/lib/automation/clientExecutionContract",
+        "@/lib/automation/retryPolicy",
+        "@/lib/automation/transportTypes",
+        "@/lib/communication/businessTemplateVariables",
+        "@/lib/communication/leadReference",
+        "@/lib/communication/types",
+        "@/lib/supabase",
+        "@/services/automationPersistenceService",
+        "@/services/automationTransportService",
+        "@/services/runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/automationOrphanCancellationService.ts",
+      "name": "automationOrphanCancellationService",
+      "exports": [
+        "AutomationCancelOrphanTransportInput",
+        "cancelOrphanAutomationJobForN8nTransport"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/orphanCancellationContract",
+        "@/lib/automation/transportTypes",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/automationPersistenceService.ts",
+      "name": "automationPersistenceService",
+      "exports": [
+        "AuthorizeAutomationRequestInput",
+        "AutomationAttemptOwnership",
+        "authorizeAutomationActionRequest",
+        "claimAutomationJob",
+        "completeAutomationAttempt",
+        "createAutomationActionRequest",
+        "createAutomationJob",
+        "getAutomationActionRequest",
+        "getAutomationExecutionAttempt",
+        "getAutomationJob",
+        "getClaimedAutomationJobEnvelope",
+        "proveCurrentAutomationAttemptOwnership",
+        "rejectAutomationActionRequest",
+        "toCoreAuthorizedAction"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/actionContract",
+        "@/lib/automation/actionRegistry",
+        "@/lib/automation/persistenceTypes",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/automationRecoveryService.ts",
+      "name": "automationRecoveryService",
+      "exports": [
+        "AutomationRecoveryTransportInput",
+        "reconcileStaleAutomationAttemptForN8nTransport",
+        "recoverDueAutomationRetryForN8nTransport"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/clientDispatchRegistry",
+        "@/lib/automation/recoveryContract",
+        "@/lib/automation/retryPolicy",
+        "@/lib/automation/transportTypes",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/automationStaleBusinessCancellationService.ts",
+      "name": "automationStaleBusinessCancellationService",
+      "exports": [
+        "AutomationCancelStaleTransportInput",
+        "cancelStaleBusinessAutomationJobForN8nTransport"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/staleBusinessContract",
+        "@/lib/automation/transportTypes",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/automationTransportService.ts",
+      "name": "automationTransportService",
+      "exports": [
+        "CompleteAutomationAttemptForN8nTransportInput",
+        "N8nCompletionTransportResult",
+        "RecordedClientExecutionIdentity",
+        "claimAutomationJobForFamilyN8nTransport",
+        "claimAutomationJobForN8nTransport",
+        "completeAutomationAttemptForN8nTransport",
+        "getAutomationTransportRuntimeConfig",
+        "getRecordedClientExecutionIdentity",
+        "recordClientExecutionTransportIdentity"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [
+        "QF_AUTOMATION_RUNTIME_ENV",
+        "QF_CORE_TO_N8N_HMAC_SECRET",
+        "QF_N8N_TO_CORE_HMAC_SECRET",
+        "QF_N8N_TRANSPORT_MODE",
+        "QF_N8N_WORKER_ID"
+      ],
+      "internalImports": [
+        "@/lib/automation/clientDispatchRegistry",
+        "@/lib/automation/completionContract",
+        "@/lib/automation/retryPolicy",
+        "@/lib/automation/transportTypes",
+        "@/lib/supabase",
+        "@/services/automationPersistenceService"
+      ]
+    },
+    {
+      "path": "services/automationVendorExecutionService.ts",
+      "name": "automationVendorExecutionService",
+      "exports": [
+        "ExecuteVendorAutomationInput",
+        "VENDOR_EXECUTION_WORKFLOW_FAMILY",
+        "executeVendorAutomationForN8nTransport"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/clientDispatchRegistry",
+        "@/lib/automation/clientExecutionContract",
+        "@/lib/automation/familyExecutionContract",
+        "@/lib/automation/retryPolicy",
+        "@/lib/automation/vendorBusinessEligibility",
+        "@/lib/automation/vendorDispatchRegistry",
+        "@/lib/communication/businessTemplateVariables",
+        "@/lib/communication/types",
+        "@/lib/supabase",
+        "@/services/automationPersistenceService",
+        "@/services/automationTransportService",
+        "@/services/runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/campaignCommunicationResultService.ts",
+      "name": "campaignCommunicationResultService",
+      "exports": [
+        "CampaignExecutionPlan",
+        "buildCampaignExecutionPlan",
+        "getCampaignIntentResult",
+        "getCampaignResultProjection",
+        "reconcileCampaignIntent"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/campaignResultContract",
+        "../lib/communication/types",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/campaignHandoffService.ts",
+      "name": "campaignHandoffService",
+      "exports": [
+        "CampaignIntentSummary",
+        "HANDOFF_BATCH_DEFAULT",
+        "HANDOFF_BATCH_MAX",
+        "HANDOFF_BATCH_MIN",
+        "HANDOFF_CODE_MESSAGES",
+        "HandoffCounts",
+        "HandoffOutcome",
+        "HandoffReadiness",
+        "HandoffServiceError",
+        "getCampaignIntentSummary",
+        "getHandoffReadiness",
+        "handoffCampaignIntents"
+      ],
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/canonicalAssignmentAuthority.ts",
+      "name": "canonicalAssignmentAuthority",
+      "exports": [
+        "blockedClientSelectedAssignment",
+        "executeCanonicalAssignment"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/marketplace/canonicalAssignmentContract",
         "../lib/supabase"
       ]
     },
@@ -1239,6 +2201,7 @@
         "../lib/supabase",
         "../lib/vendors/categoryMatching",
         "../lib/vendors/vendorEligibility",
+        "./canonicalAssignmentAuthority",
         "./leadDeliveryService",
         "./vendorNotificationService"
       ]
@@ -1344,6 +2307,60 @@
       "internalImports": [
         "../lib/communication/consentCommand",
         "../lib/communication/consentPolicy",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/communicationFrequencyPolicyService.ts",
+      "name": "communicationFrequencyPolicyService",
+      "exports": [
+        "CreateFrequencyPolicyInput",
+        "FrequencyPolicyRow",
+        "FrequencyPolicyServiceError",
+        "POLICY_CHANNELS",
+        "POLICY_CODE_MESSAGES",
+        "POLICY_MAX_HOURS",
+        "POLICY_MAX_PER_WINDOW_LIMIT",
+        "POLICY_SCOPES",
+        "createFrequencyPolicy",
+        "listFrequencyPolicies",
+        "retireFrequencyPolicy"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/communicationMarketingConsentWriterService.ts",
+      "name": "communicationMarketingConsentWriterService",
+      "exports": [
+        "MARKETING_CONSENT_POLICY_VERSION",
+        "MarketingConsentAction",
+        "MarketingConsentActionValue",
+        "MarketingConsentChannel",
+        "MarketingConsentCommand",
+        "MarketingConsentDeps",
+        "MarketingConsentFailure",
+        "MarketingConsentFailureValue",
+        "MarketingConsentPrincipalType",
+        "MarketingConsentResult",
+        "MarketingConsentSource",
+        "applyMarketingConsent",
+        "defaultMarketingConsentDeps",
+        "validateMarketingConsentCommand"
+      ],
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
         "../lib/supabase"
       ]
     },
@@ -1537,8 +2554,29 @@
         "../lib/supabase",
         "../lib/vendors/categoryMatching",
         "../lib/vendors/vendorEligibility",
+        "./canonicalAssignmentAuthority",
         "./leadDeliveryService",
         "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/geoVendorShortlistService.ts",
+      "name": "geoVendorShortlistService",
+      "exports": [
+        "GEO_SHORTLIST_FAILED",
+        "GEO_SHORTLIST_MIGRATION_HINT",
+        "GEO_SHORTLIST_UNAVAILABLE",
+        "fetchGeoVendorShortlist"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/geo/canonicalCoordinate",
+        "../lib/geo/geoShortlistContract",
+        "../lib/supabase"
       ]
     },
     {
@@ -1637,6 +2675,58 @@
       ]
     },
     {
+      "path": "services/leadAssignmentDispatchService.ts",
+      "name": "leadAssignmentDispatchService",
+      "exports": [
+        "ActivationBoundaryRead",
+        "EligibleIntentSelection",
+        "LeadAssignmentDispatchOutcome",
+        "LeadAssignmentDispatchRunSummary",
+        "dispatchLeadAssignmentIntent",
+        "readLeadAssignmentActivationBoundary",
+        "runLeadAssignmentDispatchBatch",
+        "selectEligibleLeadAssignmentIntents"
+      ],
+      "external": [
+        "meta_whatsapp",
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/communication/campaignResultContract",
+        "@/lib/communication/leadAssignmentDispatchContract",
+        "@/lib/communication/leadReference",
+        "@/lib/communication/types",
+        "@/lib/supabase",
+        "@/services/runtimeCommunicationService"
+      ]
+    },
+    {
+      "path": "services/leadAssignmentResultService.ts",
+      "name": "leadAssignmentResultService",
+      "exports": [
+        "LeadAssignmentReconcileSummary",
+        "reconcileLeadAssignmentDeliveryResults"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/communication/leadAssignmentDispatchContract",
+        "@/lib/communication/leadAssignmentResultContract",
+        "@/lib/supabase"
+      ]
+    },
+    {
       "path": "services/leadClarificationService.ts",
       "name": "leadClarificationService",
       "exports": [
@@ -1677,7 +2767,8 @@
       "envRefs": [],
       "internalImports": [
         "../lib/errors",
-        "../lib/supabase"
+        "../lib/supabase",
+        "./canonicalAssignmentAuthority"
       ]
     },
     {
@@ -1687,6 +2778,7 @@
         "AutoLeadMatchingResult",
         "CoordinateSource",
         "EligibleMatchedVendor",
+        "EligibleVendorCoordinate",
         "LeadForMatching",
         "SkippedVendorAudit",
         "VendorMatchEvaluation",
@@ -1700,11 +2792,21 @@
       "envRefs": [],
       "internalImports": [
         "../lib/errors",
+        "../lib/geo/canonicalCoordinate",
         "../lib/geo/distance",
+        "../lib/geo/geoShortlistContract",
+        "../lib/lead-assignment/runtimeSettings",
+        "../lib/marketplace/canonicalAssignmentContract",
+        "../lib/matchcore/automaticMatchDecision",
+        "../lib/matchcore/geoFairSecondaryDecision",
+        "../lib/matchcore/geoFrontierDecision",
+        "../lib/matchcore/selectionPlan",
         "../lib/supabase",
         "../lib/vendors/categoryMatching",
         "../lib/vendors/vendorEligibility",
-        "./leadDeliveryService"
+        "./geoVendorShortlistService",
+        "./leadDeliveryService",
+        "./leadRouteTimeService"
       ]
     },
     {
@@ -1837,7 +2939,6 @@
         "LeadScoreClass",
         "SCORE_MODEL_VERSION",
         "calculateLeadQuality",
-        "canAutoDistributeLead",
         "classifyLeadScore",
         "getLeadQualityDecision",
         "scoreAndStoreLead"
@@ -1848,8 +2949,31 @@
       "supabase": [],
       "envRefs": [],
       "internalImports": [
+        "../lib/lead-quality/distributionGate",
         "../lib/supabase",
         "@/lib/lead-quality/budgetFit"
+      ]
+    },
+    {
+      "path": "services/leadRouteTimeService.ts",
+      "name": "leadRouteTimeService",
+      "exports": [
+        "RouteCandidateInput",
+        "RouteTimeEvidence",
+        "RouteTimeRunInput",
+        "RouteTimeRunOutcome",
+        "buildRouteDomain",
+        "measureLeadRouteTimes"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/httpTransport",
+        "../lib/geo/routeTimeContract",
+        "../lib/geo/routeTimePolicy",
+        "../lib/matchcore/geoFrontierDecision",
+        "./routeTimeProviderService"
       ]
     },
     {
@@ -1864,13 +2988,15 @@
       "supabase": [],
       "envRefs": [],
       "internalImports": [
-        "../lib/aos/events/emitLeadClarificationRequiredEvent",
-        "../lib/aos/events/emitLeadCreatedEvent",
+        "../lib/aos/v2/contracts",
         "../lib/config",
         "../lib/errors",
+        "../lib/leads/leadContactContract",
         "../lib/supabase",
         "../lib/supabaseLogging",
         "../lib/types",
+        "./aosV2IntelligenceService",
+        "./canonicalAssignmentAuthority",
         "./leadClarificationService",
         "./leadMatchingEngine",
         "./leadQualityService",
@@ -1902,6 +3028,7 @@
         "../lib/supabase",
         "../lib/vendors/categoryMatching",
         "../lib/vendors/vendorEligibility",
+        "./canonicalAssignmentAuthority",
         "./leadDeliveryService",
         "./vendorNotificationService"
       ]
@@ -1961,6 +3088,7 @@
         "./consentCommandResponseService",
         "./inboundConsentCommandService",
         "./inboundWhatsAppMessageService",
+        "./leadAssignmentResultService",
         "./outboundConsentEnforcementService"
       ]
     },
@@ -2037,6 +3165,7 @@
       "internalImports": [
         "../lib/supabase",
         "../lib/vendors/vendorEligibility",
+        "./canonicalAssignmentAuthority",
         "./delayedLeadFillService",
         "./leadDeliveryService",
         "./vendorNotificationService"
@@ -2080,6 +3209,32 @@
         "@/lib/supabase",
         "@/lib/vendors/vendorEligibility",
         "@/lib/vendors/vendorVisibility"
+      ]
+    },
+    {
+      "path": "services/routeTimeProviderService.ts",
+      "name": "routeTimeProviderService",
+      "exports": [
+        "GOOGLE_BROWSER_KEY_VAR",
+        "GOOGLE_ROUTES_API_KEY_VAR",
+        "GoogleRouteTimeProvider",
+        "ROUTE_TIME_PROVIDER_ENABLED_VAR",
+        "RouteMatrixCallResult",
+        "RouteMatrixRequest",
+        "RouteProviderCredential",
+        "RouteProviderCredentialStatus",
+        "RouteTimeProvider",
+        "createRouteTimeProvider",
+        "resolveRouteProviderCredential"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/httpTransport",
+        "../lib/geo/googleRouteMatrixProtocol",
+        "../lib/geo/routeTimeContract",
+        "../lib/geo/routeTimePolicy"
       ]
     },
     {
@@ -2408,6 +3563,46 @@
       ]
     },
     {
+      "path": "services/vendorCampaignService.ts",
+      "name": "vendorCampaignService",
+      "exports": [
+        "CAMPAIGN_CODE_MESSAGES",
+        "CampaignAudienceMember",
+        "CampaignServiceError",
+        "PrepareResult",
+        "VendorCampaignListResult",
+        "VendorCampaignRow",
+        "approveVendorCampaign",
+        "archiveVendorCampaign",
+        "cancelVendorCampaign",
+        "createVendorCampaign",
+        "getCampaignAudience",
+        "getVendorCampaign",
+        "listCampaignEvents",
+        "listUsableSegments",
+        "listUsableTemplates",
+        "listVendorCampaigns",
+        "prepareCampaignForReview",
+        "previewCampaignCandidates",
+        "returnCampaignToDraft",
+        "updateVendorCampaign"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/phone",
+        "../lib/crm/campaignAudiencePlan",
+        "../lib/crm/campaignContracts",
+        "../lib/crm/campaignValidation",
+        "../lib/supabase",
+        "./communicationConsentDecisionService",
+        "./vendorSegmentService"
+      ]
+    },
+    {
       "path": "services/vendorCreditWalletService.ts",
       "name": "vendorCreditWalletService",
       "exports": [
@@ -2425,6 +3620,97 @@
       "internalImports": [
         "../lib/errors",
         "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorCrmProfileReadService.ts",
+      "name": "vendorCrmProfileReadService",
+      "exports": [
+        "getVendorCrmProfileSummary",
+        "listVendorContactsPage",
+        "listVendorNotesPage",
+        "listVendorTasksPage"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/adminPaging",
+        "../lib/crm/vendorCrmContracts",
+        "../lib/crm/vendorCrmProfileTypes",
+        "../lib/crm/vendorCrmValidation",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorCrmService.ts",
+      "name": "vendorCrmService",
+      "exports": [
+        "VendorCrmDirectoryResult",
+        "VendorCrmDirectoryRow",
+        "archiveVendorContact",
+        "archiveVendorTag",
+        "assignVendorTag",
+        "cancelVendorTask",
+        "completeVendorTask",
+        "createVendorContact",
+        "createVendorNote",
+        "createVendorTag",
+        "createVendorTask",
+        "getVendorCoreFacts",
+        "getVendorCrmProfile",
+        "listVendorCrmDirectory",
+        "listVendorTagAssignments",
+        "listVendorTags",
+        "removeVendorTag",
+        "updateVendorContact",
+        "updateVendorTag",
+        "updateVendorTask",
+        "upsertVendorCrmProfile"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/adminPaging",
+        "../lib/crm/vendorCrmProfileTypes",
+        "../lib/crm/vendorCrmValidation",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/vendorLoginActivationService.ts",
+      "name": "vendorLoginActivationService",
+      "exports": [
+        "ACTIVATABLE_VENDOR_STATUS",
+        "AUTH_DIRECTORY_MAX_PAGES",
+        "AUTH_DIRECTORY_PAGE_SIZE",
+        "ActivateVendorLoginInput",
+        "SUPERADMIN_ADMIN_ROLE",
+        "VENDOR_ACTIVATION_COLUMNS",
+        "VENDOR_LOGIN_OWNER_ROLE",
+        "VendorLoginActivation",
+        "VendorLoginActivationError",
+        "VendorLoginActivationErrorCode",
+        "activateVendorLogin",
+        "canonicalMappingPhone"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/phone",
+        "../lib/errors",
+        "../lib/identity/authPrincipalMarker",
+        "../lib/siteUrl",
+        "../lib/supabase",
+        "../lib/vendors/vendorEligibility",
+        "./vendorAccessService",
+        "./vendorPrincipalProfileService"
       ]
     },
     {
@@ -2500,6 +3786,27 @@
       ]
     },
     {
+      "path": "services/vendorPrincipalProfileService.ts",
+      "name": "vendorPrincipalProfileService",
+      "exports": [
+        "PROFILES_TABLE",
+        "VENDOR_PRINCIPAL_ROLE",
+        "VendorPrincipalProfile",
+        "VendorPrincipalProfileError",
+        "VendorPrincipalProfileErrorCode",
+        "VendorPrincipalProfileOutcome",
+        "VendorPrincipalProfileOutcomeValue",
+        "ensureVendorPrincipalProfile"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
       "path": "services/vendorProfileChangeService.ts",
       "name": "vendorProfileChangeService",
       "exports": [
@@ -2520,6 +3827,36 @@
         "../lib/errors",
         "../lib/supabase",
         "./vendorNotificationService"
+      ]
+    },
+    {
+      "path": "services/vendorSegmentService.ts",
+      "name": "vendorSegmentService",
+      "exports": [
+        "SegmentPreviewResult",
+        "SegmentPreviewVendor",
+        "SegmentServiceError",
+        "VendorSegmentListResult",
+        "VendorSegmentRow",
+        "activateVendorSegment",
+        "archiveVendorSegment",
+        "createVendorSegment",
+        "findDuplicateDefinition",
+        "getVendorSegment",
+        "listVendorSegments",
+        "previewVendorSegment",
+        "updateVendorSegment"
+      ],
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/crm/segmentQueryPlan",
+        "../lib/crm/segmentRuleContracts",
+        "../lib/crm/segmentRuleValidation",
+        "../lib/supabase"
       ]
     },
     {
@@ -2552,7 +3889,8 @@
         "../lib/supabase",
         "../lib/supabaseLogging",
         "../lib/types",
-        "../lib/vendors/vendorEligibility"
+        "../lib/vendors/assignedLeadContactAccess",
+        "../lib/vendors/vendorContactContract"
       ]
     },
     {
@@ -2682,6 +4020,15 @@
       "envRefs": []
     },
     {
+      "path": "lib/communication/providers/metaRuntimeReadiness.ts",
+      "name": "metaRuntimeReadiness",
+      "external": [
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/communication/providers/metaWebhookAccountIdentity.ts",
       "name": "metaWebhookAccountIdentity",
       "external": [
@@ -2786,33 +4133,54 @@
     }
   ],
   "libGroupCounts": {
+    "admin": 1,
+    "adminPaging.ts": 1,
     "agents": 3,
-    "analytics": 2,
-    "aos": 184,
+    "analytics": 3,
+    "aos": 137,
     "auth": 3,
+    "automation": 18,
     "categories": 2,
     "categories.ts": 1,
-    "communication": 43,
+    "communication": 50,
     "config.ts": 1,
-    "crm": 3,
+    "crm": 13,
     "errors.ts": 1,
     "events": 1,
-    "geo": 1,
+    "geo": 6,
     "geo.ts": 1,
     "google-maps": 3,
-    "identity": 16,
+    "identity": 17,
     "images.ts": 1,
     "lead-assignment": 4,
-    "lead-quality": 2,
+    "lead-quality": 3,
+    "leads": 2,
     "locations": 2,
+    "marketplace": 1,
+    "matchcore": 4,
     "quickfurno-data.ts": 1,
+    "siteUrl.ts": 1,
     "supabase.ts": 1,
     "supabaseBrowser.ts": 1,
     "supabaseLogging.ts": 1,
     "types.ts": 1,
-    "vendors": 4
+    "vendors": 6
   },
   "lib": [
+    {
+      "path": "lib/admin/whatsappSourceCatalogue.ts",
+      "group": "admin",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/adminPaging.ts",
+      "group": "adminPaging.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
     {
       "path": "lib/agents/agentAttribution.ts",
       "group": "agents",
@@ -2848,38 +4216,15 @@
       "envRefs": []
     },
     {
-      "path": "lib/analytics/types/index.ts",
+      "path": "lib/analytics/leadTracking.ts",
       "group": "analytics",
       "external": [],
       "supabase": [],
       "envRefs": []
     },
     {
-      "path": "lib/aos/agents/ad-brain/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/ad-brain/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/ad-brain/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/admin-copilot/agent.config.ts",
-      "group": "aos",
+      "path": "lib/analytics/types/index.ts",
+      "group": "analytics",
       "external": [],
       "supabase": [],
       "envRefs": []
@@ -2892,136 +4237,7 @@
       "envRefs": []
     },
     {
-      "path": "lib/aos/agents/calendar-sync/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/calendar-sync/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/calendar-sync/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/city-scout/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/city-scout/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/city-scout/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/client-care/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/content-craft/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/deal-tracker/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/deal-tracker/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/deal-tracker/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
       "path": "lib/aos/agents/engines.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/executive-brief/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/executive-brief/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/executive-brief/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/fraud-radar/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/fraud-radar/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/fraud-radar/service.ts",
       "group": "aos",
       "external": [
         "n8n_automation"
@@ -3045,13 +4261,6 @@
     },
     {
       "path": "lib/aos/agents/furno-memory/service.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/growth-radar/agent.config.ts",
       "group": "aos",
       "external": [],
       "supabase": [],
@@ -3096,29 +4305,6 @@
       "path": "lib/aos/agents/lead-lens/service.ts",
       "group": "aos",
       "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/lead-nurture/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/lead-nurture/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/lead-nurture/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
       "supabase": [],
       "envRefs": []
     },
@@ -3186,158 +4372,6 @@
       "envRefs": []
     },
     {
-      "path": "lib/aos/agents/package-advisor/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/package-advisor/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/package-advisor/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/quality-audit/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/quality-audit/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/quality-audit/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/replacement-desk/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/replacement-desk/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/replacement-desk/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/revenue-vault/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/review-shield/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/sales-coach/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/sales-coach/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/sales-coach/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/seo-scout/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/seo-scout/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/seo-scout/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/source-tracker/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/source-tracker/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/source-tracker/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
       "path": "lib/aos/agents/trust-shield/agent.config.ts",
       "group": "aos",
       "external": [],
@@ -3355,66 +4389,6 @@
       "path": "lib/aos/agents/trust-shield/service.ts",
       "group": "aos",
       "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/vault-guard/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/vendor-onboard/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/vendor-onboard/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/vendor-onboard/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/vendor-pulse/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/whatsapp-pilot/agent.config.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/whatsapp-pilot/schema.ts",
-      "group": "aos",
-      "external": [],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/agents/whatsapp-pilot/service.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
       "supabase": [],
       "envRefs": []
     },
@@ -3844,6 +4818,57 @@
         "n8n_automation"
       ],
       "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/agentCapabilities.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/contracts.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/leadIntelligence.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/opsBrief.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/proposalPolicy.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/runtime.ts",
+      "group": "aos",
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
       "envRefs": []
     },
     {
@@ -4292,6 +5317,163 @@
       "envRefs": []
     },
     {
+      "path": "lib/automation/actionContract.ts",
+      "group": "automation",
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/actionRegistry.ts",
+      "group": "automation",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/campaignDispatchRegistry.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/clientClarificationExecution.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/clientDispatchRegistry.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/clientDispatchVariables.ts",
+      "group": "automation",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/clientExecutionContract.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/completionContract.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/familyExecutionContract.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/orphanCancellationContract.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/persistenceTypes.ts",
+      "group": "automation",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/recoveryContract.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/retryPolicy.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/staleBusinessContract.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/transportAuth.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/transportTypes.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/vendorBusinessEligibility.ts",
+      "group": "automation",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/automation/vendorDispatchRegistry.ts",
+      "group": "automation",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/categories.ts",
       "group": "categories.ts",
       "external": [],
@@ -4351,6 +5533,20 @@
       "external": [
         "n8n_automation"
       ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/businessTemplateVariables.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/campaignResultContract.ts",
+      "group": "communication",
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -4445,6 +5641,36 @@
       "envRefs": []
     },
     {
+      "path": "lib/communication/leadAssignmentDispatchContract.ts",
+      "group": "communication",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/leadAssignmentDispatchTrigger.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/leadAssignmentResultContract.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/leadReference.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/communication/outboundConsentScope.ts",
       "group": "communication",
       "external": [],
@@ -4521,6 +5747,15 @@
       "path": "lib/communication/providers/metaRuntimeGate.ts",
       "group": "communication",
       "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaRuntimeReadiness.ts",
+      "group": "communication",
+      "external": [
+        "meta_whatsapp"
+      ],
       "supabase": [],
       "envRefs": []
     },
@@ -4674,6 +5909,27 @@
       "envRefs": []
     },
     {
+      "path": "lib/crm/campaignAudiencePlan.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/campaignContracts.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/campaignValidation.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/crm/crmAdapter.ts",
       "group": "crm",
       "external": [],
@@ -4681,7 +5937,60 @@
       "envRefs": []
     },
     {
+      "path": "lib/crm/crmAuth.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/segmentQueryPlan.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/segmentRuleContracts.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/segmentRuleValidation.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/crm/types/index.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/vendorCrmContracts.ts",
+      "group": "crm",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/vendorCrmProfileTypes.ts",
+      "group": "crm",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/crm/vendorCrmValidation.ts",
       "group": "crm",
       "external": [],
       "supabase": [],
@@ -4712,7 +6021,44 @@
       "envRefs": []
     },
     {
+      "path": "lib/geo/canonicalCoordinate.ts",
+      "group": "geo",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/geo/distance.ts",
+      "group": "geo",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/geo/geoShortlistContract.ts",
+      "group": "geo",
+      "external": [],
+      "supabase": [
+        "service_role"
+      ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/geo/googleRouteMatrixProtocol.ts",
+      "group": "geo",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/geo/routeTimeContract.ts",
+      "group": "geo",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/geo/routeTimePolicy.ts",
       "group": "geo",
       "external": [],
       "supabase": [],
@@ -4737,6 +6083,13 @@
     {
       "path": "lib/google-maps/types.ts",
       "group": "google-maps",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/identity/authPrincipalMarker.ts",
+      "group": "identity",
       "external": [],
       "supabase": [],
       "envRefs": []
@@ -4924,6 +6277,29 @@
       "envRefs": []
     },
     {
+      "path": "lib/lead-quality/distributionGate.ts",
+      "group": "lead-quality",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/leads/indianMobile.ts",
+      "group": "leads",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/leads/leadContactContract.ts",
+      "group": "leads",
+      "external": [
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/locations/cityService.ts",
       "group": "locations",
       "external": [
@@ -4945,8 +6321,50 @@
       "envRefs": []
     },
     {
+      "path": "lib/marketplace/canonicalAssignmentContract.ts",
+      "group": "marketplace",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/matchcore/automaticMatchDecision.ts",
+      "group": "matchcore",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/matchcore/geoFairSecondaryDecision.ts",
+      "group": "matchcore",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/matchcore/geoFrontierDecision.ts",
+      "group": "matchcore",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/matchcore/selectionPlan.ts",
+      "group": "matchcore",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/quickfurno-data.ts",
       "group": "quickfurno-data.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/siteUrl.ts",
+      "group": "siteUrl.ts",
       "external": [],
       "supabase": [],
       "envRefs": []
@@ -4992,6 +6410,13 @@
       "envRefs": []
     },
     {
+      "path": "lib/vendors/assignedLeadContactAccess.ts",
+      "group": "vendors",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/vendors/categoryMatching.ts",
       "group": "vendors",
       "external": [],
@@ -5000,6 +6425,13 @@
     },
     {
       "path": "lib/vendors/vendorAutomaticEligibility.ts",
+      "group": "vendors",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/vendors/vendorContactContract.ts",
       "group": "vendors",
       "external": [],
       "supabase": [],
@@ -5021,7 +6453,7 @@
     }
   ],
   "components": {
-    "count": 65,
+    "count": 170,
     "paths": [
       "components/AdminDashboard.tsx",
       "components/AdminLoginForm.tsx",
@@ -5056,12 +6488,11 @@
       "components/VendorCards.tsx",
       "components/VendorCompactCard.tsx",
       "components/VendorCompare.tsx",
-      "components/VendorDashboard.tsx",
       "components/VendorDashboardPreview.tsx",
       "components/VendorDetailHeader.tsx",
       "components/VendorRegisterForm.tsx",
       "components/WhatsAppButton.tsx",
-      "components/admin/AOSControlCenter.tsx",
+      "components/admin/AdminCommandPalette.tsx",
       "components/admin/AdminIcon.tsx",
       "components/admin/AdminPrimitives.tsx",
       "components/admin/AdminSectionPage.tsx",
@@ -5069,37 +6500,269 @@
       "components/admin/AnalyticsDashboard.tsx",
       "components/admin/AosAutomationControl.tsx",
       "components/admin/AssignmentLedgerPanels.tsx",
+      "components/admin/AttentionCenter.tsx",
       "components/admin/CRMDashboard.tsx",
       "components/admin/CategoryManager.tsx",
       "components/admin/LeadAssignmentApprovalControl.tsx",
       "components/admin/LeadMatchingAuditPanels.tsx",
       "components/admin/ManualLeadAssignmentPanel.tsx",
+      "components/admin/Pagination.tsx",
       "components/admin/RequirementGroupsPanel.tsx",
       "components/admin/adminConfig.ts",
       "components/admin/adminTypes.ts",
       "components/admin/adminUtils.ts",
+      "components/admin/crm/VendorCrmDirectory.tsx",
+      "components/admin/crm/VendorCrmProfile.tsx",
+      "components/admin/crm/VendorCrmProfileSections.tsx",
+      "components/admin/crm/campaigns/CampaignHandoffPanel.tsx",
+      "components/admin/crm/campaigns/VendorCampaignDirectory.tsx",
+      "components/admin/crm/campaigns/VendorCampaignEditor.tsx",
+      "components/admin/crm/lead/LeadCrmAssignmentQueue.tsx",
+      "components/admin/crm/lead/LeadCrmDrawer.tsx",
+      "components/admin/crm/lead/LeadCrmFollowUps.tsx",
+      "components/admin/crm/lead/LeadCrmInbox.tsx",
+      "components/admin/crm/lead/LeadCrmNurture.tsx",
+      "components/admin/crm/lead/LeadCrmPipeline.tsx",
+      "components/admin/crm/lead/LeadCrmSourceAnalytics.tsx",
+      "components/admin/crm/lead/LeadCrmSummary.tsx",
+      "components/admin/crm/lead/LeadCrmVendorContext.tsx",
+      "components/admin/crm/lead/index.ts",
+      "components/admin/crm/lead/leadCrmShared.tsx",
+      "components/admin/crm/lead/leadCrmTypes.ts",
+      "components/admin/crm/lead/leadCrmUtils.ts",
+      "components/admin/crm/policies/FrequencyPolicyManager.tsx",
+      "components/admin/crm/segments/VendorSegmentDirectory.tsx",
+      "components/admin/crm/segments/VendorSegmentEditor.tsx",
+      "components/admin/operations/OperationsControlCenter.tsx",
+      "components/admin/operations/OperationsControlState.tsx",
+      "components/admin/operations/OperationsIncidentDrawer.tsx",
+      "components/admin/operations/OperationsIncidentsTab.tsx",
+      "components/admin/operations/OperationsLaunchReadiness.tsx",
+      "components/admin/operations/OperationsOverviewTab.tsx",
+      "components/admin/operations/operationsTypes.ts",
+      "components/admin/sections/CategoriesSection.tsx",
+      "components/admin/sections/CitiesSection.tsx",
+      "components/admin/sections/LeadDistributionSection.tsx",
+      "components/admin/sections/LeadsDirectory.tsx",
+      "components/admin/sections/LeadsSection.tsx",
+      "components/admin/sections/MiscSections.tsx",
+      "components/admin/sections/PackagesSection.tsx",
+      "components/admin/sections/PaymentsSection.tsx",
+      "components/admin/sections/ReportsSection.tsx",
+      "components/admin/sections/SettingsSection.tsx",
+      "components/admin/sections/SubscriptionsSection.tsx",
+      "components/admin/sections/VendorsSection.tsx",
+      "components/admin/sections/index.ts",
+      "components/admin/sections/shared.tsx",
+      "components/admin/sections/vendorLoginActivationCopy.ts",
+      "components/admin/useAdminModalFocus.ts",
+      "components/admin/whatsapp/WhatsAppAutomationTab.tsx",
+      "components/admin/whatsapp/WhatsAppConsentTab.tsx",
+      "components/admin/whatsapp/WhatsAppControlCenter.tsx",
+      "components/admin/whatsapp/WhatsAppDeliveryTab.tsx",
+      "components/admin/whatsapp/WhatsAppMessagesTab.tsx",
+      "components/admin/whatsapp/WhatsAppOverviewTab.tsx",
+      "components/admin/whatsapp/WhatsAppProviderTab.tsx",
+      "components/admin/whatsapp/WhatsAppTemplatesTab.tsx",
+      "components/admin/whatsapp/whatsappAdminTypes.ts",
+      "components/admin/whatsapp/whatsappShared.tsx",
+      "components/client-enquiry/enquiryDisplay.ts",
       "components/home/HomeCategoryGrid.tsx",
+      "components/home/HomeHeroSlider.tsx",
       "components/home/HomeSearchBar.tsx",
       "components/home/HomeSections.tsx",
+      "components/home/HomeSectionsV2.tsx",
+      "components/home/HomeServiceLauncher.tsx",
       "components/home/StatsCounter.tsx",
       "components/home/TestimonialsCarousel.tsx",
       "components/location/GooglePlaceAutocomplete.tsx",
+      "components/public-listing/VendorCompareV2.tsx",
+      "components/public-listing/VendorDiscovery.tsx",
+      "components/public-listing/VendorListingCard.tsx",
+      "components/public-listing/categoryArtwork.ts",
+      "components/public-listing/listingModel.ts",
+      "components/public-vendor/VendorProfileActions.tsx",
+      "components/public-vendor/VendorProfileMedia.tsx",
+      "components/public-vendor/VendorProfileSections.tsx",
+      "components/public-vendor/profileModel.ts",
+      "components/vendor-dashboard-v2/VendorAccessStatus.tsx",
+      "components/vendor-dashboard-v2/VendorAttentionLeads.tsx",
+      "components/vendor-dashboard-v2/VendorBusinessSummary.tsx",
+      "components/vendor-dashboard-v2/VendorMetricCard.tsx",
+      "components/vendor-dashboard-v2/VendorMobileNav.tsx",
+      "components/vendor-dashboard-v2/VendorOverview.tsx",
+      "components/vendor-dashboard-v2/VendorOverviewHeader.tsx",
+      "components/vendor-dashboard-v2/VendorPanel.tsx",
+      "components/vendor-dashboard-v2/VendorPortalBrand.tsx",
+      "components/vendor-dashboard-v2/VendorPortalSidebar.tsx",
+      "components/vendor-dashboard-v2/VendorPortalTopbar.tsx",
+      "components/vendor-dashboard-v2/VendorProfileProgress.tsx",
+      "components/vendor-dashboard-v2/VendorUtilityChrome.tsx",
+      "components/vendor-dashboard-v2/icons.tsx",
+      "components/vendor-dashboard-v2/leads/VendorLeadAccessNotice.tsx",
+      "components/vendor-dashboard-v2/leads/VendorLeadCard.tsx",
+      "components/vendor-dashboard-v2/leads/VendorLeadStatusControl.tsx",
+      "components/vendor-dashboard-v2/leads/VendorLeadsBoard.tsx",
+      "components/vendor-dashboard-v2/leads/VendorLeadsFeedback.tsx",
+      "components/vendor-dashboard-v2/leads/leadsModel.ts",
+      "components/vendor-dashboard-v2/navigation.ts",
+      "components/vendor-dashboard-v2/notifications/VendorNotificationsWorkspace.tsx",
+      "components/vendor-dashboard-v2/notifications/notificationsModel.ts",
+      "components/vendor-dashboard-v2/package/VendorPackageWorkspace.tsx",
+      "components/vendor-dashboard-v2/package/packageModel.ts",
+      "components/vendor-dashboard-v2/profile/VendorProfileEditor.tsx",
+      "components/vendor-dashboard-v2/profile/VendorProfileFeedback.tsx",
+      "components/vendor-dashboard-v2/profile/VendorProfileMedia.tsx",
+      "components/vendor-dashboard-v2/profile/VendorProfileStatusPanels.tsx",
+      "components/vendor-dashboard-v2/profile/VendorProfileWorkspace.tsx",
+      "components/vendor-dashboard-v2/profile/profileModel.ts",
+      "components/vendor-dashboard-v2/support/VendorSupportThreads.tsx",
+      "components/vendor-dashboard-v2/support/VendorSupportWorkspace.tsx",
+      "components/vendor-dashboard-v2/support/supportModel.ts",
+      "components/vendor-dashboard-v2/vendorOverviewModel.ts",
       "components/vendor/VendorPortal.tsx",
+      "components/vendor/VendorPortalFooter.tsx",
+      "components/vendor/VendorPortalHeader.tsx",
       "components/vendors/ClientSelectedVendorEnquiry.tsx",
-      "components/vendors/VendorHeroStats.tsx",
       "components/vendors/VendorLeadReportForm.tsx"
     ]
   },
   "packageScripts": {
+    "bootstrap:local:qa": "node scripts/mvp/local/bootstrap-qf-canonical-local-qa.mjs",
     "build": "next build",
+    "build:staging:safe": "node scripts/mvp/build/build-staging-safe.mjs",
+    "canary:mvp:40": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/activate-meta-staging-canary-cli.mjs",
+    "create:mvp:40-r7b-once": "node scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
+    "create:mvp:40-r7i-once": "node scripts/mvp/communication/create-meta-staging-client-matching-update-once.mjs",
+    "create:mvp:40-r7k-once": "node scripts/mvp/communication/create-meta-staging-client-lead-status-update-once.mjs",
+    "create:mvp:40-r7l-once": "node scripts/mvp/communication/create-meta-staging-held-utility-recovery-once.mjs",
+    "create:mvp:40-r7m-once": "node scripts/mvp/communication/create-meta-staging-start-ack-v2-repair-once.mjs",
+    "create:mvp:40-r7n-once": "node scripts/mvp/communication/create-meta-staging-client-matching-update-v2-once.mjs",
+    "create:mvp:40-r8b-once": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/create-actual-staging-vendor-onboarding-reminder-once.mjs",
+    "create:mvp:40-r8c-once": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/create-actual-staging-remaining-seven-once.mjs",
     "dev": "next dev",
+    "fixture:mvp:40-r7g": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/create-staging-canary-recipient-once.mjs",
+    "gen:mvp:40-10a": "node scripts/mvp/communication/generate-meta-template-submission-packet.mjs",
+    "gen:mvp:40-11": "node scripts/mvp/communication/generate-meta-inactive-mapping-readiness.mjs",
     "grant:superadmin": "node scripts/grant-superadmin.mjs",
     "inventory:mvp": "node scripts/mvp/inventory/run.mjs",
     "lint": "next lint",
+    "reconcile:mvp:compare": "node scripts/mvp/reconciliation/run.mjs compare",
+    "reconcile:mvp:production": "node scripts/mvp/reconciliation/run.mjs production",
+    "reconcile:mvp:selftest": "node scripts/mvp/reconciliation/run.mjs selftest",
+    "reconcile:mvp:staging": "node scripts/mvp/reconciliation/run.mjs staging",
+    "repair:mvp:40-r8a-once": "node scripts/mvp/communication/repair-meta-staging-account-identity-once.mjs",
+    "report:mvp:40-c9": "node scripts/mvp/communication/evaluate-criterion-9-readiness.mjs",
+    "seed:mvp:40-12": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
+    "seed:mvp:40-marketing-mapping": "node scripts/mvp/communication/seed-meta-marketing-mapping-once.mjs",
     "start": "next start",
-    "test:mvp": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace communication",
+    "test:admin:c4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c4-vendor-crm-profile.mjs",
+    "test:admin:c5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c5-responsive-accessibility.mjs",
+    "test:admin:c6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c6-integrated-admin.mjs",
+    "test:admin:cperf1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-perf1-pagination.mjs",
+    "test:admin:cperf2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-perf2-data-loading.mjs",
+    "test:admin:cwa1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-wa1-whatsapp-control-center.mjs",
+    "test:admin:cwa1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-cwa1b-whatsapp-billing.mjs",
+    "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs",
+    "test:crm:30-1b": "node scripts/mvp/crm/validate-qf-mvp-30-1b.mjs",
+    "test:crm:30-2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-2.mjs",
+    "test:crm:30-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-3.mjs",
+    "test:crm:30-3c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-3c.mjs",
+    "test:crm:30-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-4.mjs",
+    "test:crm:30-4c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-4c.mjs",
+    "test:crm:30-5a": "node scripts/mvp/crm/validate-qf-mvp-30-5a.mjs",
+    "test:crm:30-5b2b": "node scripts/mvp/crm/validate-qf-mvp-30-5b2b.mjs",
+    "test:crm:30-5c1": "node scripts/mvp/crm/validate-qf-mvp-30-5c1.mjs",
+    "test:crm:blueprint": "node scripts/mvp/crm/validate-qf-mvp-30-blueprint.mjs",
+    "test:mvp": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace assignment-authority communication",
+    "test:mvp:20-4a": "node scripts/mvp/reconciliation/validate-qf-mvp-20-4a.mjs",
+    "test:mvp:20-4c": "node scripts/mvp/reconciliation/validate-qf-mvp-20-4c.mjs",
+    "test:mvp:20-5a": "node scripts/mvp/auth/validate-qf-mvp-20-5a.mjs",
+    "test:mvp:40-10a": "node scripts/mvp/communication/validate-meta-template-submission-packet.mjs",
+    "test:mvp:40-11": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-inactive-mapping-readiness.mjs",
+    "test:mvp:40-12": "node scripts/mvp/communication/validate-meta-staging-inactive-mapping-seed.mjs",
+    "test:mvp:40-12-prereq": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-internal-staging-template-seed.mjs",
+    "test:mvp:40-12-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-business-template-bindings.mjs",
+    "test:mvp:40-13": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-activation.mjs",
+    "test:mvp:40-13c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-runtime.mjs",
+    "test:mvp:40-13c-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-canary-cli.mjs",
+    "test:mvp:40-14": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-40-14-transactional-mapping-authority.mjs",
+    "test:mvp:40-14-pgdef": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-40-14-functiondef-representation.mjs",
+    "test:mvp:40-2": "node scripts/mvp/communication/validate-qf-mvp-40-2.mjs",
+    "test:mvp:40-3": "node scripts/mvp/communication/validate-qf-mvp-40-3.mjs",
+    "test:mvp:40-4": "node scripts/mvp/communication/validate-qf-mvp-40-4-templates.mjs",
+    "test:mvp:40-6": "node scripts/mvp/communication/validate-qf-mvp-40-6.mjs",
+    "test:mvp:40-8": "node scripts/mvp/communication/validate-qf-mvp-40-8.mjs",
+    "test:mvp:40-c9a": "node scripts/mvp/communication/validate-meta-marketing-mapping-authority.mjs",
+    "test:mvp:40-c9b": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-marketing-consent-writer.mjs",
+    "test:mvp:40-r7b": "node scripts/mvp/communication/validate-meta-staging-one-shot-template-creation.mjs",
+    "test:mvp:40-r7c": "node scripts/mvp/communication/validate-meta-staging-provider-account-rebind.mjs",
+    "test:mvp:40-r7f": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-asset-stage-binding.mjs",
+    "test:mvp:40-r7g": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-staging-canary-recipient-fixture.mjs",
+    "test:mvp:40-r7i": "node scripts/mvp/communication/validate-meta-staging-client-matching-update-one-shot.mjs",
+    "test:mvp:40-r7k": "node scripts/mvp/communication/validate-meta-staging-client-lead-status-update-one-shot.mjs",
+    "test:mvp:40-r7l": "node scripts/mvp/communication/validate-meta-staging-held-utility-recovery-one-shot.mjs",
+    "test:mvp:40-r7m": "node scripts/mvp/communication/validate-meta-staging-start-ack-v2-repair-one-shot.mjs",
+    "test:mvp:40-r7n": "node scripts/mvp/communication/validate-meta-staging-client-matching-update-v2-one-shot.mjs",
+    "test:mvp:40-r8": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-identity-boundary.mjs",
+    "test:mvp:40-r8a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-meta-staging-account-identity-repair.mjs",
+    "test:mvp:40-r8b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-actual-staging-vendor-onboarding-reminder-one-shot.mjs",
+    "test:mvp:40-r8c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-actual-staging-remaining-seven-one-shot.mjs",
+    "test:mvp:50-1a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1a.mjs",
+    "test:mvp:50-1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1b.mjs",
+    "test:mvp:50-1c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1c.mjs",
+    "test:mvp:50-2-final": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2-final.mjs",
+    "test:mvp:50-2a": "node scripts/mvp/automation/validate-qf-mvp-50-2a.mjs",
+    "test:mvp:50-2b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2b.mjs",
+    "test:mvp:50-2c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2c.mjs",
+    "test:mvp:50-2c-s2-g1": "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs",
+    "test:mvp:50-2d": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2d.mjs",
+    "test:mvp:50-2e": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2e.mjs",
+    "test:mvp:50-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-3.mjs",
+    "test:mvp:50-3-50-4-bridge": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-policy-config-bridge.mjs",
+    "test:mvp:50-3-50-4-cert": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-staging-orchestration-certification.mjs",
+    "test:mvp:50-3-50-4-forensic": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-staging-forensic-reconciliation.mjs",
+    "test:mvp:50-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs",
+    "test:mvp:50-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-5.mjs",
+    "test:mvp:50-6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-6.mjs",
+    "test:mvp:50-7": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-7.mjs",
+    "test:mvp:50-7-toctou": "node scripts/mvp/automation/local-toctou-qf-mvp-50-7.mjs",
+    "test:mvp:50-8": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-50-8-lead-destination.mjs",
+    "test:mvp:50-9": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/automation/validate-qf-mvp-50-9.mjs",
+    "test:mvp:70-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-01-operations.mjs",
+    "test:mvp:70-02": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-02-attention-detail.mjs",
+    "test:mvp:70-03": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-03-launch-control.mjs",
+    "test:mvp:70-04": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-04-final-certification.mjs",
+    "test:mvp:75-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-01.mjs",
+    "test:mvp:75-02": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-02.mjs",
+    "test:mvp:75-03": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-03.mjs",
+    "test:mvp:75-04": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-04.mjs",
+    "test:mvp:80-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-80-01.mjs",
+    "test:mvp:80-02-gate06": "node scripts/qf-mvp-80-02-vendor-login-activation-harness.mjs",
+    "test:mvp:80-03-audit": "node scripts/qf-mvp-80-03-audit-log-repair-harness.mjs",
+    "test:mvp:80-04": "node scripts/qf-mvp-80-04-fail-closed-runtime-default-harness.mjs",
+    "test:mvp:80-13a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-13a.mjs",
+    "test:mvp:80-13b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-13b.mjs",
+    "test:mvp:80-14a": "node scripts/mvp/communication/validate-qf-mvp-80-14a.mjs",
+    "test:mvp:80-14c": "node scripts/mvp/communication/validate-qf-mvp-80-14c-production-scheduler.mjs",
+    "test:mvp:80-15c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qf-mvp-80-15c-assigned-contact-entitlement-harness.mjs",
+    "test:mvp:80-15c-local": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/local/qf-mvp-80-15c-local-contact-entitlement-integration.mjs",
+    "test:mvp:80-16b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-80-16b-vendor-destination.mjs",
+    "test:mvp:80-16c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-16c-delivery-safety.mjs",
+    "test:mvp:80-17a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-intent-reconciliation.mjs",
+    "test:mvp:80-17a-r1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-17a-r1-controlled-reconciliation.mjs",
+    "test:mvp:80-17a-r1-loader": "node scripts/mvp/operator/validate-qf-mvp-80-17a-r1-runtime-loader.cjs",
+    "test:mvp:82a-r0": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-realtime-publication.mjs",
+    "test:mvp:82a-r0-s1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-s1-staging-certification.mjs",
+    "test:mvp:assignment-authority": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs assignment-authority",
+    "test:mvp:b2": "node scripts/mvp/staging/validate-qf-mvp-20-3b2.mjs",
+    "test:mvp:build-gate": "node scripts/mvp/build/validate-staging-build-gate.mjs",
+    "test:mvp:c": "node scripts/mvp/staging/validate-qf-mvp-20-3c.mjs",
     "test:mvp:communication": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs communication",
+    "test:mvp:d": "node scripts/mvp/staging/validate-qf-mvp-20-3d.mjs",
+    "test:mvp:e": "node scripts/mvp/staging/validate-qf-mvp-20-3e.mjs",
     "test:mvp:marketplace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace",
+    "test:mvp:r1": "node scripts/qf-mvp-20-3r1-consumer-migration-harness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",
@@ -5135,9 +6798,13 @@
     "test:phase5f:d3b": "node scripts/phase5f-d3b-outbound-consent-enforcement-harness.mjs",
     "test:phase5f:d4b": "node scripts/phase5f-d4b-consent-command-response-harness.mjs",
     "test:phase5f:d4c": "node scripts/phase5f-d4c-consent-ack-async-harness.mjs",
+    "test:security:launch-closeout": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/security/validate-qf-launch-security-closeout.mjs",
     "test:supabase:lead": "node scripts/test-supabase-lead-insert.mjs",
+    "test:ui:lead-attribution": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/ui/validate-lead-attribution.mjs",
+    "test:ui:mobile-form-focus": "node scripts/ui/validate-mobile-form-focus.mjs",
     "typecheck": "tsc --noEmit",
-    "verify:mvp": "npm run test:mvp && npm run typecheck && npm run lint && npm run build"
+    "verify:mvp": "npm run test:mvp && npm run test:mvp:r1 && npm run test:mvp:b2 && npm run test:mvp:c && npm run test:mvp:d && npm run test:mvp:e && npm run test:mvp:20-4a && npm run test:mvp:20-4c && npm run test:mvp:20-5a && npm run test:mvp:build-gate && npm run typecheck && npm run lint && npm run build",
+    "verify:mvp:core-provider-env": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/verify-core-provider-env.mjs"
   },
   "runtimeConfig": [
     ".eslintrc.json",

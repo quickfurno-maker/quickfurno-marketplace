@@ -15,6 +15,8 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { evaluateBudgetFit, resolveBudgetCategory } from "@/lib/lead-quality/budgetFit";
+import { canAutoDistributeLead } from "../lib/lead-quality/distributionGate";
+export { canAutoDistributeLead } from "../lib/lead-quality/distributionGate";
 
 export type LeadScoreClass = "A+" | "A" | "B" | "C" | "D";
 
@@ -292,13 +294,6 @@ export async function scoreAndStoreLead(leadId: string, input: LeadQualityInput)
   if (updateError) throw updateError;
 
   return score;
-}
-
-export function canAutoDistributeLead(scoreResult: LeadQualityScoreResult): boolean {
-  return scoreResult.total_score >= 70
-    && (scoreResult.score_class === "A" || scoreResult.score_class === "A+")
-    && !scoreResult.hard_block_reason
-    && scoreResult.recommended_action === "auto_distribute";
 }
 
 export function getLeadQualityDecision(scoreResult: LeadQualityScoreResult): LeadQualityDecision {

@@ -102,7 +102,7 @@ export const CLIENT_DISPATCH_REGISTRY: Readonly<
   "client.missing_information_reminder": definition("client.missing_information_reminder", "clarification_reminder"),
   "client.matching_update": definition("client.matching_update", "client_matching_update"),
   "client.lead_status_update": definition("client.lead_status_update", "client_lead_status_update"),
-  "client.transactional_followup": definition("client.transactional_followup", "client_transactional_followup"),
+  "client.transactional_followup": definition("client.transactional_followup", "client_vendor_connection_reminder"),
 });
 
 export function isClientAutomationActionType(

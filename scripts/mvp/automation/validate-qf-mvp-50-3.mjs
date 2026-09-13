@@ -430,8 +430,8 @@ record("G08 CI still takes no secret, database, provider or deployment action",
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-record("G09 the local migration set is exactly 104",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 109);
+record("G09 the local migration set is exactly 111",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 111);
 
 // ---------------------------------------------------------------------------
 // V. CHECK 9.6 REGRESSION - the vendor AVAILABILITY toggle is not accept/reject
@@ -835,16 +835,15 @@ record("V12 lead_offer reproof re-reads the assignment and its vendor",
     assignmentExists: true, assignmentVendorId: "other", resolvedVendorId: VID }) === S.STALE &&
   // and the executor still reads exactly that row before deciding
   /from\("lead_assignments"\)[\s\S]{0,200}?select\("id, vendor_id, vendor_status"\)/.test(vendorService));
-record("V13 response_reminder requires vendor_status still exactly 'New'",
-  decideVendorBusinessState({ actionType: "vendor.response_reminder", entityType: "lead_assignment",
-    sourceEventKey: "k:resp2h", assignmentExists: true, assignmentVendorId: VID,
-    resolvedVendorId: VID, assignmentVendorStatus: "New" }) === S.ELIGIBLE &&
-  decideVendorBusinessState({ actionType: "vendor.response_reminder", entityType: "lead_assignment",
-    sourceEventKey: "k:resp24h", assignmentExists: true, assignmentVendorId: VID,
-    resolvedVendorId: VID, assignmentVendorStatus: "Contacted" }) === S.STALE &&
-  decideVendorBusinessState({ actionType: "vendor.response_reminder", entityType: "lead_assignment",
-    sourceEventKey: "k:nope", assignmentExists: true, assignmentVendorId: VID,
-    resolvedVendorId: VID, assignmentVendorStatus: "New" }) === S.STALE &&
+record("V13 historical response_reminders are permanently terminal no-send",
+  [
+    { sourceEventKey: "k:resp2h", assignmentVendorStatus: "New" },
+    { sourceEventKey: "k:resp24h", assignmentVendorStatus: "Contacted" },
+    { sourceEventKey: "k:nope", assignmentVendorStatus: "New" },
+  ].every((fixture) => decideVendorBusinessState({
+    actionType: "vendor.response_reminder", entityType: "lead_assignment",
+    assignmentExists: true, assignmentVendorId: VID, resolvedVendorId: VID, ...fixture,
+  }) === S.STALE) &&
   /resp2h/.test(predicateAuthority) && /resp24h/.test(predicateAuthority));
 record("V14 onboarding reproof requires onboarding_stage still 'new'",
   decideVendorBusinessState({ actionType: "vendor.onboarding_reminder", entityType: "vendor",

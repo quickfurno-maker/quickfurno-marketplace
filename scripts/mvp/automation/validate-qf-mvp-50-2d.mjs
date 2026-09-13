@@ -669,8 +669,8 @@ record("I02 the 50.2D migration matches its pinned hash",
 // QF-MVP-40.14 RE-PIN: 21 -> 22, adding ONLY the SOURCE-PENDING Meta transactional
 // mapping seed + activation authority (20260912000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("I03 exactly twenty-two migrations are newer than the anchor",
-  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 22);
+record("I03 exactly twenty-four migrations are newer than the anchor",
+  migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000").length === 24);
 record("I04 they are exactly the 50.2D completion route, the 50.2E execution route, the 50.2 producer, the execute_v1 repair, the fresh-claim wedge repair, the policy-config bridge, the 50.3/50.4 set, then the 50.5 recovery transport, then the marketing-consent writer",
   same(migrationFiles.filter((f) => f.slice(0, 14) > "20260803000000"),
        [MIGRATION_NAME, EXECUTION_MIGRATION_NAME, PRODUCER_MIGRATION_NAME, REPAIR_MIGRATION_NAME,
@@ -698,13 +698,15 @@ record("I04 they are exactly the 50.2D completion route, the 50.2E execution rou
         "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
         "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
         "20260911000000_qf_launch_security_closeout.sql",
-        "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql"]));
+        "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+        "20260912040000_qf_aos_v2_intelligence.sql",
+        "20260912050000_qf_lead_generation_scope_lock.sql"]));
 // QF-MVP-40.13B RE-PIN: 97 -> 98, adding only the SOURCE-PENDING canary activation
 // authority. Still exact equality.
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
-record("I05 the local migration count is exactly 109", migrationFiles.length === 109);
+record("I05 the local migration count is exactly 111", migrationFiles.length === 111);
 record("I05a the 50.2E execution migration matches its pinned hash",
   canonicalSha256(readFileSync(path.join(ROOT, "supabase/migrations", EXECUTION_MIGRATION_NAME))) === EXECUTION_MIGRATION_SHA);
 record("I05b the 50.2D migration text is untouched by 50.2E",
@@ -756,7 +758,7 @@ record("G02 the superseded pendingTarget block is gone", manifest.pendingTarget 
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the Meta production activation authority. Still an exact count, never `>=`.
-record("G03 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and FOUR PENDING post-anchor migrations are declared",
+record("G03 exactly ten APPLIED, five RECONCILED, two STAGING-APPLIED and seven PENDING post-anchor migrations are declared",
   Array.isArray(manifest.appliedPostAnchorMigrations) && manifest.appliedPostAnchorMigrations.length === 10 &&
   Array.isArray(manifest.reconciledPostAnchorMigrations) && manifest.reconciledPostAnchorMigrations.length === 5 &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
@@ -766,7 +768,7 @@ record("G03 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and FOUR P
   // QF-MVP-82A-R0-S1 then moved R0 to the STAGING-APPLIED set, returning PENDING to one.
   // QF-MVP-50.6 RE-PIN: 1 -> 2 again, adding the SOURCE-PENDING orphan cancellation
   // authority (20260905000000). APPLIED stays ten, RECONCILED stays five.
-  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 5 &&
+  Array.isArray(manifest.pendingPostAnchorMigrations) && manifest.pendingPostAnchorMigrations.length === 7 &&
   Array.isArray(manifest.stagingAppliedPostAnchorMigrations) && manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
   manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
@@ -775,9 +777,14 @@ record("G03 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and FOUR P
   manifest.pendingPostAnchorMigrations[1].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[2].version === "20260906000000" &&
   manifest.pendingPostAnchorMigrations[2].operationalStatus === "PENDING" &&
+  manifest.pendingPostAnchorMigrations[3].version === "20260911000000" &&
+  manifest.pendingPostAnchorMigrations[4].version === "20260912000000" &&
+  manifest.pendingPostAnchorMigrations[5].version === "20260912040000" &&
+  manifest.pendingPostAnchorMigrations[6].version === "20260912050000" &&
+  manifest.pendingPostAnchorMigrations.slice(3).every((r) => r.operationalStatus === "PENDING") &&
   manifest.appliedPostAnchorMigrations[9].version === "20260812000000" &&
   manifest.appliedPostAnchorMigrations[9].operationalStatus === "APPLIED" &&
-  manifest.appliedAnchor?.postAnchorMigrationCount === 22 &&
+  manifest.appliedAnchor?.postAnchorMigrationCount === 24 &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version),
     ["20260804000000", "20260805000000", "20260806000000", "20260807000000", "20260808000000", "20260808500000", "20260809000000", "20260810000000", "20260811000000", "20260812000000"]));
 record("G04a the applied entry is the exact 50.2D migration by version, name, path and hash",
@@ -816,7 +823,7 @@ record("G07 no generic future-migration allowance was granted",
 // state an EXACT count with no `>=` anywhere — so the literal moves and the shape
 // requirement does not.
 record("G08 G1 asserts the exact migration count, not a lower bound",
-  /const MIGRATION_COUNT = 109;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 111;/.test(g1Source) &&
   /state\.migrations\.length === MIGRATION_COUNT/.test(g1Source) &&
   !/state\.migrations\.length\s*>=/.test(g1Source));
 record("G09 G1 pins both post-anchor identities and hashes literally",

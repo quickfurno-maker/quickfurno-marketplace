@@ -13,15 +13,16 @@ import {
   StatusBadge,
 } from "../AdminPrimitives";
 import { type Lead, type Vendor } from "../adminTypes";
+import { statusBucket, statusLabel } from "../crm/lead/leadCrmUtils";
 import {
   assignmentStatus,
   shortId,
   vendorName,
 } from "../adminUtils";
 
-export const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
+export const closedLeadStatuses = new Set(["duplicate", "spam", "invalid", "rejected quality", "bad lead"]);
 
-export const leadStatuses = ["All", "New", "Assigned", "Contacted", "Interested", "Site Visit Scheduled", "Quotation Sent", "Converted", "Lost", "Duplicate", "Spam", "Invalid"];
+export const leadStatuses = ["All", "New", "Verified", "Quality Checked", "Clarification Required", "Hot Lead", "Nurture", "Assigned", "Rejected Quality", "Duplicate", "Bad Lead"];
 
 
 export function LeadPriorityBadge({ lead }: { lead: Lead }) {
@@ -38,9 +39,8 @@ export function SourceBadge({ value }: { value: string }) {
 
 export function isHotLead(lead: Lead) {
   const priority = String(lead.lead_priority ?? "").toLowerCase();
-  const status = String(lead.status ?? "").toLowerCase();
   const score = Number(lead.lead_quality_score ?? 0);
-  return priority.includes("hot") || priority.includes("high") || score >= 70 || status.includes("interested") || status.includes("quotation");
+  return priority.includes("hot") || priority.includes("high") || score >= 70;
 }
 
 export function isUnassignedLead(lead: Lead) {
@@ -71,7 +71,7 @@ export function LeadDetailDrawer({ lead, vendors, onClose }: { lead: Lead; vendo
           ["Category", lead.service_required || lead.category || "Not provided"],
           ["Budget", lead.budget || "Not provided"],
           ["Timeline", lead.timeline || "Not provided"],
-          ["Status", <StatusBadge key="status" value={lead.status || "New"} />],
+          ["Stage", <StatusBadge key="status" value={statusLabel(statusBucket(lead, lead.lead_assignments?.length ?? 0))} />],
         ]} />
         <article className="qfa-panel p-4">
           <h3 className="text-sm font-semibold text-slate-950">Requirement</h3>

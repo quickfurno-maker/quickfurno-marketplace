@@ -381,10 +381,7 @@ export function LeadDrawer({
                         {(a.assignment_type || "assigned").replace(/_/g, " ")} · {formatDate(a.assigned_at || a.created_at)}
                       </p>
                     </div>
-                    {/* vendor_status is the vendor's PROGRESS on an assigned
-                        lead, not a response to an offer. Vendors never accept
-                        or reject in QuickFurno. */}
-                    <StatusBadge value={a.vendor_status || "New"} />
+                    <StatusBadge value="Assigned / delivered" tone="emerald" />
                   </li>
                 ))}
               </ul>
@@ -451,17 +448,8 @@ export function LeadDrawer({
           </div>
         </DrawerSection>
 
-        <DrawerSection title="Follow-up & notes">
-          <InfoGrid rows={[
-            ["Next follow-up", row.followUp ? formatDate(row.followUp) : "Not scheduled"],
-            ["Admin notes", lead.internal_notes || "None"],
-          ]} />
-          {/* Scheduling a follow-up is not a capability this phase has, and the
-              status actions live in the Lead Inbox row menu. Nothing inert is
-              rendered here to imply otherwise. */}
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            Follow-up dates are set upstream. Stage changes are available from the Lead Inbox row actions.
-          </p>
+        <DrawerSection title="Admin notes">
+          <p className="text-[13px] leading-5 text-slate-600">{lead.internal_notes || "None"}</p>
         </DrawerSection>
       </div>
     </Drawer>

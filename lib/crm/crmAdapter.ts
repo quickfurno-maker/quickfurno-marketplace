@@ -59,7 +59,7 @@ export const sampleCrmLeads: CRMLead[] = [
     assigned_vendor_count: 0,
     owner: "Admin",
     created_at: isoFromNow(-1),
-    next_follow_up_date: isoFromNow(0, 16),
+    next_follow_up_date: null,
     last_activity_at: isoFromNow(-1),
   },
   {
@@ -79,7 +79,7 @@ export const sampleCrmLeads: CRMLead[] = [
     assigned_vendor_count: 0,
     owner: "CRM",
     created_at: isoFromNow(-2),
-    next_follow_up_date: isoFromNow(1, 11),
+    next_follow_up_date: null,
     last_activity_at: isoFromNow(-1),
   },
   {
@@ -99,12 +99,12 @@ export const sampleCrmLeads: CRMLead[] = [
     assigned_vendor_count: 2,
     owner: "Ops",
     created_at: isoFromNow(-4),
-    next_follow_up_date: isoFromNow(2, 12),
+    next_follow_up_date: null,
     last_activity_at: isoFromNow(-1),
   },
   {
-    id: "sample-crm-site-visit",
-    lead_id: "sample-crm-site-visit",
+    id: "sample-crm-delivered",
+    lead_id: "sample-crm-delivered",
     client_name: "Priya Iyer",
     phone_masked: "90xxxxxx77",
     email_masked: "pxxx@example.com",
@@ -114,17 +114,17 @@ export const sampleCrmLeads: CRMLead[] = [
     area: "Powai",
     budget: "INR 75,000",
     priority: "warm",
-    status: "site_visit_scheduled",
+    status: "assigned",
     source: "meta_ads",
     assigned_vendor_count: 3,
     owner: "ClientCare",
     created_at: isoFromNow(-5),
-    next_follow_up_date: isoFromNow(3, 15),
+    next_follow_up_date: null,
     last_activity_at: isoFromNow(-1),
   },
   {
-    id: "sample-crm-quotation",
-    lead_id: "sample-crm-quotation",
+    id: "sample-crm-clarification",
+    lead_id: "sample-crm-clarification",
     client_name: "Kabir Joshi",
     phone_masked: "88xxxxxx66",
     email_masked: "kxxx@example.com",
@@ -134,12 +134,12 @@ export const sampleCrmLeads: CRMLead[] = [
     area: "Wakad",
     budget: "INR 35,000",
     priority: "weak",
-    status: "quotation_sent",
+    status: "clarification_required",
     source: "manual",
     assigned_vendor_count: 1,
-    owner: "Sales",
+    owner: "Quality Ops",
     created_at: isoFromNow(-7),
-    next_follow_up_date: isoFromNow(-1, 10),
+    next_follow_up_date: null,
     last_activity_at: isoFromNow(-2),
   },
   {
@@ -227,18 +227,25 @@ export function getCrmLeadModel(input: {
 
 export function buildCrmFollowUpTasks(leads: CRMLead[]): CRMTask[] {
   return leads
-    .filter((lead) => lead.next_follow_up_date)
+    .filter((lead) =>
+      (lead.status === "clarification_required" && lead.next_follow_up_date) ||
+      (lead.status === "nurture_later" && lead.nurture_follow_up_date),
+    )
     .slice(0, 8)
-    .map((lead, index) => ({
-      id: `task-${lead.id}`,
-      lead_id: lead.id,
-      title: lead.client_name,
-      task_type: index % 3 === 0 ? "client_call" : index % 3 === 1 ? "quotation_followup" : "nurture_followup",
-      due_date: lead.next_follow_up_date,
-      owner: lead.owner ?? "Unassigned",
-      status: isFollowUpOverdue(lead.next_follow_up_date) ? "overdue" : "open",
-      created_at: lead.created_at,
-    }));
+    .map((lead) => {
+      const clarification = lead.status === "clarification_required";
+      const dueDate = clarification ? lead.next_follow_up_date : lead.nurture_follow_up_date;
+      return {
+        id: `task-${lead.id}`,
+        lead_id: lead.id,
+        title: lead.client_name,
+        task_type: clarification ? "clarification_followup" : "nurture_followup",
+        due_date: dueDate,
+        owner: lead.owner ?? "Unassigned",
+        status: isFollowUpOverdue(dueDate) ? "overdue" : "open",
+        created_at: lead.created_at,
+      };
+    });
 }
 
 export function buildCrmActivities(leads: CRMLead[]): CRMActivity[] {
@@ -272,17 +279,17 @@ export function buildCrmActivities(leads: CRMLead[]): CRMActivity[] {
     {
       id: "activity-client-contacted",
       lead_id: second.id,
-      activity_type: "client_contacted",
-      summary: "Client contacted",
-      actor: "ClientCare placeholder",
+      activity_type: "clarification_requested",
+      summary: "Lead clarification requested",
+      actor: "Core",
       created_at: isoFromNow(-1, 14),
     },
     {
       id: "activity-followup-scheduled",
       lead_id: lead.id,
-      activity_type: "follow_up_scheduled",
-      summary: "Follow-up scheduled",
-      actor: "CRM",
+      activity_type: "clarification_completed",
+      summary: "Lead clarification completed",
+      actor: "Core",
       created_at: isoFromNow(0, 9),
     },
     {

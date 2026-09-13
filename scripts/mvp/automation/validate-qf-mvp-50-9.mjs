@@ -523,8 +523,8 @@ check("36 [static] safeContext and n8n can never choose message content", () => 
   assert(!/n8n/i.test(CONTRACT_SRC), "n8n reached the pure contract");
   // outstandingItem is a PARAMETER of resolveVariableInput — it cannot be
   // sourced there from anything the caller did not prove.
-  assert(/function resolveVariableInput\(\s*definition: ClientAutomationDispatchDefinition,\s*lead: LeadFacts,\s*outstandingItem: string \| null,\s*\)/.test(SERVICE_SRC),
-    "resolveVariableInput no longer receives the proven outstandingItem as a parameter");
+  assert(/function resolveVariableInput\(\s*definition: ClientAutomationDispatchDefinition,\s*lead: LeadFacts,\s*outstandingItem: string \| null,\s*connectionFacts: ConnectionAssuranceFacts \| null,\s*\)/.test(SERVICE_SRC),
+    "resolveVariableInput no longer receives the proven clarification + connection facts as parameters");
 });
 
 check("37 [static] both clarification actions use the existing builders and the proven value", () => {
@@ -539,7 +539,7 @@ check("37 [static] both clarification actions use the existing builders and the 
   assert(/args\.builder as/.test(SERVICE_SRC), "the existing builder is no longer the final authority");
 });
 
-check("38 [static] every OTHER client action's variable input is unchanged", () => {
+check("38 [static] unrelated client inputs are unchanged and connection follow-up is Core-fact bound", () => {
   const body = varBody();
   assert(/case "client\.lead_confirmation":\s*return \{ ok: true, input: \{ clientName: lead\.name \} \};/.test(body),
     "lead_confirmation input changed");
@@ -547,8 +547,8 @@ check("38 [static] every OTHER client action's variable input is unchanged", () 
     "matching_update input changed");
   assert(/case "client\.lead_status_update":[\s\S]{0,160}?leadStatusLabel: lead\.status/.test(body),
     "lead_status_update input changed");
-  assert(/case "client\.transactional_followup":[\s\S]{0,160}?leadReference: lead\.reference/.test(body),
-    "transactional_followup input changed");
+  assert(/case "client\.transactional_followup":[\s\S]{0,240}?connectionFacts === null[\s\S]{0,240}?vendorName: connectionFacts\.vendorName[\s\S]{0,160}?vendorPhone: connectionFacts\.vendorPhone/.test(body),
+    "bounded connection follow-up is not bound to proven vendor facts");
   assert(/default:\s*return unresolved;/.test(body), "the fail-closed default was removed");
 });
 
@@ -575,7 +575,7 @@ check("40 [static] QF-MVP-50.9 adds no send, provider, write or migration", () =
   assert(!/adminClient|process\.env|Date\.now|Math\.random/.test(CONTRACT_SRC),
     "the pure contract is no longer pure");
   const migrations = execFileSync("git",
-    ["diff", "--name-only", "a6047ae216f5abf87da7196de13616e7b09c3f46", "--", "supabase/migrations"],
+    ["diff", "--name-only", "a6047ae216f5abf87da7196de13616e7b09c3f46", "b32ec0b20baeb9138588fe5cb219c2f1b7b52b67", "--", "supabase/migrations"],
     { encoding: "utf8" });
   assert(migrations.trim() === "", `QF-MVP-50.9 must add no migration, but touched: ${migrations.trim()}`);
 });

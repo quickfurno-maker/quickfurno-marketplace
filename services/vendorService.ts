@@ -1,9 +1,9 @@
 // ============================================================================
 // QuickFurno — services/vendorService.ts
-// Vendor registration, dashboard data, lead status updates, bad-lead reports.
+// Vendor registration, dashboard data, lead delivery access, and lead-validity reports.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
-import { appError, AppError, type Result, ok, fail } from "../lib/errors";
+import { appError, AppError, type Result, ok, fail, isMissingRelationError } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { loadMarketplaceRuntimeSettings } from "../lib/lead-assignment/runtimeSettings";
 import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadContactAccess";
@@ -11,7 +11,7 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 // the server authority, the live form and the notification lane cannot drift.
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
 import type {
-  VendorRegistrationInput, VendorDashboardStats, VendorLeadStatus,
+  VendorRegistrationInput, VendorDashboardStats,
 } from "../lib/types";
 
 /** Public vendor registration. Always lands as Pending + not visible. */
@@ -232,21 +232,17 @@ export async function getVendorDashboardStats(vendorId: string): Promise<Result<
     const db = adminClient();
     const [vendor, assignments, reports] = await Promise.all([
       db.from("vendors").select("total_credits, remaining_credits").eq("id", vendorId).single(),
-      db.from("lead_assignments").select("vendor_status").eq("vendor_id", vendorId),
+      db.from("lead_assignments").select("id").eq("vendor_id", vendorId),
       db.from("bad_lead_reports").select("id", { count: "exact", head: true }).eq("vendor_id", vendorId),
     ]);
     if (vendor.error) throw vendor.error;
 
     const rows = assignments.data ?? [];
-    const count = (s: VendorLeadStatus) => rows.filter((r: { vendor_status: string }) => r.vendor_status === s).length;
 
     return ok({
       total_credits: vendor.data.total_credits,
       remaining_credits: vendor.data.remaining_credits,
       total_leads: rows.length,
-      won: count("Won"),
-      lost: count("Lost"),
-      in_progress: rows.length - count("Won") - count("Lost"),
       bad_lead_reports: reports.count ?? 0,
     });
   } catch (e) {
@@ -320,22 +316,55 @@ export async function getVendorAssignedLeads(vendorId: string): Promise<Result<u
         .order("assigned_at", { ascending: false });
 
     let { data, error } = await runQuery(
-      "id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported, operation_id, credit_deducted",
+      "id, assigned_at, assignment_type, assignment_source, is_bad_lead_reported, operation_id, credit_deducted",
     );
     if (error && isMissingColumnError(error)) {
       ({ data, error } = await runQuery(
-        "id, assigned_at, assignment_type, assignment_source, vendor_status, is_bad_lead_reported",
+        "id, assigned_at, assignment_type, assignment_source, is_bad_lead_reported",
       ));
     }
     if (error && isMissingColumnError(error)) {
-      ({ data, error } = await runQuery("id, assigned_at, assignment_type, vendor_status, is_bad_lead_reported"));
+      ({ data, error } = await runQuery("id, assigned_at, assignment_type, is_bad_lead_reported"));
     }
     if (error) throw error;
 
     // The select list is built at runtime, so supabase-js cannot type it
     // statically; go through `unknown` exactly as the previous code did.
     const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
-    return ok(rows.map((row) => sanitizeAssignedLeadRow(row, vendorRow as Record<string, unknown>, settings)));
+
+    // Connection assurance is a separate, assignment-scoped post-delivery fact.
+    // Before the migration exists this fails closed: the browser is told the
+    // feature is unavailable instead of rendering a control that cannot work.
+    const assignmentIds = rows.map((row) => String(row.id ?? "")).filter(Boolean);
+    const assuranceByAssignment = new Map<string, Record<string, unknown>>();
+    let connectionAssuranceSupported = true;
+    if (assignmentIds.length > 0) {
+      const assuranceRead = await db
+        .from("lead_connection_assurance")
+        .select("assignment_id, vendor_outcome, vendor_reported_at, window_expires_at, client_responded_at, riya_handoff_status")
+        .eq("vendor_id", vendorId)
+        .in("assignment_id", assignmentIds);
+      if (assuranceRead.error) {
+        if (isMissingRelationError(assuranceRead.error)) {
+          connectionAssuranceSupported = false;
+        } else {
+          throw assuranceRead.error;
+        }
+      } else {
+        for (const assurance of (assuranceRead.data ?? []) as unknown as Array<Record<string, unknown>>) {
+          const assignmentId = String(assurance.assignment_id ?? "");
+          if (assignmentId) assuranceByAssignment.set(assignmentId, assurance);
+        }
+      }
+    }
+
+    return ok(rows.map((row) => sanitizeAssignedLeadRow(
+      row,
+      vendorRow as Record<string, unknown>,
+      settings,
+      connectionAssuranceSupported,
+      assuranceByAssignment.get(String(row.id ?? "")) ?? null,
+    )));
   } catch (e) {
     return fail(e);
   }
@@ -352,6 +381,8 @@ function sanitizeAssignedLeadRow(
   row: Record<string, unknown>,
   vendorRow: Record<string, unknown>,
   settings: Record<string, unknown> | { allow_trial_vendors_for_assignment?: boolean | null },
+  connectionAssuranceSupported: boolean,
+  connectionAssurance: Record<string, unknown> | null,
 ): Record<string, unknown> {
   const access = evaluateAssignedLeadContactAccess(vendorRow, row, settings);
   const rawLead = (row.lead ?? null) as Record<string, unknown> | null;
@@ -378,51 +409,70 @@ function sanitizeAssignedLeadRow(
     assigned_at: row.assigned_at ?? null,
     assignment_type: row.assignment_type ?? null,
     assignment_source: row.assignment_source ?? null,
-    vendor_status: row.vendor_status ?? null,
     is_bad_lead_reported: row.is_bad_lead_reported ?? null,
     // The ONLY entitlement fact the browser is given. operation_id and
     // credit_deducted stay server-side.
     contact_allowed: access.contactAllowed,
+    connection_assurance_supported: connectionAssuranceSupported,
+    connection_assurance: sanitizeConnectionAssurance(connectionAssurance),
     lead,
   };
 }
 
-/** Vendor updates their pipeline status for a lead + logs it to the timeline. */
-export async function updateVendorLeadStatus(
-  vendorId: string, assignmentId: string, status: VendorLeadStatus, notes?: string
-): Promise<Result<null>> {
+/** Report a bad lead — only within app_settings.bad_lead_report_window_hours. */
+function sanitizeConnectionAssurance(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!value) return null;
+  const outcome = value.vendor_outcome;
+  if (outcome !== "responded" && outcome !== "no_response") return null;
+  return {
+    vendor_outcome: outcome,
+    vendor_reported_at: typeof value.vendor_reported_at === "string" ? value.vendor_reported_at : null,
+    window_expires_at: typeof value.window_expires_at === "string" ? value.window_expires_at : null,
+    client_responded_at: typeof value.client_responded_at === "string" ? value.client_responded_at : null,
+    riya_handoff_status: typeof value.riya_handoff_status === "string" ? value.riya_handoff_status : null,
+  };
+}
+
+export type VendorClientResponseOutcome = "responded" | "no_response";
+
+/** Record one immutable vendor connection outcome for one delivered lead. */
+export async function recordVendorClientResponse(
+  vendorId: string,
+  assignmentId: string,
+  outcome: VendorClientResponseOutcome,
+): Promise<Result<{ assignmentId: string; outcome: VendorClientResponseOutcome }>> {
+  if (!vendorId || !assignmentId || (outcome !== "responded" && outcome !== "no_response")) {
+    return { ok: false, code: "CONNECTION_RESPONSE_INVALID", error: "Choose a valid client response option." };
+  }
   try {
     const db = adminClient();
-    const { data: a, error: aErr } = await db
-      .from("lead_assignments")
-      .select("id, vendor_id")
-      .eq("id", assignmentId)
-      .eq("vendor_id", vendorId)
-      .single();
-    if (aErr || !a) throw appError("UNKNOWN");
-
-    const { error: upErr } = await db
-      .from("lead_assignments").update({ vendor_status: status }).eq("id", assignmentId);
-    if (upErr) throw upErr;
-
-    const { error: statusErr } = await db.from("lead_status_updates").insert({
-      lead_assignment_id: assignmentId, vendor_id: a.vendor_id, status, notes: notes ?? null,
-    });
-    if (statusErr) {
-      logSupabaseInsertError("lead_status_updates", statusErr, {
-        assignment_id: assignmentId,
-        vendor_id: a.vendor_id,
-        status,
-      });
-      throw statusErr;
+    const { data, error } = await db.rpc(
+      "qf_record_vendor_client_response_v1" as never,
+      { p_vendor_id: vendorId, p_assignment_id: assignmentId, p_outcome: outcome } as never,
+    );
+    if (error) {
+      const message = error.message ?? "";
+      if (message.includes("QF_CONNECTION_WINDOW_CLOSED")) {
+        return { ok: false, code: "CONNECTION_WINDOW_CLOSED", error: "The 24-hour client-response window has closed for this lead." };
+      }
+      if (message.includes("QF_CONNECTION_RESPONSE_LOCKED")) {
+        return { ok: false, code: "CONNECTION_RESPONSE_LOCKED", error: "A client-response outcome is already recorded for this lead." };
+      }
+      if (message.includes("QF_CONNECTION_ASSIGNMENT_NOT_FOUND")) {
+        return { ok: false, code: "CONNECTION_ASSIGNMENT_NOT_FOUND", error: "This lead assignment is not available for your account." };
+      }
+      if (message.includes("schema cache") || message.includes("qf_record_vendor_client_response_v1")) {
+        return { ok: false, code: "CONNECTION_FEATURE_UNAVAILABLE", error: "Client-response tracking is not active yet." };
+      }
+      throw error;
     }
-    return ok(null);
-  } catch (e) {
-    return fail(e);
+    if (!data) throw appError("UNKNOWN");
+    return ok({ assignmentId, outcome });
+  } catch (error) {
+    return fail(error);
   }
 }
 
-/** Report a bad lead — only within app_settings.bad_lead_report_window_hours. */
 export async function reportBadLead(
   vendorId: string,
   assignmentId: string,
@@ -478,7 +528,7 @@ export async function reportBadLead(
 }
 
 // Phase 26A-2C: structured vendor lead-issue reasons. Codes are machine-
-// readable so later WhatsApp/AI automation can follow up with the client.
+// readable so later Core-authorized clarification can resolve genuine lead-quality issues.
 export const LEAD_REPORT_REASONS = [
   { code: "client_not_reachable", label: "Client not reachable after multiple attempts", commentRequired: false },
   { code: "requirement_already_closed", label: "Client says requirement is already closed", commentRequired: false },

@@ -16,9 +16,8 @@
 //   * Nurture         — server-paged 20/page
 // Drawer histories and vendor identities load on demand per lead.
 //
-// Writes are limited to lead STATUS changes via the existing, superadmin-
-// guarded adminUpdateLeadStatus action. No assignment logic, credit
-// deduction, WhatsApp send, or schema change happens here.
+// QuickFurno owns lead quality, matching and verified delivery only. Quotation,
+// site visit, negotiation, sale and project execution are intentionally absent.
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -27,7 +26,6 @@ import {
   adminCrmTabData,
   adminLeadContext,
   adminPrepareLeadClarification,
-  adminUpdateLeadStatus,
 } from "@/app/actions";
 import { NoteBar, TabPanel, Tabs } from "./AdminPrimitives";
 import { Pagination } from "./Pagination";
@@ -36,7 +34,6 @@ import { emptySnapshot } from "./adminTypes";
 import { formatNumber, uniqueOptions } from "./adminUtils";
 import {
   AssignmentQueue,
-  FollowUps,
   LeadDrawer,
   LeadInbox,
   Nurture,
@@ -56,15 +53,14 @@ export type CrmBaseData = {
   categories: Category[];
 };
 
-type CrmTabKey = "overview" | "pipeline" | "followups" | "queue" | "vendor_activity" | "sources" | "nurture";
+type CrmTabKey = "overview" | "pipeline" | "queue" | "vendor_activity" | "sources" | "nurture";
 
 const TAB_LOADER: Record<string, CrmTabKey | null> = {
   Overview: "overview",
   "Lead Inbox": null, // self-fetching (C-PERF1)
-  "Pipeline Board": "pipeline",
-  "Follow-ups": "followups",
+  "Lead Flow": "pipeline",
   "Assignment Queue": "queue",
-  "Vendor Activity": "vendor_activity",
+  "Delivery Evidence": "vendor_activity",
   "Source Analytics": "sources",
   Nurture: "nurture",
 };
@@ -174,19 +170,6 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
     });
   }, [activityVendors]);
 
-  function updateStatus(leadId: string, status: string) {
-    startTransition(async () => {
-      const result = await adminUpdateLeadStatus(leadId, status);
-      if (!result.ok) {
-        notify(result.error ?? "Could not update lead status.", "error");
-        return;
-      }
-      notify(`Lead marked ${status}.`, "success");
-      setReloadToken((token) => token + 1);
-      router.refresh();
-    });
-  }
-
   function prepareClarification(leadId: string) {
     startTransition(async () => {
       const result = await adminPrepareLeadClarification(leadId);
@@ -213,28 +196,18 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
     const kpis: Array<Kpi | null> = [
       { key: "total", label: "Total leads", value: counts.total, helper: "All captured leads (live count)", tone: "indigo" },
       { key: "new_today", label: "New today", value: counts.newToday, helper: "Created today (live count)", tone: "emerald" },
-      { key: "hot", label: "Hot leads", value: counts.hot, helper: "Stored quality A+/A (live count)", tone: "rose" },
-      counts.unassigned === null ? null : { key: "unassigned", label: "Unassigned", value: counts.unassigned, helper: "No vendor yet (live count)", tone: "amber" },
-      counts.assigned === null ? null : { key: "assigned", label: "Assigned", value: counts.assigned, helper: "At least one vendor (live count)", tone: "emerald" },
-      { key: "vendor_selected", label: "Vendor-selected", value: counts.vendorSelected, helper: "Client picked a vendor (live count)", tone: "indigo" },
-      { key: "follow_ups", label: "Follow-ups due", value: counts.followUps, helper: "Due or overdue (live count)", tone: "amber" },
-      { key: "site_visit", label: "Site visits", value: counts.siteVisit, helper: "Scheduled (live count)", tone: "indigo" },
-      { key: "won", label: "Won", value: counts.won, helper: "Converted (live count)", tone: "emerald" },
-      { key: "lost", label: "Lost", value: counts.lost, helper: "Closed lost (live count)", tone: "rose" },
-      { key: "spam_dup", label: "Spam / duplicate", value: counts.spamDup, helper: "Flagged low quality (live count)", tone: "slate" },
+      { key: "quality_ready", label: "Quality ready", value: counts.qualityReady, helper: "A+/A leads ready for matching", tone: "emerald" },
+      { key: "clarification", label: "Needs clarification", value: counts.clarification, helper: "Missing or unclear lead details", tone: "amber" },
+      counts.unassigned === null ? null : { key: "unassigned", label: "Unassigned", value: counts.unassigned, helper: "No vendor yet", tone: "amber" },
+      counts.assigned === null ? null : { key: "assigned", label: "Assigned", value: counts.assigned, helper: "At least one vendor", tone: "emerald" },
+      { key: "vendor_selected", label: "Vendor-selected", value: counts.vendorSelected, helper: "Client picked a vendor", tone: "indigo" },
+      { key: "nurture", label: "Nurture", value: counts.nurture, helper: "Not ready for delivery yet", tone: "slate" },
+      { key: "invalid_dup", label: "Invalid / duplicate", value: counts.invalidDup, helper: "Lead-validity exceptions", tone: "rose" },
     ];
     return kpis.filter((k): k is Kpi => Boolean(k));
   }, [tabPayload.overview]);
 
   const pipelineRows = useMemo(() => rowsFromLeads(tabPayload.pipeline?.sample ?? []), [tabPayload.pipeline]);
-  const followupGroups = useMemo(
-    () => ({
-      overdue: rowsFromLeads(tabPayload.followups?.overdue ?? []),
-      today: rowsFromLeads(tabPayload.followups?.today ?? []),
-      upcoming: rowsFromLeads(tabPayload.followups?.upcoming ?? []),
-    }),
-    [tabPayload.followups],
-  );
   const sourceRows = useMemo(() => rowsFromLeads(tabPayload.sources?.sample ?? []), [tabPayload.sources]);
   const nurtureRows = useMemo(() => rowsFromLeads(tabPayload.nurture?.result?.rows ?? []), [tabPayload.nurture]);
 
@@ -262,7 +235,7 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
 
       {active === "Overview" ? (
         overviewKpis.length ? (
-          <Overview kpis={overviewKpis} onCard={openInbox} onGoFollowUps={() => setActive("Follow-ups")} />
+          <Overview kpis={overviewKpis} onCard={openInbox} />
         ) : (
           <p className="text-[13px] text-slate-500" aria-busy={tabLoading}>{tabLoading ? "Loading live counts…" : "Counts unavailable."}</p>
         )
@@ -273,7 +246,6 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
           quickFilter={quickFilter}
           setQuickFilter={setQuickFilter}
           onSelect={setSelected}
-          onUpdateStatus={updateStatus}
           onAssign={() => {
             notify("Opening Lead Distribution for manual vendor assignment…", "info");
             router.push("/admin/lead-distribution");
@@ -284,32 +256,20 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
         />
       ) : null}
 
-      {active === "Pipeline Board" ? (
+      {active === "Lead Flow" ? (
         <div className="space-y-3" aria-busy={tabLoading}>
           {tabPayload.pipeline?.stageCounts ? (
             <NoteBar>
-              Lane cards cover the latest {formatNumber(pipelineRows.length)} leads. Live stage totals across all{" "}
-              {formatNumber(tabPayload.pipeline.stageCounts.total)} leads: Contacted{" "}
-              {formatNumber(tabPayload.pipeline.stageCounts.contacted)} · Site Visit{" "}
-              {formatNumber(tabPayload.pipeline.stageCounts.site_visit)} · Quotation{" "}
-              {formatNumber(tabPayload.pipeline.stageCounts.quotation)} · Won {formatNumber(tabPayload.pipeline.stageCounts.won)} ·
-              Lost {formatNumber(tabPayload.pipeline.stageCounts.lost)} · Spam/Dup{" "}
-              {formatNumber(tabPayload.pipeline.stageCounts.spam)}. Open the Lead Inbox quick filters for the full lists.
+              Lead-generation flow only. Across {formatNumber(tabPayload.pipeline.stageCounts.total)} leads: quality ready{" "}
+              {formatNumber(tabPayload.pipeline.stageCounts.qualityReady)} → clarification {formatNumber(tabPayload.pipeline.stageCounts.clarification)} → assigned{" "}
+              {formatNumber(tabPayload.pipeline.stageCounts.assigned)} → nurture {formatNumber(tabPayload.pipeline.stageCounts.nurture)} → invalid/duplicate{" "}
+              {formatNumber(tabPayload.pipeline.stageCounts.invalidDup)}. Post-delivery sales stages are not tracked.
             </NoteBar>
           ) : null}
           <PipelineBoard rows={pipelineRows} onSelect={setSelected} />
         </div>
       ) : null}
 
-      {active === "Follow-ups" ? (
-        <FollowUps
-          groups={followupGroups}
-          counts={tabPayload.followups?.counts ?? { overdue: 0, today: 0, upcoming: 0, unscheduled: 0 }}
-          groupLimit={tabPayload.followups?.groupLimit ?? 20}
-          loading={tabLoading}
-          onSelect={setSelected}
-        />
-      ) : null}
 
       {active === "Assignment Queue" ? (
         <AssignmentQueue
@@ -320,10 +280,9 @@ export function CRMDashboard({ base, notify, error }: { base: CrmBaseData | null
         />
       ) : null}
 
-      {active === "Vendor Activity" ? (
+      {active === "Delivery Evidence" ? (
         <VendorResponse
           result={tabPayload.vendor_activity?.result ?? { rows: [], page: 1, pageSize: 20, total: 0 }}
-          progressAgg={tabPayload.vendor_activity?.progressAgg ?? []}
           counts={tabPayload.vendor_activity?.counts ?? { logsTotal: 0, contactShared: 0, creditDeducted: 0 }}
           vendorsById={knownVendors}
           isPending={tabLoading}

@@ -1,31 +1,15 @@
-import { NextResponse } from "next/server";
-import {
-  formatN8nApiResponse,
-  formatN8nBlockedApiResponse,
-  handleWhatsAppStatusUpdate,
-} from "@/lib/aos/sync/n8nSyncService";
-import { validateN8nSecret } from "@/lib/aos/tools/n8nTool";
+﻿import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
-  const secret = validateN8nSecret(request);
-  if (!secret.ok) {
-    return NextResponse.json(formatN8nBlockedApiResponse(secret), { status: secret.status });
-  }
+export const dynamic = "force-dynamic";
 
-  const body = await readJsonBody(request);
-  if (!body.ok) {
-    return NextResponse.json(formatN8nBlockedApiResponse(secret), { status: 400 });
-  }
-
-  const result = await handleWhatsAppStatusUpdate(body.payload);
-
-  return NextResponse.json(formatN8nApiResponse(result, secret), { status: 200 });
-}
-
-async function readJsonBody(request: Request): Promise<{ ok: true; payload: unknown } | { ok: false; message: string }> {
-  try {
-    return { ok: true, payload: await request.json() };
-  } catch {
-    return { ok: false, message: "Invalid JSON payload." };
-  }
+export async function POST() {
+  return NextResponse.json(
+    {
+      ok: false,
+      status: "retired",
+      code: "AOS_LEGACY_DIRECT_N8N_ROUTE_RETIRED",
+      message: "This legacy AOS/n8n preview route is retired. AOS V2 is advisory and uses the Core-governed automation boundary.",
+    },
+    { status: 410 },
+  );
 }

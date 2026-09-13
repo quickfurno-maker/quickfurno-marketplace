@@ -350,7 +350,7 @@ record("S05 all six carry the frozen client dispatch policy",
 record("S06 the frozen action-to-template map is unchanged",
   same(CLIENT_AUTOMATION_ACTION_TYPES.map((a) => CLIENT_DISPATCH_REGISTRY[a].templateKey), [
     "lead_received", "clarification_request", "clarification_reminder",
-    "client_matching_update", "client_lead_status_update", "client_transactional_followup",
+    "client_matching_update", "client_lead_status_update", "client_vendor_connection_reminder",
   ]));
 
 // ---------------------------------------------------------------------------
@@ -378,8 +378,10 @@ record("D06 the recipient is the durable lead reference, never an ephemeral dest
   !/ephemeralAuthDestination|ephemeral_auth_destination/.test(executionCode));
 record("D07 consent, mapping and provider account are never re-implemented",
   !/consent_|suppression|provider_account|approved_mapping|prepareInitialOutbound|prepareFinalOutbound/i.test(executionCode));
-record("D08 no recipient phone or destination is ever read or built",
-  !/\.phone|phone_e164|whatsapp_number|destination_hash|destination_masked|normalizePhoneE164|maskPhoneE164/.test(newModuleCode));
+record("D08 recipient destination stays lead-reference derived; vendor phone is content only",
+  /destination_source: RECIPIENT_REFERENCE_DESTINATION/.test(executionCode) &&
+  !/phone_e164|destination_hash|destination_masked|normalizePhoneE164|maskPhoneE164/.test(newModuleCode) &&
+  !/recipientPhone|recipient_phone|destinationPhone|destination_phone/.test(newModuleCode));
 
 // ---------------------------------------------------------------------------
 // I. IDEMPOTENCY
@@ -755,20 +757,25 @@ record("G01 the anchor is untouched",
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: the pending set holds exactly ONE explicitly pinned entry again —
   // the Meta production activation authority. Still an exact count, never `>=`.
-record("G02 exactly ten APPLIED, five RECONCILED, one STAGING-APPLIED and FOUR PENDING post-anchor migrations",
-  manifest.appliedAnchor?.postAnchorMigrationCount === 22 &&
+record("G02 exactly ten APPLIED, five RECONCILED, two STAGING-APPLIED and seven PENDING post-anchor migrations",
+  manifest.appliedAnchor?.postAnchorMigrationCount === 24 &&
   manifest.appliedPostAnchorMigrations?.length === 10 &&
   Array.isArray(manifest.pendingPostAnchorMigrations) &&
   // QF-MVP-82A-R0 RE-PIN: 1 -> 2 SOURCE-PENDING entries (80.14A activation authority
   // + 82A-R0 Realtime publication membership). APPLIED stays ten, RECONCILED stays five.
   // QF-MVP-50.6 RE-PIN: 1 -> 2 SOURCE-PENDING entries. APPLIED stays ten.
   // QF-MVP-50.7 RE-PIN: 2 -> 3 SOURCE-PENDING entries. APPLIED stays ten.
-  manifest.pendingPostAnchorMigrations.length === 5 &&
+  manifest.pendingPostAnchorMigrations.length === 7 &&
   manifest.stagingAppliedPostAnchorMigrations.length === 2 &&
   manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
   manifest.pendingPostAnchorMigrations[2].version === "20260906000000" &&
+  manifest.pendingPostAnchorMigrations[3].version === "20260911000000" &&
+  manifest.pendingPostAnchorMigrations[4].version === "20260912000000" &&
+  manifest.pendingPostAnchorMigrations[5].version === "20260912040000" &&
+  manifest.pendingPostAnchorMigrations[6].version === "20260912050000" &&
+  manifest.pendingPostAnchorMigrations.every((r) => r.operationalStatus === "PENDING") &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   manifest.reconciledPostAnchorMigrations[0].version === "20260813000000" &&
   manifest.reconciledPostAnchorMigrations[0].operationalStatus === "APPLIED" &&
@@ -832,8 +839,8 @@ record("G05 no applied record fabricates an offline remote status, and only 50.5
   manifest.appliedPostAnchorMigrations.filter((r) => r.appliedByThisPhase === true).length === 1 &&
   manifest.evidence?.g1PerformsDatabaseAccess === false &&
   manifest.scope?.databaseMutationAuthorized === false);
-record("G06 G1 pins the exact count 99, not a lower bound",
-  /const MIGRATION_COUNT = 109;/.test(g1Source) &&
+record("G06 G1 pins the exact count 111, not a lower bound",
+  /const MIGRATION_COUNT = 111;/.test(g1Source) &&
   !/>=\s*9[0-9]|length\s*>=/.test(g1Source));
 record("G07 G1 pins both post-anchor identities, hashes, markers and histories literally",
   g1Source.includes('version: "20260804000000"') &&
@@ -854,10 +861,10 @@ record("G07 G1 pins both post-anchor identities, hashes, markers and histories l
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-record("G08 the local migration set is exactly 109 and the 50.2 wedge repair is still present in order",
+record("G08 the local migration set is exactly 111 and the 50.2 wedge repair is still present in order",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 109 &&
+    return files.length === 111 &&
       files.includes("20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql") &&
       files.includes("20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql") &&
       files.includes("20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql") &&
@@ -865,18 +872,20 @@ record("G08 the local migration set is exactly 109 and the 50.2 wedge repair is 
       files.includes("20260814000000_qf_mvp_40_marketing_consent_writer.sql") &&
       files.includes("20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql") &&
       files.includes("20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql") &&
-      files.at(-8) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
-      files.at(-7) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
-      files.at(-6) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
-      files.at(-5) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql" &&
-      files.at(-4) === "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql" &&
-      files.at(-3) === "20260910060000_qf_mvp_40_canary_quiesce_transition.sql" &&
-      files.at(-2) === "20260911000000_qf_launch_security_closeout.sql" &&
-      files.at(-1) === "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql";
+      files.at(-10) === "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql" &&
+      files.at(-9) === "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql" &&
+      files.at(-8) === "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql" &&
+      files.at(-7) === "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql" &&
+      files.at(-6) === "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql" &&
+      files.at(-5) === "20260910060000_qf_mvp_40_canary_quiesce_transition.sql" &&
+      files.at(-4) === "20260911000000_qf_launch_security_closeout.sql" &&
+      files.at(-3) === "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql" &&
+      files.at(-2) === "20260912040000_qf_aos_v2_intelligence.sql" &&
+      files.at(-1) === "20260912050000_qf_lead_generation_scope_lock.sql";
   })());
 record("G09 the 50.2D validator was re-pinned, not loosened",
-  /I05 the local migration count is exactly 109/.test(d2Source) &&
-  /exactly twenty-two migrations are newer than the anchor/.test(d2Source) &&
+  /I05 the local migration count is exactly 111/.test(d2Source) &&
+  /exactly twenty-four migrations are newer than the anchor/.test(d2Source) &&
   !/lengths*>=|>=s*9[0-9]/.test(d2Source) &&
   /claim_v1,complete_v1,execute_v1,recover_v1,reconcile_v1/.test(d2Source) &&
   /C05a the 50\.2A and 50\.2B candidates are byte-frozen/.test(d2Source));
@@ -902,7 +911,7 @@ for (const [label, re] of [
   ["stale/reclaim/lease recovery (50.5)", /reclaim|stale|lease|orphan|sweep\(/i],
   ["vendor workflow surface (50.3)", /vendor\.(lead_offer|response_reminder|onboarding_reminder|document_reminder|package_expiry|low_credit)/],
   ["campaign surface (50.4)", /campaign\.(execute_batch|execute_recipient)/],
-  ["credit / package / assignment mutation", /credit|package|assign(ment)?_/i],
+  ["credit / package / assignment mutation", /(?:insert|update|upsert|delete)\([^)]*(?:credit|package|assignment)|(?:credit_delta|remaining_credits|package_status)\s*[:=]/i],
   ["Jarvis", /jarvis|qf-jarvis/i],
 ]) {
   record(`Z-${label} absent from the 50.2E modules`, !re.test(newModuleCode));

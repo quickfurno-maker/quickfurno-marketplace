@@ -73,8 +73,9 @@ record("A02 it is explicitly transaction-wrapped, COMMIT after the verification 
   })());
 record("A03 it carries a fail-loud self-verification block",
   /do \$verify\$/.test(SQL) && (SQL.match(/raise exception/g) ?? []).length >= 15);
-record("A04 no historical migration was edited by this phase",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 109);
+record("A04 later forward migrations are allowed while the closeout migration remains pinned",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 111 &&
+  existsSync(path.join(ROOT, MIGRATION)));
 
 // ---------------------------------------------------------------------------
 // B. vendor_public_v — read only, contract unchanged
